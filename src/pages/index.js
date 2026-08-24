@@ -1,0 +1,7 @@
+export { default as ShopPage } from './ShopPage';
+export { default as LoginPage } from './LoginPage';
+export { default as SignUpPage } from './SignUpPage';
+export { default as OrderPage } from './OrderPage';
+export { default as GaragePage } from './GaragePage';
+export { default as WishlistPage } from './WishlistPage';
+export { default as AdminDashboard } from './AdminDashboard';

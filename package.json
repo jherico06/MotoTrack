@@ -1,0 +1,33 @@
+{
+  "name": "moto",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "expo start",
+    "tunnel": "expo start --tunnel",
+    "clear": "expo start -c",
+    "web": "expo start --web",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "mobile": "expo start --tunnel"
+  },
+  "dependencies": {
+    "@expo-google-fonts/poppins": "^0.4.1",
+    "@expo/metro-runtime": "~6.1.2",
+    "@expo/vector-icons": "^15.0.3",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@supabase/supabase-js": "^2.112.3",
+    "expo": "~54.0.36",
+    "expo-font": "~14.0.12",
+    "expo-image-picker": "~17.0.11",
+    "expo-status-bar": "~3.0.9",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-web": "^0.21.0"
+  },
+  "private": true,
+  "devDependencies": {
+    "@expo/ngrok": "^4.1.3"
+  }
+}
