@@ -9,20 +9,10 @@ export default function HeroBanner({ onSelectCategory, showToast }) {
 
   return (
     <View style={styles.heroBannerWrap}>
-      <View
-        style={[
-          styles.heroBannerCard,
-          isDesktop && styles.heroBannerCardDesktop,
-        ]}
-      >
+      <View style={[styles.heroBannerCard, isDesktop && styles.heroBannerCardDesktop]}>
         <View style={styles.heroBannerBgShape} />
         <View style={styles.heroBannerLeft}>
-          <Text
-            style={[
-              styles.heroBannerHeading,
-              isDesktop && styles.heroBannerHeadingDesktop,
-            ]}
-          >
+          <Text style={[styles.heroBannerHeading, isDesktop && styles.heroBannerHeadingDesktop]}>
             Upgrade Your Ride: Up to 30% OFF Pro Motorcycle Parts!
           </Text>
           <Text style={styles.heroBannerSub}>
@@ -44,13 +34,9 @@ export default function HeroBanner({ onSelectCategory, showToast }) {
         <View style={styles.heroBannerRight}>
           <Image
             source={{
-              uri:
-                'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
+              uri: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
             }}
-            style={[
-              styles.heroProductImg,
-              isDesktop && styles.heroProductImgDesktop,
-            ]}
+            style={[styles.heroProductImg, isDesktop && styles.heroProductImgDesktop]}
           />
         </View>
       </View>

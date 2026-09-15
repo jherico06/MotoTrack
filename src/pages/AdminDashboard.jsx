@@ -25,6 +25,8 @@ import { supabaseManager } from '../services/supabaseClient';
 import { CATEGORY_NAMES, ADMIN_IMAGE_PRESETS } from '../data/motorParts';
 import { BootstrapIcon } from '../components/common';
 import { pickImageFromFile } from '../utils/imagePickerHelper';
+import { systemSettingsService } from '../services/systemSettingsService';
+import NotificationsPage from './NotificationsPage';
 
 export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const { width: windowWidth } = useWindowDimensions();
@@ -134,6 +136,60 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     connected: false,
     message: 'Ready to test',
   });
+
+  // ─── SYSTEM SETTINGS STATE ───
+  const [systemSettings, setSystemSettings] = useState(() => systemSettingsService.getSettings());
+  const [setForm, setSetForm] = useState(() => ({ ...systemSettingsService.getSettings() }));
+  const [settingsActiveSubTab, setSettingsActiveSubTab] = useState('general'); // 'general' | 'operations' | 'garage' | 'maintenance'
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+
+  useEffect(() => {
+    const unsub = systemSettingsService.subscribe((updated) => {
+      setSystemSettings(updated);
+      setSetForm({ ...updated });
+    });
+    return () => unsub?.();
+  }, []);
+
+  const handleUpdateSettingField = (field, value) => {
+    setSetForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSaveSystemSettings = () => {
+    setIsSavingSettings(true);
+    const res = systemSettingsService.saveSettings(setForm);
+    setIsSavingSettings(false);
+    if (res.success) {
+      setSystemSettings(res.settings);
+      showToast('✓ System settings deployed successfully! ⚙️');
+    } else {
+      showToast('⚠️ Error saving settings: ' + res.error);
+    }
+  };
+
+  const handleResetSystemSettings = () => {
+    const proceed = () => {
+      const res = systemSettingsService.resetToDefaults();
+      if (res.success) {
+        setSetForm({ ...res.settings });
+        setSystemSettings(res.settings);
+        showToast('✓ Restored project factory presets! ⚙️');
+      }
+    };
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.confirm('Reset all system settings to project defaults?')) proceed();
+    } else {
+      Alert.alert('Reset Settings', 'Reset all system settings to project defaults?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reset Defaults', style: 'destructive', onPress: proceed },
+      ]);
+    }
+  };
+
+  const handleClearCache = () => {
+    systemSettingsService.clearSystemCache();
+    showToast('✓ Non-critical system caches cleared.');
+  };
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -714,6 +770,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     garage: '🛠️ Garage Services (PMS & Tuning)',
     users: '👥 User Accounts Management',
     supabase: '⚡ Supabase Database Settings',
+    notifications: '🔔 Notifications & Alerts Center',
+    settings: '⚙️ System & Platform Settings',
   };
 
   return (
@@ -905,6 +963,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </Text>
                 </TouchableOpacity>
 
+                {/* ─── SECTION 3: GARAGE & SERVICES ─── */}
+                <Text style={styles.navHeading}>Garage & Services</Text>
+
                 {/* 8. Garage */}
                 <TouchableOpacity
                   style={[styles.sidebarNavItem, activeNav === 'garage' && styles.sidebarNavItemActive]}
@@ -918,6 +979,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     Garage Services
                   </Text>
                 </TouchableOpacity>
+
+                {/* ─── SECTION 4: USER MANAGEMENT ─── */}
+                <Text style={styles.navHeading}>User Management</Text>
 
                 {/* 9. Users */}
                 <TouchableOpacity
@@ -933,7 +997,28 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </Text>
                 </TouchableOpacity>
 
-                {/* 10. Supabase DB */}
+                {/* ─── SECTION 5: SYSTEM & SETTINGS ─── */}
+                <Text style={styles.navHeading}>System & Settings</Text>
+
+                {/* 10. Notifications Center */}
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, activeNav === 'notifications' && styles.sidebarNavItemActive]}
+                  onPress={() => setActiveNav('notifications')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 22, alignItems: 'center' }}>
+                    <BootstrapIcon
+                      name="bell-fill"
+                      size={16}
+                      color={activeNav === 'notifications' ? '#FFFFFF' : '#64748B'}
+                    />
+                  </View>
+                  <Text style={[styles.sidebarNavLabel, activeNav === 'notifications' && styles.sidebarNavLabelActive]}>
+                    Notifications
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 11. Supabase DB */}
                 <TouchableOpacity
                   style={[styles.sidebarNavItem, activeNav === 'supabase' && styles.sidebarNavItemActive]}
                   onPress={() => setActiveNav('supabase')}
@@ -947,7 +1032,28 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </Text>
                 </TouchableOpacity>
 
-                {/* 11. Live Storefront Link */}
+                {/* 12. System Settings */}
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, activeNav === 'settings' && styles.sidebarNavItemActive]}
+                  onPress={() => setActiveNav('settings')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 22, alignItems: 'center' }}>
+                    <BootstrapIcon
+                      name="gear-fill"
+                      size={16}
+                      color={activeNav === 'settings' ? '#FFFFFF' : '#64748B'}
+                    />
+                  </View>
+                  <Text style={[styles.sidebarNavLabel, activeNav === 'settings' && styles.sidebarNavLabelActive]}>
+                    System Settings
+                  </Text>
+                </TouchableOpacity>
+
+                {/* ─── SECTION 6: QUICK LINKS ─── */}
+                <Text style={styles.navHeading}>Quick Links</Text>
+
+                {/* 13. Live Storefront Link */}
                 <TouchableOpacity style={styles.sidebarNavItem} onPress={onNavigateToStore} activeOpacity={0.8}>
                   <View style={{ width: 22, alignItems: 'center' }}>
                     <BootstrapIcon name="shop" size={16} color="#0C6258" />
@@ -1046,6 +1152,15 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <Text style={styles.addBtnPrimaryText}>{isDesktop ? 'Add Pitstop Package' : '+ Service'}</Text>
                 </TouchableOpacity>
               )}
+
+              <TouchableOpacity
+                style={styles.quickStoreBtn}
+                onPress={() => setActiveNav('notifications')}
+                activeOpacity={0.8}
+              >
+                <BootstrapIcon name="bell-fill" size={13} color="#0C6258" />
+                {isDesktop && <Text style={styles.quickStoreBtnText}>Notifications</Text>}
+              </TouchableOpacity>
 
               <TouchableOpacity style={styles.quickStoreBtn} onPress={onNavigateToStore}>
                 <BootstrapIcon name="box-arrow-up-right" size={12} color="#0C6258" />
@@ -2777,6 +2892,570 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </View>
               </View>
             )}
+
+            {/* ─── TAB 10: NOTIFICATIONS & ALERTS CENTER ─── */}
+            {activeNav === 'notifications' && (
+              <NotificationsPage
+                onNavigateToOrders={() => setActiveNav('orders')}
+                onNavigateToGarage={() => setActiveNav('garage')}
+                onNavigateToAdmin={() => setActiveNav('overview')}
+                onNavigateToShop={onNavigateToStore}
+              />
+            )}
+
+            {/* ─── TAB 11: SYSTEM & PLATFORM SETTINGS ─── */}
+            {activeNav === 'settings' && (
+              <View>
+                {/* Header Card with Actions */}
+                <View style={[styles.tableCard, { padding: 24, marginBottom: 20 }]}>
+                  <View
+                    style={{
+                      flexDirection: isDesktop ? 'row' : 'column',
+                      alignItems: isDesktop ? 'center' : 'flex-start',
+                      justifyContent: 'space-between',
+                      gap: 16,
+                      marginBottom: 16,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <View
+                        style={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 22,
+                          backgroundColor: '#E6F4F1',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <BootstrapIcon name="gear-fill" size={22} color="#0C6258" />
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 20, fontWeight: '900', color: '#0F172A' }}>
+                          System & Platform Settings
+                        </Text>
+                        <Text style={{ color: '#64748B', fontSize: 13, marginTop: 2 }}>
+                          Configure store identity, customer checkout rules, pitstop parameters, and system maintenance.
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+                      <TouchableOpacity
+                        style={[styles.addBtnPrimary, { backgroundColor: '#0C6258' }]}
+                        onPress={handleSaveSystemSettings}
+                        activeOpacity={0.85}
+                      >
+                        <BootstrapIcon name="check-lg" size={15} color="#FFFFFF" />
+                        <Text style={styles.addBtnPrimaryText}>
+                          {isSavingSettings ? 'Saving...' : 'Save Settings'}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.addBtnPrimary,
+                          {
+                            backgroundColor: '#F1F5F9',
+                            borderWidth: 1,
+                            borderColor: '#CBD5E1',
+                          },
+                        ]}
+                        onPress={handleResetSystemSettings}
+                        activeOpacity={0.85}
+                      >
+                        <BootstrapIcon name="arrow-counterclockwise" size={14} color="#475569" />
+                        <Text style={[styles.addBtnPrimaryText, { color: '#475569' }]}>
+                          Reset Defaults
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  {/* Navigation Subtabs */}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ flexDirection: 'row', gap: 8 }}
+                  >
+                    {[
+                      { id: 'general', label: 'Store Identity', icon: 'shop' },
+                      { id: 'operations', label: 'Fulfillment & Orders', icon: 'box-seam' },
+                      { id: 'garage', label: 'Pitstop Garage Rules', icon: 'tools' },
+                      { id: 'maintenance', label: 'Maintenance & Cache', icon: 'shield-check' },
+                    ].map((tab) => {
+                      const isActive = settingsActiveSubTab === tab.id;
+                      return (
+                        <TouchableOpacity
+                          key={tab.id}
+                          style={[
+                            styles.filterPill,
+                            isActive && styles.filterPillActive,
+                            { paddingHorizontal: 16, paddingVertical: 9, flexDirection: 'row', alignItems: 'center', gap: 7 },
+                          ]}
+                          onPress={() => setSettingsActiveSubTab(tab.id)}
+                          activeOpacity={0.8}
+                        >
+                          <BootstrapIcon
+                            name={tab.icon}
+                            size={14}
+                            color={isActive ? '#FFFFFF' : '#64748B'}
+                          />
+                          <Text
+                            style={[
+                              styles.filterPillText,
+                              isActive && styles.filterPillTextActive,
+                              { fontWeight: isActive ? '800' : '600' },
+                            ]}
+                          >
+                            {tab.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+
+                {/* Subtab 1: Store Identity */}
+                {settingsActiveSubTab === 'general' && (
+                  <View style={[styles.tableCard, { padding: 24 }]}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>
+                      Store Identity & Branding Details
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: '#64748B', marginBottom: 20 }}>
+                      Primary details displayed across customer invoices, storefront headers, and email communications.
+                    </Text>
+
+                    <Text style={styles.formLabel}>Official Store Name</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={setForm.storeName}
+                      onChangeText={(val) => handleUpdateSettingField('storeName', val)}
+                      placeholder="e.g. MotoTrack Performance & Pitstop Garage"
+                      placeholderTextColor="#94A3B8"
+                    />
+
+                    <Text style={styles.formLabel}>Store Tagline / Slogan</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={setForm.storeTagline}
+                      onChangeText={(val) => handleUpdateSettingField('storeTagline', val)}
+                      placeholder="e.g. Premier Performance Motorcycle Parts"
+                      placeholderTextColor="#94A3B8"
+                    />
+
+                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.formLabel}>Support Email Address</Text>
+                        <TextInput
+                          style={styles.formInput}
+                          value={setForm.contactEmail}
+                          onChangeText={(val) => handleUpdateSettingField('contactEmail', val)}
+                          placeholder="support@mototrack.ph"
+                          placeholderTextColor="#94A3B8"
+                          autoCapitalize="none"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.formLabel}>Hotline / Customer Contact Phone</Text>
+                        <TextInput
+                          style={styles.formInput}
+                          value={setForm.contactPhone}
+                          onChangeText={(val) => handleUpdateSettingField('contactPhone', val)}
+                          placeholder="+63 (02) 8876-5432"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+
+                    <Text style={styles.formLabel}>Store Location / Physical Hub Address</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={setForm.storeAddress}
+                      onChangeText={(val) => handleUpdateSettingField('storeAddress', val)}
+                      placeholder="108 Katipunan Ave, Quezon City, Metro Manila"
+                      placeholderTextColor="#94A3B8"
+                    />
+
+                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.formLabel}>Currency Symbol</Text>
+                        <TextInput
+                          style={styles.formInput}
+                          value={setForm.currencySymbol}
+                          onChangeText={(val) => handleUpdateSettingField('currencySymbol', val)}
+                          placeholder="₱"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.formLabel}>VAT / Sales Tax Rate (%)</Text>
+                        <TextInput
+                          style={styles.formInput}
+                          value={String(setForm.taxRate ?? 12)}
+                          onChangeText={(val) => handleUpdateSettingField('taxRate', Number(val) || 0)}
+                          placeholder="12"
+                          placeholderTextColor="#94A3B8"
+                          keyboardType="numeric"
+                        />
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Subtab 2: Fulfillment & Orders */}
+                {settingsActiveSubTab === 'operations' && (
+                  <View style={[styles.tableCard, { padding: 24 }]}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>
+                      Fulfillment & Operational Thresholds
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: '#64748B', marginBottom: 20 }}>
+                      Fine-tune order checkout validation limits, free shipping tiers, and inventory alert levels.
+                    </Text>
+
+                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.formLabel}>Free Shipping Qualification (₱)</Text>
+                        <TextInput
+                          style={styles.formInput}
+                          value={String(setForm.freeShippingThreshold ?? 3500)}
+                          onChangeText={(val) => handleUpdateSettingField('freeShippingThreshold', Number(val) || 0)}
+                          placeholder="3500"
+                          placeholderTextColor="#94A3B8"
+                          keyboardType="numeric"
+                        />
+                        <Text style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 3 }}>
+                          Orders exceeding this amount receive complimentary dispatch.
+                        </Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.formLabel}>Maximum Cash On Delivery Ceiling (₱)</Text>
+                        <TextInput
+                          style={styles.formInput}
+                          value={String(setForm.maxCodAmount ?? 50000)}
+                          onChangeText={(val) => handleUpdateSettingField('maxCodAmount', Number(val) || 0)}
+                          placeholder="50000"
+                          placeholderTextColor="#94A3B8"
+                          keyboardType="numeric"
+                        />
+                        <Text style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 3 }}>
+                          Transactions above this require digital pre-payment for fraud prevention.
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={{ marginTop: 14 }}>
+                      <Text style={styles.formLabel}>Low Stock Alert Threshold (Units)</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        value={String(setForm.lowStockThreshold ?? 5)}
+                        onChangeText={(val) => handleUpdateSettingField('lowStockThreshold', Number(val) || 1)}
+                        placeholder="5"
+                        placeholderTextColor="#94A3B8"
+                        keyboardType="numeric"
+                      />
+                      <Text style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 3 }}>
+                        SKUs with inventory counts at or below this value trigger priority low stock flags.
+                      </Text>
+                    </View>
+
+                    {/* Auto-verify COD Toggle */}
+                    <View
+                      style={{
+                        marginTop: 20,
+                        padding: 16,
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <View style={{ flex: 1, paddingRight: 16 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
+                          Auto-Verify COD Orders
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                          When enabled, incoming COD purchases skip manual admin vetting and transition straight to fulfillment.
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={{
+                          width: 48,
+                          height: 28,
+                          borderRadius: 14,
+                          backgroundColor: setForm.autoVerifyCodOrders ? '#0C6258' : '#CBD5E1',
+                          padding: 2,
+                          justifyContent: 'center',
+                        }}
+                        onPress={() => handleUpdateSettingField('autoVerifyCodOrders', !setForm.autoVerifyCodOrders)}
+                        activeOpacity={0.8}
+                      >
+                        <View
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 12,
+                            backgroundColor: '#FFFFFF',
+                            alignSelf: setForm.autoVerifyCodOrders ? 'flex-end' : 'flex-start',
+                          }}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {/* Subtab 3: Pitstop Garage Rules */}
+                {settingsActiveSubTab === 'garage' && (
+                  <View style={[styles.tableCard, { padding: 24 }]}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>
+                      Pitstop Bay & Service Booking Parameters
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: '#64748B', marginBottom: 20 }}>
+                      Manage service operating hours, daily booking capacity, and mechanic roster assignments.
+                    </Text>
+
+                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.formLabel}>Garage Opening Hours</Text>
+                        <TextInput
+                          style={styles.formInput}
+                          value={setForm.garageOpeningTime}
+                          onChangeText={(val) => handleUpdateSettingField('garageOpeningTime', val)}
+                          placeholder="08:00 AM"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.formLabel}>Garage Closing Hours</Text>
+                        <TextInput
+                          style={styles.formInput}
+                          value={setForm.garageClosingTime}
+                          onChangeText={(val) => handleUpdateSettingField('garageClosingTime', val)}
+                          placeholder="07:00 PM"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ marginTop: 14 }}>
+                      <Text style={styles.formLabel}>Maximum Daily Pitstop Appointments</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        value={String(setForm.maxDailyAppointments ?? 24)}
+                        onChangeText={(val) => handleUpdateSettingField('maxDailyAppointments', Number(val) || 1)}
+                        placeholder="24"
+                        placeholderTextColor="#94A3B8"
+                        keyboardType="numeric"
+                      />
+                      <Text style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 3 }}>
+                        Limits concurrent online booking requests per day to prevent garage bay overbooking.
+                      </Text>
+                    </View>
+
+                    {/* Weekend bookings toggle */}
+                    <View
+                      style={{
+                        marginTop: 20,
+                        padding: 16,
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <View style={{ flex: 1, paddingRight: 16 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
+                          Allow Weekend Appointments (Sat & Sun)
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                          Permit riders to reserve weekend tune-ups and express PMS slots.
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={{
+                          width: 48,
+                          height: 28,
+                          borderRadius: 14,
+                          backgroundColor: setForm.allowWeekendBookings ? '#0C6258' : '#CBD5E1',
+                          padding: 2,
+                          justifyContent: 'center',
+                        }}
+                        onPress={() => handleUpdateSettingField('allowWeekendBookings', !setForm.allowWeekendBookings)}
+                        activeOpacity={0.8}
+                      >
+                        <View
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 12,
+                            backgroundColor: '#FFFFFF',
+                            alignSelf: setForm.allowWeekendBookings ? 'flex-end' : 'flex-start',
+                          }}
+                        />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Auto-assign mechanic */}
+                    <View
+                      style={{
+                        marginTop: 14,
+                        padding: 16,
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <View style={{ flex: 1, paddingRight: 16 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
+                          Auto-Assign Certified Mechanic
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                          Automatically allocates the next available pit bay technician when walk-in or web bookings are placed.
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={{
+                          width: 48,
+                          height: 28,
+                          borderRadius: 14,
+                          backgroundColor: setForm.autoAssignMechanic ? '#0C6258' : '#CBD5E1',
+                          padding: 2,
+                          justifyContent: 'center',
+                        }}
+                        onPress={() => handleUpdateSettingField('autoAssignMechanic', !setForm.autoAssignMechanic)}
+                        activeOpacity={0.8}
+                      >
+                        <View
+                          style={{
+                            width: 24,
+                            height: 24,
+                            borderRadius: 12,
+                            backgroundColor: '#FFFFFF',
+                            alignSelf: setForm.autoAssignMechanic ? 'flex-end' : 'flex-start',
+                          }}
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {/* Subtab 4: Maintenance & Cache */}
+                {settingsActiveSubTab === 'maintenance' && (
+                  <View style={[styles.tableCard, { padding: 24 }]}>
+                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>
+                      System Maintenance & Diagnostics
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: '#64748B', marginBottom: 20 }}>
+                      Control live storefront maintenance banner and system temporary caches.
+                    </Text>
+
+                    {/* Maintenance mode toggle */}
+                    <View
+                      style={{
+                        padding: 18,
+                        backgroundColor: setForm.isMaintenanceMode ? '#FEF2F2' : '#F8FAFC',
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: setForm.isMaintenanceMode ? '#FECACA' : '#E2E8F0',
+                        marginBottom: 18,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <BootstrapIcon
+                            name="cone-striped"
+                            size={20}
+                            color={setForm.isMaintenanceMode ? '#DC2626' : '#64748B'}
+                          />
+                          <View>
+                            <Text style={{ fontSize: 14, fontWeight: '800', color: setForm.isMaintenanceMode ? '#DC2626' : '#0F172A' }}>
+                              Storefront Maintenance Mode
+                            </Text>
+                            <Text style={{ fontSize: 12, color: '#64748B' }}>
+                              Displays an advisory banner to customers while admin operations proceed.
+                            </Text>
+                          </View>
+                        </View>
+                        <TouchableOpacity
+                          style={{
+                            width: 48,
+                            height: 28,
+                            borderRadius: 14,
+                            backgroundColor: setForm.isMaintenanceMode ? '#DC2626' : '#CBD5E1',
+                            padding: 2,
+                            justifyContent: 'center',
+                          }}
+                          onPress={() => handleUpdateSettingField('isMaintenanceMode', !setForm.isMaintenanceMode)}
+                          activeOpacity={0.8}
+                        >
+                          <View
+                            style={{
+                              width: 24,
+                              height: 24,
+                              borderRadius: 12,
+                              backgroundColor: '#FFFFFF',
+                              alignSelf: setForm.isMaintenanceMode ? 'flex-end' : 'flex-start',
+                            }}
+                          />
+                        </TouchableOpacity>
+                      </View>
+
+                      {setForm.isMaintenanceMode && (
+                        <View style={{ marginTop: 10 }}>
+                          <Text style={styles.formLabel}>Maintenance Advisory Notice</Text>
+                          <TextInput
+                            style={[styles.formInput, { height: 70, textAlignVertical: 'top' }]}
+                            value={setForm.maintenanceMessage}
+                            onChangeText={(val) => handleUpdateSettingField('maintenanceMessage', val)}
+                            multiline
+                            placeholderTextColor="#94A3B8"
+                          />
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Cache & Diagnostics Utilities */}
+                    <View
+                      style={{
+                        padding: 18,
+                        backgroundColor: '#F8FAFC',
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                        gap: 12,
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
+                        Platform Health & Cache Operations
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#64748B' }}>
+                        Purge temporary local storage filters and UI state without impacting customer accounts, inventory, or orders.
+                      </Text>
+                      <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+                        <TouchableOpacity
+                          style={[styles.addBtnPrimary, { backgroundColor: '#475569' }]}
+                          onPress={handleClearCache}
+                          activeOpacity={0.85}
+                        >
+                          <BootstrapIcon name="trash3" size={14} color="#FFFFFF" />
+                          <Text style={styles.addBtnPrimaryText}>Clear System Temporary Caches</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
           </ScrollView>
         </View>
       </View>
@@ -3245,6 +3924,36 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Supabase DB</Text>
                   <Text style={{ fontSize: 11, color: '#64748B' }}>Cloud Database</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Notifications Center */}
+              <TouchableOpacity
+                style={[styles.mobileMoreCard, activeNav === 'notifications' && styles.mobileMoreCardActive]}
+                onPress={() => {
+                  setActiveNav('notifications');
+                  setIsMobileMoreOpen(false);
+                }}
+              >
+                <BootstrapIcon name="bell-fill" size={20} color={activeNav === 'notifications' ? '#0C6258' : '#475569'} />
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Notifications</Text>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>Alerts & Updates</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* System Settings */}
+              <TouchableOpacity
+                style={[styles.mobileMoreCard, activeNav === 'settings' && styles.mobileMoreCardActive]}
+                onPress={() => {
+                  setActiveNav('settings');
+                  setIsMobileMoreOpen(false);
+                }}
+              >
+                <BootstrapIcon name="gear-fill" size={20} color={activeNav === 'settings' ? '#0C6258' : '#475569'} />
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>System Settings</Text>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>Store rules & maintenance</Text>
                 </View>
               </TouchableOpacity>
 

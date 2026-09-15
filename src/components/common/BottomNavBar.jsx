@@ -1,30 +1,21 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-} from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
-import { useAuth } from '../../context/AuthContext';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { BootstrapIcon } from './BootstrapIcon';
 import { useWishlist } from '../../context/WishlistContext';
 
 export default function BottomNavBar({
   activeTab = 'Home',
   onTabChange = () => {},
   wishlistCount: propWishlistCount,
-  currentUser: propCurrentUser,
 }) {
-  const auth = useAuth();
   const wishlistCtx = useWishlist();
+  const count = propWishlistCount !== undefined ? propWishlistCount : wishlistCtx?.wishlistCount || 0;
 
-  const user = propCurrentUser !== undefined ? propCurrentUser : auth?.currentUser;
-  const count = propWishlistCount !== undefined ? propWishlistCount : (wishlistCtx?.wishlistCount || 0);
+  const isDashboard = activeTab === 'Dashboard' || activeTab === 'Profile';
 
   return (
     <View style={navStyles.bottomNavWrapper}>
-      {/* 1. Home */}
+      {/* 1. Home / Shop */}
       <TouchableOpacity
         style={navStyles.bottomNavItem}
         onPress={() => onTabChange('Home')}
@@ -38,19 +29,14 @@ export default function BottomNavBar({
         <BootstrapIcon
           name="house-door-fill"
           size={19}
-          color={activeTab === 'Home' ? '#0C6258' : '#64748b'}
+          color={activeTab === 'Home' ? '#0C6258' : '#64748B'}
         />
-        <Text
-          style={[
-            navStyles.bottomNavLabel,
-            activeTab === 'Home' && navStyles.bottomNavLabelActive,
-          ]}
-        >
-          Home
+        <Text style={[navStyles.bottomNavLabel, activeTab === 'Home' && navStyles.bottomNavLabelActive]}>
+          Shop
         </Text>
       </TouchableOpacity>
 
-      {/* 2. Garage (PMS & Customization Booking) */}
+      {/* 2. Garage (PMS & Service) */}
       <TouchableOpacity
         style={navStyles.bottomNavItem}
         onPress={() => onTabChange('Garage')}
@@ -61,79 +47,73 @@ export default function BottomNavBar({
         ) : (
           <View style={navStyles.bottomNavActiveDotHidden} />
         )}
-        <BootstrapIcon
-          name="tools"
-          size={18}
-          color={activeTab === 'Garage' ? '#0C6258' : '#64748b'}
-        />
-        <Text
-          style={[
-            navStyles.bottomNavLabel,
-            activeTab === 'Garage' && navStyles.bottomNavLabelActive,
-          ]}
-        >
+        <BootstrapIcon name="tools" size={18} color={activeTab === 'Garage' ? '#0C6258' : '#64748B'} />
+        <Text style={[navStyles.bottomNavLabel, activeTab === 'Garage' && navStyles.bottomNavLabelActive]}>
           Garage
         </Text>
       </TouchableOpacity>
 
-      {/* 3. Favorites / Wishlist */}
+      {/* 3. CENTER: Customer Dashboard (Prominent Elevated Button) */}
+      <TouchableOpacity
+        style={navStyles.centerNavItem}
+        onPress={() => onTabChange('Dashboard')}
+        activeOpacity={0.85}
+      >
+        <View style={[navStyles.centerNavButton, isDashboard && navStyles.centerNavButtonActive]}>
+          <BootstrapIcon name="speedometer2" size={22} color="#FFFFFF" />
+        </View>
+        <Text style={[navStyles.centerNavLabel, isDashboard && navStyles.centerNavLabelActive]}>
+          Dashboard
+        </Text>
+      </TouchableOpacity>
+
+      {/* 4. AI Customizer Studio */}
       <TouchableOpacity
         style={navStyles.bottomNavItem}
-        onPress={() => onTabChange('Favorites')}
+        onPress={() => onTabChange('Customize')}
         activeOpacity={0.75}
       >
-        {activeTab === 'Favorites' ? (
+        {activeTab === 'Customize' ? (
+          <View style={navStyles.bottomNavActiveDot} />
+        ) : (
+          <View style={navStyles.bottomNavActiveDotHidden} />
+        )}
+        <View style={{ position: 'relative' }}>
+          <BootstrapIcon name="magic" size={18} color={activeTab === 'Customize' ? '#0C6258' : '#64748B'} />
+          <View style={[navStyles.navBadge, { backgroundColor: '#0C6258', top: -6, right: -12 }]}>
+            <Text style={[navStyles.navBadgeText, { fontSize: 8 }]}>AI</Text>
+          </View>
+        </View>
+        <Text style={[navStyles.bottomNavLabel, activeTab === 'Customize' && navStyles.bottomNavLabelActive]}>
+          Customizer
+        </Text>
+      </TouchableOpacity>
+
+      {/* 5. Orders (replacing Saved/Favorites) */}
+      <TouchableOpacity
+        style={navStyles.bottomNavItem}
+        onPress={() => onTabChange('Orders')}
+        activeOpacity={0.75}
+      >
+        {activeTab === 'Orders' || activeTab === 'orders' ? (
           <View style={navStyles.bottomNavActiveDot} />
         ) : (
           <View style={navStyles.bottomNavActiveDotHidden} />
         )}
         <View style={{ position: 'relative' }}>
           <BootstrapIcon
-            name="heart-fill"
-            size={19}
-            color={activeTab === 'Favorites' ? '#0C6258' : '#64748b'}
+            name="box-seam-fill"
+            size={18}
+            color={activeTab === 'Orders' || activeTab === 'orders' ? '#0C6258' : '#64748B'}
           />
-          {count > 0 && (
-            <View style={navStyles.navBadge}>
-              <Text style={navStyles.navBadgeText}>
-                {count > 99 ? '99+' : count}
-              </Text>
-            </View>
-          )}
         </View>
         <Text
           style={[
             navStyles.bottomNavLabel,
-            activeTab === 'Favorites' && navStyles.bottomNavLabelActive,
+            (activeTab === 'Orders' || activeTab === 'orders') && navStyles.bottomNavLabelActive,
           ]}
         >
-          Favorites
-        </Text>
-      </TouchableOpacity>
-
-      {/* 4. Profile / Sign In */}
-      <TouchableOpacity
-        style={navStyles.bottomNavItem}
-        onPress={() => onTabChange('Profile')}
-        activeOpacity={0.75}
-      >
-        {activeTab === 'Profile' ? (
-          <View style={navStyles.bottomNavActiveDot} />
-        ) : (
-          <View style={navStyles.bottomNavActiveDotHidden} />
-        )}
-        <BootstrapIcon
-          name="person-fill"
-          size={19}
-          color={activeTab === 'Profile' ? '#0C6258' : '#64748b'}
-        />
-        <Text
-          style={[
-            navStyles.bottomNavLabel,
-            activeTab === 'Profile' && navStyles.bottomNavLabelActive,
-          ]}
-        >
-          {user ? 'Profile' : 'Sign In'}
+          Orders
         </Text>
       </TouchableOpacity>
     </View>
@@ -148,46 +128,88 @@ const navStyles = StyleSheet.create({
     right: 0,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    height: Platform.OS === 'ios' ? 76 : 64,
-    paddingBottom: Platform.OS === 'ios' ? 16 : 4,
+    borderTopColor: '#E2E8F0',
+    height: Platform.OS === 'ios' ? 78 : 68,
+    paddingBottom: Platform.OS === 'ios' ? 18 : 6,
+    paddingHorizontal: 8,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 16,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.09,
+    shadowRadius: 14,
+    elevation: 20,
     zIndex: 1000,
   },
   bottomNavItem: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: 64,
     height: '100%',
+    paddingTop: 4,
   },
   bottomNavActiveDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: '#0C6258',
     marginBottom: 3,
   },
   bottomNavActiveDotHidden: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: 'transparent',
     marginBottom: 3,
   },
   bottomNavLabel: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: '600',
     color: '#64748B',
-    marginTop: 2,
+    marginTop: 3,
+    letterSpacing: -0.2,
   },
   bottomNavLabelActive: {
+    color: '#0C6258',
+    fontWeight: '800',
+  },
+  centerNavItem: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -16,
+  },
+  centerNavButton: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#0F766E',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0C6258',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 8,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+  },
+  centerNavButtonActive: {
+    backgroundColor: '#0C6258',
+    shadowColor: '#047857',
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    transform: [{ scale: 1.05 }],
+  },
+  centerNavLabel: {
+    fontSize: 10.5,
+    fontWeight: '700',
+    color: '#0F766E',
+    marginTop: 2,
+    letterSpacing: -0.2,
+  },
+  centerNavLabelActive: {
     color: '#0C6258',
     fontWeight: '800',
   },
@@ -205,7 +227,7 @@ const navStyles = StyleSheet.create({
   },
   navBadgeText: {
     color: '#FFFFFF',
-    fontSize: 9.5,
+    fontSize: 9,
     fontWeight: '900',
   },
 });

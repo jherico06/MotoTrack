@@ -10,19 +10,14 @@ export default function FloatingCartBar({ onOpenCart }) {
 
   return (
     <View style={styles.floatingCartBarWrapper} pointerEvents="box-none">
-      <TouchableOpacity
-        style={styles.floatingCartBar}
-        onPress={onOpenCart}
-        activeOpacity={0.9}
-      >
+      <TouchableOpacity style={styles.floatingCartBar} onPress={onOpenCart} activeOpacity={0.9}>
         <View style={styles.floatingCartLeft}>
           <Text style={styles.floatingCartText}>View your cart</Text>
           <View style={styles.floatingCartQtyPill}>
             <Text style={styles.floatingCartQtyText}>{cartItemCount}x</Text>
           </View>
         </View>
-        <Text style={styles.floatingCartTotalText}>₱{cartTotal.toFixed(2)}
-        </Text>
+        <Text style={styles.floatingCartTotalText}>₱{cartTotal.toFixed(2)}</Text>
       </TouchableOpacity>
     </View>
   );

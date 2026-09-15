@@ -290,7 +290,7 @@ export const shopStyles = StyleSheet.create({
     fontWeight: '500',
   },
   heroShopBtn: {
-    backgroundColor: '#FACC15',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     paddingHorizontal: 18,
     paddingVertical: 9.5,
@@ -305,7 +305,7 @@ export const shopStyles = StyleSheet.create({
     elevation: 3,
   },
   heroShopBtnText: {
-    color: '#0F172A',
+    color: '#0C6258',
     fontWeight: '800',
     fontSize: 13,
   },

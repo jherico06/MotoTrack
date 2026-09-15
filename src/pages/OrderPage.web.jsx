@@ -9,7 +9,17 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { BootstrapIcon, ToastNotification, LiveOrderTrackingMapModal, BottomNavBar } from '../components';
+import {
+  BootstrapIcon,
+  ToastNotification,
+  LiveOrderTrackingMapModal,
+  BottomNavBar,
+  ProfileModal,
+  UserProfileDropdown,
+  UserProfileButton,
+  BrandLogo,
+} from '../components';
+import { orderWebStyles as oStyles } from '../styles/web/orderPage.web.styles';
 import { useAuth } from '../context/AuthContext';
 import { orderService } from '../services/orderService';
 import { useWishlist } from '../context/WishlistContext';
@@ -18,18 +28,24 @@ export default function OrderPageWeb({
   onNavigateToStore,
   onNavigateToWishlist,
   onNavigateToGarage,
+  onNavigateToCustomizer,
+  onNavigateToCustomize,
   onNavigateToLogin,
   onNavigateToProfile,
   onNavigateToAdmin,
+  onLogout,
 }) {
   const { width: windowWidth } = useWindowDimensions();
-  const { currentUser, setRedirectReason } = useAuth();
-  const { wishlistCount } = useWishlist ? useWishlist() : { wishlistCount: 0 };
+  const { currentUser, logout, setRedirectReason } = useAuth();
+  const { wishlistCount } = useWishlist();
 
   const [orders, setOrders] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
+  const [filterDateRange, setFilterDateRange] = useState('all'); // 'all' | 'today' | 'week' | 'month'
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isLiveMapOpen, setIsLiveMapOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
   const showToast = (msg) => {
@@ -37,34 +53,100 @@ export default function OrderPageWeb({
     setTimeout(() => setToastMessage(''), 3000);
   };
 
+  // Redirect guard: Customer orders belong exclusively in the Customer Dashboard
   useEffect(() => {
-    const list = orderService.getLocalOrders();
-    setOrders(list);
-    if (list.length > 0) {
-      setSelectedOrder(list[0]);
+    if (!currentUser) {
+      if (setRedirectReason) setRedirectReason('Please sign in to view your orders in your Customer Dashboard.');
+      if (onNavigateToLogin) onNavigateToLogin();
+    } else {
+      if (onNavigateToProfile) onNavigateToProfile('orders');
     }
+  }, [currentUser, onNavigateToLogin, onNavigateToProfile, setRedirectReason]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUserOrders = async () => {
+      if (!currentUser) {
+        setOrders([]);
+        setSelectedOrder(null);
+        return;
+      }
+      const list = await orderService.getUserOrders(
+        currentUser?.id || currentUser?.user_id,
+        currentUser?.customer_id,
+        currentUser?.name
+      );
+      if (isMounted) {
+        const userOrders = Array.isArray(list) ? list : [];
+        setOrders(userOrders);
+        setSelectedOrder(userOrders[0] || null);
+      }
+    };
+
+    loadUserOrders();
+
     const unsub = orderService.subscribe((updatedList) => {
-      setOrders(updatedList);
+      if (!isMounted || !Array.isArray(updatedList)) return;
+      if (!currentUser) {
+        setOrders([]);
+        setSelectedOrder(null);
+        return;
+      }
+      const userId = currentUser?.id || currentUser?.user_id;
+      const customerId = currentUser?.customer_id;
+      const userOrders = updatedList.filter((o) => {
+        const uMatch = Boolean(userId && (o.user_id === userId || o.customer_id === userId));
+        const cMatch = Boolean(customerId && (o.customer_id === customerId || o.user_id === customerId));
+        return uMatch || cMatch;
+      });
+      setOrders(userOrders);
       setSelectedOrder((curr) => {
-        if (!curr) return updatedList[0] || null;
-        return updatedList.find((o) => o.order_id === curr.order_id || o.id === curr.id) || updatedList[0] || null;
+        if (!curr) return userOrders[0] || null;
+        return (
+          userOrders.find((o) => o.order_id === curr.order_id || o.id === curr.id) || userOrders[0] || null
+        );
       });
     });
-    return () => unsub();
-  }, []);
+
+    return () => {
+      isMounted = false;
+      unsub();
+    };
+  }, [currentUser]);
 
   const filteredOrders = orders.filter((o) => {
     const st = (o.status || 'Pending Approval').toLowerCase();
-    if (filterStatus === 'all') return true;
-    if (filterStatus === 'pending') return st.includes('pending') || st.includes('approval');
-    if (filterStatus === 'active') return st === 'processing' || st === 'shipped' || st === 'in transit';
-    if (filterStatus === 'delivered') return st === 'delivered';
-    if (filterStatus === 'cancelled') return st === 'cancelled';
+    let statusMatch = true;
+    if (filterStatus === 'pending') statusMatch = st.includes('pending') || st.includes('approval');
+    else if (filterStatus === 'active')
+      statusMatch = st === 'processing' || st === 'shipped' || st === 'in transit';
+    else if (filterStatus === 'delivered') statusMatch = st === 'delivered';
+    else if (filterStatus === 'cancelled') statusMatch = st === 'cancelled';
+    if (!statusMatch) return false;
+
+    if (filterDateRange !== 'all') {
+      const orderTime = new Date(o.created_at || Date.now()).getTime();
+      const now = Date.now();
+      const oneDay = 24 * 60 * 60 * 1000;
+      if (filterDateRange === 'today') {
+        const isToday = now - orderTime <= oneDay || (o.order_date || '').toLowerCase().includes('today');
+        if (!isToday) return false;
+      } else if (filterDateRange === 'week') {
+        if (now - orderTime > 7 * oneDay) return false;
+      } else if (filterDateRange === 'month') {
+        if (now - orderTime > 30 * oneDay) return false;
+      }
+    }
     return true;
   });
 
   const totalSpent = orders.reduce((sum, o) => sum + (o.grand_total || o.total_amount || 0), 0);
-  const pendingCount = orders.filter((o) => (o.status || '').toLowerCase().includes('pending') || (o.status || '').toLowerCase().includes('approval')).length;
+  const pendingCount = orders.filter(
+    (o) =>
+      (o.status || '').toLowerCase().includes('pending') ||
+      (o.status || '').toLowerCase().includes('approval')
+  ).length;
 
   return (
     <View style={oStyles.container}>
@@ -79,13 +161,7 @@ export default function OrderPageWeb({
             onPress={() => onNavigateToStore?.()}
             activeOpacity={0.8}
           >
-            <View style={oStyles.logoIconBadge}>
-              <BootstrapIcon name="speedometer2" size={20} color="#FFFFFF" />
-            </View>
-            <Text style={oStyles.logoText}>
-              Moto<Text style={{ color: '#0C6258' }}>Track</Text>
-              <Text style={{ fontSize: 11, color: '#64748B' }}> ORDER PORTAL</Text>
-            </Text>
+            <BrandLogo size={40} />
           </TouchableOpacity>
 
           <View style={oStyles.headerNavLinks}>
@@ -107,27 +183,53 @@ export default function OrderPageWeb({
               <Text style={oStyles.navLinkBtnText}>Pitstop & Garage</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[oStyles.navLinkBtn, { backgroundColor: '#F3F7F6', borderWidth: 1, borderColor: '#D1ECE6', paddingHorizontal: 12, borderRadius: 10 }]}
-              onPress={() => onNavigateToAdmin?.()}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name="shield-lock-fill" size={13} color="#0C6258" />
-              <Text style={[oStyles.navLinkBtnText, { color: '#0C6258', fontWeight: '800' }]}>Admin</Text>
-            </TouchableOpacity>
-
-            {currentUser ? (
+            {currentUser?.role === 'admin' && (
               <TouchableOpacity
-                style={oStyles.userPill}
-                onPress={() => onNavigateToProfile?.()}
+                style={[
+                  oStyles.navLinkBtn,
+                  {
+                    backgroundColor: '#F3F7F6',
+                    borderWidth: 1,
+                    borderColor: '#D1ECE6',
+                    paddingHorizontal: 12,
+                    borderRadius: 10,
+                  },
+                ]}
+                onPress={() => onNavigateToAdmin?.()}
                 activeOpacity={0.8}
               >
-                <Image
-                  source={{ uri: currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80' }}
-                  style={oStyles.userAvatar}
-                />
-                <Text style={oStyles.userNameText}>{currentUser.name}</Text>
+                <BootstrapIcon name="shield-lock-fill" size={13} color="#0C6258" />
+                <Text style={[oStyles.navLinkBtnText, { color: '#0C6258', fontWeight: '800' }]}>Admin</Text>
               </TouchableOpacity>
+            )}
+
+            {currentUser ? (
+              <View style={{ position: 'relative' }}>
+                <UserProfileButton
+                  currentUser={currentUser}
+                  onPress={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                  size={38}
+                />
+
+                <UserProfileDropdown
+                  currentUser={currentUser}
+                  isOpen={isUserDropdownOpen}
+                  onClose={() => setIsUserDropdownOpen(false)}
+                  onNavigateToDashboard={() => onNavigateToProfile?.('overview')}
+                  onNavigateToProfile={() => onNavigateToProfile?.('profile')}
+                  onNavigateToSettings={() => onNavigateToProfile?.('settings')}
+                  onNavigateToAdmin={() => onNavigateToAdmin?.()}
+                  onLogout={() => {
+                    if (onLogout) {
+                      onLogout();
+                    } else {
+                      logout?.();
+                      showToast?.('Logged out successfully');
+                      onNavigateToStore?.();
+                    }
+                  }}
+                />
+              </View>
             ) : (
               <TouchableOpacity
                 style={oStyles.signInBtn}
@@ -144,7 +246,6 @@ export default function OrderPageWeb({
       {/* ─── ORDERS CONTENT ─── */}
       <ScrollView contentContainerStyle={oStyles.scrollContent} showsVerticalScrollIndicator={true}>
         <View style={oStyles.maxContainer}>
-
           {/* Metrics Row */}
           <View style={oStyles.metricsRow}>
             <View style={oStyles.metricCard}>
@@ -173,7 +274,11 @@ export default function OrderPageWeb({
               </View>
               <View>
                 <Text style={oStyles.metricNum}>
-                  {orders.filter(o => o.status === 'Processing' || o.status === 'Shipped' || o.status === 'In Transit').length}
+                  {
+                    orders.filter(
+                      (o) => o.status === 'Processing' || o.status === 'Shipped' || o.status === 'In Transit'
+                    ).length
+                  }
                 </Text>
                 <Text style={oStyles.metricLabel}>Active Dispatches</Text>
               </View>
@@ -191,7 +296,7 @@ export default function OrderPageWeb({
           </View>
 
           {/* Filter Toolbar */}
-          <View style={oStyles.toolbar}>
+          <View style={[oStyles.toolbar, { flexDirection: 'column', alignItems: 'stretch', gap: 10 }]}>
             <View style={oStyles.tabButtons}>
               <TouchableOpacity
                 style={[oStyles.tabBtn, filterStatus === 'all' && oStyles.tabBtnActive]}
@@ -229,6 +334,39 @@ export default function OrderPageWeb({
                 </Text>
               </TouchableOpacity>
             </View>
+
+            {/* Date Range Filter Pills */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 4 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#64748B' }}>Date Range:</Text>
+              {[
+                { id: 'all', label: 'All Time' },
+                { id: 'today', label: 'Today' },
+                { id: 'week', label: 'Past 7 Days' },
+                { id: 'month', label: 'Past 30 Days' },
+              ].map((dr) => (
+                <TouchableOpacity
+                  key={dr.id}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 5,
+                    borderRadius: 20,
+                    backgroundColor: filterDateRange === dr.id ? '#0C6258' : '#F1F5F9',
+                  }}
+                  onPress={() => setFilterDateRange(dr.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11.5,
+                      fontWeight: '700',
+                      color: filterDateRange === dr.id ? '#FFFFFF' : '#475569',
+                    }}
+                  >
+                    {dr.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           {/* 2-Column Ledger & Details Layout */}
@@ -236,16 +374,20 @@ export default function OrderPageWeb({
             <View style={oStyles.emptyBox}>
               <BootstrapIcon name="receipt" size={36} color="#94A3B8" />
               <Text style={oStyles.emptyTitle}>No orders found in this category</Text>
-              <Text style={oStyles.emptySub}>When you complete a checkout in the shop, your delivery telemetry will appear here.</Text>
+              <Text style={oStyles.emptySub}>
+                When you complete a checkout in the shop, your delivery telemetry will appear here.
+              </Text>
             </View>
           ) : (
             <View style={oStyles.ledgerSplitLayout}>
-
               {/* Left Column: Order Cards List */}
               <View style={oStyles.orderListCol}>
                 {filteredOrders.map((order) => {
-                  const isSelected = selectedOrder?.order_id === order.order_id || selectedOrder?.id === order.id;
-                  const isPending = (order.status || '').toLowerCase().includes('pending') || (order.status || '').toLowerCase().includes('approval');
+                  const isSelected =
+                    selectedOrder?.order_id === order.order_id || selectedOrder?.id === order.id;
+                  const isPending =
+                    (order.status || '').toLowerCase().includes('pending') ||
+                    (order.status || '').toLowerCase().includes('approval');
                   const isDelivered = (order.status || '').toLowerCase() === 'delivered';
                   return (
                     <TouchableOpacity
@@ -259,14 +401,26 @@ export default function OrderPageWeb({
                           <Text style={oStyles.orderNumber}>ORDER #{order.order_id || order.id}</Text>
                           <Text style={oStyles.orderDate}>{order.order_date || 'Recent'}</Text>
                         </View>
-                        <View style={[
-                          oStyles.statusPill,
-                          isPending ? { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' } : isDelivered ? oStyles.statusDelivered : oStyles.statusProcessing
-                        ]}>
-                          <Text style={[
-                            oStyles.statusPillText,
-                            isPending ? { color: '#B45309' } : isDelivered ? oStyles.statusTextDelivered : oStyles.statusTextProcessing
-                          ]}>
+                        <View
+                          style={[
+                            oStyles.statusPill,
+                            isPending
+                              ? { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }
+                              : isDelivered
+                                ? oStyles.statusDelivered
+                                : oStyles.statusProcessing,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              oStyles.statusPillText,
+                              isPending
+                                ? { color: '#B45309' }
+                                : isDelivered
+                                  ? oStyles.statusTextDelivered
+                                  : oStyles.statusTextProcessing,
+                            ]}
+                          >
                             {isPending ? '⏳ Awaiting COD Approval' : order.status}
                           </Text>
                         </View>
@@ -277,7 +431,8 @@ export default function OrderPageWeb({
                       </Text>
 
                       <View style={oStyles.orderCardBottom}>
-                        <Text style={oStyles.orderTotalText}>₱{(order.grand_total || order.total_amount || 0).toFixed(2)}
+                        <Text style={oStyles.orderTotalText}>
+                          ₱{(order.grand_total || order.total_amount || 0).toFixed(2)}
                         </Text>
 
                         <TouchableOpacity
@@ -304,7 +459,9 @@ export default function OrderPageWeb({
                     <View style={oStyles.invoiceHeader}>
                       <View>
                         <Text style={oStyles.invoiceTitle}>Invoice Telemetry</Text>
-                        <Text style={oStyles.invoiceSub}>Tracking #{selectedOrder.tracking_number || 'MOTO-TRK-91823'}</Text>
+                        <Text style={oStyles.invoiceSub}>
+                          Tracking #{selectedOrder.tracking_number || 'MOTO-TRK-91823'}
+                        </Text>
                       </View>
                       <TouchableOpacity
                         style={oStyles.fullTrackBtn}
@@ -316,59 +473,147 @@ export default function OrderPageWeb({
                       </TouchableOpacity>
                     </View>
 
-                    {/* Delivery Timeline Block */}
-                    <View style={oStyles.timelineBlock}>
-                      <View style={oStyles.timelineStep}>
-                        <View style={oStyles.timelineDotActive} />
-                        <View>
-                          <Text style={oStyles.timelineStepTitle}>Order Confirmed & Dyno Inspected</Text>
-                          <Text style={oStyles.timelineStepSub}>Warehouse Circuit Makati</Text>
+                    {/* Dynamic Delivery Timeline Block */}
+                    {(() => {
+                      const timeline = orderService.getTrackingTimeline(selectedOrder);
+                      return (
+                        <View style={oStyles.timelineBlock}>
+                          <Text style={[oStyles.blockHeading, { marginBottom: 6 }]}>Delivery Milestones</Text>
+                          {timeline.map((step, idx) => (
+                            <View key={step.id || idx} style={oStyles.timelineStep}>
+                              <View
+                                style={[
+                                  oStyles.timelineDotActive,
+                                  step.isCancelled && { backgroundColor: '#DC2626' },
+                                  !step.completed && !step.current && oStyles.timelineDotPending,
+                                  step.current &&
+                                    !step.isCancelled && {
+                                      borderWidth: 2,
+                                      borderColor: '#0C6258',
+                                      backgroundColor: '#FFFFFF',
+                                    },
+                                ]}
+                              />
+                              <View style={{ flex: 1 }}>
+                                <View
+                                  style={{
+                                    flexDirection: 'row',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                  }}
+                                >
+                                  <Text
+                                    style={[
+                                      oStyles.timelineStepTitle,
+                                      step.isCancelled && { color: '#DC2626' },
+                                      !step.completed && !step.current && { color: '#94A3B8' },
+                                    ]}
+                                  >
+                                    {step.title}
+                                  </Text>
+                                  <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                                    {step.time && step.time !== '--'
+                                      ? `${step.date}, ${step.time}`
+                                      : step.date}
+                                  </Text>
+                                </View>
+                                <Text style={oStyles.timelineStepSub}>{step.description}</Text>
+                              </View>
+                            </View>
+                          ))}
                         </View>
+                      );
+                    })()}
+
+                    {/* Cancellation / Return Banner if applicable */}
+                    {selectedOrder.cancel_reason ? (
+                      <View
+                        style={{
+                          backgroundColor: '#FEF2F2',
+                          padding: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#FECACA',
+                          marginBottom: 14,
+                        }}
+                      >
+                        <Text
+                          style={{ fontSize: 12.5, fontWeight: '800', color: '#B91C1C', marginBottom: 2 }}
+                        >
+                          Cancellation Reason:
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#7F1D1D' }}>{selectedOrder.cancel_reason}</Text>
                       </View>
-                      <View style={oStyles.timelineStep}>
-                        <View style={oStyles.timelineDotActive} />
-                        <View>
-                          <Text style={oStyles.timelineStepTitle}>Handed to {selectedOrder.courier || 'MotoTrack SuperAir'}</Text>
-                          <Text style={oStyles.timelineStepSub}>Courier on track route</Text>
-                        </View>
+                    ) : null}
+
+                    {selectedOrder.return_status && selectedOrder.return_status !== 'none' ? (
+                      <View
+                        style={{
+                          backgroundColor: '#F0FDF4',
+                          padding: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#BBF7D0',
+                          marginBottom: 14,
+                        }}
+                      >
+                        <Text
+                          style={{ fontSize: 12.5, fontWeight: '800', color: '#166534', marginBottom: 2 }}
+                        >
+                          Return Status: {selectedOrder.return_status.toUpperCase()}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#14532D' }}>
+                          Reason: {selectedOrder.return_reason || 'N/A'}{' '}
+                          {selectedOrder.return_notes ? `(${selectedOrder.return_notes})` : ''}
+                        </Text>
                       </View>
-                      <View style={oStyles.timelineStep}>
-                        <View style={oStyles.timelineDotPending} />
-                        <View>
-                          <Text style={oStyles.timelineStepTitle}>Estimated Delivery</Text>
-                          <Text style={oStyles.timelineStepSub}>{selectedOrder.estimated_delivery || 'Today (30-45 mins)'}</Text>
-                        </View>
-                      </View>
-                    </View>
+                    ) : null}
 
                     {/* Customer & Address Details */}
                     <View style={oStyles.detailsBlock}>
                       <Text style={oStyles.blockHeading}>Recipient Details</Text>
                       <Text style={oStyles.detailLine}>
-                        <Text style={{ fontWeight: '800' }}>Name: </Text>{selectedOrder.customer_name || 'Rider'}
+                        <Text style={{ fontWeight: '800' }}>Name: </Text>
+                        {selectedOrder.customer_name || 'Rider'}
                       </Text>
                       <Text style={oStyles.detailLine}>
-                        <Text style={{ fontWeight: '800' }}>Contact: </Text>{selectedOrder.customer_phone || '+63 917 000 0000'}
+                        <Text style={{ fontWeight: '800' }}>Contact: </Text>
+                        {selectedOrder.customer_phone || '+63 917 000 0000'}
                       </Text>
                       <Text style={oStyles.detailLine}>
-                        <Text style={{ fontWeight: '800' }}>Address: </Text>{selectedOrder.customer_address || 'Delivery Address'}
+                        <Text style={{ fontWeight: '800' }}>Address: </Text>
+                        {selectedOrder.customer_address || 'Delivery Address'}
                       </Text>
                       <Text style={oStyles.detailLine}>
-                        <Text style={{ fontWeight: '800' }}>Payment: </Text>{selectedOrder.payment_method || 'GCash / COD'}
+                        <Text style={{ fontWeight: '800' }}>Payment: </Text>
+                        {selectedOrder.payment_method || 'GCash / COD'}
                       </Text>
                     </View>
 
                     {/* Items List */}
                     <View style={oStyles.itemsBlock}>
-                      <Text style={oStyles.blockHeading}>Ordered Items ({selectedOrder.items?.length || 1})</Text>
+                      <Text style={oStyles.blockHeading}>
+                        Ordered Items ({selectedOrder.items?.length || 1})
+                      </Text>
                       {selectedOrder.items?.map((item, idx) => (
                         <View key={idx} style={oStyles.itemRow}>
-                          <Image source={{ uri: item.image || 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=120&q=80' }} style={oStyles.itemThumb} />
+                          <Image
+                            source={{
+                              uri:
+                                item.image ||
+                                'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=120&q=80',
+                            }}
+                            style={oStyles.itemThumb}
+                          />
                           <View style={{ flex: 1 }}>
                             <Text style={oStyles.itemName}>{item.name}</Text>
-                            <Text style={oStyles.itemMeta}>Qty: {item.quantity} • ₱{(item.price || 0).toFixed(2)} each</Text>
+                            <Text style={oStyles.itemMeta}>
+                              Qty: {item.quantity} • ₱{(item.price || 0).toFixed(2)} each
+                            </Text>
                           </View>
-                          <Text style={oStyles.itemTotal}>₱{((item.price || 0) * (item.quantity || 1)).toFixed(2)}</Text>
+                          <Text style={oStyles.itemTotal}>
+                            ₱{((item.price || 0) * (item.quantity || 1)).toFixed(2)}
+                          </Text>
                         </View>
                       ))}
                     </View>
@@ -381,21 +626,22 @@ export default function OrderPageWeb({
                       </View>
                       <View style={oStyles.totalRow}>
                         <Text style={oStyles.totalLabel}>Discount</Text>
-                        <Text style={[oStyles.totalVal, { color: '#16A34A' }]}>-₱{(selectedOrder.discount_amount || 0).toFixed(2)}</Text>
+                        <Text style={[oStyles.totalVal, { color: '#16A34A' }]}>
+                          -₱{(selectedOrder.discount_amount || 0).toFixed(2)}
+                        </Text>
                       </View>
                       <View style={[oStyles.totalRow, oStyles.grandTotalRow]}>
                         <Text style={oStyles.grandTotalLabel}>Grand Total</Text>
-                        <Text style={oStyles.grandTotalVal}>₱{(selectedOrder.grand_total || selectedOrder.total_amount || 0).toFixed(2)}</Text>
+                        <Text style={oStyles.grandTotalVal}>
+                          ₱{(selectedOrder.grand_total || selectedOrder.total_amount || 0).toFixed(2)}
+                        </Text>
                       </View>
                     </View>
-
                   </View>
                 </View>
               )}
-
             </View>
           )}
-
         </View>
       </ScrollView>
 
@@ -407,25 +653,43 @@ export default function OrderPageWeb({
         showToast={showToast}
       />
 
+      {/* User Profile & Address Settings Modal */}
+      <ProfileModal
+        visible={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        onNavigateToOrders={() => setIsProfileModalOpen(false)}
+        onNavigateToWishlist={onNavigateToWishlist}
+        onNavigateToAdmin={onNavigateToAdmin}
+        showToast={showToast}
+      />
+
       {/* Persistent Mobile Bottom Navigation Bar on smaller screens */}
       {windowWidth < 768 && (
         <BottomNavBar
-          activeTab="Home"
+          activeTab="Orders"
           onTabChange={(tab) => {
             if (tab === 'Home') {
               onNavigateToStore?.();
+            } else if (tab === 'Customize') {
+              if (onNavigateToCustomizer) onNavigateToCustomizer();
+              else if (onNavigateToCustomize) onNavigateToCustomize();
+              else onNavigateToStore?.();
             } else if (tab === 'Garage') {
               onNavigateToGarage?.();
+            } else if (tab === 'Orders') {
+              // already on orders
             } else if (tab === 'Favorites') {
               onNavigateToWishlist?.();
             } else if (tab === 'Admin') {
-              onNavigateToAdmin?.();
+              if (currentUser?.role === 'admin') {
+                onNavigateToAdmin?.();
+              }
             } else if (tab === 'Profile') {
               if (!currentUser) {
                 setRedirectReason('');
                 onNavigateToLogin?.();
               } else {
-                onNavigateToProfile?.();
+                setIsProfileModalOpen(true);
               }
             }
           }}
@@ -436,445 +700,3 @@ export default function OrderPageWeb({
     </View>
   );
 }
-
-const oStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  headerWrapper: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    position: 'sticky',
-    top: 0,
-    zIndex: 1000,
-    boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)',
-  },
-  headerInner: {
-    maxWidth: 1360,
-    marginHorizontal: 'auto',
-    width: '100%',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  logoWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  logoIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#0C6258',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  headerNavLinks: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  navLinkBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-  },
-  navLinkBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  userPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingRight: 12,
-    paddingVertical: 4,
-    paddingLeft: 4,
-    borderRadius: 20,
-    backgroundColor: '#F3F7F6',
-    borderWidth: 1,
-    borderColor: '#D1ECE6',
-  },
-  userAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-  },
-  userNameText: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#042F2E',
-  },
-  signInBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 18,
-    backgroundColor: '#0F172A',
-  },
-  signInBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  scrollContent: {
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-  },
-  maxContainer: {
-    maxWidth: 1360,
-    marginHorizontal: 'auto',
-    width: '100%',
-  },
-  metricsRow: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 24,
-    flexWrap: 'wrap',
-  },
-  metricCard: {
-    flex: 1,
-    minWidth: 240,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  metricIconWrap: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#F3F7F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  metricNum: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  metricLabel: {
-    fontSize: 12.5,
-    color: '#64748B',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  toolbar: {
-    marginBottom: 20,
-  },
-  tabButtons: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  tabBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  tabBtnActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
-  },
-  tabBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  tabBtnTextActive: {
-    color: '#FFFFFF',
-  },
-  emptyBox: {
-    padding: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  emptyTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginTop: 12,
-  },
-  emptySub: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 4,
-  },
-  ledgerSplitLayout: {
-    flexDirection: 'row',
-    gap: 20,
-    alignItems: 'flex-start',
-  },
-  orderListCol: {
-    flex: 1.1,
-    gap: 12,
-  },
-  orderCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-  },
-  orderCardSelected: {
-    borderColor: '#0C6258',
-    backgroundColor: '#F8FAF9',
-  },
-  orderCardTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  orderNumber: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#0C6258',
-  },
-  orderDate: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  statusPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusProcessing: {
-    backgroundColor: '#F3F7F6',
-  },
-  statusTextProcessing: {
-    color: '#0C6258',
-    fontSize: 11.5,
-    fontWeight: '800',
-  },
-  statusDelivered: {
-    backgroundColor: '#DCFCE7',
-  },
-  statusTextDelivered: {
-    color: '#15803D',
-    fontSize: 11.5,
-    fontWeight: '800',
-  },
-  orderSummaryText: {
-    fontSize: 13.5,
-    color: '#334155',
-    lineHeight: 19,
-    marginVertical: 10,
-  },
-  orderCardBottom: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  orderTotalText: {
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  trackBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#F3F7F6',
-    borderWidth: 1,
-    borderColor: '#D1ECE6',
-  },
-  trackBtnText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#0C6258',
-  },
-  invoiceDrawerCol: {
-    flex: 1.2,
-  },
-  invoiceCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
-  },
-  invoiceHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    marginBottom: 16,
-  },
-  invoiceTitle: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  invoiceSub: {
-    fontSize: 12.5,
-    color: '#0C6258',
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  fullTrackBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#0C6258',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 14,
-  },
-  fullTrackBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12.5,
-    fontWeight: '800',
-  },
-  timelineBlock: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
-    marginBottom: 16,
-  },
-  timelineStep: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  timelineDotActive: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#0C6258',
-  },
-  timelineDotPending: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#94A3B8',
-  },
-  timelineStepTitle: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  timelineStepSub: {
-    fontSize: 11.5,
-    color: '#64748B',
-  },
-  detailsBlock: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    marginBottom: 14,
-    gap: 4,
-  },
-  blockHeading: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#0F172A',
-    marginBottom: 6,
-  },
-  detailLine: {
-    fontSize: 12.5,
-    color: '#475569',
-  },
-  itemsBlock: {
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    marginBottom: 14,
-    gap: 10,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  itemThumb: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-  },
-  itemName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  itemMeta: {
-    fontSize: 11.5,
-    color: '#64748B',
-  },
-  itemTotal: {
-    fontSize: 13.5,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  totalSummaryBlock: {
-    gap: 6,
-  },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalLabel: {
-    fontSize: 13,
-    color: '#64748B',
-  },
-  totalVal: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  grandTotalRow: {
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    marginTop: 4,
-  },
-  grandTotalLabel: {
-    fontSize: 15,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  grandTotalVal: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#0C6258',
-  },
-});

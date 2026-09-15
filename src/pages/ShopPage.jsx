@@ -1,11 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  SafeAreaView,
-  RefreshControl,
-} from 'react-native';
+import { View, Text, ScrollView, SafeAreaView, RefreshControl } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 // ─── STYLES & DATA ──────────────────────────────────────────────────────────
@@ -27,7 +21,7 @@ import {
   ToastNotification,
   MobileHeader,
   HeroBanner,
-  CategoryPills,
+  CategoryDropdown,
   FilterChips,
   ProductCard,
   FloatingCartBar,
@@ -37,12 +31,10 @@ import {
   ProfileModal,
   AccessDeniedModal,
   LiveOrderTrackingMapModal,
+  GCashPaymentModal,
 } from '../components';
 
-export default function ShopPage({
-  onNavigateToScreen,
-}) {
-
+export default function ShopPage({ onNavigateToScreen }) {
   // Contexts
   const { currentUser, setRedirectReason } = useAuth();
   const {
@@ -53,27 +45,30 @@ export default function ShopPage({
     cartItemCount,
     discountAmount,
     cartTotal,
+    appliedPromoId,
     toastMessage,
     showToast,
   } = useCart();
   const { wishlistCount } = useWishlist();
 
-  // Products & Filter state
+  // Local state
   const [productsList, setProductsList] = useState([]);
-  const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterSort, setFilterSort] = useState('all'); // 'all' | 'rating' | 'price-low' | 'price-high'
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [filterSort, setFilterSort] = useState('default');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Modal states
+  // Modals state
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isSpecsOpen, setIsSpecsOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAccessDeniedModalOpen, setIsAccessDeniedModalOpen] = useState(false);
-  const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
+  const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
+  const [isGcashModalOpen, setIsGcashModalOpen] = useState(false);
+  const [pendingGcashOrderData, setPendingGcashOrderData] = useState(null);
 
   // Load products from DB or fallback
   const refreshProducts = useCallback(async () => {
@@ -105,8 +100,7 @@ export default function ShopPage({
     const prods = Array.isArray(productsList) ? productsList : [];
     let list = prods.filter((item) => {
       const matchCategory =
-        selectedCategory === 'All' ||
-        item.category.toLowerCase() === selectedCategory.toLowerCase();
+        selectedCategory === 'All' || item.category.toLowerCase() === selectedCategory.toLowerCase();
       const query = searchQuery.toLowerCase().trim();
       const matchSearch =
         !query ||
@@ -152,6 +146,30 @@ export default function ShopPage({
 
   // Place order
   const handleCompleteOrder = async (orderFormData) => {
+    const { paymentMethod } = orderFormData;
+
+    // 1. If GCash is selected, launch GCash Interactive Test Gateway Portal
+    if (paymentMethod === 'GCash') {
+      setPendingGcashOrderData(orderFormData);
+      setIsCheckoutOpen(false);
+      setIsGcashModalOpen(true);
+      return;
+    }
+
+    // 2. Otherwise handle standard COD
+    await executeCreateOrder(orderFormData);
+  };
+
+  const handleGcashPaymentSuccess = async (paymentReceipt) => {
+    const orderData = {
+      ...pendingGcashOrderData,
+      gcashReference: paymentReceipt.referenceNumber,
+      paymentMethod: 'GCash',
+    };
+    await executeCreateOrder(orderData, 'Processing');
+  };
+
+  const executeCreateOrder = async (orderFormData, overrideStatus = null) => {
     const {
       customerName,
       customerPhone,
@@ -163,66 +181,39 @@ export default function ShopPage({
       codChangeFor,
     } = orderFormData;
 
-    const res = await databaseService.createOrder({
-      customerId: currentUser?.customer_id || null,
+    const isCOD =
+      (paymentMethod || '').toLowerCase().includes('cash') || (paymentMethod || '').includes('COD');
+
+    const res = await orderService.createOrder({
+      userId: currentUser?.user_id || currentUser?.id || null,
+      customerId: currentUser?.customer_id || currentUser?.user_id || currentUser?.id || null,
       customerName,
       customerPhone,
       customerAddress,
+      deliveryNotes,
       paymentMethod,
+      gcashNumber,
+      gcashReference,
+      codChangeFor,
+      promoId: appliedPromoId || null,
       total: cartSubtotal.toFixed(2),
       discountAmount: discountAmount.toFixed(2),
       grandTotal: cartTotal.toFixed(2),
-      itemsSummary: cart.map((i) => `${i.product.name} (x${i.quantity})`).join(', '),
-      itemsCount: cartItemCount,
       items: cart,
+      channel: 'Online Store',
+      overrideStatus,
     });
 
-    const isCOD = (paymentMethod || '').toLowerCase().includes('cash') || (paymentMethod || '').includes('COD');
-    const orderStatus = isCOD ? 'Pending Approval' : 'Processing';
-
-    const newOrder = {
-      order_id: res.order?.order_id || 'ord-' + Math.floor(10000 + Math.random() * 90000),
-      id: res.order?.order_id || 'ord-' + Math.floor(10000 + Math.random() * 90000),
-      customer_id: currentUser?.customer_id || 'cust-01',
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      customer_address: customerAddress,
-      delivery_notes: deliveryNotes,
-      payment_method: paymentMethod,
-      gcash_number: paymentMethod === 'GCash' ? gcashNumber : null,
-      gcash_reference: gcashReference,
-      cod_change_for: isCOD ? codChangeFor : null,
-      total_amount: Number(cartSubtotal.toFixed(2)),
-      discount_amount: Number(discountAmount.toFixed(2)),
-      grand_total: Number(cartTotal.toFixed(2)),
-      items_summary: cart.map((i) => `${i.product.name} (x${i.quantity})`).join(', '),
-      items_count: cartItemCount,
-      status: orderStatus,
-      created_at: new Date().toISOString(),
-      order_date: 'Today',
-      estimated_delivery: isCOD ? 'Today (Awaiting COD Verification)' : 'Today (30-45 mins Express Courier)',
-      tracking_number: 'MOTO-TRK-' + Math.floor(1000000 + Math.random() * 9000000),
-      courier: 'MotoTrack Express SuperAir',
-      items: cart.map((i) => ({
-        product_id: i.product.id,
-        name: i.product.name,
-        brand: i.product.brand || 'MotoTrack',
-        category: i.product.category || 'Gear',
-        quantity: i.quantity,
-        price: i.product.price,
-        image: i.product.image,
-      })),
-    };
-
-    // Save locally
-    const existing = orderService.getLocalOrders();
-    orderService.saveLocalOrders([newOrder, ...existing]);
-
+    const placedOrder = res.order;
     clearCart();
     setIsCheckoutOpen(false);
-    setSelectedOrderForTracking(newOrder);
+    setSelectedOrderForTracking(placedOrder);
     setIsLiveTrackingOpen(true);
-    showToast(isCOD ? '🎉 COD Order placed! Awaiting Store Admin verification.' : '🎉 Order placed successfully! Live tracking active.');
+    showToast(
+      isCOD
+        ? '🎉 COD Order placed! Awaiting Store Admin verification.'
+        : '🎉 GCash Payment Confirmed! Live order tracking active.'
+    );
   };
 
   return (
@@ -268,24 +259,32 @@ export default function ShopPage({
               setRedirectReason('');
               onNavigateToScreen?.('login');
             }}
+            onNavigateToNotifications={() => onNavigateToScreen?.('notifications')}
             onNavigateToWishlist={() => onNavigateToScreen?.('wishlist')}
-            onNavigateToAdmin={() => onNavigateToScreen?.('admin')}
+            onNavigateToAdmin={() => {
+              if (currentUser?.role === 'admin') {
+                onNavigateToScreen?.('admin');
+              } else {
+                setIsAccessDeniedModalOpen(true);
+              }
+            }}
           />
 
-          {/* Category Horizontal Pills */}
-          <CategoryPills
+          {/* Category Dropdown */}
+          <CategoryDropdown
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
+            productsList={productsList}
           />
 
           {/* Hero Promo Banner */}
-          <HeroBanner
-            onSelectCategory={(cat) => setSelectedCategory(cat)}
-            showToast={showToast}
-          />
+          <HeroBanner onSelectCategory={(cat) => setSelectedCategory(cat)} showToast={showToast} />
 
-          {/* Filter Chips Row */}
+          {/* Filter Chips Row with Category Dropdown */}
           <FilterChips
+            selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
+            productsList={productsList}
             filterSort={filterSort}
             onSetFilterSort={setFilterSort}
             onResetFilters={() => {
@@ -299,9 +298,7 @@ export default function ShopPage({
           {/* Section Title */}
           <View style={styles.sectionHeaderRow}>
             <Text style={styles.sectionTitle}>Featured Products</Text>
-            <Text style={styles.sectionCount}>
-              {filteredProducts.length} items available
-            </Text>
+            <Text style={styles.sectionCount}>{filteredProducts.length} items available</Text>
           </View>
 
           {/* Multi-Column Product Grid */}
@@ -331,18 +328,26 @@ export default function ShopPage({
           if (tab === 'Home') {
             setSelectedCategory('All');
             setSearchQuery('');
+          } else if (tab === 'Customize') {
+            onNavigateToScreen?.('customizer');
           } else if (tab === 'Garage') {
             onNavigateToScreen?.('garage');
+          } else if (tab === 'Orders') {
+            onNavigateToScreen?.('orders');
           } else if (tab === 'Favorites') {
             onNavigateToScreen?.('wishlist');
           } else if (tab === 'Admin') {
-            onNavigateToScreen?.('admin');
-          } else if (tab === 'Profile') {
+            if (currentUser?.role === 'admin') {
+              onNavigateToScreen?.('admin');
+            } else {
+              setIsAccessDeniedModalOpen(true);
+            }
+          } else if (tab === 'Dashboard' || tab === 'Profile') {
             if (!currentUser) {
-              setRedirectReason('');
+              setRedirectReason?.('Please sign in to access your Customer Dashboard.');
               onNavigateToScreen?.('login');
             } else {
-              setIsProfileOpen(true);
+              onNavigateToScreen?.('profile');
             }
           }
         }}
@@ -356,6 +361,7 @@ export default function ShopPage({
         product={selectedProduct}
         onClose={() => setIsSpecsOpen(false)}
         onAddToCart={handleAddToCartAttempt}
+        onCustomizeWithPart={(prod) => onNavigateToScreen?.('customizer', { product: prod })}
       />
 
       <CartModal
@@ -368,14 +374,25 @@ export default function ShopPage({
         visible={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         onCompleteOrder={handleCompleteOrder}
+        onOpenProfile={() => {
+          setIsCheckoutOpen(false);
+          setIsProfileOpen(true);
+        }}
       />
 
       <ProfileModal
         visible={isProfileOpen}
         onClose={() => setIsProfileOpen(false)}
-        onNavigateToOrders={() => onNavigateToScreen?.('orders')}
+        onNavigateToOrders={() => onNavigateToScreen?.('profile', { tab: 'orders' })}
         onNavigateToWishlist={() => onNavigateToScreen?.('wishlist')}
-        onNavigateToAdmin={() => onNavigateToScreen?.('admin')}
+        onNavigateToAdmin={() => {
+          if (currentUser?.role === 'admin') {
+            onNavigateToScreen?.('admin');
+          } else {
+            setIsAccessDeniedModalOpen(true);
+          }
+        }}
+        showToast={showToast}
       />
 
       <AccessDeniedModal
@@ -385,12 +402,22 @@ export default function ShopPage({
           setRedirectReason('Please sign in with your Store Administrator account.');
           onNavigateToScreen?.('login');
         }}
+        onNavigateToAdmin={() => onNavigateToScreen?.('admin')}
       />
 
       <LiveOrderTrackingMapModal
         visible={isLiveTrackingOpen}
         order={selectedOrderForTracking}
         onClose={() => setIsLiveTrackingOpen(false)}
+        showToast={showToast}
+      />
+
+      <GCashPaymentModal
+        visible={isGcashModalOpen}
+        amount={cartTotal}
+        orderData={pendingGcashOrderData}
+        onClose={() => setIsGcashModalOpen(false)}
+        onPaymentSuccess={handleGcashPaymentSuccess}
         showToast={showToast}
       />
     </SafeAreaView>

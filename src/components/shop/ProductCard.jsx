@@ -4,11 +4,7 @@ import BootstrapIcon from '../common/BootstrapIcon';
 import { shopStyles as styles } from '../../styles/shop.styles';
 import { useWishlist } from '../../context/WishlistContext';
 
-export default function ProductCard({
-  product,
-  onPress,
-  onAddToCart,
-}) {
+export default function ProductCard({ product, onPress, onAddToCart }) {
   const { width } = useWindowDimensions();
   const isTablet = width >= 700 && width < 1024;
   const isDesktop = width >= 1024;
@@ -28,10 +24,7 @@ export default function ProductCard({
     >
       {/* Product Image & Badges */}
       <View style={styles.productImageContainer}>
-        <Image
-          source={{ uri: product.image }}
-          style={styles.productImg}
-        />
+        <Image source={{ uri: product.image }} style={styles.productImg} />
 
         {/* Wishlist Heart Button */}
         <TouchableOpacity
@@ -51,25 +44,16 @@ export default function ProductCard({
 
         {/* Royal Blue Price Badge */}
         <View style={styles.priceBadgePill}>
-          <Text style={styles.priceBadgeText}>₱{product.price?.toFixed(2)}
-          </Text>
+          <Text style={styles.priceBadgeText}>₱{product.price?.toFixed(2)}</Text>
         </View>
       </View>
 
       {/* Product Details */}
       <View style={styles.productCardDetails}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 }}>
-          <BootstrapIcon
-            name="box-seam"
-            size={11}
-            color={product.stock <= 5 ? '#ef4444' : '#64748b'}
-          />
+          <BootstrapIcon name="box-seam" size={11} color={product.stock <= 5 ? '#ef4444' : '#64748b'} />
           <Text
-            style={[
-              styles.stockCountText,
-              product.stock <= 5 && styles.stockLowText,
-              { marginBottom: 0 },
-            ]}
+            style={[styles.stockCountText, product.stock <= 5 && styles.stockLowText, { marginBottom: 0 }]}
           >
             {product.stock} Stocks Left
           </Text>
@@ -77,12 +61,8 @@ export default function ProductCard({
 
         <View style={styles.ratingReviewRow}>
           <BootstrapIcon name="star-fill" size={11} color="#f59e0b" />
-          <Text style={styles.ratingStarText}>
-            {product.rating?.toFixed(1) || '5.0'}
-          </Text>
-          <Text style={styles.ratingCountText}>
-            ({product.reviews || 0})
-          </Text>
+          <Text style={styles.ratingStarText}>{product.rating?.toFixed(1) || '5.0'}</Text>
+          <Text style={styles.ratingCountText}>({product.reviews || 0})</Text>
         </View>
 
         <Text style={styles.productTitle} numberOfLines={2}>
@@ -109,9 +89,7 @@ export default function ProductCard({
           }}
         >
           <BootstrapIcon name="bag-plus-fill" size={13} color="#0C6258" />
-          <Text style={{ color: '#0C6258', fontSize: 12, fontWeight: '800' }}>
-            Add to Bag
-          </Text>
+          <Text style={{ color: '#0C6258', fontSize: 12, fontWeight: '800' }}>Add to Bag</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

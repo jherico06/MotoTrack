@@ -1,38 +1,34 @@
 // ─── SUPABASE FULL ER DATABASE SERVICE ──────────────────────────────────────
 import { supabase } from './supabaseClient';
+import { orderService } from './orderService';
+import { supplierService } from './supplierService';
 
 export const databaseService = {
   // ─── 1. SUPPLIERS ───
   async getSuppliers() {
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('suppliers')
-          .select('*')
-          .order('name', { ascending: true });
-        if (!error && data && data.length > 0) return data;
-      } catch (e) {
-        console.warn('Failed to fetch suppliers from Supabase:', e);
-      }
+    try {
+      const data = await supplierService.fetchSuppliers();
+      return data || [];
+    } catch (e) {
+      console.warn('Failed to fetch suppliers from database:', e);
+      return [];
     }
-    return [
-      { supplier_id: 'sup-01', name: 'Akrapovič Racing Exhausts', contact_person: 'Igor Akrapovič', phone: '+386 1 7878 000', address: 'Ivančna Gorica, Slovenia' },
-      { supplier_id: 'sup-02', name: 'Brembo High Performance SpA', contact_person: 'Matteo Rossi', phone: '+39 035 605 111', address: 'Curno, Bergamo, Italy' },
-      { supplier_id: 'sup-03', name: 'Öhlins Racing AB', contact_person: 'Kenth Öhlin', phone: '+46 8 5979 6300', address: 'Upplands Väsby, Sweden' },
-      { supplier_id: 'sup-04', name: 'D.I.D Daido Kogyo Co.', contact_person: 'Kenji Takahashi', phone: '+81 761 74 1211', address: 'Ishikawa, Japan' },
-      { supplier_id: 'sup-05', name: 'Dynojet Research Inc.', contact_person: 'Robert Miller', phone: '+1 (800) 992-4993', address: 'Las Vegas, NV, USA' },
-    ];
   },
 
-  async addSupplier({ name, contact_person = '', phone = '', address = '' }) {
-    const id = 'sup-' + Date.now();
-    const newSupplier = { supplier_id: id, name, contact_person, phone, address };
-    if (supabase) {
-      try {
-        await supabase.from('suppliers').insert([newSupplier]);
-      } catch (e) {}
+  async addSupplier({ name, contact_person = '', phone = '', address = '', ...rest }) {
+    try {
+      const res = await supplierService.addSupplier({
+        name,
+        contact_person,
+        phone,
+        address,
+        ...rest,
+      });
+      return res?.supplier || null;
+    } catch (e) {
+      console.warn('Failed to add supplier to database:', e);
+      return null;
     }
-    return newSupplier;
   },
 
   // ─── 2. CATEGORIES ───
@@ -49,14 +45,61 @@ export const databaseService = {
       }
     }
     return [
-      { category_id: 'cat-01', name: 'Exhaust', description: 'Titanium & Carbon fiber high-performance exhaust systems' },
-      { category_id: 'cat-02', name: 'Brakes', description: 'Monobloc calipers, floating rotors and sintered racing pads' },
-      { category_id: 'cat-03', name: 'Suspension', description: 'Inverted racing forks, monoshocks and steering dampers' },
-      { category_id: 'cat-04', name: 'Engine', description: 'ECU tuners, high-flow filters, camshafts and spark plugs' },
-      { category_id: 'cat-05', name: 'Drivetrain', description: 'Gold X-ring chains, sprockets and slipper clutches' },
-      { category_id: 'cat-06', name: 'Helmets', description: 'FIM & ECE certified full carbon fiber track helmets' },
-      { category_id: 'cat-07', name: 'Tires', description: 'WSBK compound superbike and sport tires' },
-      { category_id: 'cat-08', name: 'Accessories', description: 'Billet CNC rearsets, aero winglets and levers' },
+      {
+        category_id: 'cat-01',
+        name: 'Engine',
+        description: 'Camshafts, big bore kits, pistons and high-performance engine parts',
+      },
+      {
+        category_id: 'cat-02',
+        name: 'Electrical',
+        description: 'Lithium batteries, iridium spark plugs, stators and electronics',
+      },
+      {
+        category_id: 'cat-03',
+        name: 'Tires & Wheels',
+        description: 'WSBK compound racing tires and forged lightweight wheels',
+      },
+      {
+        category_id: 'cat-04',
+        name: 'Brakes',
+        description: 'Radial master cylinders, monobloc calipers, racing pads and rotors',
+      },
+      {
+        category_id: 'cat-05',
+        name: 'Suspension',
+        description: 'Monoshock dampers, cartridge kits, steering dampers and springs',
+      },
+      {
+        category_id: 'cat-06',
+        name: 'Transmission',
+        description: 'Gold racing chains, sprockets, slipper clutches and quickshifters',
+      },
+      {
+        category_id: 'cat-07',
+        name: 'Fuel System',
+        description: 'ECU tuners, flat-slide carburetors, fuel pumps and injectors',
+      },
+      {
+        category_id: 'cat-08',
+        name: 'Body Parts',
+        description: 'Full carbon fiber fairings, CNC billet rearsets and aero winglets',
+      },
+      {
+        category_id: 'cat-09',
+        name: 'Exhaust',
+        description: 'Titanium & Carbon fiber slip-on and full racing exhaust systems',
+      },
+      {
+        category_id: 'cat-10',
+        name: 'Maintenance',
+        description: '100% synthetic racing oils, high-flow filters, fluids and care',
+      },
+      {
+        category_id: 'cat-11',
+        name: 'Accessories',
+        description: 'FIM helmets, phone vibration mounts, luggage and gear',
+      },
     ];
   },
 
@@ -90,7 +133,10 @@ export const databaseService = {
   async updateStock(productId, stockQuantity) {
     if (supabase) {
       try {
-        await supabase.from('products').update({ stock: stockQuantity }).or(`product_id.eq.${productId},id.eq.${productId}`);
+        await supabase
+          .from('products')
+          .update({ stock: stockQuantity })
+          .or(`product_id.eq.${productId},id.eq.${productId}`);
         await supabase.from('inventory').upsert([
           {
             inventory_id: 'inv-' + productId,
@@ -118,10 +164,38 @@ export const databaseService = {
       }
     }
     return [
-      { service_id: 'srv-01', name: 'Dyno Tuning, Custom Fuel Mapping & ECU Flashing', category: 'Motor Tuning', price: 250.0, duration: '90 min', status: 'active' },
-      { service_id: 'srv-02', name: 'Full Suspension Sag & Track Setup Calibration', category: 'Chassis', price: 150.0, duration: '60 min', status: 'active' },
-      { service_id: 'srv-03', name: 'Race Caliper Overhaul & High-Temp Fluid Bleed', category: 'Braking', price: 120.0, duration: '45 min', status: 'active' },
-      { service_id: 'srv-04', name: '520 Chain Conversion & Sprocket Gearing Fitting', category: 'Drivetrain', price: 95.0, duration: '40 min', status: 'active' },
+      {
+        service_id: 'srv-01',
+        name: 'Dyno Tuning, Custom Fuel Mapping & ECU Flashing',
+        category: 'Motor Tuning',
+        price: 250.0,
+        duration: '90 min',
+        status: 'active',
+      },
+      {
+        service_id: 'srv-02',
+        name: 'Full Suspension Sag & Track Setup Calibration',
+        category: 'Chassis',
+        price: 150.0,
+        duration: '60 min',
+        status: 'active',
+      },
+      {
+        service_id: 'srv-03',
+        name: 'Race Caliper Overhaul & High-Temp Fluid Bleed',
+        category: 'Braking',
+        price: 120.0,
+        duration: '45 min',
+        status: 'active',
+      },
+      {
+        service_id: 'srv-04',
+        name: '520 Chain Conversion & Sprocket Gearing Fitting',
+        category: 'Drivetrain',
+        price: 95.0,
+        duration: '40 min',
+        status: 'active',
+      },
     ];
   },
 
@@ -167,121 +241,30 @@ export const databaseService = {
     return { success: true };
   },
 
-  // ─── 5. ORDERS & PAYMENTS & SALES ───
-  async getOrders() {
+  async deleteBooking(bookingId) {
     if (supabase) {
       try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('*')
-          .order('created_at', { ascending: false });
-        if (!error && data) return data;
-      } catch (e) {
-        console.warn('Failed to fetch orders from Supabase:', e);
-      }
+        await supabase.from('bookings').delete().eq('booking_id', bookingId);
+      } catch (e) {}
     }
-    return [];
+    return { success: true };
   },
 
-  async createOrder({
-    customerId = null,
-    customerName,
-    customerPhone,
-    customerAddress,
-    paymentMethod,
-    total,
-    discountAmount = 0,
-    grandTotal,
-    itemsSummary,
-    itemsCount,
-    items = [],
-  }) {
-    const orderId = 'ord-' + Date.now();
-    const isCOD = (paymentMethod || '').toLowerCase().includes('cash') || (paymentMethod || '').includes('COD');
-    const initialStatus = isCOD ? 'Pending Approval' : 'Processing';
+  // ─── 5. ORDERS & PAYMENTS & SALES (DELEGATED TO UNIFIED ORDER SERVICE) ───
+  async getOrders() {
+    return orderService.getAllOrders();
+  },
 
-    const newOrder = {
-      order_id: orderId,
-      customer_id: customerId,
-      customer_name: customerName,
-      customer_phone: customerPhone,
-      customer_address: customerAddress,
-      payment_method: paymentMethod,
-      total_amount: Number(total),
-      discount_amount: Number(discountAmount),
-      grand_total: Number(grandTotal || total),
-      items_summary: itemsSummary,
-      items_count: itemsCount,
-      status: initialStatus,
-    };
-
-    if (supabase) {
-      try {
-        await supabase.from('orders').insert([newOrder]);
-
-        // Create Payment record
-        const paymentId = 'pay-' + Date.now();
-        await supabase.from('payments').insert([
-          {
-            payment_id: paymentId,
-            order_id: orderId,
-            payment_method: paymentMethod,
-            amount: Number(grandTotal || total),
-            reference_number: isCOD ? 'COD-PENDING' : 'TXN-' + Math.floor(100000 + Math.random() * 900000),
-            status: isCOD ? 'Pending' : 'Completed',
-          },
-        ]);
-
-        // Create Sales record
-        const saleId = 'sale-' + Date.now();
-        await supabase.from('sales').insert([
-          {
-            sale_id: saleId,
-            customer_id: customerId,
-            payment_id: paymentId,
-            sale_type: 'Online',
-            total_amount: Number(grandTotal || total),
-            amount_paid: isCOD ? 0 : Number(grandTotal || total),
-            change: 0,
-          },
-        ]);
-
-        // Create Order Items
-        if (Array.isArray(items) && items.length > 0) {
-          const orderItemsPayload = items.map((it) => ({
-            order_item_id: 'oi-' + Math.floor(Math.random() * 1000000),
-            order_id: orderId,
-            product_id: it.product?.product_id || it.product?.id || it.product_id,
-            quantity: it.quantity || 1,
-            cost: Number(it.product?.price || 0),
-            subtotal: Number(it.product?.price || 0) * (it.quantity || 1),
-          }));
-          await supabase.from('order_items').insert(orderItemsPayload);
-        }
-      } catch (e) {
-        console.warn('Supabase order creation error:', e);
-      }
-    }
-
-    return { success: true, order: newOrder };
+  async createOrder(orderData) {
+    return orderService.createOrder(orderData);
   },
 
   async approveCODOrder(orderId) {
-    if (supabase) {
-      try {
-        await supabase.from('orders').update({ status: 'Processing' }).or(`order_id.eq.${orderId},id.eq.${orderId}`);
-      } catch (e) {}
-    }
-    return { success: true };
+    return orderService.approveCODOrder(orderId);
   },
 
   async updateOrderStatus(orderId, status) {
-    if (supabase) {
-      try {
-        await supabase.from('orders').update({ status }).or(`order_id.eq.${orderId},id.eq.${orderId}`);
-      } catch (e) {}
-    }
-    return { success: true };
+    return orderService.updateOrderStatus(orderId, status);
   },
 
   // ─── 6. SYSTEM SETTINGS ───
@@ -303,12 +286,22 @@ export const databaseService = {
   async getStats() {
     try {
       const [prodsRes, ordersRes, usersRes, promosRes, custsRes, srvRes] = await Promise.all([
-        supabase ? supabase.from('products').select('product_id, price, stock', { count: 'exact' }) : { data: [], count: 0 },
-        supabase ? supabase.from('orders').select('order_id, grand_total, status', { count: 'exact' }) : { data: [], count: 0 },
-        supabase ? supabase.from('users').select('user_id, role', { count: 'exact' }) : { data: [], count: 0 },
+        supabase
+          ? supabase.from('products').select('product_id, price, stock', { count: 'exact' })
+          : { data: [], count: 0 },
+        supabase
+          ? supabase.from('orders').select('order_id, grand_total, status', { count: 'exact' })
+          : { data: [], count: 0 },
+        supabase
+          ? supabase.from('users').select('user_id, role', { count: 'exact' })
+          : { data: [], count: 0 },
         supabase ? supabase.from('promos').select('promo_id', { count: 'exact' }) : { data: [], count: 0 },
-        supabase ? supabase.from('customers').select('customer_id', { count: 'exact' }) : { data: [], count: 0 },
-        supabase ? supabase.from('services').select('service_id', { count: 'exact' }) : { data: [], count: 0 },
+        supabase
+          ? supabase.from('customers').select('customer_id', { count: 'exact' })
+          : { data: [], count: 0 },
+        supabase
+          ? supabase.from('services').select('service_id', { count: 'exact' })
+          : { data: [], count: 0 },
       ]);
 
       const products = prodsRes.data || [];

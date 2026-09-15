@@ -24,14 +24,10 @@ function setupRealtimeSubscription() {
 
     realtimeChannel = client
       .channel('public:products_realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'products' },
-        async () => {
-          const fresh = await productService.getProducts();
-          notifyListeners(fresh);
-        }
-      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async () => {
+        const fresh = await productService.getProducts();
+        notifyListeners(fresh);
+      })
       .subscribe();
   } catch (e) {
     console.warn('Realtime subscription setup failed:', e);
@@ -81,15 +77,17 @@ export const productService = {
             type: item.type || 'newArrival',
             isNew: Boolean(item.is_new),
             discount: item.discount,
-            image: item.image || 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
+            image:
+              item.image ||
+              'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
             material: item.material || 'Aircraft Grade Alloy',
             weight: item.weight || '1.0 kg',
             description: item.description || '',
             features: Array.isArray(item.features)
               ? item.features
               : typeof item.features === 'string'
-              ? JSON.parse(item.features)
-              : [],
+                ? JSON.parse(item.features)
+                : [],
           }));
           appStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
           return normalized;
@@ -134,11 +132,15 @@ export const productService = {
       type: newProduct.type || 'newArrival',
       isNew: Boolean(newProduct.isNew ?? true),
       discount: newProduct.discount || '',
-      image: newProduct.image || 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
+      image:
+        newProduct.image ||
+        'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
       material: newProduct.material || 'CNC Aluminum / Titanium',
       weight: newProduct.weight || '1.2 kg',
       description: newProduct.description || 'High quality motorcycle upgrade part.',
-      features: Array.isArray(newProduct.features) ? newProduct.features : ['Direct OEM Fitment', 'Track Tested'],
+      features: Array.isArray(newProduct.features)
+        ? newProduct.features
+        : ['Direct OEM Fitment', 'Track Tested'],
     };
 
     try {
@@ -192,7 +194,8 @@ export const productService = {
         const payload = {};
         if (updates.name !== undefined) payload.name = updates.name;
         if (updates.price !== undefined) payload.price = Number(updates.price);
-        if (updates.oldPrice !== undefined) payload.old_price = updates.oldPrice ? Number(updates.oldPrice) : null;
+        if (updates.oldPrice !== undefined)
+          payload.old_price = updates.oldPrice ? Number(updates.oldPrice) : null;
         if (updates.stock !== undefined) payload.stock = Number(updates.stock);
         if (updates.category !== undefined) payload.category = updates.category;
         if (updates.brand !== undefined) payload.brand = updates.brand;
@@ -228,11 +231,21 @@ export const productService = {
       const client = supabaseManager.getClient();
       if (client) {
         // 1. Clean up any related child records first to satisfy foreign keys
-        try { await client.from('cart_items').delete().or(`product_id.eq.${prodId},id.eq.${prodId}`); } catch (e) {}
-        try { await client.from('inventory').delete().or(`product_id.eq.${prodId},id.eq.${prodId}`); } catch (e) {}
-        try { await client.from('order_items').delete().or(`product_id.eq.${prodId},id.eq.${prodId}`); } catch (e) {}
-        try { await client.from('sale_items').delete().or(`product_id.eq.${prodId},id.eq.${prodId}`); } catch (e) {}
-        try { await client.from('purchase_items').delete().or(`product_id.eq.${prodId},id.eq.${prodId}`); } catch (e) {}
+        try {
+          await client.from('cart_items').delete().or(`product_id.eq.${prodId},id.eq.${prodId}`);
+        } catch (e) {}
+        try {
+          await client.from('inventory').delete().or(`product_id.eq.${prodId},id.eq.${prodId}`);
+        } catch (e) {}
+        try {
+          await client.from('order_items').delete().or(`product_id.eq.${prodId},id.eq.${prodId}`);
+        } catch (e) {}
+        try {
+          await client.from('sale_items').delete().or(`product_id.eq.${prodId},id.eq.${prodId}`);
+        } catch (e) {}
+        try {
+          await client.from('purchase_items').delete().or(`product_id.eq.${prodId},id.eq.${prodId}`);
+        } catch (e) {}
 
         // 2. Delete the product itself from Supabase
         const { error } = await client
@@ -305,7 +318,10 @@ export const productService = {
         try {
           const client = supabaseManager.getClient();
           if (client) {
-            await client.from('products').update({ stock: newStock }).or(`product_id.eq.${prodId},id.eq.${prodId}`);
+            await client
+              .from('products')
+              .update({ stock: newStock })
+              .or(`product_id.eq.${prodId},id.eq.${prodId}`);
           }
         } catch (e) {
           console.warn('Supabase stock deduction error:', e);

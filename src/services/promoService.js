@@ -2,10 +2,34 @@ import { supabaseManager } from './supabaseClient';
 import { appStorage } from './storageAdapter';
 
 const DEFAULT_PROMOS = [
-  { promo_id: 'prm-1', code: 'TRACK10', discountPercent: 10, description: '10% Off Superbike Parts', isActive: true },
-  { promo_id: 'prm-2', code: 'VIP20', discountPercent: 20, description: '20% VIP Rider Voucher', isActive: true },
-  { promo_id: 'prm-3', code: 'FLASH50', discountPercent: 50, description: '50% Flash Sale Super Discount', isActive: true },
-  { promo_id: 'prm-4', code: 'MOTO10', discountPercent: 10, description: '10% Trackday Discount', isActive: true },
+  {
+    promo_id: 'prm-1',
+    code: 'TRACK10',
+    discountPercent: 10,
+    description: '10% Off Superbike Parts',
+    isActive: true,
+  },
+  {
+    promo_id: 'prm-2',
+    code: 'VIP20',
+    discountPercent: 20,
+    description: '20% VIP Rider Voucher',
+    isActive: true,
+  },
+  {
+    promo_id: 'prm-3',
+    code: 'FLASH50',
+    discountPercent: 50,
+    description: '50% Flash Sale Super Discount',
+    isActive: true,
+  },
+  {
+    promo_id: 'prm-4',
+    code: 'MOTO10',
+    discountPercent: 10,
+    description: '10% Trackday Discount',
+    isActive: true,
+  },
 ];
 
 const STORAGE_KEY = 'mototrack_promos_db';
@@ -119,9 +143,7 @@ export const promoService = {
     }
 
     const current = await this.getPromos();
-    const updated = current.map((p) =>
-      p.code === cleanCode ? { ...p, ...updates } : p
-    );
+    const updated = current.map((p) => (p.code === cleanCode ? { ...p, ...updates } : p));
     try {
       appStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
     } catch (e) {}
@@ -171,6 +193,7 @@ export const promoService = {
 
     return {
       valid: true,
+      promoId: match.promo_id || match.id || `prm-${match.code.toLowerCase()}`,
       discountPercent: match.discountPercent,
       description: match.description,
       code: match.code,

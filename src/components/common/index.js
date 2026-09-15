@@ -1,3 +1,9 @@
 export { default as BootstrapIcon } from './BootstrapIcon';
 export { default as BottomNavBar } from './BottomNavBar';
 export { default as ToastNotification } from './ToastNotification';
+export { default as UserProfileDropdown } from './UserProfileDropdown';
+export { default as UserProfileButton } from './UserProfileButton';
+export { default as NotificationDropdown } from './NotificationDropdown';
+export { default as BrandLogo } from './BrandLogo';
+export { default as GoogleIcon } from './GoogleIcon';
+export { default as ProductSpecsModal } from '../modals/ProductSpecsModal';

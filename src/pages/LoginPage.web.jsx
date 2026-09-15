@@ -11,8 +11,9 @@ import {
   Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { BootstrapIcon } from '../components';
+import { BootstrapIcon, BrandLogo, GoogleIcon } from '../components';
 import { useAuth } from '../context/AuthContext';
+import { botanicalStyles, authWebStyles as authStyles } from '../styles/web/loginPage.web.styles';
 
 // ─── DECORATIVE BOTANICAL PLANT POT ───
 function BotanicalPotGraphic() {
@@ -30,6 +31,7 @@ function BotanicalPotGraphic() {
 
 export default function LoginPageWeb({
   onLoginSuccess,
+  onSignUpSuccess,
   onNavigateToSignUp,
   onNavigateToStore,
   redirectReason: propRedirectReason,
@@ -37,8 +39,8 @@ export default function LoginPageWeb({
 }) {
   const {
     login,
-    demoCustomerLogin,
-    adminLogin,
+    loginWithGoogle,
+    loginWithGoogleSimulated,
     validatePasswordStrength,
     sendSignupOtp,
     verifySignupOtp,
@@ -58,13 +60,17 @@ export default function LoginPageWeb({
   const [signInPassword, setSignInPassword] = useState('');
   const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [signInError, setSignInError] = useState('');
+  const [authSuccessNotification, setAuthSuccessNotification] = useState('');
   const [isSignInLoading, setIsSignInLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [googleAdvisory, setGoogleAdvisory] = useState(false);
 
   // Sign Up Form State
   const [signUpStep, setSignUpStep] = useState(1); // 1 = Details + Password, 2 = 6-Digit OTP Verification
   const [signUpName, setSignUpName] = useState('');
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpPhone, setSignUpPhone] = useState('');
+  const [signUpAddress, setSignUpAddress] = useState('');
   const [signUpPassword, setSignUpPassword] = useState('');
   const [signUpConfirmPassword, setSignUpConfirmPassword] = useState('');
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
@@ -74,21 +80,28 @@ export default function LoginPageWeb({
 
   // OTP State
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [dispatchedOtp, setDispatchedOtp] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const otpInputRefs = useRef([]);
 
   // Password Strength State
-  const passwordAnalysis = validatePasswordStrength ? validatePasswordStrength(signUpPassword) : {
-    score: 0,
-    strength: 'weak',
-    label: 'Weak',
-    color: '#DC2626',
-    isStrong: false,
-    criteria: { minLength: false, hasUppercase: false, hasLowercase: false, hasNumber: false, hasSpecial: false },
-    feedback: 'Password must be at least 8 characters with upper, lower, number, and special character.',
-  };
+  const passwordAnalysis = validatePasswordStrength
+    ? validatePasswordStrength(signUpPassword)
+    : {
+        score: 0,
+        strength: 'weak',
+        label: 'Weak',
+        color: '#DC2626',
+        isStrong: false,
+        criteria: {
+          minLength: false,
+          hasUppercase: false,
+          hasLowercase: false,
+          hasNumber: false,
+          hasSpecial: false,
+        },
+        feedback: 'Password must be at least 8 characters with upper, lower, number, and special character.',
+      };
 
   useEffect(() => {
     Animated.timing(slideAnim, {
@@ -128,13 +141,17 @@ export default function LoginPageWeb({
   // ─── 1. SIGN IN HANDLER (CONNECTED TO SUPABASE) ───
   const handleSignInSubmit = async () => {
     setSignInError('');
-    if (!signInEmail.trim() || !signInPassword) {
+    setAuthSuccessNotification('');
+    const cleanEmail = (signInEmail || '').trim();
+    const cleanPassword = (signInPassword || '').trim();
+
+    if (!cleanEmail || !cleanPassword) {
       setSignInError('Please enter both email and password.');
       return;
     }
 
     setIsSignInLoading(true);
-    const res = await login(signInEmail.trim(), signInPassword);
+    const res = await login(cleanEmail, cleanPassword);
     setIsSignInLoading(false);
 
     if (!res.success) {
@@ -142,7 +159,56 @@ export default function LoginPageWeb({
       return;
     }
 
-    onLoginSuccess?.(res.user);
+    if (onLoginSuccess) {
+      onLoginSuccess(res.user);
+    } else {
+      onNavigateToStore?.();
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setSignInError('');
+    setGoogleAdvisory(false);
+    setIsGoogleLoading(true);
+    try {
+      const res = await loginWithGoogle();
+      if (res?.success && res.user) {
+        if (onLoginSuccess) {
+          onLoginSuccess(res.user);
+        } else {
+          onNavigateToStore?.();
+        }
+      } else if (res?.redirecting) {
+        // Browser is redirecting to Google OAuth
+      } else if (res?.notEnabled) {
+        setGoogleAdvisory(true);
+      } else if (res?.cancelled) {
+        // User cancelled or closed prompt
+      } else if (res?.error) {
+        setSignInError(res.error);
+      }
+    } catch (err) {
+      setSignInError('Google sign in error: ' + (err?.message || 'Unknown error'));
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleGoogleInstantTest = async () => {
+    setIsGoogleLoading(true);
+    setGoogleAdvisory(false);
+    try {
+      const res = await loginWithGoogleSimulated();
+      if (res?.success && res.user) {
+        if (onLoginSuccess) {
+          onLoginSuccess(res.user);
+        } else {
+          onNavigateToStore?.();
+        }
+      }
+    } finally {
+      setIsGoogleLoading(false);
+    }
   };
 
   // ─── 2. SIGN UP STEP 1: SEND OTP (WITH STRONG PASSWORD VALIDATION) ───
@@ -162,8 +228,14 @@ export default function LoginPageWeb({
       setSignUpError('Please enter your contact phone number.');
       return;
     }
+    if (!signUpAddress.trim()) {
+      setSignUpError('Please enter your delivery address.');
+      return;
+    }
     if (!passwordAnalysis.isStrong) {
-      setSignUpError(passwordAnalysis.feedback || 'Please choose a strong password fulfilling all security requirements.');
+      setSignUpError(
+        passwordAnalysis.feedback || 'Please choose a strong password fulfilling all security requirements.'
+      );
       return;
     }
     if (signUpPassword !== signUpConfirmPassword) {
@@ -183,12 +255,11 @@ export default function LoginPageWeb({
       return;
     }
 
-    setDispatchedOtp(res.otpCode || '');
     setSignUpStep(2);
     setResendTimer(60);
     setCanResend(false);
     setOtpDigits(['', '', '', '', '', '']);
-    setSignUpSuccessMsg(`Verification code sent to ${signUpEmail.trim()}`);
+    setSignUpSuccessMsg(`Verification code sent to ${signUpEmail.trim()}. Please check your Gmail.`);
   };
 
   // ─── 3. RESEND OTP ───
@@ -205,10 +276,9 @@ export default function LoginPageWeb({
     setIsSignUpLoading(false);
 
     if (res.success) {
-      setDispatchedOtp(res.otpCode || '');
       setResendTimer(60);
       setCanResend(false);
-      setSignUpSuccessMsg(`New 6-digit code sent to ${signUpEmail.trim()}`);
+      setSignUpSuccessMsg(`New 6-digit code sent to ${signUpEmail.trim()}. Please check your Gmail.`);
     } else {
       setSignUpError(res.error || 'Failed to resend code.');
     }
@@ -249,6 +319,9 @@ export default function LoginPageWeb({
     }
   };
 
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [createdUserName, setCreatedUserName] = useState('');
+
   // ─── 5. SIGN UP STEP 2: VERIFY OTP & CREATE ACCOUNT IN SUPABASE ───
   const handleVerifyOtpAndCreate = async () => {
     setSignUpError('');
@@ -267,7 +340,7 @@ export default function LoginPageWeb({
         name: signUpName.trim(),
         email: signUpEmail.trim(),
         phone: signUpPhone.trim(),
-        address: 'Metro Manila, Philippines',
+        address: signUpAddress.trim(),
         password: signUpPassword,
         isAdmin: false,
       },
@@ -279,7 +352,14 @@ export default function LoginPageWeb({
       return;
     }
 
-    onLoginSuccess?.(res.user);
+    // Direct navigation straight to the storefront
+    if (onLoginSuccess) {
+      onLoginSuccess(res.user);
+    } else if (onSignUpSuccess) {
+      onSignUpSuccess(res.user);
+    } else {
+      onNavigateToStore?.();
+    }
   };
 
   // Interpolated sliding translations for 820px wide card (410px each half)
@@ -301,12 +381,7 @@ export default function LoginPageWeb({
           onPress={() => onNavigateToStore?.()}
           activeOpacity={0.8}
         >
-          <View style={authStyles.logoBadge}>
-            <BootstrapIcon name="speedometer2" size={18} color="#FFFFFF" />
-          </View>
-          <Text style={authStyles.topBrandText}>
-            Moto<Text style={{ color: '#56B9A1' }}>Track</Text>
-          </Text>
+          <BrandLogo size={36} textColor="#FFFFFF" accentColor="#EF4444" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -321,20 +396,23 @@ export default function LoginPageWeb({
 
       {/* ─── MAIN SLIDING AUTHENTICATION CARD ─── */}
       <View style={authStyles.cardContainer}>
-
         {/* ─── LEFT HALF: SIGN IN FORM (Visible when overlay is on right) ─── */}
         <View style={[authStyles.formHalf, authStyles.leftFormHalf]}>
-          <ScrollView
-            contentContainerStyle={authStyles.formScrollInner}
-            showsVerticalScrollIndicator={false}
-          >
-            <Text style={authStyles.formHeading}>Sign In to MotoTrack</Text>
+          <ScrollView contentContainerStyle={authStyles.formScrollInner} showsVerticalScrollIndicator={false}>
+            <Text style={authStyles.formHeading}>Sign In to D,Blockchain</Text>
             <Text style={authStyles.mutedSubtext}>Enter your registered email and password</Text>
 
             {redirectReason ? (
               <View style={authStyles.infoBadge}>
                 <BootstrapIcon name="info-circle" size={13} color="#0C6258" />
                 <Text style={authStyles.infoBadgeText}>{redirectReason}</Text>
+              </View>
+            ) : null}
+
+            {authSuccessNotification ? (
+              <View style={authStyles.successBadge}>
+                <BootstrapIcon name="check-circle" size={14} color="#065F46" />
+                <Text style={authStyles.successBadgeText}>{authSuccessNotification}</Text>
               </View>
             ) : null}
 
@@ -381,11 +459,7 @@ export default function LoginPageWeb({
                 onPress={() => setShowSignInPassword(!showSignInPassword)}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
-                <BootstrapIcon
-                  name={showSignInPassword ? 'eye-slash' : 'eye'}
-                  size={15}
-                  color="#88A9A3"
-                />
+                <BootstrapIcon name={showSignInPassword ? 'eye-slash' : 'eye'} size={15} color="#88A9A3" />
               </TouchableOpacity>
             </View>
 
@@ -407,44 +481,128 @@ export default function LoginPageWeb({
               </Text>
             </TouchableOpacity>
 
-            {/* Fast Demo Shortcuts */}
-            <View style={authStyles.fastLoginSection}>
-              <Text style={authStyles.fastLoginTitle}>Quick Demo Access:</Text>
-              <View style={authStyles.fastLoginRow}>
-                <TouchableOpacity
-                  style={authStyles.fastPill}
-                  onPress={async () => {
-                    const res = await demoCustomerLogin();
-                    onLoginSuccess?.(res.user);
-                  }}
-                >
-                  <Text style={authStyles.fastPillText}>⚡ Alex Rider (Customer)</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={authStyles.fastPill}
-                  onPress={async () => {
-                    const res = await adminLogin();
-                    onLoginSuccess?.(res.user);
-                  }}
-                >
-                  <Text style={authStyles.fastPillText}>🛡️ Store Admin</Text>
-                </TouchableOpacity>
-              </View>
+            {/* Or Continue With Google */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                width: '100%',
+                marginVertical: 18,
+                gap: 12,
+              }}
+            >
+              <View style={{ flex: 1, height: 1, backgroundColor: '#E2ECE9' }} />
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: '#88A9A3',
+                  fontWeight: '700',
+                  letterSpacing: 0.6,
+                  textTransform: 'uppercase',
+                }}
+              >
+                Or continue with
+              </Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: '#E2ECE9' }} />
             </View>
+
+            {/* Google Sign In Button */}
+            <TouchableOpacity
+              style={{
+                width: '100%',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                backgroundColor: '#FFFFFF',
+                borderWidth: 1.5,
+                borderColor: '#E2ECE9',
+                borderRadius: 22,
+                paddingVertical: 12,
+                paddingHorizontal: 18,
+                shadowColor: '#0C6258',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.06,
+                shadowRadius: 6,
+                elevation: 1,
+              }}
+              onPress={handleGoogleSignIn}
+              activeOpacity={0.85}
+              disabled={isGoogleLoading || isSignInLoading}
+            >
+              <GoogleIcon size={18} />
+              <Text
+                style={{
+                  color: '#1E293B',
+                  fontWeight: '700',
+                  fontSize: 13.5,
+                  letterSpacing: 0.2,
+                }}
+              >
+                {isGoogleLoading ? 'Connecting to Google...' : 'Sign in with Google'}
+              </Text>
+            </TouchableOpacity>
+
+            {googleAdvisory && (
+              <View
+                style={{
+                  marginTop: 14,
+                  padding: 14,
+                  backgroundColor: '#FEF3C7',
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: '#FDE68A',
+                  width: '100%',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                  <BootstrapIcon name="info-circle-fill" size={14} color="#B45309" />
+                  <Text style={{ fontWeight: '800', fontSize: 12.5, color: '#92400E' }}>
+                    Google OAuth Setup Required
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11.5, color: '#78350F', lineHeight: 16, marginBottom: 10 }}>
+                  Google provider is not enabled yet in your Supabase project (vtbdmurblidtdghaotne). Enable Google in Supabase Dashboard &gt; Authentication &gt; Providers. In the meantime, you can test immediately with one click:
+                </Text>
+
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#0C6258',
+                    borderRadius: 10,
+                    paddingVertical: 9,
+                    paddingHorizontal: 12,
+                    alignItems: 'center',
+                    marginBottom: 8,
+                  }}
+                  onPress={handleGoogleInstantTest}
+                  activeOpacity={0.85}
+                >
+                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>
+                    ✓ Test Sign In as Google Rider (Instant)
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={{ backgroundColor: '#FFFFFF', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}>
+                  <Text style={{ fontSize: 10.5, color: '#64748B', marginBottom: 2 }}>
+                    Your Supabase Redirect URI:
+                  </Text>
+                  <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#0C6258' }}>
+                    https://vtbdmurblidtdghaotne.supabase.co/auth/v1/callback
+                  </Text>
+                </View>
+              </View>
+            )}
           </ScrollView>
         </View>
 
         {/* ─── RIGHT HALF: SIGN UP FORM WITH STRONG PASSWORD & OTP ─── */}
         <View style={[authStyles.formHalf, authStyles.rightFormHalf]}>
-          <ScrollView
-            contentContainerStyle={authStyles.formScrollInner}
-            showsVerticalScrollIndicator={false}
-          >
+          <ScrollView contentContainerStyle={authStyles.formScrollInner} showsVerticalScrollIndicator={false}>
             {signUpStep === 1 ? (
               // ─── SIGN UP STEP 1: CREDENTIALS & STRONG PASSWORD ───
               <>
                 <Text style={authStyles.formHeading}>Create Account</Text>
-                <Text style={authStyles.mutedSubtext}>Join MotoTrack Pro Gear Community</Text>
+                <Text style={authStyles.mutedSubtext}>Join D,Blockchain Community</Text>
 
                 {signUpError.length > 0 && (
                   <View style={authStyles.errorBadge}>
@@ -498,6 +656,22 @@ export default function LoginPageWeb({
                       if (signUpError) setSignUpError('');
                     }}
                     keyboardType="phone-pad"
+                  />
+                </View>
+
+                {/* Delivery Address */}
+                <View style={authStyles.inputWrap}>
+                  <BootstrapIcon name="geo-alt" size={15} color="#88A9A3" />
+                  <TextInput
+                    style={authStyles.textInput}
+                    placeholder="Complete Delivery Address"
+                    placeholderTextColor="#9FB9B5"
+                    value={signUpAddress}
+                    onChangeText={(t) => {
+                      setSignUpAddress(t);
+                      if (signUpError) setSignUpError('');
+                    }}
+                    autoCapitalize="words"
                   />
                 </View>
 
@@ -555,7 +729,12 @@ export default function LoginPageWeb({
                           size={10}
                           color={passwordAnalysis.criteria.minLength ? '#10B981' : '#94A3B8'}
                         />
-                        <Text style={[authStyles.criteriaChipText, passwordAnalysis.criteria.minLength && authStyles.criteriaChipTextActive]}>
+                        <Text
+                          style={[
+                            authStyles.criteriaChipText,
+                            passwordAnalysis.criteria.minLength && authStyles.criteriaChipTextActive,
+                          ]}
+                        >
                           8+ Chars
                         </Text>
                       </View>
@@ -565,7 +744,12 @@ export default function LoginPageWeb({
                           size={10}
                           color={passwordAnalysis.criteria.hasUppercase ? '#10B981' : '#94A3B8'}
                         />
-                        <Text style={[authStyles.criteriaChipText, passwordAnalysis.criteria.hasUppercase && authStyles.criteriaChipTextActive]}>
+                        <Text
+                          style={[
+                            authStyles.criteriaChipText,
+                            passwordAnalysis.criteria.hasUppercase && authStyles.criteriaChipTextActive,
+                          ]}
+                        >
                           A-Z
                         </Text>
                       </View>
@@ -575,7 +759,12 @@ export default function LoginPageWeb({
                           size={10}
                           color={passwordAnalysis.criteria.hasLowercase ? '#10B981' : '#94A3B8'}
                         />
-                        <Text style={[authStyles.criteriaChipText, passwordAnalysis.criteria.hasLowercase && authStyles.criteriaChipTextActive]}>
+                        <Text
+                          style={[
+                            authStyles.criteriaChipText,
+                            passwordAnalysis.criteria.hasLowercase && authStyles.criteriaChipTextActive,
+                          ]}
+                        >
                           a-z
                         </Text>
                       </View>
@@ -585,7 +774,12 @@ export default function LoginPageWeb({
                           size={10}
                           color={passwordAnalysis.criteria.hasNumber ? '#10B981' : '#94A3B8'}
                         />
-                        <Text style={[authStyles.criteriaChipText, passwordAnalysis.criteria.hasNumber && authStyles.criteriaChipTextActive]}>
+                        <Text
+                          style={[
+                            authStyles.criteriaChipText,
+                            passwordAnalysis.criteria.hasNumber && authStyles.criteriaChipTextActive,
+                          ]}
+                        >
                           0-9
                         </Text>
                       </View>
@@ -595,7 +789,12 @@ export default function LoginPageWeb({
                           size={10}
                           color={passwordAnalysis.criteria.hasSpecial ? '#10B981' : '#94A3B8'}
                         />
-                        <Text style={[authStyles.criteriaChipText, passwordAnalysis.criteria.hasSpecial && authStyles.criteriaChipTextActive]}>
+                        <Text
+                          style={[
+                            authStyles.criteriaChipText,
+                            passwordAnalysis.criteria.hasSpecial && authStyles.criteriaChipTextActive,
+                          ]}
+                        >
                           !@#$
                         </Text>
                       </View>
@@ -659,21 +858,9 @@ export default function LoginPageWeb({
                   </View>
                   <Text style={authStyles.formHeading}>Enter OTP Code</Text>
                   <Text style={authStyles.otpSubtitle}>
-                    We sent a 6-digit code to{' '}
-                    <Text style={authStyles.otpEmailHighlight}>{signUpEmail}</Text>
+                    We sent a 6-digit code to <Text style={authStyles.otpEmailHighlight}>{signUpEmail}</Text>
                   </Text>
                 </View>
-
-                {/* Instant In-App Test Code Banner */}
-                {dispatchedOtp ? (
-                  <View style={authStyles.instantOtpBadge}>
-                    <BootstrapIcon name="key-fill" size={13} color="#1D4ED8" />
-                    <Text style={authStyles.instantOtpText}>
-                      Security OTP:{' '}
-                      <Text style={authStyles.instantOtpCode}>{dispatchedOtp}</Text>
-                    </Text>
-                  </View>
-                ) : null}
 
                 {signUpSuccessMsg ? (
                   <View style={authStyles.successBadge}>
@@ -695,10 +882,7 @@ export default function LoginPageWeb({
                     <TextInput
                       key={idx}
                       ref={(el) => (otpInputRefs.current[idx] = el)}
-                      style={[
-                        authStyles.otpBox,
-                        digit ? authStyles.otpBoxFilled : null,
-                      ]}
+                      style={[authStyles.otpBox, digit ? authStyles.otpBoxFilled : null]}
                       value={digit}
                       onChangeText={(val) => handleOtpChange(val, idx)}
                       onKeyPress={(e) => handleOtpKeyPress(e, idx)}
@@ -739,20 +923,15 @@ export default function LoginPageWeb({
 
         {/* ─── SLIDING TEAL DECORATIVE OVERLAY PANEL ─── */}
         <Animated.View
-          style={[
-            authStyles.slidingOverlayPanel,
-            { transform: [{ translateX: overlayTranslateX }] },
-          ]}
+          style={[authStyles.slidingOverlayPanel, { transform: [{ translateX: overlayTranslateX }] }]}
         >
           <View style={botanicalStyles.organicBlob} />
           <BotanicalPotGraphic />
 
           <View style={authStyles.overlayContentBox}>
-            <Text style={authStyles.overlayHeadingLine1}>
-              {isSignUp ? 'Welcome Back!' : 'Hello Rider!'}
-            </Text>
+            <Text style={authStyles.overlayHeadingLine1}>{isSignUp ? 'Welcome Back!' : 'Hello Rider!'}</Text>
             <Text style={authStyles.overlayHeadingLine2}>
-              {isSignUp ? 'To MotoTrack' : 'Welcome to MotoTrack'}
+              {isSignUp ? 'To D,Blockchain' : 'Welcome to D,Blockchain'}
             </Text>
 
             <Text style={authStyles.overlaySubtext}>
@@ -761,531 +940,108 @@ export default function LoginPageWeb({
                 : 'Enter your personal details, verify your email with OTP, and start your track journey'}
             </Text>
 
-            <TouchableOpacity
-              style={authStyles.overlayGhostBtn}
-              onPress={toggleMode}
-              activeOpacity={0.85}
-            >
-              <Text style={authStyles.overlayGhostBtnText}>
-                {isSignUp ? 'SIGN IN' : 'SIGN UP'}
-              </Text>
+            <TouchableOpacity style={authStyles.overlayGhostBtn} onPress={toggleMode} activeOpacity={0.85}>
+              <Text style={authStyles.overlayGhostBtnText}>{isSignUp ? 'SIGN IN' : 'SIGN UP'}</Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
-
       </View>
+
+      {/* ─── SUCCESS REGISTRATION POPUP MODAL ─── */}
+      {successModalVisible ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(4, 47, 46, 0.82)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: 999,
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 24,
+              padding: 32,
+              maxWidth: 440,
+              width: '100%',
+              alignItems: 'center',
+              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.35)',
+              borderWidth: 1.5,
+              borderColor: '#E2E8F0',
+            }}
+          >
+            <View
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: 32,
+                backgroundColor: '#D1FAE5',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: 16,
+              }}
+            >
+              <BootstrapIcon name="check-circle-fill" size={34} color="#059669" />
+            </View>
+
+            <Text
+              style={{
+                fontSize: 22,
+                fontWeight: '900',
+                color: '#0C6258',
+                textAlign: 'center',
+                marginBottom: 8,
+              }}
+            >
+              Account Created!
+            </Text>
+
+            <Text
+              style={{
+                fontSize: 13.5,
+                color: '#64748B',
+                textAlign: 'center',
+                lineHeight: 20,
+                marginBottom: 24,
+              }}
+            >
+              Welcome to D,Blockchain, <Text style={{ fontWeight: '700', color: '#0F172A' }}>{createdUserName}</Text>! Your email has been verified. Please sign in with your password to continue to the storefront.
+            </Text>
+
+            <TouchableOpacity
+              style={{
+                backgroundColor: '#0C6258',
+                paddingVertical: 13,
+                paddingHorizontal: 28,
+                borderRadius: 22,
+                width: '100%',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 14px rgba(12, 98, 88, 0.35)',
+              }}
+              onPress={() => setSuccessModalVisible(false)}
+              activeOpacity={0.85}
+            >
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontWeight: '900',
+                  fontSize: 13.5,
+                  letterSpacing: 0.5,
+                }}
+              >
+                PROCEED TO SIGN IN ➔
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
-
-const botanicalStyles = StyleSheet.create({
-  organicBlob: {
-    position: 'absolute',
-    top: -30,
-    left: -30,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: '#56B9A1',
-    opacity: 0.7,
-  },
-  decorWrap: {
-    position: 'absolute',
-    right: 20,
-    top: 20,
-    alignItems: 'center',
-    opacity: 0.9,
-  },
-  leafGroup: {
-    alignItems: 'center',
-    marginBottom: -4,
-  },
-  leftLeaf: {
-    position: 'absolute',
-    bottom: 16,
-    left: -10,
-    width: 10,
-    height: 38,
-    backgroundColor: '#56B9A1',
-    borderRadius: 8,
-    transform: [{ rotate: '-18deg' }],
-  },
-  centerLeaf: {
-    width: 12,
-    height: 52,
-    backgroundColor: '#74C9B4',
-    borderRadius: 8,
-    zIndex: 2,
-  },
-  rightLeaf: {
-    position: 'absolute',
-    bottom: 14,
-    right: -10,
-    width: 10,
-    height: 34,
-    backgroundColor: '#48A48D',
-    borderRadius: 8,
-    transform: [{ rotate: '20deg' }],
-  },
-  potBody: {
-    width: 32,
-    height: 28,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-});
-
-const authStyles = StyleSheet.create({
-  pageWrapper: {
-    flex: 1,
-    backgroundColor: '#042F2E',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-    minHeight: '100vh',
-  },
-  topNav: {
-    width: '100%',
-    maxWidth: 820,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  topBrand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  logoBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: '#0C6258',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  topBrandText: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-  },
-  backStoreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  backStoreBtnText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#88A9A3',
-  },
-  cardContainer: {
-    width: 820,
-    minHeight: 520,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 28,
-    position: 'relative',
-    overflow: 'hidden',
-    boxShadow: '0 25px 60px rgba(0, 0, 0, 0.5)',
-  },
-  formHalf: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 410,
-    backgroundColor: '#FFFFFF',
-    justifyContent: 'center',
-  },
-  leftFormHalf: {
-    left: 0,
-  },
-  rightFormHalf: {
-    right: 0,
-  },
-  formScrollInner: {
-    paddingHorizontal: 32,
-    paddingVertical: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  formHeading: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#0C6258',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  mutedSubtext: {
-    fontSize: 11.5,
-    color: '#88A9A3',
-    marginBottom: 14,
-    textAlign: 'center',
-  },
-  inputWrap: {
-    width: '100%',
-    backgroundColor: '#F3F7F6',
-    borderRadius: 20,
-    height: 42,
-    paddingHorizontal: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 10,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 13,
-    color: '#0F172A',
-    fontWeight: '600',
-    outlineStyle: 'none',
-  },
-  forgotPasswordBtn: {
-    alignSelf: 'flex-end',
-    marginBottom: 10,
-    marginTop: -4,
-  },
-  forgotPasswordText: {
-    fontSize: 11.5,
-    color: '#88A9A3',
-    fontWeight: '600',
-  },
-  primaryTealBtn: {
-    backgroundColor: '#0C6258',
-    borderRadius: 22,
-    paddingVertical: 11,
-    paddingHorizontal: 36,
-    marginTop: 6,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 4px 14px rgba(12, 98, 88, 0.35)',
-  },
-  primaryTealBtnDisabled: {
-    backgroundColor: '#94A3B8',
-    boxShadow: 'none',
-  },
-  primaryTealBtnText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-
-  // Password Strength Meter
-  strengthMeterBox: {
-    width: '100%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 8,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  strengthHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  strengthLabel: {
-    fontSize: 10.5,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  strengthBadge: {
-    fontSize: 10.5,
-    fontWeight: '800',
-  },
-  meterTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#E2E8F0',
-    overflow: 'hidden',
-    marginBottom: 6,
-  },
-  meterFill: {
-    height: '100%',
-    borderRadius: 2,
-  },
-  criteriaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  criteriaChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
-  criteriaChipText: {
-    fontSize: 9.5,
-    color: '#94A3B8',
-    fontWeight: '500',
-  },
-  criteriaChipTextActive: {
-    color: '#059669',
-    fontWeight: '700',
-  },
-
-  // OTP Container & Inputs
-  otpContainer: {
-    width: '100%',
-    alignItems: 'center',
-  },
-  otpBackBtn: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 8,
-  },
-  otpBackBtnText: {
-    fontSize: 11.5,
-    color: '#0C6258',
-    fontWeight: '700',
-  },
-  otpHeader: {
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  otpBadge: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#E6F4F1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  otpSubtitle: {
-    fontSize: 12,
-    color: '#64748B',
-    textAlign: 'center',
-    maxWidth: 280,
-  },
-  otpEmailHighlight: {
-    fontWeight: '800',
-    color: '#0C6258',
-  },
-  instantOtpBadge: {
-    backgroundColor: '#EFF6FF',
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 10,
-    width: '100%',
-  },
-  instantOtpText: {
-    fontSize: 11,
-    color: '#1D4ED8',
-    fontWeight: '600',
-    flex: 1,
-  },
-  instantOtpCode: {
-    fontWeight: '900',
-    letterSpacing: 2,
-    color: '#1E40AF',
-  },
-  otpBoxesRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginVertical: 14,
-  },
-  otpBox: {
-    width: 42,
-    height: 48,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    backgroundColor: '#F8FAFC',
-    textAlign: 'center',
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0C6258',
-    outlineStyle: 'none',
-  },
-  otpBoxFilled: {
-    borderColor: '#0C6258',
-    backgroundColor: '#FFFFFF',
-  },
-  resendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-  },
-  resendText: {
-    fontSize: 11.5,
-    color: '#64748B',
-  },
-  resendLink: {
-    fontSize: 11.5,
-    color: '#0C6258',
-    fontWeight: '800',
-  },
-  resendCountdown: {
-    fontSize: 11.5,
-    color: '#94A3B8',
-    fontWeight: '700',
-  },
-
-  // Fast Login Section
-  fastLoginSection: {
-    marginTop: 14,
-    width: '100%',
-    alignItems: 'center',
-  },
-  fastLoginTitle: {
-    fontSize: 11,
-    color: '#94A3B8',
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  fastLoginRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  fastPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: '#F3F7F6',
-    borderWidth: 1,
-    borderColor: '#E2ECE9',
-  },
-  fastPillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#0C6258',
-  },
-
-  // Badges
-  errorBadge: {
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    marginBottom: 10,
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  errorBadgeText: {
-    color: '#DC2626',
-    fontSize: 11.5,
-    fontWeight: '700',
-    flex: 1,
-  },
-  infoBadge: {
-    backgroundColor: '#E6F4F1',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    marginBottom: 10,
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  infoBadgeText: {
-    color: '#0C6258',
-    fontSize: 11.5,
-    fontWeight: '700',
-    flex: 1,
-  },
-  successBadge: {
-    backgroundColor: '#D1FAE5',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
-    marginBottom: 10,
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  successBadgeText: {
-    color: '#065F46',
-    fontSize: 11.5,
-    fontWeight: '700',
-    flex: 1,
-  },
-
-  // Sliding Overlay Panel
-  slidingOverlayPanel: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    width: 410,
-    height: '100%',
-    backgroundColor: '#0C6258',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 36,
-    zIndex: 10,
-    overflow: 'hidden',
-  },
-  overlayContentBox: {
-    alignItems: 'center',
-    textAlign: 'center',
-    width: '100%',
-    zIndex: 5,
-  },
-  overlayHeadingLine1: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    lineHeight: 30,
-  },
-  overlayHeadingLine2: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    lineHeight: 30,
-    marginBottom: 10,
-  },
-  overlaySubtext: {
-    fontSize: 12.5,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: 24,
-    maxWidth: 260,
-  },
-  overlayGhostBtn: {
-    borderWidth: 1.5,
-    borderColor: '#FFFFFF',
-    borderRadius: 20,
-    paddingHorizontal: 32,
-    paddingVertical: 9,
-  },
-  overlayGhostBtnText: {
-    color: '#FFFFFF',
-    fontSize: 11.5,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-  },
-});

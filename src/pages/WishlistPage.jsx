@@ -14,14 +14,14 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { wishlistStyles as styles } from '../styles/wishlistPage.styles';
 import { wishlistService } from '../services/wishlistService';
-import { BootstrapIcon, BottomNavBar } from '../components/common';
+import { BootstrapIcon, BottomNavBar, BrandLogo } from '../components/common';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import { productService } from '../services/productService';
-import { MOTOR_PARTS } from '../data/motorParts';
+import { MOTOR_PARTS, CATEGORY_NAMES } from '../data/motorParts';
 
-const CATEGORIES = ['All', 'Exhaust', 'Brakes', 'Suspension', 'Engine', 'Drivetrain', 'Helmets', 'Tires', 'Accessories'];
+const CATEGORIES = CATEGORY_NAMES;
 
 export default function WishlistPage({
   currentUser: propCurrentUser,
@@ -29,6 +29,8 @@ export default function WishlistPage({
   onNavigateToStore,
   onNavigateToOrders,
   onNavigateToGarage,
+  onNavigateToCustomizer,
+  onNavigateToCustomize,
   onNavigateToLogin,
   onNavigateToProfile,
   onNavigateToAdmin,
@@ -43,8 +45,8 @@ export default function WishlistPage({
   const cartCtx = useCart();
 
   const currentUser = propCurrentUser !== undefined ? propCurrentUser : auth?.currentUser;
-  const cartItemCount = propCartItemCount !== undefined ? propCartItemCount : (cartCtx?.cartItemCount || 0);
-  const cartTotal = propCartTotal !== undefined ? propCartTotal : (cartCtx?.cartTotal || 0);
+  const cartItemCount = propCartItemCount !== undefined ? propCartItemCount : cartCtx?.cartItemCount || 0;
+  const cartTotal = propCartTotal !== undefined ? propCartTotal : cartCtx?.cartTotal || 0;
   const showToast = propShowToast || cartCtx?.showToast || (() => {});
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 1024;
@@ -61,13 +63,21 @@ export default function WishlistPage({
   const handleBottomNavChange = (tab) => {
     if (tab === 'Home') {
       onNavigateToStore?.();
+    } else if (tab === 'Customize') {
+      if (onNavigateToCustomizer) onNavigateToCustomizer();
+      else if (onNavigateToCustomize) onNavigateToCustomize();
+      else onNavigateToStore?.();
     } else if (tab === 'Garage') {
       onNavigateToGarage?.();
+    } else if (tab === 'Orders') {
+      onNavigateToOrders?.();
     } else if (tab === 'Favorites') {
       setSelectedCategory('All');
     } else if (tab === 'Admin') {
-      onNavigateToAdmin?.();
-    } else if (tab === 'Profile') {
+      if (currentUser?.role === 'admin') {
+        onNavigateToAdmin?.();
+      }
+    } else if (tab === 'Dashboard' || tab === 'Profile') {
       if (!currentUser) {
         onNavigateToLogin?.();
       } else {
@@ -109,8 +119,7 @@ export default function WishlistPage({
   const displayedProducts = useMemo(() => {
     let list = wishlistedProducts.filter((item) => {
       const matchCat =
-        selectedCategory === 'All' ||
-        item.category.toLowerCase() === selectedCategory.toLowerCase();
+        selectedCategory === 'All' || item.category.toLowerCase() === selectedCategory.toLowerCase();
       const q = searchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -195,54 +204,13 @@ export default function WishlistPage({
       {/* ─── TOP NAVBAR (CROSS-PLATFORM) ─── */}
       <View style={styles.navbarWrapper}>
         <View style={[styles.maxContainer, styles.navbarInner]}>
-          <TouchableOpacity
-            style={styles.logoRow}
-            onPress={onNavigateToStore}
-            activeOpacity={0.8}
-          >
-            <BootstrapIcon name="speedometer2" size={24} color="#0C6258" />
-            <Text style={styles.logoText}>
-              Moto<Text style={styles.logoAccent}>Track</Text>
-            </Text>
-          </TouchableOpacity>
-
-          <View style={styles.navActionsRight}>
-            <TouchableOpacity
-              style={styles.navBtn}
-              onPress={onNavigateToStore}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name="arrow-left" size={13} color="#334155" />
-              <Text style={styles.navBtnText}>Back to Store</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.navBtn}
-              onPress={onNavigateToOrders}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name="box-seam-fill" size={13} color="#334155" />
-              <Text style={styles.navBtnText}>My Orders</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.navBtn, styles.navBtnPrimary]}
-              onPress={onOpenCart}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name="bag-fill" size={13} color="#FFFFFF" />
-              <Text style={styles.navBtnPrimaryText}>
-                Bag ({cartItemCount})
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.logoRow}>
+            <BrandLogo size={36} />
           </View>
         </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.maxContainer}>
           {/* ─── HEADER & BREADCRUMB ─── */}
           <View style={styles.headerSection}>
@@ -251,9 +219,7 @@ export default function WishlistPage({
                 <Text style={styles.breadcrumbText}>Home</Text>
               </TouchableOpacity>
               <BootstrapIcon name="arrow-right" size={10} color="#94A3B8" />
-              <Text style={[styles.breadcrumbText, styles.breadcrumbActive]}>
-                Saved Wishlist
-              </Text>
+              <Text style={[styles.breadcrumbText, styles.breadcrumbActive]}>Saved Wishlist</Text>
             </View>
 
             <View style={styles.titleRow}>
@@ -324,18 +290,10 @@ export default function WishlistPage({
                   ].map((s) => (
                     <TouchableOpacity
                       key={s.id}
-                      style={[
-                        styles.filterPill,
-                        sortBy === s.id && styles.filterPillActive,
-                      ]}
+                      style={[styles.filterPill, sortBy === s.id && styles.filterPillActive]}
                       onPress={() => setSortBy(s.id)}
                     >
-                      <Text
-                        style={[
-                          styles.filterPillText,
-                          sortBy === s.id && styles.filterPillTextActive,
-                        ]}
-                      >
+                      <Text style={[styles.filterPillText, sortBy === s.id && styles.filterPillTextActive]}>
                         {s.label}
                       </Text>
                     </TouchableOpacity>
@@ -355,18 +313,10 @@ export default function WishlistPage({
                     return (
                       <TouchableOpacity
                         key={cat}
-                        style={[
-                          styles.filterPill,
-                          isActive && styles.filterPillActive,
-                        ]}
+                        style={[styles.filterPill, isActive && styles.filterPillActive]}
                         onPress={() => setSelectedCategory(cat)}
                       >
-                        <Text
-                          style={[
-                            styles.filterPillText,
-                            isActive && styles.filterPillTextActive,
-                          ]}
-                        >
+                        <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
                           {cat}
                         </Text>
                       </TouchableOpacity>
@@ -385,13 +335,10 @@ export default function WishlistPage({
               </View>
               <Text style={styles.emptyTitle}>Your Wishlist is Empty</Text>
               <Text style={styles.emptySubtitle}>
-                Explore our premium motorcycle spare parts, titanium racing exhausts, Brembo braking systems, and Öhlins suspension, then tap the heart icon to save your favorites here.
+                Explore our premium motorcycle spare parts, titanium racing exhausts, Brembo braking systems,
+                and Öhlins suspension, then tap the heart icon to save your favorites here.
               </Text>
-              <TouchableOpacity
-                style={styles.emptyShopBtn}
-                onPress={onNavigateToStore}
-                activeOpacity={0.9}
-              >
+              <TouchableOpacity style={styles.emptyShopBtn} onPress={onNavigateToStore} activeOpacity={0.9}>
                 <BootstrapIcon name="bag-fill" size={15} color="#FFFFFF" />
                 <Text style={styles.emptyShopBtnText}>Explore Store Catalog</Text>
               </TouchableOpacity>
@@ -419,27 +366,17 @@ export default function WishlistPage({
               {displayedProducts.map((product) => {
                 const isOutOfStock = Number(product.stock || 0) <= 0;
                 return (
-                  <View
-                    key={product.id}
-                    style={[styles.productCard, getGridItemStyle()]}
-                  >
+                  <View key={product.id} style={[styles.productCard, getGridItemStyle()]}>
                     {/* Image & Badges */}
                     <View style={styles.imageWrap}>
-                      <Image
-                        source={{ uri: product.image }}
-                        style={styles.productImage}
-                      />
+                      <Image source={{ uri: product.image }} style={styles.productImage} />
                       {product.discount ? (
                         <View style={styles.discountBadge}>
-                          <Text style={styles.badgePillText}>
-                            {product.discount}
-                          </Text>
+                          <Text style={styles.badgePillText}>{product.discount}</Text>
                         </View>
                       ) : product.badge ? (
                         <View style={styles.badgePill}>
-                          <Text style={styles.badgePillText}>
-                            {product.badge}
-                          </Text>
+                          <Text style={styles.badgePillText}>{product.badge}</Text>
                         </View>
                       ) : null}
 
@@ -466,12 +403,8 @@ export default function WishlistPage({
 
                       <View style={styles.ratingRow}>
                         <BootstrapIcon name="star-fill" size={12} color="#F59E0B" />
-                        <Text style={styles.ratingText}>
-                          {(product.rating || 5.0).toFixed(1)}
-                        </Text>
-                        <Text style={styles.reviewCountText}>
-                          ({product.reviews || 0} reviews)
-                        </Text>
+                        <Text style={styles.ratingText}>{(product.rating || 5.0).toFixed(1)}</Text>
+                        <Text style={styles.reviewCountText}>({product.reviews || 0} reviews)</Text>
                       </View>
 
                       {/* Stock Indicator */}
@@ -481,33 +414,23 @@ export default function WishlistPage({
                           size={11}
                           color={isOutOfStock ? '#DC2626' : '#16A34A'}
                         />
-                        <Text
-                          style={[
-                            styles.stockBadgeText,
-                            isOutOfStock && { color: '#DC2626' },
-                          ]}
-                        >
+                        <Text style={[styles.stockBadgeText, isOutOfStock && { color: '#DC2626' }]}>
                           {isOutOfStock ? 'Out of Stock' : `In Stock (${product.stock || 15} units)`}
                         </Text>
                       </View>
 
                       {/* Price Row */}
                       <View style={styles.priceRow}>
-                        <Text style={styles.mainPrice}>₱{product.price.toFixed(2)}
-                        </Text>
+                        <Text style={styles.mainPrice}>₱{product.price.toFixed(2)}</Text>
                         {product.oldPrice && (
-                          <Text style={styles.oldPrice}>₱{product.oldPrice.toFixed(2)}
-                          </Text>
+                          <Text style={styles.oldPrice}>₱{product.oldPrice.toFixed(2)}</Text>
                         )}
                       </View>
 
                       {/* Action Buttons */}
                       <View style={styles.cardActions}>
                         <TouchableOpacity
-                          style={[
-                            styles.addToCartBtn,
-                            isOutOfStock && { backgroundColor: '#94A3B8' },
-                          ]}
+                          style={[styles.addToCartBtn, isOutOfStock && { backgroundColor: '#94A3B8' }]}
                           disabled={isOutOfStock}
                           onPress={() => handleAddToCart(product)}
                           activeOpacity={0.85}
@@ -546,15 +469,10 @@ export default function WishlistPage({
             <Text style={styles.mobileSummaryText}>
               {wishlistedProducts.length} Saved {wishlistedProducts.length === 1 ? 'Item' : 'Items'}
             </Text>
-            <Text style={styles.mobileSummaryTotal}>₱{totalWishlistValue.toFixed(2)}
-            </Text>
+            <Text style={styles.mobileSummaryTotal}>₱{totalWishlistValue.toFixed(2)}</Text>
           </View>
 
-          <TouchableOpacity
-            style={styles.mobileAddAllBtn}
-            onPress={handleMoveAllToCart}
-            activeOpacity={0.9}
-          >
+          <TouchableOpacity style={styles.mobileAddAllBtn} onPress={handleMoveAllToCart} activeOpacity={0.9}>
             <BootstrapIcon name="bag-check-fill" size={14} color="#FFFFFF" />
             <Text style={styles.mobileAddAllBtnText}>Move All to Bag</Text>
           </TouchableOpacity>
@@ -563,16 +481,47 @@ export default function WishlistPage({
 
       {/* ─── MODAL 1: PRODUCT SPECS QUICK VIEW MODAL ─── */}
       <Modal visible={isSpecsModalOpen} transparent animationType="slide">
-        <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 16 }}>
-          <View style={{ width: '100%', maxWidth: 520, backgroundColor: '#FFFFFF', borderRadius: 24, padding: 20, maxHeight: '85%' }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 16,
+          }}
+        >
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 520,
+              backgroundColor: '#FFFFFF',
+              borderRadius: 24,
+              padding: 20,
+              maxHeight: '85%',
+            }}
+          >
             {selectedProductForSpecs && (
               <>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 14,
+                  }}
+                >
                   <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>
                     Product Specifications
                   </Text>
                   <TouchableOpacity
-                    style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F1F5F9', justifyContent: 'center', alignItems: 'center' }}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 16,
+                      backgroundColor: '#F1F5F9',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}
                     onPress={() => setIsSpecsModalOpen(false)}
                   >
                     <BootstrapIcon name="x-lg" size={14} color="#64748B" />
@@ -582,7 +531,13 @@ export default function WishlistPage({
                 <ScrollView style={{ maxHeight: 380 }}>
                   <Image
                     source={{ uri: selectedProductForSpecs.image }}
-                    style={{ width: '100%', height: 200, borderRadius: 14, marginBottom: 14, resizeMode: 'cover' }}
+                    style={{
+                      width: '100%',
+                      height: 200,
+                      borderRadius: 14,
+                      marginBottom: 14,
+                      resizeMode: 'cover',
+                    }}
                   />
                   <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A', marginBottom: 4 }}>
                     {selectedProductForSpecs.name}
@@ -590,14 +545,18 @@ export default function WishlistPage({
                   <Text style={{ fontSize: 12.5, color: '#0C6258', fontWeight: '700', marginBottom: 10 }}>
                     {selectedProductForSpecs.brand} • {selectedProductForSpecs.category}
                   </Text>
-                  <Text style={{ fontSize: 20, fontWeight: '900', color: '#0F172A', marginBottom: 12 }}>₱{selectedProductForSpecs.price.toFixed(2)}
+                  <Text style={{ fontSize: 20, fontWeight: '900', color: '#0F172A', marginBottom: 12 }}>
+                    ₱{selectedProductForSpecs.price.toFixed(2)}
                   </Text>
                   <Text style={{ fontSize: 13.5, color: '#475569', lineHeight: 20, marginBottom: 14 }}>
                     {selectedProductForSpecs.description}
                   </Text>
 
                   {selectedProductForSpecs.features?.map((feat, idx) => (
-                    <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <View
+                      key={idx}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}
+                    >
                       <BootstrapIcon name="check2" size={13} color="#0C6258" />
                       <Text style={{ fontSize: 13, color: '#334155' }}>{feat}</Text>
                     </View>
@@ -621,9 +580,7 @@ export default function WishlistPage({
                   }}
                 >
                   <BootstrapIcon name="bag-plus-fill" size={14} color="#FFFFFF" />
-                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>
-                    Add to Bag
-                  </Text>
+                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Add to Bag</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -633,26 +590,64 @@ export default function WishlistPage({
 
       {/* ─── MODAL 2: CONFIRM CLEAR WISHLIST ─── */}
       <Modal visible={isClearModalOpen} transparent animationType="fade">
-        <View style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-          <View style={{ width: '100%', maxWidth: 420, backgroundColor: '#FFFFFF', borderRadius: 20, padding: 24, alignItems: 'center' }}>
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(15, 23, 42, 0.6)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          }}
+        >
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 420,
+              backgroundColor: '#FFFFFF',
+              borderRadius: 20,
+              padding: 24,
+              alignItems: 'center',
+            }}
+          >
             <BootstrapIcon name="trash3-fill" size={36} color="#EF4444" style={{ marginBottom: 12 }} />
             <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A', marginBottom: 6 }}>
               Clear Your Saved Wishlist?
             </Text>
-            <Text style={{ fontSize: 13.5, color: '#64748B', textAlign: 'center', lineHeight: 20, marginBottom: 20 }}>
-              This will remove all {wishlistedProducts.length} items from your favorites. You will need to re-add them from the catalog.
+            <Text
+              style={{
+                fontSize: 13.5,
+                color: '#64748B',
+                textAlign: 'center',
+                lineHeight: 20,
+                marginBottom: 20,
+              }}
+            >
+              This will remove all {wishlistedProducts.length} items from your favorites. You will need to
+              re-add them from the catalog.
             </Text>
 
             <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
               <TouchableOpacity
-                style={{ flex: 1, backgroundColor: '#F1F5F9', paddingVertical: 11, borderRadius: 12, alignItems: 'center' }}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#F1F5F9',
+                  paddingVertical: 11,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                }}
                 onPress={() => setIsClearModalOpen(false)}
               >
                 <Text style={{ color: '#475569', fontWeight: '700', fontSize: 13.5 }}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={{ flex: 1, backgroundColor: '#EF4444', paddingVertical: 11, borderRadius: 12, alignItems: 'center' }}
+                style={{
+                  flex: 1,
+                  backgroundColor: '#EF4444',
+                  paddingVertical: 11,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                }}
                 onPress={handleClearConfirm}
               >
                 <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13.5 }}>Yes, Clear</Text>

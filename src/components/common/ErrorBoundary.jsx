@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Platform } from 'react-native';
+import BootstrapIcon from './BootstrapIcon';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -27,7 +28,15 @@ export default class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#0A2E28', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+        <SafeAreaView
+          style={{
+            flex: 1,
+            backgroundColor: '#0A2E28',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 24,
+          }}
+        >
           <View
             style={{
               backgroundColor: '#FFFFFF',
@@ -54,14 +63,30 @@ export default class ErrorBoundary extends React.Component {
                 marginBottom: 16,
               }}
             >
-              <Text style={{ fontSize: 28 }}>⚠️</Text>
+              <BootstrapIcon name="exclamation-triangle-fill" size={30} color="#DC2626" />
             </View>
 
-            <Text style={{ fontSize: 22, fontWeight: '900', color: '#0F172A', textAlign: 'center', marginBottom: 8 }}>
-              MotoTrack Experience Recovered
+            <Text
+              style={{
+                fontSize: 22,
+                fontWeight: '900',
+                color: '#0F172A',
+                textAlign: 'center',
+                marginBottom: 8,
+              }}
+            >
+              D,Blockchain Experience Recovered
             </Text>
 
-            <Text style={{ fontSize: 13.5, color: '#64748B', textAlign: 'center', lineHeight: 20, marginBottom: 20 }}>
+            <Text
+              style={{
+                fontSize: 13.5,
+                color: '#64748B',
+                textAlign: 'center',
+                lineHeight: 20,
+                marginBottom: 20,
+              }}
+            >
               An unexpected display issue occurred. Click reload below to refresh your session.
             </Text>
 
@@ -78,7 +103,13 @@ export default class ErrorBoundary extends React.Component {
                   borderColor: '#E2E8F0',
                 }}
               >
-                <Text style={{ fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', color: '#DC2626' }}>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+                    color: '#DC2626',
+                  }}
+                >
                   {this.state.error.toString()}
                 </Text>
               </ScrollView>

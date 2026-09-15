@@ -5,3 +5,6 @@ export { default as OrderPage } from './OrderPage';
 export { default as GaragePage } from './GaragePage';
 export { default as WishlistPage } from './WishlistPage';
 export { default as AdminDashboard } from './AdminDashboard';
+export { default as CustomizerPage } from './CustomizerPage';
+export { default as ProfilePage } from './ProfilePage';
+export { default as NotificationsPage } from './NotificationsPage';

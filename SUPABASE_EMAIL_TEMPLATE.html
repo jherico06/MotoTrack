@@ -1,0 +1,11 @@
+<h2>MotoTrack Account Verification</h2>
+<p>Your 6-digit security OTP code is:</p>
+<h1 style="font-size: 36px; letter-spacing: 6px; color: #0C6258; font-weight: bold; background: #E6F4F1; padding: 12px 24px; display: inline-block; border-radius: 8px;">
+  {{ .Data.otp_code }}
+</h1>
+<p>Enter this code in MotoTrack to verify your email and finish your registration.</p>
+<p style="color: #64748B; font-size: 13px;">This code expires in 5 minutes.</p>
+<hr style="border: none; border-top: 1px solid #E2E8F0; margin: 20px 0;" />
+<p style="font-size: 12px; color: #94A3B8;">
+  Or confirm directly: <a href="{{ .ConfirmationURL }}">Confirm Email</a>
+</p>

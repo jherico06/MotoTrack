@@ -6,6 +6,7 @@ const CartContext = createContext(null);
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
   const [promoCode, setPromoCode] = useState('');
+  const [appliedPromoId, setAppliedPromoId] = useState(null);
   const [discountPercent, setDiscountPercent] = useState(0);
   const [promoFeedback, setPromoFeedback] = useState({ text: '', isError: false });
   const [toastMessage, setToastMessage] = useState('');
@@ -22,9 +23,7 @@ export function CartProvider({ children }) {
       const existing = prevCart.find((item) => item.product.id === product.id);
       if (existing) {
         return prevCart.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + qty }
-            : item
+          item.product.id === product.id ? { ...item, quantity: item.quantity + qty } : item
         );
       }
       return [...prevCart, { product, quantity: qty }];
@@ -55,6 +54,7 @@ export function CartProvider({ children }) {
     setCart([]);
     setDiscountPercent(0);
     setPromoCode('');
+    setAppliedPromoId(null);
     setPromoFeedback({ text: '', isError: false });
   };
 
@@ -84,16 +84,18 @@ export function CartProvider({ children }) {
     const result = await promoService.validatePromo(code);
     if (result.valid) {
       setDiscountPercent(result.discountPercent);
+      setAppliedPromoId(result.promoId || null);
       setPromoFeedback({
         text: `✅ Promo "${result.code}" applied! (${result.discountPercent}% OFF)`,
         isError: false,
       });
       showToast(`Saved ${result.discountPercent}% with ${result.code}!`);
-      return { success: true, discountPercent: result.discountPercent };
+      return { success: true, discountPercent: result.discountPercent, promoId: result.promoId };
     } else {
       setDiscountPercent(0);
-      setPromoFeedback({ text: `❌ ${result.message}`, isError: true });
-      return { success: false, message: result.message };
+      setAppliedPromoId(null);
+      setPromoFeedback({ text: `❌ ${result.message || result.error || 'Invalid code'}`, isError: true });
+      return { success: false, message: result.message || result.error };
     }
   };
 
@@ -111,6 +113,7 @@ export function CartProvider({ children }) {
     cartTotal,
     promoCode,
     setPromoCode,
+    appliedPromoId,
     applyPromo,
     promoFeedback,
     setPromoFeedback,

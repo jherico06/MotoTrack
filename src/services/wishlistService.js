@@ -1,7 +1,6 @@
 // ─── WISHLIST SERVICE (SUPABASE + LOCAL STORAGE PERSISTENCE) ────────────────
 import { appStorage } from './storageAdapter';
 import { productService } from './productService';
-import { supabase } from './supabaseClient';
 
 const STORAGE_PREFIX = 'mototrack_wishlist_';
 
@@ -14,6 +13,8 @@ class WishlistService {
    * Get set of wishlisted product IDs for user
    */
   getWishlistIds(userId) {
+    if (!userId) return []; // If not logged in, no wishlist items are shown
+    
     try {
       const key = this.getStorageKey(userId);
       const raw = appStorage.getItem(key);
@@ -24,8 +25,8 @@ class WishlistService {
     } catch (e) {
       console.warn('Failed to load wishlist IDs:', e);
     }
-    // Default initial wishlist item for demo Alex Rider or guest
-    return ['p1', 'p4'];
+    // Return empty array for new users instead of demo items
+    return [];
   }
 
   /**

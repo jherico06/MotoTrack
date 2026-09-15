@@ -1,23 +1,61 @@
-// ─── UNIVERSAL CROSS-PLATFORM STORAGE ADAPTER (WEB / IOS / ANDROID) ───────────
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// ─── WEB STORAGE STRATEGY ────────────────────────────────────────────────────
+// On web we use sessionStorage (tab-scoped) instead of localStorage (shared
+// across all tabs).  This allows a user to open a new tab and sign in with a
+// different account without the previous session bleeding over.
+// Mobile (AsyncStorage) is unaffected.
 
 class UniversalStorage {
   constructor() {
     this.memoryStore = new Map();
+    this.getItem = this.getItem.bind(this);
+    this.setItem = this.setItem.bind(this);
+    this.removeItem = this.removeItem.bind(this);
+    this.clear = this.clear.bind(this);
+    this.isWebStorageAvailable = this.isWebStorageAvailable.bind(this);
+    
+    // Clean up old localStorage so old shared sessions don't linger
+    this._cleanupOldLocalStorage();
+    
     this.initNativeStorage();
   }
 
-  isWebStorageAvailable() {
+  _cleanupOldLocalStorage() {
     try {
-      return (
-        typeof window !== 'undefined' &&
-        typeof window.localStorage !== 'undefined' &&
-        window.localStorage !== null
-      );
+      if (typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.removeItem('mototrack_current_session');
+        window.localStorage.removeItem('mototrack_supabase_url');
+        window.localStorage.removeItem('mototrack_supabase_anon_key');
+        // Clear Supabase's default localStorage keys (they start with sb-)
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
+            window.localStorage.removeItem(key);
+          }
+        }
+      }
     } catch (e) {
-      return false;
+      // Ignore errors if localStorage is restricted
     }
+  }
+
+  // Returns the sessionStorage object when running in a browser, or null otherwise.
+  _webStorage() {
+    try {
+      if (
+        typeof window !== 'undefined' &&
+        typeof window.sessionStorage !== 'undefined' &&
+        window.sessionStorage !== null
+      ) {
+        return window.sessionStorage;
+      }
+    } catch (_e) {}
+    return null;
+  }
+
+  isWebStorageAvailable() {
+    return this._webStorage() !== null;
   }
 
   async initNativeStorage() {
@@ -40,8 +78,9 @@ class UniversalStorage {
 
   getItem(key) {
     try {
-      if (this.isWebStorageAvailable()) {
-        const val = window.localStorage.getItem(key);
+      const webStore = this._webStorage();
+      if (webStore) {
+        const val = webStore.getItem(key);
         if (val !== null) return val;
       }
       return this.memoryStore.has(key) ? this.memoryStore.get(key) : null;
@@ -54,8 +93,9 @@ class UniversalStorage {
     try {
       const strVal = String(value);
       this.memoryStore.set(key, strVal);
-      if (this.isWebStorageAvailable()) {
-        window.localStorage.setItem(key, strVal);
+      const webStore = this._webStorage();
+      if (webStore) {
+        webStore.setItem(key, strVal);
       } else if (AsyncStorage) {
         AsyncStorage.setItem(key, strVal).catch(() => {});
       }
@@ -69,8 +109,9 @@ class UniversalStorage {
   removeItem(key) {
     try {
       this.memoryStore.delete(key);
-      if (this.isWebStorageAvailable()) {
-        window.localStorage.removeItem(key);
+      const webStore = this._webStorage();
+      if (webStore) {
+        webStore.removeItem(key);
       } else if (AsyncStorage) {
         AsyncStorage.removeItem(key).catch(() => {});
       }
@@ -84,8 +125,9 @@ class UniversalStorage {
   clear() {
     try {
       this.memoryStore.clear();
-      if (this.isWebStorageAvailable()) {
-        window.localStorage.clear();
+      const webStore = this._webStorage();
+      if (webStore) {
+        webStore.clear();
       } else if (AsyncStorage) {
         AsyncStorage.clear().catch(() => {});
       }

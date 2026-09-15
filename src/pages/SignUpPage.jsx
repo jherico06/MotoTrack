@@ -14,11 +14,7 @@ import { signUpPageStyles as styles } from '../styles/signUpPage.styles';
 import { useAuth } from '../context/AuthContext';
 import BootstrapIcon from '../components/common/BootstrapIcon';
 
-export default function SignUpPage({
-  onSignUpSuccess,
-  onNavigateToLogin,
-  onNavigateToStore,
-}) {
+export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavigateToStore }) {
   const { validatePasswordStrength, sendSignupOtp, verifySignupOtp } = useAuth();
 
   // Step 1 = Form & Password, Step 2 = 6-Digit OTP Verification
@@ -28,6 +24,7 @@ export default function SignUpPage({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -35,7 +32,6 @@ export default function SignUpPage({
 
   // OTP State
   const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [dispatchedOtp, setDispatchedOtp] = useState('');
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const otpInputRefs = useRef([]);
@@ -46,15 +42,23 @@ export default function SignUpPage({
   const [isLoading, setIsLoading] = useState(false);
 
   // Dynamic Password Analysis
-  const passwordAnalysis = validatePasswordStrength ? validatePasswordStrength(password) : {
-    score: 0,
-    strength: 'weak',
-    label: 'Weak',
-    color: '#DC2626',
-    isStrong: false,
-    criteria: { minLength: false, hasUppercase: false, hasLowercase: false, hasNumber: false, hasSpecial: false },
-    feedback: 'Password must be at least 8 characters with upper, lower, number, and special character.',
-  };
+  const passwordAnalysis = validatePasswordStrength
+    ? validatePasswordStrength(password)
+    : {
+        score: 0,
+        strength: 'weak',
+        label: 'Weak',
+        color: '#DC2626',
+        isStrong: false,
+        criteria: {
+          minLength: false,
+          hasUppercase: false,
+          hasLowercase: false,
+          hasNumber: false,
+          hasSpecial: false,
+        },
+        feedback: 'Password must be at least 8 characters with upper, lower, number, and special character.',
+      };
 
   // Resend Countdown
   useEffect(() => {
@@ -92,8 +96,14 @@ export default function SignUpPage({
       setErrorMessage('Please enter your contact phone number.');
       return;
     }
+    if (!address.trim()) {
+      setErrorMessage('Please enter your delivery address.');
+      return;
+    }
     if (!passwordAnalysis.isStrong) {
-      setErrorMessage(passwordAnalysis.feedback || 'Please choose a strong password fulfilling all security requirements.');
+      setErrorMessage(
+        passwordAnalysis.feedback || 'Please choose a strong password fulfilling all security requirements.'
+      );
       return;
     }
     if (password !== confirmPassword) {
@@ -113,12 +123,11 @@ export default function SignUpPage({
       return;
     }
 
-    setDispatchedOtp(res.otpCode || '');
     setStep(2);
     setResendTimer(60);
     setCanResend(false);
     setOtpDigits(['', '', '', '', '', '']);
-    setSuccessMessage(`Verification code sent to ${email.trim()}`);
+    setSuccessMessage(`Verification code sent to ${email.trim()}. Please check your Gmail.`);
   };
 
   // ─── RESEND OTP ───
@@ -135,10 +144,9 @@ export default function SignUpPage({
     setIsLoading(false);
 
     if (res.success) {
-      setDispatchedOtp(res.otpCode || '');
       setResendTimer(60);
       setCanResend(false);
-      setSuccessMessage(`New code sent to ${email.trim()}`);
+      setSuccessMessage(`New code sent to ${email.trim()}. Please check your Gmail.`);
     } else {
       setErrorMessage(res.error || 'Failed to resend OTP.');
     }
@@ -195,7 +203,7 @@ export default function SignUpPage({
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim(),
-        address: 'Metro Manila, Philippines',
+        address: address.trim(),
         password: password,
         isAdmin: false,
       },
@@ -214,10 +222,7 @@ export default function SignUpPage({
     <View style={styles.container}>
       <StatusBar style="light" />
       <SafeAreaView style={{ flex: 0, backgroundColor: '#0C6258' }} />
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.innerContainer}>
           {/* ─── TOP TEAL HEADER SECTION ─── */}
           <View style={styles.topHeroSection}>
@@ -259,12 +264,7 @@ export default function SignUpPage({
 
                   {/* 1. Full Name */}
                   <View style={styles.inputGroup}>
-                    <View
-                      style={[
-                        styles.inputPill,
-                        focusedField === 'name' && styles.inputPillFocused,
-                      ]}
-                    >
+                    <View style={[styles.inputPill, focusedField === 'name' && styles.inputPillFocused]}>
                       <BootstrapIcon name="person" size={17} color="#88A9A3" />
                       <TextInput
                         style={styles.textInput}
@@ -283,12 +283,7 @@ export default function SignUpPage({
 
                   {/* 2. Email */}
                   <View style={styles.inputGroup}>
-                    <View
-                      style={[
-                        styles.inputPill,
-                        focusedField === 'email' && styles.inputPillFocused,
-                      ]}
-                    >
+                    <View style={[styles.inputPill, focusedField === 'email' && styles.inputPillFocused]}>
                       <BootstrapIcon name="envelope" size={17} color="#88A9A3" />
                       <TextInput
                         style={styles.textInput}
@@ -309,12 +304,7 @@ export default function SignUpPage({
 
                   {/* 3. Phone */}
                   <View style={styles.inputGroup}>
-                    <View
-                      style={[
-                        styles.inputPill,
-                        focusedField === 'phone' && styles.inputPillFocused,
-                      ]}
-                    >
+                    <View style={[styles.inputPill, focusedField === 'phone' && styles.inputPillFocused]}>
                       <BootstrapIcon name="phone" size={17} color="#88A9A3" />
                       <TextInput
                         style={styles.textInput}
@@ -332,14 +322,29 @@ export default function SignUpPage({
                     </View>
                   </View>
 
+                  {/* Delivery Address */}
+                  <View style={styles.inputGroup}>
+                    <View style={[styles.inputPill, focusedField === 'address' && styles.inputPillFocused]}>
+                      <BootstrapIcon name="geo-alt" size={17} color="#88A9A3" />
+                      <TextInput
+                        style={styles.textInput}
+                        placeholder="Delivery Address (Street, City, Province)"
+                        placeholderTextColor="#9FB9B5"
+                        value={address}
+                        onChangeText={(t) => {
+                          setAddress(t);
+                          if (errorMessage) setErrorMessage('');
+                        }}
+                        autoCapitalize="words"
+                        onFocus={() => setFocusedField('address')}
+                        onBlur={() => setFocusedField('')}
+                      />
+                    </View>
+                  </View>
+
                   {/* 4. Password */}
                   <View style={styles.inputGroup}>
-                    <View
-                      style={[
-                        styles.inputPill,
-                        focusedField === 'password' && styles.inputPillFocused,
-                      ]}
-                    >
+                    <View style={[styles.inputPill, focusedField === 'password' && styles.inputPillFocused]}>
                       <BootstrapIcon name="lock" size={17} color="#88A9A3" />
                       <TextInput
                         style={styles.textInput}
@@ -358,11 +363,7 @@ export default function SignUpPage({
                         onPress={() => setShowPassword(!showPassword)}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >
-                        <BootstrapIcon
-                          name={showPassword ? 'eye-slash' : 'eye'}
-                          size={16}
-                          color="#88A9A3"
-                        />
+                        <BootstrapIcon name={showPassword ? 'eye-slash' : 'eye'} size={16} color="#88A9A3" />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -396,7 +397,12 @@ export default function SignUpPage({
                             size={11}
                             color={passwordAnalysis.criteria.minLength ? '#10B981' : '#94A3B8'}
                           />
-                          <Text style={[styles.criteriaText, passwordAnalysis.criteria.minLength && styles.criteriaTextActive]}>
+                          <Text
+                            style={[
+                              styles.criteriaText,
+                              passwordAnalysis.criteria.minLength && styles.criteriaTextActive,
+                            ]}
+                          >
                             Minimum 8 characters
                           </Text>
                         </View>
@@ -406,7 +412,12 @@ export default function SignUpPage({
                             size={11}
                             color={passwordAnalysis.criteria.hasUppercase ? '#10B981' : '#94A3B8'}
                           />
-                          <Text style={[styles.criteriaText, passwordAnalysis.criteria.hasUppercase && styles.criteriaTextActive]}>
+                          <Text
+                            style={[
+                              styles.criteriaText,
+                              passwordAnalysis.criteria.hasUppercase && styles.criteriaTextActive,
+                            ]}
+                          >
                             Uppercase letter (A-Z)
                           </Text>
                         </View>
@@ -416,7 +427,12 @@ export default function SignUpPage({
                             size={11}
                             color={passwordAnalysis.criteria.hasLowercase ? '#10B981' : '#94A3B8'}
                           />
-                          <Text style={[styles.criteriaText, passwordAnalysis.criteria.hasLowercase && styles.criteriaTextActive]}>
+                          <Text
+                            style={[
+                              styles.criteriaText,
+                              passwordAnalysis.criteria.hasLowercase && styles.criteriaTextActive,
+                            ]}
+                          >
                             Lowercase letter (a-z)
                           </Text>
                         </View>
@@ -426,7 +442,12 @@ export default function SignUpPage({
                             size={11}
                             color={passwordAnalysis.criteria.hasNumber ? '#10B981' : '#94A3B8'}
                           />
-                          <Text style={[styles.criteriaText, passwordAnalysis.criteria.hasNumber && styles.criteriaTextActive]}>
+                          <Text
+                            style={[
+                              styles.criteriaText,
+                              passwordAnalysis.criteria.hasNumber && styles.criteriaTextActive,
+                            ]}
+                          >
                             Number (0-9)
                           </Text>
                         </View>
@@ -436,7 +457,12 @@ export default function SignUpPage({
                             size={11}
                             color={passwordAnalysis.criteria.hasSpecial ? '#10B981' : '#94A3B8'}
                           />
-                          <Text style={[styles.criteriaText, passwordAnalysis.criteria.hasSpecial && styles.criteriaTextActive]}>
+                          <Text
+                            style={[
+                              styles.criteriaText,
+                              passwordAnalysis.criteria.hasSpecial && styles.criteriaTextActive,
+                            ]}
+                          >
                             Special symbol (!@#$...)
                           </Text>
                         </View>
@@ -494,11 +520,7 @@ export default function SignUpPage({
               ) : (
                 // ─── STEP 2: OTP VERIFICATION SCREEN ───
                 <>
-                  <TouchableOpacity
-                    style={styles.backLinkRow}
-                    onPress={() => setStep(1)}
-                    activeOpacity={0.8}
-                  >
+                  <TouchableOpacity style={styles.backLinkRow} onPress={() => setStep(1)} activeOpacity={0.8}>
                     <BootstrapIcon name="arrow-left" size={14} color="#0C6258" />
                     <Text style={styles.backLinkText}>Edit registration details</Text>
                   </TouchableOpacity>
@@ -513,17 +535,6 @@ export default function SignUpPage({
                       <Text style={styles.otpTargetEmail}>{email}</Text>
                     </Text>
                   </View>
-
-                  {/* Instant Test OTP Code Display */}
-                  {dispatchedOtp ? (
-                    <View style={styles.otpInstantCodeBanner}>
-                      <BootstrapIcon name="key-fill" size={14} color="#1D4ED8" />
-                      <Text style={styles.otpInstantCodeText}>
-                        Security Code:{' '}
-                        <Text style={styles.otpInstantCodeBold}>{dispatchedOtp}</Text>
-                      </Text>
-                    </View>
-                  ) : null}
 
                   {successMessage ? (
                     <View style={styles.successBanner}>

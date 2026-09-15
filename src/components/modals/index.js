@@ -4,3 +4,7 @@ export { default as CheckoutModal } from './CheckoutModal';
 export { default as ProfileModal } from './ProfileModal';
 export { default as AccessDeniedModal } from './AccessDeniedModal';
 export { default as LiveOrderTrackingMapModal } from './LiveOrderTrackingMapModal';
+export { default as GCashPaymentModal } from './GCashPaymentModal';
+export { default as AdminPinLockScreen } from './AdminPinLockScreen';
+export { default as ConfirmModal } from './ConfirmModal';
+export { default as RegisterMotorcycleModal } from './RegisterMotorcycleModal';

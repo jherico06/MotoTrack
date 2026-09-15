@@ -9,30 +9,50 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { BootstrapIcon, ToastNotification, ProductSpecsModal, BottomNavBar } from '../components';
+import { BootstrapIcon, ToastNotification, BottomNavBar, UserProfileDropdown, UserProfileButton, BrandLogo, NotificationDropdown } from '../components/common';
+import { LiveOrderTrackingMapModal, ProductSpecsModal } from '../components/modals';
+import { wishlistWebStyles as wStyles } from '../styles/web/wishlistPage.web.styles';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { notificationService } from '../services/notificationService';
 import { MOTOR_PARTS } from '../data/motorParts';
 import { productService } from '../services/productService';
+import { orderService } from '../services/orderService';
 
 export default function WishlistPageWeb({
   onNavigateToStore,
   onNavigateToOrders,
   onNavigateToGarage,
+  onNavigateToCustomizer,
+  onNavigateToCustomize,
   onNavigateToLogin,
   onNavigateToProfile,
   onNavigateToAdmin,
   onAddToCart,
+  onLogout,
 }) {
   const { width: windowWidth } = useWindowDimensions();
-  const { currentUser } = useAuth();
-  const { addToCart, showToast, toastMessage } = useCart();
+  const { currentUser, logout, setRedirectReason } = useAuth();
+  const { addToCart, showToast, toastMessage, cartItemCount } = useCart();
   const { wishlist, toggleWishlist, clearWishlist, wishlistCount } = useWishlist();
+
+  const [unreadNotifCount, setUnreadNotifCount] = useState(() => notificationService.getUnreadCount(currentUser?.id));
+  const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const unsub = notificationService.subscribe(() => {
+      setUnreadNotifCount(notificationService.getUnreadCount(currentUser?.id));
+    });
+    return () => unsub?.();
+  }, [currentUser]);
 
   const [catalogProducts, setCatalogProducts] = useState(MOTOR_PARTS);
   const [selectedProductForSpecs, setSelectedProductForSpecs] = useState(null);
   const [isSpecsOpen, setIsSpecsOpen] = useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
+  const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
 
   useEffect(() => {
     productService.getProducts().then((data) => {
@@ -69,7 +89,8 @@ export default function WishlistPageWeb({
   };
 
   const numColumns = windowWidth >= 1200 ? 4 : windowWidth >= 800 ? 3 : 2;
-  const cardWidth = `${(100 / numColumns) - 1.5}%`;
+  const gapSize = 16;
+  const cardWidth = `calc(${100 / numColumns}% - ${((numColumns - 1) * gapSize) / numColumns}px)`;
 
   return (
     <View style={wStyles.container}>
@@ -84,72 +105,175 @@ export default function WishlistPageWeb({
             onPress={() => onNavigateToStore?.()}
             activeOpacity={0.8}
           >
-            <View style={wStyles.logoIconBadge}>
-              <BootstrapIcon name="speedometer2" size={20} color="#FFFFFF" />
-            </View>
-            <Text style={wStyles.logoText}>
-              Moto<Text style={{ color: '#0C6258' }}>Track</Text>
-              <Text style={{ fontSize: 11, color: '#64748B' }}> WISHLIST</Text>
-            </Text>
+            <BrandLogo size={40} textColor="#FFFFFF" />
           </TouchableOpacity>
 
-          <View style={wStyles.headerNavLinks}>
+          {/* Center Navigation: Store & Repair */}
+          <View style={wStyles.headerCenterNav}>
+            {/* Store Button */}
             <TouchableOpacity
-              style={wStyles.navLinkBtn}
+              style={wStyles.headerCenterBtn}
               onPress={() => onNavigateToStore?.()}
-              activeOpacity={0.8}
+              activeOpacity={0.85}
+              title="Store"
             >
-              <BootstrapIcon name="bag-check" size={14} color="#64748B" />
-              <Text style={wStyles.navLinkBtnText}>Storefront</Text>
+              <BootstrapIcon name="shop" size={16} color="#FFFFFF" />
+              <Text style={wStyles.headerCenterBtnText}>Store</Text>
             </TouchableOpacity>
 
+            {/* Repair Button */}
             <TouchableOpacity
-              style={wStyles.navLinkBtn}
-              onPress={() => onNavigateToOrders?.()}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name="receipt" size={14} color="#64748B" />
-              <Text style={wStyles.navLinkBtnText}>Orders</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={wStyles.navLinkBtn}
+              style={wStyles.headerCenterBtn}
               onPress={() => onNavigateToGarage?.()}
               activeOpacity={0.8}
+              title="Book a Service"
             >
-              <BootstrapIcon name="tools" size={14} color="#64748B" />
-              <Text style={wStyles.navLinkBtnText}>Pitstop</Text>
+              <BootstrapIcon name="tools" size={16} color="#FFFFFF" />
+              <Text style={wStyles.headerCenterBtnText}>Book a Service</Text>
             </TouchableOpacity>
 
+            {/* Customize Button */}
             <TouchableOpacity
-              style={[wStyles.navLinkBtn, { backgroundColor: '#F3F7F6', borderWidth: 1, borderColor: '#D1ECE6', paddingHorizontal: 12, borderRadius: 10 }]}
-              onPress={() => onNavigateToAdmin?.()}
+              style={wStyles.headerCenterBtn}
+              onPress={() => {
+                if (onNavigateToCustomizer) onNavigateToCustomizer();
+                else if (onNavigateToCustomize) onNavigateToCustomize();
+              }}
               activeOpacity={0.8}
+              title="Customize"
             >
-              <BootstrapIcon name="shield-lock-fill" size={13} color="#0C6258" />
-              <Text style={[wStyles.navLinkBtnText, { color: '#0C6258', fontWeight: '800' }]}>Admin</Text>
+              <BootstrapIcon name="magic" size={16} color="#FFFFFF" />
+              <Text style={wStyles.headerCenterBtnText}>Customize</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Right Header Actions */}
+          <View style={wStyles.headerActions}>
+            {/* Favorites Button */}
+            <TouchableOpacity
+              style={wStyles.navActionIconBtn}
+              onPress={() => onNavigateToWishlist?.()}
+              activeOpacity={0.8}
+              title="Favorites"
+            >
+              <BootstrapIcon name="heart" size={16} color="#FFFFFF" />
+              {wishlistCount > 0 && (
+                <View style={wStyles.navBadgeCircle}>
+                  <Text style={wStyles.navBadgeText}>{wishlistCount}</Text>
+                </View>
+              )}
             </TouchableOpacity>
 
-            {currentUser ? (
+            {/* Notifications Button */}
+            <View style={{ position: 'relative' }}>
               <TouchableOpacity
-                style={wStyles.userPill}
-                onPress={() => onNavigateToProfile?.()}
+                style={wStyles.navActionIconBtn}
+                onPress={() => {
+                  setIsUserDropdownOpen(false);
+                  setIsNotifDropdownOpen((prev) => !prev);
+                }}
                 activeOpacity={0.8}
+                title="Notifications"
               >
-                <Image
-                  source={{ uri: currentUser.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80' }}
-                  style={wStyles.userAvatar}
-                />
-                <Text style={wStyles.userNameText}>{currentUser.name}</Text>
+                <BootstrapIcon name="bell" size={16} color="#FFFFFF" />
+                {unreadNotifCount > 0 && (
+                  <View style={wStyles.navBadgeCircle}>
+                    <Text style={wStyles.navBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
-            ) : (
+
+              <NotificationDropdown
+                isOpen={isNotifDropdownOpen}
+                onClose={() => setIsNotifDropdownOpen(false)}
+                onNavigateToScreen={(screen) => {
+                  if (screen === 'store') onNavigateToStore?.();
+                  else if (screen === 'orders') onNavigateToOrders?.();
+                }}
+                currentUser={currentUser}
+              />
+            </View>
+
+            {/* Cart Button */}
+            <TouchableOpacity
+              style={wStyles.navActionIconBtn}
+              onPress={() => onNavigateToStore?.()}
+              activeOpacity={0.85}
+              title="Shopping Cart"
+            >
+              <BootstrapIcon name="bag" size={16} color="#FFFFFF" />
+              {cartItemCount > 0 && (
+                <View style={wStyles.navBadgeCircle}>
+                  <Text style={wStyles.navBadgeText}>{cartItemCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Admin Badge */}
+            {currentUser?.role === 'admin' && (
               <TouchableOpacity
-                style={wStyles.signInBtn}
-                onPress={() => onNavigateToLogin?.()}
-                activeOpacity={0.85}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 42,
+                  height: 42,
+                  borderRadius: 21,
+                  backgroundColor: 'rgba(12, 98, 88, 0.4)',
+                  borderWidth: 1,
+                  borderColor: '#0C6258',
+                }}
+                onPress={() => onNavigateToAdmin?.()}
+                activeOpacity={0.8}
+                title="Admin Panel"
               >
-                <Text style={wStyles.signInBtnText}>Sign In</Text>
+                <BootstrapIcon name="shield-lock-fill" size={16} color="#56B9A1" />
               </TouchableOpacity>
+            )}
+
+            {/* Auth: Sign In & Sign Up OR Logged In Profile */}
+            {currentUser ? (
+              <View style={[wStyles.loggedInContainer, { position: 'relative' }]}>
+                <UserProfileButton
+                  currentUser={currentUser}
+                  onPress={() => {
+                    setIsNotifDropdownOpen(false);
+                    setIsUserDropdownOpen(!isUserDropdownOpen);
+                  }}
+                  size={40}
+                />
+
+                <UserProfileDropdown
+                  currentUser={currentUser}
+                  isOpen={isUserDropdownOpen}
+                  onClose={() => setIsUserDropdownOpen(false)}
+                  onNavigateToDashboard={() => onNavigateToProfile?.('overview')}
+                  onNavigateToOrders={() => onNavigateToOrders?.()}
+                  onNavigateToProfile={() => onNavigateToProfile?.('profile')}
+                  onNavigateToSettings={() => onNavigateToProfile?.('settings')}
+                  onNavigateToAdmin={() => onNavigateToAdmin?.()}
+                  onLogout={() => {
+                    if (onLogout) {
+                      onLogout();
+                    } else {
+                      logout?.();
+                      showToast?.('Logged out successfully');
+                      onNavigateToStore?.();
+                    }
+                  }}
+                />
+              </View>
+            ) : (
+              <View style={wStyles.authButtonsRow}>
+                <TouchableOpacity
+                  style={wStyles.signInHeaderBtn}
+                  onPress={() => onNavigateToLogin?.()}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="person" size={16} color="#FFFFFF" />
+                  <Text style={wStyles.signInHeaderBtnText}>Sign In</Text>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
         </View>
@@ -158,7 +282,6 @@ export default function WishlistPageWeb({
       {/* ─── WISHLIST CONTENT ─── */}
       <ScrollView contentContainerStyle={wStyles.scrollContent} showsVerticalScrollIndicator={true}>
         <View style={wStyles.maxContainer}>
-
           {/* Top Title & Batch Actions Bar */}
           <View style={wStyles.actionBar}>
             <View>
@@ -239,9 +362,13 @@ export default function WishlistPageWeb({
                   </TouchableOpacity>
 
                   <View style={wStyles.productDetails}>
-                    <Text style={wStyles.productBrand}>{product.brand || 'MotoTrack'}</Text>
-                    <Text style={wStyles.productName} numberOfLines={2}>{product.name}</Text>
-                    <Text style={wStyles.productCompat} numberOfLines={1}>Fit: {product.compatibility || 'Universal'}</Text>
+                    <Text style={wStyles.productBrand}>{product.brand || 'D,Blockchain'}</Text>
+                    <Text style={wStyles.productName} numberOfLines={2}>
+                      {product.name}
+                    </Text>
+                    <Text style={wStyles.productCompat} numberOfLines={1}>
+                      Fit: {product.compatibility || 'Universal'}
+                    </Text>
 
                     <View style={wStyles.actionRow}>
                       <TouchableOpacity
@@ -269,7 +396,6 @@ export default function WishlistPageWeb({
               ))}
             </View>
           )}
-
         </View>
       </ScrollView>
 
@@ -288,12 +414,20 @@ export default function WishlistPageWeb({
           onTabChange={(tab) => {
             if (tab === 'Home') {
               onNavigateToStore?.();
+            } else if (tab === 'Customize') {
+              if (onNavigateToCustomizer) onNavigateToCustomizer();
+              else if (onNavigateToCustomize) onNavigateToCustomize();
+              else onNavigateToStore?.();
             } else if (tab === 'Garage') {
               onNavigateToGarage?.();
+            } else if (tab === 'Orders') {
+              onNavigateToOrders?.();
             } else if (tab === 'Favorites') {
               // already on wishlist
             } else if (tab === 'Admin') {
-              onNavigateToAdmin?.();
+              if (currentUser?.role === 'admin') {
+                onNavigateToAdmin?.();
+              }
             } else if (tab === 'Profile') {
               if (!currentUser) {
                 setRedirectReason('');
@@ -307,300 +441,14 @@ export default function WishlistPageWeb({
           currentUser={currentUser}
         />
       )}
+
+      {/* Live Order Tracking Modal */}
+      <LiveOrderTrackingMapModal
+        visible={isLiveTrackingOpen}
+        order={selectedOrderForTracking}
+        onClose={() => setIsLiveTrackingOpen(false)}
+        showToast={showToast}
+      />
     </View>
   );
 }
-
-const wStyles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  headerWrapper: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    position: 'sticky',
-    top: 0,
-    zIndex: 1000,
-    boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)',
-  },
-  headerInner: {
-    maxWidth: 1360,
-    marginHorizontal: 'auto',
-    width: '100%',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  logoWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  logoIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#0C6258',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: {
-    fontSize: 22,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  headerNavLinks: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  navLinkBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-  },
-  navLinkBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  userPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingRight: 12,
-    paddingVertical: 4,
-    paddingLeft: 4,
-    borderRadius: 20,
-    backgroundColor: '#F3F7F6',
-    borderWidth: 1,
-    borderColor: '#D1ECE6',
-  },
-  userAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-  },
-  userNameText: {
-    fontSize: 12.5,
-    fontWeight: '800',
-    color: '#042F2E',
-  },
-  signInBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 18,
-    backgroundColor: '#0F172A',
-  },
-  signInBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  scrollContent: {
-    paddingVertical: 24,
-    paddingHorizontal: 20,
-  },
-  maxContainer: {
-    maxWidth: 1360,
-    marginHorizontal: 'auto',
-    width: '100%',
-  },
-  actionBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 24,
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  pageTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#0F172A',
-  },
-  pageSub: {
-    fontSize: 13.5,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  actionBtnsGroup: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  clearWishlistBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    borderRadius: 14,
-    backgroundColor: '#FEE2E2',
-  },
-  clearWishlistBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#DC2626',
-  },
-  moveAllBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 14,
-    backgroundColor: '#0C6258',
-  },
-  moveAllBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  emptyBox: {
-    padding: 60,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginTop: 14,
-  },
-  emptySub: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 4,
-    maxWidth: 400,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  exploreStoreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#0C6258',
-    paddingHorizontal: 20,
-    paddingVertical: 11,
-    borderRadius: 14,
-  },
-  exploreStoreBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13.5,
-    fontWeight: '800',
-  },
-  productGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  productCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-  },
-  productImgWrap: {
-    width: '100%',
-    height: 180,
-    backgroundColor: '#F1F5F9',
-    position: 'relative',
-  },
-  productImg: {
-    width: '100%',
-    height: '100%',
-  },
-  removeFavBtn: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-  },
-  pricePill: {
-    position: 'absolute',
-    bottom: 10,
-    left: 10,
-    backgroundColor: '#0C6258',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  pricePillText: {
-    fontSize: 13,
-    fontWeight: '900',
-    color: '#FFFFFF',
-  },
-  productDetails: {
-    padding: 14,
-  },
-  productBrand: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-  },
-  productName: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0F172A',
-    lineHeight: 18,
-    marginVertical: 4,
-    minHeight: 36,
-  },
-  productCompat: {
-    fontSize: 11.5,
-    color: '#64748B',
-    marginBottom: 12,
-  },
-  actionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  addToBagBtn: {
-    flex: 1,
-    backgroundColor: '#F3F7F6',
-    borderWidth: 1,
-    borderColor: '#D1ECE6',
-    borderRadius: 12,
-    paddingVertical: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  addToBagBtnText: {
-    color: '#0C6258',
-    fontSize: 12.5,
-    fontWeight: '800',
-  },
-  inspectBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
