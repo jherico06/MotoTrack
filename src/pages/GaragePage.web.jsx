@@ -499,7 +499,7 @@ export default function GaragePageWeb({
               activeOpacity={0.85}
               title="Shopping Cart"
             >
-              <BootstrapIcon name="bag" size={16} color="#FFFFFF" />
+              <BootstrapIcon name="cart3" size={17} color="#FFFFFF" />
               {cartItemCount > 0 && (
                 <View style={gStyles.navBadgeCircle}>
                   <Text style={gStyles.navBadgeText}>{cartItemCount}</Text>
@@ -763,8 +763,8 @@ export default function GaragePageWeb({
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
                 <View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <BootstrapIcon name="calendar-check-fill" size={20} color="#0C6258" />
-                    <Text style={gStyles.sectionTitle}>Scheduled Booking Information</Text>
+                    <BootstrapIcon name="calendar3" size={18} color="#0C6258" />
+                    <Text style={[gStyles.sectionTitle, { marginBottom: 0 }]}>Scheduled Bookings</Text>
                   </View>
                 </View>
                 <View
@@ -802,7 +802,7 @@ export default function GaragePageWeb({
                   <BootstrapIcon name="person-lock" size={36} color="#0C6258" />
                   <Text style={[gStyles.emptyTitle, { marginTop: 12 }]}>Sign In to View Scheduled Bookings</Text>
                   <Text style={[gStyles.emptySub, { textAlign: 'center', maxWidth: 440 }]}>
-                    Sign in to your account to view your scheduled pit bay appointments, track master mechanic assignments, and manage service downpayments.
+                    Sign in to your account to view your scheduled appointments, track master mechanic assignments, and manage service downpayments.
                   </Text>
                   <TouchableOpacity
                     style={{
@@ -825,7 +825,7 @@ export default function GaragePageWeb({
               ) : userBookings.length === 0 ? (
                 <View style={gStyles.emptyBox}>
                   <BootstrapIcon name="calendar-x" size={36} color="#94A3B8" />
-                  <Text style={gStyles.emptyTitle}>No scheduled pit bay appointments yet</Text>
+                  <Text style={gStyles.emptyTitle}>No scheduled appointments yet</Text>
                   <Text style={gStyles.emptySub}>
                     Book a Repair or PMS service above to reserve your guaranteed slot and master technician allocation.
                   </Text>

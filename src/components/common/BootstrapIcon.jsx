@@ -18,9 +18,18 @@ if (
 // Complete Icon dictionary mapping Bootstrap icon names to @expo/vector-icons
 const ICON_MAP = {
   // Navigation & Core Controls
-  speedometer: { type: 'ion', name: 'speedometer' },
-  speedometer2: { type: 'ion', name: 'speedometer' },
-  search: { type: 'ion', name: 'search' },
+  house: { type: 'ion', name: 'home-outline' },
+  'house-door': { type: 'ion', name: 'home-outline' },
+  'house-door-fill': { type: 'ion', name: 'home' },
+  'house-fill': { type: 'ion', name: 'home' },
+  heart: { type: 'ion', name: 'heart-outline' },
+  'heart-fill': { type: 'ion', name: 'heart' },
+  person: { type: 'ion', name: 'person-outline' },
+  'person-fill': { type: 'ion', name: 'person' },
+  'person-circle': { type: 'ion', name: 'person-circle-outline' },
+  speedometer: { type: 'ion', name: 'speedometer-outline' },
+  speedometer2: { type: 'ion', name: 'speedometer-outline' },
+  search: { type: 'ion', name: 'search-outline' },
   sliders: { type: 'ion', name: 'options-outline' },
   sliders2: { type: 'ion', name: 'options' },
   filter: { type: 'ion', name: 'filter' },
@@ -126,9 +135,9 @@ const ICON_MAP = {
   star: { type: 'ion', name: 'star-outline' },
   'star-fill': { type: 'ion', name: 'star' },
   'star-half': { type: 'ion', name: 'star-half' },
-  stars: { type: 'ion', name: 'sparkles' },
-  magic: { type: 'ion', name: 'sparkles' },
-  sparkles: { type: 'ion', name: 'sparkles' },
+  stars: { type: 'ion', name: 'sparkles-outline' },
+  magic: { type: 'ion', name: 'color-wand-outline' },
+  sparkles: { type: 'ion', name: 'sparkles-outline' },
 
   // Users & Auth & Security
   person: { type: 'ion', name: 'person-outline' },
@@ -234,8 +243,8 @@ const ICON_MAP = {
   'sort-alpha-up': { type: 'mci', name: 'sort-alphabetical-descending' },
 
   // Garage, Tools, Motorcycle & Maps
-  tools: { type: 'ion', name: 'construct' },
-  wrench: { type: 'ion', name: 'build' },
+  tools: { type: 'ion', name: 'construct-outline' },
+  wrench: { type: 'ion', name: 'build-outline' },
   'wrench-adjustable': { type: 'mci', name: 'wrench' },
   'wrench-adjustable-circle': { type: 'mci', name: 'wrench-clock' },
   'wrench-adjustable-circle-fill': { type: 'mci', name: 'wrench-clock' },

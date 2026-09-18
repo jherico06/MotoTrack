@@ -146,7 +146,7 @@ export default function LoginPageWeb({
     const cleanPassword = (signInPassword || '').trim();
 
     if (!cleanEmail || !cleanPassword) {
-      setSignInError('Please enter both email and password.');
+      setSignInError('Please enter your email or username and password.');
       return;
     }
 
@@ -400,7 +400,9 @@ export default function LoginPageWeb({
         <View style={[authStyles.formHalf, authStyles.leftFormHalf]}>
           <ScrollView contentContainerStyle={authStyles.formScrollInner} showsVerticalScrollIndicator={false}>
             <Text style={authStyles.formHeading}>Sign In to D,Blockchain</Text>
-            <Text style={authStyles.mutedSubtext}>Enter your registered email and password</Text>
+            <Text style={authStyles.mutedSubtext}>
+              Customers, admins, and delivery riders sign in here — your role opens the right dashboard.
+            </Text>
 
             {redirectReason ? (
               <View style={authStyles.infoBadge}>
@@ -428,7 +430,7 @@ export default function LoginPageWeb({
               <BootstrapIcon name="envelope" size={15} color="#88A9A3" />
               <TextInput
                 style={authStyles.textInput}
-                placeholder="Email Address"
+                placeholder="Email or username"
                 placeholderTextColor="#9FB9B5"
                 value={signInEmail}
                 onChangeText={(t) => {
@@ -929,7 +931,7 @@ export default function LoginPageWeb({
           <BotanicalPotGraphic />
 
           <View style={authStyles.overlayContentBox}>
-            <Text style={authStyles.overlayHeadingLine1}>{isSignUp ? 'Welcome Back!' : 'Hello Rider!'}</Text>
+            <Text style={authStyles.overlayHeadingLine1}>{isSignUp ? 'Welcome Back!' : 'Hello!'}</Text>
             <Text style={authStyles.overlayHeadingLine2}>
               {isSignUp ? 'To D,Blockchain' : 'Welcome to D,Blockchain'}
             </Text>

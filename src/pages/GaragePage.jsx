@@ -41,6 +41,7 @@ export default function GaragePage({
   onNavigateToCustomizer,
   onNavigateToCustomize,
   onNavigateToAdmin,
+  onOpenCart,
   wishlistCount: propWishlistCount,
   showToast: propShowToast,
 }) {
@@ -58,6 +59,7 @@ export default function GaragePage({
   const [activeFilter, setActiveFilter] = useState('Services'); // 'Services' | 'MyBookings'
   const [servicesList, setServicesList] = useState(() => garageService.getServices());
   const [userBookings, setUserBookings] = useState([]);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
   const handleBottomNavChange = (tab) => {
     if (tab === 'Home') {
@@ -382,9 +384,27 @@ export default function GaragePage({
       {/* ─── 1. TOP NAVBAR ─── */}
       <View style={styles.navbarWrapper}>
         <View style={[styles.maxContainer, styles.navbarInner]}>
-          <View style={styles.logoRow}>
+          <TouchableOpacity style={styles.logoRow} onPress={onNavigateToStore} activeOpacity={0.8}>
             <BrandLogo size={36} />
-          </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              backgroundColor: '#F8FAFC',
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+              paddingHorizontal: 12,
+              paddingVertical: 7,
+              borderRadius: 10,
+            }}
+            onPress={onNavigateToStore}
+            activeOpacity={0.8}
+          >
+            <BootstrapIcon name="arrow-left" size={12} color="#0C6258" />
+            <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A' }}>Back to Shop</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -394,46 +414,90 @@ export default function GaragePage({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.maxContainer}>
-          {/* ─── GARAGE HEADER & QUICK ACTIONS (MATCHING WEB) ─── */}
-          <View style={styles.garageHeaderRow}>
-            <View style={styles.garageHeaderLeft}>
-              <Text style={styles.garageHeaderTitle}>Motorcycle Repair & Maintenance</Text>
-            </View>
+          {/* ─── GARAGE HEADER & QUICK ACTIONS ─── */}
+          <View style={{ marginTop: 4, marginBottom: 18 }}>
+            <Text style={styles.garageHeaderTitle}>Motorcycle Repair & Maintenance</Text>
+            <Text style={{ fontSize: 12.5, color: '#64748B', marginTop: 4, lineHeight: 18 }}>
+              Real-time pit bay status, diagnostics & certified technician bookings
+            </Text>
 
-            <View style={styles.garageHeaderActions}>
-              <View style={styles.tabButtons}>
-                {/* 1. Repair Button (Opens Modal) */}
-                <TouchableOpacity
-                  style={[styles.tabBtn, serviceDetailModal === 'Repair' && styles.tabBtnActive]}
-                  onPress={() => setServiceDetailModal('Repair')}
-                  activeOpacity={0.8}
+            {/* Clean Segmented Booking Quick Action Buttons */}
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 7,
+                  backgroundColor: serviceDetailModal === 'PMS' ? '#0C6258' : '#FFFFFF',
+                  borderWidth: 1.5,
+                  borderColor: serviceDetailModal === 'PMS' ? '#0C6258' : '#E2E8F0',
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  shadowColor: '#0F172A',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.03,
+                  shadowRadius: 3,
+                  elevation: 1,
+                }}
+                onPress={() => setServiceDetailModal('PMS')}
+                activeOpacity={0.85}
+              >
+                <BootstrapIcon
+                  name="wrench-adjustable"
+                  size={14}
+                  color={serviceDetailModal === 'PMS' ? '#FFFFFF' : '#0C6258'}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: serviceDetailModal === 'PMS' ? '#FFFFFF' : '#0F172A',
+                  }}
                 >
-                  <BootstrapIcon
-                    name="wrench"
-                    size={13}
-                    color={serviceDetailModal === 'Repair' ? '#FFFFFF' : '#DC2626'}
-                  />
-                  <Text style={[styles.tabBtnText, serviceDetailModal === 'Repair' && styles.tabBtnTextActive]}>
-                    Repair
-                  </Text>
-                </TouchableOpacity>
+                  PMS Service
+                </Text>
+              </TouchableOpacity>
 
-                {/* 2. PMS Button (Opens Modal) */}
-                <TouchableOpacity
-                  style={[styles.tabBtn, serviceDetailModal === 'PMS' && styles.tabBtnActive]}
-                  onPress={() => setServiceDetailModal('PMS')}
-                  activeOpacity={0.8}
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 7,
+                  backgroundColor: serviceDetailModal === 'Repair' ? '#0F172A' : '#FFFFFF',
+                  borderWidth: 1.5,
+                  borderColor: serviceDetailModal === 'Repair' ? '#0F172A' : '#E2E8F0',
+                  paddingVertical: 10,
+                  paddingHorizontal: 14,
+                  borderRadius: 12,
+                  shadowColor: '#0F172A',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.03,
+                  shadowRadius: 3,
+                  elevation: 1,
+                }}
+                onPress={() => setServiceDetailModal('Repair')}
+                activeOpacity={0.85}
+              >
+                <BootstrapIcon
+                  name="wrench"
+                  size={13}
+                  color={serviceDetailModal === 'Repair' ? '#FFFFFF' : '#475569'}
+                />
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: '700',
+                    color: serviceDetailModal === 'Repair' ? '#FFFFFF' : '#0F172A',
+                  }}
                 >
-                  <BootstrapIcon
-                    name="wrench-adjustable"
-                    size={13}
-                    color={serviceDetailModal === 'PMS' ? '#FFFFFF' : '#0C6258'}
-                  />
-                  <Text style={[styles.tabBtnText, serviceDetailModal === 'PMS' && styles.tabBtnTextActive]}>
-                    PMS
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                  Repair Request
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -497,10 +561,24 @@ export default function GaragePage({
             </View>
 
             {/* Card 3: NEXT OPENING */}
-            <View style={[styles.statCard, styles.statCardDangerAccent]}>
+            <View
+              style={[
+                styles.statCard,
+                todaySlotsData.isFullyBooked ? styles.statCardWarningAccent : styles.statCardDangerAccent,
+              ]}
+            >
               <View>
-                <View style={[styles.statIconWrap, { backgroundColor: '#FEF2F2' }]}>
-                  <BootstrapIcon name="clock-history" size={17} color="#E11D48" />
+                <View
+                  style={[
+                    styles.statIconWrap,
+                    { backgroundColor: todaySlotsData.isFullyBooked ? '#FFFBEB' : '#EEF2FF' },
+                  ]}
+                >
+                  <BootstrapIcon
+                    name="clock-history"
+                    size={17}
+                    color={todaySlotsData.isFullyBooked ? '#D97706' : '#4F46E5'}
+                  />
                 </View>
                 <Text style={styles.statLabel}>NEXT OPENING</Text>
                 <Text style={styles.statValue}>
@@ -563,93 +641,128 @@ export default function GaragePage({
             </View>
           )}
 
-          {/* ─── SCHEDULED BOOKING INFORMATION (MAIN VIEW - MATCHING WEB) ─── */}
+          {/* ─── SCHEDULED BOOKING INFORMATION ─── */}
           <View style={styles.bookingsContainer}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-              <View style={{ flex: 1, minWidth: 200 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <BootstrapIcon name="calendar-check-fill" size={18} color="#0C6258" />
-                  <Text style={styles.sectionTitle}>Scheduled Booking Information</Text>
-                </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <BootstrapIcon name="calendar3" size={17} color="#0C6258" />
+                <Text style={styles.sectionTitle}>Scheduled Bookings</Text>
               </View>
               <View
                 style={{
-                  backgroundColor: '#D1ECE6',
+                  backgroundColor: '#F1F5F9',
                   paddingHorizontal: 10,
                   paddingVertical: 4,
-                  borderRadius: 16,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 5,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
                 }}
               >
-                <BootstrapIcon name="ticket-detailed" size={12} color="#0C6258" />
-                <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#0C6258' }}>
-                  {userBookings.length} Scheduled {userBookings.length === 1 ? 'Booking' : 'Bookings'}
+                <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#475569' }}>
+                  {userBookings.length} {userBookings.length === 1 ? 'Booking' : 'Bookings'}
                 </Text>
               </View>
             </View>
 
             {!currentUser ? (
               <View style={styles.emptyBox}>
-                <BootstrapIcon name="person-lock" size={34} color="#0C6258" />
+                <View
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 10,
+                  }}
+                >
+                  <BootstrapIcon name="person-lock" size={24} color="#0C6258" />
+                </View>
                 <Text style={styles.emptyTitle}>Sign In to View Scheduled Bookings</Text>
                 <Text style={styles.emptySub}>
-                  Sign in to your account to view your scheduled pit bay appointments, track master mechanic assignments, and manage service downpayments.
+                  Sign in to your account to view your scheduled appointments, track master mechanic assignments, and manage service downpayments.
                 </Text>
                 <TouchableOpacity
                   style={{
                     marginTop: 14,
                     backgroundColor: '#0C6258',
                     paddingHorizontal: 20,
-                    paddingVertical: 9,
-                    borderRadius: 10,
+                    paddingVertical: 10,
+                    borderRadius: 12,
                   }}
                   onPress={() => onNavigateToLogin?.()}
                   activeOpacity={0.85}
                 >
-                  <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>Sign In Now</Text>
+                  <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>Sign In Now</Text>
                 </TouchableOpacity>
               </View>
             ) : userBookings.length === 0 ? (
               <View style={styles.emptyBox}>
-                <BootstrapIcon name="calendar-x" size={36} color="#94A3B8" />
-                <Text style={styles.emptyTitle}>No scheduled pit bay appointments yet</Text>
+                <View
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#F1F5F9',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginBottom: 10,
+                  }}
+                >
+                  <BootstrapIcon name="calendar3" size={24} color="#64748B" />
+                </View>
+                <Text style={styles.emptyTitle}>No scheduled appointments yet</Text>
                 <Text style={styles.emptySub}>
-                  Book a Repair or PMS service above to reserve your guaranteed slot and master technician allocation.
+                  Book a PMS service or repair diagnostic above to reserve your slot and certified mechanic allocation.
                 </Text>
-                <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+                <View style={{ flexDirection: 'row', gap: 10, marginTop: 16, width: '100%' }}>
                   <TouchableOpacity
                     style={{
+                      flex: 1,
                       flexDirection: 'row',
                       alignItems: 'center',
-                      gap: 6,
-                      backgroundColor: '#DC2626',
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 10,
-                    }}
-                    onPress={() => setServiceDetailModal('Repair')}
-                    activeOpacity={0.85}
-                  >
-                    <BootstrapIcon name="wrench" size={12} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Book Repair</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
+                      justifyContent: 'center',
                       gap: 6,
                       backgroundColor: '#0C6258',
+                      paddingVertical: 11,
                       paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 10,
+                      borderRadius: 12,
+                      shadowColor: '#0C6258',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 4,
+                      elevation: 2,
                     }}
                     onPress={() => setServiceDetailModal('PMS')}
                     activeOpacity={0.85}
                   >
-                    <BootstrapIcon name="wrench-adjustable" size={12} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Book PMS</Text>
+                    <BootstrapIcon name="wrench-adjustable" size={13} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>Book PMS</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      backgroundColor: '#FFFFFF',
+                      borderWidth: 1.5,
+                      borderColor: '#E2E8F0',
+                      paddingVertical: 11,
+                      paddingHorizontal: 14,
+                      borderRadius: 12,
+                    }}
+                    onPress={() => setServiceDetailModal('Repair')}
+                    activeOpacity={0.85}
+                  >
+                    <BootstrapIcon name="wrench" size={13} color="#334155" />
+                    <Text style={{ color: '#0F172A', fontSize: 13, fontWeight: '700' }}>Book Repair</Text>
                   </TouchableOpacity>
                 </View>
               </View>

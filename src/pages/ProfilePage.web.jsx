@@ -134,7 +134,7 @@ export default function ProfilePage({
     }
     return [];
   });
-  const [orders, setOrders] = useState(() => orderService.getOrders(currentUser?.id || 'guest'));
+  const [orders, setOrders] = useState([]);
   const [notifications, setNotifications] = useState(() => notificationService.getNotifications(currentUser?.id));
   const [accountLogs, setAccountLogs] = useState([]);
   const [bookingFilter, setBookingFilter] = useState('All'); // 'All' | 'Active' | 'Completed' | 'Cancelled'
@@ -265,7 +265,15 @@ export default function ProfilePage({
     } catch (_e) {}
 
     try {
-      setOrders(orderService.getOrders(currentUser?.id || 'guest') || []);
+      orderService
+        .getUserOrders(
+          currentUser?.id || currentUser?.user_id,
+          currentUser?.customer_id,
+          currentUser?.name,
+          currentUser
+        )
+        .then((list) => setOrders(Array.isArray(list) ? list : []))
+        .catch(() => setOrders([]));
     } catch (_e) {
       setOrders([]);
     }
@@ -1121,7 +1129,7 @@ export default function ProfilePage({
 
                     {orders.length === 0 ? (
                       <View style={{ paddingVertical: 28, alignItems: 'center' }}>
-                        <BootstrapIcon name="bag" size={32} color={tokens.textMuted} />
+                        <BootstrapIcon name="cart3" size={32} color={tokens.textMuted} />
                         <Text style={{ fontSize: 13.5, fontWeight: '700', color: tokens.textPrimary, marginTop: 8 }}>
                           No Orders Yet
                         </Text>

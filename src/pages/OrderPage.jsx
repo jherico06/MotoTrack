@@ -1,30 +1,107 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   ScrollView,
-  Image,
-  Modal,
   SafeAreaView,
   Platform,
-  useWindowDimensions,
+  StyleSheet,
+  AppState,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { orderStyles as styles } from '../styles/orderPage.styles';
+import { BootstrapIcon, BottomNavBar } from '../components/common';
+import {
+  LiveOrderTrackingMapModal,
+  RateDeliveredOrderModal,
+} from '../components/modals';
 import { orderService } from '../services/orderService';
-import { BootstrapIcon, BottomNavBar, BrandLogo } from '../components/common';
-import { LiveOrderTrackingMapModal, ProfileModal } from '../components/modals';
+import { deliveryService } from '../services/deliveryService';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 
-const STATUS_TABS = ['All', 'Pending Approval', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
+const isOutForDeliveryStatus = (status = '') => {
+  const st = status.toLowerCase();
+  return (
+    st === 'out for delivery' ||
+    st === 'shipped' ||
+    st === 'in transit' ||
+    st.includes('transit') ||
+    st.includes('way')
+  );
+};
+
+const isProcessingGroupStatus = (status = '') => {
+  const st = status.toLowerCase();
+  return (
+    st.includes('processing') ||
+    st.includes('pending') ||
+    st.includes('approval') ||
+    st === 'ready for delivery' ||
+    st === 'rescheduled'
+  );
+};
+
+const isShippedGroupStatus = (status = '') => {
+  const st = status.toLowerCase();
+  return isOutForDeliveryStatus(status) || st === 'delivery failed';
+};
+
+const getDisplayStatusLabel = (status = '') => {
+  if (isOutForDeliveryStatus(status)) return 'Out for Delivery';
+  return status || 'Processing';
+};
+
+const ORDER_CATEGORIES = [
+  {
+    id: 'All',
+    name: 'All Orders',
+    icon: 'grid-fill',
+    color: '#0C6258',
+    bgColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+    description: 'All past and active purchases',
+  },
+  {
+    id: 'Processing',
+    name: 'Processing',
+    icon: 'clock-fill',
+    color: '#B45309',
+    bgColor: '#FEF3C7',
+    borderColor: '#FDE68A',
+    description: 'Awaiting confirmation & packing',
+  },
+  {
+    id: 'Shipped',
+    name: 'In Transit / Shipped',
+    icon: 'truck',
+    color: '#4338CA',
+    bgColor: '#E0E7FF',
+    borderColor: '#C7D2FE',
+    description: 'On the way with courier',
+  },
+  {
+    id: 'Delivered',
+    name: 'Delivered',
+    icon: 'check-circle-fill',
+    color: '#15803D',
+    bgColor: '#DCFCE7',
+    borderColor: '#BBF7D0',
+    description: 'Successfully received packages',
+  },
+  {
+    id: 'Cancelled',
+    name: 'Cancelled',
+    icon: 'x-circle-fill',
+    color: '#B91C1C',
+    bgColor: '#FEE2E2',
+    borderColor: '#FECACA',
+    description: 'Cancelled or refunded orders',
+  },
+];
 
 export default function OrderPage({
-  currentUser: propCurrentUser,
-  productsList = [],
   onNavigateToStore,
   onNavigateToWishlist,
   onNavigateToGarage,
@@ -33,837 +110,592 @@ export default function OrderPage({
   onNavigateToLogin,
   onNavigateToProfile,
   onNavigateToAdmin,
-  onAddToCart,
-  onOpenCart,
-  cartItemCount: propCartItemCount,
-  wishlistCount: propWishlistCount,
-  showToast: propShowToast,
 }) {
-  const auth = useAuth();
-  const cartCtx = useCart();
-  const wishlistCtx = useWishlist();
-
-  const currentUser = propCurrentUser !== undefined ? propCurrentUser : auth?.currentUser;
-  const cartItemCount = propCartItemCount !== undefined ? propCartItemCount : cartCtx?.cartItemCount || 0;
-  const wishlistCount = propWishlistCount !== undefined ? propWishlistCount : wishlistCtx?.wishlistCount || 0;
-  const showToast = propShowToast || cartCtx?.showToast || (() => {});
-  const { width: windowWidth } = useWindowDimensions();
-  const isDesktop = windowWidth >= 1024;
+  const { currentUser } = useAuth();
+  const { showToast } = useCart();
+  const { wishlistCount } = useWishlist();
 
   const [ordersList, setOrdersList] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [dateFilter, setDateFilter] = useState('All'); // 'All' | 'Today' | 'Week' | 'Month'
-  const [searchQuery, setSearchQuery] = useState('');
+  const [orderFilter, setOrderFilter] = useState('All');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
+  const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
+  const [selectedOrderForRating, setSelectedOrderForRating] = useState(null);
+  const [isRateModalOpen, setIsRateModalOpen] = useState(false);
 
-  // Redirect guard: Customer orders belong exclusively in the Customer Dashboard
+  // Authentication guard: redirect to login if not signed in
   useEffect(() => {
     if (!currentUser) {
       if (typeof onNavigateToLogin === 'function') onNavigateToLogin();
-    } else {
-      if (typeof onNavigateToProfile === 'function') onNavigateToProfile('orders');
     }
-  }, [currentUser, onNavigateToLogin, onNavigateToProfile]);
+  }, [currentUser, onNavigateToLogin]);
 
-  const handleBottomNavChange = (tab) => {
-    if (tab === 'Home') {
-      onNavigateToStore?.();
-    } else if (tab === 'Customize') {
-      if (onNavigateToCustomizer) onNavigateToCustomizer();
-      else if (onNavigateToCustomize) onNavigateToCustomize();
-      else onNavigateToStore?.();
-    } else if (tab === 'Garage') {
-      onNavigateToGarage?.();
-    } else if (tab === 'Orders') {
-      // already on orders
-    } else if (tab === 'Favorites') {
-      onNavigateToWishlist?.();
-    } else if (tab === 'Admin') {
-      if (currentUser?.role === 'admin') {
-        onNavigateToAdmin?.();
+  // Fetch only the current user's actual orders (never demo orders if user hasn't ordered)
+  const fetchOrders = useCallback(async () => {
+    try {
+      const userId = currentUser?.id || currentUser?.user_id;
+      const customerId = currentUser?.customer_id;
+      if (!userId && !customerId) {
+        setOrdersList([]);
+        return;
       }
-    } else if (tab === 'Dashboard' || tab === 'Profile') {
-      if (!currentUser) {
-        onNavigateToLogin?.();
-      } else if (onNavigateToProfile) {
-        onNavigateToProfile();
-      } else {
-        setIsProfileModalOpen(true);
-      }
+      const data = await orderService.getUserOrders(userId, customerId, currentUser?.name, currentUser);
+      setOrdersList(Array.isArray(data) ? data : []);
+      setSelectedOrderForTracking((curr) => {
+        if (!curr || !Array.isArray(data)) return curr;
+        const fresh = data.find((o) => o.order_id === curr.order_id || o.id === curr.id);
+        return fresh || curr;
+      });
+    } catch (e) {
+      console.warn('Fetch orders error:', e);
+      setOrdersList([]);
     }
-  };
-
-  // Modals
-  const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
-  const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
-
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-
-  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState(null);
-  const [isInvoiceModalOpen, setIsInvoiceModalOpen] = useState(false);
-
-  const [orderToCancel, setOrderToCancel] = useState(null);
-  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-
-  // Fetch orders on mount or user change
-  const fetchOrders = async () => {
-    setIsLoading(true);
-    const data = await orderService.getUserOrders(
-      currentUser?.id || currentUser?.user_id,
-      currentUser?.customer_id,
-      currentUser?.name
-    );
-    setOrdersList(data);
-    setIsLoading(false);
-  };
+  }, [currentUser]);
 
   useEffect(() => {
     fetchOrders();
-    const unsubscribe = orderService.subscribe((updatedOrders) => {
-      if (Array.isArray(updatedOrders)) {
-        if (!currentUser) {
-          setOrdersList([]);
-        } else {
-          const userId = currentUser?.id || currentUser?.user_id;
-          const customerId = currentUser?.customer_id;
-          const userOrders = updatedOrders.filter((o) => {
-            const uMatch = Boolean(userId && (o.user_id === userId || o.customer_id === userId));
-            const cMatch = Boolean(customerId && (o.customer_id === customerId || o.user_id === customerId));
-            return uMatch || cMatch;
-          });
-          setOrdersList(userOrders);
-        }
-      }
+
+    const unsubscribe = orderService.subscribe(() => {
+      // Always re-fetch from service (DB reconcile) — never trust raw cache dumps
+      fetchOrders();
     });
-    return () => unsubscribe();
-  }, [currentUser]);
 
-  // Filtered orders
-  const filteredOrders = useMemo(() => {
-    return ordersList.filter((order) => {
-      const matchStatus =
-        statusFilter === 'All' || (order.status || 'Processing').toLowerCase() === statusFilter.toLowerCase();
+    const onOrdersUpdated = () => {
+      fetchOrders();
+    };
 
-      const q = searchQuery.toLowerCase().trim();
-      const matchSearch =
-        !q ||
-        (order.order_id && order.order_id.toLowerCase().includes(q)) ||
-        (order.items_summary && order.items_summary.toLowerCase().includes(q)) ||
-        (order.customer_name && order.customer_name.toLowerCase().includes(q)) ||
-        (order.tracking_number && order.tracking_number.toLowerCase().includes(q));
+    const onStorage = (e) => {
+      if (e?.key && e.key !== 'mototrack_orders_db') return;
+      fetchOrders();
+    };
 
-      if (!matchStatus || !matchSearch) return false;
-
-      if (dateFilter !== 'All') {
-        const orderTime = new Date(order.created_at || Date.now()).getTime();
-        const now = Date.now();
-        const oneDay = 24 * 60 * 60 * 1000;
-        if (dateFilter === 'Today') {
-          const isToday =
-            now - orderTime <= oneDay || (order.order_date || '').toLowerCase().includes('today');
-          if (!isToday) return false;
-        } else if (dateFilter === 'Week') {
-          if (now - orderTime > 7 * oneDay) return false;
-        } else if (dateFilter === 'Month') {
-          if (now - orderTime > 30 * oneDay) return false;
-        }
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchOrders();
       }
+    };
 
-      return true;
-    });
-  }, [ordersList, statusFilter, dateFilter, searchQuery]);
+    const onAppState = (nextState) => {
+      if (nextState === 'active') fetchOrders();
+    };
+    const appSub = AppState.addEventListener?.('change', onAppState);
 
-  // Statistics counts
-  const countsByStatus = useMemo(() => {
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('mototrack_orders');
+        bc.onmessage = () => fetchOrders();
+      }
+    } catch (_e) {}
+
+    // Poll so admin → customer status changes appear even across accounts/devices
+    const pollId = setInterval(() => {
+      fetchOrders();
+    }, 5000);
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('mototrack_orders_updated', onOrdersUpdated);
+      window.addEventListener('storage', onStorage);
+      document.addEventListener?.('visibilitychange', onVisible);
+    }
+
+    return () => {
+      unsubscribe();
+      clearInterval(pollId);
+      try {
+        appSub?.remove?.();
+      } catch (_e) {}
+      try {
+        bc?.close?.();
+      } catch (_e) {}
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.removeEventListener('mototrack_orders_updated', onOrdersUpdated);
+        window.removeEventListener('storage', onStorage);
+        document.removeEventListener?.('visibilitychange', onVisible);
+      }
+    };
+  }, [currentUser, fetchOrders]);
+
+  // Real-time counts per category for the dropdown
+  const categoryCounts = useMemo(() => {
+    const list = Array.isArray(ordersList) ? ordersList : [];
     const counts = {
-      All: ordersList.length,
-      'Pending Approval': 0,
+      All: list.length,
       Processing: 0,
       Shipped: 0,
       Delivered: 0,
       Cancelled: 0,
     };
-    ordersList.forEach((o) => {
-      const st = (o.status || 'Processing').toLowerCase();
-      if (st.includes('pending') || st.includes('approval')) counts['Pending Approval']++;
-      else if (st === 'processing') counts.Processing++;
-      else if (st === 'shipped') counts.Shipped++;
-      else if (st === 'delivered') counts.Delivered++;
-      else if (st === 'cancelled') counts.Cancelled++;
+    list.forEach((order) => {
+      const st = order.status || 'Processing';
+      if (isProcessingGroupStatus(st)) {
+        counts.Processing += 1;
+      } else if (isShippedGroupStatus(st)) {
+        counts.Shipped += 1;
+      } else if (
+        (st || '').toLowerCase().includes('delivered') ||
+        (st || '').toLowerCase().includes('completed')
+      ) {
+        counts.Delivered += 1;
+      } else if ((st || '').toLowerCase().includes('cancel')) {
+        counts.Cancelled += 1;
+      }
     });
     return counts;
   }, [ordersList]);
 
-  // Reorder / Buy Again
-  const handleBuyAgain = (order) => {
-    if (!order.items || order.items.length === 0) {
-      showToast('No items found to reorder');
-      return;
-    }
+  const activeCategory = useMemo(() => {
+    return ORDER_CATEGORIES.find((c) => c.id === orderFilter) || ORDER_CATEGORIES[0];
+  }, [orderFilter]);
 
-    let addedCount = 0;
-    order.items.forEach((item) => {
-      // Find matching catalog product or create fallback
-      const matchingProduct = productsList.find(
-        (p) => p.id === item.product_id || p.name.toLowerCase() === item.name.toLowerCase()
-      ) || {
-        id: item.product_id || 'reorder-' + Date.now(),
-        name: item.name,
-        price: item.price || 99.0,
-        image:
-          item.image ||
-          'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
-        brand: item.brand || 'MotoTrack',
-        category: item.category || 'Gear',
-      };
-
-      if (typeof onAddToCart === 'function') {
-        onAddToCart(matchingProduct, item.quantity || 1);
-      } else if (cartCtx?.addToCart) {
-        cartCtx.addToCart(matchingProduct, item.quantity || 1);
+  // Filtered orders list matching selected category
+  const filteredOrders = useMemo(() => {
+    const list = Array.isArray(ordersList) ? ordersList : [];
+    if (orderFilter === 'All') return list;
+    return list.filter((order) => {
+      const st = order.status || 'Processing';
+      const f = orderFilter.toLowerCase();
+      if (f === 'processing') return isProcessingGroupStatus(st);
+      if (f === 'shipped') return isShippedGroupStatus(st);
+      if (f === 'delivered') {
+        const s = st.toLowerCase();
+        return s.includes('delivered') || s.includes('completed');
       }
-      addedCount += item.quantity || 1;
+      if (f === 'cancelled') return st.toLowerCase().includes('cancel');
+      return st.toLowerCase() === f;
     });
+  }, [ordersList, orderFilter]);
 
-    showToast(`🛒 Reordered ${addedCount} items! Added to your shopping bag.`);
+  const getStatusBadgeStyle = (status = '') => {
+    const s = status.toLowerCase();
+    if (s.includes('delivered') || s.includes('completed')) {
+      return { bg: '#DCFCE7', text: '#15803D', border: '#BBF7D0' };
+    }
+    if (isOutForDeliveryStatus(status) || s === 'delivery failed') {
+      return { bg: '#E0E7FF', text: '#4338CA', border: '#C7D2FE' };
+    }
+    if (isProcessingGroupStatus(status)) {
+      return { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A' };
+    }
+    if (s.includes('cancel')) {
+      return { bg: '#FEE2E2', text: '#B91C1C', border: '#FECACA' };
+    }
+    return { bg: '#F1F5F9', text: '#475569', border: '#E2E8F0' };
   };
 
-  // Cancel order handler
-  const handleCancelOrderConfirm = async () => {
-    if (!orderToCancel) return;
-    await orderService.cancelOrder(orderToCancel.order_id || orderToCancel.id);
-    showToast(`Order ${orderToCancel.order_id || orderToCancel.id} has been cancelled.`);
-    setIsCancelModalOpen(false);
-    setOrderToCancel(null);
-    fetchOrders();
+  const handleTrackOrder = (order) => {
+    setSelectedOrderForTracking(order);
+    setIsLiveTrackingOpen(true);
   };
 
-  // Render Status Badge Pill
-  const renderStatusBadge = (status = 'Processing') => {
-    const st = status.toLowerCase();
-    if (st.includes('pending') || st.includes('approval')) {
-      return (
-        <View style={[styles.statusPillProcessing, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}>
-          <BootstrapIcon name="shield-lock-fill" size={12} color="#D97706" />
-          <Text style={[styles.statusTextProcessing, { color: '#B45309' }]}>Awaiting COD Approval</Text>
-        </View>
-      );
+  const handleOpenRating = (order) => {
+    setSelectedOrderForRating(order);
+    setIsRateModalOpen(true);
+  };
+
+  const handleBottomNavChange = (tab) => {
+    if (tab === 'Home' || tab === 'Search' || tab === 'Cart') onNavigateToStore?.();
+    else if (tab === 'Garage') onNavigateToGarage?.();
+    else if (tab === 'Dashboard' || tab === 'Profile') onNavigateToProfile?.();
+    else if (tab === 'Customize') {
+      if (onNavigateToCustomizer) onNavigateToCustomizer();
+      else if (onNavigateToCustomize) onNavigateToCustomize();
+      else onNavigateToStore?.();
+    } else if (tab === 'Wishlist' || tab === 'Favorites') {
+      onNavigateToWishlist?.();
+    } else if (tab === 'Orders') {
+      // already on orders page
     }
-    if (st === 'delivered') {
-      return (
-        <View style={styles.statusPillDelivered}>
-          <BootstrapIcon name="check-circle-fill" size={12} color="#16A34A" />
-          <Text style={styles.statusTextDelivered}>Delivered</Text>
-        </View>
-      );
-    }
-    if (st === 'shipped') {
-      return (
-        <View style={styles.statusPillShipped}>
-          <BootstrapIcon name="truck" size={12} color="#9333EA" />
-          <Text style={styles.statusTextShipped}>In Transit</Text>
-        </View>
-      );
-    }
-    if (st === 'cancelled') {
-      return (
-        <View style={styles.statusPillCancelled}>
-          <BootstrapIcon name="x-lg" size={12} color="#DC2626" />
-          <Text style={styles.statusTextCancelled}>Cancelled</Text>
-        </View>
-      );
-    }
-    return (
-      <View style={styles.statusPillProcessing}>
-        <BootstrapIcon name="arrow-repeat" size={12} color="#0C6258" />
-        <Text style={styles.statusTextProcessing}>Processing</Text>
-      </View>
-    );
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={tailwind.safeArea}>
       <StatusBar style="dark" />
 
-      {/* ─── TOP NAVBAR (CROSS-PLATFORM) ─── */}
-      <View style={styles.navbarWrapper}>
-        <View style={[styles.maxContainer, styles.navbarInner]}>
-          <TouchableOpacity style={styles.logoRow} onPress={onNavigateToStore} activeOpacity={0.8}>
-            <BrandLogo size={36} />
+      {/* ─── TOP HEADER BAR (CLEAN, EASY TO NAVIGATE) ─── */}
+      <View style={tailwind.topBar}>
+        <View style={tailwind.topBarInner}>
+          <TouchableOpacity
+            style={tailwind.backBtn}
+            onPress={onNavigateToStore}
+            activeOpacity={0.75}
+            accessibilityLabel="Back to Shop"
+          >
+            <BootstrapIcon name="arrow-left" size={16} color="#0C6258" />
+            <Text style={tailwind.backBtnText}>Shop</Text>
           </TouchableOpacity>
 
-          <View style={styles.navActionsRight}>
-            <TouchableOpacity style={styles.navBtn} onPress={onNavigateToStore} activeOpacity={0.8}>
-              <BootstrapIcon name="arrow-left" size={13} color="#334155" />
-              <Text style={styles.navBtnText}>Back to Store</Text>
-            </TouchableOpacity>
+          <View style={tailwind.headerTitleWrap}>
+            <BootstrapIcon name="box-seam-fill" size={18} color="#0C6258" />
+            <Text style={tailwind.headerTitle}>My Orders</Text>
+          </View>
 
-            <TouchableOpacity style={styles.navBtn} onPress={onNavigateToWishlist} activeOpacity={0.8}>
-              <BootstrapIcon name="heart-fill" size={13} color="#EF4444" />
-              <Text style={styles.navBtnText}>Favorites</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.navBtn, { backgroundColor: '#0C6258' }]}
-              onPress={onOpenCart}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name="bag-fill" size={13} color="#FFFFFF" />
-              <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Bag ({cartItemCount})</Text>
-            </TouchableOpacity>
+          <View style={tailwind.orderBadgePill}>
+            <Text style={tailwind.orderBadgeText}>
+              {ordersList.length} {ordersList.length === 1 ? 'Order' : 'Orders'}
+            </Text>
           </View>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        <View style={styles.maxContainer}>
-          {/* ─── HEADER & BREADCRUMB ─── */}
-          <View style={styles.headerSection}>
-            <View style={styles.breadcrumbRow}>
-              <TouchableOpacity onPress={onNavigateToStore}>
-                <Text style={styles.breadcrumbText}>Home</Text>
-              </TouchableOpacity>
-              <BootstrapIcon name="arrow-right" size={10} color="#94A3B8" />
-              <Text style={[styles.breadcrumbText, styles.breadcrumbActive]}>My Orders</Text>
-            </View>
-
-            <View style={styles.titleRow}>
-              <View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <BootstrapIcon name="box-seam-fill" size={24} color="#0C6258" />
-                  <Text style={styles.pageTitle}>Order History & Tracking</Text>
-                </View>
-                <View style={styles.statsRow}>
-                  <View style={styles.statChip}>
-                    <BootstrapIcon name="receipt" size={12} color="#0C6258" />
-                    <Text style={styles.statChipText}>{ordersList.length} Total Orders</Text>
-                  </View>
-                  <View style={[styles.statChip, { backgroundColor: '#F0FDF4' }]}>
-                    <BootstrapIcon name="check2" size={12} color="#16A34A" />
-                    <Text style={[styles.statChipText, { color: '#16A34A' }]}>
-                      {countsByStatus.Delivered} Delivered
-                    </Text>
-                  </View>
-                  <View style={[styles.statChip, { backgroundColor: '#FAF5FF' }]}>
-                    <BootstrapIcon name="truck" size={12} color="#9333EA" />
-                    <Text style={[styles.statChipText, { color: '#9333EA' }]}>
-                      {countsByStatus.Processing + countsByStatus.Shipped} Active
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* ─── SEARCH & STATUS TABS TOOLBAR ─── */}
-          <View style={styles.toolbarCard}>
-            <View style={styles.searchBox}>
-              <BootstrapIcon name="search" size={14} color="#94A3B8" />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search by Order ID (e.g. ord-8921), item name, or tracking #..."
-                placeholderTextColor="#94A3B8"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-              {searchQuery ? (
-                <TouchableOpacity onPress={() => setSearchQuery('')}>
-                  <BootstrapIcon name="x-lg" size={12} color="#64748B" />
-                </TouchableOpacity>
-              ) : null}
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.statusTabsScroll}
+      <ScrollView
+        style={tailwind.container}
+        contentContainerStyle={tailwind.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={tailwind.maxContainer}>
+          {/* ─── CATEGORY DROPDOWN (TAILWIND STYLED) ─── */}
+          <View style={tailwind.dropdownContainer}>
+            <TouchableOpacity
+              style={[
+                tailwind.dropdownTrigger,
+                isDropdownOpen && tailwind.dropdownTriggerOpen,
+              ]}
+              onPress={() => setIsDropdownOpen((prev) => !prev)}
+              activeOpacity={0.85}
+              accessibilityRole="button"
+              accessibilityLabel={`Filter orders by category: ${activeCategory.name}`}
             >
-              {STATUS_TABS.map((tab) => {
-                const isActive = statusFilter.toLowerCase() === tab.toLowerCase();
-                const count = countsByStatus[tab] ?? 0;
-                return (
-                  <TouchableOpacity
-                    key={tab}
-                    style={[styles.statusTab, isActive && styles.statusTabActive]}
-                    onPress={() => setStatusFilter(tab)}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={[styles.statusTabText, isActive && styles.statusTabTextActive]}>{tab}</Text>
-                    <View style={[styles.statusTabCount, isActive && styles.statusTabCountActive]}>
-                      <Text style={[styles.statusTabCountText, isActive && styles.statusTabCountTextActive]}>
-                        {count}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
-
-            {/* Date Range Filter Pills */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                marginTop: 8,
-                paddingHorizontal: 4,
-              }}
-            >
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginRight: 2 }}>Date:</Text>
-              {[
-                { id: 'All', label: 'All' },
-                { id: 'Today', label: 'Today' },
-                { id: 'Week', label: '7 Days' },
-                { id: 'Month', label: '30 Days' },
-              ].map((dr) => (
-                <TouchableOpacity
-                  key={dr.id}
-                  style={{
-                    paddingHorizontal: 10,
-                    paddingVertical: 4,
-                    borderRadius: 14,
-                    backgroundColor: dateFilter === dr.id ? '#0C6258' : '#F1F5F9',
-                  }}
-                  onPress={() => setDateFilter(dr.id)}
-                  activeOpacity={0.8}
+              <View style={tailwind.dropdownTriggerLeft}>
+                <View
+                  style={[
+                    tailwind.dropdownIconWrap,
+                    { backgroundColor: activeCategory.bgColor, borderColor: activeCategory.borderColor },
+                  ]}
                 >
-                  <Text
-                    style={{
-                      fontSize: 11,
-                      fontWeight: '700',
-                      color: dateFilter === dr.id ? '#FFFFFF' : '#475569',
-                    }}
-                  >
-                    {dr.label}
+                  <BootstrapIcon
+                    name={activeCategory.icon}
+                    size={15}
+                    color={activeCategory.color}
+                  />
+                </View>
+                <View style={tailwind.dropdownTextCol}>
+                  <Text style={tailwind.dropdownSubLabel}>FILTER CATEGORY</Text>
+                  <Text style={tailwind.dropdownMainLabel} numberOfLines={1}>
+                    {activeCategory.name}
                   </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-
-          {/* ─── ORDERS LIST OR EMPTY STATE ─── */}
-          {ordersList.length === 0 ? (
-            <View style={styles.emptyStateWrap}>
-              <View style={styles.emptyIconWrap}>
-                <BootstrapIcon name="box-seam" size={40} color="#0C6258" />
+                </View>
               </View>
-              <Text style={styles.emptyTitle}>No Orders Placed Yet</Text>
-              <Text style={styles.emptySubtitle}>
-                You have not placed any orders yet. Discover our latest motorcycle spare parts, performance
-                upgrades, and racing components to place your first order.
-              </Text>
-              <TouchableOpacity style={styles.emptyShopBtn} onPress={onNavigateToStore} activeOpacity={0.9}>
-                <BootstrapIcon name="bag-fill" size={15} color="#FFFFFF" />
-                <Text style={styles.emptyShopBtnText}>Start Shopping Now</Text>
-              </TouchableOpacity>
-            </View>
-          ) : filteredOrders.length === 0 ? (
-            <View style={styles.emptyStateWrap}>
-              <BootstrapIcon name="search" size={36} color="#94A3B8" style={{ marginBottom: 12 }} />
-              <Text style={styles.emptyTitle}>No Orders Match Your Filter</Text>
-              <Text style={styles.emptySubtitle}>
-                No orders found under status "{statusFilter}" or matching "{searchQuery}".
-              </Text>
-              <TouchableOpacity
-                style={styles.buyAgainBtn}
-                onPress={() => {
-                  setStatusFilter('All');
-                  setSearchQuery('');
-                }}
-              >
-                <Text style={styles.buyAgainBtnText}>Clear Search & Filters</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.orderList}>
-              {filteredOrders.map((order, orderIdx) => {
-                const isCancellable = (order.status || 'Processing').toLowerCase() === 'processing';
-                return (
-                  <View key={order.order_id || order.id || `order-${orderIdx}`} style={styles.orderCard}>
-                    {/* Header */}
-                    <View style={styles.orderCardHeader}>
-                      <View style={styles.orderHeaderLeft}>
-                        <BootstrapIcon name="receipt" size={18} color="#0C6258" />
-                        <View>
-                          <Text style={styles.orderIdText}>{order.order_id || order.id}</Text>
-                          <Text style={styles.orderDateText}>
-                            Placed on {order.order_date || 'Aug 20, 2026'} •{' '}
-                            {order.items_count || order.items?.length || 1}{' '}
-                            {order.items_count === 1 ? 'item' : 'items'}
+
+              <View style={tailwind.dropdownTriggerRight}>
+                <View style={tailwind.categoryCountPill}>
+                  <Text style={tailwind.categoryCountText}>
+                    {categoryCounts[activeCategory.id] ?? 0}{' '}
+                    {(categoryCounts[activeCategory.id] ?? 0) === 1 ? 'Order' : 'Orders'}
+                  </Text>
+                </View>
+                <View
+                  style={[
+                    tailwind.chevronBox,
+                    isDropdownOpen && tailwind.chevronBoxOpen,
+                  ]}
+                >
+                  <BootstrapIcon
+                    name={isDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                    size={12}
+                    color={isDropdownOpen ? '#0C6258' : '#64748B'}
+                  />
+                </View>
+              </View>
+            </TouchableOpacity>
+
+            {/* Expandable Dropdown Menu Card */}
+            {isDropdownOpen && (
+              <View style={tailwind.dropdownMenuCard}>
+                <View style={tailwind.dropdownMenuHeader}>
+                  <Text style={tailwind.dropdownMenuHeaderTitle}>Select Category</Text>
+                  <TouchableOpacity
+                    onPress={() => setIsDropdownOpen(false)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <BootstrapIcon name="x-circle-fill" size={16} color="#94A3B8" />
+                  </TouchableOpacity>
+                </View>
+
+                {ORDER_CATEGORIES.map((cat) => {
+                  const isSelected = orderFilter === cat.id;
+                  const count = categoryCounts[cat.id] ?? 0;
+                  return (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[
+                        tailwind.dropdownMenuItem,
+                        isSelected && tailwind.dropdownMenuItemSelected,
+                      ]}
+                      onPress={() => {
+                        setOrderFilter(cat.id);
+                        setIsDropdownOpen(false);
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={tailwind.dropdownMenuItemLeft}>
+                        <View
+                          style={[
+                            tailwind.itemIconWrap,
+                            { backgroundColor: cat.bgColor, borderColor: cat.borderColor },
+                          ]}
+                        >
+                          <BootstrapIcon name={cat.icon} size={15} color={cat.color} />
+                        </View>
+                        <View style={tailwind.itemInfoCol}>
+                          <Text
+                            style={[
+                              tailwind.itemTitle,
+                              isSelected && tailwind.itemTitleSelected,
+                            ]}
+                          >
+                            {cat.name}
+                          </Text>
+                          <Text style={tailwind.itemDesc} numberOfLines={1}>
+                            {cat.description}
                           </Text>
                         </View>
                       </View>
 
-                      {renderStatusBadge(order.status)}
-                    </View>
-
-                    {/* Order Items */}
-                    <View style={styles.orderItemsWrap}>
-                      {order.items && order.items.length > 0 ? (
-                        order.items.map((item, idx) => (
-                          <View key={idx} style={styles.orderItemRow}>
-                            <Image
-                              source={{
-                                uri:
-                                  item.image ||
-                                  'https://images.unsplash.com/photo-1530549387789-4c1017266635?auto=format&fit=crop&w=800&q=80',
-                              }}
-                              style={styles.orderItemThumb}
-                            />
-                            <View style={styles.orderItemDetails}>
-                              <Text style={styles.orderItemName} numberOfLines={2}>
-                                {item.name}
-                              </Text>
-                              <Text style={styles.orderItemSub}>
-                                Qty: {item.quantity || 1} • Unit: ${Number(item.price || 0).toFixed(2)}
-                              </Text>
-                            </View>
-                            <View style={styles.orderItemPriceCol}>
-                              <Text style={styles.orderItemPrice}>
-                                ₱{(Number(item.price || 0) * (item.quantity || 1)).toFixed(2)}
-                              </Text>
-                            </View>
-                          </View>
-                        ))
-                      ) : (
-                        <Text style={{ fontSize: 13.5, color: '#475569' }}>{order.items_summary}</Text>
-                      )}
-
-                      {/* Customer & Delivery address snippet */}
-                      <View
-                        style={{
-                          backgroundColor: '#F8FAFC',
-                          padding: 10,
-                          borderRadius: 10,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 8,
-                          marginTop: 4,
-                        }}
-                      >
-                        <BootstrapIcon name="geo-alt-fill" size={13} color="#64748B" />
-                        <Text style={{ fontSize: 12, color: '#475569', flex: 1 }} numberOfLines={1}>
-                          Shipping to:{' '}
-                          <Text style={{ fontWeight: '700' }}>{order.customer_name || 'Alex Rider'}</Text> (
-                          {order.customer_address || '742 Evergreen Terrace, Springfield, OR'})
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Footer / Actions */}
-                    <View style={styles.orderCardFooter}>
-                      <View style={styles.orderMetaCol}>
-                        <Text style={styles.orderTotalLabel}>Grand Total Paid</Text>
-                        <Text style={styles.orderTotalValue}>
-                          ₱{Number(order.grand_total || order.total_amount || 0).toFixed(2)}
-                        </Text>
-                        <Text style={styles.paymentMethodText}>
-                          via {order.payment_method || 'Credit Card / Apple Pay'}
-                        </Text>
-                      </View>
-
-                      <View style={styles.orderActionsRow}>
-                        {/* Track on Live Map */}
-                        <TouchableOpacity
-                          style={[styles.trackShipmentBtn, { backgroundColor: '#0F172A', gap: 6 }]}
-                          onPress={() => {
-                            setSelectedOrderForTracking(order);
-                            setIsTrackingModalOpen(true);
-                          }}
-                          activeOpacity={0.85}
+                      <View style={tailwind.dropdownMenuItemRight}>
+                        <View
+                          style={[
+                            tailwind.itemCountBadge,
+                            isSelected && tailwind.itemCountBadgeSelected,
+                          ]}
                         >
-                          <BootstrapIcon name="map-fill" size={13} color="#FFFFFF" />
-                          <Text style={styles.trackShipmentBtnText}>Track on Live Map</Text>
-                        </TouchableOpacity>
-
-                        {/* Buy Again */}
-                        <TouchableOpacity
-                          style={styles.buyAgainBtn}
-                          onPress={() => handleBuyAgain(order)}
-                          activeOpacity={0.85}
-                        >
-                          <BootstrapIcon name="arrow-repeat" size={13} color="#0C6258" />
-                          <Text style={styles.buyAgainBtnText}>Buy Again</Text>
-                        </TouchableOpacity>
-
-                        {/* View Invoice */}
-                        <TouchableOpacity
-                          style={styles.invoiceBtn}
-                          onPress={() => {
-                            setSelectedOrderForInvoice(order);
-                            setIsInvoiceModalOpen(true);
-                          }}
-                          activeOpacity={0.85}
-                        >
-                          <BootstrapIcon name="receipt" size={12} color="#475569" />
-                          <Text style={styles.invoiceBtnText}>Invoice</Text>
-                        </TouchableOpacity>
-
-                        {/* Cancel Order (if still in Processing) */}
-                        {isCancellable && (
-                          <TouchableOpacity
-                            style={styles.cancelOrderBtn}
-                            onPress={() => {
-                              setOrderToCancel(order);
-                              setIsCancelModalOpen(true);
-                            }}
-                            activeOpacity={0.85}
+                          <Text
+                            style={[
+                              tailwind.itemCountText,
+                              isSelected && tailwind.itemCountTextSelected,
+                            ]}
                           >
-                            <BootstrapIcon name="x-lg" size={11} color="#DC2626" />
-                            <Text style={styles.cancelOrderBtnText}>Cancel</Text>
-                          </TouchableOpacity>
+                            {count}
+                          </Text>
+                        </View>
+                        {isSelected && (
+                          <View style={tailwind.checkWrap}>
+                            <BootstrapIcon name="check-circle-fill" size={16} color="#0C6258" />
+                          </View>
                         )}
                       </View>
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          )}
-        </View>
-      </ScrollView>
-
-      {/* ─── MODAL 1: LIVE INTERACTIVE GPS MAP TRACKING MODAL ─── */}
-      <LiveOrderTrackingMapModal
-        visible={isTrackingModalOpen}
-        order={selectedOrderForTracking}
-        onClose={() => setIsTrackingModalOpen(false)}
-        showToast={showToast}
-      />
-
-      {/* ─── MODAL 1.5: PROFILE & SETTINGS MODAL ─── */}
-      <ProfileModal
-        visible={isProfileModalOpen}
-        onClose={() => setIsProfileModalOpen(false)}
-        onNavigateToOrders={() => setIsProfileModalOpen(false)}
-        onNavigateToWishlist={onNavigateToWishlist}
-        onNavigateToAdmin={onNavigateToAdmin}
-        showToast={showToast}
-      />
-
-      {/* ─── MODAL 2: INVOICE / RECEIPT MODAL ─── */}
-      <Modal visible={isInvoiceModalOpen} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxWidth: 580 }]}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <BootstrapIcon name="receipt" size={18} color="#0C6258" />
-                <Text style={styles.modalTitle}>Official Purchase Receipt</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsInvoiceModalOpen(false)}>
-                <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+            )}
+          </View>
+
+          {/* ─── ORDERS LIST OR EMPTY STATE ─── */}
+          {filteredOrders.length === 0 ? (
+            <View style={tailwind.emptyContainer}>
+              <View style={tailwind.emptyIconCircle}>
+                <BootstrapIcon name="box-seam" size={32} color="#94A3B8" />
+              </View>
+              <Text style={tailwind.emptyTitle}>
+                {ordersList.length === 0 ? 'No Orders Placed Yet' : 'No Orders Found'}
+              </Text>
+              <Text style={tailwind.emptySubtitle}>
+                {ordersList.length === 0
+                  ? "You haven't placed any orders yet. Discover our premium motorcycle parts, exhaust systems, and accessories!"
+                  : `You have no orders matching "${activeCategory.name}". Browse our curated catalog of motorparts!`}
+              </Text>
+              <TouchableOpacity
+                style={tailwind.emptyCtaBtn}
+                onPress={onNavigateToStore}
+                activeOpacity={0.85}
+              >
+                <BootstrapIcon name="cart-fill" size={14} color="#FFFFFF" />
+                <Text style={tailwind.emptyCtaBtnText}>Explore Motorparts</Text>
               </TouchableOpacity>
             </View>
+          ) : (
+            filteredOrders.map((order, idx) => {
+              const badge = getStatusBadgeStyle(order.status);
+              const orderId = order.order_id || order.id || `ord-${idx + 1}`;
+              const orderDate = order.order_date || order.date || 'Recent';
+              const summary =
+                order.items_summary ||
+                order.itemsSummary ||
+                (Array.isArray(order.items)
+                  ? order.items.map((i) => `${i.name} (x${i.quantity || 1})`).join(', ')
+                  : 'Genuine Motorcycle Parts & Accessories');
+              const totalAmount = Number(
+                order.grand_total || order.grandTotal || order.total_amount || order.total || 0
+              );
 
-            {selectedOrderForInvoice && (
-              <ScrollView showsVerticalScrollIndicator={false}>
-                <View style={styles.invoicePaper}>
-                  {/* Company & Invoice Header */}
-                  <View style={styles.invoiceHeader}>
+              const isDelivered =
+                (order.status || '').toLowerCase().includes('delivered') ||
+                (order.status || '').toLowerCase().includes('completed');
+              const isOutForDelivery = isOutForDeliveryStatus(order.status);
+              const isOrderRated = Boolean(order.is_rated);
+              const ratedScore = Number(order.rating_data?.customer_rating || 5);
+              const confirmedAt = order.admin_confirmed_at || order.updated_at || null;
+              const statusLabel = getDisplayStatusLabel(order.status);
+
+              return (
+                <View key={orderId} style={tailwind.orderCard}>
+                  {/* Card Header: Order ID, Date & Status Pill */}
+                  <View style={tailwind.orderCardHeader}>
                     <View>
-                      <View style={{ marginBottom: 6 }}>
-                        <BrandLogo size={28} />
-                      </View>
-                      <Text style={styles.invoiceSub}>
-                        Invoice #{selectedOrderForInvoice.order_id || selectedOrderForInvoice.id}
-                      </Text>
-                      <Text style={styles.invoiceSub}>
-                        Date: {selectedOrderForInvoice.order_date || 'Aug 20, 2026'}
-                      </Text>
+                      <Text style={tailwind.orderIdText}>Order #{orderId}</Text>
+                      <Text style={tailwind.orderDateText}>{orderDate}</Text>
                     </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#16A34A' }}>PAID IN FULL</Text>
-                      <Text style={styles.invoiceSub}>
-                        {selectedOrderForInvoice.payment_method || 'Credit Card'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Customer Information */}
-                  <View style={{ marginBottom: 16 }}>
-                    <Text
-                      style={{
-                        fontSize: 11.5,
-                        fontWeight: '800',
-                        color: '#64748B',
-                        textTransform: 'uppercase',
-                      }}
+                    <View
+                      style={[
+                        tailwind.statusPill,
+                        { backgroundColor: badge.bg, borderColor: badge.border, borderWidth: 1 },
+                      ]}
                     >
-                      Billed & Shipped To:
-                    </Text>
-                    <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0F172A', marginTop: 2 }}>
-                      {selectedOrderForInvoice.customer_name || 'Alex Rider'}
-                    </Text>
-                    <Text style={{ fontSize: 12.5, color: '#475569' }}>
-                      {selectedOrderForInvoice.customer_address ||
-                        '742 Evergreen Terrace, Springfield, OR 97477'}
-                    </Text>
-                    {selectedOrderForInvoice.customer_phone ? (
-                      <Text style={{ fontSize: 12, color: '#64748B' }}>
-                        Tel: {selectedOrderForInvoice.customer_phone}
+                      <Text style={[tailwind.statusPillText, { color: badge.text }]}>
+                        {statusLabel}
                       </Text>
-                    ) : null}
+                    </View>
                   </View>
 
-                  {/* Itemized list */}
-                  <Text
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: '800',
-                      color: '#64748B',
-                      textTransform: 'uppercase',
-                      marginBottom: 6,
-                    }}
-                  >
-                    Purchased Items:
+                  {/* Card Body: Items Summary */}
+                  <Text style={tailwind.orderItemsSummary} numberOfLines={3}>
+                    {summary}
                   </Text>
-                  {selectedOrderForInvoice.items && selectedOrderForInvoice.items.length > 0 ? (
-                    selectedOrderForInvoice.items.map((item, idx) => (
-                      <View key={idx} style={styles.invoiceItemRow}>
-                        <Text style={styles.invoiceItemName}>
-                          {item.name}{' '}
-                          <Text style={{ color: '#64748B', fontWeight: '600' }}>(x{item.quantity || 1})</Text>
+
+                  {isOutForDelivery && (
+                    <View style={tailwind.deliveryMetaBlock}>
+                      {order.rider_name ? (
+                        <Text style={tailwind.deliveryMetaText}>
+                          Rider: {order.rider_name}
                         </Text>
-                        <Text style={styles.invoiceItemPrice}>
-                          ₱{(Number(item.price || 0) * (item.quantity || 1)).toFixed(2)}
+                      ) : null}
+                      {order.estimated_delivery ? (
+                        <Text style={tailwind.deliveryMetaText}>
+                          Expected: {order.estimated_delivery}
                         </Text>
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={{ fontSize: 13, color: '#0F172A', paddingVertical: 6 }}>
-                      {selectedOrderForInvoice.items_summary}
-                    </Text>
+                      ) : null}
+                      <Text style={tailwind.deliveryMetaText}>
+                        Optional: Confirm Received after you get the package. The store finalizes delivery.
+                      </Text>
+                      {!order.customer_delivery_confirmed ? (
+                        <TouchableOpacity
+                          style={{
+                            marginTop: 8,
+                            backgroundColor: '#0C6258',
+                            borderRadius: 10,
+                            paddingVertical: 8,
+                            paddingHorizontal: 12,
+                            alignSelf: 'flex-start',
+                          }}
+                          onPress={async (e) => {
+                            e?.stopPropagation?.();
+                            const oid = order.order_id || order.id;
+                            const res = await deliveryService.customerConfirmReceived({
+                              orderId: oid,
+                              customerUser: currentUser,
+                            });
+                            if (res.success) {
+                              showToast?.('Thanks — store notified you received the order');
+                              setOrdersList((prev) =>
+                                (prev || []).map((o) =>
+                                  o.order_id === oid || o.id === oid
+                                    ? {
+                                        ...o,
+                                        customer_delivery_confirmed: true,
+                                        customer_delivery_confirmed_at: new Date().toISOString(),
+                                      }
+                                    : o
+                                )
+                              );
+                            } else {
+                              showToast?.(res.error || 'Could not confirm receipt');
+                            }
+                          }}
+                        >
+                          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>
+                            Confirm Received
+                          </Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <Text style={[tailwind.deliveryMetaText, { color: '#047857', marginTop: 6 }]}>
+                          You confirmed receipt
+                        </Text>
+                      )}
+                    </View>
                   )}
 
-                  {/* Pricing breakdown */}
-                  <View
-                    style={{
-                      marginTop: 14,
-                      paddingTop: 10,
-                      borderTopWidth: 1,
-                      borderTopColor: '#E2E8F0',
-                      gap: 6,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 12.5, color: '#64748B' }}>Subtotal</Text>
-                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A' }}>
-                        ₱
-                        {Number(
-                          selectedOrderForInvoice.total_amount || selectedOrderForInvoice.grand_total || 0
-                        ).toFixed(2)}
-                      </Text>
-                    </View>
-
-                    {Number(selectedOrderForInvoice.discount_amount || 0) > 0 && (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 12.5, color: '#16A34A' }}>Promo Voucher Discount</Text>
-                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#16A34A' }}>
-                          -₱{Number(selectedOrderForInvoice.discount_amount).toFixed(2)}
+                  {isDelivered && (
+                      <View style={tailwind.confirmedBanner}>
+                        <BootstrapIcon name="check-circle-fill" size={13} color="#15803D" />
+                        <Text style={tailwind.confirmedBannerText}>
+                          Delivered by the store
+                          {confirmedAt
+                            ? ` · ${new Date(confirmedAt).toLocaleString()}`
+                            : ''}
                         </Text>
                       </View>
                     )}
 
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 12.5, color: '#64748B' }}>Standard Shipping</Text>
-                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#16A34A' }}>
-                        FREE (₱0.00)
-                      </Text>
+                  {/* Card Footer: Total Amount & Action Buttons */}
+                  <View style={tailwind.orderCardFooter}>
+                    <View>
+                      <Text style={tailwind.orderTotalLabel}>Total Amount</Text>
+                      <Text style={tailwind.orderTotalPrice}>₱{totalAmount.toLocaleString()}</Text>
                     </View>
 
-                    <View style={styles.invoiceTotalRow}>
-                      <Text style={styles.invoiceTotalLabel}>Grand Total</Text>
-                      <Text style={styles.invoiceTotalVal}>
-                        ₱
-                        {Number(
-                          selectedOrderForInvoice.grand_total || selectedOrderForInvoice.total_amount || 0
-                        ).toFixed(2)}
-                      </Text>
+                    <View style={tailwind.orderActionBtnsRow}>
+                      {isDelivered && (
+                        <TouchableOpacity
+                          style={isOrderRated ? tailwind.orderRatedBtn : tailwind.orderRateBtn}
+                          onPress={() => handleOpenRating(order)}
+                          activeOpacity={0.85}
+                          accessibilityRole="button"
+                          accessibilityLabel={isOrderRated ? "View or edit rating" : "Rate delivered items"}
+                        >
+                          <BootstrapIcon
+                            name="star-fill"
+                            size={12}
+                            color={isOrderRated ? '#D97706' : '#FFFFFF'}
+                          />
+                          <Text
+                            style={
+                              isOrderRated
+                                ? tailwind.orderRatedBtnText
+                                : tailwind.orderRateBtnText
+                            }
+                          >
+                            {isOrderRated ? `Rated ${ratedScore.toFixed(1)} ★` : 'Rate Items'}
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+
+                      <TouchableOpacity
+                        style={tailwind.orderTrackBtn}
+                        onPress={() => handleTrackOrder(order)}
+                        activeOpacity={0.85}
+                      >
+                        <BootstrapIcon name="geo-alt-fill" size={13} color="#065F46" />
+                        <Text style={tailwind.orderTrackBtnText}>
+                          {isDelivered ? 'Route' : 'Track Order'}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
                 </View>
-
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <TouchableOpacity
-                    style={[styles.buyAgainBtn, { flex: 1, justifyContent: 'center' }]}
-                    onPress={() => {
-                      showToast('Receipt download initiated / print preview ready.');
-                      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                        window.print?.();
-                      }
-                    }}
-                  >
-                    <BootstrapIcon name="download" size={13} color="#0C6258" />
-                    <Text style={styles.buyAgainBtnText}>Download / Print</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.trackShipmentBtn, { flex: 1, justifyContent: 'center' }]}
-                    onPress={() => setIsInvoiceModalOpen(false)}
-                  >
-                    <Text style={styles.trackShipmentBtnText}>Close Receipt</Text>
-                  </TouchableOpacity>
-                </View>
-              </ScrollView>
-            )}
-          </View>
+              );
+            })
+          )}
         </View>
-      </Modal>
+      </ScrollView>
 
-      {/* ─── MODAL 3: CONFIRM CANCEL ORDER MODAL ─── */}
-      <Modal visible={isCancelModalOpen} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { maxWidth: 420, alignItems: 'center' }]}>
-            <BootstrapIcon name="x-lg" size={36} color="#DC2626" style={{ marginBottom: 12 }} />
-            <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A', marginBottom: 6 }}>
-              Cancel Order {orderToCancel?.order_id || orderToCancel?.id}?
-            </Text>
-            <Text
-              style={{
-                fontSize: 13.5,
-                color: '#64748B',
-                textAlign: 'center',
-                lineHeight: 20,
-                marginBottom: 20,
-              }}
-            >
-              Are you sure you want to cancel this order? Once cancelled, the items will not be dispatched and
-              a full refund will be credited back to your payment method.
-            </Text>
+      {/* ─── LIVE GPS TRACKING MODAL ─── */}
+      <LiveOrderTrackingMapModal
+        visible={isLiveTrackingOpen}
+        order={selectedOrderForTracking}
+        onClose={() => setIsLiveTrackingOpen(false)}
+      />
 
-            <View style={{ flexDirection: 'row', gap: 10, width: '100%' }}>
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  backgroundColor: '#F1F5F9',
-                  paddingVertical: 11,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                }}
-                onPress={() => {
-                  setIsCancelModalOpen(false);
-                  setOrderToCancel(null);
-                }}
-              >
-                <Text style={{ color: '#475569', fontWeight: '700', fontSize: 13.5 }}>Keep Order</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={{
-                  flex: 1,
-                  backgroundColor: '#DC2626',
-                  paddingVertical: 11,
-                  borderRadius: 12,
-                  alignItems: 'center',
-                }}
-                onPress={handleCancelOrderConfirm}
-              >
-                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13.5 }}>Yes, Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* ─── RATE DELIVERED ITEMS MODAL ─── */}
+      <RateDeliveredOrderModal
+        visible={isRateModalOpen}
+        order={selectedOrderForRating}
+        currentUser={currentUser}
+        onClose={() => setIsRateModalOpen(false)}
+        onSubmitSuccess={() => {
+          fetchOrders();
+        }}
+      />
 
       {/* ─── PERSISTENT MOBILE BOTTOM NAVIGATION ─── */}
       <BottomNavBar
@@ -875,3 +707,494 @@ export default function OrderPage({
     </SafeAreaView>
   );
 }
+
+// ─── TAILWIND-INSPIRED ORGANIZED STYLES ──────────────────────────────────────────
+const tailwind = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    paddingTop: 12,
+    paddingBottom: 100,
+  },
+  maxContainer: {
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
+    paddingHorizontal: 16,
+  },
+
+  // Top Bar
+  topBar: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  topBarInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    maxWidth: 720,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  backBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F0FDFA',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#CCFBF1',
+  },
+  backBtnText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#0C6258',
+  },
+  headerTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+  orderBadgePill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  orderBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: '#475569',
+  },
+
+  // Category Dropdown Styles (Tailwind CSS Aesthetic)
+  dropdownContainer: {
+    marginBottom: 14,
+    zIndex: 40,
+  },
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  dropdownTriggerOpen: {
+    borderColor: '#0C6258',
+    backgroundColor: '#F9FCFB',
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+  },
+  dropdownTriggerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  dropdownIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  dropdownTextCol: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  dropdownSubLabel: {
+    fontSize: 9.5,
+    fontWeight: '800',
+    color: '#94A3B8',
+    letterSpacing: 0.6,
+    marginBottom: 1,
+  },
+  dropdownMainLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  dropdownTriggerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  categoryCountPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  categoryCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  chevronBox: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  chevronBoxOpen: {
+    backgroundColor: '#E6F4F1',
+    borderColor: '#CCFBF1',
+  },
+  dropdownMenuCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 8,
+    marginTop: 6,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  dropdownMenuHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    marginBottom: 4,
+  },
+  dropdownMenuHeaderTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dropdownMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 8,
+    paddingVertical: 9,
+    borderRadius: 12,
+    marginBottom: 3,
+  },
+  dropdownMenuItemSelected: {
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  dropdownMenuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  itemIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 9,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  itemInfoCol: {
+    flex: 1,
+  },
+  itemTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  itemTitleSelected: {
+    color: '#0C6258',
+    fontWeight: '800',
+  },
+  itemDesc: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 1,
+  },
+  dropdownMenuItemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  itemCountBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 7,
+    paddingVertical: 2.5,
+    borderRadius: 10,
+  },
+  itemCountBadgeSelected: {
+    backgroundColor: '#DCFCE7',
+  },
+  itemCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  itemCountTextSelected: {
+    color: '#15803D',
+  },
+  checkWrap: {
+    marginLeft: 2,
+  },
+
+  // Order Card (Tailwind-like: bg-white rounded-2xl p-4 border border-slate-200 shadow-sm)
+  orderCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  orderCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
+  orderIdText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  orderDateText: {
+    fontSize: 11.5,
+    color: '#94A3B8',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  statusPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 3.5,
+    borderRadius: 10,
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  orderItemsSummary: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#334155',
+    lineHeight: 19,
+    marginBottom: 12,
+  },
+  orderCardFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F8FAFC',
+  },
+  orderTotalLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+  },
+  orderTotalPrice: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#0C6258',
+    marginTop: 1,
+  },
+  orderTrackBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  orderTrackBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#065F46',
+  },
+  orderActionBtnsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  orderRateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#D97706',
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 10,
+    shadowColor: '#D97706',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  orderRateBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  orderRatedBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  orderRatedBtnText: {
+    fontSize: 11.5,
+    fontWeight: '800',
+    color: '#B45309',
+  },
+  deliveryMetaBlock: {
+    backgroundColor: '#F0FDFA',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#CCFBF1',
+    padding: 12,
+    marginBottom: 12,
+    gap: 4,
+  },
+  deliveryMetaText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#0F766E',
+    marginBottom: 2,
+  },
+  confirmedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#DCFCE7',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  confirmedBannerText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#15803D',
+  },
+
+  // Empty State (Tailwind centered card)
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 50,
+    paddingHorizontal: 24,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 10,
+  },
+  emptyIconCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  emptyTitle: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 19,
+    marginBottom: 20,
+    maxWidth: 320,
+  },
+  emptyCtaBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#0C6258',
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 12,
+    shadowColor: '#0C6258',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  emptyCtaBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+});

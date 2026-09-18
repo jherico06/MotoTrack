@@ -815,6 +815,106 @@ class NotificationService {
       icon: 'shield-lock-fill',
     });
   }
+
+  async notifyCustomerOutForDelivery({ userId, orderId, riderName, expectedDelivery }) {
+    const expectText = expectedDelivery
+      ? ` Expected: ${new Date(expectedDelivery).toLocaleDateString()}.`
+      : '';
+    return this.addNotification({
+      target: 'customer',
+      userId: userId || 'guest',
+      category: 'delivery_out',
+      type: 'order',
+      priority: 'high',
+      title: 'Your order is out for delivery',
+      message: `Your order #${orderId} is out for delivery${riderName ? ` with ${riderName}` : ''}.${expectText} The rider will confirm drop-off; the store then finalizes delivery.`,
+      meta: { orderId, riderName },
+      link: 'orders',
+      icon: 'truck',
+    });
+  }
+
+  async notifyAdminDeliveryConfirmed({
+    orderId,
+    customerName,
+    riderName,
+    confirmedAt,
+    adminOverride = true,
+  }) {
+    const timeLabel = confirmedAt
+      ? new Date(confirmedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+      : '';
+    return this.addNotification({
+      target: 'admin',
+      category: 'delivery_confirmed',
+      type: 'order',
+      priority: 'high',
+      title: 'Order Delivered',
+      message: `Order #${orderId} has been marked as delivered${customerName ? ` for ${customerName}` : ''}.${riderName ? ` Rider: ${riderName}.` : ''}${timeLabel ? ` Time: ${timeLabel}.` : ''} Confirmed by store admin.`,
+      meta: { orderId, customerName, riderName, confirmedAt, adminOverride },
+      link: 'orders',
+      icon: 'check-circle-fill',
+    });
+  }
+
+  async notifyAdminRiderReportedDelivered({ orderId, riderName, notes, reportedBy }) {
+    return this.addNotification({
+      target: 'admin',
+      category: 'rider_reported_delivered',
+      type: 'order',
+      priority: 'high',
+      title: 'Delivery Reported',
+      message: `${riderName || 'The rider'} reported that order #${orderId} was delivered.${notes ? ` Note: ${notes}` : ''} Review the report and tap Confirm Delivery.${reportedBy ? ` Reported by ${reportedBy}.` : ''}`,
+      meta: { orderId, riderName, notes, reportedBy },
+      link: 'orders',
+      icon: 'bicycle',
+    });
+  }
+
+  async notifyCustomerDeliveryConfirmed({ userId, orderId }) {
+    return this.addNotification({
+      target: 'customer',
+      userId: userId || 'guest',
+      category: 'delivery_confirmed',
+      type: 'order',
+      priority: 'medium',
+      title: 'Order Delivered',
+      message: `Your order #${orderId} has been marked as delivered by the store. If you did not receive it, please contact MotoTrack support.`,
+      meta: { orderId },
+      link: 'orders',
+      icon: 'check-circle-fill',
+    });
+  }
+
+  async notifyCustomerDeliveryFailed({ userId, orderId, notes }) {
+    return this.addNotification({
+      target: 'customer',
+      userId: userId || 'guest',
+      category: 'delivery_failed',
+      type: 'order',
+      priority: 'high',
+      title: 'Delivery attempt failed',
+      message: `We could not complete delivery for order #${orderId}.${notes ? ` ${notes}` : ''} The store will reschedule.`,
+      meta: { orderId, notes },
+      link: 'orders',
+      icon: 'exclamation-triangle',
+    });
+  }
+
+  async notifyCustomerDeliveryRescheduled({ userId, orderId, notes }) {
+    return this.addNotification({
+      target: 'customer',
+      userId: userId || 'guest',
+      category: 'delivery_rescheduled',
+      type: 'order',
+      priority: 'medium',
+      title: 'Delivery rescheduled',
+      message: `Delivery for order #${orderId} has been rescheduled.${notes ? ` ${notes}` : ''} We will assign a rider again shortly.`,
+      meta: { orderId, notes },
+      link: 'orders',
+      icon: 'arrow-repeat',
+    });
+  }
 }
 
 export const notificationService = new NotificationService();

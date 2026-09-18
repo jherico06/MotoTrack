@@ -10,10 +10,14 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.moto.shop"
+      "bundleIdentifier": "com.moto.shop",
+      "infoPlist": {
+        "NSCameraUsageDescription": "MotoTrack riders use the camera to scan order QR codes and confirm deliveries."
+      }
     },
     "android": {
       "package": "com.moto.shop",
+      "permissions": ["CAMERA", "android.permission.CAMERA"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -24,7 +28,16 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "MotoTrack riders use the camera to scan order QR codes and confirm deliveries.",
+          "microphonePermission": "MotoTrack does not record audio during delivery scans.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ]
     ]
   }
 }

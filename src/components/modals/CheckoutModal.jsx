@@ -15,7 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { formatPHPhone } from './LiveOrderTrackingMapModal';
 
-export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpenProfile }) {
+export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpenProfile, isPlacingOrder = false }) {
   const { currentUser, updateProfile } = useAuth();
   const { cartItemCount, cartTotal, showToast } = useCart();
 
@@ -27,6 +27,7 @@ export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpe
     'MP-GCASH-' + Math.floor(100000 + Math.random() * 900000)
   );
   const [codChangeFor, setCodChangeFor] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Inline Quick Address Editor (if user has missing address or wants quick edit)
   const [isEditingAddress, setIsEditingAddress] = useState(!currentUser?.address);
@@ -37,6 +38,7 @@ export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpe
   const customerName = currentUser?.name || currentUser?.fullName || currentUser?.email?.split('@')[0] || '';
   const customerPhone = currentUser?.phone || inlinePhone || '';
   const customerAddress = currentUser?.address || inlineAddress || '';
+  const busy = isSubmitting || isPlacingOrder;
 
   const handleSaveInlineAddress = async () => {
     if (!inlineAddress.trim()) {
@@ -62,7 +64,9 @@ export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpe
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (busy) return;
+
     if (!customerAddress || customerAddress.trim().length < 5) {
       showToast('Please add a delivery address to your profile first');
       setIsEditingAddress(true);
@@ -74,16 +78,21 @@ export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpe
       return;
     }
 
-    onCompleteOrder?.({
-      customerName,
-      customerPhone,
-      customerAddress,
-      deliveryNotes,
-      paymentMethod,
-      gcashNumber,
-      gcashReference,
-      codChangeFor,
-    });
+    setIsSubmitting(true);
+    try {
+      await onCompleteOrder?.({
+        customerName,
+        customerPhone,
+        customerAddress,
+        deliveryNotes,
+        paymentMethod,
+        gcashNumber,
+        gcashReference,
+        codChangeFor,
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -440,12 +449,23 @@ export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpe
             style={[
               styles.checkoutBtn,
               { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+              busy && { opacity: 0.7 },
             ]}
             onPress={handleSubmit}
             activeOpacity={0.9}
+            disabled={busy}
           >
-            <Text style={styles.checkoutBtnText}>Place Order Now</Text>
-            <BootstrapIcon name="arrow-right" size={14} color="#ffffff" />
+            {busy ? (
+              <>
+                <ActivityIndicator size="small" color="#ffffff" />
+                <Text style={styles.checkoutBtnText}>Placing Order...</Text>
+              </>
+            ) : (
+              <>
+                <Text style={styles.checkoutBtnText}>Place Order Now</Text>
+                <BootstrapIcon name="arrow-right" size={14} color="#ffffff" />
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </View>

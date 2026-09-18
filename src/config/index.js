@@ -8,6 +8,9 @@ const env = typeof process !== 'undefined' && process.env ? process.env : {};
 export const APP_CONFIG = {
   appName: env.EXPO_PUBLIC_APP_NAME || 'MotoTrack',
   version: '1.0.0',
+  // Public origin encoded into rider QR codes. Must be reachable from a phone
+  // (LAN IP or hosted https). localhost will fail on iPhone.
+  publicAppUrl: String(env.EXPO_PUBLIC_APP_URL || '').trim(),
   supabase: {
     url: env.EXPO_PUBLIC_SUPABASE_URL || '',
     anonKey: env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',

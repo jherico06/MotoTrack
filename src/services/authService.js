@@ -475,6 +475,10 @@ export const authService = {
     return await this.login(email, password, 'admin');
   },
 
+  async loginRider(identifier, password) {
+    return await this.login(identifier, password, 'rider');
+  },
+
   async loginCustomer(email, password) {
     return await this.login(email, password, null);
   },

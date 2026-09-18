@@ -89,7 +89,7 @@ export default function ProductSpecsModal({ visible, product, onClose, onAddToCa
               }}
               activeOpacity={0.9}
             >
-              <BootstrapIcon name="bag-plus-fill" size={14} color="#ffffff" />
+              <BootstrapIcon name="cart-plus-fill" size={14} color="#ffffff" />
               <Text style={styles.checkoutBtnText}>Add to Cart</Text>
             </TouchableOpacity>
           </View>

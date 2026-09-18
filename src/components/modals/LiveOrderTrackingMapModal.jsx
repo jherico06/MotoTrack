@@ -16,7 +16,7 @@ import {
 import { WebView } from 'react-native-webview';
 import BootstrapIcon from '../common/BootstrapIcon';
 import { useAuth } from '../../context/AuthContext';
-import { orderService } from '../../services/orderService';
+import { orderService, canCustomerCancelStatus, canCustomerRequestReturnStatus, canCustomerEditAddressStatus } from '../../services/orderService';
 
 // Route Waypoints focused across City of Naga, Cebu, Philippines
 const ROUTE_WAYPOINTS = [
@@ -151,6 +151,9 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   const [returnReason, setReturnReason] = useState('Defective / Damaged part');
   const [returnNotes, setReturnNotes] = useState('');
   const [isSubmittingAction, setIsSubmittingAction] = useState(false);
+  const canCancelOrder = canCustomerCancelStatus(activeOrder?.status);
+  const canRequestReturn = canCustomerRequestReturnStatus(activeOrder?.status);
+  const canEditAddress = canCustomerEditAddressStatus(activeOrder?.status);
 
   const handleSaveAddress = async () => {
     if (!customAddress.trim()) {
@@ -161,7 +164,11 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
     if (orderId) {
       setIsSubmittingAction(true);
       try {
-        await orderService.updateAddress(orderId, customAddress.trim());
+      const res = await orderService.updateAddress(orderId, customAddress.trim());
+        if (!res.success) {
+          showToast(res.error || 'Failed to update address');
+          return;
+        }
         showToast('Delivery address updated successfully');
         setIsAddressModalOpen(false);
       } catch (e) {
@@ -179,7 +186,11 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
     if (!orderId) return;
     setIsSubmittingAction(true);
     try {
-      await orderService.cancelOrder(orderId, cancelReason);
+      const res = await orderService.cancelOrder(orderId, cancelReason);
+      if (!res.success) {
+        showToast(res.error || 'Failed to cancel order');
+        return;
+      }
       showToast(`Order #${orderId} cancelled successfully`);
       setIsCancelModalOpen(false);
     } catch (e) {
@@ -194,10 +205,14 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
     if (!orderId) return;
     setIsSubmittingAction(true);
     try {
-      await orderService.requestReturn(orderId, {
+      const res = await orderService.requestReturn(orderId, {
         reason: returnReason,
         notes: returnNotes,
       });
+      if (!res.success) {
+        showToast(res.error || 'Failed to request return');
+        return;
+      }
       showToast(`Return requested for Order #${orderId}`);
       setIsReturnModalOpen(false);
     } catch (e) {
@@ -207,16 +222,39 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
     }
   };
 
-  // Rider & Vehicle Profile
-  const riderInfo = {
-    name: 'Marco Valerio',
-    phone: '+63 (917) 582-9410',
-    vehicle: 'Yamaha NMAX 155 (Black Edition)',
-    plateNumber: 'NMX-4892',
-    rating: 4.95,
-    totalDeliveries: 428,
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80',
-  };
+  // Rider & Vehicle Profile — from assigned registered rider on the order
+  const riderInfo = useMemo(() => {
+    const name = activeOrder?.rider_name || null;
+    const phone = activeOrder?.rider_contact || activeOrder?.rider_phone || null;
+    const vehicle =
+      activeOrder?.rider_vehicle || activeOrder?.vehicle_info || activeOrder?.rider_vehicle_info || null;
+    const plateNumber = activeOrder?.rider_plate || null;
+    const avatar =
+      activeOrder?.rider_avatar ||
+      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80';
+    if (!name) {
+      return {
+        name: null,
+        phone: null,
+        vehicle: null,
+        plateNumber: null,
+        rating: null,
+        totalDeliveries: null,
+        avatar,
+        unassigned: true,
+      };
+    }
+    return {
+      name,
+      phone: phone || '—',
+      vehicle: vehicle || 'Delivery vehicle',
+      plateNumber: plateNumber || '—',
+      rating: activeOrder?.rider_rating != null ? Number(activeOrder.rider_rating) : null,
+      totalDeliveries: null,
+      avatar,
+      unassigned: false,
+    };
+  }, [activeOrder]);
 
   // Dynamically resolve delivery address (order address -> profile address -> fallback)
   const deliveryAddressStr = useMemo(() => {
@@ -290,7 +328,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
     const destLng = 123.77;
 
     const safeDestTitle = (destSummary || 'Inoburan, City of Naga').replace(/'/g, "\\'");
-    const safeRiderName = (riderInfo?.name || 'Marco Valerio').replace(/'/g, "\\'");
+    const safeRiderName = (riderInfo?.name || 'Awaiting rider').replace(/'/g, "\\'");
 
     return `
 <!DOCTYPE html>
@@ -451,22 +489,46 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
     (activeOrder.payment_method || '').includes('COD');
   const isGCash = (activeOrder.payment_method || '').toLowerCase().includes('gcash');
 
-  // Determine active step index (0: Order placed, 1: Waiting for courier, 2: In transit, 3: Order delivered)
+  // Determine active step index (0: Order placed, 1: Ready/Packing, 2: Out for Delivery, 3: Delivered)
   const getStepIndex = () => {
-    const st = (activeOrder.status || 'In transit').toLowerCase();
+    const st = (activeOrder.status || 'Out for Delivery').toLowerCase();
     if (st.includes('pending') || st.includes('approval')) return 0;
-    if (st === 'processing') return 1;
-    if (st === 'shipped' || st.includes('transit')) return 2;
-    if (st === 'delivered') return 3;
+    if (
+      st === 'processing' ||
+      st === 'ready for delivery' ||
+      st === 'rescheduled'
+    ) {
+      return 1;
+    }
+    if (
+      st === 'shipped' ||
+      st.includes('transit') ||
+      st === 'out for delivery' ||
+      st === 'delivery failed'
+    ) {
+      return 2;
+    }
+    if (st === 'delivered' || st.includes('completed')) return 3;
     return 2;
   };
 
   const stepIndex = getStepIndex();
+  const statusLower = (activeOrder.status || '').toLowerCase();
+  const step2Label =
+    statusLower === 'delivery failed' ? 'Delivery Failed' : 'Out for Delivery';
+  const step1Label =
+    statusLower === 'rescheduled'
+      ? 'Rescheduled'
+      : statusLower === 'ready for delivery'
+        ? 'Ready for Delivery'
+        : isCOD
+          ? 'Approval / Packing'
+          : 'Ready for Delivery';
 
   const STEPS = [
     { label: 'Order placed', key: 'step-0' },
-    { label: isCOD ? 'Approval / Packing' : 'Waiting for courier', key: 'step-1' },
-    { label: 'In transit', key: 'step-2' },
+    { label: step1Label, key: 'step-1' },
+    { label: step2Label, key: 'step-2' },
     { label: 'Order delivered', key: 'step-3' },
   ];
 
@@ -493,9 +555,34 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
     showToast('Opening Google Maps...');
   };
 
-  const grandTotalValue = Number(activeOrder.grand_total || activeOrder.total_amount || 0).toFixed(2);
-  const subtotalValue = Number(activeOrder.total_amount || activeOrder.grand_total || 0).toFixed(2);
-  const discountValue = Number(activeOrder.discount_amount || 0).toFixed(2);
+  const formatMoney = (n) =>
+    Number(n || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+
+  const merchandiseSubtotal = Number(activeOrder.total_amount || 0);
+  const grandTotalNum = Number(activeOrder.grand_total || merchandiseSubtotal || 0);
+  const discountNum = Number(activeOrder.discount_amount || 0);
+  const storedShipping = activeOrder.shipping_fee;
+  const storedShippingNum = Number(storedShipping);
+  const inferredShipping =
+    Number.isFinite(grandTotalNum) && Number.isFinite(merchandiseSubtotal)
+      ? Math.max(0, Math.round((grandTotalNum - (merchandiseSubtotal - discountNum)) * 100) / 100)
+      : 0;
+  const shippingFeeNum =
+    storedShipping != null && Number.isFinite(storedShippingNum) && storedShippingNum > 0
+      ? storedShippingNum
+      : inferredShipping > 0
+        ? inferredShipping
+        : Number.isFinite(storedShippingNum)
+          ? storedShippingNum
+          : 0;
+
+  const grandTotalValue = formatMoney(grandTotalNum);
+  const subtotalValue = formatMoney(merchandiseSubtotal || grandTotalNum - shippingFeeNum + discountNum);
+  const discountValue = formatMoney(discountNum);
+  const shippingFeeValue = formatMoney(shippingFeeNum);
 
   return (
     <Modal visible={visible} transparent animationType="slide">
@@ -512,9 +599,9 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                 {stepIndex === 0
                   ? 'Order placed'
                   : stepIndex === 1
-                    ? 'Waiting for courier'
+                    ? step1Label
                     : stepIndex === 2
-                      ? 'In transit'
+                      ? step2Label
                       : 'Order delivered'}
               </Text>
               <Text style={styles.headerSubtitleText}>{arrivalRangeText}</Text>
@@ -902,7 +989,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                         </View>
                         <View style={styles.riderTooltipPillRealistic}>
                           <Text style={styles.riderTooltipNameRealistic}>
-                            🏍️ {riderInfo.name} ({etaMinutes}m)
+                            🏍️ {riderInfo.name || 'Awaiting rider'} ({etaMinutes}m)
                           </Text>
                           <Text style={styles.riderTooltipSpeedRealistic}>
                             {currentSpeed} km/h • {destCity}
@@ -935,23 +1022,51 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
 
                 {/* Rider Contact Card */}
                 <View style={styles.riderInfoBar}>
-                  <Image source={{ uri: riderInfo.avatar }} style={styles.riderAvatarSmall} />
+                  {riderInfo.unassigned ? (
+                    <View style={[styles.riderAvatarSmall, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0' }]}>
+                      <BootstrapIcon name="person" size={16} color="#94A3B8" />
+                    </View>
+                  ) : (
+                    <Image source={{ uri: riderInfo.avatar }} style={styles.riderAvatarSmall} />
+                  )}
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.riderNameSmall}>
-                      {riderInfo.name} • {riderInfo.vehicle}
-                    </Text>
-                    <Text style={styles.riderPlateText}>
-                      Plate: {riderInfo.plateNumber} • ⭐️ {riderInfo.rating} (Express Rider)
-                    </Text>
+                    {riderInfo.unassigned ? (
+                      <>
+                        <Text style={styles.riderNameSmall}>Awaiting rider assignment</Text>
+                        <Text style={styles.riderPlateText}>
+                          Admin will assign a registered delivery rider
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.riderNameSmall}>
+                          {riderInfo.name}
+                          {riderInfo.vehicle ? ` • ${riderInfo.vehicle}` : ''}
+                        </Text>
+                        <Text style={styles.riderPlateText}>
+                          {riderInfo.plateNumber && riderInfo.plateNumber !== '—'
+                            ? `Plate: ${riderInfo.plateNumber}`
+                            : 'Registered delivery rider'}
+                          {riderInfo.rating != null ? ` • ⭐️ ${riderInfo.rating}` : ''}
+                        </Text>
+                      </>
+                    )}
                   </View>
-                  <TouchableOpacity
-                    style={styles.riderCallSmallBtn}
-                    onPress={() => setIsCallingRider(true)}
-                    activeOpacity={0.8}
-                  >
-                    <BootstrapIcon name="telephone-fill" size={13} color="#FFFFFF" />
-                    <Text style={styles.riderCallSmallText}>Call</Text>
-                  </TouchableOpacity>
+                  {!riderInfo.unassigned && riderInfo.phone && riderInfo.phone !== '—' ? (
+                    <TouchableOpacity
+                      style={styles.riderCallSmallBtn}
+                      onPress={() => {
+                        if (Platform.OS === 'web' && typeof Linking !== 'undefined') {
+                          Linking.openURL(`tel:${String(riderInfo.phone).replace(/[^\d+]/g, '')}`);
+                        }
+                        setIsCallingRider(true);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <BootstrapIcon name="telephone-fill" size={13} color="#FFFFFF" />
+                      <Text style={styles.riderCallSmallText}>Call</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
             )}
@@ -1123,13 +1238,21 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                   )}
                   <View style={styles.priceBreakdownLine}>
                     <Text style={styles.priceBreakdownLabel}>Delivery Fee</Text>
-                    <Text style={[styles.priceBreakdownVal, { color: '#0C6258' }]}>FREE</Text>
+                    <Text
+                      style={[
+                        styles.priceBreakdownVal,
+                        shippingFeeNum === 0 ? { color: '#0C6258' } : null,
+                      ]}
+                    >
+                      {shippingFeeNum > 0 ? `₱${shippingFeeValue}` : '₱0.00'}
+                    </Text>
                   </View>
                 </View>
               )}
             </View>
 
             {/* ─── 7. FREE RETURNS AT YOUR CONVENIENCE CARD ─── */}
+            {canRequestReturn && (
             <TouchableOpacity
               style={styles.freeReturnsBar}
               onPress={() => setIsReturnModalOpen(true)}
@@ -1144,16 +1267,19 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
               </View>
               <BootstrapIcon name="chevron-right" size={13} color="#64748B" />
             </TouchableOpacity>
+            )}
           </ScrollView>
 
           {/* ─── 8. BOTTOM ACTION BUTTONS (CHANGE ADDRESS / CANCEL ORDER) ─── */}
           <View style={styles.bottomButtonsContainer}>
             <TouchableOpacity
-              style={styles.secondaryBottomBtn}
+              style={[styles.secondaryBottomBtn, showLiveMapDrawer && !canEditAddress && { opacity: 0.5 }]}
               onPress={() => {
                 if (!showLiveMapDrawer) {
                   setShowLiveMapDrawer(true);
                   showToast('Opened Google Maps view');
+                } else if (!canEditAddress) {
+                  showToast('Address cannot be changed after the order is out for delivery.');
                 } else {
                   setIsAddressModalOpen(true);
                 }
@@ -1168,12 +1294,12 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
             <TouchableOpacity
               style={[
                 styles.primaryCancelBtn,
-                (activeOrder?.status === 'Cancelled' || activeOrder?.status === 'Delivered') && {
+                !canCancelOrder && {
                   opacity: 0.5,
                   backgroundColor: '#94A3B8',
                 },
               ]}
-              disabled={activeOrder?.status === 'Cancelled' || activeOrder?.status === 'Delivered'}
+              disabled={!canCancelOrder}
               onPress={() => setIsCancelModalOpen(true)}
               activeOpacity={0.85}
             >
@@ -1400,7 +1526,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
           )}
 
           {/* ─── SIMULATED PHONE CALL MODAL ─── */}
-          {isCallingRider && (
+          {isCallingRider && !riderInfo.unassigned && (
             <View style={styles.callDialogOverlay}>
               <View style={styles.callDialogCard}>
                 <View style={styles.callAvatarPulse}>

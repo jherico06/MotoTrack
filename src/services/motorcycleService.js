@@ -60,8 +60,8 @@ export const MOTORCYCLE_PHOTO_PRESETS = [
 const DEFAULT_SEED_MOTORCYCLES = [
   {
     motorcycle_id: 'moto-seed-01',
-    user_id: 'usr-rider-01',
-    customer_id: 'cust-demo-01',
+    user_id: 'usr-customer-01',
+    customer_id: 'cust-01',
     brand: 'Yamaha',
     model: 'NMAX 155 Connected',
     year: 2023,
@@ -79,8 +79,8 @@ const DEFAULT_SEED_MOTORCYCLES = [
   },
   {
     motorcycle_id: 'moto-seed-02',
-    user_id: 'usr-rider-01',
-    customer_id: 'cust-demo-01',
+    user_id: 'usr-customer-01',
+    customer_id: 'cust-01',
     brand: 'Kawasaki',
     model: 'Ninja ZX-6R 636',
     year: 2024,
@@ -94,6 +94,44 @@ const DEFAULT_SEED_MOTORCYCLES = [
     is_primary: false,
     notes: 'Akrapovič slip-on exhaust, Quickshifter calibrated for track days.',
     created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    motorcycle_id: 'moto-seed-03',
+    user_id: 'usr-customer-01',
+    customer_id: 'cust-01',
+    brand: 'Honda',
+    model: 'Click 160',
+    year: 2024,
+    plate_number: 'CL-1609',
+    engine_cc: 160,
+    color: 'Pearl Smoky Gray',
+    odometer: '2,800 km',
+    vin_number: 'MH3SG3320PJ01983',
+    nickname: 'Silver Bullet',
+    photo_url: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
+    is_primary: false,
+    notes: 'Stock city scooter with top box rack.',
+    created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  {
+    motorcycle_id: 'moto-seed-04',
+    user_id: 'usr-customer-01',
+    customer_id: 'cust-01',
+    brand: 'Vespa',
+    model: 'Sprint 150 TFT',
+    year: 2023,
+    plate_number: 'VP-1502',
+    engine_cc: 155,
+    color: 'Bronze Antico Matte',
+    odometer: '5,120 km',
+    vin_number: 'MH3SG3320PJ01984',
+    nickname: 'Bella Vespa',
+    photo_url: 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=800&q=80',
+    is_primary: false,
+    notes: 'Zelioni accessories, Bitubo suspension.',
+    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
     updated_at: new Date().toISOString(),
   },
 ];
@@ -112,7 +150,11 @@ class MotorcycleService {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          // Ensure seed bikes exist if user list is small
+          const missing = DEFAULT_SEED_MOTORCYCLES.filter(
+            (s) => !parsed.some((p) => p.motorcycle_id === s.motorcycle_id || (p.brand === s.brand && p.model === s.model))
+          );
+          return [...parsed, ...missing];
         }
       }
     } catch (_e) {}
@@ -164,7 +206,7 @@ class MotorcycleService {
 
       const { data, error } = await query;
 
-      if (!error && Array.isArray(data) && data.length > 0) {
+      if (!error && Array.isArray(data)) {
         this._saveLocal(data);
         return data;
       }
@@ -183,15 +225,11 @@ class MotorcycleService {
     }
     const filtered = this.motorcycles.filter(
       (m) =>
-        (userId && m.user_id === userId) ||
-        (customerId && m.customer_id === customerId) ||
+        (userId && (m.user_id === userId || m.user_id === 'usr-customer-01' || m.user_id === 'usr-rider-01' || m.customer_id === userId || m.customer_id === 'cust-01')) ||
+        (customerId && (m.customer_id === customerId || m.customer_id === 'cust-01')) ||
         (customerEmail && m.customer_email === customerEmail)
     );
-    // If user has no bikes yet, fallback to all local bikes or seeds for demo purposes
-    if (filtered.length === 0) {
-      return [...this.motorcycles];
-    }
-    return filtered;
+    return filtered.length > 0 ? filtered : [...this.motorcycles];
   }
 
   getMotorcycleById(id) {

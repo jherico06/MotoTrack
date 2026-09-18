@@ -20,11 +20,10 @@ import {
   BottomNavBar,
   ToastNotification,
   MobileHeader,
+  UserProfileDropdown,
   HeroBanner,
-  CategoryDropdown,
   FilterChips,
   ProductCard,
-  FloatingCartBar,
   ProductSpecsModal,
   CartModal,
   CheckoutModal,
@@ -36,7 +35,7 @@ import {
 
 export default function ShopPage({ onNavigateToScreen }) {
   // Contexts
-  const { currentUser, setRedirectReason } = useAuth();
+  const { currentUser, setRedirectReason, logout } = useAuth();
   const {
     cart,
     addToCart,
@@ -44,6 +43,7 @@ export default function ShopPage({ onNavigateToScreen }) {
     cartSubtotal,
     cartItemCount,
     discountAmount,
+    shippingFee,
     cartTotal,
     appliedPromoId,
     toastMessage,
@@ -56,6 +56,8 @@ export default function ShopPage({ onNavigateToScreen }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [filterSort, setFilterSort] = useState('default');
+  const [ratingFilter, setRatingFilter] = useState('all');
+  const [priceFilter, setPriceFilter] = useState('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Modals state
@@ -63,6 +65,8 @@ export default function ShopPage({ onNavigateToScreen }) {
   const [isSpecsOpen, setIsSpecsOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAccessDeniedModalOpen, setIsAccessDeniedModalOpen] = useState(false);
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
@@ -108,19 +112,34 @@ export default function ShopPage({ onNavigateToScreen }) {
         item.brand.toLowerCase().includes(query) ||
         item.category.toLowerCase().includes(query);
 
-      return matchCategory && matchSearch;
+      // Rating filter
+      let matchRating = true;
+      const itemRating = Number(item.rating || 5);
+      if (ratingFilter === '5') matchRating = itemRating >= 5.0;
+      else if (ratingFilter === '4.5') matchRating = itemRating >= 4.5;
+      else if (ratingFilter === '4') matchRating = itemRating >= 4.0;
+
+      // Price filter range
+      let matchPrice = true;
+      const p = Number(item.price || 0);
+      if (priceFilter === 'under-1000') matchPrice = p < 1000;
+      else if (priceFilter === '1000-5000') matchPrice = p >= 1000 && p <= 5000;
+      else if (priceFilter === 'above-5000') matchPrice = p > 5000;
+
+      return matchCategory && matchSearch && matchRating && matchPrice;
     });
 
-    if (filterSort === 'price-low') {
+    // Sorting
+    if (priceFilter === 'price-low' || filterSort === 'price-low') {
       list = [...list].sort((a, b) => a.price - b.price);
-    } else if (filterSort === 'price-high') {
+    } else if (priceFilter === 'price-high' || filterSort === 'price-high') {
       list = [...list].sort((a, b) => b.price - a.price);
-    } else if (filterSort === 'rating') {
+    } else if (ratingFilter === 'sort-rating' || filterSort === 'rating') {
       list = [...list].sort((a, b) => (b.rating || 5) - (a.rating || 5));
     }
 
     return list;
-  }, [productsList, selectedCategory, searchQuery, filterSort]);
+  }, [productsList, selectedCategory, searchQuery, filterSort, ratingFilter, priceFilter]);
 
   // Add to cart with auth check
   const handleAddToCartAttempt = (product, qty = 1) => {
@@ -170,6 +189,8 @@ export default function ShopPage({ onNavigateToScreen }) {
   };
 
   const executeCreateOrder = async (orderFormData, overrideStatus = null) => {
+    if (isPlacingOrder) return { success: false };
+
     const {
       customerName,
       customerPhone,
@@ -184,36 +205,55 @@ export default function ShopPage({ onNavigateToScreen }) {
     const isCOD =
       (paymentMethod || '').toLowerCase().includes('cash') || (paymentMethod || '').includes('COD');
 
-    const res = await orderService.createOrder({
-      userId: currentUser?.user_id || currentUser?.id || null,
-      customerId: currentUser?.customer_id || currentUser?.user_id || currentUser?.id || null,
-      customerName,
-      customerPhone,
-      customerAddress,
-      deliveryNotes,
-      paymentMethod,
-      gcashNumber,
-      gcashReference,
-      codChangeFor,
-      promoId: appliedPromoId || null,
-      total: cartSubtotal.toFixed(2),
-      discountAmount: discountAmount.toFixed(2),
-      grandTotal: cartTotal.toFixed(2),
-      items: cart,
-      channel: 'Online Store',
-      overrideStatus,
-    });
+    setIsPlacingOrder(true);
+    try {
+      const res = await orderService.createOrder({
+        userId: currentUser?.user_id || currentUser?.id || null,
+        customerId: currentUser?.customer_id || currentUser?.user_id || currentUser?.id || null,
+        customerName,
+        customerPhone,
+        customerAddress,
+        deliveryNotes,
+        paymentMethod,
+        gcashNumber,
+        gcashReference,
+        codChangeFor,
+        promoId: appliedPromoId || null,
+        total: cartSubtotal.toFixed(2),
+        discountAmount: discountAmount.toFixed(2),
+        shippingFee: Number(shippingFee || 0),
+        grandTotal: cartTotal.toFixed(2),
+        items: cart,
+        channel: 'Online Store',
+        overrideStatus,
+      });
 
-    const placedOrder = res.order;
-    clearCart();
-    setIsCheckoutOpen(false);
-    setSelectedOrderForTracking(placedOrder);
-    setIsLiveTrackingOpen(true);
-    showToast(
-      isCOD
-        ? '🎉 COD Order placed! Awaiting Store Admin verification.'
-        : '🎉 GCash Payment Confirmed! Live order tracking active.'
-    );
+      if (!res?.success) {
+        showToast(res?.error || 'Could not place order. Please try again.');
+        return res;
+      }
+
+      const placedOrder = res.order;
+      clearCart();
+      setIsCheckoutOpen(false);
+      setIsGcashModalOpen(false);
+      setSelectedOrderForTracking(placedOrder);
+      setIsLiveTrackingOpen(true);
+      showToast(
+        !res.supabaseSynced
+          ? '📦 Order saved offline — will sync when connection is back.'
+          : isCOD
+            ? '🎉 COD Order placed! Awaiting Store Admin verification.'
+            : '🎉 GCash Payment Confirmed! Live order tracking active.'
+      );
+      return res;
+    } catch (e) {
+      console.warn('[ShopPage] place order failed:', e);
+      showToast('Could not place order. Please try again.');
+      return { success: false, error: e?.message || 'Order failed' };
+    } finally {
+      setIsPlacingOrder(false);
+    }
   };
 
   return (
@@ -254,7 +294,8 @@ export default function ShopPage({ onNavigateToScreen }) {
                 setIsCartOpen(true);
               }
             }}
-            onOpenProfile={() => setIsProfileOpen(true)}
+            isProfileDropdownOpen={isProfileDropdownOpen}
+            onOpenProfile={() => setIsProfileDropdownOpen((prev) => !prev)}
             onNavigateToLogin={() => {
               setRedirectReason('');
               onNavigateToScreen?.('login');
@@ -270,27 +311,26 @@ export default function ShopPage({ onNavigateToScreen }) {
             }}
           />
 
-          {/* Category Dropdown */}
-          <CategoryDropdown
-            selectedCategory={selectedCategory}
-            onSelectCategory={setSelectedCategory}
-            productsList={productsList}
-          />
-
           {/* Hero Promo Banner */}
           <HeroBanner onSelectCategory={(cat) => setSelectedCategory(cat)} showToast={showToast} />
 
-          {/* Filter Chips Row with Category Dropdown */}
+          {/* Filter Chips Row with Category, Rating, Price, and Reset Dropdowns */}
           <FilterChips
             selectedCategory={selectedCategory}
             onSelectCategory={setSelectedCategory}
             productsList={productsList}
             filterSort={filterSort}
             onSetFilterSort={setFilterSort}
+            ratingFilter={ratingFilter}
+            onSetRatingFilter={setRatingFilter}
+            priceFilter={priceFilter}
+            onSetPriceFilter={setPriceFilter}
             onResetFilters={() => {
               setSelectedCategory('All');
               setSearchQuery('');
-              setFilterSort('all');
+              setFilterSort('default');
+              setRatingFilter('all');
+              setPriceFilter('all');
               showToast('Reset all filters');
             }}
           />
@@ -318,9 +358,6 @@ export default function ShopPage({ onNavigateToScreen }) {
         </View>
       </ScrollView>
 
-      {/* Floating Bottom Cart Bar for Mobile */}
-      <FloatingCartBar onOpenCart={() => setIsCartOpen(true)} />
-
       {/* Persistent Bottom Navigation Bar for Mobile */}
       <BottomNavBar
         activeTab="Home"
@@ -328,26 +365,36 @@ export default function ShopPage({ onNavigateToScreen }) {
           if (tab === 'Home') {
             setSelectedCategory('All');
             setSearchQuery('');
+          } else if (tab === 'Search') {
+            setSelectedCategory('All');
+            setSearchQuery('');
+          } else if (tab === 'Cart') {
+            if (!currentUser) {
+              setRedirectReason?.('Please sign in to view and manage your shopping cart.');
+              onNavigateToScreen?.('login');
+            } else {
+              setIsCartOpen(true);
+            }
+          } else if (tab === 'Wishlist' || tab === 'Favorites') {
+            onNavigateToScreen?.('wishlist');
+          } else if (tab === 'Profile' || tab === 'Dashboard') {
+            if (!currentUser) {
+              setRedirectReason?.('Please sign in to access your Customer Profile.');
+              onNavigateToScreen?.('login');
+            } else {
+              onNavigateToScreen?.('profile');
+            }
           } else if (tab === 'Customize') {
             onNavigateToScreen?.('customizer');
           } else if (tab === 'Garage') {
             onNavigateToScreen?.('garage');
           } else if (tab === 'Orders') {
             onNavigateToScreen?.('orders');
-          } else if (tab === 'Favorites') {
-            onNavigateToScreen?.('wishlist');
           } else if (tab === 'Admin') {
             if (currentUser?.role === 'admin') {
               onNavigateToScreen?.('admin');
             } else {
               setIsAccessDeniedModalOpen(true);
-            }
-          } else if (tab === 'Dashboard' || tab === 'Profile') {
-            if (!currentUser) {
-              setRedirectReason?.('Please sign in to access your Customer Dashboard.');
-              onNavigateToScreen?.('login');
-            } else {
-              onNavigateToScreen?.('profile');
             }
           }
         }}
@@ -372,11 +419,40 @@ export default function ShopPage({ onNavigateToScreen }) {
 
       <CheckoutModal
         visible={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
+        onClose={() => !isPlacingOrder && setIsCheckoutOpen(false)}
         onCompleteOrder={handleCompleteOrder}
+        isPlacingOrder={isPlacingOrder}
         onOpenProfile={() => {
           setIsCheckoutOpen(false);
           setIsProfileOpen(true);
+        }}
+      />
+
+      {/* ─── USER PROFILE DROPDOWN MENU (MOBILE) ─── */}
+      <UserProfileDropdown
+        currentUser={currentUser}
+        isOpen={isProfileDropdownOpen}
+        onClose={() => setIsProfileDropdownOpen(false)}
+        isMobile={true}
+        align="left"
+        onNavigateToDashboard={(tab = 'overview') => onNavigateToScreen?.('profile', { tab })}
+        onNavigateToOrders={() => onNavigateToScreen?.('orders')}
+        onNavigateToProfile={() => onNavigateToScreen?.('profile')}
+        onNavigateToSettings={() => {
+          setIsProfileDropdownOpen(false);
+          setIsProfileOpen(true);
+        }}
+        onNavigateToNotifications={() => onNavigateToScreen?.('notifications')}
+        onNavigateToAdmin={() => {
+          if (currentUser?.role === 'admin') {
+            onNavigateToScreen?.('admin');
+          } else {
+            setIsAccessDeniedModalOpen(true);
+          }
+        }}
+        onLogout={() => {
+          logout();
+          showToast('Logged out successfully');
         }}
       />
 

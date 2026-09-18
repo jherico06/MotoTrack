@@ -109,6 +109,7 @@ class UserService {
               address: u.address || '',
               role: u.role || 'user',
               status: u.status || 'active',
+              username: u.username || '',
               avatar: u.avatar || null,
               memberSince: u.member_since || '2026',
               orders: [],
@@ -126,8 +127,21 @@ class UserService {
   }
 
   // ─── CREATE NEW USER IN SUPABASE DATABASE & LOCAL CACHE ───
-  async createUser({ name, email, password, phone = '', address = '', role = 'user', avatar = '' }) {
+  async createUser({
+    name,
+    email,
+    password,
+    phone = '',
+    address = '',
+    role = 'user',
+    avatar = '',
+    username = '',
+    status = 'active',
+  }) {
     const normalizedEmail = (email || '').trim().toLowerCase();
+    const normalizedUsername = String(username || '').trim().toLowerCase();
+    const accountStatus = String(status || 'active').trim().toLowerCase() === 'inactive' ? 'inactive' : 'active';
+    const safeRole = role === 'admin' || role === 'rider' ? role : 'user';
 
     // Check if already in Supabase
     if (supabase) {
@@ -139,6 +153,12 @@ class UserService {
           .maybeSingle();
 
         if (existingUser) {
+          if (safeRole === 'rider') {
+            return {
+              success: false,
+              error: 'That email already belongs to another account. Use a unique rider email.',
+            };
+          }
           const updatedPwd = hashPassword(password || '', normalizedEmail);
           await supabase
             .from('users')
@@ -156,6 +176,7 @@ class UserService {
             user_id: existingUser.user_id,
             name: (name || '').trim(),
             email: normalizedEmail,
+            username: normalizedUsername,
             password: updatedPwd,
             phone: (phone || '').trim(),
             address: (address || 'Metro Manila, Philippines').trim(),
@@ -178,8 +199,21 @@ class UserService {
       }
     }
 
-    const userId = 'usr-' + Date.now();
-    const customerId = role !== 'admin' ? 'cust-' + Date.now() : null;
+    if (normalizedUsername && supabase) {
+      try {
+        const { data: existingUsername } = await supabase
+          .from('users')
+          .select('user_id')
+          .ilike('username', normalizedUsername)
+          .maybeSingle();
+        if (existingUsername) {
+          return { success: false, error: 'That username is already in use.' };
+        }
+      } catch (_e) {}
+    }
+
+    const userId = (safeRole === 'rider' ? 'usr-rider-' : 'usr-') + Date.now();
+    const customerId = safeRole === 'admin' || safeRole === 'rider' ? null : 'cust-' + Date.now();
 
     const newUser = {
       id: userId,
@@ -187,37 +221,51 @@ class UserService {
       customer_id: customerId,
       name: (name || '').trim(),
       email: normalizedEmail,
+      username: normalizedUsername,
       password: hashPassword(password || '', normalizedEmail),
       phone: (phone || '').trim(),
       address: (address || 'Metro Manila, Philippines').trim(),
-      role: role || 'user',
-      status: 'active',
+      role: safeRole,
+      status: accountStatus,
       avatar: avatar || null,
       memberSince: 'Today',
       orders: [],
     };
 
     // Save to Supabase Cloud Database (users + customers + addresses)
-    if (supabase) {
+    if (!supabase) {
+      if (safeRole === 'rider') {
+        return {
+          success: false,
+          error: 'Database is not connected. Rider accounts must be saved in Supabase.',
+        };
+      }
+    } else {
       try {
-        const { error: userError } = await supabase.from('users').insert([
-          {
-            user_id: newUser.user_id,
-            name: newUser.name,
-            email: newUser.email,
-            password: newUser.password,
-            phone: newUser.phone,
-            address: newUser.address,
-            role: newUser.role,
-            status: 'active',
-            avatar: newUser.avatar,
-            member_since: newUser.memberSince,
-          },
-        ]);
+        const userRow = {
+          user_id: newUser.user_id,
+          name: newUser.name,
+          email: newUser.email,
+          username: newUser.username || null,
+          password: newUser.password,
+          phone: newUser.phone,
+          address: newUser.address,
+          role: newUser.role,
+          status: accountStatus,
+          avatar: newUser.avatar,
+          member_since: newUser.memberSince,
+        };
+        let { error: userError } = await supabase.from('users').insert([userRow]);
+        if (userError && /username/i.test(String(userError.message || ''))) {
+          const { username: _u, ...withoutUsername } = userRow;
+          const retry = await supabase.from('users').insert([withoutUsername]);
+          userError = retry.error;
+        }
 
         if (userError) {
           console.warn('Supabase user insert error:', userError);
-        } else if (role !== 'admin' && customerId) {
+          return { success: false, error: userError.message || 'Could not create the user account.' };
+        } else if (safeRole !== 'admin' && safeRole !== 'rider' && customerId) {
           await supabase.from('customers').insert([
             {
               customer_id: customerId,
@@ -242,6 +290,9 @@ class UserService {
         }
       } catch (e) {
         console.warn('Supabase user creation error:', e);
+        if (safeRole === 'rider') {
+          return { success: false, error: e?.message || 'Could not create the rider login account.' };
+        }
       }
     }
 
@@ -251,6 +302,50 @@ class UserService {
     this.saveLocalUsers(updatedUsers);
 
     return { success: true, user: newUser };
+  }
+
+  async updateRiderAccount(userId, { name, phone, status, username, email, password }) {
+    const id = String(userId || '').trim();
+    if (!id) return { success: false, error: 'User id is required.' };
+    const payload = {};
+    if (name !== undefined) payload.name = String(name || '').trim();
+    if (phone !== undefined) payload.phone = String(phone || '').trim();
+    if (status !== undefined) payload.status = String(status || 'active').toLowerCase() === 'inactive' ? 'inactive' : 'active';
+    if (username !== undefined) payload.username = String(username || '').trim().toLowerCase() || null;
+    if (email !== undefined) payload.email = String(email || '').trim().toLowerCase();
+
+    const localUsers = this.getLocalUsers();
+    const existing = localUsers.find((u) => u.id === id || u.user_id === id);
+    const saltEmail = payload.email || existing?.email || '';
+    if (password) payload.password = hashPassword(String(password).trim(), saltEmail);
+
+    if (!supabase) {
+      return {
+        success: false,
+        error: 'Database is not connected. Rider accounts must be saved in Supabase.',
+      };
+    }
+
+    try {
+      let { error } = await supabase.from('users').update(payload).eq('user_id', id);
+      if (error && /username/i.test(String(error.message || ''))) {
+        const { username: _u, ...withoutUsername } = payload;
+        const retry = await supabase.from('users').update(withoutUsername).eq('user_id', id);
+        error = retry.error;
+      }
+      if (error) {
+        return { success: false, error: error.message || 'Could not update the rider login account.' };
+      }
+    } catch (e) {
+      console.warn('Supabase updateRiderAccount:', e);
+      return { success: false, error: e?.message || 'Could not update the rider login account.' };
+    }
+
+    const next = localUsers.map((u) =>
+      u.id === id || u.user_id === id ? { ...u, ...payload, role: 'rider' } : u
+    );
+    this.saveLocalUsers(next);
+    return { success: true, user: next.find((u) => u.id === id || u.user_id === id) };
   }
 
   // ─── UPDATE USER PROFILE (NAME, PHONE, ADDRESS, AVATAR) ───
@@ -737,57 +832,163 @@ class UserService {
   }
 
   // ─── AUTHENTICATE USER DIRECTLY FROM SUPABASE ───
-  async authenticate(email, password, requiredRole = null) {
-    const normalizedEmail = (email || '').trim().toLowerCase();
+  async authenticate(identifier, password, requiredRole = null) {
+    const rawIdentifier = (identifier || '').trim();
+    const normalizedEmail = rawIdentifier.toLowerCase();
     const cleanPassword = (password || '').trim();
 
     if (!normalizedEmail || !cleanPassword) {
-      return { success: false, error: 'Please provide both email and password.' };
+      return { success: false, error: 'Please provide both username/email and password.' };
     }
 
-    // 1. Check Supabase users table
+    const finishUser = async (user) => {
+      if (!user) {
+        return { success: false, error: 'No account found with this email or username.' };
+      }
+      if (user.status === 'disabled' || user.status === 'inactive') {
+        return {
+          success: false,
+          error:
+            user.role === 'rider'
+              ? 'Your rider account is Inactive. Contact the store administrator.'
+              : 'Account Disabled: Your account has been temporarily deactivated by a store administrator. Please contact MotoTrack support.',
+        };
+      }
+
+      let riderRow = null;
+      if (user.role === 'rider' || requiredRole === 'rider') {
+        try {
+          if (supabase) {
+            const { data } = await supabase
+              .from('riders')
+              .select('id, account_status, username, email, user_id')
+              .or(
+                [
+                  user.id ? `user_id.eq.${user.id}` : null,
+                  user.username ? `username.ilike.${user.username}` : null,
+                  `email.ilike.${user.email || normalizedEmail}`,
+                ]
+                  .filter(Boolean)
+                  .join(',')
+              )
+              .maybeSingle();
+            riderRow = data || null;
+          }
+        } catch (_e) {}
+        if (!riderRow) {
+          try {
+            const raw = appStorage.getItem('mototrack_riders_list');
+            const list = raw ? JSON.parse(raw) : [];
+            riderRow = (Array.isArray(list) ? list : []).find(
+              (r) =>
+                r.userId === user.id ||
+                r.user_id === user.id ||
+                String(r.username || '').toLowerCase() === String(user.username || normalizedEmail).toLowerCase() ||
+                String(r.email || '').toLowerCase() === String(user.email || '').toLowerCase()
+            );
+          } catch (_e) {}
+        }
+        const accountStatus = String(riderRow?.account_status || riderRow?.accountStatus || 'Active');
+        if (accountStatus.toLowerCase() === 'inactive') {
+          return {
+            success: false,
+            error: 'Your rider account is Inactive. Contact the store administrator.',
+          };
+        }
+        if (riderRow) {
+          user = {
+            ...user,
+            rider_id: riderRow.id,
+            username: riderRow.username || user.username,
+            account_status: accountStatus,
+          };
+        }
+      }
+
+      if (user.role === 'rider' && requiredRole && requiredRole !== 'rider') {
+        return {
+          success: false,
+          error:
+            requiredRole === 'admin'
+              ? 'Rider accounts cannot access the Admin Dashboard. Sign in on the mobile app to open My Deliveries.'
+              : 'This is a Rider account. Sign in on the MotoTrack app to open the Rider Dashboard.',
+        };
+      }
+      if (requiredRole === 'rider' && user.role !== 'rider') {
+        return {
+          success: false,
+          error: 'Only rider accounts can sign in here. Use the customer or admin login instead.',
+        };
+      }
+      if (requiredRole === 'admin' && user.role !== 'admin') {
+        return {
+          success: false,
+          error:
+            user.role === 'rider'
+              ? 'Rider accounts cannot access the Admin Dashboard. Sign in on the mobile app to open My Deliveries.'
+              : 'Access Denied: This account is a Customer account. Only authorized Store Administrators can access the Admin Dashboard.',
+        };
+      }
+
+      const { password: _pwd, ...safeUser } = user;
+      try {
+        this.logAccountActivity(user.id || user.user_id, 'LOGIN_SUCCESS', 'Logged in successfully');
+      } catch (_e) {}
+      return { success: true, user: safeUser };
+    };
+
+    // 1. Check Supabase users table (email or username)
     if (supabase) {
       try {
-        const { data: dbUser, error } = await supabase
+        let dbUser = null;
+        const withUsername = await supabase
           .from('users')
           .select('*, customers(customer_id, contact_number)')
-          .ilike('email', normalizedEmail)
+          .or(`email.ilike.${normalizedEmail},username.ilike.${normalizedEmail}`)
           .maybeSingle();
+        if (!withUsername.error && withUsername.data) {
+          dbUser = withUsername.data;
+        } else {
+          const byEmail = await supabase
+            .from('users')
+            .select('*, customers(customer_id, contact_number)')
+            .ilike('email', normalizedEmail)
+            .maybeSingle();
+          if (!byEmail.error && byEmail.data) dbUser = byEmail.data;
+        }
 
-        if (!error && dbUser) {
+        if (!dbUser && requiredRole === 'rider') {
+          const { data: riderRow } = await supabase
+            .from('riders')
+            .select('*')
+            .or(`username.ilike.${normalizedEmail},email.ilike.${normalizedEmail}`)
+            .maybeSingle();
+          if (riderRow?.user_id) {
+            const { data: linked } = await supabase
+              .from('users')
+              .select('*, customers(customer_id, contact_number)')
+              .eq('user_id', riderRow.user_id)
+              .maybeSingle();
+            if (linked) dbUser = linked;
+          }
+        }
+
+        if (dbUser) {
           const storedPwd = dbUser.password;
+          const salt = String(dbUser.email || normalizedEmail).toLowerCase();
           const pwdValid =
-            verifyPassword(cleanPassword, storedPwd, normalizedEmail) || storedPwd === password;
+            verifyPassword(cleanPassword, storedPwd, salt) || storedPwd === password;
           if (!pwdValid) {
             return { success: false, error: 'Incorrect password. Please verify your credentials.' };
           }
 
-          // Upgrade legacy plaintext passwords to hashes on successful sign-in
           if (storedPwd && !isHashed(storedPwd)) {
             try {
               await supabase
                 .from('users')
-                .update({ password: hashPassword(cleanPassword, normalizedEmail) })
+                .update({ password: hashPassword(cleanPassword, salt) })
                 .eq('user_id', dbUser.user_id || dbUser.id);
             } catch (e) {}
-          }
-
-          if (dbUser.status === 'disabled' || dbUser.status === 'inactive') {
-            return {
-              success: false,
-              error:
-                'Account Disabled: Your account has been temporarily deactivated by a store administrator. Please contact MotoTrack support.',
-            };
-          }
-
-          if (requiredRole && dbUser.role !== requiredRole) {
-            if (requiredRole === 'admin') {
-              return {
-                success: false,
-                error:
-                  'Access Denied: This account is a Customer account. Only authorized Store Administrators can access the Admin Dashboard.',
-              };
-            }
           }
 
           const custInfo =
@@ -798,6 +999,7 @@ class UserService {
             customer_id: custInfo ? custInfo.customer_id : null,
             name: dbUser.name,
             email: dbUser.email,
+            username: dbUser.username || '',
             phone: dbUser.phone || (custInfo ? custInfo.contact_number : '') || '',
             address: dbUser.address || '',
             role: dbUser.role || 'user',
@@ -806,12 +1008,7 @@ class UserService {
             memberSince: dbUser.member_since || '2026',
             orders: [],
           };
-
-          try {
-            this.logAccountActivity(user.id, 'LOGIN_SUCCESS', 'Logged in successfully');
-          } catch (_e) {}
-
-          return { success: true, user };
+          return finishUser(user);
         }
       } catch (e) {
         console.warn('Supabase direct auth note:', e);
@@ -820,7 +1017,26 @@ class UserService {
 
     // 2. Fallback to local users list
     const users = await this.getAllUsers();
-    let user = users.find((u) => u.email?.toLowerCase() === normalizedEmail);
+    let user = users.find(
+      (u) =>
+        u.email?.toLowerCase() === normalizedEmail ||
+        String(u.username || '').toLowerCase() === normalizedEmail
+    );
+
+    if (!user) {
+      try {
+        const raw = appStorage.getItem('mototrack_riders_list');
+        const list = raw ? JSON.parse(raw) : [];
+        const rider = (Array.isArray(list) ? list : []).find(
+          (r) =>
+            String(r.username || '').toLowerCase() === normalizedEmail ||
+            String(r.email || '').toLowerCase() === normalizedEmail
+        );
+        if (rider?.userId || rider?.user_id) {
+          user = users.find((u) => u.id === rider.userId || u.user_id === rider.userId || u.id === rider.user_id);
+        }
+      } catch (_e) {}
+    }
 
     if (!user) {
       if (normalizedEmail === CUSTOMER_USER.email.toLowerCase()) {
@@ -831,18 +1047,18 @@ class UserService {
     }
 
     if (!user) {
-      return { success: false, error: 'No account found with this email. Please sign up for an account.' };
+      return { success: false, error: 'No account found with this email or username.' };
     }
 
     const storedPwd = user.password;
-    const pwdValid = verifyPassword(cleanPassword, storedPwd, normalizedEmail) || storedPwd === password;
+    const salt = String(user.email || normalizedEmail).toLowerCase();
+    const pwdValid = verifyPassword(cleanPassword, storedPwd, salt) || storedPwd === password;
     if (!pwdValid) {
       return { success: false, error: 'Incorrect password. Please try again.' };
     }
 
-    // Upgrade legacy plaintext passwords to hashes in the local cache
     if (storedPwd && !isHashed(storedPwd)) {
-      const upgradedHash = hashPassword(cleanPassword, normalizedEmail);
+      const upgradedHash = hashPassword(cleanPassword, salt);
       this.saveLocalUsers(
         this.getLocalUsers().map((u) =>
           u.id === user.id || u.user_id === user.id ? { ...u, password: upgradedHash } : u
@@ -851,29 +1067,7 @@ class UserService {
       user = { ...user, password: upgradedHash };
     }
 
-    if (user.status === 'disabled' || user.status === 'inactive') {
-      return {
-        success: false,
-        error:
-          'Account Disabled: Your account has been temporarily deactivated by a store administrator. Please contact MotoTrack support.',
-      };
-    }
-
-    if (requiredRole && user.role !== requiredRole) {
-      if (requiredRole === 'admin') {
-        return {
-          success: false,
-          error:
-            'Access Denied: This account is a Customer account. Only authorized Store Administrators can access the Admin Dashboard.',
-        };
-      }
-    }
-
-    const { password: _, ...safeUser } = user;
-    try {
-      this.logAccountActivity(user.id || user.user_id, 'LOGIN_SUCCESS', 'Logged in successfully');
-    } catch (_e) {}
-    return { success: true, user: safeUser };
+    return finishUser(user);
   }
 }
 

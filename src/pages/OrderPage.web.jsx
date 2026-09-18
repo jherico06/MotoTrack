@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,14 @@ import {
   Image,
   StyleSheet,
   useWindowDimensions,
+  AppState,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
   BootstrapIcon,
   ToastNotification,
   LiveOrderTrackingMapModal,
+  RateDeliveredOrderModal,
   BottomNavBar,
   ProfileModal,
   UserProfileDropdown,
@@ -22,7 +24,44 @@ import {
 import { orderWebStyles as oStyles } from '../styles/web/orderPage.web.styles';
 import { useAuth } from '../context/AuthContext';
 import { orderService } from '../services/orderService';
+import { deliveryService } from '../services/deliveryService';
 import { useWishlist } from '../context/WishlistContext';
+
+const isOutForDeliveryStatus = (status = '') => {
+  const st = (status || '').toLowerCase();
+  return (
+    st === 'out for delivery' ||
+    st === 'shipped' ||
+    st === 'in transit' ||
+    st.includes('transit')
+  );
+};
+
+const isReportedStatus = (status = '') => {
+  const st = (status || '').toLowerCase();
+  return st === 'delivery reported' || st === 'reported';
+};
+
+const isActiveDispatchStatus = (status = '') => {
+  const st = (status || '').toLowerCase();
+  return (
+    st === 'processing' ||
+    st === 'ready for delivery' ||
+    st === 'rescheduled' ||
+    isOutForDeliveryStatus(status) ||
+    isReportedStatus(status) ||
+    st === 'delivery failed' ||
+    st === 'delivery issue'
+  );
+};
+
+const getDisplayStatusLabel = (status = '') => {
+  if (isReportedStatus(status)) return 'Delivery Reported';
+  if (isOutForDeliveryStatus(status)) return 'Out for Delivery';
+  const st = (status || '').toLowerCase();
+  if (st === 'delivery failed') return 'Delivery Issue';
+  return status || 'Processing';
+};
 
 export default function OrderPageWeb({
   onNavigateToStore,
@@ -44,6 +83,8 @@ export default function OrderPageWeb({
   const [filterDateRange, setFilterDateRange] = useState('all'); // 'all' | 'today' | 'week' | 'month'
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isLiveMapOpen, setIsLiveMapOpen] = useState(false);
+  const [selectedOrderForRating, setSelectedOrderForRating] = useState(null);
+  const [isRateModalOpen, setIsRateModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
@@ -53,18 +94,30 @@ export default function OrderPageWeb({
     setTimeout(() => setToastMessage(''), 3000);
   };
 
-  // Redirect guard: Customer orders belong exclusively in the Customer Dashboard
+  // Authentication guard: redirect to login if not signed in
   useEffect(() => {
     if (!currentUser) {
-      if (setRedirectReason) setRedirectReason('Please sign in to view your orders in your Customer Dashboard.');
+      if (setRedirectReason) setRedirectReason('Please sign in to view your orders.');
       if (onNavigateToLogin) onNavigateToLogin();
-    } else {
-      if (onNavigateToProfile) onNavigateToProfile('orders');
     }
-  }, [currentUser, onNavigateToLogin, onNavigateToProfile, setRedirectReason]);
+  }, [currentUser, onNavigateToLogin, setRedirectReason]);
 
   useEffect(() => {
     let isMounted = true;
+
+    const applyUserOrders = (list) => {
+      if (!isMounted) return;
+      const userOrders = Array.isArray(list) ? list : [];
+      setOrders(userOrders);
+      setSelectedOrder((curr) => {
+        if (!curr) return userOrders[0] || null;
+        return (
+          userOrders.find((o) => o.order_id === curr.order_id || o.id === curr.id) ||
+          userOrders[0] ||
+          null
+        );
+      });
+    };
 
     const loadUserOrders = async () => {
       if (!currentUser) {
@@ -75,43 +128,76 @@ export default function OrderPageWeb({
       const list = await orderService.getUserOrders(
         currentUser?.id || currentUser?.user_id,
         currentUser?.customer_id,
-        currentUser?.name
+        currentUser?.name,
+        currentUser
       );
-      if (isMounted) {
-        const userOrders = Array.isArray(list) ? list : [];
-        setOrders(userOrders);
-        setSelectedOrder(userOrders[0] || null);
-      }
+      applyUserOrders(list);
     };
 
     loadUserOrders();
 
-    const unsub = orderService.subscribe((updatedList) => {
-      if (!isMounted || !Array.isArray(updatedList)) return;
-      if (!currentUser) {
-        setOrders([]);
-        setSelectedOrder(null);
-        return;
-      }
-      const userId = currentUser?.id || currentUser?.user_id;
-      const customerId = currentUser?.customer_id;
-      const userOrders = updatedList.filter((o) => {
-        const uMatch = Boolean(userId && (o.user_id === userId || o.customer_id === userId));
-        const cMatch = Boolean(customerId && (o.customer_id === customerId || o.user_id === customerId));
-        return uMatch || cMatch;
-      });
-      setOrders(userOrders);
-      setSelectedOrder((curr) => {
-        if (!curr) return userOrders[0] || null;
-        return (
-          userOrders.find((o) => o.order_id === curr.order_id || o.id === curr.id) || userOrders[0] || null
-        );
-      });
+    const unsub = orderService.subscribe(() => {
+      if (!isMounted) return;
+      loadUserOrders();
     });
+
+    const refreshFromShared = () => {
+      loadUserOrders();
+    };
+
+    const onOrdersUpdated = () => {
+      refreshFromShared();
+    };
+
+    const onStorage = (e) => {
+      if (e?.key && e.key !== 'mototrack_orders_db') return;
+      refreshFromShared();
+    };
+
+    const onVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        refreshFromShared();
+      }
+    };
+
+    const onAppState = (nextState) => {
+      if (nextState === 'active') refreshFromShared();
+    };
+    const appSub = AppState.addEventListener?.('change', onAppState);
+
+    let bc = null;
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        bc = new BroadcastChannel('mototrack_orders');
+        bc.onmessage = () => refreshFromShared();
+      }
+    } catch (_e) {}
+
+    const pollId = setInterval(() => {
+      refreshFromShared();
+    }, 5000);
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mototrack_orders_updated', onOrdersUpdated);
+      window.addEventListener('storage', onStorage);
+      document.addEventListener?.('visibilitychange', onVisible);
+    }
 
     return () => {
       isMounted = false;
       unsub();
+      clearInterval(pollId);
+      try {
+        appSub?.remove?.();
+      } catch (_e) {}
+      try {
+        bc?.close?.();
+      } catch (_e) {}
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('mototrack_orders_updated', onOrdersUpdated);
+        window.removeEventListener('storage', onStorage);
+        document.removeEventListener?.('visibilitychange', onVisible);
+      }
     };
   }, [currentUser]);
 
@@ -119,9 +205,8 @@ export default function OrderPageWeb({
     const st = (o.status || 'Pending Approval').toLowerCase();
     let statusMatch = true;
     if (filterStatus === 'pending') statusMatch = st.includes('pending') || st.includes('approval');
-    else if (filterStatus === 'active')
-      statusMatch = st === 'processing' || st === 'shipped' || st === 'in transit';
-    else if (filterStatus === 'delivered') statusMatch = st === 'delivered';
+    else if (filterStatus === 'active') statusMatch = isActiveDispatchStatus(o.status);
+    else if (filterStatus === 'delivered') statusMatch = st.includes('delivered') || st.includes('completed');
     else if (filterStatus === 'cancelled') statusMatch = st === 'cancelled';
     if (!statusMatch) return false;
 
@@ -141,12 +226,52 @@ export default function OrderPageWeb({
     return true;
   });
 
+  // If the open order was marked Delivered, leave the Active tab so the update is visible
+  useEffect(() => {
+    if (!selectedOrder) return;
+    const st = (selectedOrder.status || '').toLowerCase();
+    if (filterStatus === 'active' && (st.includes('delivered') || st.includes('completed'))) {
+      setFilterStatus('delivered');
+    }
+    if (
+      (filterStatus === 'pending' || filterStatus === 'active') &&
+      st.includes('cancel')
+    ) {
+      setFilterStatus('cancelled');
+    }
+  }, [selectedOrder?.status, filterStatus, selectedOrder]);
+
   const totalSpent = orders.reduce((sum, o) => sum + (o.grand_total || o.total_amount || 0), 0);
   const pendingCount = orders.filter(
     (o) =>
       (o.status || '').toLowerCase().includes('pending') ||
       (o.status || '').toLowerCase().includes('approval')
   ).length;
+  const activeDispatchCount = orders.filter((o) => isActiveDispatchStatus(o.status)).length;
+
+  const refreshOrders = useCallback(async () => {
+    if (!currentUser) {
+      setOrders([]);
+      setSelectedOrder(null);
+      return;
+    }
+    const list = await orderService.getUserOrders(
+      currentUser?.id || currentUser?.user_id,
+      currentUser?.customer_id,
+      currentUser?.name,
+      currentUser
+    );
+    const userOrders = Array.isArray(list) ? list : [];
+    setOrders(userOrders);
+    setSelectedOrder((curr) => {
+      if (!curr) return userOrders[0] || null;
+      return (
+        userOrders.find((o) => o.order_id === curr.order_id || o.id === curr.id) ||
+        userOrders[0] ||
+        null
+      );
+    });
+  }, [currentUser]);
 
   return (
     <View style={oStyles.container}>
@@ -273,13 +398,7 @@ export default function OrderPageWeb({
                 <BootstrapIcon name="truck" size={18} color="#0C6258" />
               </View>
               <View>
-                <Text style={oStyles.metricNum}>
-                  {
-                    orders.filter(
-                      (o) => o.status === 'Processing' || o.status === 'Shipped' || o.status === 'In Transit'
-                    ).length
-                  }
-                </Text>
+                <Text style={oStyles.metricNum}>{activeDispatchCount}</Text>
                 <Text style={oStyles.metricLabel}>Active Dispatches</Text>
               </View>
             </View>
@@ -388,7 +507,14 @@ export default function OrderPageWeb({
                   const isPending =
                     (order.status || '').toLowerCase().includes('pending') ||
                     (order.status || '').toLowerCase().includes('approval');
-                  const isDelivered = (order.status || '').toLowerCase() === 'delivered';
+                  const isDelivered =
+                    (order.status || '').toLowerCase().includes('delivered') ||
+                    (order.status || '').toLowerCase().includes('completed');
+                  const isOutForDelivery = isOutForDeliveryStatus(order.status);
+                  const statusLabel = isPending
+                    ? '⏳ Awaiting COD Approval'
+                    : getDisplayStatusLabel(order.status);
+                  const confirmedAt = order.admin_confirmed_at || order.updated_at || null;
                   return (
                     <TouchableOpacity
                       key={order.order_id || order.id}
@@ -408,7 +534,9 @@ export default function OrderPageWeb({
                               ? { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }
                               : isDelivered
                                 ? oStyles.statusDelivered
-                                : oStyles.statusProcessing,
+                                : isOutForDelivery
+                                  ? { backgroundColor: '#E0E7FF', borderColor: '#C7D2FE' }
+                                  : oStyles.statusProcessing,
                           ]}
                         >
                           <Text
@@ -418,10 +546,12 @@ export default function OrderPageWeb({
                                 ? { color: '#B45309' }
                                 : isDelivered
                                   ? oStyles.statusTextDelivered
-                                  : oStyles.statusTextProcessing,
+                                  : isOutForDelivery
+                                    ? { color: '#4338CA' }
+                                    : oStyles.statusTextProcessing,
                             ]}
                           >
-                            {isPending ? '⏳ Awaiting COD Approval' : order.status}
+                            {statusLabel}
                           </Text>
                         </View>
                       </View>
@@ -430,22 +560,116 @@ export default function OrderPageWeb({
                         {order.items_summary || 'Track performance components'}
                       </Text>
 
+                      {isOutForDelivery && (
+                        <View
+                          style={{
+                            backgroundColor: '#F0FDFA',
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderColor: '#CCFBF1',
+                            padding: 10,
+                            marginBottom: 10,
+                            gap: 4,
+                          }}
+                        >
+                          {order.rider_name ? (
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F766E' }}>
+                              Rider: {order.rider_name}
+                            </Text>
+                          ) : null}
+                          {order.estimated_delivery ? (
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F766E' }}>
+                              Expected: {order.estimated_delivery}
+                            </Text>
+                          ) : null}
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F766E' }}>
+                            The store will mark this delivered after drop-off.
+                          </Text>
+                        </View>
+                      )}
+
+                      {isDelivered && (
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                              backgroundColor: '#DCFCE7',
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: '#BBF7D0',
+                              paddingHorizontal: 10,
+                              paddingVertical: 7,
+                              marginBottom: 10,
+                            }}
+                          >
+                            <BootstrapIcon name="check-circle-fill" size={12} color="#15803D" />
+                            <Text style={{ flex: 1, fontSize: 11.5, fontWeight: '700', color: '#15803D' }}>
+                              Delivered by the store
+                              {confirmedAt
+                                ? ` · ${new Date(confirmedAt).toLocaleString()}`
+                                : ''}
+                            </Text>
+                          </View>
+                        )}
+
                       <View style={oStyles.orderCardBottom}>
                         <Text style={oStyles.orderTotalText}>
                           ₱{(order.grand_total || order.total_amount || 0).toFixed(2)}
                         </Text>
 
-                        <TouchableOpacity
-                          style={oStyles.trackBtn}
-                          onPress={() => {
-                            setSelectedOrder(order);
-                            setIsLiveMapOpen(true);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <BootstrapIcon name="geo-alt-fill" size={12} color="#0C6258" />
-                          <Text style={oStyles.trackBtnText}>Live GPS Route</Text>
-                        </TouchableOpacity>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          {isDelivered && (
+                            <TouchableOpacity
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                                backgroundColor: order.is_rated ? '#FEF3C7' : '#D97706',
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                borderWidth: order.is_rated ? 1 : 0,
+                                borderColor: '#FDE68A',
+                              }}
+                              onPress={(e) => {
+                                e.stopPropagation?.();
+                                setSelectedOrderForRating(order);
+                                setIsRateModalOpen(true);
+                              }}
+                              activeOpacity={0.85}
+                            >
+                              <BootstrapIcon
+                                name="star-fill"
+                                size={11}
+                                color={order.is_rated ? '#D97706' : '#FFFFFF'}
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 11.5,
+                                  fontWeight: '800',
+                                  color: order.is_rated ? '#B45309' : '#FFFFFF',
+                                }}
+                              >
+                                {order.is_rated
+                                  ? `Rated ${(order.rating_data?.customer_rating || 5).toFixed(1)} ★`
+                                  : 'Rate Items'}
+                              </Text>
+                            </TouchableOpacity>
+                          )}
+
+                          <TouchableOpacity
+                            style={oStyles.trackBtn}
+                            onPress={() => {
+                              setSelectedOrder(order);
+                              setIsLiveMapOpen(true);
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <BootstrapIcon name="geo-alt-fill" size={12} color="#0C6258" />
+                            <Text style={oStyles.trackBtnText}>Live GPS Route</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </TouchableOpacity>
                   );
@@ -545,6 +769,113 @@ export default function OrderPageWeb({
                         <Text style={{ fontSize: 12, color: '#7F1D1D' }}>{selectedOrder.cancel_reason}</Text>
                       </View>
                     ) : null}
+
+                    {(isOutForDeliveryStatus(selectedOrder.status) ||
+                      isReportedStatus(selectedOrder.status)) && (
+                      <View
+                        style={{
+                          backgroundColor: '#F0FDFA',
+                          padding: 14,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#CCFBF1',
+                          marginBottom: 14,
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>
+                          {isReportedStatus(selectedOrder.status)
+                            ? 'Delivery Reported'
+                            : 'Out for Delivery'}
+                        </Text>
+                        {selectedOrder.rider_name ? (
+                          <Text style={{ fontSize: 12.5, color: '#0F766E', marginBottom: 4, fontWeight: '600' }}>
+                            Rider: {selectedOrder.rider_name}
+                          </Text>
+                        ) : null}
+                        {selectedOrder.estimated_delivery ? (
+                          <Text style={{ fontSize: 12.5, color: '#0F766E', marginBottom: 4, fontWeight: '600' }}>
+                            Expected: {selectedOrder.estimated_delivery}
+                          </Text>
+                        ) : null}
+                        <Text style={{ fontSize: 12.5, color: '#0F766E', fontWeight: '600', marginBottom: 10 }}>
+                          {isReportedStatus(selectedOrder.status)
+                            ? 'The rider reported drop-off. The store will confirm delivery shortly.'
+                            : 'Optional: tap below if you already received your package. Final delivery is confirmed by the store.'}
+                        </Text>
+                        {!selectedOrder.customer_delivery_confirmed && (
+                          <TouchableOpacity
+                            style={{
+                              backgroundColor: '#0C6258',
+                              borderRadius: 10,
+                              paddingVertical: 10,
+                              paddingHorizontal: 14,
+                              alignSelf: 'flex-start',
+                            }}
+                            onPress={async () => {
+                              const oid = selectedOrder.order_id || selectedOrder.id;
+                              const res = await deliveryService.customerConfirmReceived({
+                                orderId: oid,
+                                customerUser: currentUser,
+                              });
+                              if (res.success) {
+                                showToast('Thanks — we notified the store you received your order');
+                                setSelectedOrder((prev) =>
+                                  prev
+                                    ? {
+                                        ...prev,
+                                        customer_delivery_confirmed: true,
+                                        customer_delivery_confirmed_at: new Date().toISOString(),
+                                      }
+                                    : prev
+                                );
+                              } else {
+                                showToast(res.error || 'Could not confirm receipt');
+                              }
+                            }}
+                            activeOpacity={0.85}
+                          >
+                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>
+                              Confirm Received
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                        {selectedOrder.customer_delivery_confirmed ? (
+                          <Text style={{ fontSize: 12, color: '#047857', fontWeight: '700' }}>
+                            You confirmed receipt
+                            {selectedOrder.customer_delivery_confirmed_at
+                              ? ` · ${new Date(selectedOrder.customer_delivery_confirmed_at).toLocaleString()}`
+                              : ''}
+                          </Text>
+                        ) : null}
+                      </View>
+                    )}
+
+                    {((selectedOrder.status || '').toLowerCase().includes('delivered') ||
+                      (selectedOrder.status || '').toLowerCase().includes('completed')) && (
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 8,
+                            backgroundColor: '#DCFCE7',
+                            padding: 12,
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: '#BBF7D0',
+                            marginBottom: 14,
+                          }}
+                        >
+                          <BootstrapIcon name="check-circle-fill" size={14} color="#15803D" />
+                          <Text style={{ flex: 1, fontSize: 12.5, fontWeight: '700', color: '#15803D' }}>
+                            Delivered by the store
+                            {selectedOrder.admin_confirmed_at || selectedOrder.updated_at
+                              ? ` · ${new Date(
+                                  selectedOrder.admin_confirmed_at || selectedOrder.updated_at
+                                ).toLocaleString()}`
+                              : ''}
+                          </Text>
+                        </View>
+                      )}
 
                     {selectedOrder.return_status && selectedOrder.return_status !== 'none' ? (
                       <View
@@ -661,6 +992,18 @@ export default function OrderPageWeb({
         onNavigateToWishlist={onNavigateToWishlist}
         onNavigateToAdmin={onNavigateToAdmin}
         showToast={showToast}
+      />
+
+      {/* Rate Delivered Items Modal */}
+      <RateDeliveredOrderModal
+        visible={isRateModalOpen}
+        order={selectedOrderForRating}
+        currentUser={currentUser}
+        onClose={() => setIsRateModalOpen(false)}
+        onSubmitSuccess={() => {
+          showToast('Review submitted successfully!');
+          refreshOrders();
+        }}
       />
 
       {/* Persistent Mobile Bottom Navigation Bar on smaller screens */}

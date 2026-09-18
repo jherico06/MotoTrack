@@ -264,23 +264,85 @@ export const aiCustomizerService = {
   },
 
   /**
-   * MODE 2: Simulate AI synthesis & Neural rendering pipeline
+   * Synthesize an articulate natural-language prompt sentence from
+   * the selected motorcycle (registered or preset) and selected products/parts.
+   */
+  buildCustomizationPrompt({ motorcycle, selectedParts = [], selectedThemeId, customNotes = '' }) {
+    const bikeYear = motorcycle?.year || '';
+    const bikeBrand = motorcycle?.brand || 'Motorcycle';
+    const bikeModel = motorcycle?.model || 'Sport';
+    const bikeColor = motorcycle?.color || 'factory metallic';
+    const bikeCc = motorcycle?.engine_cc ? `${motorcycle.engine_cc}cc` : '';
+    const bikeNickname = motorcycle?.nickname ? `"${motorcycle.nickname}"` : '';
+
+    const themeObj = CUSTOM_THEMES.find((t) => t.id === selectedThemeId) || CUSTOM_THEMES[0];
+    const themeName = themeObj?.name || 'Factory Racing Edition';
+
+    let partsSentence = 'stock OEM setup with factory finish';
+    if (selectedParts.length === 1) {
+      const p = selectedParts[0];
+      const mat = p.material ? `, ${p.material}` : '';
+      partsSentence = `a high-performance ${p.name} (${p.brand} ${p.category}${mat}) cleanly installed onto the motorcycle`;
+    } else if (selectedParts.length > 1) {
+      const partsItems = selectedParts.map((p) => {
+        const mat = p.material ? ` (${p.material})` : '';
+        return `${p.name} by ${p.brand}${mat}`;
+      });
+      partsSentence = `custom performance upgrades comprising ${partsItems.join(' and ')} seamlessly installed and calibrated onto the motorcycle`;
+    }
+
+    const bikeIdentity = [bikeYear, bikeBrand, bikeModel, bikeCc, bikeNickname]
+      .filter(Boolean)
+      .join(' ');
+
+    let baseSentence = `A professional studio 4K photorealistic automotive photograph of a ${bikeIdentity} in sleek ${bikeColor} finish, custom fitted with ${partsSentence}, finished in ${themeName} styling (${themeObj.description || ''}), studio rim lighting, cinematic sharp depth of field, hyper-detailed mechanical parts, 8K ultra-realistic automotive visual render.`;
+
+    if (customNotes && customNotes.trim().length > 0) {
+      baseSentence += ` Custom aesthetic request: ${customNotes.trim()}`;
+    }
+
+    return baseSentence;
+  },
+
+  /**
+   * MODE 2: AI Neural synthesis & Photorealistic Render Pipeline
+   * Generates a real AI photo using the synthesized motorcycle + installed product sentence prompt.
    */
   async generateAICustomization({
+    motorcycle,
     bikePhotoUri,
     bikeName,
     bikeBrand,
-    selectedParts,
+    selectedParts = [],
     selectedThemeId,
     customPrompt = '',
     onProgress,
   }) {
+    const effectiveBikeName = motorcycle?.model || bikeName || 'Custom Motorcycle Build';
+    const effectiveBikeBrand = motorcycle?.brand || bikeBrand || 'MotoTrack';
+    const effectiveBasePhoto = motorcycle?.photo_url || bikePhotoUri;
+
+    // Formulate the prompt sentence if not already customized
+    const finalPrompt =
+      customPrompt && customPrompt.trim().length > 0
+        ? customPrompt.trim()
+        : this.buildCustomizationPrompt({
+            motorcycle,
+            selectedParts,
+            selectedThemeId,
+          });
+
+    const partsLabel =
+      selectedParts.length > 0
+        ? `${selectedParts.map((p) => p.name).slice(0, 2).join(', ')}${selectedParts.length > 2 ? ` + ${selectedParts.length - 2} more` : ''}`
+        : 'Performance Kit';
+
     const steps = [
-      'Scanning motorcycle frame geometry & wheel alignment...',
-      `Identifying mount points for ${selectedParts.length} performance parts...`,
-      'Simulating thermal exhaust glow & titanium header blueing...',
-      'Applying carbon-weave texture & aerodynamic winglet downforce...',
-      'Generating high-definition 4K neural render...',
+      `Scanning ${effectiveBikeBrand} ${effectiveBikeName} chassis & frame geometry...`,
+      `Synthesizing custom fitment for: ${partsLabel}...`,
+      'Compiling natural language prompt into high-definition diffusion tensor...',
+      'Rendering photorealistic 4K AI motorcycle photo with installed parts...',
+      'Finalizing dyno telemetry, acoustics & thermal diagnostics...',
     ];
 
     for (let i = 0; i < steps.length; i++) {
@@ -292,29 +354,47 @@ export const aiCustomizerService = {
           percentage: Math.round(((i + 1) / steps.length) * 100),
         });
       }
-      // Smooth rendering step delay
-      await new Promise((resolve) => setTimeout(resolve, 450));
+      // Realistic rendering cadence
+      await new Promise((resolve) => setTimeout(resolve, 420));
     }
 
-    // Determine the generated image
-    const themeRenders = AI_RENDER_GALLERY[selectedThemeId] || AI_RENDER_GALLERY['theme-factory-racing'];
-    const randomPick = themeRenders[Math.floor(Math.random() * themeRenders.length)];
-    const generatedImage = randomPick || bikePhotoUri;
+    // Build the AI image URL using prompt synthesis (Pollinations AI Flux model)
+    const cleanPromptForUrl = finalPrompt
+      .replace(/[^\w\s,.-]/gi, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 480);
+
+    const randomSeed = Math.floor(100000 + Math.random() * 900000);
+    const aiGeneratedImageUrl = `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanPromptForUrl)}?width=1024&height=768&nologo=true&seed=${randomSeed}&model=flux`;
+
+    // Pre-cache the image in web environment if available
+    try {
+      if (typeof window !== 'undefined' && typeof window.Image !== 'undefined') {
+        const preloader = new window.Image();
+        preloader.src = aiGeneratedImageUrl;
+      }
+    } catch (_e) {}
 
     // Calculate technical diagnostics & invoke Gemini AI Vision analysis
     const themeObj = CUSTOM_THEMES.find((t) => t.id === selectedThemeId);
-    const geminiAnalysis = await geminiService.analyzeCustomBuild({
-      bikePhotoUri,
-      bikeName,
-      bikeBrand,
-      selectedParts,
-      selectedThemeName: themeObj?.name || 'Factory Racing Edition',
-      customPrompt,
-    });
+    let geminiAnalysis = null;
+    try {
+      geminiAnalysis = await geminiService.analyzeCustomBuild({
+        bikePhotoUri: effectiveBasePhoto,
+        bikeName: effectiveBikeName,
+        bikeBrand: effectiveBikeBrand,
+        selectedParts,
+        selectedThemeName: themeObj?.name || 'Factory Racing Edition',
+        customPrompt: finalPrompt,
+      });
+    } catch (_err) {
+      console.warn('Gemini analysis note:', _err);
+    }
 
     const diagnostics = this.calculatePerformanceGains(selectedParts, {
-      name: bikeName,
-      brand: bikeBrand,
+      name: effectiveBikeName,
+      brand: effectiveBikeBrand,
       baseHp: geminiAnalysis?.estimatedHpGain ? 160 + geminiAnalysis.estimatedHpGain : undefined,
     });
 
@@ -324,12 +404,14 @@ export const aiCustomizerService = {
     return {
       success: true,
       customizationId: 'AI-CUST-' + Math.floor(10000 + Math.random() * 90000),
-      originalImage: bikePhotoUri,
-      generatedImage,
-      bikeName: bikeName || 'Custom Motorcycle Build',
-      bikeBrand: bikeBrand || 'MotoTrack',
+      originalImage: effectiveBasePhoto,
+      generatedImage: aiGeneratedImageUrl,
+      promptUsed: finalPrompt,
+      bikeName: effectiveBikeName,
+      bikeBrand: effectiveBikeBrand,
+      motorcycle,
       selectedThemeId,
-      customPrompt,
+      customPrompt: finalPrompt,
       selectedParts,
       diagnostics,
       geminiAnalysis,

@@ -22,11 +22,11 @@ export default function ProductCard({ product, onPress, onAddToCart }) {
       onPress={() => onPress?.(product)}
       activeOpacity={0.92}
     >
-      {/* Product Image & Badges */}
+      {/* 1:1 Square Product Image */}
       <View style={styles.productImageContainer}>
         <Image source={{ uri: product.image }} style={styles.productImg} />
 
-        {/* Wishlist Heart Button */}
+        {/* Minimalist Line Wishlist Heart Button (Top-Right) */}
         <TouchableOpacity
           style={styles.wishlistToggleBtn}
           onPress={(e) => {
@@ -37,59 +37,55 @@ export default function ProductCard({ product, onPress, onAddToCart }) {
         >
           <BootstrapIcon
             name={isFav ? 'heart-fill' : 'heart'}
-            size={15}
-            color={isFav ? '#EF4444' : '#94A3B8'}
+            size={13}
+            color={isFav ? '#EF4444' : '#64748B'}
           />
         </TouchableOpacity>
-
-        {/* Royal Blue Price Badge */}
-        <View style={styles.priceBadgePill}>
-          <Text style={styles.priceBadgeText}>₱{product.price?.toFixed(2)}</Text>
-        </View>
       </View>
 
-      {/* Product Details */}
+      {/* Product Details - Minimalist E-Commerce Layout */}
       <View style={styles.productCardDetails}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 3 }}>
-          <BootstrapIcon name="box-seam" size={11} color={product.stock <= 5 ? '#ef4444' : '#64748b'} />
-          <Text
-            style={[styles.stockCountText, product.stock <= 5 && styles.stockLowText, { marginBottom: 0 }]}
-          >
-            {product.stock} Stocks Left
+        {/* Brand/Category Subtle Tag */}
+        {product.brand ? (
+          <Text style={styles.productBrandText} numberOfLines={1}>
+            {product.brand.toUpperCase()}
           </Text>
-        </View>
+        ) : null}
 
-        <View style={styles.ratingReviewRow}>
-          <BootstrapIcon name="star-fill" size={11} color="#f59e0b" />
-          <Text style={styles.ratingStarText}>{product.rating?.toFixed(1) || '5.0'}</Text>
-          <Text style={styles.ratingCountText}>({product.reviews || 0})</Text>
-        </View>
-
+        {/* Product Name (2 Lines Max) */}
         <Text style={styles.productTitle} numberOfLines={2}>
           {product.name}
         </Text>
 
-        {/* Quick Add To Bag Button */}
+        {/* Price: Clean Bold Charcoal */}
+        <View style={styles.priceRow}>
+          <Text style={styles.priceMainText}>₱{product.price?.toFixed(2)}</Text>
+        </View>
+
+        {/* Clean Single-Line Meta: Rating & Stock */}
+        <View style={styles.metaMinimalRow}>
+          <View style={styles.ratingMinimal}>
+            <BootstrapIcon name="star-fill" size={9.5} color="#F59E0B" />
+            <Text style={styles.ratingValText}>{product.rating?.toFixed(1) || '5.0'}</Text>
+            <Text style={styles.reviewCountText}>({product.reviews || 0})</Text>
+          </View>
+          <Text style={styles.metaDotDivider}>•</Text>
+          <Text style={styles.stockMinimalText}>
+            {product.stock <= 5 ? `Only ${product.stock} left` : `${product.stock} in stock`}
+          </Text>
+        </View>
+
+        {/* Minimalist Flat Add to Cart Button */}
         <TouchableOpacity
-          style={{
-            backgroundColor: '#F3F7F6',
-            borderRadius: 12,
-            paddingVertical: 7,
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginTop: 8,
-            borderWidth: 1,
-            borderColor: '#D1ECE6',
-            flexDirection: 'row',
-            gap: 6,
-          }}
+          style={styles.addToCartBtn}
           onPress={(e) => {
             e.stopPropagation?.();
             onAddToCart?.(product);
           }}
+          activeOpacity={0.8}
         >
-          <BootstrapIcon name="bag-plus-fill" size={13} color="#0C6258" />
-          <Text style={{ color: '#0C6258', fontSize: 12, fontWeight: '800' }}>Add to Bag</Text>
+          <BootstrapIcon name="cart3" size={13} color="#FFFFFF" />
+          <Text style={styles.addToCartBtnText}>Add to Cart</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

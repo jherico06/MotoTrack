@@ -8,8 +8,11 @@ export function CartProvider({ children }) {
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromoId, setAppliedPromoId] = useState(null);
   const [discountPercent, setDiscountPercent] = useState(0);
+  const [isFreeShipping, setIsFreeShipping] = useState(false);
   const [promoFeedback, setPromoFeedback] = useState({ text: '', isError: false });
   const [toastMessage, setToastMessage] = useState('');
+
+  const shippingRate = 150;
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -19,30 +22,59 @@ export function CartProvider({ children }) {
   };
 
   const addToCart = (product, qty = 1) => {
+    const stock = Number(product?.stock);
+    const maxStock = Number.isFinite(stock) ? Math.max(0, stock) : Infinity;
+    if (maxStock <= 0) {
+      showToast(`"${product.name?.slice(0, 20) || 'Item'}..." is out of stock`);
+      return;
+    }
+
+    let capped = false;
     setCart((prevCart) => {
       const existing = prevCart.find((item) => item.product.id === product.id);
       if (existing) {
+        const nextQty = Math.min(existing.quantity + qty, maxStock);
+        if (nextQty === existing.quantity) {
+          capped = true;
+          return prevCart;
+        }
         return prevCart.map((item) =>
-          item.product.id === product.id ? { ...item, quantity: item.quantity + qty } : item
+          item.product.id === product.id
+            ? { ...item, quantity: nextQty, product: { ...item.product, ...product } }
+            : item
         );
       }
-      return [...prevCart, { product, quantity: qty }];
+      return [...prevCart, { product, quantity: Math.min(qty, maxStock) }];
     });
-    showToast(`Added "${product.name.slice(0, 20)}..." to bag!`);
+
+    if (capped) {
+      showToast(`Only ${maxStock} unit(s) available for this item`);
+    } else {
+      showToast(`Added "${product.name.slice(0, 20)}..." to bag!`);
+    }
   };
 
   const updateCartQuantity = (productId, delta) => {
+    let cappedAt = null;
     setCart((prevCart) =>
       prevCart
         .map((item) => {
-          if (item.product.id === productId) {
-            const newQty = item.quantity + delta;
-            return newQty > 0 ? { ...item, quantity: newQty } : null;
+          if (item.product.id !== productId) return item;
+          const stock = Number(item.product?.stock);
+          const maxStock = Number.isFinite(stock) ? Math.max(0, stock) : Infinity;
+          const newQty = item.quantity + delta;
+          if (newQty <= 0) return null;
+          if (newQty > maxStock) {
+            cappedAt = maxStock;
+            return { ...item, quantity: maxStock };
           }
-          return item;
+          return { ...item, quantity: newQty };
         })
         .filter(Boolean)
     );
+    if (cappedAt !== null) {
+      showToast(`Only ${cappedAt} unit(s) available for this item`);
+    }
   };
 
   const removeFromCart = (productId) => {
@@ -53,6 +85,7 @@ export function CartProvider({ children }) {
   const clearCart = () => {
     setCart([]);
     setDiscountPercent(0);
+    setIsFreeShipping(false);
     setPromoCode('');
     setAppliedPromoId(null);
     setPromoFeedback({ text: '', isError: false });
@@ -70,10 +103,15 @@ export function CartProvider({ children }) {
     return (cartSubtotal * discountPercent) / 100;
   }, [cartSubtotal, discountPercent]);
 
+  const shippingFee = useMemo(() => {
+    if (cart.length === 0) return 0;
+    return isFreeShipping ? 0 : shippingRate;
+  }, [cart.length, isFreeShipping]);
+
   const cartTotal = useMemo(() => {
-    const total = cartSubtotal - discountAmount;
+    const total = cartSubtotal - discountAmount + shippingFee;
     return total > 0 ? total : 0;
-  }, [cartSubtotal, discountAmount]);
+  }, [cartSubtotal, discountAmount, shippingFee]);
 
   const applyPromo = async (codeToApply) => {
     const code = (codeToApply || promoCode).trim();
@@ -84,15 +122,24 @@ export function CartProvider({ children }) {
     const result = await promoService.validatePromo(code);
     if (result.valid) {
       setDiscountPercent(result.discountPercent);
+      const freeShip = result.description?.toLowerCase().includes('free shipping');
+      setIsFreeShipping(freeShip);
       setAppliedPromoId(result.promoId || null);
+      
+      const benefitText = [
+        result.discountPercent > 0 ? `${result.discountPercent}% OFF` : '',
+        freeShip ? 'Free Shipping' : ''
+      ].filter(Boolean).join(' + ');
+
       setPromoFeedback({
-        text: `✅ Promo "${result.code}" applied! (${result.discountPercent}% OFF)`,
+        text: `✅ Promo "${result.code}" applied! (${benefitText})`,
         isError: false,
       });
-      showToast(`Saved ${result.discountPercent}% with ${result.code}!`);
-      return { success: true, discountPercent: result.discountPercent, promoId: result.promoId };
+      showToast(`Applied ${result.code}!`);
+      return { success: true, discountPercent: result.discountPercent, promoId: result.promoId, isFreeShipping: freeShip };
     } else {
       setDiscountPercent(0);
+      setIsFreeShipping(false);
       setAppliedPromoId(null);
       setPromoFeedback({ text: `❌ ${result.message || result.error || 'Invalid code'}`, isError: true });
       return { success: false, message: result.message || result.error };
@@ -110,6 +157,8 @@ export function CartProvider({ children }) {
     cartSubtotal,
     discountPercent,
     discountAmount,
+    shippingFee,
+    isFreeShipping,
     cartTotal,
     promoCode,
     setPromoCode,

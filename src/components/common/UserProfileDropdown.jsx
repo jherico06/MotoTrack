@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Platform,
   TouchableWithoutFeedback,
+  Modal,
 } from 'react-native';
 import BootstrapIcon from './BootstrapIcon';
 import ConfirmModal from '../modals/ConfirmModal';
@@ -23,6 +24,9 @@ export default function UserProfileDropdown({
   onLogout,
   onNavigateToDashboard,
   onNavigateToOrders,
+  isMobile = false,
+  align = 'right',
+  topOffset,
 }) {
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
@@ -37,197 +41,255 @@ export default function UserProfileDropdown({
     (currentUser.avatar.startsWith('http') || currentUser.avatar.startsWith('data:image'))
   );
 
-  return (
+  const dropdownContent = (
     <>
-      {isOpen && (
-        <>
-          {/* Click-outside backdrop */}
-          <TouchableWithoutFeedback onPress={onClose}>
-            <View style={styles.backdrop} />
-          </TouchableWithoutFeedback>
-
-          {/* Floating Dropdown Card */}
-          <View style={styles.dropdownContainer}>
-        {/* User Quick Header */}
-        <View style={styles.userHeaderRow}>
-          {isUploadedAvatar ? (
-            <Image
-              source={{ uri: currentUser.avatar || currentUser.photoUri }}
-              style={styles.avatarImg}
-            />
-          ) : (
-            <View
-              style={{
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: '#DDE2E8',
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1.5,
-                borderColor: '#CBD5E1',
-              }}
-            >
-              <BootstrapIcon name="person-fill" size={26} color="#64748B" />
-            </View>
-          )}
-          <View style={styles.userInfo}>
-            <Text style={styles.userName} numberOfLines={1}>
-              {currentUser.name || currentUser.fullName || 'Rider Account'}
-            </Text>
-            <Text style={styles.userEmail} numberOfLines={1}>
-              {currentUser.email || 'rider@mototrack.ph'}
-            </Text>
-            {isAdmin && (
-              <View style={[styles.roleBadge, styles.roleBadgeAdmin]}>
-                <BootstrapIcon
-                  name="shield-lock-fill"
-                  size={11}
-                  color="#0C6258"
-                />
-                <Text style={[styles.roleBadgeText, styles.roleBadgeTextAdmin]}>
-                  Store Administrator
-                </Text>
-              </View>
-            )}
+      {/* User Quick Header */}
+      <View style={styles.userHeaderRow}>
+        {isUploadedAvatar ? (
+          <Image
+            source={{ uri: currentUser.avatar || currentUser.photoUri }}
+            style={styles.avatarImg}
+          />
+        ) : (
+          <View
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: '#DDE2E8',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1.5,
+              borderColor: '#CBD5E1',
+            }}
+          >
+            <BootstrapIcon name="person-fill" size={26} color="#64748B" />
           </View>
-        </View>
-
-        <View style={styles.divider} />
-
-        {/* Choices Menu */}
-        <View style={styles.menuList}>
-          {/* 1. My Dashboard */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              onClose();
-              if (onNavigateToDashboard) {
-                onNavigateToDashboard('overview');
-              } else if (onNavigateToProfile) {
-                onNavigateToProfile('overview');
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.menuIconBox, { backgroundColor: '#E6F4F1' }]}>
-              <BootstrapIcon name="speedometer2" size={15} color="#0C6258" />
+        )}
+        <View style={styles.userInfo}>
+          <Text style={styles.userName} numberOfLines={1}>
+            {currentUser.name || currentUser.fullName || 'Rider Account'}
+          </Text>
+          <Text style={styles.userEmail} numberOfLines={1}>
+            {currentUser.email || 'rider@mototrack.ph'}
+          </Text>
+          {isAdmin ? (
+            <View style={[styles.roleBadge, styles.roleBadgeAdmin]}>
+              <BootstrapIcon
+                name="shield-lock-fill"
+                size={11}
+                color="#0C6258"
+              />
+              <Text style={[styles.roleBadgeText, styles.roleBadgeTextAdmin]}>
+                Store Administrator
+              </Text>
             </View>
-            <View style={styles.menuTextWrap}>
-              <Text style={styles.menuTitle}>My Dashboard</Text>
-              <Text style={styles.menuSub}>Orders, garage bookings & rider stats</Text>
+          ) : (
+            <View style={styles.roleBadge}>
+              <BootstrapIcon
+                name="person-fill"
+                size={10}
+                color="#64748B"
+              />
+              <Text style={styles.roleBadgeText}>
+                Customer Account
+              </Text>
             </View>
-            <BootstrapIcon name="chevron-right" size={12} color="#CBD5E1" />
-          </TouchableOpacity>
-
-          {/* 2. My Orders (Customer Dashboard) */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              onClose();
-              if (onNavigateToOrders) {
-                onNavigateToOrders();
-              } else if (onNavigateToDashboard) {
-                onNavigateToDashboard('orders');
-              } else if (onNavigateToProfile) {
-                onNavigateToProfile('orders');
-              }
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.menuIconBox, { backgroundColor: '#F0FDF4' }]}>
-              <BootstrapIcon name="receipt" size={15} color="#0C6258" />
-            </View>
-            <View style={styles.menuTextWrap}>
-              <Text style={styles.menuTitle}>My Orders</Text>
-              <Text style={styles.menuSub}>Track packages & purchase history</Text>
-            </View>
-            <BootstrapIcon name="chevron-right" size={12} color="#CBD5E1" />
-          </TouchableOpacity>
-
-          {/* 3. Settings */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              onClose();
-              onNavigateToSettings?.();
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.menuIconBox, { backgroundColor: '#F1F5F9' }]}>
-              <BootstrapIcon name="gear-fill" size={15} color="#475569" />
-            </View>
-            <View style={styles.menuTextWrap}>
-              <Text style={styles.menuTitle}>Settings</Text>
-              <Text style={styles.menuSub}>Security, password & preferences</Text>
-            </View>
-            <BootstrapIcon name="chevron-right" size={12} color="#CBD5E1" />
-          </TouchableOpacity>
-
-          {/* 3. Notifications */}
-          <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => {
-              onClose();
-              onNavigateToNotifications?.();
-            }}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.menuIconBox, { backgroundColor: '#FEF2F2' }]}>
-              <BootstrapIcon name="bell-fill" size={15} color="#E11D48" />
-            </View>
-            <View style={styles.menuTextWrap}>
-              <Text style={styles.menuTitle}>Notifications</Text>
-              <Text style={styles.menuSub}>Orders, garage updates & alerts</Text>
-            </View>
-            <BootstrapIcon name="chevron-right" size={12} color="#CBD5E1" />
-          </TouchableOpacity>
-
-          {/* 4. Admin Dashboard (Admin Only) */}
-          {isAdmin && (
-            <TouchableOpacity
-              style={[styles.menuItem, styles.menuItemAdmin]}
-              onPress={() => {
-                onClose();
-                onNavigateToAdmin?.();
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.menuIconBox, { backgroundColor: '#D1ECE6' }]}>
-                <BootstrapIcon name="shield-lock-fill" size={15} color="#0C6258" />
-              </View>
-              <View style={styles.menuTextWrap}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={[styles.menuTitle, { color: '#0C6258' }]}>Admin Dashboard</Text>
-                  <View style={styles.adminChip}>
-                    <Text style={styles.adminChipText}>CONSOLE</Text>
-                  </View>
-                </View>
-                <Text style={styles.menuSub}>Orders, inventory & garage slots</Text>
-              </View>
-              <BootstrapIcon name="chevron-right" size={12} color="#0C6258" />
-            </TouchableOpacity>
           )}
         </View>
+      </View>
 
-        <View style={styles.divider} />
+      <View style={styles.divider} />
 
-        {/* 5. Log Out */}
+      {/* Choices Menu */}
+      <View style={styles.menuList}>
+        {/* 1. My Dashboard */}
         <TouchableOpacity
-          style={styles.logoutItem}
+          style={styles.menuItem}
           onPress={() => {
             onClose();
-            setIsLogoutConfirmOpen(true);
+            if (onNavigateToDashboard) {
+              onNavigateToDashboard('overview');
+            } else if (onNavigateToProfile) {
+              onNavigateToProfile('overview');
+            }
           }}
           activeOpacity={0.7}
         >
-          <View style={[styles.menuIconBox, { backgroundColor: '#FEE2E2' }]}>
-            <BootstrapIcon name="box-arrow-right" size={15} color="#DC2626" />
+          <View style={[styles.menuIconBox, { backgroundColor: '#E6F4F1' }]}>
+            <BootstrapIcon name="speedometer2" size={15} color="#0C6258" />
           </View>
-          <Text style={styles.logoutText}>Log Out</Text>
+          <View style={styles.menuTextWrap}>
+            <Text style={styles.menuTitle}>My Dashboard</Text>
+            <Text style={styles.menuSub}>Orders, garage bookings & rider stats</Text>
+          </View>
+          <BootstrapIcon name="chevron-right" size={12} color="#CBD5E1" />
         </TouchableOpacity>
+
+        {/* 2. My Orders (Customer Dashboard) */}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => {
+            onClose();
+            if (onNavigateToOrders) {
+              onNavigateToOrders();
+            } else if (onNavigateToDashboard) {
+              onNavigateToDashboard('orders');
+            } else if (onNavigateToProfile) {
+              onNavigateToProfile('orders');
+            }
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.menuIconBox, { backgroundColor: '#F0FDF4' }]}>
+            <BootstrapIcon name="receipt" size={15} color="#0C6258" />
+          </View>
+          <View style={styles.menuTextWrap}>
+            <Text style={styles.menuTitle}>My Orders</Text>
+            <Text style={styles.menuSub}>Track packages & purchase history</Text>
+          </View>
+          <BootstrapIcon name="chevron-right" size={12} color="#CBD5E1" />
+        </TouchableOpacity>
+
+        {/* 3. Settings */}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => {
+            onClose();
+            onNavigateToSettings?.();
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.menuIconBox, { backgroundColor: '#F1F5F9' }]}>
+            <BootstrapIcon name="gear-fill" size={15} color="#475569" />
+          </View>
+          <View style={styles.menuTextWrap}>
+            <Text style={styles.menuTitle}>Settings</Text>
+            <Text style={styles.menuSub}>Security, password & preferences</Text>
+          </View>
+          <BootstrapIcon name="chevron-right" size={12} color="#CBD5E1" />
+        </TouchableOpacity>
+
+        {/* 4. Notifications */}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => {
+            onClose();
+            onNavigateToNotifications?.();
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.menuIconBox, { backgroundColor: '#FEF2F2' }]}>
+            <BootstrapIcon name="bell-fill" size={15} color="#E11D48" />
+          </View>
+          <View style={styles.menuTextWrap}>
+            <Text style={styles.menuTitle}>Notifications</Text>
+            <Text style={styles.menuSub}>Orders, garage updates & alerts</Text>
+          </View>
+          <BootstrapIcon name="chevron-right" size={12} color="#CBD5E1" />
+        </TouchableOpacity>
+
+        {/* 5. Admin Dashboard (Admin Only) */}
+        {isAdmin && (
+          <TouchableOpacity
+            style={[styles.menuItem, styles.menuItemAdmin]}
+            onPress={() => {
+              onClose();
+              onNavigateToAdmin?.();
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.menuIconBox, { backgroundColor: '#D1ECE6' }]}>
+              <BootstrapIcon name="shield-lock-fill" size={15} color="#0C6258" />
+            </View>
+            <View style={styles.menuTextWrap}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={[styles.menuTitle, { color: '#0C6258' }]}>Admin Dashboard</Text>
+                <View style={styles.adminChip}>
+                  <Text style={styles.adminChipText}>CONSOLE</Text>
+                </View>
+              </View>
+              <Text style={styles.menuSub}>Orders, inventory & garage slots</Text>
+            </View>
+            <BootstrapIcon name="chevron-right" size={12} color="#0C6258" />
+          </TouchableOpacity>
+        )}
       </View>
-        </>
+
+      <View style={styles.divider} />
+
+      {/* 6. Log Out */}
+      <TouchableOpacity
+        style={styles.logoutItem}
+        onPress={() => {
+          onClose();
+          setIsLogoutConfirmOpen(true);
+        }}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.menuIconBox, { backgroundColor: '#FEE2E2' }]}>
+          <BootstrapIcon name="box-arrow-right" size={15} color="#DC2626" />
+        </View>
+        <Text style={styles.logoutText}>Log Out</Text>
+      </TouchableOpacity>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile Modal Overlay */}
+      {(isMobile || Platform.OS !== 'web') ? (
+        <Modal
+          visible={isOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={onClose}
+        >
+          <TouchableWithoutFeedback onPress={onClose}>
+            <View
+              style={[
+                styles.mobileBackdrop,
+                { paddingTop: topOffset ?? (Platform.OS === 'ios' ? 104 : 76) },
+              ]}
+            >
+              <TouchableWithoutFeedback
+                onPress={(e) => {
+                  if (e && e.stopPropagation) e.stopPropagation();
+                }}
+              >
+                <View
+                  style={[
+                    styles.dropdownContainer,
+                    styles.dropdownContainerMobile,
+                    align === 'left' ? { alignSelf: 'flex-start' } : { alignSelf: 'flex-end' },
+                  ]}
+                >
+                  {dropdownContent}
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </Modal>
+      ) : (
+        /* Desktop Web Dropdown */
+        isOpen && (
+          <>
+            {/* Click-outside backdrop */}
+            <TouchableWithoutFeedback onPress={onClose}>
+              <View style={styles.backdrop} />
+            </TouchableWithoutFeedback>
+
+            {/* Floating Dropdown Card */}
+            <View
+              style={[
+                styles.dropdownContainer,
+                align === 'left' ? { left: 0, right: 'auto' } : { right: 0, left: 'auto' },
+              ]}
+            >
+              {dropdownContent}
+            </View>
+          </>
+        )
       )}
 
       {/* Center Log Out Confirmation Modal */}
@@ -261,6 +323,11 @@ const styles = StyleSheet.create({
     zIndex: 9998,
     backgroundColor: 'transparent',
   },
+  mobileBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.38)',
+    paddingHorizontal: 16,
+  },
   dropdownContainer: {
     position: 'absolute',
     top: '100%',
@@ -278,6 +345,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 24,
     elevation: 12,
+  },
+  dropdownContainerMobile: {
+    position: 'relative',
+    top: 0,
+    left: 0,
+    right: 'auto',
+    marginTop: 0,
+    width: '100%',
+    maxWidth: 310,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 20,
+    elevation: 20,
   },
   userHeaderRow: {
     flexDirection: 'row',

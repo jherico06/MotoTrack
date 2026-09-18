@@ -61,8 +61,18 @@ export default function WishlistPage({
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
 
   const handleBottomNavChange = (tab) => {
-    if (tab === 'Home') {
+    if (tab === 'Home' || tab === 'Search') {
       onNavigateToStore?.();
+    } else if (tab === 'Cart') {
+      onNavigateToStore?.();
+    } else if (tab === 'Wishlist' || tab === 'Favorites') {
+      setSelectedCategory('All');
+    } else if (tab === 'Dashboard' || tab === 'Profile') {
+      if (!currentUser) {
+        onNavigateToLogin?.();
+      } else {
+        onNavigateToProfile?.();
+      }
     } else if (tab === 'Customize') {
       if (onNavigateToCustomizer) onNavigateToCustomizer();
       else if (onNavigateToCustomize) onNavigateToCustomize();
@@ -71,17 +81,9 @@ export default function WishlistPage({
       onNavigateToGarage?.();
     } else if (tab === 'Orders') {
       onNavigateToOrders?.();
-    } else if (tab === 'Favorites') {
-      setSelectedCategory('All');
     } else if (tab === 'Admin') {
       if (currentUser?.role === 'admin') {
         onNavigateToAdmin?.();
-      }
-    } else if (tab === 'Dashboard' || tab === 'Profile') {
-      if (!currentUser) {
-        onNavigateToLogin?.();
-      } else {
-        onNavigateToProfile?.();
       }
     }
   };
@@ -240,9 +242,9 @@ export default function WishlistPage({
                     onPress={handleMoveAllToCart}
                     activeOpacity={0.85}
                   >
-                    <BootstrapIcon name="bag-check-fill" size={14} color="#FFFFFF" />
+                    <BootstrapIcon name="cart-check-fill" size={14} color="#FFFFFF" />
                     <Text style={styles.headerActionBtnText}>
-                      Move All to Bag (${totalWishlistValue.toFixed(2)})
+                      Move All to Cart (${totalWishlistValue.toFixed(2)})
                     </Text>
                   </TouchableOpacity>
 
@@ -339,7 +341,7 @@ export default function WishlistPage({
                 and Öhlins suspension, then tap the heart icon to save your favorites here.
               </Text>
               <TouchableOpacity style={styles.emptyShopBtn} onPress={onNavigateToStore} activeOpacity={0.9}>
-                <BootstrapIcon name="bag-fill" size={15} color="#FFFFFF" />
+                <BootstrapIcon name="cart-fill" size={15} color="#FFFFFF" />
                 <Text style={styles.emptyShopBtnText}>Explore Store Catalog</Text>
               </TouchableOpacity>
             </View>
@@ -435,9 +437,9 @@ export default function WishlistPage({
                           onPress={() => handleAddToCart(product)}
                           activeOpacity={0.85}
                         >
-                          <BootstrapIcon name="bag-plus-fill" size={13} color="#FFFFFF" />
+                          <BootstrapIcon name="cart-plus-fill" size={13} color="#FFFFFF" />
                           <Text style={styles.addToCartBtnText}>
-                            {isOutOfStock ? 'Sold Out' : 'Add to Bag'}
+                            {isOutOfStock ? 'Sold Out' : 'Add to Cart'}
                           </Text>
                         </TouchableOpacity>
 
@@ -473,8 +475,8 @@ export default function WishlistPage({
           </View>
 
           <TouchableOpacity style={styles.mobileAddAllBtn} onPress={handleMoveAllToCart} activeOpacity={0.9}>
-            <BootstrapIcon name="bag-check-fill" size={14} color="#FFFFFF" />
-            <Text style={styles.mobileAddAllBtnText}>Move All to Bag</Text>
+            <BootstrapIcon name="cart-check-fill" size={14} color="#FFFFFF" />
+            <Text style={styles.mobileAddAllBtnText}>Move All to Cart</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -579,8 +581,8 @@ export default function WishlistPage({
                     setIsSpecsModalOpen(false);
                   }}
                 >
-                  <BootstrapIcon name="bag-plus-fill" size={14} color="#FFFFFF" />
-                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Add to Bag</Text>
+                  <BootstrapIcon name="cart-plus-fill" size={14} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Add to Cart</Text>
                 </TouchableOpacity>
               </>
             )}
@@ -659,7 +661,7 @@ export default function WishlistPage({
 
       {/* ─── PERSISTENT MOBILE BOTTOM NAVIGATION ─── */}
       <BottomNavBar
-        activeTab="Favorites"
+        activeTab="Wishlist"
         onTabChange={handleBottomNavChange}
         wishlistCount={wishlistedProducts.length}
         currentUser={currentUser}

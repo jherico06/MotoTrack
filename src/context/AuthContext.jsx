@@ -75,9 +75,21 @@ export function AuthProvider({ children }) {
       setCurrentUser(safeUser);
       setRedirectReason('');
 
-      // Clean OAuth token fragments from browser URL hash and query params
+      // Clean OAuth token fragments only — never strip rider/confirm public links
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        if (window.location.hash || window.location.search.includes('code=')) {
+        const params = new URLSearchParams(window.location.search);
+        const publicScreen = params.get('screen');
+        const keepPublic =
+          publicScreen === 'rider-run' ||
+          publicScreen === 'confirm-delivery' ||
+          publicScreen === 'rider-dashboard';
+        const hash = String(window.location.hash || '');
+        const isOAuthHash =
+          hash.includes('access_token') ||
+          hash.includes('id_token') ||
+          hash.includes('error=') ||
+          window.location.search.includes('code=');
+        if (isOAuthHash && !keepPublic) {
           window.history.replaceState({}, document.title, window.location.pathname);
         }
       }
@@ -197,6 +209,10 @@ export function AuthProvider({ children }) {
     return await login(email, password, 'admin');
   };
 
+  const loginRider = async (identifier, password) => {
+    return await login(identifier, password, 'rider');
+  };
+
   const demoCustomerLogin = () => {
     const res = authService.demoCustomerLogin();
     if (res.success) {
@@ -291,6 +307,7 @@ export function AuthProvider({ children }) {
     setCurrentUser,
     isAuthenticated: Boolean(currentUser),
     isAdmin: Boolean(currentUser && currentUser.role === 'admin'),
+    isRider: Boolean(currentUser && currentUser.role === 'rider'),
     redirectReason,
     setRedirectReason,
     isLoadingAuth,
@@ -300,6 +317,7 @@ export function AuthProvider({ children }) {
     login,
     loginCustomer,
     loginAdmin,
+    loginRider,
     demoCustomerLogin,
     loginWithGoogle,
     loginWithGoogleSimulated,

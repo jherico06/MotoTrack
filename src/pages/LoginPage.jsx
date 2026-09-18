@@ -48,7 +48,7 @@ export default function LoginPage({
 
   const handleEmailLogin = async () => {
     if (!email.trim() || !password) {
-      setErrorMessage('Please enter both email and password.');
+      setErrorMessage('Please enter your email or username and password.');
       return;
     }
 
@@ -128,7 +128,7 @@ export default function LoginPage({
 
             <DecorativePlantPot />
 
-            <Text style={styles.heroTitle}>Hello Rider!</Text>
+            <Text style={styles.heroTitle}>Hello!</Text>
             <Text style={styles.heroSubtitle}>Welcome to D,Blockchain Motorparts and Accessories</Text>
           </View>
 
@@ -140,6 +140,9 @@ export default function LoginPage({
               keyboardShouldPersistTaps="handled"
             >
               <Text style={styles.cardTitle}>Login</Text>
+              <Text style={{ fontSize: 12, color: '#64748B', marginTop: -4, marginBottom: 12 }}>
+                Customers, admins, and riders use this app. Your role opens the right screen.
+              </Text>
 
               {/* Redirect Notice */}
               {redirectReason ? (
@@ -163,7 +166,7 @@ export default function LoginPage({
                   <BootstrapIcon name="envelope" size={17} color="#88A9A3" />
                   <TextInput
                     style={styles.textInput}
-                    placeholder="Email Address"
+                    placeholder="Email or username"
                     placeholderTextColor="#9FB9B5"
                     value={email}
                     onChangeText={(text) => {

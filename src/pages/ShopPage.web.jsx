@@ -37,6 +37,7 @@ import {
   GCashPaymentModal,
 } from '../components';
 import { UserProfileDropdown, UserProfileButton, BrandLogo, NotificationDropdown } from '../components/common';
+import HeroBanner from '../components/shop/HeroBanner';
 import { shopWebStyles as webStyles } from '../styles/web/shopPage.web.styles';
 
 export default function ShopPageWeb({ onNavigateToScreen }) {
@@ -49,6 +50,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
     cartSubtotal,
     cartItemCount,
     discountAmount,
+    shippingFee,
     cartTotal,
     appliedPromoId,
     toastMessage,
@@ -69,6 +71,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
   const [isSpecsOpen, setIsSpecsOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
@@ -175,6 +178,8 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
   };
 
   const executeCreateOrder = async (orderFormData, overrideStatus = null) => {
+    if (isPlacingOrder) return { success: false };
+
     const {
       customerName,
       customerPhone,
@@ -189,45 +194,64 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
     const isCOD =
       (paymentMethod || '').toLowerCase().includes('cash') || (paymentMethod || '').includes('COD');
 
-    const res = await orderService.createOrder({
-      userId: currentUser?.user_id || currentUser?.id || null,
-      customerId: currentUser?.customer_id || currentUser?.user_id || currentUser?.id || null,
-      customerName,
-      customerPhone,
-      customerAddress,
-      deliveryNotes,
-      paymentMethod,
-      gcashNumber,
-      gcashReference,
-      codChangeFor,
-      promoId: appliedPromoId || null,
-      total: cartSubtotal.toFixed(2),
-      discountAmount: discountAmount.toFixed(2),
-      grandTotal: cartTotal.toFixed(2),
-      items: cart,
-      channel: 'Online Store',
-      overrideStatus,
-    });
+    setIsPlacingOrder(true);
+    try {
+      const res = await orderService.createOrder({
+        userId: currentUser?.user_id || currentUser?.id || null,
+        customerId: currentUser?.customer_id || currentUser?.user_id || currentUser?.id || null,
+        customerName,
+        customerPhone,
+        customerAddress,
+        deliveryNotes,
+        paymentMethod,
+        gcashNumber,
+        gcashReference,
+        codChangeFor,
+        promoId: appliedPromoId || null,
+        total: cartSubtotal.toFixed(2),
+        discountAmount: discountAmount.toFixed(2),
+        shippingFee: Number(shippingFee || 0),
+        grandTotal: cartTotal.toFixed(2),
+        items: cart,
+        channel: 'Online Store',
+        overrideStatus,
+      });
 
-    const placedOrder = res.order;
-    clearCart();
-    setIsCheckoutOpen(false);
-    setSelectedOrderForTracking(placedOrder);
-    setIsLiveTrackingOpen(true);
-    showToast(
-      isCOD
-        ? '🎉 COD Order placed! Awaiting Store Admin verification.'
-        : '🎉 GCash Payment Confirmed! Live order tracking active.'
-    );
+      if (!res?.success) {
+        showToast(res?.error || 'Could not place order. Please try again.');
+        return res;
+      }
+
+      const placedOrder = res.order;
+      clearCart();
+      setIsCheckoutOpen(false);
+      setIsGcashModalOpen(false);
+      setSelectedOrderForTracking(placedOrder);
+      setIsLiveTrackingOpen(true);
+      showToast(
+        !res.supabaseSynced
+          ? '📦 Order saved offline — will sync when connection is back.'
+          : isCOD
+            ? '🎉 COD Order placed! Awaiting Store Admin verification.'
+            : '🎉 GCash Payment Confirmed! Live order tracking active.'
+      );
+      return res;
+    } catch (e) {
+      console.warn('[ShopPage] place order failed:', e);
+      showToast('Could not place order. Please try again.');
+      return { success: false, error: e?.message || 'Order failed' };
+    } finally {
+      setIsPlacingOrder(false);
+    }
   };
 
-  // Determine grid columns
-  const numColumns = windowWidth >= 1200 ? 4 : windowWidth >= 800 ? 3 : 2;
+  // Balanced grid columns: not too big, not too small
+  const numColumns = windowWidth >= 1250 ? 5 : windowWidth >= 980 ? 4 : windowWidth >= 680 ? 3 : 2;
   const gapSize = 16;
   const cardWidth = `calc(${100 / numColumns}% - ${((numColumns - 1) * gapSize) / numColumns}px)`;
 
   return (
-    <View style={webStyles.container}>
+    <View style={webStyles.container} className="bg-slate-100 min-h-screen">
       <StatusBar style="dark" />
       <ToastNotification message={toastMessage} />
 
@@ -339,7 +363,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
               activeOpacity={0.85}
               title="Shopping Cart"
             >
-              <BootstrapIcon name="bag" size={16} color="#FFFFFF" />
+              <BootstrapIcon name="cart3" size={17} color="#FFFFFF" />
               {cartItemCount > 0 && (
                 <View style={webStyles.navBadgeCircle}>
                   <Text style={webStyles.navBadgeText}>{cartItemCount}</Text>
@@ -406,6 +430,8 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
         showsVerticalScrollIndicator={true}
       >
         <View style={webStyles.maxContainer}>
+          <HeroBanner onSelectCategory={setSelectedCategory} showToast={showToast} />
+          
           {/* ─── CATEGORY DROPDOWN, SEARCH & SORTING TOOLBAR ─── */}
           <View style={webStyles.toolbarRow}>
             {/* Left Cluster: Category Dropdown & Relocated Search Bar */}
@@ -601,10 +627,10 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
           <View style={webStyles.catalogHeaderRow}>
             <View>
               <Text style={webStyles.catalogTitle}>
-                {selectedCategory === 'All' ? 'All Pro Performance Gear' : `${selectedCategory} Collection`}
+                {selectedCategory === 'All' ? 'Featured Products' : `${selectedCategory} Collection`}
               </Text>
               <Text style={webStyles.catalogSub}>
-                Showing {filteredProducts.length} high-spec components dyno-matched for track & street
+                {filteredProducts.length} items available
               </Text>
             </View>
           </View>
@@ -614,82 +640,82 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
             {filteredProducts.map((product) => {
               const isFav = isWishlisted(product.id);
               return (
-                <View key={product.id} style={[webStyles.productCard, { width: cardWidth }]}>
-                  <TouchableOpacity
-                    style={webStyles.productImgContainer}
-                    onPress={() => {
-                      setSelectedProduct(product);
-                      setIsSpecsOpen(true);
-                    }}
-                    activeOpacity={0.9}
-                  >
-                    <Image source={{ uri: product.image }} style={webStyles.productImg} resizeMode="cover" />
+                <TouchableOpacity
+                  key={product.id}
+                  style={[webStyles.productCard, { width: cardWidth }]}
+                  className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden mb-2 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                  onPress={() => {
+                    setSelectedProduct(product);
+                    setIsSpecsOpen(true);
+                  }}
+                  activeOpacity={0.92}
+                >
+                  {/* 1:1 Square Product Image */}
+                  <View style={webStyles.productImgContainer} className="w-full aspect-square bg-slate-100 relative overflow-hidden">
+                    <Image source={{ uri: product.image }} style={webStyles.productImg} resizeMode="cover" className="w-full h-full object-cover" />
 
-                    {/* Stock Badge */}
-                    <View style={webStyles.stockBadge}>
-                      <BootstrapIcon name="box-seam" size={11} color="#475569" />
-                      <Text style={webStyles.stockBadgeText}>{product.stock} in stock</Text>
-                    </View>
-
-                    {/* Wishlist Button */}
+                    {/* Wishlist Button (Top-Right) */}
                     <TouchableOpacity
                       style={webStyles.wishlistBtn}
-                      onPress={() => toggleWishlist(product.id)}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/95 items-center justify-center shadow-sm z-10 hover:scale-105 transition-transform"
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        toggleWishlist(product.id);
+                      }}
                       activeOpacity={0.8}
                     >
                       <BootstrapIcon
                         name={isFav ? 'heart-fill' : 'heart'}
-                        size={14}
-                        color={isFav ? '#EF4444' : '#94A3B8'}
+                        size={13}
+                        color={isFav ? '#EF4444' : '#64748B'}
                       />
                     </TouchableOpacity>
+                  </View>
 
-                    {/* Price Pill */}
-                    <View style={webStyles.pricePill}>
-                      <Text style={webStyles.pricePillText}>₱{product.price?.toFixed(2)}</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  {/* Details */}
-                  <View style={webStyles.productDetails}>
-                    <View style={webStyles.ratingRow}>
-                      <BootstrapIcon name="star-fill" size={12} color="#F59E0B" />
-                      <Text style={webStyles.ratingVal}>{product.rating?.toFixed(1) || '5.0'}</Text>
-                      <Text style={webStyles.reviewCount}>({product.reviews || 0} reviews)</Text>
-                      <Text style={webStyles.brandTag}>• {product.brand}</Text>
-                    </View>
-
-                    <Text style={webStyles.productName} numberOfLines={2}>
+                  {/* Details - Compact Square Layout */}
+                  <View style={webStyles.productDetails} className="p-2.5 bg-white flex flex-col justify-between">
+                    {/* Product Name (2 Lines Max) */}
+                    <Text style={webStyles.productName} numberOfLines={2} className="text-[12.5px] font-semibold text-slate-800 leading-[17px] mb-1 h-[34px]">
                       {product.name}
                     </Text>
 
-                    <Text style={webStyles.compatibilityText} numberOfLines={1}>
-                      Fit: {product.compatibility || 'Universal Fit'}
-                    </Text>
-
-                    <View style={webStyles.cardActionRow}>
-                      <TouchableOpacity
-                        style={webStyles.quickAddBtn}
-                        onPress={() => handleAddToCartAttempt(product)}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="bag-plus-fill" size={13} color="#0C6258" />
-                        <Text style={webStyles.quickAddBtnText}>Add to Bag</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={webStyles.specsInspectBtn}
-                        onPress={() => {
-                          setSelectedProduct(product);
-                          setIsSpecsOpen(true);
-                        }}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="eye" size={14} color="#64748B" />
-                      </TouchableOpacity>
+                    {/* Price Row: Bold Teal Brand Color (matching app) */}
+                    <View style={webStyles.priceRow} className="flex flex-row items-baseline gap-1.5 mb-1.5">
+                      <Text style={webStyles.priceMainText} className="text-[15px] font-extrabold text-[#0C6258]">₱{product.price?.toFixed(2)}</Text>
                     </View>
+
+                    {/* Tags Row: COD, Actual Stock & Rating */}
+                    <View style={webStyles.tagsRow} className="flex flex-row items-center gap-1.5 mb-1.5 flex-wrap">
+                      <View style={webStyles.codTag} className="bg-amber-100 px-1.5 py-0.5 rounded">
+                        <Text style={webStyles.codTagText} className="text-[10px] font-extrabold text-amber-700">COD</Text>
+                      </View>
+                      <View style={webStyles.stockTag} className="bg-emerald-50 px-1.5 py-0.5 rounded">
+                        <Text style={webStyles.stockTagText} className="text-[10px] font-bold text-emerald-700">
+                          {product.stock <= 5 ? `Only ${product.stock} left` : `${product.stock} in stock`}
+                        </Text>
+                      </View>
+                      <View style={[webStyles.ratingLeft, { marginLeft: 'auto' }]} className="flex flex-row items-center gap-1 ml-auto">
+                        <BootstrapIcon name="star-fill" size={10} color="#F59E0B" />
+                        <Text style={webStyles.ratingValText} className="text-[11.5px] font-bold text-amber-500">{product.rating?.toFixed(1) || '5.0'}</Text>
+                        <Text style={webStyles.reviewCountText} className="text-[10.5px] text-slate-500 font-medium">({product.reviews || 0})</Text>
+                      </View>
+                    </View>
+
+                    {/* Add to Cart Button with matching App Solid Teal style */}
+                    <TouchableOpacity
+                      style={webStyles.addToCartBtn}
+                      className="bg-[#0C6258] hover:bg-[#094e46] rounded-lg py-2 flex flex-row items-center justify-center gap-1.5 mt-1.5 transition-colors cursor-pointer"
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        handleAddToCartAttempt(product);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <BootstrapIcon name="cart3" size={13} color="#FFFFFF" />
+                      <Text style={webStyles.addToCartBtnText} className="text-xs font-bold text-white">Add to Cart</Text>
+                    </TouchableOpacity>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -754,8 +780,9 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
 
       <CheckoutModal
         visible={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
+        onClose={() => !isPlacingOrder && setIsCheckoutOpen(false)}
         onCompleteOrder={handleCompleteOrder}
+        isPlacingOrder={isPlacingOrder}
         onOpenProfile={() => {
           setIsCheckoutOpen(false);
           setIsProfileOpen(true);

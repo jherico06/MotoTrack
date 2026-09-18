@@ -6,4 +6,7 @@ export { default as UserProfileButton } from './UserProfileButton';
 export { default as NotificationDropdown } from './NotificationDropdown';
 export { default as BrandLogo } from './BrandLogo';
 export { default as GoogleIcon } from './GoogleIcon';
+export { default as ExpectedDateField } from './ExpectedDateField';
+export { default as ExpectedDeliveryEditor } from './ExpectedDeliveryEditor';
+export { default as ExternalLink, openExternalUrl } from './ExternalLink';
 export { default as ProductSpecsModal } from '../modals/ProductSpecsModal';

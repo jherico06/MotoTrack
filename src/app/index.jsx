@@ -1,5 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
-import { AuthProvider, CartProvider, WishlistProvider, useAuth, useCart } from '../context';
+import React, { useState, useEffect } from 'react';
+import { AuthProvider, CartProvider, WishlistProvider, useAuth, useCart, useWishlist } from '../context';
 import {
   ShopPage,
   LoginPage,
@@ -11,9 +11,13 @@ import {
   CustomizerPage,
   ProfilePage,
   NotificationsPage,
+  DeliveryConfirmPage,
+  RiderRunPage,
+  RiderDashboard,
 } from '../pages';
 
 import { Platform, View, Text, TouchableOpacity, SafeAreaView, StyleSheet } from 'react-native';
+import * as ExpoLinking from 'expo-linking';
 import { BootstrapIcon } from '../components/common';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import { adminSecurityService } from '../services/adminSecurityService';
@@ -95,40 +99,77 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   }
 }
 
+function parsePublicRoute(url) {
+  const out = { screen: '', token: '' };
+  if (!url && Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    url = window.location.href;
+  }
+  if (!url) return out;
+  try {
+    const normalized = String(url).replace(/^exp:\/\//i, 'http://');
+    const u = new URL(normalized, Platform.OS === 'web' ? window.location.origin : 'https://mototrack.local');
+    const hash = String(u.hash || '').replace(/^#\/?/, '');
+    const hashQuery = hash.includes('=') || hash.includes('?') ? hash.replace(/^\?/, '') : '';
+    const params = new URLSearchParams(u.search);
+    const hashParams = new URLSearchParams(hashQuery);
+    out.screen = params.get('screen') || hashParams.get('screen') || '';
+    out.token = params.get('token') || hashParams.get('token') || '';
+    if (!out.screen && (hash === 'rider-run' || hash === 'confirm-delivery')) out.screen = hash;
+    return out;
+  } catch (_e) {}
+  try {
+    const parsed = ExpoLinking.parse(String(url));
+    const q = parsed?.queryParams || {};
+    out.screen = String(q.screen || '');
+    out.token = String(q.token || '');
+  } catch (_e) {}
+  return out;
+}
+
 function MainAppRouter() {
   const getInitialScreen = () => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
-      try {
-        const params = new URLSearchParams(window.location.search);
-        const s = params.get('screen') || window.location.hash.replace('#', '');
-        if (s === 'orders') {
-          return 'profile';
-        }
-        if (['login', 'signup', 'admin', 'garage', 'wishlist', 'shop', 'customizer', 'profile', 'notifications'].includes(s)) {
-          return s;
-        }
-      } catch (_e) {}
-    }
+    try {
+      const { screen: s } = parsePublicRoute();
+      if (s === 'orders') {
+        return 'orders';
+      }
+      if (s === 'confirm-delivery') {
+        return 'confirm-delivery';
+      }
+      if (s === 'rider-run') {
+        return 'rider-run';
+      }
+      // Old rider-login links open the shared app login
+      if (s === 'rider-login') {
+        return 'login';
+      }
+      if (s === 'rider-dashboard') {
+        return 'rider-dashboard';
+      }
+      if (['login', 'signup', 'admin', 'garage', 'wishlist', 'shop', 'customizer', 'profile', 'notifications', 'orders', 'confirm-delivery', 'rider-run', 'rider-dashboard'].includes(s)) {
+        return s;
+      }
+    } catch (_e) {}
     return 'shop';
   };
 
   const [currentScreen, setCurrentScreen] = useState(getInitialScreen);
   const [customizerProduct, setCustomizerProduct] = useState(null);
   const [profileInitialTab, setProfileInitialTab] = useState(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
-      try {
-        const params = new URLSearchParams(window.location.search);
-        const s = params.get('screen') || window.location.hash.replace('#', '');
-        const tab = params.get('tab');
+    try {
+      const { screen: s } = parsePublicRoute();
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+        const tab = new URLSearchParams(window.location.search).get('tab');
         if (s === 'orders' || tab === 'orders') return 'orders';
         if (tab) return tab;
-      } catch (_e) {}
-    }
+      }
+    } catch (_e) {}
     return 'profile';
   });
   const [allowMobileAdmin, setAllowMobileAdmin] = useState(false);
   const { currentUser, logout, adminLogin, redirectReason, setRedirectReason } = useAuth();
   const { addToCart, cartItemCount, cartTotal, showToast } = useCart();
+  const { wishlistCount } = useWishlist();
 
   const navigateScreen = (screen) => {
     setCurrentScreen(screen);
@@ -137,8 +178,12 @@ function MainAppRouter() {
         const url = new URL(window.location.href);
         if (screen === 'shop') {
           url.searchParams.delete('screen');
+          url.searchParams.delete('token');
         } else {
           url.searchParams.set('screen', screen);
+        }
+        if (screen !== 'rider-run' && screen !== 'confirm-delivery') {
+          url.searchParams.delete('token');
         }
         window.history.pushState({}, '', url.pathname + (url.search ? url.search : ''));
       } catch (_e) {}
@@ -163,6 +208,8 @@ function MainAppRouter() {
     const resolvedRole = user?.role || authService.getCurrentUser()?.role || currentUser?.role;
     if (resolvedRole === 'admin') {
       navigateScreen('admin');
+    } else if (resolvedRole === 'rider') {
+      navigateScreen('rider-dashboard');
     } else {
       navigateScreen('shop');
     }
@@ -172,16 +219,33 @@ function MainAppRouter() {
     try {
       adminSecurityService.lockSession();
     } catch (_e) {}
+    const wasRider = currentUser?.role === 'rider';
     logout();
-    navigateScreen('shop');
+    navigateScreen(wasRider ? 'login' : 'shop');
     showToast('Logged out successfully');
   };
 
   // â”€â”€â”€ STRICT ENVIRONMENT SEPARATION â”€â”€â”€
   // 1. Admin accounts can ONLY access the Admin Dashboard
   useEffect(() => {
-    if (currentUser?.role === 'admin' && currentScreen !== 'admin') {
+    if (
+      currentUser?.role === 'admin' &&
+      currentScreen !== 'admin' &&
+      currentScreen !== 'confirm-delivery' &&
+      currentScreen !== 'rider-run'
+    ) {
       navigateScreen('admin');
+    }
+  }, [currentUser, currentScreen]);
+
+  useEffect(() => {
+    if (
+      currentUser?.role === 'rider' &&
+      currentScreen !== 'rider-dashboard' &&
+      currentScreen !== 'rider-run' &&
+      currentScreen !== 'confirm-delivery'
+    ) {
+      navigateScreen('rider-dashboard');
     }
   }, [currentUser, currentScreen]);
 
@@ -190,26 +254,49 @@ function MainAppRouter() {
     if (currentUser && (currentScreen === 'login' || currentScreen === 'signup')) {
       if (currentUser.role === 'admin') {
         navigateScreen('admin');
+      } else if (currentUser.role === 'rider') {
+        navigateScreen('rider-dashboard');
       } else if (!redirectReason) {
         navigateScreen('shop');
       }
     }
   }, [currentUser, currentScreen, redirectReason]);
 
-  // Listen to browser URL changes (back/forward or external navigation)
+  // Deep links / scanned QR (web + Expo Go) should open rider/confirm screens
   useEffect(() => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-      const handlePopState = () => {
-        const s = getInitialScreen();
-        setCurrentScreen(s);
-      };
-      window.addEventListener('popstate', handlePopState);
-      return () => {
-        if (typeof window.removeEventListener === 'function') {
-          window.removeEventListener('popstate', handlePopState);
+    const applyUrl = (url) => {
+      const { screen, token } = parsePublicRoute(url);
+      if (screen === 'rider-run' || screen === 'confirm-delivery') {
+        setCurrentScreen(screen);
+        if (Platform.OS === 'web' && typeof window !== 'undefined' && token) {
+          try {
+            const next = new URL(window.location.href);
+            next.searchParams.set('screen', screen);
+            next.searchParams.set('token', token);
+            window.history.replaceState({}, '', next.pathname + next.search);
+          } catch (_e) {}
         }
-      };
+      }
+    };
+    ExpoLinking.getInitialURL()
+      .then((url) => applyUrl(url))
+      .catch(() => {});
+    const sub = ExpoLinking.addEventListener('url', (event) => applyUrl(event?.url));
+    const handlePopState = () => {
+      const s = getInitialScreen();
+      setCurrentScreen(s);
+    };
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.addEventListener('popstate', handlePopState);
     }
+    return () => {
+      try {
+        sub?.remove?.();
+      } catch (_e) {}
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.removeEventListener('popstate', handlePopState);
+      }
+    };
   }, []);
 
   // If user logs out or session ends while on protected screen (profile, orders), return to storefront
@@ -218,6 +305,60 @@ function MainAppRouter() {
       navigateScreen('shop');
     }
   }, [currentUser, currentScreen]);
+
+  // Authenticated rider dashboard
+  if (currentUser?.role === 'rider') {
+    // Packing-label QR deep link opens Confirm Delivery inside the app (not the browser tab alone).
+    if (currentScreen === 'confirm-delivery') {
+      const parsed = parsePublicRoute();
+      return (
+        <DeliveryConfirmPage
+          token={parsed.token}
+          onDone={() => {
+            navigateScreen('rider-dashboard');
+            showToast('Back to My Deliveries');
+          }}
+        />
+      );
+    }
+    return (
+      <RiderDashboard
+        onLogout={() => {
+          logout();
+          navigateScreen('login');
+          showToast('Rider logged out');
+        }}
+      />
+    );
+  }
+
+  // Unauthenticated riders use the shared Login page (same as customers/admins)
+  if (!currentUser && currentScreen === 'rider-dashboard') {
+    return (
+      <LoginPage
+        onLoginSuccess={handleAuthSuccess}
+        onNavigateToSignUp={() => navigateScreen('signup')}
+        onNavigateToStore={() => navigateScreen('shop')}
+      />
+    );
+  }
+
+  // Public rider dashboard (no login) — temporary access token
+  if (currentScreen === 'rider-run') {
+    const parsed = parsePublicRoute();
+    return <RiderRunPage token={parsed.token} />;
+  }
+
+  // Public rider confirmation (no login) — after hooks
+  if (currentScreen === 'confirm-delivery') {
+    const parsed = parsePublicRoute();
+    return (
+      <DeliveryConfirmPage
+        token={parsed.token}
+        onDone={() => navigateScreen('shop')}
+      />
+    );
+  }
 
   // â”€â”€â”€ ADMIN ENVIRONMENT: ADMIN CAN ONLY ACCESS THE ADMIN DASHBOARD â”€â”€â”€
   if (currentUser?.role === 'admin') {
@@ -370,7 +511,7 @@ function MainAppRouter() {
             if (screen === 'profile') {
               handleNavigateToProfile(params?.tab || 'profile');
             } else if (screen === 'orders') {
-              handleNavigateToProfile('orders');
+              navigateScreen('orders');
             } else {
               navigateScreen(screen);
             }
@@ -420,7 +561,7 @@ function MainAppRouter() {
       <WishlistPage
         onAddToCart={(product, qty) => addToCart(product, qty)}
         onNavigateToStore={() => navigateScreen('shop')}
-        onNavigateToOrders={() => handleNavigateToProfile('orders')}
+        onNavigateToOrders={() => navigateScreen('orders')}
         onNavigateToGarage={() => navigateScreen('garage')}
         onNavigateToLogin={() => navigateScreen('login')}
         onNavigateToProfile={(tab) => handleNavigateToProfile(tab)}
@@ -434,12 +575,28 @@ function MainAppRouter() {
 
   if (currentScreen === 'orders') {
     if (!currentUser) {
-      setRedirectReason('Please sign in to view your orders in your Customer Dashboard.');
+      setRedirectReason('Please sign in to view your orders.');
       navigateScreen('login');
       return null;
     }
-    handleNavigateToProfile('orders');
-    return null;
+    return (
+      <OrderPage
+        currentUser={currentUser}
+        onNavigateToStore={() => navigateScreen('shop')}
+        onNavigateToWishlist={() => navigateScreen('wishlist')}
+        onNavigateToGarage={() => navigateScreen('garage')}
+        onNavigateToCustomizer={() => navigateScreen('customizer')}
+        onNavigateToCustomize={() => navigateScreen('customizer')}
+        onNavigateToLogin={() => navigateScreen('login')}
+        onNavigateToProfile={(tab) => handleNavigateToProfile(tab)}
+        onNavigateToAdmin={() => navigateScreen('admin')}
+        onAddToCart={(product, qty) => addToCart(product, qty)}
+        onOpenCart={() => setIsCartOpen(true)}
+        cartItemCount={cartItemCount}
+        wishlistCount={wishlistCount}
+        showToast={showToast}
+      />
+    );
   }
 
   if (currentScreen === 'garage') {
@@ -447,7 +604,7 @@ function MainAppRouter() {
       <GaragePage
         onNavigateToStore={() => navigateScreen('shop')}
         onNavigateToWishlist={() => navigateScreen('wishlist')}
-        onNavigateToOrders={() => handleNavigateToProfile('orders')}
+        onNavigateToOrders={() => navigateScreen('orders')}
         onNavigateToCustomizer={() => navigateScreen('customizer')}
         onNavigateToCustomize={() => navigateScreen('customizer')}
         onNavigateToLogin={() => {
@@ -456,6 +613,7 @@ function MainAppRouter() {
         }}
         onNavigateToProfile={(tab) => handleNavigateToProfile(tab)}
         onNavigateToAdmin={() => navigateScreen('admin')}
+        onOpenCart={() => setIsCartOpen(true)}
         onLogout={handleLogout}
       />
     );
@@ -468,13 +626,14 @@ function MainAppRouter() {
         onNavigateToStore={() => navigateScreen('shop')}
         onNavigateToGarage={() => navigateScreen('garage')}
         onNavigateToWishlist={() => navigateScreen('wishlist')}
-        onNavigateToOrders={() => handleNavigateToProfile('orders')}
+        onNavigateToOrders={() => navigateScreen('orders')}
         onNavigateToLogin={() => {
           setRedirectReason('Please sign in to book your customized build.');
           navigateScreen('login');
         }}
         onNavigateToProfile={(tab) => handleNavigateToProfile(tab)}
         onNavigateToAdmin={() => navigateScreen('admin')}
+        onOpenCart={() => setIsCartOpen(true)}
         onLogout={handleLogout}
       />
     );
@@ -486,7 +645,7 @@ function MainAppRouter() {
         initialTab={profileInitialTab}
         onNavigateToStore={() => navigateScreen('shop')}
         onNavigateToGarage={() => navigateScreen('garage')}
-        onNavigateToOrders={() => handleNavigateToProfile('orders')}
+        onNavigateToOrders={() => navigateScreen('orders')}
         onNavigateToWishlist={() => navigateScreen('wishlist')}
         onNavigateToCustomizer={() => navigateScreen('customizer')}
         onNavigateToAdmin={() => navigateScreen('admin')}
@@ -500,7 +659,7 @@ function MainAppRouter() {
     return (
       <NotificationsPage
         onNavigateBack={() => navigateScreen('shop')}
-        onNavigateToOrders={() => handleNavigateToProfile('orders')}
+        onNavigateToOrders={() => navigateScreen('orders')}
         onNavigateToGarage={() => navigateScreen('garage')}
         onNavigateToShop={() => navigateScreen('shop')}
         onNavigateToAdmin={() => navigateScreen('admin')}
@@ -518,7 +677,7 @@ function MainAppRouter() {
         if (screen === 'profile') {
           handleNavigateToProfile(params?.tab || 'profile');
         } else if (screen === 'orders') {
-          handleNavigateToProfile('orders');
+          navigateScreen('orders');
         } else {
           navigateScreen(screen);
         }

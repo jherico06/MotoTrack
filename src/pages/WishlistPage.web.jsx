@@ -29,6 +29,7 @@ export default function WishlistPageWeb({
   onNavigateToLogin,
   onNavigateToProfile,
   onNavigateToAdmin,
+  onNavigateToWishlist,
   onAddToCart,
   onLogout,
 }) {
@@ -88,12 +89,13 @@ export default function WishlistPageWeb({
     }
   };
 
-  const numColumns = windowWidth >= 1200 ? 4 : windowWidth >= 800 ? 3 : 2;
+  // Balanced grid columns: not too big, not too small
+  const numColumns = windowWidth >= 1250 ? 5 : windowWidth >= 980 ? 4 : windowWidth >= 680 ? 3 : 2;
   const gapSize = 16;
   const cardWidth = `calc(${100 / numColumns}% - ${((numColumns - 1) * gapSize) / numColumns}px)`;
 
   return (
-    <View style={wStyles.container}>
+    <View style={wStyles.container} className="bg-slate-100 min-h-screen">
       <StatusBar style="dark" />
       <ToastNotification message={toastMessage} />
 
@@ -201,7 +203,7 @@ export default function WishlistPageWeb({
               activeOpacity={0.85}
               title="Shopping Cart"
             >
-              <BootstrapIcon name="bag" size={16} color="#FFFFFF" />
+              <BootstrapIcon name="cart3" size={17} color="#FFFFFF" />
               {cartItemCount > 0 && (
                 <View style={wStyles.navBadgeCircle}>
                   <Text style={wStyles.navBadgeText}>{cartItemCount}</Text>
@@ -310,8 +312,8 @@ export default function WishlistPageWeb({
                   onPress={handleMoveAllToCart}
                   activeOpacity={0.85}
                 >
-                  <BootstrapIcon name="bag-check-fill" size={14} color="#FFFFFF" />
-                  <Text style={wStyles.moveAllBtnText}>Move All to Bag</Text>
+                  <BootstrapIcon name="cart-check-fill" size={14} color="#FFFFFF" />
+                  <Text style={wStyles.moveAllBtnText}>Move All to Cart</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -330,69 +332,85 @@ export default function WishlistPageWeb({
                 onPress={() => onNavigateToStore?.()}
                 activeOpacity={0.85}
               >
-                <BootstrapIcon name="bag-plus-fill" size={14} color="#FFFFFF" />
+                <BootstrapIcon name="cart-plus-fill" size={14} color="#FFFFFF" />
                 <Text style={wStyles.exploreStoreBtnText}>Explore Performance Gear</Text>
               </TouchableOpacity>
             </View>
           ) : (
             <View style={wStyles.productGrid}>
               {wishlistedProducts.map((product) => (
-                <View key={product.id} style={[wStyles.productCard, { width: cardWidth }]}>
-                  <TouchableOpacity
-                    style={wStyles.productImgWrap}
-                    onPress={() => {
-                      setSelectedProductForSpecs(product);
-                      setIsSpecsOpen(true);
-                    }}
-                    activeOpacity={0.9}
-                  >
-                    <Image source={{ uri: product.image }} style={wStyles.productImg} resizeMode="cover" />
+                <TouchableOpacity
+                  key={product.id}
+                  style={[wStyles.productCard, { width: cardWidth }]}
+                  className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden mb-2 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                  onPress={() => {
+                    setSelectedProductForSpecs(product);
+                    setIsSpecsOpen(true);
+                  }}
+                  activeOpacity={0.92}
+                >
+                  {/* 1:1 Square Product Image */}
+                  <View style={wStyles.productImgWrap} className="w-full aspect-square bg-slate-100 relative overflow-hidden">
+                    <Image source={{ uri: product.image }} style={wStyles.productImg} resizeMode="cover" className="w-full h-full object-cover" />
 
+                    {/* Wishlist Remove Button */}
                     <TouchableOpacity
                       style={wStyles.removeFavBtn}
-                      onPress={() => toggleWishlist(product.id)}
+                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/95 items-center justify-center shadow-sm z-10 hover:scale-105 transition-transform"
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        toggleWishlist(product.id);
+                      }}
                       activeOpacity={0.8}
                     >
-                      <BootstrapIcon name="heart-fill" size={14} color="#EF4444" />
+                      <BootstrapIcon name="heart-fill" size={13} color="#EF4444" />
                     </TouchableOpacity>
+                  </View>
 
-                    <View style={wStyles.pricePill}>
-                      <Text style={wStyles.pricePillText}>₱{product.price?.toFixed(2)}</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <View style={wStyles.productDetails}>
-                    <Text style={wStyles.productBrand}>{product.brand || 'D,Blockchain'}</Text>
-                    <Text style={wStyles.productName} numberOfLines={2}>
+                  {/* Details - Compact Square Layout */}
+                  <View style={wStyles.productDetails} className="p-2.5 bg-white flex flex-col justify-between">
+                    {/* Product Name (2 Lines Max) */}
+                    <Text style={wStyles.productName} numberOfLines={2} className="text-[12.5px] font-semibold text-slate-800 leading-[17px] mb-1 h-[34px]">
                       {product.name}
                     </Text>
-                    <Text style={wStyles.productCompat} numberOfLines={1}>
-                      Fit: {product.compatibility || 'Universal'}
-                    </Text>
 
-                    <View style={wStyles.actionRow}>
-                      <TouchableOpacity
-                        style={wStyles.addToBagBtn}
-                        onPress={() => handleAddToCartSingle(product)}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="bag-plus-fill" size={13} color="#0C6258" />
-                        <Text style={wStyles.addToBagBtnText}>Add to Bag</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={wStyles.inspectBtn}
-                        onPress={() => {
-                          setSelectedProductForSpecs(product);
-                          setIsSpecsOpen(true);
-                        }}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="eye" size={14} color="#64748B" />
-                      </TouchableOpacity>
+                    {/* Price Row: Bold Teal Brand Color (matching app) */}
+                    <View style={wStyles.priceRow} className="flex flex-row items-baseline gap-1.5 mb-1.5">
+                      <Text style={wStyles.priceMainText} className="text-[15px] font-extrabold text-[#0C6258]">₱{product.price?.toFixed(2)}</Text>
                     </View>
+
+                    {/* Tags Row: COD, Actual Stock & Rating */}
+                    <View style={wStyles.tagsRow} className="flex flex-row items-center gap-1.5 mb-1.5 flex-wrap">
+                      <View style={wStyles.codTag} className="bg-amber-100 px-1.5 py-0.5 rounded">
+                        <Text style={wStyles.codTagText} className="text-[10px] font-extrabold text-amber-700">COD</Text>
+                      </View>
+                      <View style={wStyles.stockTag} className="bg-emerald-50 px-1.5 py-0.5 rounded">
+                        <Text style={wStyles.stockTagText} className="text-[10px] font-bold text-emerald-700">
+                          {product.stock <= 5 ? `Only ${product.stock} left` : `${product.stock} in stock`}
+                        </Text>
+                      </View>
+                      <View style={[wStyles.ratingLeft, { marginLeft: 'auto' }]} className="flex flex-row items-center gap-1 ml-auto">
+                        <BootstrapIcon name="star-fill" size={10} color="#F59E0B" />
+                        <Text style={wStyles.ratingValText} className="text-[11.5px] font-bold text-amber-500">{product.rating?.toFixed(1) || '5.0'}</Text>
+                        <Text style={wStyles.reviewCountText} className="text-[10.5px] text-slate-500 font-medium">({product.reviews || 0})</Text>
+                      </View>
+                    </View>
+
+                    {/* Add to Cart Button with matching App Solid Teal style */}
+                    <TouchableOpacity
+                      style={wStyles.addToCartBtn}
+                      className="bg-[#0C6258] hover:bg-[#094e46] rounded-lg py-2 flex flex-row items-center justify-center gap-1.5 mt-1.5 transition-colors cursor-pointer"
+                      onPress={(e) => {
+                        e?.stopPropagation?.();
+                        handleAddToCartSingle(product);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <BootstrapIcon name="cart3" size={13} color="#FFFFFF" />
+                      <Text style={wStyles.addToCartBtnText} className="text-xs font-bold text-white">Add to Cart</Text>
+                    </TouchableOpacity>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           )}

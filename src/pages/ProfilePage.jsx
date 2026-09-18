@@ -8,6 +8,9 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Image,
+  Modal,
+  Animated,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { profileMobileStyles as styles } from '../styles/profilePage.styles';
@@ -35,12 +38,12 @@ export default function ProfilePage({
   initialTab = 'overview',
   onNavigateToStore,
   onNavigateToGarage,
-  _onNavigateToOrders,
+  onNavigateToOrders,
   onNavigateToWishlist,
   onNavigateToCustomizer,
   onNavigateToCustomize,
-  _onNavigateToAdmin,
-  _onNavigateToLogin,
+  onNavigateToAdmin,
+  onNavigateToLogin,
   onLogout,
 }) {
   const { currentUser, updateProfile, logout } = useAuth();
@@ -62,6 +65,51 @@ export default function ProfilePage({
     setPrevInitialTab(initialTab);
     setActiveTab(initialTab);
   }
+
+  // Hamburger Choices Drawer Menu State with Smooth Slide Animation
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-340)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  const openMenu = () => {
+    setIsMenuVisible(true);
+    slideAnim.setValue(-340);
+    fadeAnim.setValue(0);
+    Animated.parallel([
+      Animated.spring(slideAnim, {
+        toValue: 0,
+        damping: 24,
+        mass: 0.8,
+        stiffness: 220,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start();
+  };
+
+  const closeMenu = (callback) => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: -340,
+        duration: 220,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start(() => {
+      setIsMenuVisible(false);
+      if (typeof callback === 'function') {
+        callback();
+      }
+    });
+  };
 
   // Form State (Profile Tab)
   const [name, setName] = useState(currentUser?.name || currentUser?.fullName || '');
@@ -102,7 +150,7 @@ export default function ProfilePage({
   });
 
   // Orders State
-  const [orders, setOrders] = useState(() => orderService.getOrders(currentUser?.id || 'guest'));
+  const [orders, setOrders] = useState([]);
 
   // Notifications State
   const [notifications, setNotifications] = useState(() =>
@@ -172,12 +220,17 @@ export default function ProfilePage({
     let unsubMoto = () => {};
     let isSubscribed = true;
 
-    const syncData = () => {
+    const syncData = async () => {
       syncCustomerBookings();
 
       try {
-        const userOrders = orderService.getOrders(currentUser?.id || 'guest') || [];
-        if (isSubscribed) setOrders(userOrders);
+        const userOrders = await orderService.getUserOrders(
+          currentUser?.id || currentUser?.user_id,
+          currentUser?.customer_id,
+          currentUser?.name,
+          currentUser
+        );
+        if (isSubscribed) setOrders(Array.isArray(userOrders) ? userOrders : []);
       } catch (_e) {
         if (isSubscribed) setOrders([]);
       }
@@ -440,8 +493,7 @@ export default function ProfilePage({
     } else if (tab === 'Customize') {
       (onNavigateToCustomizer || onNavigateToCustomize)?.();
     } else if (tab === 'Orders') {
-      setActiveTab('orders');
-      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      onNavigateToOrders?.();
     } else if (tab === 'Favorites') {
       onNavigateToWishlist?.();
     }
@@ -469,18 +521,220 @@ export default function ProfilePage({
       <StatusBar style="light" />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── TOP APP BAR ─── */}
+      {/* ─── TOP APP BAR WITH HAMBURGER ON TOP-LEFT ─── */}
       <View style={styles.headerRow}>
-        <View style={styles.titleRow}>
-          <BootstrapIcon name="speedometer2" size={20} color="#FFFFFF" />
-          <Text style={styles.titleText}>Customer Dashboard</Text>
+        <View style={styles.headerLeftGroup}>
+          <TouchableOpacity
+            style={styles.hamburgerBtn}
+            onPress={openMenu}
+            activeOpacity={0.7}
+            accessibilityLabel="Open Dashboard Choices Menu"
+          >
+            <BootstrapIcon name="list" size={24} color="#FFFFFF" />
+          </TouchableOpacity>
+
+          <View style={styles.titleRow}>
+            <BootstrapIcon name="speedometer2" size={18} color="#FFFFFF" />
+            <Text style={styles.titleText}>Customer Dashboard</Text>
+          </View>
         </View>
 
-        <TouchableOpacity style={styles.headerBackBtn} onPress={onNavigateToStore} activeOpacity={0.8}>
-          <BootstrapIcon name="chevron-left" size={12} color="#FFFFFF" />
-          <Text style={styles.headerBackBtnText}>Shop</Text>
+        <TouchableOpacity
+          style={styles.headerActiveBadge}
+          onPress={openMenu}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.headerActiveBadgeText}>
+            {activeTab === 'overview' && 'Overview'}
+            {activeTab === 'garage' && `Garage (${motorcycles.length})`}
+            {activeTab === 'bookings' && `Bookings (${activeBookingsCount})`}
+            {activeTab === 'notifications' && `Alerts (${unreadNotifCount})`}
+            {activeTab === 'profile' && 'Settings'}
+          </Text>
+          <BootstrapIcon name="chevron-down" size={10} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
+
+      {/* ─── HAMBURGER CHOICES DRAWER MODAL WITH SLIDING EFFECT ─── */}
+      <Modal
+        visible={isMenuVisible}
+        transparent
+        animationType="none"
+        onRequestClose={() => closeMenu()}
+      >
+        <View style={styles.menuModalContainer}>
+          {/* Animated Backdrop (fades in and out, tap to dismiss) */}
+          <Animated.View
+            style={[
+              styles.menuBackdrop,
+              { opacity: fadeAnim },
+            ]}
+          >
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              activeOpacity={1}
+              onPress={() => closeMenu()}
+            />
+          </Animated.View>
+
+          {/* Animated Drawer Menu (slides in smoothly from the left) */}
+          <Animated.View
+            style={[
+              styles.menuDrawer,
+              {
+                transform: [{ translateX: slideAnim }],
+              },
+            ]}
+          >
+            {/* Drawer Header */}
+            <View style={styles.menuDrawerHeader}>
+              <View style={styles.menuDrawerHeaderInfo}>
+                <View style={styles.menuDrawerLogoWrap}>
+                  <BootstrapIcon name="speedometer2" size={20} color="#0C6258" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuDrawerTitle} numberOfLines={1}>Customer Menu</Text>
+                  <Text style={styles.menuDrawerSub} numberOfLines={1}>
+                    {currentUser?.name || currentUser?.fullName || 'Valued Rider'}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.menuCloseBtn}
+                onPress={() => closeMenu()}
+                activeOpacity={0.7}
+              >
+                <BootstrapIcon name="x-lg" size={15} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Dashboard Choices List */}
+            <ScrollView style={styles.menuItemList} showsVerticalScrollIndicator={false}>
+              <Text style={styles.menuSectionTitle}>DASHBOARD CHOICES</Text>
+
+              {[
+                { id: 'overview', label: 'Overview Hub', icon: 'speedometer2' },
+                { id: 'garage', label: 'My Garage', icon: 'tools', count: motorcycles.length },
+                { id: 'bookings', label: 'Pit Bookings', icon: 'calendar-check', count: activeBookingsCount },
+                { id: 'notifications', label: 'Alerts', icon: 'bell', count: unreadNotifCount },
+                { id: 'profile', label: 'Settings & Profile', icon: 'gear-fill' },
+              ].map((item) => {
+                const isActive = activeTab === item.id;
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.menuItemBtn, isActive && styles.menuItemBtnActive]}
+                    onPress={() => {
+                      closeMenu(() => setActiveTab(item.id));
+                    }}
+                    activeOpacity={0.75}
+                  >
+                    <View style={styles.menuItemLeft}>
+                      <View style={[styles.menuItemIconWrap, isActive && styles.menuItemIconWrapActive]}>
+                        <BootstrapIcon
+                          name={item.icon}
+                          size={16}
+                          color={isActive ? '#FFFFFF' : '#0C6258'}
+                        />
+                      </View>
+                      <Text style={[styles.menuItemText, isActive && styles.menuItemTextActive]}>
+                        {item.label}
+                      </Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      {item.count !== undefined && item.count !== null && (
+                        <View style={[styles.menuItemBadge, isActive && styles.menuItemBadgeActive]}>
+                          <Text style={[styles.menuItemBadgeText, isActive && styles.menuItemBadgeTextActive]}>
+                            {item.count}
+                          </Text>
+                        </View>
+                      )}
+                      {isActive && (
+                        <BootstrapIcon name="check2" size={16} color="#FFFFFF" />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+
+              <View style={styles.menuDivider} />
+
+              <Text style={styles.menuSectionTitle}>QUICK NAVIGATION</Text>
+
+              <TouchableOpacity
+                style={styles.menuItemBtn}
+                onPress={() => {
+                  closeMenu(() => onNavigateToOrders?.());
+                }}
+                activeOpacity={0.75}
+              >
+                <View style={styles.menuItemLeft}>
+                  <View style={styles.menuItemIconWrap}>
+                    <BootstrapIcon name="box-seam" size={16} color="#0C6258" />
+                  </View>
+                  <Text style={styles.menuItemText}>My Orders</Text>
+                </View>
+                {orders.length > 0 && (
+                  <View style={styles.menuItemBadge}>
+                    <Text style={styles.menuItemBadgeText}>{orders.length}</Text>
+                  </View>
+                )}
+                <BootstrapIcon name="chevron-right" size={13} color="#94A3B8" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.menuItemBtn}
+                onPress={() => {
+                  closeMenu(() => onNavigateToStore?.());
+                }}
+                activeOpacity={0.75}
+              >
+                <View style={styles.menuItemLeft}>
+                  <View style={styles.menuItemIconWrap}>
+                    <BootstrapIcon name="shop" size={16} color="#0C6258" />
+                  </View>
+                  <Text style={styles.menuItemText}>Browse Shop</Text>
+                </View>
+                <BootstrapIcon name="chevron-right" size={13} color="#94A3B8" />
+              </TouchableOpacity>
+
+              {onNavigateToGarage && (
+                <TouchableOpacity
+                  style={styles.menuItemBtn}
+                  onPress={() => {
+                    closeMenu(() => onNavigateToGarage?.());
+                  }}
+                  activeOpacity={0.75}
+                >
+                  <View style={styles.menuItemLeft}>
+                    <View style={styles.menuItemIconWrap}>
+                      <BootstrapIcon name="wrench-adjustable" size={16} color="#0C6258" />
+                    </View>
+                    <Text style={styles.menuItemText}>Garage Services</Text>
+                  </View>
+                  <BootstrapIcon name="chevron-right" size={13} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+
+            {/* Drawer Footer */}
+            <View style={styles.menuDrawerFooter}>
+              <TouchableOpacity
+                style={styles.menuLogoutBtn}
+                onPress={() => {
+                  closeMenu(() => setIsLogoutModalOpen(true));
+                }}
+                activeOpacity={0.8}
+              >
+                <BootstrapIcon name="box-arrow-right" size={15} color="#DC2626" />
+                <Text style={styles.menuLogoutText}>Sign Out</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
 
       <ScrollView
         ref={scrollViewRef}
@@ -488,134 +742,7 @@ export default function ProfilePage({
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ─── RIDER HERO PROFILE CARD ─── */}
-        <View style={styles.riderHeroCard}>
-          <View style={styles.riderHeroInner}>
-            <TouchableOpacity style={styles.avatarWrapper} onPress={handleUploadAvatar} activeOpacity={0.85}>
-              {isUploadedAvatar ? (
-                <Image
-                  source={{ uri: currentUser.avatar || currentUser.photoUri }}
-                  style={styles.riderAvatar}
-                />
-              ) : (
-                <View style={[styles.riderAvatar, { alignItems: 'center', justifyContent: 'center' }]}>
-                  <BootstrapIcon name="person-fill" size={32} color="#FFFFFF" />
-                </View>
-              )}
-              <View style={styles.avatarEditBadge}>
-                <BootstrapIcon name="camera-fill" size={10} color="#FFFFFF" />
-              </View>
-            </TouchableOpacity>
-
-            <View style={styles.riderInfo}>
-              <View style={styles.riderNameRow}>
-                <Text style={styles.riderName} numberOfLines={1}>
-                  {currentUser?.name || currentUser?.fullName || 'Valued Rider'}
-                </Text>
-              </View>
-              <Text style={styles.riderEmail} numberOfLines={1}>
-                {currentUser?.email || 'rider@mototrack.com'}
-              </Text>
-              <View style={styles.riderBadgesRow}>
-                <View style={styles.loyaltyBadge}>
-                  <BootstrapIcon name="award-fill" size={10} color="#FDE68A" />
-                  <Text style={styles.loyaltyBadgeText}>Gold Rider</Text>
-                </View>
-                <View style={styles.memberSinceBadge}>
-                  <Text style={styles.memberSinceText}>Member since 2024</Text>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-
-        {/* ─── NAVIGATION PILL TABS ─── */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.tabsScroll}
-          contentContainerStyle={styles.tabsRow}
-        >
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'overview' && styles.tabBtnActive]}
-            onPress={() => setActiveTab('overview')}
-            activeOpacity={0.8}
-          >
-            <BootstrapIcon
-              name="speedometer2"
-              size={13}
-              color={activeTab === 'overview' ? '#FFFFFF' : '#475569'}
-            />
-            <Text style={[styles.tabText, activeTab === 'overview' && styles.tabTextActive]}>Overview</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'garage' && styles.tabBtnActive]}
-            onPress={() => setActiveTab('garage')}
-            activeOpacity={0.8}
-          >
-            <BootstrapIcon name="tools" size={13} color={activeTab === 'garage' ? '#FFFFFF' : '#475569'} />
-            <Text style={[styles.tabText, activeTab === 'garage' && styles.tabTextActive]}>
-              My Garage ({motorcycles.length})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'orders' && styles.tabBtnActive]}
-            onPress={() => setActiveTab('orders')}
-            activeOpacity={0.8}
-          >
-            <BootstrapIcon name="box-seam" size={13} color={activeTab === 'orders' ? '#FFFFFF' : '#475569'} />
-            <Text style={[styles.tabText, activeTab === 'orders' && styles.tabTextActive]}>
-              Orders ({orders.length})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'bookings' && styles.tabBtnActive]}
-            onPress={() => setActiveTab('bookings')}
-            activeOpacity={0.8}
-          >
-            <BootstrapIcon
-              name="calendar-check"
-              size={13}
-              color={activeTab === 'bookings' ? '#FFFFFF' : '#475569'}
-            />
-            <Text style={[styles.tabText, activeTab === 'bookings' && styles.tabTextActive]}>
-              Bookings ({activeBookingsCount})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'notifications' && styles.tabBtnActive]}
-            onPress={() => setActiveTab('notifications')}
-            activeOpacity={0.8}
-          >
-            <BootstrapIcon
-              name="bell"
-              size={13}
-              color={activeTab === 'notifications' ? '#FFFFFF' : '#475569'}
-            />
-            <Text style={[styles.tabText, activeTab === 'notifications' && styles.tabTextActive]}>
-              Alerts ({unreadNotifCount})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.tabBtn, activeTab === 'profile' && styles.tabBtnActive]}
-            onPress={() => setActiveTab('profile')}
-            activeOpacity={0.8}
-          >
-            <BootstrapIcon
-              name="person-gear"
-              size={13}
-              color={activeTab === 'profile' ? '#FFFFFF' : '#475569'}
-            />
-            <Text style={[styles.tabText, activeTab === 'profile' && styles.tabTextActive]}>Settings</Text>
-          </TouchableOpacity>
-        </ScrollView>
-
-        <View style={styles.maxContainer}>
+        <View style={[styles.maxContainer, { paddingTop: 16 }]}>
           {/* ═══════════════════════════════════════════════════════
               TAB 1: OVERVIEW / DASHBOARD HUB
              ═══════════════════════════════════════════════════════ */}
@@ -626,7 +753,7 @@ export default function ProfilePage({
                 {/* Card 1: Orders Placed */}
                 <TouchableOpacity
                   style={[styles.statCard, styles.statCardTealAccent]}
-                  onPress={() => setActiveTab('orders')}
+                  onPress={onNavigateToOrders}
                   activeOpacity={0.85}
                 >
                   <View style={[styles.statIconWrap, { backgroundColor: '#E6F4F1' }]}>
@@ -733,7 +860,7 @@ export default function ProfilePage({
                   activeOpacity={0.8}
                 >
                   <View style={[styles.quickActionIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                    <BootstrapIcon name="bag-check-fill" size={18} color="#2563EB" />
+                    <BootstrapIcon name="cart-check-fill" size={18} color="#2563EB" />
                   </View>
                   <Text style={styles.quickActionLabel}>Shop Parts</Text>
                 </TouchableOpacity>
@@ -751,7 +878,7 @@ export default function ProfilePage({
 
                 <TouchableOpacity
                   style={styles.quickActionTile}
-                  onPress={() => setActiveTab('orders')}
+                  onPress={onNavigateToOrders}
                   activeOpacity={0.8}
                 >
                   <View style={[styles.quickActionIconWrap, { backgroundColor: '#FFFBEB' }]}>
@@ -816,7 +943,7 @@ export default function ProfilePage({
                   <BootstrapIcon name="box-seam-fill" size={16} color="#0C6258" />
                   <Text style={styles.sectionTitle}>Recent Orders</Text>
                 </View>
-                <TouchableOpacity onPress={() => setActiveTab('orders')} activeOpacity={0.7}>
+                <TouchableOpacity onPress={onNavigateToOrders} activeOpacity={0.7}>
                   <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0C6258' }}>
                     View All ({orders.length}) →
                   </Text>
@@ -965,101 +1092,6 @@ export default function ProfilePage({
             </View>
           )}
 
-          {/* ═══════════════════════════════════════════════════════
-              TAB 3: ORDERS & LIVE DELIVERY TRACKING
-             ═══════════════════════════════════════════════════════ */}
-          {activeTab === 'orders' && (
-            <View>
-              {/* Order Status Filter Chips */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={{ marginBottom: 12 }}
-                contentContainerStyle={{ gap: 6 }}
-              >
-                {ORDER_STATUS_FILTERS.map((st) => (
-                  <TouchableOpacity
-                    key={st}
-                    style={[
-                      styles.presetChip,
-                      orderFilter === st && { backgroundColor: '#0C6258', borderColor: '#0C6258' },
-                    ]}
-                    onPress={() => setOrderFilter(st)}
-                    activeOpacity={0.8}
-                  >
-                    <Text
-                      style={[
-                        styles.presetChipText,
-                        orderFilter === st && { color: '#FFFFFF', fontWeight: '800' },
-                      ]}
-                    >
-                      {st}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-
-              {filteredOrders.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <View style={styles.emptyIconCircle}>
-                    <BootstrapIcon name="box-seam" size={30} color="#94A3B8" />
-                  </View>
-                  <Text style={styles.emptyTitle}>No Orders Found</Text>
-                  <Text style={styles.emptySubtitle}>
-                    You have no orders matching "{orderFilter}". Browse our curated catalog of motorparts!
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.emptyCtaBtn}
-                    onPress={onNavigateToStore}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.emptyCtaBtnText}>Explore Motorparts</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                filteredOrders.map((order) => {
-                  const badge = getStatusBadgeStyle(order.status);
-                  return (
-                    <View key={order.id} style={styles.orderCard}>
-                      <View style={styles.orderCardHeader}>
-                        <View>
-                          <Text style={styles.orderIdText}>Order #{order.id}</Text>
-                          <Text style={styles.orderDateText}>{order.date || 'Aug 10, 2026'}</Text>
-                        </View>
-                        <View style={[styles.statusPill, { backgroundColor: badge.bg }]}>
-                          <Text style={[styles.statusPillText, { color: badge.text }]}>
-                            {order.status || 'Processing'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <Text style={styles.orderItemsSummary}>
-                        {order.itemsSummary || order.items || 'Genuine Motorcycle Parts & Accessories'}
-                      </Text>
-
-                      <View style={styles.orderCardFooter}>
-                        <View>
-                          <Text style={styles.orderTotalLabel}>Total Amount</Text>
-                          <Text style={styles.orderTotalPrice}>
-                            ₱{Number(order.grandTotal || order.total || 0).toLocaleString()}
-                          </Text>
-                        </View>
-
-                        <TouchableOpacity
-                          style={styles.orderTrackBtn}
-                          onPress={() => handleTrackOrder(order)}
-                          activeOpacity={0.85}
-                        >
-                          <BootstrapIcon name="geo-alt-fill" size={12} color="#065F46" />
-                          <Text style={styles.orderTrackBtnText}>Track Order</Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  );
-                })
-              )}
-            </View>
-          )}
 
           {/* ═══════════════════════════════════════════════════════
               TAB 4: BOOKINGS (SERVICE & PMS APPOINTMENTS)

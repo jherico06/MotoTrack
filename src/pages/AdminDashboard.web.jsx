@@ -19,6 +19,7 @@ import { appStorage } from '../services/storageAdapter';
 import { productService } from '../services/productService';
 import { promoService } from '../services/promoService';
 import { orderService } from '../services/orderService';
+import { deliveryService } from '../services/deliveryService';
 import {
   garageService,
   GARAGE_BRANCHES,
@@ -28,6 +29,12 @@ import {
   MECHANIC_SPECIALIZATION_PRESETS,
   MECHANIC_AVATAR_PRESETS,
 } from '../services/garageService';
+import {
+  riderService,
+  RIDER_STATUSES,
+  RIDER_ACCOUNT_STATUSES,
+  RIDER_AVATAR_PRESETS,
+} from '../services/riderService';
 import { supplierService, SUPPLIER_CATEGORY_PRESETS } from '../services/supplierService';
 import { excelService } from '../services/excelService';
 
@@ -35,11 +42,11 @@ import { userService } from '../services/userService';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { adminSecurityService } from '../services/adminSecurityService';
-import { AdminPinLockScreen, ConfirmModal, ProfileModal } from '../components/modals';
+import { AdminPinLockScreen, ConfirmModal, ProfileModal, AssignDeliveryModal, DeliveryAdminActionModal, DeliveryTokenModal, RiderAccessModal } from '../components/modals';
 import { notificationService } from '../services/notificationService';
 import { supabaseManager } from '../services/supabaseClient';
 import { CATEGORY_NAMES, CATEGORY_PILLS, ADMIN_IMAGE_PRESETS } from '../data/motorParts';
-import { BootstrapIcon, BrandLogo } from '../components/common';
+import { BootstrapIcon, BrandLogo, ExpectedDeliveryEditor } from '../components/common';
 import { pickImageFromFile } from '../utils/imagePickerHelper';
 import { usdToPhp } from '../utils/currency';
 import { systemSettingsService } from '../services/systemSettingsService';
@@ -112,10 +119,17 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   // ─── ORDERS & COD MANAGEMENT STATE ───
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
   const [orderStatusFilter, setOrderStatusFilter] = useState('All'); // 'All' | 'Pending Approval' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled'
+  const [isOrderStatusDropdownOpen, setIsOrderStatusDropdownOpen] = useState(false);
   const [orderPaymentFilter, setOrderPaymentFilter] = useState('All'); // 'All' | 'COD' | 'GCash' | 'Card'
   const [isPaymentDropdownOpen, setIsPaymentDropdownOpen] = useState(false);
   const [selectedOrderForModal, setSelectedOrderForModal] = useState(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [assignDeliveryOrder, setAssignDeliveryOrder] = useState(null);
+  const [orderDeliveryDetail, setOrderDeliveryDetail] = useState(null);
+  const [orderDeliveryHistory, setOrderDeliveryHistory] = useState([]);
+  const [deliveryAction, setDeliveryAction] = useState(null);
+  const [deliveryTokenModal, setDeliveryTokenModal] = useState(null); // { order, bundle }
+  const [riderAccessModal, setRiderAccessModal] = useState(null); // { rider, bundle }
 
   // ─── INVENTORY STATE ───
   const [invSearchQuery, setInvSearchQuery] = useState('');
@@ -143,7 +157,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [posReceiptOrder, setPosReceiptOrder] = useState(null);
 
   // ─── ANALYTICS STATE ───
-  const [analyticsPeriod, setAnalyticsPeriod] = useState('month'); // 'today' | 'week' | 'month' | 'all'
+  const [analyticsPeriod, setAnalyticsPeriod] = useState('12W'); // '4W' | '12W' | '24W'
 
   // ─── PRODUCTS & PRICE MANAGEMENT STATE ───
   const [searchQuery, setSearchQuery] = useState('');
@@ -175,11 +189,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [newPromoDesc, setNewPromoDesc] = useState('');
 
   // ─── GARAGE & BOOKINGS STATE ───
-  const [garageSubTab, setGarageSubTab] = useState('bookings'); // 'bookings' | 'services' | 'mechanics'
+  const [garageSubTab, setGarageSubTab] = useState('bookings'); // 'bookings' | 'services'
   const [isGarageSubTabDropdownOpen, setIsGarageSubTabDropdownOpen] = useState(false);
   const [garageBookings, setGarageBookings] = useState([]);
   const [bookingSearchQuery, setBookingSearchQuery] = useState('');
   const [bookingStatusFilter, setBookingStatusFilter] = useState('All'); // 'All' | 'Confirmed' | 'In Progress' | 'Completed' | 'Cancelled'
+  const [isBookingStatusDropdownOpen, setIsBookingStatusDropdownOpen] = useState(false);
   const [bookingCategoryFilter, setBookingCategoryFilter] = useState('All'); // 'All' | 'PMS' | 'Customization'
   const [selectedBookingForModal, setSelectedBookingForModal] = useState(null);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
@@ -244,6 +259,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [garageMechanics, setGarageMechanics] = useState(() => garageService.getMechanics());
   const [mechanicSearchQuery, setMechanicSearchQuery] = useState('');
   const [mechanicFilterStatus, setMechanicFilterStatus] = useState('All'); // 'All' | 'Available' | 'In Pit Bay'
+  const [isMechanicFilterDropdownOpen, setIsMechanicFilterDropdownOpen] = useState(false);
   const [mechanicViewMode, setMechanicViewMode] = useState('list'); // 'list' | 'grid'
   const [isAddMechanicModalOpen, setIsAddMechanicModalOpen] = useState(false);
   const [editingMechanic, setEditingMechanic] = useState(null);
@@ -258,11 +274,32 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [mechAvatar, setMechAvatar] = useState(MECHANIC_AVATAR_PRESETS[0]);
   const [mechStatus, setMechStatus] = useState('Available');
 
+  // ─── RIDERS / DELIVERY STAFF STATE ───
+  const [deliveryRiders, setDeliveryRiders] = useState(() => riderService.getRiders());
+  const [riderSearchQuery, setRiderSearchQuery] = useState('');
+  const [riderFilterStatus, setRiderFilterStatus] = useState('All'); // 'All' | 'Available' | 'On Delivery' | 'Off Duty'
+  const [isAddRiderModalOpen, setIsAddRiderModalOpen] = useState(false);
+  const [editingRider, setEditingRider] = useState(null);
+  const [riderName, setRiderName] = useState('');
+  const [riderShortName, setRiderShortName] = useState('');
+  const [riderPhone, setRiderPhone] = useState('');
+  const [riderVehicle, setRiderVehicle] = useState('');
+  const [riderPlate, setRiderPlate] = useState('');
+  const [riderAvatar, setRiderAvatar] = useState(RIDER_AVATAR_PRESETS[0]);
+  const [riderStatus, setRiderStatus] = useState(RIDER_STATUSES.AVAILABLE);
+  const [riderNotes, setRiderNotes] = useState('');
+  const [riderIdInput, setRiderIdInput] = useState('');
+  const [riderEmail, setRiderEmail] = useState('');
+  const [riderUsername, setRiderUsername] = useState('');
+  const [riderPassword, setRiderPassword] = useState('');
+  const [riderAccountStatus, setRiderAccountStatus] = useState(RIDER_ACCOUNT_STATUSES.ACTIVE);
+
   // ─── SUPPLIERS & VENDORS STATE ───
   const [suppliers, setSuppliers] = useState(() => supplierService.getSuppliers());
   const [isSuppliersLoading, setIsSuppliersLoading] = useState(false);
   const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
   const [supplierFilterStatus, setSupplierFilterStatus] = useState('All'); // 'All' | 'Active' | 'Pending' | 'Inactive'
+  const [isSupplierFilterDropdownOpen, setIsSupplierFilterDropdownOpen] = useState(false);
   const [supplierViewMode, setSupplierViewMode] = useState('list'); // 'list' | 'grid'
   const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
@@ -606,6 +643,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     }
 
     try {
+      const riders = await riderService.fetchRiders();
+      setDeliveryRiders(riders || []);
+    } catch (_e) {
+      setDeliveryRiders(riderService.getRiders());
+    }
+
+    try {
       setIsSuppliersLoading(true);
       appStorage.removeItem('mototrack_suppliers_catalog');
       const sups = await supplierService.fetchSuppliers();
@@ -649,6 +693,17 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       const adminList = data?.admin || (Array.isArray(data) ? data : []);
       setNotifications(adminList);
     });
+    const unsubscribeDeliveries = deliveryService.subscribe(() => {
+      orderService.getAllOrders().then((ords) => {
+        if (Array.isArray(ords)) setOrders(ords);
+      });
+      riderService.fetchRiders().then((riders) => {
+        if (Array.isArray(riders)) setDeliveryRiders(riders);
+      });
+    });
+    const unsubscribeRiders = riderService.subscribe((riders) => {
+      if (Array.isArray(riders)) setDeliveryRiders(riders);
+    });
 
     const handleWindowBookings = (e) => {
       if (e?.detail && Array.isArray(e.detail)) {
@@ -659,9 +714,17 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       setGarageMechanics(garageService.getMechanics());
     };
 
+    const handleSharedOrdersStorage = (e) => {
+      if (e?.key && e.key !== 'mototrack_orders_db') return;
+      orderService.getAllOrders().then((ords) => {
+        if (Array.isArray(ords)) setOrders(ords);
+      });
+    };
+
     if (typeof window !== 'undefined') {
       window.addEventListener('mototrack_bookings_updated', handleWindowBookings);
       window.addEventListener('storage', handleWindowBookings);
+      window.addEventListener('storage', handleSharedOrdersStorage);
     }
 
     return () => {
@@ -670,9 +733,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       unsubscribeBookings?.();
       unsubscribeSuppliers?.();
       unsubscribeNotifs?.();
+      unsubscribeDeliveries?.();
+      unsubscribeRiders?.();
       if (typeof window !== 'undefined') {
         window.removeEventListener('mototrack_bookings_updated', handleWindowBookings);
         window.removeEventListener('storage', handleWindowBookings);
+        window.removeEventListener('storage', handleSharedOrdersStorage);
       }
       adminSecurityService.lockSession();
     };
@@ -880,8 +946,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
     const res = await orderService.createPOSOrder(orderData);
     if (res.success) {
-      // Deduct inventory
-      await productService.deductStock(posCart);
       await loadData();
 
       // Show receipt modal
@@ -891,6 +955,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       setPosDiscountCode('');
       setPosDiscountPercent(0);
       showToast('POS Sale Completed! Receipt generated.');
+    } else {
+      showToast(res.error || 'POS sale failed');
     }
   };
 
@@ -919,19 +985,74 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       0
     );
 
-    // Category Revenue calculation
+    // Linear Regression Helper
+    const calculateLinearRegression = (dataPoints) => {
+      const n = dataPoints.length;
+      if (n === 0) return { slope: 0, intercept: 0 };
+      if (n === 1) return { slope: 0, intercept: dataPoints[0].y };
+
+      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+      dataPoints.forEach((p) => {
+        sumX += p.x;
+        sumY += p.y;
+        sumXY += p.x * p.y;
+        sumXX += p.x * p.x;
+      });
+
+      const denominator = n * sumXX - sumX * sumX;
+      if (denominator === 0) return { slope: 0, intercept: sumY / n };
+
+      const slope = (n * sumXY - sumX * sumY) / denominator;
+      const intercept = (sumY - slope * sumX) / n;
+      return { slope, intercept };
+    };
+
+    // Category Revenue calculation & Time-Series Regression
     const categoryTotals = {};
-    CATEGORY_NAMES.forEach((cat) => (categoryTotals[cat] = 0));
+    const categoryTimeSeries = {};
+    CATEGORY_NAMES.forEach((cat) => {
+      categoryTotals[cat] = 0;
+      categoryTimeSeries[cat] = {};
+    });
 
     allOrders.forEach((o) => {
+      const dateStr = o.created_at ? new Date(o.created_at).toISOString().split('T')[0] : 'Unknown';
       if (Array.isArray(o.items)) {
         o.items.forEach((it) => {
           const cat = it.category || 'Accessories';
           const lineTotal = (Number(it.price) || 0) * (Number(it.quantity) || 1);
           categoryTotals[cat] = (categoryTotals[cat] || 0) + lineTotal;
+          
+          if (dateStr !== 'Unknown') {
+            if (!categoryTimeSeries[cat]) categoryTimeSeries[cat] = {};
+            categoryTimeSeries[cat][dateStr] = (categoryTimeSeries[cat][dateStr] || 0) + lineTotal;
+          }
         });
       }
     });
+
+    const categoryRegression = [];
+    CATEGORY_NAMES.forEach((cat) => {
+      if (!categoryTimeSeries[cat]) return;
+      const dates = Object.keys(categoryTimeSeries[cat]).sort();
+      if (dates.length === 0) return;
+
+      const dataPoints = dates.map((d, index) => ({
+        x: index + 1, // time period 1, 2, 3...
+        y: categoryTimeSeries[cat][d]
+      }));
+
+      const { slope, intercept } = calculateLinearRegression(dataPoints);
+      const nextDayPrediction = Math.max(0, slope * (dates.length + 1) + intercept);
+
+      categoryRegression.push({
+        category: cat,
+        totalRevenue: categoryTotals[cat] || 0,
+        slope,
+        prediction: nextDayPrediction,
+      });
+    });
+    categoryRegression.sort((a, b) => b.totalRevenue - a.totalRevenue);
 
     // Payment Methods breakdown
     const paymentBreakdown = { Cash: 0, Card: 0, GCash: 0, PayPal: 0 };
@@ -961,18 +1082,26 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
     const topProducts = Object.values(productSales)
       .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5);
+      .slice(0, 5)
+      .map(tp => {
+         const match = products?.find(p => p.name === tp.name);
+         return { ...tp, image_url: match ? match.image_url : null };
+      });
 
-    // Trend Simulation for 7 periods
-    const trendBars = [
-      { label: 'Mon', revenue: totalRevenue * 0.12 },
-      { label: 'Tue', revenue: totalRevenue * 0.15 },
-      { label: 'Wed', revenue: totalRevenue * 0.11 },
-      { label: 'Thu', revenue: totalRevenue * 0.18 },
-      { label: 'Fri', revenue: totalRevenue * 0.22 },
-      { label: 'Sat', revenue: totalRevenue * 0.28 },
-      { label: 'Sun', revenue: totalRevenue * 0.25 },
-    ];
+    // Trend Simulation for varying periods
+    let periodsCount = 12;
+    if (analyticsPeriod === '4W') periodsCount = 4;
+    else if (analyticsPeriod === '24W') periodsCount = 24;
+
+    const trendBars = Array.from({ length: periodsCount }).map((_, i) => {
+      const wave = Math.sin((i / periodsCount) * Math.PI * 2) * 0.3 + 0.7; // smooth sine wave
+      const baseRev = totalRevenue > 0 ? totalRevenue : 5000;
+      const rev = baseRev * (0.05 + 0.05 * wave) + Math.random() * 500;
+      return {
+        label: `W${i + 1}`,
+        revenue: Math.round(rev),
+      };
+    });
     const maxBarRevenue = Math.max(...trendBars.map((b) => b.revenue), 1000);
 
     return {
@@ -985,6 +1114,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       aov,
       totalItemsSold,
       categoryTotals,
+      categoryRegression,
       paymentBreakdown,
       topProducts,
       trendBars,
@@ -1252,6 +1382,29 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       return matchQ && matchStatus;
     });
   }, [garageMechanics, mechanicSearchQuery, mechanicFilterStatus, mechanicsStats]);
+
+  const filteredRiders = useMemo(() => {
+    return deliveryRiders.filter((r) => {
+      const q = riderSearchQuery.toLowerCase().trim();
+      const matchesSearch =
+        !q ||
+        (r.name || '').toLowerCase().includes(q) ||
+        (r.shortName || '').toLowerCase().includes(q) ||
+        (r.phone || '').toLowerCase().includes(q) ||
+        (r.email || '').toLowerCase().includes(q) ||
+        (r.username || '').toLowerCase().includes(q) ||
+        (r.id || '').toLowerCase().includes(q) ||
+        (r.vehicleInfo || '').toLowerCase().includes(q) ||
+        (r.plateNumber || '').toLowerCase().includes(q);
+      const account = (r.accountStatus || RIDER_ACCOUNT_STATUSES.ACTIVE).toLowerCase();
+      const matchesStatus =
+        riderFilterStatus === 'All' ||
+        r.status === riderFilterStatus ||
+        (riderFilterStatus === RIDER_ACCOUNT_STATUSES.ACTIVE && account === 'active') ||
+        (riderFilterStatus === RIDER_ACCOUNT_STATUSES.INACTIVE && account === 'inactive');
+      return matchesSearch && matchesStatus;
+    });
+  }, [deliveryRiders, riderSearchQuery, riderFilterStatus]);
 
   // ─── SUPPLIERS & VENDORS COMPUTATIONS ───
   const supplierStats = useMemo(() => {
@@ -1690,6 +1843,179 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     });
   };
 
+  // ─── RIDER / DELIVERY STAFF ACTIONS ───
+  const resetRiderForm = () => {
+    setRiderName('');
+    setRiderShortName('');
+    setRiderPhone('');
+    setRiderVehicle('');
+    setRiderPlate('');
+    setRiderAvatar(RIDER_AVATAR_PRESETS[deliveryRiders.length % RIDER_AVATAR_PRESETS.length]);
+    setRiderStatus(RIDER_STATUSES.AVAILABLE);
+    setRiderNotes('');
+    setRiderIdInput('');
+    setRiderEmail('');
+    setRiderUsername('');
+    setRiderPassword('');
+    setRiderAccountStatus(RIDER_ACCOUNT_STATUSES.ACTIVE);
+  };
+
+  const handleOpenAddRider = () => {
+    setEditingRider(null);
+    resetRiderForm();
+    setIsAddRiderModalOpen(true);
+  };
+
+  const handleOpenEditRider = (rider) => {
+    setEditingRider(rider);
+    setRiderName(rider.name || '');
+    setRiderShortName(rider.shortName || '');
+    setRiderPhone(rider.phone || '');
+    setRiderVehicle(rider.vehicleInfo || '');
+    setRiderPlate(rider.plateNumber || '');
+    setRiderAvatar(rider.avatar || RIDER_AVATAR_PRESETS[0]);
+    setRiderStatus(rider.status || RIDER_STATUSES.AVAILABLE);
+    setRiderNotes(rider.notes || '');
+    setRiderIdInput(rider.id || '');
+    setRiderEmail(rider.email || '');
+    setRiderUsername(rider.username || '');
+    setRiderPassword('');
+    setRiderAccountStatus(rider.accountStatus || RIDER_ACCOUNT_STATUSES.ACTIVE);
+    setIsAddRiderModalOpen(true);
+  };
+
+  const handleAddRider = async () => {
+    if (!riderName.trim()) {
+      showAlert('Required Field', 'Please enter the rider full name.');
+      return;
+    }
+    if (!riderPhone.trim() || riderPhone.trim().length < 8) {
+      showAlert('Required Field', 'Please enter a valid rider phone number.');
+      return;
+    }
+    if (!riderEmail.trim() || !riderEmail.includes('@')) {
+      showAlert('Required Field', 'Enter the rider email used for login.');
+      return;
+    }
+    if (!riderUsername.trim() || riderUsername.trim().length < 3) {
+      showAlert('Required Field', 'Enter a username (at least 3 characters).');
+      return;
+    }
+    if (!riderPassword.trim() || riderPassword.trim().length < 6) {
+      showAlert('Required Field', 'Enter a temporary password (at least 6 characters).');
+      return;
+    }
+
+    const payload = {
+      id: riderIdInput.trim() || undefined,
+      name: riderName.trim(),
+      shortName: riderShortName.trim() || riderName.trim().split(' ')[0],
+      phone: riderPhone.trim(),
+      email: riderEmail.trim(),
+      username: riderUsername.trim(),
+      password: riderPassword.trim(),
+      accountStatus: riderAccountStatus || RIDER_ACCOUNT_STATUSES.ACTIVE,
+      vehicleInfo: riderVehicle.trim(),
+      plateNumber: riderPlate.trim(),
+      avatar: riderAvatar.trim() || RIDER_AVATAR_PRESETS[0],
+      status: riderStatus || RIDER_STATUSES.AVAILABLE,
+      notes: riderNotes.trim(),
+    };
+
+    const res = await riderService.addRider(payload);
+    if (res.success) {
+      setDeliveryRiders(riderService.getRiders());
+      setIsAddRiderModalOpen(false);
+      setEditingRider(null);
+      showToast(`✓ Added ${payload.shortName || payload.name} to delivery staff`);
+    } else {
+      showAlert('Error', res.error || 'Failed to add rider.');
+    }
+  };
+
+  const handleUpdateRider = async () => {
+    if (!editingRider) return;
+    if (!riderName.trim()) {
+      showAlert('Required Field', 'Please enter the rider full name.');
+      return;
+    }
+    if (!riderPhone.trim() || riderPhone.trim().length < 8) {
+      showAlert('Required Field', 'Please enter a valid rider phone number.');
+      return;
+    }
+
+    const payload = {
+      name: riderName.trim(),
+      shortName: riderShortName.trim() || riderName.trim().split(' ')[0],
+      phone: riderPhone.trim(),
+      email: riderEmail.trim(),
+      username: riderUsername.trim(),
+      password: riderPassword.trim(),
+      accountStatus: riderAccountStatus || RIDER_ACCOUNT_STATUSES.ACTIVE,
+      vehicleInfo: riderVehicle.trim(),
+      plateNumber: riderPlate.trim(),
+      avatar: riderAvatar.trim() || RIDER_AVATAR_PRESETS[0],
+      status: riderStatus || RIDER_STATUSES.AVAILABLE,
+      notes: riderNotes.trim(),
+    };
+
+    const res = await riderService.updateRider(editingRider.id, payload);
+    if (res.success) {
+      setDeliveryRiders(riderService.getRiders());
+      setIsAddRiderModalOpen(false);
+      setEditingRider(null);
+      showToast(`✓ Updated ${payload.shortName || payload.name}`);
+    } else {
+      showAlert('Update Failed', res.error || 'Unable to update rider.');
+    }
+  };
+
+  const handleSaveRider = async () => {
+    if (editingRider) {
+      await handleUpdateRider();
+    } else {
+      await handleAddRider();
+    }
+  };
+
+  const handleDeleteRider = (rider) => {
+    showConfirm({
+      title: 'Remove Delivery Rider',
+      message: `Remove ${rider.name} from the delivery staff roster?`,
+      itemName: rider.name,
+      confirmText: 'Remove Rider',
+      cancelText: 'Keep on Roster',
+      type: 'danger',
+      confirmIcon: 'trash3-fill',
+      onConfirm: async () => {
+        const res = await riderService.deleteRider(rider.id);
+        if (res.success) {
+          setDeliveryRiders(riderService.getRiders());
+          showToast(`Removed ${rider.shortName || rider.name} from roster.`);
+        } else {
+          showAlert('Error', res.error || 'Failed to delete rider.');
+        }
+      },
+    });
+  };
+
+  const handleToggleRiderStatus = async (rider) => {
+    const cycle = [
+      RIDER_STATUSES.AVAILABLE,
+      RIDER_STATUSES.ON_DELIVERY,
+      RIDER_STATUSES.OFF_DUTY,
+    ];
+    const idx = cycle.indexOf(rider.status);
+    const next = cycle[(idx + 1) % cycle.length];
+    const res = await riderService.setRiderStatus(rider.id, next);
+    if (res.success) {
+      setDeliveryRiders(riderService.getRiders());
+      showToast(`${rider.shortName || rider.name} → ${next}`);
+    } else {
+      showAlert('Error', res.error || 'Failed to update status.');
+    }
+  };
+
   // ─── SUPPLIER & VENDOR ACTIONS ───
   const handleOpenAddSupplier = () => {
     setEditingSupplier(null);
@@ -1858,9 +2184,20 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     const total = orders.length;
     const pendingCod = pendingCodCount;
     const processing = orders.filter((o) => (o.status || '').toLowerCase() === 'processing').length;
-    const shipped = orders.filter(
-      (o) => (o.status || '').toLowerCase() === 'shipped' || (o.status || '').toLowerCase() === 'in transit'
-    ).length;
+    const ready = orders.filter((o) => (o.status || '').toLowerCase() === 'ready for delivery').length;
+    const shipped = orders.filter((o) => {
+      const s = (o.status || '').toLowerCase();
+      return s === 'shipped' || s === 'in transit' || s === 'out for delivery';
+    }).length;
+    const reported = orders.filter((o) => {
+      const s = (o.status || '').toLowerCase();
+      return s === 'delivery reported' || s === 'reported';
+    }).length;
+    const failed = orders.filter((o) => {
+      const s = (o.status || '').toLowerCase();
+      return s === 'delivery failed' || s === 'delivery issue';
+    }).length;
+    const rescheduled = orders.filter((o) => (o.status || '').toLowerCase() === 'rescheduled').length;
     const delivered = orders.filter(
       (o) => (o.status || '').toLowerCase() === 'delivered' || (o.status || '').toLowerCase() === 'completed'
     ).length;
@@ -1869,7 +2206,19 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       .filter((o) => (o.status || '').toLowerCase() !== 'cancelled')
       .reduce((sum, o) => sum + (Number(o.grand_total) || Number(o.total_amount) || 0), 0);
 
-    return { total, pendingCod, processing, shipped, delivered, cancelled, totalRevenue };
+    return {
+      total,
+      pendingCod,
+      processing,
+      ready,
+      shipped,
+      reported,
+      failed,
+      rescheduled,
+      delivered,
+      cancelled,
+      totalRevenue,
+    };
   }, [orders, pendingCodCount]);
 
   const filteredOrdersList = useMemo(() => {
@@ -1878,6 +2227,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       let matchStatus = true;
       if (orderStatusFilter === 'Pending Approval') {
         matchStatus = st.includes('pending') || st.includes('approval');
+      } else if (orderStatusFilter === 'Shipped' || orderStatusFilter === 'Out for Delivery') {
+        matchStatus = st === 'shipped' || st === 'out for delivery' || st === 'in transit';
+      } else if (orderStatusFilter === 'Delivery Reported') {
+        matchStatus = st === 'delivery reported' || st === 'reported';
+      } else if (orderStatusFilter === 'Delivery Failed' || orderStatusFilter === 'Delivery Issue') {
+        matchStatus = st === 'delivery failed' || st === 'delivery issue';
       } else if (orderStatusFilter !== 'All') {
         matchStatus = st === orderStatusFilter.toLowerCase();
       }
@@ -1906,6 +2261,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     if (res.success) {
       await loadData();
       showToast(`Approved COD Order #${orderId.slice(0, 10)}! Moved to Packing.`);
+    } else {
+      showToast(res.error || 'COD approval failed');
     }
   };
 
@@ -1929,6 +2286,43 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         setSelectedOrderForModal(res.order || { ...selectedOrderForModal, status: newStatus });
       }
       showToast(`Order status updated to "${newStatus}"`);
+    } else {
+      showToast(res.error || 'Status update blocked');
+    }
+  };
+
+  const refreshOrderDeliveryPanel = async (orderId) => {
+    if (!orderId) {
+      setOrderDeliveryDetail(null);
+      setOrderDeliveryHistory([]);
+      return;
+    }
+    const d = await deliveryService.getDeliveryForOrder(orderId);
+    const h = await deliveryService.getDeliveryHistory(orderId);
+    setOrderDeliveryDetail(d);
+    setOrderDeliveryHistory(h || []);
+  };
+
+  useEffect(() => {
+    if (isOrderModalOpen && selectedOrderForModal) {
+      refreshOrderDeliveryPanel(selectedOrderForModal.order_id || selectedOrderForModal.id);
+    }
+  }, [isOrderModalOpen, selectedOrderForModal?.order_id, selectedOrderForModal?.id]);
+
+  const handleUploadProof = async () => {
+    const oid = selectedOrderForModal?.order_id || selectedOrderForModal?.id;
+    if (!oid) return;
+    const picked = await pickImageFromFile();
+    if (!picked.success) {
+      if (picked.error && picked.error !== 'No file selected') showToast(picked.error);
+      return;
+    }
+    const res = await deliveryService.uploadProofOfDelivery(oid, picked.uri, currentUser);
+    if (res.success) {
+      showToast('Proof of delivery uploaded');
+      await refreshOrderDeliveryPanel(oid);
+    } else {
+      showToast(res.error || 'Upload failed');
     }
   };
 
@@ -1942,12 +2336,27 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       type: 'warning',
       confirmIcon: 'x-circle-fill',
       onConfirm: async () => {
-        await orderService.cancelOrder(orderId);
+        const res = await orderService.cancelOrder(orderId, 'Cancelled by admin', { admin: true });
+        if (!res.success) {
+          showToast(res.error || 'Cancel failed');
+          return;
+        }
         await loadData();
         if (isOrderModalOpen) setIsOrderModalOpen(false);
         showToast(`Order #${orderId.slice(0, 10)} cancelled.`);
       },
     });
+  };
+
+  const handleProcessReturn = async (orderId, decision) => {
+    const res = await orderService.processReturn(orderId, decision, `Admin ${decision.toLowerCase()} return`);
+    if (!res.success) {
+      showToast(res.error || 'Return update failed');
+      return;
+    }
+    await loadData();
+    setSelectedOrderForModal(res.order || null);
+    showToast(decision === 'Approved' ? 'Return approved — order refunded' : 'Return rejected — order remains delivered');
   };
 
   // Filtered products list for Products Tab
@@ -1972,6 +2381,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     suppliers: 'Suppliers & Parts Vendors',
     garage: 'Garage & Service Appointments Management',
     mechanics: 'Certified Mechanics & Pit Crew',
+    riders: 'Rider Management',
     users: 'User Accounts Management',
     supabase: 'Supabase Database Settings',
     notifications: 'Notifications & Alerts Center',
@@ -1989,6 +2399,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     suppliers: 'truck',
     garage: 'tools',
     mechanics: 'person-badge-fill',
+    riders: 'bicycle',
     users: 'people-fill',
     supabase: 'database-fill-gear',
     notifications: 'bell-fill',
@@ -2178,16 +2589,16 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         {isDesktop && (
           <View style={styles.sidebar}>
             {/* Top Fixed Area: Brand Logo */}
-            <View style={styles.sidebarBrandRow}>
+            <View style={styles.sidebarBrandRow} className="pb-3 mb-4 border-b border-slate-100 dark:border-slate-800">
               <TouchableOpacity
                 onPress={onNavigateToStore}
                 style={{ flexDirection: 'row', alignItems: 'center' }}
                 activeOpacity={0.8}
               >
                 <BrandLogo
-                  size={36}
+                  size={34}
                   textColor={tokens.textPrimary}
-                  accentColor="#DC2626"
+                  accentColor="#0C6258"
                 />
               </TouchableOpacity>
             </View>
@@ -2199,16 +2610,18 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               contentContainerStyle={{ paddingBottom: 16 }}
             >
               {/* Admin Profile Box */}
-              <View style={styles.adminProfileBox}>
-                <View style={styles.adminAvatarCircle}>
-                  <Text style={styles.adminAvatarText}>A</Text>
-                  <View style={styles.onlineIndicator} />
+              <View style={styles.adminProfileBox} className="admin-minimal-card mb-4 p-3 flex flex-row items-center gap-3">
+                <View style={styles.adminAvatarCircle} className="w-9 h-9 rounded-full bg-slate-900 dark:bg-slate-700 flex items-center justify-center relative">
+                  <Text style={styles.adminAvatarText} className="text-white font-bold text-sm">
+                    {(currentUser?.name || currentUser?.fullName || 'A').charAt(0).toUpperCase()}
+                  </Text>
+                  <View style={styles.onlineIndicator} className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.profileNameText} numberOfLines={1}>
+                  <Text style={styles.profileNameText} className="text-xs font-semibold text-slate-900 dark:text-white truncate" numberOfLines={1}>
                     {currentUser?.name || 'Administrator'}
                   </Text>
-                  <Text style={styles.profileRoleText}>Store Administrator</Text>
+                  <Text style={styles.profileRoleText} className="text-[11px] text-slate-500 dark:text-slate-400">Store Administrator</Text>
                 </View>
               </View>
 
@@ -2512,10 +2925,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 {/* 8.5. Mechanics & Crew */}
                 <TouchableOpacity
                   style={[styles.sidebarNavItem, activeNav === 'mechanics' && styles.sidebarNavItemActive]}
-                  onPress={() => {
-                    setActiveNav('mechanics');
-                    setGarageSubTab('mechanics');
-                  }}
+                  onPress={() => setActiveNav('mechanics')}
                   activeOpacity={0.8}
                 >
                   <View style={{ width: 22, alignItems: 'center' }}>
@@ -2543,6 +2953,41 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       ]}
                     >
                       {garageMechanics.length}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* 8.6. Riders / Delivery Staff */}
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, activeNav === 'riders' && styles.sidebarNavItemActive]}
+                  onPress={() => setActiveNav('riders')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 22, alignItems: 'center' }}>
+                    <BootstrapIcon
+                      name="bicycle"
+                      size={16}
+                      color={activeNav === 'riders' ? '#FFFFFF' : '#64748B'}
+                    />
+                  </View>
+                  <Text
+                    style={[styles.sidebarNavLabel, activeNav === 'riders' && styles.sidebarNavLabelActive]}
+                  >
+                    Rider Management
+                  </Text>
+                  <View
+                    style={[
+                      styles.sidebarCountBadge,
+                      activeNav === 'riders' && styles.sidebarCountBadgeActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.sidebarCountText,
+                        activeNav === 'riders' && styles.sidebarCountTextActive,
+                      ]}
+                    >
+                      {deliveryRiders.length}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -2767,14 +3212,17 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 zIndex: isProfileDropdownOpen ? 99999 : 50,
               },
             ]}
+            className="flex flex-row items-center justify-between px-6 py-3.5 bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800"
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <BootstrapIcon
-                name={navIcons[activeNav] || 'speedometer2'}
-                size={isDesktop ? 18 : 16}
-                color="#0C6258"
-              />
-              <Text style={[styles.pageBreadcrumbTitle, !isDesktop && { fontSize: 16 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }} className="flex flex-row items-center gap-2.5">
+              <View className="w-8 h-8 rounded-lg bg-teal-50 dark:bg-teal-950/40 border border-teal-100 dark:border-teal-800/40 flex items-center justify-center">
+                <BootstrapIcon
+                  name={navIcons[activeNav] || 'speedometer2'}
+                  size={15}
+                  color="#0C6258"
+                />
+              </View>
+              <Text style={[styles.pageBreadcrumbTitle, !isDesktop && { fontSize: 16 }]} className="text-[17px] font-bold text-slate-900 dark:text-white tracking-tight">
                 {navTitles[activeNav] || 'Admin Console'}
               </Text>
             </View>
@@ -2840,8 +3288,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       setNewBkOdo('');
                       setNewBkNotes('');
                       setIsNewBookingModalOpen(true);
-                    } else if (garageSubTab === 'mechanics') {
-                      handleOpenAddMechanic();
                     } else {
                       setEditingGarageService(null);
                       setServTitle('');
@@ -2861,7 +3307,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   activeOpacity={0.85}
                 >
                   <BootstrapIcon
-                    name={garageSubTab === 'mechanics' ? 'person-plus-fill' : 'plus-lg'}
+                    name="plus-lg"
                     size={14}
                     color="#FFFFFF"
                   />
@@ -2870,13 +3316,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       ? isDesktop
                         ? 'New Service Booking'
                         : '+ Booking'
-                      : garageSubTab === 'mechanics'
-                        ? isDesktop
-                          ? 'Add New Mechanic'
-                          : '+ Mechanic'
-                        : isDesktop
-                          ? 'Add Service Package'
-                          : '+ Package'}
+                      : isDesktop
+                        ? 'Add Service Package'
+                        : '+ Package'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -2901,6 +3343,18 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <BootstrapIcon name="person-plus-fill" size={14} color="#FFFFFF" />
                   <Text style={styles.addBtnPrimaryText}>
                     {isDesktop ? 'Add New Mechanic' : '+ Mechanic'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {activeNav === 'riders' && (
+                <TouchableOpacity
+                  style={styles.addBtnPrimary}
+                  onPress={handleOpenAddRider}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="person-plus-fill" size={14} color="#FFFFFF" />
+                  <Text style={styles.addBtnPrimaryText}>
+                    {isDesktop ? 'Add Rider' : '+ Rider'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -3361,23 +3815,23 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             {activeNav === 'overview' && (
               <View>
                 {/* Stats Grid */}
-                <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={styles.statIconWrap}>
+                <View style={styles.statsGrid} className="flex flex-row flex-wrap gap-4 mb-6 w-full">
+                  <View style={[styles.statCard, styles.statCardTealAccent]} className="admin-stat-card border-l-4 border-l-teal-600">
+                    <View style={styles.statIconWrap} className="admin-icon-pill admin-icon-pill-teal mb-3">
                       <BootstrapIcon name="currency-dollar" size={18} color="#0C6258" />
                     </View>
-                    <Text style={styles.statLabel}>Total Store Revenue</Text>
-                    <Text style={styles.statValue}>₱{analyticsData.totalRevenue.toLocaleString()}</Text>
-                    <Text style={styles.statSub}>Online + Walk-in POS</Text>
+                    <Text style={styles.statLabel} className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Total Store Revenue</Text>
+                    <Text style={styles.statValue} className="text-[26px] font-bold text-slate-900 dark:text-white tracking-tight block">₱{analyticsData.totalRevenue.toLocaleString()}</Text>
+                    <Text style={styles.statSub} className="text-[12px] font-normal text-slate-500 dark:text-slate-400 mt-1 block">Online + Walk-in POS</Text>
                   </View>
 
-                  <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                    <View style={styles.statIconWrap}>
+                  <View style={[styles.statCard, styles.statCardSuccessAccent]} className="admin-stat-card border-l-4 border-l-emerald-500">
+                    <View style={styles.statIconWrap} className="admin-icon-pill admin-icon-pill-teal mb-3">
                       <BootstrapIcon name="box-seam" size={18} color="#10B981" />
                     </View>
-                    <Text style={styles.statLabel}>Active SKUs</Text>
-                    <Text style={styles.statValue}>{products.length}</Text>
-                    <Text style={styles.statSub}>{invStats.totalUnits} total units in stock</Text>
+                    <Text style={styles.statLabel} className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Active SKUs</Text>
+                    <Text style={styles.statValue} className="text-[26px] font-bold text-slate-900 dark:text-white tracking-tight block">{products.length}</Text>
+                    <Text style={styles.statSub} className="text-[12px] font-normal text-slate-500 dark:text-slate-400 mt-1 block">{invStats.totalUnits} total units in stock</Text>
                   </View>
 
                   <View
@@ -3387,28 +3841,29 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         ? styles.statCardWarningAccent
                         : styles.statCardSuccessAccent,
                     ]}
+                    className={`admin-stat-card border-l-4 ${invStats.lowStockCount > 0 ? 'border-l-amber-500' : 'border-l-emerald-500'}`}
                   >
-                    <View style={styles.statIconWrap}>
+                    <View style={styles.statIconWrap} className={`admin-icon-pill mb-3 ${invStats.lowStockCount > 0 ? 'admin-icon-pill-amber' : 'admin-icon-pill-teal'}`}>
                       <BootstrapIcon
-                        name="exclamation-triangle-fill"
+                        name={invStats.lowStockCount > 0 ? "exclamation-triangle" : "check2-circle"}
                         size={18}
                         color={invStats.lowStockCount > 0 ? '#F59E0B' : '#10B981'}
                       />
                     </View>
-                    <Text style={styles.statLabel}>Stock Alerts</Text>
-                    <Text style={[styles.statValue, invStats.lowStockCount > 0 && { color: '#D97706' }]}>
+                    <Text style={styles.statLabel} className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Stock Alerts</Text>
+                    <Text style={[styles.statValue, invStats.lowStockCount > 0 && { color: '#D97706' }]} className="text-[26px] font-bold text-slate-900 dark:text-white tracking-tight block">
                       {invStats.lowStockCount} Low / {invStats.outOfStockCount} Out
                     </Text>
-                    <Text style={styles.statSub}>Needs reorder attention</Text>
+                    <Text style={styles.statSub} className="text-[12px] font-normal text-slate-500 dark:text-slate-400 mt-1 block">Needs reorder attention</Text>
                   </View>
 
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="receipt" size={18} color="#0C6258" />
+                  <View style={[styles.statCard, styles.statCardTealAccent]} className="admin-stat-card border-l-4 border-l-blue-500">
+                    <View style={styles.statIconWrap} className="admin-icon-pill admin-icon-pill-blue mb-3">
+                      <BootstrapIcon name="receipt" size={18} color="#2563EB" />
                     </View>
-                    <Text style={styles.statLabel}>Dispatches & Orders</Text>
-                    <Text style={styles.statValue}>{orders.length}</Text>
-                    <Text style={styles.statSub}>
+                    <Text style={styles.statLabel} className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Dispatches & Orders</Text>
+                    <Text style={styles.statValue} className="text-[26px] font-bold text-slate-900 dark:text-white tracking-tight block">{orders.length}</Text>
+                    <Text style={styles.statSub} className="text-[12px] font-normal text-slate-500 dark:text-slate-400 mt-1 block">
                       {analyticsData.posOrdersCount} POS / {analyticsData.onlineOrdersCount} Online
                     </Text>
                   </View>
@@ -3469,104 +3924,116 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
                 {/* Quick Action Banner */}
                 <View
-                  style={[styles.tableCard, { padding: 22, marginBottom: 24, backgroundColor: '#FFFFFF' }]}
+                  style={[styles.tableCard, { padding: 22, marginBottom: 24 }]}
+                  className="admin-minimal-card p-6 mb-6"
                 >
-                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: tokens.textPrimary, marginBottom: 4 }} className="text-[17px] font-bold text-slate-900 dark:text-white mb-1">
                     Backoffice Quick Control Center
                   </Text>
-                  <Text style={{ color: '#64748B', fontSize: 13.5, lineHeight: 20, marginBottom: 20 }}>
+                  <Text style={{ color: tokens.textMuted, fontSize: 13, lineHeight: 19, marginBottom: 18 }} className="text-[13px] text-slate-500 dark:text-slate-400 mb-4">
                     Manage customer orders and Cash on Delivery approvals, audit warehouse inventory levels,
                     process in-store walk-in sales via POS, and track revenue telemetry.
                   </Text>
 
-                  <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+                  <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }} className="flex flex-row gap-2.5 flex-wrap">
                     <TouchableOpacity
                       style={[
                         styles.addBtnPrimary,
-                        { backgroundColor: '#0C6258', flexDirection: 'row', alignItems: 'center', gap: 8 },
+                        { backgroundColor: '#0F172A', flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12 },
                       ]}
+                      className="bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white flex flex-row items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors"
                       onPress={() => setActiveNav('orders')}
                     >
                       <BootstrapIcon name="receipt" size={15} color="#FFFFFF" />
-                      <Text style={styles.addBtnPrimaryText}>
+                      <Text style={styles.addBtnPrimaryText} className="text-white text-xs font-semibold">
                         Manage Orders & COD {pendingCodCount > 0 ? `(${pendingCodCount} Pending)` : ''}
                       </Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       style={[
-                        styles.addBtnPrimary,
+                        styles.quickStoreBtn,
                         {
-                          backgroundColor: '#FEF3C7',
-                          borderWidth: 1,
-                          borderColor: '#FDE68A',
+                          backgroundColor: tokens.bgSub,
+                          borderColor: tokens.border,
                           flexDirection: 'row',
                           alignItems: 'center',
                           gap: 8,
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          borderRadius: 12,
                         },
                       ]}
+                      className="bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 flex flex-row items-center gap-2 px-3.5 py-2.5 rounded-xl transition-colors"
                       onPress={() => setActiveNav('pos')}
                     >
-                      <BootstrapIcon name="cart-check-fill" size={15} color="#0C6258" />
-                      <Text style={[styles.addBtnPrimaryText, { color: '#0C6258' }]}>Launch POS Cashier</Text>
+                      <BootstrapIcon name="cart-check" size={15} color={tokens.textPrimary} />
+                      <Text style={[styles.quickStoreBtnText, { color: tokens.textPrimary }]} className="text-slate-700 dark:text-slate-200 text-xs font-semibold">Launch POS Cashier</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       style={[
-                        styles.addBtnPrimary,
+                        styles.quickStoreBtn,
                         {
-                          backgroundColor: '#FEF3C7',
-                          borderWidth: 1,
-                          borderColor: '#FDE68A',
+                          backgroundColor: tokens.bgSub,
+                          borderColor: tokens.border,
                           flexDirection: 'row',
                           alignItems: 'center',
                           gap: 8,
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          borderRadius: 12,
                         },
                       ]}
+                      className="bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 flex flex-row items-center gap-2 px-3.5 py-2.5 rounded-xl transition-colors"
                       onPress={() => setActiveNav('inventory')}
                     >
-                      <BootstrapIcon name="box-seam-fill" size={15} color="#0C6258" />
-                      <Text style={[styles.addBtnPrimaryText, { color: '#0C6258' }]}>Audit Inventory</Text>
+                      <BootstrapIcon name="box-seam" size={15} color={tokens.textPrimary} />
+                      <Text style={[styles.quickStoreBtnText, { color: tokens.textPrimary }]} className="text-slate-700 dark:text-slate-200 text-xs font-semibold">Audit Inventory</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity
                       style={[
-                        styles.addBtnPrimary,
+                        styles.quickStoreBtn,
                         {
-                          backgroundColor: '#FEF3C7',
-                          borderWidth: 1,
-                          borderColor: '#FDE68A',
+                          backgroundColor: tokens.bgSub,
+                          borderColor: tokens.border,
                           flexDirection: 'row',
                           alignItems: 'center',
                           gap: 8,
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          borderRadius: 12,
                         },
                       ]}
+                      className="bg-slate-100 hover:bg-slate-200/80 dark:bg-slate-800 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 flex flex-row items-center gap-2 px-3.5 py-2.5 rounded-xl transition-colors"
                       onPress={() => setActiveNav('analytics')}
                     >
-                      <BootstrapIcon name="graph-up-arrow" size={15} color="#0C6258" />
-                      <Text style={[styles.addBtnPrimaryText, { color: '#0C6258' }]}>Revenue Analytics</Text>
+                      <BootstrapIcon name="graph-up-arrow" size={15} color={tokens.textPrimary} />
+                      <Text style={[styles.quickStoreBtnText, { color: tokens.textPrimary }]} className="text-slate-700 dark:text-slate-200 text-xs font-semibold">Revenue Analytics</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
 
                 {/* Recent Transactions Table */}
-                <View style={styles.tableCard}>
+                <View style={styles.tableCard} className="admin-minimal-card overflow-hidden mb-6">
                   <View
                     style={{
-                      paddingHorizontal: 18,
-                      paddingVertical: 14,
+                      paddingHorizontal: 20,
+                      paddingVertical: 16,
                       borderBottomWidth: 1,
-                      borderBottomColor: '#E2E8F0',
+                      borderBottomColor: tokens.border,
                       flexDirection: 'row',
                       justifyContent: 'space-between',
                       alignItems: 'center',
                     }}
+                    className="flex flex-row justify-between items-center px-5 py-4 border-b border-slate-100 dark:border-slate-800"
                   >
-                    <Text style={{ fontSize: 15, fontWeight: '900', color: '#0F172A' }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: tokens.textPrimary }} className="text-[15px] font-bold text-slate-900 dark:text-white">
                       Recent Orders & POS Sales
                     </Text>
                     <TouchableOpacity onPress={() => setActiveNav('orders')}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#0C6258' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#0C6258' }}>
                         View All Orders ({orders.length}) →
                       </Text>
                     </TouchableOpacity>
@@ -3578,7 +4045,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     contentContainerStyle={{ minWidth: 740 }}
                   >
                     <View style={{ width: '100%', minWidth: 740 }}>
-                      <View style={styles.tableHeaderRow}>
+                      <View style={styles.tableHeaderRow} className="admin-table-head flex flex-row items-center px-5 py-3">
                         <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 120 }]}>Order Ref</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 2, minWidth: 160 }]}>Customer</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 120 }]}>Channel</Text>
@@ -3591,7 +4058,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       </View>
 
                       {orders.slice(0, 5).map((o, idx) => (
-                        <View key={o.order_id || idx} style={styles.tableRow}>
+                        <View key={o.order_id || idx} style={styles.tableRow} className="admin-table-row flex flex-row items-center px-5 py-3.5">
                           <Text
                             style={[
                               styles.tableTitle,
@@ -3612,18 +4079,19 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           <View style={{ flex: 1.5, minWidth: 120 }}>
                             <View
                               style={{
-                                backgroundColor: o.channel === 'POS (In-Store)' ? '#FEF3C7' : '#EFF6FF',
-                                paddingHorizontal: 8,
+                                backgroundColor: o.channel === 'POS (In-Store)' ? tokens.badgeNeutralBg : tokens.accentBg,
+                                paddingHorizontal: 9,
                                 paddingVertical: 3,
-                                borderRadius: 6,
+                                borderRadius: 9999,
                                 alignSelf: 'flex-start',
                               }}
+                              className="px-2.5 py-1 rounded-full text-xs font-medium"
                             >
                               <Text
                                 style={{
-                                  color: o.channel === 'POS (In-Store)' ? '#0C6258' : '#1D4ED8',
+                                  color: o.channel === 'POS (In-Store)' ? tokens.textSecondary : tokens.accent,
                                   fontSize: 11,
-                                  fontWeight: '800',
+                                  fontWeight: '600',
                                 }}
                               >
                                 {o.channel || 'Online Store'}
@@ -3633,7 +4101,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           <Text
                             style={[
                               styles.tableTitle,
-                              { flex: 1.5, minWidth: 110, textAlign: 'right', color: '#0C6258', fontWeight: '900' },
+                              { flex: 1.5, minWidth: 110, textAlign: 'right', color: tokens.textPrimary, fontWeight: '700' },
                             ]}
                           >
                             ₱{(Number(o.grand_total) || Number(o.total_amount) || 0).toLocaleString()}
@@ -3642,20 +4110,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             <View
                               style={{
                                 backgroundColor: (o.status || '').toLowerCase().includes('pending')
-                                  ? '#FEF3C7'
-                                  : '#D1FAE5',
-                                paddingHorizontal: 8,
-                                paddingVertical: 3,
-                                borderRadius: 6,
+                                  ? tokens.statusWarningBg
+                                  : tokens.statusSuccessBg,
+                                paddingHorizontal: 10,
+                                paddingVertical: 4,
+                                borderRadius: 9999,
                               }}
+                              className="px-2.5 py-1 rounded-full text-xs font-medium"
                             >
                               <Text
                                 style={{
                                   color: (o.status || '').toLowerCase().includes('pending')
-                                    ? '#92400E'
-                                    : '#065F46',
+                                    ? tokens.statusWarningText
+                                    : tokens.statusSuccessText,
                                   fontSize: 11,
-                                  fontWeight: '800',
+                                  fontWeight: '600',
                                 }}
                               >
                                 {(o.status || '').toLowerCase().includes('pending')
@@ -3726,7 +4195,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     <View style={[styles.statIconWrap, { backgroundColor: '#F3E8FF' }]}>
                       <BootstrapIcon name="truck" size={18} color="#9333EA" />
                     </View>
-                    <Text style={styles.statLabel}>In Transit & Shipped</Text>
+                    <Text style={styles.statLabel}>Out for Delivery</Text>
                     <Text style={[styles.statValue, { color: '#9333EA' }]}>{orderStats.shipped}</Text>
                     <Text style={styles.statSub}>On the road with courier</Text>
                   </View>
@@ -3774,8 +4243,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     styles.toolbarRow,
                     {
                       position: 'relative',
-                      zIndex: isPaymentDropdownOpen ? 99999 : 10,
-                      elevation: isPaymentDropdownOpen ? 99999 : 1,
+                      zIndex: (isPaymentDropdownOpen || isOrderStatusDropdownOpen) ? 99999 : 10,
+                      elevation: (isPaymentDropdownOpen || isOrderStatusDropdownOpen) ? 99999 : 1,
                     },
                   ]}
                 >
@@ -3793,6 +4262,249 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <BootstrapIcon name="x-circle" size={14} color="#94A3B8" />
                       </TouchableOpacity>
                     ) : null}
+                  </View>
+
+                  {/* Order Status Filter Dropdown */}
+                  <View
+                    style={{
+                      position: 'relative',
+                      zIndex: isOrderStatusDropdownOpen ? 99999 : 10,
+                    }}
+                  >
+                    {(() => {
+                      const orderStatusOptions = [
+                        { key: 'All', label: 'All Orders', count: orderStats.total, icon: 'list-check', color: '#0C6258' },
+                        {
+                          key: 'Pending Approval',
+                          label: 'Pending COD',
+                          count: orderStats.pendingCod,
+                          icon: 'clock-history',
+                          color: '#D97706',
+                          highlight: orderStats.pendingCod > 0,
+                        },
+                        { key: 'Processing', label: 'Processing', count: orderStats.processing, icon: 'gear-wide-connected', color: '#0284C7' },
+                        { key: 'Ready for Delivery', label: 'Ready', count: orderStats.ready, icon: 'box-seam', color: '#0EA5E9' },
+                        { key: 'Out for Delivery', label: 'Out for Delivery', count: orderStats.shipped, icon: 'truck', color: '#6366F1' },
+                        { key: 'Delivery Reported', label: 'Reported', count: orderStats.reported, icon: 'clipboard-check', color: '#0C6258' },
+                        { key: 'Delivery Issue', label: 'Issue', count: orderStats.failed, icon: 'exclamation-triangle', color: '#DC2626' },
+                        { key: 'Rescheduled', label: 'Rescheduled', count: orderStats.rescheduled, icon: 'arrow-repeat', color: '#D97706' },
+                        { key: 'Delivered', label: 'Delivered', count: orderStats.delivered, icon: 'check-circle-fill', color: '#16A34A' },
+                        { key: 'Cancelled', label: 'Cancelled', count: orderStats.cancelled, icon: 'x-circle-fill', color: '#DC2626' },
+                      ];
+                      const activeOpt = orderStatusOptions.find((o) => o.key === orderStatusFilter) || orderStatusOptions[0];
+
+                      return (
+                        <>
+                          <TouchableOpacity
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 8,
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderWidth: 1.5,
+                              borderColor: isOrderStatusDropdownOpen
+                                ? '#0C6258'
+                                : activeOpt.highlight
+                                  ? '#F59E0B'
+                                  : orderStatusFilter !== 'All'
+                                    ? '#0C6258'
+                                    : isDarkMode ? '#334155' : '#E2E8F0',
+                              borderRadius: 12,
+                              paddingHorizontal: 14,
+                              paddingVertical: 9,
+                              minWidth: 170,
+                              cursor: 'pointer',
+                              boxShadow: isOrderStatusDropdownOpen
+                                ? '0 6px 20px -2px rgba(12, 98, 88, 0.2)'
+                                : '0 1px 3px rgba(0, 0, 0, 0.04)',
+                            }}
+                            onPress={() => {
+                              setIsOrderStatusDropdownOpen((prev) => !prev);
+                              setIsPaymentDropdownOpen(false);
+                            }}
+                            activeOpacity={0.85}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                              <BootstrapIcon
+                                name={activeOpt.icon}
+                                size={13}
+                                color={
+                                  activeOpt.highlight
+                                    ? '#D97706'
+                                    : orderStatusFilter !== 'All'
+                                      ? activeOpt.color
+                                      : '#64748B'
+                                }
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: '700',
+                                  color:
+                                    activeOpt.highlight
+                                      ? '#B45309'
+                                      : orderStatusFilter !== 'All'
+                                        ? '#0C6258'
+                                        : isDarkMode ? '#F8FAFC' : '#0F172A',
+                                }}
+                              >
+                                {activeOpt.label}
+                              </Text>
+                              <View
+                                style={{
+                                  backgroundColor:
+                                    activeOpt.highlight
+                                      ? '#FEF3C7'
+                                      : orderStatusFilter !== 'All'
+                                        ? '#0C6258'
+                                        : isDarkMode ? '#334155' : '#E2E8F0',
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 1,
+                                  borderRadius: 8,
+                                  marginLeft: 2,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: '800',
+                                    color:
+                                      activeOpt.highlight
+                                        ? '#B45309'
+                                        : orderStatusFilter !== 'All'
+                                          ? '#FFFFFF'
+                                          : isDarkMode ? '#CBD5E1' : '#475569',
+                                  }}
+                                >
+                                  {activeOpt.count}
+                                </Text>
+                              </View>
+                            </View>
+                            <BootstrapIcon
+                              name={isOrderStatusDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                              size={12}
+                              color={isOrderStatusDropdownOpen ? '#0C6258' : '#64748B'}
+                            />
+                          </TouchableOpacity>
+
+                          {/* Transparent backdrop for outside click */}
+                          {isOrderStatusDropdownOpen && (
+                            <TouchableOpacity
+                              style={{
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                zIndex: 99998,
+                                backgroundColor: 'transparent',
+                                cursor: 'default',
+                              }}
+                              onPress={() => setIsOrderStatusDropdownOpen(false)}
+                              activeOpacity={1}
+                            />
+                          )}
+
+                          {/* Floating Dropdown Menu */}
+                          {isOrderStatusDropdownOpen && (
+                            <View
+                              style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                marginTop: 6,
+                                minWidth: 230,
+                                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                                borderRadius: 14,
+                                borderWidth: 1.5,
+                                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                                boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
+                                zIndex: 99999,
+                                padding: 6,
+                                gap: 3,
+                                maxHeight: 320,
+                                overflowY: 'auto',
+                              }}
+                            >
+                              {orderStatusOptions.map((option) => {
+                                const isSelected = orderStatusFilter === option.key;
+                                return (
+                                  <TouchableOpacity
+                                    key={option.key}
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      paddingHorizontal: 12,
+                                      paddingVertical: 9,
+                                      borderRadius: 9,
+                                      backgroundColor: isSelected
+                                        ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                        : 'transparent',
+                                      cursor: 'pointer',
+                                    }}
+                                    onPress={() => {
+                                      setOrderStatusFilter(option.key);
+                                      setIsOrderStatusDropdownOpen(false);
+                                    }}
+                                    activeOpacity={0.8}
+                                  >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                      <BootstrapIcon
+                                        name={option.icon}
+                                        size={14}
+                                        color={isSelected ? '#0C6258' : option.color || '#64748B'}
+                                      />
+                                      <Text
+                                        style={{
+                                          fontSize: 13,
+                                          fontWeight: isSelected ? '800' : '600',
+                                          color: isSelected
+                                            ? '#0C6258'
+                                            : isDarkMode ? '#E2E8F0' : '#334155',
+                                        }}
+                                      >
+                                        {option.label}
+                                      </Text>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                      <View
+                                        style={{
+                                          backgroundColor: option.highlight
+                                            ? '#FEF3C7'
+                                            : isSelected
+                                              ? '#0C6258'
+                                              : isDarkMode ? '#334155' : '#E2E8F0',
+                                          paddingHorizontal: 6,
+                                          paddingVertical: 1,
+                                          borderRadius: 6,
+                                        }}
+                                      >
+                                        <Text
+                                          style={{
+                                            fontSize: 10.5,
+                                            fontWeight: '800',
+                                            color: option.highlight
+                                              ? '#B45309'
+                                              : isSelected
+                                                ? '#FFFFFF'
+                                                : isDarkMode ? '#CBD5E1' : '#475569',
+                                          }}
+                                        >
+                                          {option.count}
+                                        </Text>
+                                      </View>
+                                      {isSelected && <BootstrapIcon name="check2" size={14} color="#0C6258" />}
+                                    </View>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          )}
+                        </>
+                      );
+                    })()}
                   </View>
 
                     {/* Payment Method Filter Dropdown */}
@@ -3982,61 +4694,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </TouchableOpacity>
                 </View>
 
-                {/* Status Tabs */}
-                <View style={styles.orderFilterBar}>
-                  {[
-                    { key: 'All', label: `All Orders (${orderStats.total})`, icon: 'list-check' },
-                    {
-                      key: 'Pending Approval',
-                      label: `Pending COD (${orderStats.pendingCod})`,
-                      icon: 'clock-history',
-                      highlight: orderStats.pendingCod > 0,
-                    },
-                    { key: 'Processing', label: `Processing (${orderStats.processing})`, icon: 'gear-wide-connected' },
-                    { key: 'Shipped', label: `Shipped (${orderStats.shipped})`, icon: 'truck' },
-                    { key: 'Delivered', label: `Delivered (${orderStats.delivered})`, icon: 'check-circle-fill' },
-                    { key: 'Cancelled', label: `Cancelled (${orderStats.cancelled})`, icon: 'x-circle-fill' },
-                  ].map((tab) => (
-                    <TouchableOpacity
-                      key={tab.key}
-                      style={[
-                        styles.orderFilterTab,
-                        orderStatusFilter === tab.key && styles.orderFilterTabActive,
-                        tab.highlight &&
-                          orderStatusFilter !== tab.key && {
-                            borderColor: '#F59E0B',
-                            backgroundColor: '#FEF3C7',
-                          },
-                      ]}
-                      onPress={() => setOrderStatusFilter(tab.key)}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <BootstrapIcon
-                          name={tab.icon}
-                          size={12}
-                          color={
-                            orderStatusFilter === tab.key
-                              ? '#FFFFFF'
-                              : tab.highlight
-                              ? '#B45309'
-                              : '#64748B'
-                          }
-                        />
-                        <Text
-                          style={[
-                            styles.orderFilterTabText,
-                            orderStatusFilter === tab.key && styles.orderFilterTabTextActive,
-                            tab.highlight &&
-                              orderStatusFilter !== tab.key && { color: '#B45309', fontWeight: '900' },
-                          ]}
-                        >
-                          {tab.label}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
                 {/* Orders List Table */}
                 <View style={styles.tableCard}>
                   <View
@@ -4081,16 +4738,18 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={true}
-                    contentContainerStyle={{ minWidth: 1060 }}
+                    contentContainerStyle={{ minWidth: 1280 }}
                   >
-                    <View style={{ width: '100%', minWidth: 1060 }}>
+                    <View style={{ width: '100%', minWidth: 1280 }}>
                       <View style={styles.tableHeaderRow}>
                         <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 140 }]}>Order Ref & Date</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 170 }]}>Customer & Destination</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 1.6, minWidth: 160 }]}>Items Summary</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 115 }]}>Payment Method</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.0, minWidth: 100 }]}>Rider</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.0, minWidth: 100 }]}>Delivery</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.0, minWidth: 100 }]}>Payment</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 0.9, minWidth: 95, textAlign: 'right' }]}>Total</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 110, textAlign: 'center' }]}>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 120, textAlign: 'center' }]}>
                           Status
                         </Text>
                         <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 190, textAlign: 'center' }]}>
@@ -4111,12 +4770,44 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           const st = (o.status || 'Pending Approval').toLowerCase();
                           const isPending = st.includes('pending') || st.includes('approval');
                           const isProcessing = st === 'processing';
-                          const isShipped = st === 'shipped' || st === 'in transit';
+                          const isReady = st === 'ready for delivery';
+                          const isShipped = st === 'shipped' || st === 'in transit' || st === 'out for delivery';
+                          const isReported = st === 'delivery reported' || st === 'reported';
+                          const isFailed = st === 'delivery failed' || st === 'delivery issue';
+                          const isRescheduled = st === 'rescheduled';
                           const isDelivered = st === 'delivered' || st === 'completed';
                           const isCancelled = st === 'cancelled';
                           const isCOD =
                             (o.payment_method || '').toLowerCase().includes('cash') ||
                             (o.payment_method || '').includes('COD');
+                          const deliveryLabel = isDelivered
+                            ? 'Admin confirmed'
+                            : isReported
+                              ? 'Awaiting admin confirm'
+                              : isShipped
+                                ? o.rider_reported_delivered
+                                  ? 'Rider dropped off'
+                                  : 'QR active'
+                                : isReady || isFailed || isRescheduled
+                                  ? (o.delivery_status || o.status)
+                                  : '—';
+                          const statusLabel = isPending
+                            ? 'Pending'
+                            : isProcessing
+                              ? 'Processing'
+                              : isReady
+                                ? 'Ready'
+                                : isReported
+                                  ? 'Delivery Reported'
+                                  : isShipped
+                                    ? 'Out for Delivery'
+                                    : isFailed
+                                      ? 'Delivery Issue'
+                                      : isRescheduled
+                                        ? 'Rescheduled'
+                                        : isDelivered
+                                          ? 'Delivered'
+                                          : 'Cancelled';
 
                           return (
                             <View
@@ -4206,8 +4897,22 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 </Text>
                               </View>
 
-                              {/* 4. Payment Method */}
-                              <View style={{ flex: 1.2, minWidth: 115 }}>
+                              {/* 4. Rider */}
+                              <View style={{ flex: 1.0, minWidth: 100 }}>
+                                <Text style={[styles.tableTitle, { fontSize: 12 }]} numberOfLines={1}>
+                                  {o.rider_name || '—'}
+                                </Text>
+                              </View>
+
+                              {/* 5. Delivery confirmation */}
+                              <View style={{ flex: 1.0, minWidth: 100 }}>
+                                <Text style={[styles.tableSub, { fontWeight: '700', color: deliveryLabel === 'Confirmed' ? '#059669' : '#64748B' }]}>
+                                  {deliveryLabel}
+                                </Text>
+                              </View>
+
+                              {/* 6. Payment Method */}
+                              <View style={{ flex: 1.0, minWidth: 100 }}>
                                 <View
                                   style={{
                                     backgroundColor: isCOD ? '#FEF3C7' : '#EFF6FF',
@@ -4231,7 +4936,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 </View>
                               </View>
 
-                              {/* 5. Grand Total */}
+                              {/* 7. Grand Total */}
                               <View style={{ flex: 0.9, minWidth: 95, alignItems: 'flex-end' }}>
                                 <Text
                                   style={[
@@ -4243,15 +4948,15 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 </Text>
                               </View>
 
-                              {/* 6. Status Badge */}
-                              <View style={{ flex: 1.1, minWidth: 110, alignItems: 'center' }}>
+                              {/* 8. Status Badge */}
+                              <View style={{ flex: 1.2, minWidth: 120, alignItems: 'center' }}>
                                 <View
                                   style={{
                                     backgroundColor: isPending
                                       ? '#FEF3C7'
-                                      : isProcessing
+                                      : isProcessing || isReady
                                         ? '#EFF6FF'
-                                        : isShipped
+                                        : isShipped || isRescheduled
                                           ? '#F3E8FF'
                                           : isDelivered
                                             ? '#D1FAE5'
@@ -4259,9 +4964,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     borderWidth: 1,
                                     borderColor: isPending
                                       ? '#FDE68A'
-                                      : isProcessing
+                                      : isProcessing || isReady
                                         ? '#BFDBFE'
-                                        : isShipped
+                                        : isShipped || isRescheduled
                                           ? '#E9D5FF'
                                           : isDelivered
                                             ? '#A7F3D0'
@@ -4275,9 +4980,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     style={{
                                       color: isPending
                                         ? '#92400E'
-                                        : isProcessing
+                                        : isProcessing || isReady
                                           ? '#1D4ED8'
-                                          : isShipped
+                                          : isShipped || isRescheduled
                                             ? '#7E22CE'
                                             : isDelivered
                                               ? '#065F46'
@@ -4286,12 +4991,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       fontWeight: '900',
                                     }}
                                   >
-                                    {isPending ? 'Pending' : isProcessing ? 'Processing' : isShipped ? 'Shipped' : isDelivered ? 'Delivered' : 'Cancelled'}
+                                    {statusLabel}
                                   </Text>
                                 </View>
                               </View>
 
-                              {/* 7. Fulfillment Actions */}
+                              {/* 9. Fulfillment Actions */}
                               <View
                                 style={{
                                   flex: 2.0,
@@ -4303,7 +5008,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   flexShrink: 0,
                                 }}
                               >
-                                {/* One-Click Approve COD Button */}
                                 {isPending && (
                                   <TouchableOpacity
                                     style={styles.btnApproveCod}
@@ -4315,36 +5019,141 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   </TouchableOpacity>
                                 )}
 
-                                {/* Advance from Processing to Shipped */}
-                                {isProcessing && (
+                                {(isProcessing || isRescheduled) && (
                                   <TouchableOpacity
                                     style={styles.btnAdvanceOrder}
-                                    onPress={() => handleUpdateOrderStatus(orderId, 'Shipped')}
+                                    onPress={() => setAssignDeliveryOrder(o)}
                                     activeOpacity={0.85}
                                   >
                                     <BootstrapIcon name="truck" size={11} color="#1D4ED8" />
-                                    <Text style={styles.btnAdvanceOrderText}>Ship</Text>
+                                    <Text style={styles.btnAdvanceOrderText}>Assign</Text>
                                   </TouchableOpacity>
                                 )}
 
-                                {/* Advance from Shipped to Delivered */}
-                                {isShipped && (
+                                {isReady && (
+                                  <TouchableOpacity
+                                    style={styles.btnAdvanceOrder}
+                                    onPress={async () => {
+                                      const res = await deliveryService.markOutForDelivery(orderId, currentUser);
+                                      if (res.success) {
+                                        showToast('Out for delivery — share QR with rider');
+                                        setDeliveryTokenModal({
+                                          order: o,
+                                          bundle: {
+                                            token: res.token,
+                                            confirmUrl: res.confirmUrl,
+                                            qrImageUrl: res.qrImageUrl,
+                                            expiresAt: res.expiresAt,
+                                          },
+                                        });
+                                        await loadData();
+                                      } else {
+                                        showToast(res.error || 'Failed to dispatch');
+                                      }
+                                    }}
+                                    activeOpacity={0.85}
+                                  >
+                                    <BootstrapIcon name="box-seam" size={11} color="#1D4ED8" />
+                                    <Text style={styles.btnAdvanceOrderText}>Dispatch</Text>
+                                  </TouchableOpacity>
+                                )}
+
+                                {isShipped && !isReported && (
+                                  <TouchableOpacity
+                                    style={styles.btnAdvanceOrder}
+                                    onPress={() => setDeliveryTokenModal({ order: o, bundle: null })}
+                                    activeOpacity={0.85}
+                                  >
+                                    <BootstrapIcon name="qr-code" size={11} color="#1D4ED8" />
+                                    <Text style={styles.btnAdvanceOrderText}>QR</Text>
+                                  </TouchableOpacity>
+                                )}
+
+                                {(isReady || isShipped || isReported) && (o.rider_id || o.rider_name) && (
+                                  <TouchableOpacity
+                                    style={styles.btnAdvanceOrder}
+                                    onPress={() =>
+                                      setRiderAccessModal({
+                                        rider: {
+                                          id: o.rider_id,
+                                          name: o.rider_name,
+                                          phone: o.rider_contact,
+                                        },
+                                        bundle: null,
+                                      })
+                                    }
+                                    activeOpacity={0.85}
+                                  >
+                                    <BootstrapIcon name="geo-alt" size={11} color="#1D4ED8" />
+                                    <Text style={styles.btnAdvanceOrderText}>Rider link</Text>
+                                  </TouchableOpacity>
+                                )}
+
+                                {(isReported || (o.rider_reported_delivered && !o.admin_confirmed)) && (
                                   <TouchableOpacity
                                     style={[
                                       styles.btnAdvanceOrder,
                                       { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
                                     ]}
-                                    onPress={() => handleUpdateOrderStatus(orderId, 'Delivered')}
+                                    onPress={() =>
+                                      setDeliveryAction({
+                                        mode: 'mark_delivered',
+                                        order: o,
+                                      })
+                                    }
                                     activeOpacity={0.85}
                                   >
-                                    <BootstrapIcon name="check-circle" size={11} color="#059669" />
-                                    <Text style={[styles.btnAdvanceOrderText, { color: '#059669' }]}>
-                                      Deliver
+                                    <BootstrapIcon name="check-circle-fill" size={11} color="#047857" />
+                                    <Text style={[styles.btnAdvanceOrderText, { color: '#047857' }]}>
+                                      Confirm Delivery
                                     </Text>
                                   </TouchableOpacity>
                                 )}
 
-                                {/* View Details Modal Button */}
+                                {isShipped && !isReported && (
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.btnAdvanceOrder,
+                                      { backgroundColor: '#FFFBEB', borderColor: '#FDE68A' },
+                                    ]}
+                                    onPress={() =>
+                                      setDeliveryAction({
+                                        mode: 'delivery_issue',
+                                        order: o,
+                                      })
+                                    }
+                                    activeOpacity={0.85}
+                                  >
+                                    <BootstrapIcon name="exclamation-triangle" size={11} color="#B45309" />
+                                    <Text style={[styles.btnAdvanceOrderText, { color: '#B45309' }]}>
+                                      Issue
+                                    </Text>
+                                  </TouchableOpacity>
+                                )}
+
+                                {isFailed && (
+                                  <TouchableOpacity
+                                    style={styles.btnAdvanceOrder}
+                                    onPress={async () => {
+                                      const res = await deliveryService.rescheduleDelivery(
+                                        orderId,
+                                        currentUser,
+                                        'Rescheduled by admin'
+                                      );
+                                      if (res.success) {
+                                        showToast('Delivery rescheduled — re-assign and dispatch for a new QR');
+                                        await loadData();
+                                      } else {
+                                        showToast(res.error || 'Reschedule failed');
+                                      }
+                                    }}
+                                    activeOpacity={0.85}
+                                  >
+                                    <BootstrapIcon name="arrow-repeat" size={11} color="#1D4ED8" />
+                                    <Text style={styles.btnAdvanceOrderText}>Reschedule</Text>
+                                  </TouchableOpacity>
+                                )}
+
                                 <TouchableOpacity
                                   style={styles.btnViewOrder}
                                   onPress={() => {
@@ -4357,7 +5166,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   <Text style={styles.btnViewOrderText}>Details</Text>
                                 </TouchableOpacity>
 
-                                {/* Cancel Button */}
                                 {!isDelivered && !isCancelled && (
                                   <TouchableOpacity
                                     style={styles.btnCancelOrder}
@@ -4840,9 +5648,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
             {/* ─── TAB 3: POINT OF SALE (POS) CASHIER TERMINAL ─── */}
             {activeNav === 'pos' && (
-              <View style={styles.posContainer}>
+              <View style={[styles.posContainer, isDesktop && { height: 'calc(100vh - 120px)', overflow: 'hidden' }]}>
                 {/* LEFT PANE: PRODUCT CATALOG GRID */}
-                <View style={styles.posCatalogColumn}>
+                <View style={[styles.posCatalogColumn, isDesktop && { height: '100%', display: 'flex', flexDirection: 'column' }]}>
                   <View
                     style={[
                       styles.toolbarRow,
@@ -5012,70 +5820,99 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </View>
 
                   {/* Product Cards Grid */}
-                  <View style={styles.posGrid}>
-                    {filteredPOSProducts.map((p) => {
+                  <ScrollView style={{ flex: 1, marginTop: 12 }} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+                    <View style={[styles.posGrid, { marginTop: 0 }]}>
+                      {filteredPOSProducts.map((p) => {
                       const isOutOfStock = !p.stock || p.stock <= 0;
                       return (
                         <View
                           key={p.id}
                           style={[styles.posProductCard, isOutOfStock && styles.posProductCardDisabled]}
                         >
-                          <Image source={{ uri: p.image }} style={styles.posProductImg} />
-                          <Text style={styles.posProductBrand}>{p.brand}</Text>
-                          <Text style={styles.posProductName} numberOfLines={2}>
-                            {p.name}
-                          </Text>
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                            }}
-                          >
-                            <Text style={styles.posProductPrice}>₱{p.price?.toLocaleString()}</Text>
-                            <Text
+                          <View style={styles.posProductImgContainer}>
+                            <Image
+                              source={{ uri: p.image }}
+                              style={styles.posProductImg}
+                              resizeMode="cover"
+                            />
+                          </View>
+                          <View style={styles.posProductBody}>
+                            <Text style={styles.posProductBrand}>{p.brand}</Text>
+                            <Text style={styles.posProductName} numberOfLines={2}>
+                              {p.name}
+                            </Text>
+                            <View
                               style={{
-                                fontSize: 11,
-                                fontWeight: '700',
-                                color: isOutOfStock ? '#EF4444' : '#10B981',
+                                flexDirection: 'row',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
                               }}
                             >
-                              {isOutOfStock ? '0 Left' : `${p.stock} In Stock`}
-                            </Text>
+                              <Text style={styles.posProductPrice}>₱{p.price?.toLocaleString()}</Text>
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: '700',
+                                  color: isOutOfStock ? '#EF4444' : '#10B981',
+                                }}
+                              >
+                                {isOutOfStock ? '0 Left' : `${p.stock} In Stock`}
+                              </Text>
+                            </View>
+                            <TouchableOpacity
+                              style={[styles.posAddBtn, isOutOfStock && { opacity: 0.5 }]}
+                              onPress={() => handlePOSAddToCart(p)}
+                              disabled={isOutOfStock}
+                            >
+                              <BootstrapIcon name="plus-lg" size={12} color="#FFFFFF" />
+                              <Text style={styles.posAddBtnText}>Add to Cart</Text>
+                            </TouchableOpacity>
                           </View>
-                          <TouchableOpacity
-                            style={[styles.posAddBtn, isOutOfStock && { opacity: 0.5 }]}
-                            onPress={() => handlePOSAddToCart(p)}
-                            disabled={isOutOfStock}
-                          >
-                            <BootstrapIcon name="plus-lg" size={12} color="#0C6258" />
-                            <Text style={styles.posAddBtnText}>Add to Cart</Text>
-                          </TouchableOpacity>
                         </View>
                       );
                     })}
-                  </View>
+                    </View>
+                  </ScrollView>
                 </View>
 
                 {/* RIGHT PANE: POS REGISTER CART & CHECKOUT */}
-                <View style={styles.posRegisterColumn}>
-                  <View style={styles.posRegisterCard}>
+                <View style={[styles.posRegisterColumn, isDesktop && { height: '100%', display: 'flex', flexDirection: 'column' }]}>
+                  <View style={[styles.posRegisterCard, isDesktop && { height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }]}>
                     <View style={styles.posRegisterHeader}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <BootstrapIcon name="cart3" size={18} color="#0C6258" />
                         <Text style={styles.posRegisterTitle}>POS Cashier Register</Text>
                       </View>
-                      <View
-                        style={{
-                          backgroundColor: '#FEF3C7',
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 8,
-                        }}
-                      >
-                        <Text style={{ color: '#0C6258', fontSize: 11, fontWeight: '800' }}>
-                          {posCart.length} Item(s)
-                        </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {posCart.length > 0 && (
+                          <TouchableOpacity
+                            onPress={() => setPosCart([])}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              paddingHorizontal: 8,
+                              paddingVertical: 4,
+                              borderRadius: 8,
+                              backgroundColor: isDarkMode ? '#334155' : '#FEE2E2',
+                            }}
+                          >
+                            <BootstrapIcon name="trash" size={11} color="#EF4444" />
+                            <Text style={{ color: '#EF4444', fontSize: 11, fontWeight: '700' }}>Clear</Text>
+                          </TouchableOpacity>
+                        )}
+                        <View
+                          style={{
+                            backgroundColor: '#E6F4F1',
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Text style={{ color: '#0C6258', fontSize: 11, fontWeight: '800' }}>
+                            {posCart.reduce((acc, item) => acc + item.quantity, 0)} Item(s)
+                          </Text>
+                        </View>
                       </View>
                     </View>
 
@@ -5088,7 +5925,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       >
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                           <BootstrapIcon name="person-circle" size={16} color="#0C6258" />
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
                             {posSelectedCustomer.name}
                           </Text>
                         </View>
@@ -5106,7 +5943,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             marginTop: 8,
                             paddingTop: 8,
                             borderTopWidth: 1,
-                            borderTopColor: '#E2E8F0',
+                            borderTopColor: isDarkMode ? '#334155' : '#E2E8F0',
                             maxHeight: 150,
                           }}
                         >
@@ -5139,7 +5976,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   setPosCustomerDropdownOpen(false);
                                 }}
                               >
-                                <Text style={{ fontSize: 12.5, color: '#334155', fontWeight: '600' }}>
+                                <Text style={{ fontSize: 12.5, color: isDarkMode ? '#CBD5E1' : '#334155', fontWeight: '600' }}>
                                   {u.name} ({u.email})
                                 </Text>
                               </TouchableOpacity>
@@ -5151,43 +5988,87 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
                     {/* Cart Items List */}
                     {posCart.length === 0 ? (
-                      <View style={{ paddingVertical: 32, alignItems: 'center' }}>
-                        <View style={{ marginBottom: 8 }}><BootstrapIcon name="cart-x" size={36} color="#94A3B8" /></View>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748B' }}>
+                      <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+                        <View style={{ marginBottom: 8 }}>
+                          <BootstrapIcon name="cart3" size={32} color="#94A3B8" />
+                        </View>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B' }}>
                           Cart is currently empty
                         </Text>
-                        <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>
+                        <Text style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 2 }}>
                           Click any product part on the left to begin sale
                         </Text>
                       </View>
                     ) : (
-                      <ScrollView style={styles.posCartItemsList}>
+                      <ScrollView
+                        style={[styles.posCartItemsList, { flexShrink: 0, minHeight: 140, maxHeight: 260 }]}
+                        contentContainerStyle={{ paddingRight: 4 }}
+                        showsVerticalScrollIndicator={true}
+                      >
                         {posCart.map((item) => (
                           <View key={item.id} style={styles.posCartItemRow}>
-                            <View style={{ flex: 1 }}>
+                            {/* Product Thumbnail */}
+                            <View
+                              style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 8,
+                                backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
+                                overflow: 'hidden',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                marginRight: 10,
+                                flexShrink: 0,
+                              }}
+                            >
+                              {item.image ? (
+                                <Image
+                                  source={{ uri: item.image }}
+                                  style={{ width: '100%', height: '100%' }}
+                                  resizeMode="contain"
+                                />
+                              ) : (
+                                <BootstrapIcon name="box-seam" size={16} color="#94A3B8" />
+                              )}
+                            </View>
+
+                            <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
                               <Text style={styles.posCartItemName} numberOfLines={1}>
                                 {item.name}
                               </Text>
                               <Text style={styles.posCartItemPrice}>
-                                ₱{item.price?.toLocaleString()} x {item.quantity} = ₱
-                                {(item.price * item.quantity).toLocaleString()}
+                                ₱{item.price?.toLocaleString()} each
                               </Text>
                             </View>
+
                             <View style={styles.posQtyBox}>
                               <TouchableOpacity
                                 style={styles.posQtyBtn}
                                 onPress={() => handlePOSUpdateQty(item.id, -1)}
                               >
-                                <Text style={{ fontWeight: '800', color: '#475569' }}>-</Text>
+                                <Text style={{ fontWeight: '800', color: isDarkMode ? '#CBD5E1' : '#475569', fontSize: 13 }}>-</Text>
                               </TouchableOpacity>
                               <Text style={styles.posQtyText}>{item.quantity}</Text>
                               <TouchableOpacity
                                 style={styles.posQtyBtn}
                                 onPress={() => handlePOSUpdateQty(item.id, 1)}
                               >
-                                <Text style={{ fontWeight: '800', color: '#475569' }}>+</Text>
+                                <Text style={{ fontWeight: '800', color: isDarkMode ? '#CBD5E1' : '#475569', fontSize: 13 }}>+</Text>
                               </TouchableOpacity>
                             </View>
+
+                            <View style={{ minWidth: 62, alignItems: 'flex-end', marginLeft: 8 }}>
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#0C6258' }}>
+                                ₱{(item.price * item.quantity).toLocaleString()}
+                              </Text>
+                            </View>
+
+                            <TouchableOpacity
+                              style={{ padding: 6, marginLeft: 4 }}
+                              onPress={() => handlePOSUpdateQty(item.id, -item.quantity)}
+                            >
+                              <BootstrapIcon name="trash3" size={13} color="#EF4444" />
+                            </TouchableOpacity>
                           </View>
                         ))}
                       </ScrollView>
@@ -5243,7 +6124,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     {/* Payment Method Selector */}
                     <Text style={[styles.posCustomerLabel, { marginTop: 14 }]}>Payment Method</Text>
                     <View style={styles.posPayMethodRow}>
-                      {['Cash', 'Card', 'GCash', 'Bank'].map((method) => (
+                      {['Cash', 'GCash'].map((method) => (
                         <TouchableOpacity
                           key={method}
                           style={[
@@ -5341,25 +6222,25 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <View>
                 {/* Key Telemetry Metrics */}
                 <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
+                  <View style={[styles.statCard, styles.statCardTealAccent]} className="border border-teal-600">
                     <Text style={styles.statLabel}>Gross Sales Volume</Text>
                     <Text style={styles.statValue}>₱{analyticsData.totalRevenue.toLocaleString()}</Text>
                     <Text style={styles.statSub}>Combined online & in-store</Text>
                   </View>
 
-                  <View style={[styles.statCard, styles.statCardSuccessAccent]}>
+                  <View style={[styles.statCard, styles.statCardSuccessAccent]} className="border border-blue-500">
                     <Text style={styles.statLabel}>Average Order Value (AOV)</Text>
                     <Text style={styles.statValue}>₱{Math.round(analyticsData.aov).toLocaleString()}</Text>
                     <Text style={styles.statSub}>Per transaction average</Text>
                   </View>
 
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
+                  <View style={[styles.statCard, styles.statCardTealAccent]} className="border border-teal-600">
                     <Text style={styles.statLabel}>Total Units Sold</Text>
                     <Text style={styles.statValue}>{analyticsData.totalItemsSold} Items</Text>
                     <Text style={styles.statSub}>Across {analyticsData.totalOrders} total orders</Text>
                   </View>
 
-                  <View style={[styles.statCard, styles.statCardWarningAccent]}>
+                  <View style={[styles.statCard, styles.statCardWarningAccent]} className="border border-amber-500">
                     <Text style={styles.statLabel}>POS In-Store Sales Share</Text>
                     <Text style={[styles.statValue, { color: '#0C6258' }]}>
                       {analyticsData.totalRevenue > 0
@@ -5373,57 +6254,106 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </View>
                 </View>
 
-                {/* Revenue Trend Visual Bar Chart */}
-                <View style={styles.analyticsCard}>
+                {/* Revenue Trend Area Chart */}
+                <View style={[styles.analyticsCard, { backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', borderColor: isDarkMode ? '#334155' : '#E2E8F0' }]}>
                   <View style={styles.analyticsCardHeader}>
                     <View>
-                      <Text style={styles.analyticsCardTitle}>Revenue Trends Telemetry</Text>
-                      <Text style={styles.analyticsCardSubtitle}>Real-time sales velocity breakdown</Text>
+                      <Text style={[styles.analyticsCardTitle, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>Revenue trend</Text>
+                      <Text style={[styles.analyticsCardSubtitle, { color: isDarkMode ? '#94A3B8' : '#64748B' }]}>Revenue for products sales in category</Text>
                     </View>
-                    <View style={styles.analyticsPeriodTabs}>
-                      {['today', 'week', 'month', 'all'].map((p) => (
+                    <View style={[styles.analyticsPeriodTabs, { backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', borderColor: isDarkMode ? '#334155' : '#E2E8F0' }]}>
+                      {['4W', '12W', '24W'].map((p) => (
                         <TouchableOpacity
                           key={p}
                           style={[
                             styles.analyticsPeriodTab,
-                            analyticsPeriod === p && styles.analyticsPeriodTabActive,
+                            analyticsPeriod === p && [styles.analyticsPeriodTabActive, { backgroundColor: '#0C6258' }],
                           ]}
                           onPress={() => setAnalyticsPeriod(p)}
                         >
                           <Text
                             style={[
                               styles.analyticsPeriodTabText,
-                              analyticsPeriod === p && styles.analyticsPeriodTabTextActive,
+                              { color: analyticsPeriod === p ? '#FFFFFF' : (isDarkMode ? '#94A3B8' : '#64748B') },
                             ]}
                           >
-                            {p.toUpperCase()}
+                            {p}
                           </Text>
                         </TouchableOpacity>
                       ))}
                     </View>
                   </View>
 
-                  {/* Pure Styled Custom Chart Container */}
-                  <View style={styles.chartBarContainer}>
-                    {analyticsData.trendBars.map((bar, idx) => {
-                      const heightPercent = Math.max(
-                        12,
-                        Math.min(100, (bar.revenue / analyticsData.maxBarRevenue) * 100)
-                      );
-                      return (
-                        <View key={idx} style={styles.chartBarCol}>
-                          <Text style={styles.chartBarVal}>₱{Math.round(bar.revenue / 1000)}k</Text>
-                          <View
-                            style={[
-                              styles.chartBarPill,
-                              idx % 2 === 1 && styles.chartBarPillAlt,
-                              { height: `${heightPercent}%` },
-                            ]}
-                          />
-                          <Text style={styles.chartBarLabel}>{bar.label}</Text>
-                        </View>
-                      );
-                    })}
+                  {/* SVG Area Chart matching dark theme */}
+                  <View style={{ width: '100%', marginTop: 20, paddingTop: 10 }}>
+                    <div style={{ width: '100%', overflowX: 'auto' }}>
+                      <svg width="100%" height={240} viewBox="0 0 800 240" preserveAspectRatio="none" style={{ minWidth: 600 }}>
+                        <defs>
+                          <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#0C6258" stopOpacity={0.6} />
+                            <stop offset="100%" stopColor="#0C6258" stopOpacity={0.0} />
+                          </linearGradient>
+                        </defs>
+                        {(() => {
+                          const svgWidth = 800;
+                          const svgHeight = 240;
+                          const pad = { top: 10, right: 20, bottom: 30, left: 50 };
+                          const gW = svgWidth - pad.left - pad.right;
+                          const gH = svgHeight - pad.top - pad.bottom;
+                          const dataLen = analyticsData.trendBars.length || 1;
+                          const maxRev = (analyticsData.maxBarRevenue || 1000) * 1.1;
+
+                          const points = analyticsData.trendBars.map((d, i) => {
+                            const x = pad.left + (i / Math.max(1, dataLen - 1)) * gW;
+                            const y = pad.top + gH - (d.revenue / maxRev) * gH;
+                            return { x, y };
+                          });
+
+                          let linePath = '';
+                          if (points.length > 0) {
+                            linePath = `M ${points[0].x},${points[0].y}`;
+                            for (let i = 0; i < points.length - 1; i++) {
+                              const p0 = points[i === 0 ? 0 : i - 1];
+                              const p1 = points[i];
+                              const p2 = points[i + 1];
+                              const p3 = points[i + 2 >= points.length ? points.length - 1 : i + 2];
+                              
+                              const cp1x = p1.x + (p2.x - p0.x) / 6;
+                              const cp1y = p1.y + (p2.y - p0.y) / 6;
+                              const cp2x = p2.x - (p3.x - p1.x) / 6;
+                              const cp2y = p2.y - (p3.y - p1.y) / 6;
+                              
+                              linePath += ` C ${cp1x},${cp1y} ${cp2x},${cp2y} ${p2.x},${p2.y}`;
+                            }
+                          }
+                          const areaPath = points.length > 0 ? `${linePath} L ${points[points.length - 1].x},${pad.top + gH} L ${points[0].x},${pad.top + gH} Z` : '';
+
+                          return (
+                            <>
+                              {[0, 0.2, 0.4, 0.6, 0.8, 1].map((ratio, i) => {
+                                const y = pad.top + gH * ratio;
+                                const val = Math.round(maxRev * (1 - ratio));
+                                return (
+                                  <g key={i}>
+                                    <text x={pad.left - 10} y={y + 4} fill={isDarkMode ? "#64748B" : "#94A3B8"} fontSize="11" textAnchor="end" fontFamily="sans-serif">
+                                      {val.toLocaleString()}
+                                    </text>
+                                    <line x1={pad.left} y1={y} x2={svgWidth - pad.right} y2={y} stroke={isDarkMode ? "#334155" : "#E2E8F0"} strokeWidth="1" strokeDasharray={ratio < 1 ? "4 4" : ""} />
+                                  </g>
+                                );
+                              })}
+                              {points.length > 0 && <path d={areaPath} fill="url(#areaGradient)" />}
+                              {points.length > 0 && <path d={linePath} fill="none" stroke="#0C6258" strokeWidth="3" />}
+                              {points.map((p, i) => (
+                                <text key={i} x={p.x} y={svgHeight - 5} fill={isDarkMode ? "#64748B" : "#94A3B8"} fontSize="11" textAnchor="middle" fontFamily="sans-serif">
+                                  {analyticsData.trendBars[i].label}
+                                </text>
+                              ))}
+                            </>
+                          );
+                        })()}
+                      </svg>
+                    </div>
                   </View>
                 </View>
 
@@ -5522,34 +6452,94 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     </View>
                   </View>
 
-                  {/* Top 5 Products Leaderboard */}
-                  <View style={[styles.analyticsCard, { flex: 1, minWidth: 320 }]}>
-                    <Text style={styles.analyticsCardTitle}>Top Performing Parts</Text>
-                    <Text style={styles.analyticsCardSubtitle}>Ranked by cumulative revenue</Text>
-
-                    <View style={{ marginTop: 12 }}>
-                      {analyticsData.topProducts.map((tp, idx) => (
-                        <View key={idx} style={styles.leaderboardRow}>
-                          <View style={styles.leaderboardRank}>
-                            <Text style={styles.leaderboardRankText}>#{idx + 1}</Text>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text
-                              style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}
-                              numberOfLines={1}
-                            >
-                              {tp.name}
-                            </Text>
-                            <Text style={{ fontSize: 11, color: '#64748B' }}>
-                              {tp.brand} • {tp.unitsSold} units sold
-                            </Text>
-                          </View>
-                          <Text style={{ fontSize: 13.5, fontWeight: '900', color: '#0C6258' }}>
-                            ₱{tp.revenue.toLocaleString()}
-                          </Text>
-                        </View>
-                      ))}
+                  {/* Top Earners Products Leaderboard */}
+                  <View style={[styles.analyticsCard, { flex: 1, minWidth: 320, backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF', borderColor: isDarkMode ? '#334155' : '#E2E8F0' }]}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <View>
+                        <Text style={[styles.analyticsCardTitle, { color: isDarkMode ? '#F8FAFC' : '#0F172A' }]}>Top earners</Text>
+                        <Text style={[styles.analyticsCardSubtitle, { color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 4 }]}>By lifetime revenue</Text>
+                      </View>
+                      <TouchableOpacity style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: isDarkMode ? '#334155' : '#F1F5F9', borderRadius: 8 }}>
+                        <Text style={{ color: isDarkMode ? '#F8FAFC' : '#64748B', fontSize: 12, fontWeight: '600' }}>View products</Text>
+                      </TouchableOpacity>
                     </View>
+
+                    <View style={{ marginTop: 20 }}>
+                      {analyticsData.topProducts.map((tp, idx) => {
+                        const maxRev = analyticsData.topProducts[0]?.revenue || 1;
+                        const barWidth = Math.max(5, (tp.revenue / maxRev) * 100);
+                        
+                        return (
+                          <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                            <View style={{ width: 50, height: 40, backgroundColor: isDarkMode ? '#334155' : '#F1F5F9', borderRadius: 8, overflow: 'hidden', marginRight: 12 }}>
+                              {tp.image_url ? (
+                                <Image source={{ uri: tp.image_url }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+                              ) : (
+                                <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+                                  <BootstrapIcon name="box-seam" size={16} color={isDarkMode ? "#94A3B8" : "#CBD5E1"} />
+                                </View>
+                              )}
+                            </View>
+                            
+                            <View style={{ flex: 1, justifyContent: 'center' }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                                <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#0F172A' }} numberOfLines={1}>
+                                  {tp.name}
+                                </Text>
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#94A3B8' : '#64748B' }}>
+                                  ₱{tp.revenue.toLocaleString()}
+                                </Text>
+                              </View>
+                              
+                              <View style={{ height: 6, backgroundColor: isDarkMode ? '#334155' : '#E2E8F0', borderRadius: 3, width: '100%', overflow: 'hidden' }}>
+                                <View style={{ height: '100%', width: `${barWidth}%`, backgroundColor: '#0C6258', borderRadius: 3 }} />
+                              </View>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </View>
+                </View>
+
+                {/* Category Revenue & Regression Analysis */}
+                <View style={[styles.analyticsCard, { marginTop: 20 }]}>
+                  <Text style={styles.analyticsCardTitle}>Category Revenue & Linear Regression Analysis</Text>
+                  <Text style={styles.analyticsCardSubtitle}>Data-driven trend prediction using least squares method</Text>
+                  
+                  <View style={{ marginTop: 16 }}>
+                    {analyticsData.categoryRegression && analyticsData.categoryRegression.length > 0 ? (
+                      analyticsData.categoryRegression.map((catReg, idx) => (
+                        <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}>
+                          <View style={{ flex: 1.5 }}>
+                            <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>{catReg.category}</Text>
+                            <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                              Historical: ₱{catReg.totalRevenue.toLocaleString()}
+                            </Text>
+                          </View>
+                          
+                          <View style={{ flex: 1, alignItems: 'center' }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: catReg.slope > 0 ? '#10B981' : (catReg.slope < 0 ? '#EF4444' : '#64748B') }}>
+                              {catReg.slope > 0 ? '📈 Trending Up' : (catReg.slope < 0 ? '📉 Trending Down' : '➖ Flat')}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
+                              Slope: {catReg.slope > 0 ? '+' : ''}{catReg.slope.toFixed(2)}
+                            </Text>
+                          </View>
+                          
+                          <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: 11, color: '#64748B', textTransform: 'uppercase', fontWeight: '800' }}>Next Period Prediction</Text>
+                            <Text style={{ fontSize: 15, fontWeight: '900', color: '#0C6258', marginTop: 2 }}>
+                              ₱{Math.round(catReg.prediction).toLocaleString()}
+                            </Text>
+                          </View>
+                        </View>
+                      ))
+                    ) : (
+                      <Text style={{ color: '#64748B', fontStyle: 'italic', textAlign: 'center', paddingVertical: 20 }}>
+                        Not enough data for regression analysis.
+                      </Text>
+                    )}
                   </View>
                 </View>
               </View>
@@ -6051,13 +7041,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             count: garageServices.length,
                             desc: 'Maintenance packages & service tiers',
                           },
-                          {
-                            id: 'mechanics',
-                            label: 'Certified Mechanics & Pit Bays',
-                            icon: 'people-fill',
-                            count: garageMechanics.length,
-                            desc: 'Mechanic roster, bay status & certs',
-                          },
                         ];
                         const activeObj = garageTabs.find((t) => t.id === garageSubTab) || garageTabs[0];
                         return (
@@ -6186,13 +7169,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             icon: 'tools',
                             count: garageServices.length,
                             desc: 'Maintenance packages & service tiers',
-                          },
-                          {
-                            id: 'mechanics',
-                            label: 'Certified Mechanics & Pit Bays',
-                            icon: 'people-fill',
-                            count: garageMechanics.length,
-                            desc: 'Mechanic roster, bay status & certs',
                           },
                         ].map((tab) => {
                           const isSelected = garageSubTab === tab.id;
@@ -6408,85 +7384,249 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       </TouchableOpacity>
                     </View>
 
-                    {/* Filter Pills */}
-                    <View style={[styles.orderFilterBar, { marginBottom: 14 }]}>
-                      {[
-                        { key: 'All', label: 'All', count: bookingStats.total, icon: 'grid-fill' },
-                        {
-                          key: 'Pending',
-                          label: 'Pending Review',
-                          count: bookingStats.pending,
-                          icon: 'hourglass-split',
-                          highlight: bookingStats.pending > 0,
-                        },
-                        {
-                          key: 'Confirmed',
-                          label: 'Confirmed',
-                          count: bookingStats.confirmed,
-                          icon: 'clock-fill',
-                        },
-                        {
-                          key: 'Inspection',
-                          label: 'Inspection',
-                          count: bookingStats.inspection,
-                          icon: 'search',
-                        },
-                        {
-                          key: 'In Progress',
-                          label: 'In Bay',
-                          count: bookingStats.inProgress,
-                          icon: 'gear-wide-connected',
-                          highlight: bookingStats.inProgress > 0,
-                        },
-                        {
-                          key: 'Service Done',
-                          label: 'Done / Bill',
-                          count: bookingStats.serviceDone,
-                          icon: 'receipt',
-                        },
-                        {
-                          key: 'Completed',
-                          label: 'Completed',
-                          count: bookingStats.completed,
-                          icon: 'check-circle-fill',
-                        },
-                        {
-                          key: 'Cancelled',
-                          label: 'Cancelled',
-                          count: bookingStats.cancelled,
-                          icon: 'x-circle-fill',
-                        },
-                      ].map((tab) => {
-                        const isActive = bookingStatusFilter === tab.key;
-                        return (
-                          <TouchableOpacity
-                            key={tab.key}
-                            style={[
-                              styles.orderFilterTab,
-                              { flexDirection: 'row', alignItems: 'center', gap: 5 },
-                              isActive && styles.orderFilterTabActive,
-                              tab.highlight &&
-                                !isActive && { borderColor: '#F59E0B', backgroundColor: '#FEF3C7' },
-                            ]}
-                            onPress={() => setBookingStatusFilter(tab.key)}
-                          >
-                            <BootstrapIcon
-                              name={tab.icon}
-                              size={12}
-                              color={isActive ? '#FFFFFF' : tab.highlight ? '#B45309' : '#64748B'}
-                            />
-                            <Text
-                              style={[
-                                styles.orderFilterTabText,
-                                isActive && styles.orderFilterTabTextActive,
-                                tab.highlight && !isActive && { color: '#B45309', fontWeight: '900' },
-                              ]}
-                            >
-                              {tab.label} ({tab.count})
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
+                    {/* Filter Dropdown & Category Bar */}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        gap: 12,
+                        marginBottom: 14,
+                        flexWrap: 'wrap',
+                        position: 'relative',
+                        zIndex: isBookingStatusDropdownOpen ? 99999 : 10,
+                      }}
+                    >
+                      {/* Booking Status Filter Dropdown */}
+                      <View
+                        style={{
+                          position: 'relative',
+                          zIndex: isBookingStatusDropdownOpen ? 99999 : 10,
+                        }}
+                      >
+                        {(() => {
+                          const bookingStatusOptions = [
+                            { key: 'All', label: 'All Bookings', count: bookingStats.total, icon: 'grid-fill', color: '#0C6258' },
+                            { key: 'Pending', label: 'Pending Review', count: bookingStats.pending, icon: 'hourglass-split', color: '#D97706', highlight: bookingStats.pending > 0 },
+                            { key: 'Confirmed', label: 'Confirmed', count: bookingStats.confirmed, icon: 'clock-fill', color: '#0284C7' },
+                            { key: 'Inspection', label: 'Inspection', count: bookingStats.inspection, icon: 'search', color: '#8B5CF6' },
+                            { key: 'In Progress', label: 'In Bay', count: bookingStats.inProgress, icon: 'gear-wide-connected', color: '#F59E0B', highlight: bookingStats.inProgress > 0 },
+                            { key: 'Service Done', label: 'Done / Bill', count: bookingStats.serviceDone, icon: 'receipt', color: '#10B981' },
+                            { key: 'Completed', label: 'Completed', count: bookingStats.completed, icon: 'check-circle-fill', color: '#16A34A' },
+                            { key: 'Cancelled', label: 'Cancelled', count: bookingStats.cancelled, icon: 'x-circle-fill', color: '#DC2626' },
+                          ];
+                          const activeOpt = bookingStatusOptions.find((o) => o.key === bookingStatusFilter) || bookingStatusOptions[0];
+
+                          return (
+                            <>
+                              <TouchableOpacity
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  gap: 8,
+                                  backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                                  borderWidth: 1.5,
+                                  borderColor: isBookingStatusDropdownOpen
+                                    ? '#0C6258'
+                                    : activeOpt.highlight
+                                      ? '#F59E0B'
+                                      : bookingStatusFilter !== 'All'
+                                        ? '#0C6258'
+                                        : isDarkMode ? '#334155' : '#E2E8F0',
+                                  borderRadius: 12,
+                                  paddingHorizontal: 14,
+                                  paddingVertical: 9,
+                                  minWidth: 180,
+                                  cursor: 'pointer',
+                                  boxShadow: isBookingStatusDropdownOpen
+                                    ? '0 6px 20px -2px rgba(12, 98, 88, 0.2)'
+                                    : '0 1px 3px rgba(0, 0, 0, 0.04)',
+                                }}
+                                onPress={() => setIsBookingStatusDropdownOpen((prev) => !prev)}
+                                activeOpacity={0.85}
+                              >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                                  <BootstrapIcon
+                                    name={activeOpt.icon}
+                                    size={13}
+                                    color={
+                                      activeOpt.highlight
+                                        ? '#D97706'
+                                        : bookingStatusFilter !== 'All'
+                                          ? activeOpt.color
+                                          : '#64748B'
+                                    }
+                                  />
+                                  <Text
+                                    style={{
+                                      fontSize: 13,
+                                      fontWeight: '700',
+                                      color:
+                                        activeOpt.highlight
+                                          ? '#B45309'
+                                          : bookingStatusFilter !== 'All'
+                                            ? '#0C6258'
+                                            : isDarkMode ? '#F8FAFC' : '#0F172A',
+                                    }}
+                                  >
+                                    {activeOpt.label}
+                                  </Text>
+                                  <View
+                                    style={{
+                                      backgroundColor:
+                                        activeOpt.highlight
+                                          ? '#FEF3C7'
+                                          : bookingStatusFilter !== 'All'
+                                            ? '#0C6258'
+                                            : isDarkMode ? '#334155' : '#E2E8F0',
+                                      paddingHorizontal: 6,
+                                      paddingVertical: 1,
+                                      borderRadius: 8,
+                                      marginLeft: 2,
+                                    }}
+                                  >
+                                    <Text
+                                      style={{
+                                        fontSize: 11,
+                                        fontWeight: '800',
+                                        color:
+                                          activeOpt.highlight
+                                            ? '#B45309'
+                                            : bookingStatusFilter !== 'All'
+                                              ? '#FFFFFF'
+                                              : isDarkMode ? '#CBD5E1' : '#475569',
+                                      }}
+                                    >
+                                      {activeOpt.count}
+                                    </Text>
+                                  </View>
+                                </View>
+                                <BootstrapIcon
+                                  name={isBookingStatusDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                                  size={12}
+                                  color={isBookingStatusDropdownOpen ? '#0C6258' : '#64748B'}
+                                />
+                              </TouchableOpacity>
+
+                              {/* Transparent backdrop for outside click */}
+                              {isBookingStatusDropdownOpen && (
+                                <TouchableOpacity
+                                  style={{
+                                    position: 'fixed',
+                                    top: 0,
+                                    left: 0,
+                                    right: 0,
+                                    bottom: 0,
+                                    zIndex: 99998,
+                                    backgroundColor: 'transparent',
+                                    cursor: 'default',
+                                  }}
+                                  onPress={() => setIsBookingStatusDropdownOpen(false)}
+                                  activeOpacity={1}
+                                />
+                              )}
+
+                              {/* Floating Dropdown Menu */}
+                              {isBookingStatusDropdownOpen && (
+                                <View
+                                  style={{
+                                    position: 'absolute',
+                                    top: '100%',
+                                    left: 0,
+                                    marginTop: 6,
+                                    minWidth: 230,
+                                    backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                                    borderRadius: 14,
+                                    borderWidth: 1.5,
+                                    borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                                    boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
+                                    zIndex: 99999,
+                                    padding: 6,
+                                    gap: 3,
+                                    maxHeight: 320,
+                                    overflowY: 'auto',
+                                  }}
+                                >
+                                  {bookingStatusOptions.map((option) => {
+                                    const isSelected = bookingStatusFilter === option.key;
+                                    return (
+                                      <TouchableOpacity
+                                        key={option.key}
+                                        style={{
+                                          flexDirection: 'row',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          paddingHorizontal: 12,
+                                          paddingVertical: 9,
+                                          borderRadius: 9,
+                                          backgroundColor: isSelected
+                                            ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                            : 'transparent',
+                                          cursor: 'pointer',
+                                        }}
+                                        onPress={() => {
+                                          setBookingStatusFilter(option.key);
+                                          setIsBookingStatusDropdownOpen(false);
+                                        }}
+                                        activeOpacity={0.8}
+                                      >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                          <BootstrapIcon
+                                            name={option.icon}
+                                            size={14}
+                                            color={isSelected ? '#0C6258' : option.color || '#64748B'}
+                                          />
+                                          <Text
+                                            style={{
+                                              fontSize: 13,
+                                              fontWeight: isSelected ? '800' : '600',
+                                              color: isSelected
+                                                ? '#0C6258'
+                                                : isDarkMode ? '#E2E8F0' : '#334155',
+                                            }}
+                                          >
+                                            {option.label}
+                                          </Text>
+                                        </View>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                          <View
+                                            style={{
+                                              backgroundColor: option.highlight
+                                                ? '#FEF3C7'
+                                                : isSelected
+                                                  ? '#0C6258'
+                                                  : isDarkMode ? '#334155' : '#E2E8F0',
+                                              paddingHorizontal: 6,
+                                              paddingVertical: 1,
+                                              borderRadius: 6,
+                                            }}
+                                          >
+                                            <Text
+                                              style={{
+                                                fontSize: 10.5,
+                                                fontWeight: '800',
+                                                color: option.highlight
+                                                  ? '#B45309'
+                                                  : isSelected
+                                                    ? '#FFFFFF'
+                                                    : isDarkMode ? '#CBD5E1' : '#475569',
+                                              }}
+                                            >
+                                              {option.count}
+                                            </Text>
+                                          </View>
+                                          {isSelected && <BootstrapIcon name="check2" size={14} color="#0C6258" />}
+                                        </View>
+                                      </TouchableOpacity>
+                                    );
+                                  })}
+                                </View>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </View>
 
                       {/* Category Filter Pills */}
                       <View style={{ flexDirection: 'row', gap: 6, marginLeft: 'auto' }}>
@@ -6496,8 +7636,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             style={[
                               styles.orderFilterTab,
                               bookingCategoryFilter === cat && {
-                                backgroundColor: '#334155',
-                                borderColor: '#334155',
+                                backgroundColor: '#0C6258',
+                                borderColor: '#0C6258',
                               },
                             ]}
                             onPress={() => setBookingCategoryFilter(cat)}
@@ -6505,7 +7645,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             <Text
                               style={[
                                 styles.orderFilterTabText,
-                                bookingCategoryFilter === cat && { color: '#FFFFFF' },
+                                bookingCategoryFilter === cat && { color: '#FFFFFF', fontWeight: '800' },
                               ]}
                             >
                               {cat === 'All' ? 'All Types' : cat}
@@ -7038,720 +8178,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     </View>
                   </View>
                 )}
-
-                {/* ── SUB-VIEW C: CERTIFIED MECHANICS & TECHNICIANS ── */}
-                {garageSubTab === 'mechanics' && (
-                  <View>
-                    {/* Technician Stats Cards */}
-                    <View style={styles.statsGrid}>
-                      <View style={[styles.statCard, styles.statCardTealAccent]}>
-                        <View style={styles.statIconWrap}>
-                          <BootstrapIcon name="people-fill" size={18} color="#0C6258" />
-                        </View>
-                        <Text style={styles.statLabel}>Total Mechanics</Text>
-                        <Text style={styles.statValue}>{mechanicsStats.total}</Text>
-                        <Text style={styles.statSub}>Certified Pit Bay Crew</Text>
-                      </View>
-
-                      <View
-                        style={[
-                          styles.statCard,
-                          {
-                            borderLeftColor: '#10B981',
-                            borderLeftWidth: 4,
-                            backgroundColor: isDarkMode ? undefined : '#F0FDF4',
-                          },
-                        ]}
-                      >
-                        <View style={[styles.statIconWrap, { backgroundColor: '#DCFCE7' }]}>
-                          <BootstrapIcon name="check-circle-fill" size={18} color="#16A34A" />
-                        </View>
-                        <Text style={styles.statLabel}>On-Duty & Available</Text>
-                        <Text style={[styles.statValue, { color: '#16A34A' }]}>
-                          {mechanicsStats.available}
-                        </Text>
-                        <Text style={styles.statSub}>Ready for Bay Assignment</Text>
-                      </View>
-
-                      <View
-                        style={[
-                          styles.statCard,
-                          {
-                            borderLeftColor: mechanicsStats.busy > 0 ? '#F59E0B' : '#94A3B8',
-                            borderLeftWidth: 4,
-                            backgroundColor:
-                              mechanicsStats.busy > 0 && !isDarkMode ? '#FFFBEB' : undefined,
-                          },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.statIconWrap,
-                            {
-                              backgroundColor: mechanicsStats.busy > 0 ? '#FEF3C7' : '#F1F5F9',
-                            },
-                          ]}
-                        >
-                          <BootstrapIcon
-                            name="tools"
-                            size={18}
-                            color={mechanicsStats.busy > 0 ? '#D97706' : '#64748B'}
-                          />
-                        </View>
-                        <Text style={styles.statLabel}>In Pit Bay (Servicing)</Text>
-                        <Text
-                          style={[
-                            styles.statValue,
-                            { color: mechanicsStats.busy > 0 ? '#D97706' : '#64748B' },
-                          ]}
-                        >
-                          {mechanicsStats.busy}
-                        </Text>
-                        <Text style={styles.statSub}>Active Work Orders</Text>
-                      </View>
-
-                      <View
-                        style={[
-                          styles.statCard,
-                          {
-                            borderLeftColor: '#8B5CF6',
-                            borderLeftWidth: 4,
-                          },
-                        ]}
-                      >
-                        <View style={[styles.statIconWrap, { backgroundColor: '#EDE9FE' }]}>
-                          <BootstrapIcon name="award-fill" size={18} color="#7C3AED" />
-                        </View>
-                        <Text style={styles.statLabel}>Master Techs</Text>
-                        <Text style={[styles.statValue, { color: '#7C3AED' }]}>
-                          {mechanicsStats.masterCertified}
-                        </Text>
-                        <Text style={styles.statSub}>OEM & Race Certified</Text>
-                      </View>
-                    </View>
-
-                    {/* Toolbar & Filter Bar */}
-                    <View style={styles.toolbarRow}>
-                      <View style={styles.searchInputBox}>
-                        <BootstrapIcon
-                          name="search"
-                          size={14}
-                          color="#64748B"
-                          style={{ marginRight: 8 }}
-                        />
-                        <TextInput
-                          style={styles.searchInput}
-                          placeholder="Search technician by name, specialization, bay, or certification..."
-                          placeholderTextColor="#94A3B8"
-                          value={mechanicSearchQuery}
-                          onChangeText={setMechanicSearchQuery}
-                        />
-                        {mechanicSearchQuery ? (
-                          <TouchableOpacity onPress={() => setMechanicSearchQuery('')}>
-                            <BootstrapIcon name="x-circle-fill" size={14} color="#94A3B8" />
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
-
-                      <TouchableOpacity
-                        style={styles.addBtnPrimary}
-                        onPress={handleOpenAddMechanic}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="person-plus-fill" size={15} color="#FFFFFF" />
-                        <Text style={styles.addBtnPrimaryText}>+ Add Certified Technician</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Filter Status Pills & View Mode Switch */}
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: 12,
-                        marginBottom: 16,
-                        flexWrap: 'wrap',
-                      }}
-                    >
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          gap: 8,
-                          flexWrap: 'wrap',
-                        }}
-                      >
-                        {[
-                          { id: 'All', label: 'All Technicians', count: mechanicsStats.total },
-                          { id: 'Available', label: 'Available on Duty', count: mechanicsStats.available },
-                          { id: 'In Pit Bay', label: 'Busy in Pit Bay', count: mechanicsStats.busy },
-                        ].map((tab) => {
-                          const active = mechanicFilterStatus === tab.id;
-                          return (
-                            <TouchableOpacity
-                              key={tab.id}
-                              onPress={() => setMechanicFilterStatus(tab.id)}
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 6,
-                                paddingHorizontal: 12,
-                                paddingVertical: 6,
-                                borderRadius: 8,
-                                backgroundColor: active
-                                  ? '#0C6258'
-                                  : isDarkMode
-                                    ? '#1E293B'
-                                    : '#F1F5F9',
-                                borderWidth: 1,
-                                borderColor: active
-                                  ? '#0C6258'
-                                  : isDarkMode
-                                    ? '#334155'
-                                    : '#E2E8F0',
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: active ? '800' : '600',
-                                  color: active
-                                    ? '#FFFFFF'
-                                    : isDarkMode
-                                      ? '#94A3B8'
-                                      : '#475569',
-                                }}
-                              >
-                                {tab.label}
-                              </Text>
-                              <View
-                                style={{
-                                  backgroundColor: active
-                                    ? 'rgba(255,255,255,0.25)'
-                                    : isDarkMode
-                                      ? '#334155'
-                                      : '#E2E8F0',
-                                  paddingHorizontal: 5,
-                                  paddingVertical: 1,
-                                  borderRadius: 6,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 10.5,
-                                    fontWeight: '800',
-                                    color: active
-                                      ? '#FFFFFF'
-                                      : isDarkMode
-                                        ? '#CBD5E1'
-                                        : '#475569',
-                                  }}
-                                >
-                                  {tab.count}
-                                </Text>
-                              </View>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-
-                      {/* View Mode Toggle (List vs Grid) */}
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
-                          borderRadius: 8,
-                          padding: 3,
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                        }}
-                      >
-                        <TouchableOpacity
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 5,
-                            paddingHorizontal: 10,
-                            paddingVertical: 5,
-                            borderRadius: 6,
-                            backgroundColor: mechanicViewMode === 'list' ? '#0C6258' : 'transparent',
-                          }}
-                          onPress={() => setMechanicViewMode('list')}
-                        >
-                          <BootstrapIcon
-                            name="list-ul"
-                            size={13}
-                            color={mechanicViewMode === 'list' ? '#FFFFFF' : '#64748B'}
-                          />
-                          <Text
-                            style={{
-                              fontSize: 11.5,
-                              fontWeight: '700',
-                              color: mechanicViewMode === 'list' ? '#FFFFFF' : '#64748B',
-                            }}
-                          >
-                            List
-                          </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 5,
-                            paddingHorizontal: 10,
-                            paddingVertical: 5,
-                            borderRadius: 6,
-                            backgroundColor: mechanicViewMode === 'grid' ? '#0C6258' : 'transparent',
-                          }}
-                          onPress={() => setMechanicViewMode('grid')}
-                        >
-                          <BootstrapIcon
-                            name="grid"
-                            size={12}
-                            color={mechanicViewMode === 'grid' ? '#FFFFFF' : '#64748B'}
-                          />
-                          <Text
-                            style={{
-                              fontSize: 11.5,
-                              fontWeight: '700',
-                              color: mechanicViewMode === 'grid' ? '#FFFFFF' : '#64748B',
-                            }}
-                          >
-                            Grid
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* Empty State if no match */}
-                    {filteredMechanics.length === 0 ? (
-                      <View
-                        style={{
-                          backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                          borderRadius: 14,
-                          padding: 36,
-                          alignItems: 'center',
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                        }}
-                      >
-                        <BootstrapIcon name="person-x" size={40} color="#94A3B8" />
-                        <Text
-                          style={{
-                            fontSize: 15,
-                            fontWeight: '800',
-                            color: isDarkMode ? '#F1F5F9' : '#0F172A',
-                            marginTop: 12,
-                          }}
-                        >
-                          No technicians found
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 12.5,
-                            color: '#64748B',
-                            marginTop: 4,
-                            marginBottom: 16,
-                            textAlign: 'center',
-                          }}
-                        >
-                          {mechanicSearchQuery
-                            ? `No mechanic matches "${mechanicSearchQuery}"`
-                            : 'Add your first certified technician to the garage roster.'}
-                        </Text>
-                        <TouchableOpacity
-                          style={styles.addBtnPrimary}
-                          onPress={handleOpenAddMechanic}
-                        >
-                          <BootstrapIcon name="plus-lg" size={14} color="#FFFFFF" />
-                          <Text style={styles.addBtnPrimaryText}>+ Add New Mechanic</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : mechanicViewMode === 'list' ? (
-                      /* ─── LIST / TABLE VIEW ─── */
-                      <View style={styles.tableCard}>
-                        <ScrollView
-                          horizontal
-                          showsHorizontalScrollIndicator={true}
-                          contentContainerStyle={{ minWidth: 960 }}
-                        >
-                          <View style={{ width: '100%', minWidth: 960 }}>
-                            <View style={styles.tableHeaderRow}>
-                              <Text style={[styles.tableHeaderCell, { flex: 2.3, minWidth: 200 }]}>Technician / Profile</Text>
-                              <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 120 }]}>Status</Text>
-                              <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 150 }]}>Pit Bay Assignment</Text>
-                              <Text style={[styles.tableHeaderCell, { flex: 2, minWidth: 170 }]}>Specialization & Experience</Text>
-                              <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 140 }]}>Certifications</Text>
-                              <Text style={[styles.tableHeaderCell, { flex: 1.6, minWidth: 160, textAlign: 'center' }]}>Actions</Text>
-                            </View>
-
-                            {filteredMechanics.map((mech) => {
-                              const activeJob = getActiveBookingForMechanic(mech);
-                              const isBusy =
-                                mech.status === 'In Pit Bay' ||
-                                mechanicsStats.busyMechanicIds.has(mech.id) ||
-                                Boolean(activeJob);
-
-                              return (
-                                <View key={mech.id} style={styles.tableRow}>
-                                  {/* Technician Profile */}
-                                  <View style={{ flex: 2.3, minWidth: 200, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                                    <Image
-                                      source={{ uri: mech.avatar }}
-                                      style={{
-                                        width: 38,
-                                        height: 38,
-                                        borderRadius: 19,
-                                        borderWidth: 1.5,
-                                        borderColor: '#0C6258',
-                                        backgroundColor: '#E2E8F0',
-                                      }}
-                                    />
-                                    <View style={{ flex: 1 }}>
-                                      <Text style={[styles.tableTitle, { fontSize: 13.5 }]} numberOfLines={1}>
-                                        {mech.name}
-                                      </Text>
-                                      <Text style={[styles.tableSub, { fontSize: 11 }]}>
-                                        Display: {mech.shortName || mech.name} • ID: {mech.id}
-                                      </Text>
-                                    </View>
-                                  </View>
-
-                                  {/* Status */}
-                                  <View style={{ flex: 1.2, minWidth: 120 }}>
-                                    <View
-                                      style={[
-                                        styles.mechanicStatusBadge,
-                                        isBusy ? styles.mechanicStatusBusy : styles.mechanicStatusAvailable,
-                                      ]}
-                                    >
-                                      <View
-                                        style={{
-                                          width: 6,
-                                          height: 6,
-                                          borderRadius: 3,
-                                          backgroundColor: isBusy ? '#D97706' : '#10B981',
-                                        }}
-                                      />
-                                      <Text
-                                        style={
-                                          isBusy
-                                            ? styles.mechanicStatusBusyText
-                                            : styles.mechanicStatusAvailableText
-                                        }
-                                      >
-                                        {isBusy ? 'In Pit Bay' : 'Available'}
-                                      </Text>
-                                    </View>
-                                    {activeJob && (
-                                      <Text
-                                        style={{ fontSize: 10, color: '#B45309', fontWeight: '700', marginTop: 3 }}
-                                        numberOfLines={1}
-                                      >
-                                        Job #{activeJob.id || activeJob.booking_id}
-                                      </Text>
-                                    )}
-                                  </View>
-
-                                  {/* Pit Bay Assignment */}
-                                  <View style={{ flex: 1.8, minWidth: 150, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <BootstrapIcon name="geo-alt-fill" size={13} color="#0C6258" />
-                                    <Text style={[styles.tableTitle, { fontSize: 12 }]} numberOfLines={1}>
-                                      {mech.bay || 'General Pit Bay'}
-                                    </Text>
-                                  </View>
-
-                                  {/* Specialization & Experience */}
-                                  <View style={{ flex: 2, minWidth: 170 }}>
-                                    <Text style={[styles.tableTitle, { fontSize: 12 }]} numberOfLines={1}>
-                                      {mech.specialization || 'Performance Maintenance'}
-                                    </Text>
-                                    <Text style={styles.tableSub} numberOfLines={1}>
-                                      {mech.experience || '5+ Years Pro Tech'}
-                                    </Text>
-                                  </View>
-
-                                  {/* Certifications */}
-                                  <View style={{ flex: 1.8, minWidth: 140, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                    <BootstrapIcon name="award-fill" size={13} color="#8B5CF6" />
-                                    <Text
-                                      style={[
-                                        styles.tableSub,
-                                        { color: isDarkMode ? '#CBD5E1' : '#334155', fontWeight: '600', flex: 1 },
-                                      ]}
-                                      numberOfLines={2}
-                                    >
-                                      {mech.certifications || 'Certified Tech'}
-                                    </Text>
-                                  </View>
-
-                                  {/* Actions */}
-                                  <View
-                                    style={{
-                                      flex: 1.6,
-                                      minWidth: 160,
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                      gap: 6,
-                                      flexShrink: 0,
-                                    }}
-                                  >
-                                    <TouchableOpacity
-                                      style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        gap: 4,
-                                        paddingHorizontal: 9,
-                                        paddingVertical: 5,
-                                        borderRadius: 6,
-                                        borderWidth: 1,
-                                        borderColor: isDarkMode ? '#334155' : '#CBD5E1',
-                                        backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                                      }}
-                                      onPress={() => handleOpenEditMechanic(mech)}
-                                    >
-                                      <BootstrapIcon
-                                        name="pencil-square"
-                                        size={12}
-                                        color={isDarkMode ? '#94A3B8' : '#475569'}
-                                      />
-                                      <Text
-                                        style={{
-                                          fontSize: 11,
-                                          fontWeight: '700',
-                                          color: isDarkMode ? '#E2E8F0' : '#475569',
-                                        }}
-                                      >
-                                        Edit
-                                      </Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                      style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        gap: 4,
-                                        paddingHorizontal: 9,
-                                        paddingVertical: 5,
-                                        borderRadius: 6,
-                                        borderWidth: 1,
-                                        borderColor: '#FCA5A5',
-                                        backgroundColor: '#FEF2F2',
-                                      }}
-                                      onPress={() => handleDeleteMechanic(mech)}
-                                    >
-                                      <BootstrapIcon name="trash3-fill" size={12} color="#DC2626" />
-                                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#DC2626' }}>
-                                        Remove
-                                      </Text>
-                                    </TouchableOpacity>
-                                  </View>
-                                </View>
-                              );
-                            })}
-                          </View>
-                        </ScrollView>
-                      </View>
-                    ) : (
-                      /* ─── GRID VIEW ─── */
-                      <View style={styles.mechanicsGrid}>
-                        {filteredMechanics.map((mech) => {
-                          const activeJob = getActiveBookingForMechanic(mech);
-                          const isBusy =
-                            mech.status === 'In Pit Bay' ||
-                            mechanicsStats.busyMechanicIds.has(mech.id) ||
-                            Boolean(activeJob);
-
-                          return (
-                            <View key={mech.id} style={styles.mechanicCard}>
-                              {/* Header: Avatar + Name + Status */}
-                              <View style={styles.mechanicCardHeader}>
-                                <Image
-                                  source={{ uri: mech.avatar }}
-                                  style={styles.mechanicAvatar}
-                                />
-                                <View style={styles.mechanicHeaderInfo}>
-                                  <View
-                                    style={{
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      gap: 6,
-                                      marginBottom: 4,
-                                    }}
-                                  >
-                                    <View
-                                      style={[
-                                        styles.mechanicStatusBadge,
-                                        isBusy
-                                          ? styles.mechanicStatusBusy
-                                          : styles.mechanicStatusAvailable,
-                                      ]}
-                                    >
-                                      <View
-                                        style={{
-                                          width: 6,
-                                          height: 6,
-                                          borderRadius: 3,
-                                          backgroundColor: isBusy ? '#D97706' : '#10B981',
-                                        }}
-                                      />
-                                      <Text
-                                        style={
-                                          isBusy
-                                            ? styles.mechanicStatusBusyText
-                                            : styles.mechanicStatusAvailableText
-                                        }
-                                      >
-                                        {isBusy ? 'In Pit Bay' : 'Available'}
-                                      </Text>
-                                    </View>
-
-                                    <Text
-                                      style={{
-                                        fontSize: 10.5,
-                                        fontWeight: '700',
-                                        color: isDarkMode ? '#64748B' : '#94A3B8',
-                                      }}
-                                    >
-                                      ID: {mech.id}
-                                    </Text>
-                                  </View>
-
-                                  <Text style={styles.mechanicName} numberOfLines={2}>
-                                    {mech.name}
-                                  </Text>
-                                  <Text style={styles.mechanicShortName}>
-                                    Display: {mech.shortName || mech.name}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              {/* Bay Badge */}
-                              <View style={styles.mechanicBayBadge}>
-                                <BootstrapIcon name="geo-alt-fill" size={12} color="#0C6258" />
-                                <Text style={styles.mechanicBayText}>
-                                  {mech.bay || 'General Service Bay'}
-                                </Text>
-                              </View>
-
-                              {/* Specialization & Credentials */}
-                              <View style={styles.mechanicInfoRow}>
-                                <BootstrapIcon
-                                  name="lightning-charge-fill"
-                                  size={12}
-                                  color="#F59E0B"
-                                />
-                                <Text style={styles.mechanicInfoText} numberOfLines={1}>
-                                  {mech.specialization || 'Performance Maintenance'}
-                                </Text>
-                              </View>
-
-                              <View style={styles.mechanicInfoRow}>
-                                <BootstrapIcon name="award-fill" size={12} color="#8B5CF6" />
-                                <Text style={styles.mechanicInfoText} numberOfLines={1}>
-                                  {mech.certifications || 'Certified Master Tech'}
-                                </Text>
-                              </View>
-
-                              <View style={styles.mechanicInfoRow}>
-                                <BootstrapIcon name="clock-history" size={12} color="#3B82F6" />
-                                <Text style={styles.mechanicInfoText}>
-                                  {mech.experience || '5+ Years Pro Tech'}
-                                </Text>
-                              </View>
-
-                              {/* Active Work Order Callout if busy */}
-                              {activeJob && (
-                                <View style={styles.mechanicActiveBookingBanner}>
-                                  <View
-                                    style={{
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      gap: 5,
-                                      marginBottom: 2,
-                                    }}
-                                  >
-                                    <BootstrapIcon name="tools" size={12} color="#B45309" />
-                                    <Text
-                                      style={{
-                                        fontSize: 11.5,
-                                        fontWeight: '800',
-                                        color: '#B45309',
-                                      }}
-                                    >
-                                      Active Job: #{activeJob.id || activeJob.booking_id}
-                                    </Text>
-                                  </View>
-                                  <Text style={styles.mechanicActiveBookingText} numberOfLines={1}>
-                                    {activeJob.service_title || 'Motorcycle Service'} •{' '}
-                                    {activeJob.customer_name || activeJob.userName || 'Customer'}
-                                  </Text>
-                                </View>
-                              )}
-
-                              {/* Action Footer */}
-                              <View style={styles.mechanicCardFooter}>
-                                <TouchableOpacity
-                                  style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 5,
-                                    paddingHorizontal: 12,
-                                    paddingVertical: 6,
-                                    borderRadius: 8,
-                                    borderWidth: 1,
-                                    borderColor: isDarkMode ? '#334155' : '#CBD5E1',
-                                    backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                                  }}
-                                  onPress={() => handleOpenEditMechanic(mech)}
-                                >
-                                  <BootstrapIcon
-                                    name="pencil-square"
-                                    size={12}
-                                    color={isDarkMode ? '#94A3B8' : '#475569'}
-                                  />
-                                  <Text
-                                    style={{
-                                      fontSize: 11.5,
-                                      fontWeight: '700',
-                                      color: isDarkMode ? '#E2E8F0' : '#475569',
-                                    }}
-                                  >
-                                    Edit Details
-                                  </Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                  style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 5,
-                                    paddingHorizontal: 12,
-                                    paddingVertical: 6,
-                                    borderRadius: 8,
-                                    borderWidth: 1,
-                                    borderColor: '#FCA5A5',
-                                    backgroundColor: '#FEF2F2',
-                                  }}
-                                  onPress={() => handleDeleteMechanic(mech)}
-                                >
-                                  <BootstrapIcon name="trash3-fill" size={12} color="#DC2626" />
-                                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#DC2626' }}>
-                                    Remove
-                                  </Text>
-                                </TouchableOpacity>
-                              </View>
-                            </View>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </View>
-                )}
               </View>
             )}
 
@@ -7879,7 +8305,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </TouchableOpacity>
                 </View>
 
-                {/* Filter Status Pills & View Mode Switch */}
+                {/* Filter Status Dropdown & View Mode Switch */}
                 <View
                   style={{
                     flexDirection: 'row',
@@ -7888,87 +8314,205 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     gap: 12,
                     marginBottom: 16,
                     flexWrap: 'wrap',
+                    position: 'relative',
+                    zIndex: isMechanicFilterDropdownOpen ? 99999 : 10,
                   }}
                 >
+                  {/* Technicians Status Filter Dropdown */}
                   <View
                     style={{
-                      flexDirection: 'row',
-                      gap: 8,
-                      flexWrap: 'wrap',
+                      position: 'relative',
+                      zIndex: isMechanicFilterDropdownOpen ? 99999 : 10,
                     }}
                   >
-                    {[
-                      { id: 'All', label: 'All Technicians', count: mechanicsStats.total },
-                      { id: 'Available', label: 'Available on Duty', count: mechanicsStats.available },
-                      { id: 'In Pit Bay', label: 'Busy in Pit Bay', count: mechanicsStats.busy },
-                    ].map((tab) => {
-                      const active = mechanicFilterStatus === tab.id;
+                    {(() => {
+                      const mechanicStatusOptions = [
+                        { id: 'All', label: 'All Technicians', count: mechanicsStats.total, icon: 'people-fill', color: '#0C6258' },
+                        { id: 'Available', label: 'Available on Duty', count: mechanicsStats.available, icon: 'check-circle-fill', color: '#16A34A' },
+                        { id: 'In Pit Bay', label: 'Busy in Pit Bay', count: mechanicsStats.busy, icon: 'tools', color: '#D97706' },
+                      ];
+                      const activeOpt = mechanicStatusOptions.find((o) => o.id === mechanicFilterStatus) || mechanicStatusOptions[0];
+
                       return (
-                        <TouchableOpacity
-                          key={tab.id}
-                          onPress={() => setMechanicFilterStatus(tab.id)}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
-                            borderRadius: 8,
-                            backgroundColor: active
-                              ? '#0C6258'
-                              : isDarkMode
-                                ? '#1E293B'
-                                : '#F1F5F9',
-                            borderWidth: 1,
-                            borderColor: active
-                              ? '#0C6258'
-                              : isDarkMode
-                                ? '#334155'
-                                : '#E2E8F0',
-                          }}
-                        >
-                          <Text
+                        <>
+                          <TouchableOpacity
                             style={{
-                              fontSize: 12,
-                              fontWeight: active ? '800' : '600',
-                              color: active
-                                ? '#FFFFFF'
-                                : isDarkMode
-                                  ? '#94A3B8'
-                                  : '#475569',
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 8,
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderWidth: 1.5,
+                              borderColor: isMechanicFilterDropdownOpen
+                                ? '#0C6258'
+                                : mechanicFilterStatus !== 'All'
+                                  ? '#0C6258'
+                                  : isDarkMode ? '#334155' : '#E2E8F0',
+                              borderRadius: 12,
+                              paddingHorizontal: 14,
+                              paddingVertical: 9,
+                              minWidth: 195,
+                              cursor: 'pointer',
+                              boxShadow: isMechanicFilterDropdownOpen
+                                ? '0 6px 20px -2px rgba(12, 98, 88, 0.2)'
+                                : '0 1px 3px rgba(0, 0, 0, 0.04)',
                             }}
+                            onPress={() => setIsMechanicFilterDropdownOpen((prev) => !prev)}
+                            activeOpacity={0.85}
                           >
-                            {tab.label}
-                          </Text>
-                          <View
-                            style={{
-                              backgroundColor: active
-                                ? 'rgba(255,255,255,0.25)'
-                                : isDarkMode
-                                  ? '#334155'
-                                  : '#E2E8F0',
-                              paddingHorizontal: 5,
-                              paddingVertical: 1,
-                              borderRadius: 6,
-                            }}
-                          >
-                            <Text
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                              <BootstrapIcon
+                                name={activeOpt.icon}
+                                size={13}
+                                color={mechanicFilterStatus !== 'All' ? activeOpt.color : '#64748B'}
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: '700',
+                                  color: mechanicFilterStatus !== 'All' ? '#0C6258' : isDarkMode ? '#F8FAFC' : '#0F172A',
+                                }}
+                              >
+                                {activeOpt.label}
+                              </Text>
+                              <View
+                                style={{
+                                  backgroundColor: mechanicFilterStatus !== 'All' ? '#0C6258' : isDarkMode ? '#334155' : '#E2E8F0',
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 1,
+                                  borderRadius: 8,
+                                  marginLeft: 2,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: '800',
+                                    color: mechanicFilterStatus !== 'All' ? '#FFFFFF' : isDarkMode ? '#CBD5E1' : '#475569',
+                                  }}
+                                >
+                                  {activeOpt.count}
+                                </Text>
+                              </View>
+                            </View>
+                            <BootstrapIcon
+                              name={isMechanicFilterDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                              size={12}
+                              color={isMechanicFilterDropdownOpen ? '#0C6258' : '#64748B'}
+                            />
+                          </TouchableOpacity>
+
+                          {/* Transparent backdrop for outside click */}
+                          {isMechanicFilterDropdownOpen && (
+                            <TouchableOpacity
                               style={{
-                                fontSize: 10.5,
-                                fontWeight: '800',
-                                color: active
-                                  ? '#FFFFFF'
-                                  : isDarkMode
-                                    ? '#CBD5E1'
-                                    : '#475569',
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                zIndex: 99998,
+                                backgroundColor: 'transparent',
+                                cursor: 'default',
+                              }}
+                              onPress={() => setIsMechanicFilterDropdownOpen(false)}
+                              activeOpacity={1}
+                            />
+                          )}
+
+                          {/* Floating Dropdown Menu */}
+                          {isMechanicFilterDropdownOpen && (
+                            <View
+                              style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                marginTop: 6,
+                                minWidth: 230,
+                                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                                borderRadius: 14,
+                                borderWidth: 1.5,
+                                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                                boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
+                                zIndex: 99999,
+                                padding: 6,
+                                gap: 3,
+                                maxHeight: 280,
+                                overflowY: 'auto',
                               }}
                             >
-                              {tab.count}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
+                              {mechanicStatusOptions.map((option) => {
+                                const isSelected = mechanicFilterStatus === option.id;
+                                return (
+                                  <TouchableOpacity
+                                    key={option.id}
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      paddingHorizontal: 12,
+                                      paddingVertical: 9,
+                                      borderRadius: 9,
+                                      backgroundColor: isSelected
+                                        ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                        : 'transparent',
+                                      cursor: 'pointer',
+                                    }}
+                                    onPress={() => {
+                                      setMechanicFilterStatus(option.id);
+                                      setIsMechanicFilterDropdownOpen(false);
+                                    }}
+                                    activeOpacity={0.8}
+                                  >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                      <BootstrapIcon
+                                        name={option.icon}
+                                        size={14}
+                                        color={isSelected ? '#0C6258' : option.color || '#64748B'}
+                                      />
+                                      <Text
+                                        style={{
+                                          fontSize: 13,
+                                          fontWeight: isSelected ? '800' : '600',
+                                          color: isSelected
+                                            ? '#0C6258'
+                                            : isDarkMode ? '#E2E8F0' : '#334155',
+                                        }}
+                                      >
+                                        {option.label}
+                                      </Text>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                      <View
+                                        style={{
+                                          backgroundColor: isSelected
+                                            ? '#0C6258'
+                                            : isDarkMode ? '#334155' : '#E2E8F0',
+                                          paddingHorizontal: 6,
+                                          paddingVertical: 1,
+                                          borderRadius: 6,
+                                        }}
+                                      >
+                                        <Text
+                                          style={{
+                                            fontSize: 10.5,
+                                            fontWeight: '800',
+                                            color: isSelected ? '#FFFFFF' : isDarkMode ? '#CBD5E1' : '#475569',
+                                          }}
+                                        >
+                                          {option.count}
+                                        </Text>
+                                      </View>
+                                      {isSelected && <BootstrapIcon name="check2" size={14} color="#0C6258" />}
+                                    </View>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          )}
+                        </>
                       );
-                    })}
+                    })()}
                   </View>
 
                   {/* View Mode Toggle (List vs Grid) */}
@@ -8469,6 +9013,296 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               </View>
             )}
 
+            {/* ─── TAB: RIDERS / DELIVERY STAFF ─── */}
+            {activeNav === 'riders' && (
+              <View>
+                <View style={styles.toolbarRow}>
+                  <View style={[styles.searchInputBox, { flex: 1 }]}>
+                    <BootstrapIcon name="search" size={14} color="#64748B" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={styles.searchInput}
+                      placeholder="Search by name, phone, vehicle, or plate..."
+                      placeholderTextColor="#94A3B8"
+                      value={riderSearchQuery}
+                      onChangeText={setRiderSearchQuery}
+                    />
+                    {riderSearchQuery ? (
+                      <TouchableOpacity onPress={() => setRiderSearchQuery('')}>
+                        <BootstrapIcon name="x-circle-fill" size={14} color="#94A3B8" />
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.addBtnPrimary}
+                    onPress={handleOpenAddRider}
+                    activeOpacity={0.85}
+                  >
+                    <BootstrapIcon name="person-plus-fill" size={14} color="#FFFFFF" />
+                    <Text style={styles.addBtnPrimaryText}>+ Add Rider</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                  <View
+                    style={{
+                      backgroundColor: '#ECFDF5',
+                      borderWidth: 1,
+                      borderColor: '#A7F3D0',
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      marginRight: 4,
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#047857', textTransform: 'uppercase' }}>
+                      Total rider earnings
+                    </Text>
+                    <Text style={{ fontSize: 16, fontWeight: '900', color: '#0C6258' }}>
+                      ₱
+                      {deliveryRiders
+                        .reduce((sum, r) => sum + Number(r.totalEarnings || 0), 0)
+                        .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </Text>
+                    <Text style={{ fontSize: 10, color: '#059669' }}>Shipping fees from delivered orders</Text>
+                  </View>
+                  {[
+                    { id: 'All', label: 'All', count: deliveryRiders.length },
+                    {
+                      id: RIDER_ACCOUNT_STATUSES.ACTIVE,
+                      label: 'Active',
+                      count: deliveryRiders.filter((r) => (r.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.ACTIVE).length,
+                    },
+                    {
+                      id: RIDER_ACCOUNT_STATUSES.INACTIVE,
+                      label: 'Inactive',
+                      count: deliveryRiders.filter((r) => r.accountStatus === RIDER_ACCOUNT_STATUSES.INACTIVE).length,
+                    },
+                    {
+                      id: RIDER_STATUSES.AVAILABLE,
+                      label: 'Available',
+                      count: deliveryRiders.filter((r) => r.status === RIDER_STATUSES.AVAILABLE).length,
+                    },
+                    {
+                      id: RIDER_STATUSES.ON_DELIVERY,
+                      label: 'On Delivery',
+                      count: deliveryRiders.filter((r) => r.status === RIDER_STATUSES.ON_DELIVERY).length,
+                    },
+                    {
+                      id: RIDER_STATUSES.OFF_DUTY,
+                      label: 'Off Duty',
+                      count: deliveryRiders.filter((r) => r.status === RIDER_STATUSES.OFF_DUTY).length,
+                    },
+                  ].map((chip) => {
+                    const active = riderFilterStatus === chip.id;
+                    return (
+                      <TouchableOpacity
+                        key={chip.id}
+                        onPress={() => setRiderFilterStatus(chip.id)}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 7,
+                          borderRadius: 999,
+                          borderWidth: 1.5,
+                          borderColor: active ? '#0C6258' : '#E2E8F0',
+                          backgroundColor: active ? '#0C6258' : isDarkMode ? '#1E293B' : '#FFFFFF',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '700',
+                            color: active ? '#FFFFFF' : '#475569',
+                          }}
+                        >
+                          {chip.label}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '800',
+                            color: active ? '#CCFBF1' : '#94A3B8',
+                          }}
+                        >
+                          {chip.count}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {filteredRiders.length === 0 ? (
+                  <View
+                    style={{
+                      alignItems: 'center',
+                      paddingVertical: 48,
+                      backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                      borderRadius: 14,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                    }}
+                  >
+                    <BootstrapIcon name="bicycle" size={28} color="#94A3B8" />
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748B', marginTop: 10 }}>
+                      No riders found
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 4, marginBottom: 14 }}>
+                      {riderSearchQuery
+                        ? `No matches for "${riderSearchQuery}"`
+                        : 'Add your first delivery rider to the roster.'}
+                    </Text>
+                    <TouchableOpacity style={styles.addBtnPrimary} onPress={handleOpenAddRider}>
+                      <BootstrapIcon name="plus-lg" size={14} color="#FFFFFF" />
+                      <Text style={styles.addBtnPrimaryText}>+ Add Rider</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View style={styles.tableCard}>
+                    {filteredRiders.map((rider) => {
+                      const statusColor =
+                        rider.status === RIDER_STATUSES.AVAILABLE
+                          ? { bg: '#DCFCE7', text: '#16A34A', border: '#86EFAC' }
+                          : rider.status === RIDER_STATUSES.ON_DELIVERY
+                            ? { bg: '#FEF3C7', text: '#D97706', border: '#FCD34D' }
+                            : { bg: '#F1F5F9', text: '#64748B', border: '#CBD5E1' };
+
+                      return (
+                        <View
+                          key={rider.id}
+                          style={[
+                            styles.tableRow,
+                            {
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: 10,
+                              paddingVertical: 12,
+                            },
+                          ]}
+                        >
+                          <Image
+                            source={{ uri: rider.avatar || RIDER_AVATAR_PRESETS[0] }}
+                            style={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: 20,
+                              borderWidth: 1.5,
+                              borderColor: '#0C6258',
+                              backgroundColor: '#E2E8F0',
+                            }}
+                          />
+                          <View style={{ flex: 1.4, minWidth: 140 }}>
+                            <Text style={[styles.tableTitle, { fontSize: 13.5 }]} numberOfLines={1}>
+                              {rider.name}
+                            </Text>
+                            <Text style={[styles.tableSub, { fontSize: 11 }]} numberOfLines={1}>
+                              {rider.shortName || '—'} · {rider.phone || 'No phone'}
+                            </Text>
+                            <Text style={[styles.tableSub, { fontSize: 11 }]} numberOfLines={1}>
+                              {rider.username ? `@${rider.username}` : 'No login yet'} · {rider.email || 'No email'}
+                            </Text>
+                          </View>
+                          <View style={{ flex: 1.2, minWidth: 120 }}>
+                            <Text style={[styles.tableSub, { fontSize: 12, color: '#0F172A', fontWeight: '600' }]} numberOfLines={1}>
+                              {rider.vehicleInfo || '—'}
+                            </Text>
+                            <Text style={[styles.tableSub, { fontSize: 11 }]} numberOfLines={1}>
+                              {rider.plateNumber || 'No plate'}
+                            </Text>
+                          </View>
+                          <View style={{ minWidth: 100, alignItems: 'flex-end' }}>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#64748B', textTransform: 'uppercase' }}>
+                              Earnings
+                            </Text>
+                            <Text style={{ fontSize: 14, fontWeight: '900', color: '#0C6258' }}>
+                              ₱{Number(rider.totalEarnings || 0).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </Text>
+                            <Text style={{ fontSize: 10, color: '#94A3B8' }}>from shipping</Text>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => handleToggleRiderStatus(rider)}
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 999,
+                              backgroundColor: statusColor.bg,
+                              borderWidth: 1,
+                              borderColor: statusColor.border,
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: statusColor.text }}>
+                              {rider.status || RIDER_STATUSES.AVAILABLE}
+                            </Text>
+                          </TouchableOpacity>
+                          <View
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 5,
+                              borderRadius: 999,
+                              backgroundColor:
+                                (rider.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.INACTIVE
+                                  ? '#F1F5F9'
+                                  : '#ECFDF5',
+                              borderWidth: 1,
+                              borderColor:
+                                (rider.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.INACTIVE
+                                  ? '#CBD5E1'
+                                  : '#A7F3D0',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: '800',
+                                color:
+                                  (rider.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.INACTIVE
+                                    ? '#64748B'
+                                    : '#047857',
+                              }}
+                            >
+                              {rider.accountStatus || RIDER_ACCOUNT_STATUSES.ACTIVE}
+                            </Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', gap: 6 }}>
+                            <TouchableOpacity
+                              style={styles.actionIconBtn}
+                              onPress={() =>
+                                setRiderAccessModal({
+                                  rider,
+                                  bundle: null,
+                                })
+                              }
+                            >
+                              <BootstrapIcon name="geo-alt" size={13} color="#0C6258" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.actionIconBtn}
+                              onPress={() => handleOpenEditRider(rider)}
+                            >
+                              <BootstrapIcon name="pencil" size={13} color="#475569" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.actionIconBtn, { backgroundColor: '#FEF2F2' }]}
+                              onPress={() => handleDeleteRider(rider)}
+                            >
+                              <BootstrapIcon name="trash3-fill" size={13} color="#DC2626" />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            )}
+
             {/* ─── TAB: SUPPLIERS & VENDORS MANAGEMENT ─── */}
             {activeNav === 'suppliers' && (
               <View>
@@ -8662,7 +9496,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </TouchableOpacity>
                 </View>
 
-                {/* Filter Status Pills & View Mode Switch */}
+                {/* Filter Status Dropdown & View Mode Switch */}
                 <View
                   style={{
                     flexDirection: 'row',
@@ -8671,88 +9505,235 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     gap: 12,
                     marginBottom: 16,
                     flexWrap: 'wrap',
+                    position: 'relative',
+                    zIndex: isSupplierFilterDropdownOpen ? 99999 : 10,
                   }}
                 >
+                  {/* Suppliers Status Filter Dropdown */}
                   <View
                     style={{
-                      flexDirection: 'row',
-                      gap: 8,
-                      flexWrap: 'wrap',
+                      position: 'relative',
+                      zIndex: isSupplierFilterDropdownOpen ? 99999 : 10,
                     }}
                   >
-                    {[
-                      { id: 'All', label: 'All Suppliers', count: supplierStats.total },
-                      { id: 'Active', label: 'Active Partners', count: supplierStats.active },
-                      { id: 'Pending', label: 'Pending Review', count: supplierStats.pending },
-                      { id: 'Inactive', label: 'Inactive / On Hold', count: supplierStats.inactive },
-                    ].map((tab) => {
-                      const active = supplierFilterStatus === tab.id;
+                    {(() => {
+                      const supplierStatusOptions = [
+                        { id: 'All', label: 'All Suppliers', count: supplierStats.total, icon: 'building', color: '#0C6258' },
+                        { id: 'Active', label: 'Active Partners', count: supplierStats.active, icon: 'check-circle-fill', color: '#16A34A' },
+                        { id: 'Pending', label: 'Pending Review', count: supplierStats.pending, icon: 'hourglass-split', color: '#D97706', highlight: supplierStats.pending > 0 },
+                        { id: 'Inactive', label: 'Inactive / On Hold', count: supplierStats.inactive, icon: 'pause-circle-fill', color: '#64748B' },
+                      ];
+                      const activeOpt = supplierStatusOptions.find((o) => o.id === supplierFilterStatus) || supplierStatusOptions[0];
+
                       return (
-                        <TouchableOpacity
-                          key={tab.id}
-                          onPress={() => setSupplierFilterStatus(tab.id)}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                            paddingHorizontal: 12,
-                            paddingVertical: 6,
-                            borderRadius: 8,
-                            backgroundColor: active
-                              ? '#0C6258'
-                              : isDarkMode
-                                ? '#1E293B'
-                                : '#F1F5F9',
-                            borderWidth: 1,
-                            borderColor: active
-                              ? '#0C6258'
-                              : isDarkMode
-                                ? '#334155'
-                                : '#E2E8F0',
-                          }}
-                        >
-                          <Text
+                        <>
+                          <TouchableOpacity
                             style={{
-                              fontSize: 12,
-                              fontWeight: active ? '800' : '600',
-                              color: active
-                                ? '#FFFFFF'
-                                : isDarkMode
-                                  ? '#94A3B8'
-                                  : '#475569',
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 8,
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderWidth: 1.5,
+                              borderColor: isSupplierFilterDropdownOpen
+                                ? '#0C6258'
+                                : activeOpt.highlight
+                                  ? '#F59E0B'
+                                  : supplierFilterStatus !== 'All'
+                                    ? '#0C6258'
+                                    : isDarkMode ? '#334155' : '#E2E8F0',
+                              borderRadius: 12,
+                              paddingHorizontal: 14,
+                              paddingVertical: 9,
+                              minWidth: 185,
+                              cursor: 'pointer',
+                              boxShadow: isSupplierFilterDropdownOpen
+                                ? '0 6px 20px -2px rgba(12, 98, 88, 0.2)'
+                                : '0 1px 3px rgba(0, 0, 0, 0.04)',
                             }}
+                            onPress={() => setIsSupplierFilterDropdownOpen((prev) => !prev)}
+                            activeOpacity={0.85}
                           >
-                            {tab.label}
-                          </Text>
-                          <View
-                            style={{
-                              backgroundColor: active
-                                ? 'rgba(255,255,255,0.25)'
-                                : isDarkMode
-                                  ? '#334155'
-                                  : '#E2E8F0',
-                              paddingHorizontal: 5,
-                              paddingVertical: 1,
-                              borderRadius: 6,
-                            }}
-                          >
-                            <Text
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                              <BootstrapIcon
+                                name={activeOpt.icon}
+                                size={13}
+                                color={
+                                  activeOpt.highlight
+                                    ? '#D97706'
+                                    : supplierFilterStatus !== 'All'
+                                      ? activeOpt.color
+                                      : '#64748B'
+                                }
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: '700',
+                                  color:
+                                    activeOpt.highlight
+                                      ? '#B45309'
+                                      : supplierFilterStatus !== 'All'
+                                        ? '#0C6258'
+                                        : isDarkMode ? '#F8FAFC' : '#0F172A',
+                                }}
+                              >
+                                {activeOpt.label}
+                              </Text>
+                              <View
+                                style={{
+                                  backgroundColor:
+                                    activeOpt.highlight
+                                      ? '#FEF3C7'
+                                      : supplierFilterStatus !== 'All'
+                                        ? '#0C6258'
+                                        : isDarkMode ? '#334155' : '#E2E8F0',
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 1,
+                                  borderRadius: 8,
+                                  marginLeft: 2,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: '800',
+                                    color:
+                                      activeOpt.highlight
+                                        ? '#B45309'
+                                        : supplierFilterStatus !== 'All'
+                                          ? '#FFFFFF'
+                                          : isDarkMode ? '#CBD5E1' : '#475569',
+                                  }}
+                                >
+                                  {activeOpt.count}
+                                </Text>
+                              </View>
+                            </View>
+                            <BootstrapIcon
+                              name={isSupplierFilterDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                              size={12}
+                              color={isSupplierFilterDropdownOpen ? '#0C6258' : '#64748B'}
+                            />
+                          </TouchableOpacity>
+
+                          {/* Transparent backdrop for outside click */}
+                          {isSupplierFilterDropdownOpen && (
+                            <TouchableOpacity
                               style={{
-                                fontSize: 10.5,
-                                fontWeight: '800',
-                                color: active
-                                  ? '#FFFFFF'
-                                  : isDarkMode
-                                    ? '#CBD5E1'
-                                    : '#475569',
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                zIndex: 99998,
+                                backgroundColor: 'transparent',
+                                cursor: 'default',
+                              }}
+                              onPress={() => setIsSupplierFilterDropdownOpen(false)}
+                              activeOpacity={1}
+                            />
+                          )}
+
+                          {/* Floating Dropdown Menu */}
+                          {isSupplierFilterDropdownOpen && (
+                            <View
+                              style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                marginTop: 6,
+                                minWidth: 230,
+                                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                                borderRadius: 14,
+                                borderWidth: 1.5,
+                                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                                boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
+                                zIndex: 99999,
+                                padding: 6,
+                                gap: 3,
+                                maxHeight: 280,
+                                overflowY: 'auto',
                               }}
                             >
-                              {tab.count}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
+                              {supplierStatusOptions.map((option) => {
+                                const isSelected = supplierFilterStatus === option.id;
+                                return (
+                                  <TouchableOpacity
+                                    key={option.id}
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      paddingHorizontal: 12,
+                                      paddingVertical: 9,
+                                      borderRadius: 9,
+                                      backgroundColor: isSelected
+                                        ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                        : 'transparent',
+                                      cursor: 'pointer',
+                                    }}
+                                    onPress={() => {
+                                      setSupplierFilterStatus(option.id);
+                                      setIsSupplierFilterDropdownOpen(false);
+                                    }}
+                                    activeOpacity={0.8}
+                                  >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                      <BootstrapIcon
+                                        name={option.icon}
+                                        size={14}
+                                        color={isSelected ? '#0C6258' : option.color || '#64748B'}
+                                      />
+                                      <Text
+                                        style={{
+                                          fontSize: 13,
+                                          fontWeight: isSelected ? '800' : '600',
+                                          color: isSelected
+                                            ? '#0C6258'
+                                            : isDarkMode ? '#E2E8F0' : '#334155',
+                                        }}
+                                      >
+                                        {option.label}
+                                      </Text>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                      <View
+                                        style={{
+                                          backgroundColor: option.highlight
+                                            ? '#FEF3C7'
+                                            : isSelected
+                                              ? '#0C6258'
+                                              : isDarkMode ? '#334155' : '#E2E8F0',
+                                          paddingHorizontal: 6,
+                                          paddingVertical: 1,
+                                          borderRadius: 6,
+                                        }}
+                                      >
+                                        <Text
+                                          style={{
+                                            fontSize: 10.5,
+                                            fontWeight: '800',
+                                            color: option.highlight
+                                              ? '#B45309'
+                                              : isSelected
+                                                ? '#FFFFFF'
+                                                : isDarkMode ? '#CBD5E1' : '#475569',
+                                          }}
+                                        >
+                                          {option.count}
+                                        </Text>
+                                      </View>
+                                      {isSelected && <BootstrapIcon name="check2" size={14} color="#0C6258" />}
+                                    </View>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          )}
+                        </>
                       );
-                    })}
+                    })()}
                   </View>
 
                   {/* View Mode Toggle (List vs Grid) */}
@@ -14561,6 +15542,286 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         </View>
       </Modal>
 
+      {/* ─── MODAL: ADD / EDIT DELIVERY RIDER ─── */}
+      <Modal
+        visible={isAddRiderModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setIsAddRiderModalOpen(false);
+          setEditingRider(null);
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { maxWidth: 520, maxHeight: '92%' }]}>
+            <View style={styles.modalHeader}>
+              <View>
+                <Text style={styles.modalTitle}>
+                  {editingRider ? 'Edit Rider Account' : 'Create Rider Account'}
+                </Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                  Role is always Rider. Only Active riders can log in.
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setIsAddRiderModalOpen(false);
+                  setEditingRider(null);
+                }}
+              >
+                <BootstrapIcon name="x-lg" size={16} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <Text style={styles.formLabel}>Avatar</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+                <Image
+                  source={{ uri: riderAvatar || RIDER_AVATAR_PRESETS[0] }}
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 28,
+                    borderWidth: 2,
+                    borderColor: '#0C6258',
+                    backgroundColor: '#F1F5F9',
+                  }}
+                />
+                <TextInput
+                  style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
+                  value={riderAvatar}
+                  onChangeText={setRiderAvatar}
+                  placeholder="Image URL"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+              <View style={styles.avatarPresetRow}>
+                {RIDER_AVATAR_PRESETS.map((presetUrl, idx) => {
+                  const isSelected = riderAvatar === presetUrl;
+                  return (
+                    <TouchableOpacity key={idx} onPress={() => setRiderAvatar(presetUrl)} activeOpacity={0.8}>
+                      <Image
+                        source={{ uri: presetUrl }}
+                        style={[
+                          styles.avatarPresetThumb,
+                          isSelected && styles.avatarPresetThumbSelected,
+                        ]}
+                      />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1.5 }}>
+                  <Text style={styles.formLabel}>Full Name *</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={riderName}
+                    onChangeText={(txt) => {
+                      setRiderName(txt);
+                      if (!editingRider && !riderShortName) {
+                        setRiderShortName(txt.trim().split(' ')[0] || '');
+                      }
+                    }}
+                    placeholder="e.g. Juan Dela Cruz"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formLabel}>Short Name</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={riderShortName}
+                    onChangeText={setRiderShortName}
+                    placeholder="e.g. Juan"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.formLabel}>Phone *</Text>
+              <TextInput
+                style={styles.formInput}
+                value={riderPhone}
+                onChangeText={setRiderPhone}
+                placeholder="e.g. 09171234567"
+                placeholderTextColor="#94A3B8"
+                keyboardType="phone-pad"
+              />
+
+              <Text style={styles.formLabel}>Rider ID</Text>
+              <TextInput
+                style={[styles.formInput, editingRider && { backgroundColor: '#F8FAFC' }]}
+                value={riderIdInput}
+                onChangeText={setRiderIdInput}
+                placeholder="e.g. rider-juan (optional, auto if blank)"
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="none"
+                editable={!editingRider}
+              />
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formLabel}>Email *</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={riderEmail}
+                    onChangeText={setRiderEmail}
+                    placeholder="rider@store.com"
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formLabel}>Username *</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={riderUsername}
+                    onChangeText={setRiderUsername}
+                    placeholder="rider.juan"
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.formLabel}>
+                {editingRider ? 'Temporary password (leave blank to keep)' : 'Temporary password *'}
+              </Text>
+              <TextInput
+                style={styles.formInput}
+                value={riderPassword}
+                onChangeText={setRiderPassword}
+                placeholder={editingRider ? 'Leave blank to keep current password' : 'Min. 6 characters'}
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="none"
+                secureTextEntry
+              />
+
+              <Text style={styles.formLabel}>Account status (login)</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                {Object.values(RIDER_ACCOUNT_STATUSES).map((st) => {
+                  const isSelected = riderAccountStatus === st;
+                  return (
+                    <TouchableOpacity
+                      key={st}
+                      onPress={() => setRiderAccountStatus(st)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isSelected ? '#0C6258' : '#CBD5E1',
+                        backgroundColor: isSelected ? '#F3F7F6' : '#FFFFFF',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '800',
+                          color: isSelected ? '#0C6258' : '#0F172A',
+                        }}
+                      >
+                        {st}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1.4 }}>
+                  <Text style={styles.formLabel}>Vehicle</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={riderVehicle}
+                    onChangeText={setRiderVehicle}
+                    placeholder="e.g. Yamaha NMAX 155"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formLabel}>Plate Number</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={riderPlate}
+                    onChangeText={setRiderPlate}
+                    placeholder="e.g. NMX-1001"
+                    placeholderTextColor="#94A3B8"
+                    autoCapitalize="characters"
+                  />
+                </View>
+              </View>
+
+              <Text style={styles.formLabel}>Status</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                {Object.values(RIDER_STATUSES).map((st) => {
+                  const isSelected = riderStatus === st;
+                  return (
+                    <TouchableOpacity
+                      key={st}
+                      onPress={() => setRiderStatus(st)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isSelected ? '#0C6258' : '#CBD5E1',
+                        backgroundColor: isSelected ? '#F3F7F6' : '#FFFFFF',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '800',
+                          color: isSelected ? '#0C6258' : '#0F172A',
+                        }}
+                      >
+                        {st}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              <Text style={styles.formLabel}>Notes</Text>
+              <TextInput
+                style={[styles.formInput, { minHeight: 64, textAlignVertical: 'top' }]}
+                value={riderNotes}
+                onChangeText={setRiderNotes}
+                placeholder="Optional notes..."
+                placeholderTextColor="#94A3B8"
+                multiline
+              />
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.quickStoreBtn}
+                onPress={() => {
+                  setIsAddRiderModalOpen(false);
+                  setEditingRider(null);
+                }}
+              >
+                <Text style={styles.quickStoreBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveRider}>
+                <BootstrapIcon
+                  name={editingRider ? 'check-lg' : 'person-plus-fill'}
+                  size={14}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.addBtnPrimaryText}>
+                  {editingRider ? 'Save Changes' : 'Add Rider'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* ─── MODAL: ADD / EDIT SUPPLIER PARTNER ─── */}
       <Modal
         visible={isAddSupplierModalOpen}
@@ -15017,6 +16278,25 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </View>
               </TouchableOpacity>
 
+              {/* Riders */}
+              <TouchableOpacity
+                style={[styles.mobileMoreCard, activeNav === 'riders' && styles.mobileMoreCardActive]}
+                onPress={() => {
+                  setActiveNav('riders');
+                  setIsMobileMoreOpen(false);
+                }}
+              >
+                <BootstrapIcon
+                  name="bicycle"
+                  size={20}
+                  color={activeNav === 'riders' ? '#0C6258' : '#475569'}
+                />
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Riders</Text>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>{deliveryRiders.length} delivery staff</Text>
+                </View>
+              </TouchableOpacity>
+
               {/* Users */}
               <TouchableOpacity
                 style={[styles.mobileMoreCard, activeNav === 'users' && styles.mobileMoreCardActive]}
@@ -15367,12 +16647,25 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   Update Order Fulfillment Status
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                  {['Pending Approval', 'Processing', 'Shipped', 'Delivered', 'Cancelled'].map((st) => {
+                  {[
+                    'Pending Approval',
+                    'Processing',
+                    'Ready for Delivery',
+                    'Out for Delivery',
+                    'Delivery Failed',
+                    'Rescheduled',
+                    'Delivered',
+                    'Cancelled',
+                  ].map((st) => {
+                    const cur = (selectedOrderForModal?.status || '').toLowerCase();
                     const isCur =
-                      (selectedOrderForModal?.status || '').toLowerCase() === st.toLowerCase() ||
+                      cur === st.toLowerCase() ||
                       (st === 'Pending Approval' &&
-                        ((selectedOrderForModal?.status || '').toLowerCase().includes('pending') ||
-                          (selectedOrderForModal?.status || '').toLowerCase().includes('approval')));
+                        (cur.includes('pending') || cur.includes('approval'))) ||
+                      (st === 'Out for Delivery' && (cur === 'shipped' || cur === 'in transit'));
+                    const isOfd =
+                      cur === 'out for delivery' || cur === 'shipped' || cur === 'in transit';
+                    const needsDeliveredReason = st === 'Delivered' && isOfd;
 
                     return (
                       <TouchableOpacity
@@ -15383,6 +16676,85 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         ]}
                         onPress={() => {
                           const oid = selectedOrderForModal?.order_id || selectedOrderForModal?.id;
+                          if (st === 'Delivered') {
+                            if (isOfd) {
+                              setDeliveryAction({ mode: 'mark_delivered', order: selectedOrderForModal });
+                            } else {
+                              showToast('Dispatch the order first, then mark it delivered.');
+                            }
+                            return;
+                          }
+                          if (st === 'Ready for Delivery') {
+                            setAssignDeliveryOrder(selectedOrderForModal);
+                            return;
+                          }
+                          if (st === 'Out for Delivery') {
+                            deliveryService.markOutForDelivery(oid, currentUser).then(async (res) => {
+                              if (res.success) {
+                                showToast('Out for delivery');
+                                await loadData();
+                                setSelectedOrderForModal((prev) =>
+                                  prev ? { ...prev, status: 'Out for Delivery' } : prev
+                                );
+                                await refreshOrderDeliveryPanel(oid);
+                              } else {
+                                showToast(res.error || 'Dispatch failed');
+                              }
+                            });
+                            return;
+                          }
+                          if (st === 'Delivery Failed') {
+                            deliveryService
+                              .markDeliveryFailed(oid, currentUser, 'Marked failed by admin')
+                              .then(async (res) => {
+                                if (res.success) {
+                                  showToast('Marked as delivery failed');
+                                  await loadData();
+                                  setSelectedOrderForModal((prev) =>
+                                    prev ? { ...prev, status: 'Delivery Failed' } : prev
+                                  );
+                                  await refreshOrderDeliveryPanel(oid);
+                                } else {
+                                  showToast(res.error || 'Update failed');
+                                }
+                              });
+                            return;
+                          }
+                          if (st === 'Rescheduled') {
+                            deliveryService
+                              .rescheduleDelivery(oid, currentUser, 'Rescheduled by admin')
+                              .then(async (res) => {
+                                if (res.success) {
+                                  showToast('Delivery rescheduled');
+                                  await loadData();
+                                  setSelectedOrderForModal((prev) =>
+                                    prev ? { ...prev, status: 'Rescheduled' } : prev
+                                  );
+                                  await refreshOrderDeliveryPanel(oid);
+                                } else {
+                                  showToast(res.error || 'Reschedule failed');
+                                }
+                              });
+                            return;
+                          }
+                          if (st === 'Cancelled') {
+                            handleCancelOrder(oid);
+                            return;
+                          }
+                          if (st === 'Processing') {
+                            if (cur.includes('pending') || cur.includes('approval')) {
+                              handleApproveCOD(oid);
+                            } else if (cur !== 'processing') {
+                              showToast('Processing is only used after COD approval.');
+                            }
+                            return;
+                          }
+                          if (st === 'Pending Approval') {
+                            if (!(cur.includes('pending') || cur.includes('approval'))) {
+                              showToast('Cannot move an order back to Pending Approval.');
+                            }
+                            return;
+                          }
                           handleUpdateOrderStatus(oid, st);
                         }}
                       >
@@ -15392,13 +16764,294 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             isCur && { color: '#FFFFFF', fontWeight: '800' },
                           ]}
                         >
-                          {st === 'Pending Approval' ? '⏳ Pending COD' : st}
+                          {st === 'Pending Approval'
+                            ? 'Pending COD'
+                            : st === 'Delivered' && needsDeliveredReason
+                              ? 'Delivered (needs reason)'
+                              : st}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
               </View>
+
+              {/* Delivery Information */}
+              <View
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  borderRadius: 12,
+                  padding: 14,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  marginBottom: 14,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '800',
+                      color: '#64748B',
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    Delivery Information
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() =>
+                      setAssignDeliveryOrder({
+                        ...selectedOrderForModal,
+                        expected_delivery_at:
+                          orderDeliveryDetail?.expected_delivery_at ||
+                          selectedOrderForModal?.expected_delivery_at,
+                      })
+                    }
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                  >
+                    <BootstrapIcon name="truck" size={12} color="#0C6258" />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0C6258' }}>
+                      Assign / Update
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                {orderDeliveryDetail ? (
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 13, color: '#0F172A' }}>
+                      Rider: <Text style={{ fontWeight: '800' }}>{orderDeliveryDetail.rider_name || '—'}</Text>
+                      {orderDeliveryDetail.rider_contact ? ` · ${orderDeliveryDetail.rider_contact}` : ''}
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: '#0C6258', fontWeight: '700' }}>
+                      Shipping → rider earning: ₱
+                      {Number(
+                        orderDeliveryDetail.rider_earning ??
+                          orderDeliveryDetail.shipping_fee ??
+                          selectedOrderForModal?.shipping_fee ??
+                          0
+                      ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {orderDeliveryDetail.rider_earning_credited ? ' · credited' : ' · pending delivery confirm'}
+                    </Text>
+                    {orderDeliveryDetail.vehicle_info ? (
+                      <Text style={{ fontSize: 12.5, color: '#334155' }}>
+                        Vehicle: {orderDeliveryDetail.vehicle_info}
+                      </Text>
+                    ) : null}
+                    <Text style={{ fontSize: 12.5, color: '#334155' }}>
+                      Status: {orderDeliveryDetail.delivery_status || selectedOrderForModal?.status || '—'}
+                    </Text>
+                    {orderDeliveryDetail.delivered_at || selectedOrderForModal?.delivered_at ? (
+                      <Text style={{ fontSize: 12.5, color: '#047857', fontWeight: '700' }}>
+                        Delivered:{' '}
+                        {new Date(
+                          orderDeliveryDetail.delivered_at || selectedOrderForModal?.delivered_at
+                        ).toLocaleString()}
+                        {orderDeliveryDetail.rider_name ? ` · ${orderDeliveryDetail.rider_name}` : ''}
+                      </Text>
+                    ) : null}
+                    <ExpectedDeliveryEditor
+                      orderId={selectedOrderForModal?.order_id || selectedOrderForModal?.id}
+                      currentIso={
+                        orderDeliveryDetail.expected_delivery_at ||
+                        selectedOrderForModal?.expected_delivery_at
+                      }
+                      adminUser={currentUser}
+                      showToast={showToast}
+                      onSaved={async (res) => {
+                        const oid = selectedOrderForModal?.order_id || selectedOrderForModal?.id;
+                        setSelectedOrderForModal((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                expected_delivery_at: res?.delivery?.expected_delivery_at,
+                                estimated_delivery: res?.estimated_delivery || prev.estimated_delivery,
+                              }
+                            : prev
+                        );
+                        if (oid) await refreshOrderDeliveryPanel(oid);
+                        await loadData();
+                      }}
+                    />
+                    <Text style={{ fontSize: 12.5, color: '#334155' }}>
+                      Admin confirmation:{' '}
+                      {orderDeliveryDetail.admin_confirmed
+                        ? `Confirmed${orderDeliveryDetail.admin_confirmed_at ? ` · ${new Date(orderDeliveryDetail.admin_confirmed_at).toLocaleString()}` : ''}${orderDeliveryDetail.confirmed_by_admin ? ` by ${orderDeliveryDetail.confirmed_by_admin}` : ''}`
+                        : 'Waiting for admin to Confirm Delivery'}
+                    </Text>
+                    <Text style={{ fontSize: 12.5, color: '#334155' }}>
+                      Rider report:{' '}
+                      {orderDeliveryDetail.rider_reported_delivered
+                        ? `Reported${orderDeliveryDetail.rider_reported_at ? ` · ${new Date(orderDeliveryDetail.rider_reported_at).toLocaleString()}` : ''}${orderDeliveryDetail.token_verified ? ' · token verified' : ''}`
+                        : 'Not reported yet — rider scans QR after drop-off'}
+                    </Text>
+                    {orderDeliveryDetail.rider_report_notes ? (
+                      <Text style={{ fontSize: 12.5, color: '#64748B', fontStyle: 'italic' }}>
+                        Report notes: {orderDeliveryDetail.rider_report_notes}
+                      </Text>
+                    ) : null}
+                    {orderDeliveryDetail.admin_confirmed ? (
+                      <Text style={{ fontSize: 12.5, color: '#047857' }}>
+                        Admin confirmed delivery
+                        {orderDeliveryDetail.admin_confirmed_reason
+                          ? `: ${orderDeliveryDetail.admin_confirmed_reason}`
+                          : ''}
+                      </Text>
+                    ) : null}
+                    {(!orderDeliveryDetail.admin_confirmed &&
+                      (orderDeliveryDetail.delivery_status || '').toLowerCase() !== 'delivered' &&
+                      ((selectedOrderForModal?.status || '').toLowerCase() === 'out for delivery' ||
+                        (selectedOrderForModal?.status || '').toLowerCase() === 'shipped' ||
+                        (selectedOrderForModal?.status || '').toLowerCase() === 'delivery reported' ||
+                        orderDeliveryDetail.rider_reported_delivered)) && (
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                        {((selectedOrderForModal?.status || '').toLowerCase() === 'out for delivery' ||
+                          (selectedOrderForModal?.status || '').toLowerCase() === 'shipped') && (
+                          <TouchableOpacity
+                            style={[styles.btnAdvanceOrder, { paddingHorizontal: 10 }]}
+                            onPress={() =>
+                              setDeliveryTokenModal({ order: selectedOrderForModal, bundle: null })
+                            }
+                          >
+                            <BootstrapIcon name="qr-code" size={12} color="#1D4ED8" />
+                            <Text style={styles.btnAdvanceOrderText}>Print QR</Text>
+                          </TouchableOpacity>
+                        )}
+                        {(orderDeliveryDetail.rider_id ||
+                          orderDeliveryDetail.rider_name ||
+                          selectedOrderForModal?.rider_id ||
+                          selectedOrderForModal?.rider_name) && (
+                          <TouchableOpacity
+                            style={[styles.btnAdvanceOrder, { paddingHorizontal: 10 }]}
+                            onPress={() =>
+                              setRiderAccessModal({
+                                rider: {
+                                  id: orderDeliveryDetail.rider_id || selectedOrderForModal?.rider_id,
+                                  name: orderDeliveryDetail.rider_name || selectedOrderForModal?.rider_name,
+                                  phone: orderDeliveryDetail.rider_contact || selectedOrderForModal?.rider_contact,
+                                },
+                                bundle: null,
+                              })
+                            }
+                          >
+                            <BootstrapIcon name="geo-alt" size={12} color="#1D4ED8" />
+                            <Text style={styles.btnAdvanceOrderText}>Rider dashboard</Text>
+                          </TouchableOpacity>
+                        )}
+                        {!orderDeliveryDetail.rider_reported_delivered && (
+                          <TouchableOpacity
+                            style={[styles.btnAdvanceOrder, { paddingHorizontal: 10, backgroundColor: '#FFFBEB', borderColor: '#FDE68A' }]}
+                            onPress={() =>
+                              setDeliveryAction({ mode: 'rider_report', order: selectedOrderForModal })
+                            }
+                          >
+                            <BootstrapIcon name="bicycle" size={12} color="#B45309" />
+                            <Text style={[styles.btnAdvanceOrderText, { color: '#B45309' }]}>Log rider report</Text>
+                          </TouchableOpacity>
+                        )}
+                        {(orderDeliveryDetail.rider_reported_delivered ||
+                          (selectedOrderForModal?.status || '').toLowerCase() === 'delivery reported') && (
+                          <TouchableOpacity
+                            style={[styles.btnAdvanceOrder, { paddingHorizontal: 10, backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}
+                            onPress={() =>
+                              setDeliveryAction({ mode: 'mark_delivered', order: selectedOrderForModal })
+                            }
+                          >
+                            <BootstrapIcon name="check-circle-fill" size={12} color="#047857" />
+                            <Text style={[styles.btnAdvanceOrderText, { color: '#047857' }]}>Confirm Delivery</Text>
+                          </TouchableOpacity>
+                        )}
+                        <TouchableOpacity
+                          style={[styles.btnAdvanceOrder, { paddingHorizontal: 10, backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
+                          onPress={() =>
+                            setDeliveryAction({ mode: 'delivery_issue', order: selectedOrderForModal })
+                          }
+                        >
+                          <BootstrapIcon name="exclamation-triangle" size={12} color="#B91C1C" />
+                          <Text style={[styles.btnAdvanceOrderText, { color: '#B91C1C' }]}>Delivery Issue</Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
+                      {(orderDeliveryDetail.delivery_photo || orderDeliveryDetail.proof_of_delivery) ? (
+                        <Image
+                          source={{ uri: orderDeliveryDetail.delivery_photo || orderDeliveryDetail.proof_of_delivery }}
+                          style={{ width: 72, height: 72, borderRadius: 8, backgroundColor: '#E2E8F0' }}
+                        />
+                      ) : (
+                        <Text style={{ fontSize: 12, color: '#94A3B8' }}>No delivery photo yet</Text>
+                      )}
+                      <TouchableOpacity
+                        style={[styles.btnAdvanceOrder, { paddingHorizontal: 10 }]}
+                        onPress={handleUploadProof}
+                      >
+                        <BootstrapIcon name="camera" size={12} color="#1D4ED8" />
+                        <Text style={styles.btnAdvanceOrderText}>
+                          {(orderDeliveryDetail.delivery_photo || orderDeliveryDetail.proof_of_delivery)
+                            ? 'Replace Photo'
+                            : 'Upload Photo'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    {orderDeliveryHistory.length > 0 && (
+                      <View style={{ marginTop: 10, gap: 4 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#64748B', textTransform: 'uppercase' }}>
+                          Delivery History
+                        </Text>
+                        {orderDeliveryHistory.slice(0, 8).map((h) => (
+                          <Text key={h.id || `${h.action}-${h.created_at}`} style={{ fontSize: 11.5, color: '#475569' }}>
+                            {h.created_at ? new Date(h.created_at).toLocaleString() : ''} — {h.action}
+                            {h.notes ? `: ${h.notes}` : ''}
+                          </Text>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <Text style={{ fontSize: 13, color: '#94A3B8' }}>
+                    No delivery assignment yet. Use Assign Delivery when the order is Processing or Rescheduled.
+                  </Text>
+                )}
+              </View>
+
+              {String(selectedOrderForModal?.status || '').toLowerCase() === 'return requested' && (
+                <View
+                  style={{
+                    backgroundColor: '#FFF7ED',
+                    borderRadius: 12,
+                    padding: 14,
+                    borderWidth: 1,
+                    borderColor: '#FED7AA',
+                    marginBottom: 14,
+                    gap: 8,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#9A3412', textTransform: 'uppercase' }}>
+                    Return Request
+                  </Text>
+                  <Text style={{ fontSize: 13, color: '#9A3412' }}>
+                    {selectedOrderForModal?.return_reason || 'Customer requested a return'}
+                    {selectedOrderForModal?.return_notes ? ` — ${selectedOrderForModal.return_notes}` : ''}
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    <TouchableOpacity
+                      style={[styles.btnAdvanceOrder, { paddingHorizontal: 10, backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' }]}
+                      onPress={() =>
+                        handleProcessReturn(selectedOrderForModal.order_id || selectedOrderForModal.id, 'Approved')
+                      }
+                    >
+                      <Text style={[styles.btnAdvanceOrderText, { color: '#047857' }]}>Approve Refund</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.btnAdvanceOrder, { paddingHorizontal: 10, backgroundColor: '#FEF2F2', borderColor: '#FECACA' }]}
+                      onPress={() =>
+                        handleProcessReturn(selectedOrderForModal.order_id || selectedOrderForModal.id, 'Rejected')
+                      }
+                    >
+                      <Text style={[styles.btnAdvanceOrderText, { color: '#B91C1C' }]}>Reject Return</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
 
               {/* Itemized Products List */}
               <View
@@ -15696,6 +17349,88 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* ─── ASSIGN DELIVERY MODAL ─── */}
+      <AssignDeliveryModal
+        visible={Boolean(assignDeliveryOrder)}
+        order={assignDeliveryOrder}
+        adminUser={currentUser}
+        onClose={() => setAssignDeliveryOrder(null)}
+        onSuccess={async (delivery, tokenBundle, riderAccess) => {
+          const assignedOrder = assignDeliveryOrder;
+          setAssignDeliveryOrder(null);
+          await loadData();
+          const oid = selectedOrderForModal?.order_id || selectedOrderForModal?.id;
+          if (oid) await refreshOrderDeliveryPanel(oid);
+          if (tokenBundle?.token || tokenBundle?.confirmUrl) {
+            setDeliveryTokenModal({
+              order: assignedOrder,
+              bundle: tokenBundle,
+            });
+          }
+          if (riderAccess?.success || riderAccess?.dashboardUrl || riderAccess?.token) {
+            setRiderAccessModal({
+              rider: {
+                id: delivery?.rider_id || assignedOrder?.rider_id,
+                name: delivery?.rider_name || assignedOrder?.rider_name,
+                phone: delivery?.rider_contact || assignedOrder?.rider_contact,
+              },
+              bundle: riderAccess,
+            });
+          }
+        }}
+        showToast={showToast}
+      />
+
+      <DeliveryTokenModal
+        visible={Boolean(deliveryTokenModal)}
+        order={deliveryTokenModal?.order}
+        adminUser={currentUser}
+        initialBundle={deliveryTokenModal?.bundle || null}
+        onClose={() => setDeliveryTokenModal(null)}
+        showToast={showToast}
+      />
+
+      <RiderAccessModal
+        visible={Boolean(riderAccessModal)}
+        rider={riderAccessModal?.rider}
+        adminUser={currentUser}
+        initialBundle={riderAccessModal?.bundle || null}
+        onClose={() => setRiderAccessModal(null)}
+        showToast={showToast}
+      />
+
+      <DeliveryAdminActionModal
+        visible={Boolean(deliveryAction)}
+        mode={deliveryAction?.mode || 'rider_report'}
+        order={deliveryAction?.order}
+        adminUser={currentUser}
+        onClose={() => setDeliveryAction(null)}
+        onSuccess={async (res) => {
+          const oid =
+            deliveryAction?.order?.order_id ||
+            deliveryAction?.order?.id ||
+            selectedOrderForModal?.order_id ||
+            selectedOrderForModal?.id;
+          setDeliveryAction(null);
+          await loadData();
+          if (oid && selectedOrderForModal && (selectedOrderForModal.order_id === oid || selectedOrderForModal.id === oid)) {
+            const nextStatus = res?.delivery?.delivery_status;
+            setSelectedOrderForModal((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    status: nextStatus || prev.status,
+                    rider_reported_delivered: Boolean(res?.delivery?.rider_reported_delivered),
+                    admin_confirmed: Boolean(res?.delivery?.admin_confirmed),
+                  }
+                : prev
+            );
+            await refreshOrderDeliveryPanel(oid);
+          }
+        }}
+        showToast={showToast}
+      />
 
       {/* ─── CUSTOM CENTER CONFIRMATION & ALERT DIALOG MODAL ─── */}
       <ConfirmModal

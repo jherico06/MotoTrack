@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, TextInput, Modal } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon';
 import { shopStyles as styles } from '../../styles/shop.styles';
 import { useCart } from '../../context/CartContext';
+import { promoService } from '../../services/promoService';
 
 export default function CartModal({ visible, onClose, onProceedToCheckout }) {
   const {
@@ -13,6 +14,8 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
     cartSubtotal,
     discountPercent,
     discountAmount,
+    shippingFee,
+    isFreeShipping,
     cartTotal,
     promoCode,
     setPromoCode,
@@ -20,13 +23,24 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
     promoFeedback,
   } = useCart();
 
+  const [availablePromos, setAvailablePromos] = useState([]);
+
+  useEffect(() => {
+    if (visible) {
+      promoService.getPromos().then((all) => {
+        const active = (all || []).filter((p) => p.isActive);
+        setAvailablePromos(active);
+      });
+    }
+  }, [visible]);
+
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
         <View style={styles.modalSheet}>
           <View style={styles.modalHeaderRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <BootstrapIcon name="bag-fill" size={16} color="#0C6258" />
+              <BootstrapIcon name="cart-fill" size={16} color="#0C6258" />
               <Text style={styles.modalTitle}>Your Cart ({cartItemCount} items)</Text>
             </View>
             <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
@@ -36,10 +50,10 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
 
           {cart.length === 0 ? (
             <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-              <BootstrapIcon name="bag-x" size={40} color="#94A3B8" style={{ marginBottom: 12 }} />
+              <BootstrapIcon name="cart-x" size={42} color="#94A3B8" style={{ marginBottom: 12 }} />
               <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>Your cart is empty</Text>
               <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
-                Browse our catalog and add motorcycle pro gear to your bag!
+                Browse our catalog and add motorcycle pro gear to your cart!
               </Text>
             </View>
           ) : (
@@ -84,6 +98,57 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
 
           {cart.length > 0 && (
             <View style={styles.cartFooter}>
+              {/* Available Active Promos */}
+              {availablePromos.length > 0 && (
+                <View style={{ marginBottom: 10 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 6, letterSpacing: 0.3 }}>
+                    ACTIVE PROMOS (TAP TO APPLY):
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                    {availablePromos.map((p) => {
+                      const isSelected = promoCode.trim().toUpperCase() === p.code;
+                      const isFreeShip = p.description?.toLowerCase().includes('free shipping');
+                      return (
+                        <TouchableOpacity
+                          key={p.code}
+                          onPress={() => {
+                            setPromoCode(p.code);
+                            applyPromo(p.code);
+                          }}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            backgroundColor: isSelected ? '#0C6258' : '#F1F5F9',
+                            borderColor: isSelected ? '#0C6258' : '#CBD5E1',
+                            borderWidth: 1,
+                            borderRadius: 12,
+                            paddingHorizontal: 9,
+                            paddingVertical: 5,
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <BootstrapIcon
+                            name={isSelected ? 'check-circle-fill' : 'ticket-perforated-fill'}
+                            size={11}
+                            color={isSelected ? '#FFFFFF' : '#0C6258'}
+                          />
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: '800',
+                              color: isSelected ? '#FFFFFF' : '#0F172A',
+                            }}
+                          >
+                            {p.code} ({p.discountPercent}% OFF{isFreeShip ? ' + Free Ship' : ''})
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
               {/* Promo Code Input */}
               <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
                 <TextInput
@@ -130,6 +195,13 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                   </Text>
                 </View>
               )}
+
+              <View style={styles.cartSummaryRow}>
+                <Text style={styles.cartSummaryLabel}>Shipping</Text>
+                <Text style={styles.cartSummaryValue}>
+                  {isFreeShipping ? 'Free' : `₱${shippingFee.toFixed(2)}`}
+                </Text>
+              </View>
 
               <View style={styles.cartSummaryRow}>
                 <Text style={styles.cartTotalLabel}>Total</Text>
