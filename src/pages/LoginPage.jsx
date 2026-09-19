@@ -15,19 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import BootstrapIcon from '../components/common/BootstrapIcon';
 import GoogleIcon from '../components/common/GoogleIcon';
 
-function DecorativePlantPot() {
-  return (
-    <View style={styles.plantDecorWrap}>
-      <View style={styles.plantLeafGroup}>
-        <View style={styles.leftLeaf} />
-        <View style={styles.centerLeaf} />
-        <View style={styles.rightLeaf} />
-      </View>
-      <View style={styles.plantPot} />
-      <View style={styles.plantPotShadow} />
-    </View>
-  );
-}
+
 
 export default function LoginPage({
   onLoginSuccess,
@@ -78,7 +66,7 @@ export default function LoginPage({
       } else if (res?.notEnabled) {
         setGoogleAdvisory(true);
       } else if (res?.cancelled) {
-        // User closed or cancelled Google sign-in modal
+        setErrorMessage(res.error || 'Google sign-in was closed before it finished.');
       } else if (res?.error) {
         setErrorMessage(res.error);
       }
@@ -126,10 +114,9 @@ export default function LoginPage({
               <View style={styles.abstractOrganicShapeInner} />
             </View>
 
-            <DecorativePlantPot />
 
             <Text style={styles.heroTitle}>Hello!</Text>
-            <Text style={styles.heroSubtitle}>Welcome to D,Blockchain Motorparts and Accessories</Text>
+            <Text style={styles.heroSubtitle}>Welcome to MotoTrack Motorparts and Accessories</Text>
           </View>
 
           {/* ─── 2. WHITE CARD CONTAINER SHEET ─── */}
@@ -140,9 +127,6 @@ export default function LoginPage({
               keyboardShouldPersistTaps="handled"
             >
               <Text style={styles.cardTitle}>Login</Text>
-              <Text style={{ fontSize: 12, color: '#64748B', marginTop: -4, marginBottom: 12 }}>
-                Customers, admins, and riders use this app. Your role opens the right screen.
-              </Text>
 
               {/* Redirect Notice */}
               {redirectReason ? (

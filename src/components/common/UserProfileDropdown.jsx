@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import BootstrapIcon from './BootstrapIcon';
 import ConfirmModal from '../modals/ConfirmModal';
+import { ANDROID_TOP_INSET } from '../../utils/safeArea';
 
 export default function UserProfileDropdown({
   currentUser,
@@ -116,7 +117,7 @@ export default function UserProfileDropdown({
           }}
           activeOpacity={0.7}
         >
-          <View style={[styles.menuIconBox, { backgroundColor: '#E6F4F1' }]}>
+          <View style={[styles.menuIconBox, { backgroundColor: '#E7F5F3' }]}>
             <BootstrapIcon name="speedometer2" size={15} color="#0C6258" />
           </View>
           <View style={styles.menuTextWrap}>
@@ -249,7 +250,7 @@ export default function UserProfileDropdown({
             <View
               style={[
                 styles.mobileBackdrop,
-                { paddingTop: topOffset ?? (Platform.OS === 'ios' ? 104 : 76) },
+                { paddingTop: topOffset ?? (Platform.OS === 'ios' ? 104 : 76 + ANDROID_TOP_INSET) },
               ]}
             >
               <TouchableWithoutFeedback

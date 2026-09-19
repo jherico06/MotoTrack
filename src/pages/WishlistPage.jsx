@@ -67,11 +67,17 @@ export default function WishlistPage({
       onNavigateToStore?.();
     } else if (tab === 'Wishlist' || tab === 'Favorites') {
       setSelectedCategory('All');
-    } else if (tab === 'Dashboard' || tab === 'Profile') {
+    } else if (tab === 'Dashboard') {
       if (!currentUser) {
         onNavigateToLogin?.();
       } else {
-        onNavigateToProfile?.();
+        onNavigateToProfile?.('overview');
+      }
+    } else if (tab === 'Profile') {
+      if (!currentUser) {
+        onNavigateToLogin?.();
+      } else {
+        onNavigateToProfile?.('profile');
       }
     } else if (tab === 'Customize') {
       if (onNavigateToCustomizer) onNavigateToCustomizer();

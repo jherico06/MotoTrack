@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { ANDROID_TOP_INSET } from '../utils/safeArea';
 
 export const customizerStyles = StyleSheet.create({
   // ─── BASE CANVAS & SCROLL CONTAINER ───
@@ -9,6 +10,7 @@ export const customizerStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    paddingTop: ANDROID_TOP_INSET,
   },
   scrollContent: {
     paddingBottom: 120, // Generous padding for persistent bottom navigation bar on mobile
@@ -735,7 +737,7 @@ export const customizerStyles = StyleSheet.create({
   selectedTrayTitle: {
     fontSize: 11.5,
     fontWeight: '800',
-    color: '#042F2E',
+    color: '#18181B',
     textTransform: 'uppercase',
   },
   selectedTrayTotal: {

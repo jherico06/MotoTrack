@@ -1,4 +1,5 @@
 import '@expo/metro-runtime';
+import './src/utils/expoCryptoPolyfill';
 import './global.css';
 import * as WebBrowser from 'expo-web-browser';
 import { registerRootComponent } from 'expo';

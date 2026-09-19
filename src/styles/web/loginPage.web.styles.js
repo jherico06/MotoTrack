@@ -67,7 +67,7 @@ export const botanicalStyles = StyleSheet.create({
 export const authWebStyles = StyleSheet.create({
   pageWrapper: {
     flex: 1,
-    backgroundColor: '#042F2E',
+    backgroundColor: '#18181B',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
@@ -289,7 +289,7 @@ export const authWebStyles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#E7F5F3',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
@@ -420,7 +420,7 @@ export const authWebStyles = StyleSheet.create({
     flex: 1,
   },
   infoBadge: {
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#E7F5F3',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,

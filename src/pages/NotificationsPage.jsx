@@ -11,6 +11,7 @@ import {
 import { BootstrapIcon } from '../components/common';
 import { notificationService, stripEmojis } from '../services/notificationService';
 import { useAuth } from '../context/AuthContext';
+import { ANDROID_TOP_INSET } from '../utils/safeArea';
 
 function getNotificationIcon(type) {
   switch (type) {
@@ -24,7 +25,7 @@ function getNotificationIcon(type) {
     case 'system':
       return { icon: 'shield-lock', color: '#7C3AED', bg: '#EDE9FE' };
     default:
-      return { icon: 'bell', color: '#0C6258', bg: '#E6F4F1' };
+      return { icon: 'bell', color: '#0C6258', bg: '#E7F5F3' };
   }
 }
 export default function NotificationsPage({
@@ -140,7 +141,7 @@ export default function NotificationsPage({
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: { flex: 1, backgroundColor: '#F8FAFC', paddingTop: ANDROID_TOP_INSET },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

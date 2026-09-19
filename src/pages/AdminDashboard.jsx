@@ -30,11 +30,12 @@ import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { supabaseManager } from '../services/supabaseClient';
 import { CATEGORY_NAMES, ADMIN_IMAGE_PRESETS } from '../data/motorParts';
-import { BootstrapIcon, ExpectedDeliveryEditor } from '../components/common';
+import { AdminStatCard, BootstrapIcon, ExpectedDeliveryEditor } from '../components/common';
 import { AssignDeliveryModal, DeliveryAdminActionModal, DeliveryTokenModal, RiderAccessModal } from '../components/modals';
 import { pickImageFromFile } from '../utils/imagePickerHelper';
 import { systemSettingsService } from '../services/systemSettingsService';
 import NotificationsPage from './NotificationsPage';
+import { SalesForecastPanel } from '../components/admin';
 
 export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const { width: windowWidth } = useWindowDimensions();
@@ -49,7 +50,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
   };
 
-  // Active Navigation Tab: 'overview' | 'orders' | 'inventory' | 'pos' | 'analytics' | 'products' | 'promos' | 'garage' | 'users' | 'supabase'
+  // Active Navigation Tab: 'overview' | 'orders' | 'inventory' | 'pos' | 'analytics' | 'forecast' | 'products' | 'promos' | 'garage' | 'users' | 'supabase'
   const [activeNav, setActiveNav] = useState('overview');
 
   // Core Data States
@@ -138,6 +139,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   );
   const [servDesc, setServDesc] = useState('');
   const [servInclusions, setServInclusions] = useState('');
+  const [garageSubTab, setGarageSubTab] = useState('bookings');
+  const [garageBookings, setGarageBookings] = useState([]);
+  const [garageMechanics, setGarageMechanics] = useState(() => garageService.getMechanics());
+  const [selectedBookingForApproval, setSelectedBookingForApproval] = useState(null);
+  const [selectedMechanicForApproval, setSelectedMechanicForApproval] = useState('');
 
   // ─── RIDERS / DELIVERY STAFF STATE ───
   const [deliveryRiders, setDeliveryRiders] = useState(() => riderService.getRiders());
@@ -238,6 +244,74 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     }
   };
 
+  const resetGaragePackageForm = () => {
+    setEditingGarageService(null);
+    setServTitle('');
+    setServSubtitle('');
+    setServCategory('PMS');
+    setServPrice('2500');
+    setServDuration('60 mins');
+    setServBadge('New Package');
+    setServImage('https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80');
+    setServDesc('');
+    setServInclusions('');
+  };
+
+  const handleSaveGarageService = async () => {
+    if (!servTitle.trim() || !servPrice.trim()) {
+      showAlert('Required Fields', 'Please enter a package title and price.');
+      return;
+    }
+    const priceNum = Number(servPrice) || 0;
+    if (editingGarageService) {
+      await garageService.updateService(editingGarageService.id || editingGarageService.service_id, {
+        title: servTitle.trim(),
+        category: servCategory,
+        subtitle: servSubtitle.trim(),
+        price: priceNum,
+        pricePhp: priceNum,
+        duration: servDuration,
+        badge: servBadge,
+        image: servImage,
+        description: servDesc.trim(),
+        inclusions: servInclusions,
+      });
+      showToast(`Package "${servTitle}" updated.`);
+    } else {
+      await garageService.addService({
+        title: servTitle.trim(),
+        category: servCategory,
+        subtitle: servSubtitle.trim(),
+        price: priceNum,
+        pricePhp: priceNum,
+        duration: servDuration,
+        badge: servBadge,
+        image: servImage,
+        description: servDesc.trim(),
+        inclusions: servInclusions,
+      });
+      showToast(`Package "${servTitle}" added to the shop catalog.`);
+    }
+    setGarageServices(garageService.getServices());
+    setIsAddGarageOpen(false);
+    resetGaragePackageForm();
+  };
+
+  const handleAdvisorApprove = async (bookingId, mechanic) => {
+    const assigned = mechanic || selectedMechanicForApproval || garageMechanics[0]?.name || 'Master Tech Jayson';
+    const updated = await garageService.approveBooking(bookingId, assigned);
+    setGarageBookings(updated);
+    setSelectedBookingForApproval(null);
+    showToast(`Booking #${bookingId} approved.`);
+  };
+
+  const handleAdvisorReject = async (bookingId) => {
+    const updated = await garageService.rejectBooking(bookingId, 'Schedule or bay not available');
+    setGarageBookings(updated);
+    setSelectedBookingForApproval(null);
+    showToast(`Booking #${bookingId} declined.`);
+  };
+
   // ─── LOAD DATA ───
   const loadData = async () => {
     const prods = await productService.getProducts();
@@ -257,6 +331,15 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       setGarageServices(srvs || []);
     } catch (e) {
       setGarageServices(garageService.getServices());
+    }
+
+    try {
+      await garageService.fetchMechanics();
+      const bks = await garageService.getAllBookings();
+      setGarageBookings(bks || []);
+      setGarageMechanics(garageService.getMechanics());
+    } catch (_e) {
+      setGarageBookings(garageService.getLocalBookings());
     }
 
     try {
@@ -294,11 +377,19 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     const unsubscribeRiders = riderService.subscribe((riders) => {
       if (Array.isArray(riders)) setDeliveryRiders(riders);
     });
+    const unsubscribeGarage = garageService.subscribe((srvs) => {
+      if (Array.isArray(srvs)) setGarageServices(srvs);
+    });
+    const unsubscribeBookings = garageService.subscribeBookings((bks) => {
+      if (Array.isArray(bks)) setGarageBookings(bks);
+    });
     return () => {
       unsubscribeProd();
       unsubscribeOrders();
       unsubscribeDeliveries?.();
       unsubscribeRiders?.();
+      unsubscribeGarage?.();
+      unsubscribeBookings?.();
     };
   }, []);
 
@@ -513,13 +604,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     });
 
     // Payment Methods breakdown
-    const paymentBreakdown = { Cash: 0, Card: 0, GCash: 0, PayPal: 0 };
+    const paymentBreakdown = { Cash: 0, GCash: 0 };
     allOrders.forEach((o) => {
       const pm = (o.payment_method || '').toLowerCase();
-      if (pm.includes('cash')) paymentBreakdown.Cash += 1;
-      else if (pm.includes('card') || pm.includes('apple') || pm.includes('credit')) paymentBreakdown.Card += 1;
-      else if (pm.includes('gcash') || pm.includes('wallet')) paymentBreakdown.GCash += 1;
-      else paymentBreakdown.PayPal += 1;
+      if (pm.includes('gcash') || pm.includes('wallet')) paymentBreakdown.GCash += 1;
+      else paymentBreakdown.Cash += 1;
     });
 
     // Top Selling Products
@@ -929,6 +1018,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       if (orderPaymentFilter === 'COD') matchPayment = pm.includes('cash') || pm.includes('cod');
       else if (orderPaymentFilter === 'GCash') matchPayment = pm.includes('gcash');
       else if (orderPaymentFilter === 'Card') matchPayment = pm.includes('card') || pm.includes('apple');
+      else if (orderPaymentFilter === 'PayPal') matchPayment = pm.includes('paypal');
 
       const q = orderSearchQuery.toLowerCase().trim();
       const matchSearch =
@@ -1065,6 +1155,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     inventory: '📦 Inventory & Stock Telemetry',
     pos: '💻 Point of Sale (POS) Cashier Terminal',
     analytics: '📈 Sales Analytics & Reports',
+    forecast: '📊 Sales Forecast & Stock Optimization',
     products: '🏷️ Products & Price Management',
     promos: '🎟️ Promo Vouchers & Discounts',
     garage: '🛠️ Garage Services (PMS & Tuning)',
@@ -1226,6 +1317,20 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </View>
                   <Text style={[styles.sidebarNavLabel, activeNav === 'analytics' && styles.sidebarNavLabelActive]}>
                     Analytics & Reports
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 5b. Forecast */}
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, activeNav === 'forecast' && styles.sidebarNavItemActive]}
+                  onPress={() => setActiveNav('forecast')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 22, alignItems: 'center' }}>
+                    <BootstrapIcon name="clipboard-data" size={16} color={activeNav === 'forecast' ? '#FFFFFF' : '#64748B'} />
+                  </View>
+                  <Text style={[styles.sidebarNavLabel, activeNav === 'forecast' && styles.sidebarNavLabelActive]}>
+                    Forecast & Stock
                   </Text>
                 </TouchableOpacity>
 
@@ -1464,12 +1569,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <TouchableOpacity
                   style={styles.addBtnPrimary}
                   onPress={() => {
+                    resetGaragePackageForm();
+                    setGarageSubTab('packages');
                     setIsAddGarageOpen(true);
                   }}
                   activeOpacity={0.85}
                 >
                   <BootstrapIcon name="plus-lg" size={14} color="#FFFFFF" />
-                  <Text style={styles.addBtnPrimaryText}>{isDesktop ? 'Add Pitstop Package' : '+ Service'}</Text>
+                  <Text style={styles.addBtnPrimaryText}>{isDesktop ? 'Add Service Package' : '+ Package'}</Text>
                 </TouchableOpacity>
               )}
               {activeNav === 'riders' && (
@@ -1524,45 +1631,35 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <View>
                 {/* Stats Grid */}
                 <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="currency-dollar" size={18} color="#0C6258" />
-                    </View>
-                    <Text style={styles.statLabel}>Total Store Revenue</Text>
-                    <Text style={styles.statValue}>₱{analyticsData.totalRevenue.toLocaleString()}</Text>
-                    <Text style={styles.statSub}>Online + Walk-in POS</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="box-seam" size={18} color="#10B981" />
-                    </View>
-                    <Text style={styles.statLabel}>Active SKUs</Text>
-                    <Text style={styles.statValue}>{products.length}</Text>
-                    <Text style={styles.statSub}>{invStats.totalUnits} total units in stock</Text>
-                  </View>
-
-                  <View style={[styles.statCard, invStats.lowStockCount > 0 ? styles.statCardWarningAccent : styles.statCardSuccessAccent]}>
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="exclamation-triangle-fill" size={18} color={invStats.lowStockCount > 0 ? '#F59E0B' : '#10B981'} />
-                    </View>
-                    <Text style={styles.statLabel}>Stock Alerts</Text>
-                    <Text style={[styles.statValue, invStats.lowStockCount > 0 && { color: '#D97706' }]}>
-                      {invStats.lowStockCount} Low / {invStats.outOfStockCount} Out
-                    </Text>
-                    <Text style={styles.statSub}>Needs reorder attention</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="receipt" size={18} color="#0C6258" />
-                    </View>
-                    <Text style={styles.statLabel}>Dispatches & Orders</Text>
-                    <Text style={styles.statValue}>{orders.length}</Text>
-                    <Text style={styles.statSub}>
-                      {analyticsData.posOrdersCount} POS / {analyticsData.onlineOrdersCount} Online
-                    </Text>
-                  </View>
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Store Revenue"
+                    value={`₱${analyticsData.totalRevenue.toLocaleString()}`}
+                    sub="Online + Walk-in POS"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="blue"
+                    label="Active SKUs"
+                    value={products.length}
+                    sub={`${invStats.totalUnits} total units in stock`}
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent={invStats.lowStockCount > 0 ? 'amber' : 'teal'}
+                    label="Stock Alerts"
+                    value={`${invStats.lowStockCount} Low / ${invStats.outOfStockCount} Out`}
+                    valueColor={invStats.lowStockCount > 0 ? '#D97706' : undefined}
+                    sub="Needs reorder attention"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="amber"
+                    label="Dispatches & Orders"
+                    value={orders.length}
+                    sub={`${analyticsData.posOrdersCount} POS / ${analyticsData.onlineOrdersCount} Online`}
+                  />
                 </View>
 
                 {/* Urgent Pending COD Approvals Alert in Overview */}
@@ -1716,43 +1813,35 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <View>
                 {/* Orders KPI Grid */}
                 <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="receipt" size={18} color="#0C6258" />
-                    </View>
-                    <Text style={styles.statLabel}>Total Orders</Text>
-                    <Text style={styles.statValue}>{orderStats.total}</Text>
-                    <Text style={styles.statSub}>₱{orderStats.totalRevenue.toLocaleString()} volume</Text>
-                  </View>
-
-                  <View style={[styles.statCard, orderStats.pendingCod > 0 ? styles.statCardWarningAccent : styles.statCardSuccessAccent]}>
-                    <View style={[styles.statIconWrap, { backgroundColor: orderStats.pendingCod > 0 ? '#FEF3C7' : '#ECFDF5' }]}>
-                      <BootstrapIcon name="shield-lock-fill" size={18} color={orderStats.pendingCod > 0 ? '#D97706' : '#10B981'} />
-                    </View>
-                    <Text style={styles.statLabel}>Pending COD Approvals</Text>
-                    <Text style={[styles.statValue, { color: orderStats.pendingCod > 0 ? '#D97706' : '#047857' }]}>
-                      {orderStats.pendingCod}
-                    </Text>
-                    <Text style={styles.statSub}>Requires Admin action</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={[styles.statIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                      <BootstrapIcon name="box-seam-fill" size={18} color="#1D4ED8" />
-                    </View>
-                    <Text style={styles.statLabel}>Packing & Processing</Text>
-                    <Text style={[styles.statValue, { color: '#1D4ED8' }]}>{orderStats.processing}</Text>
-                    <Text style={styles.statSub}>Ready for courier pickup</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                    <View style={[styles.statIconWrap, { backgroundColor: '#F3E8FF' }]}>
-                      <BootstrapIcon name="truck" size={18} color="#9333EA" />
-                    </View>
-                    <Text style={styles.statLabel}>Out for Delivery</Text>
-                    <Text style={[styles.statValue, { color: '#9333EA' }]}>{orderStats.shipped}</Text>
-                    <Text style={styles.statSub}>On the road with courier</Text>
-                  </View>
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Orders"
+                    value={orderStats.total}
+                    sub={`₱${orderStats.totalRevenue.toLocaleString()} volume`}
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent={orderStats.pendingCod > 0 ? 'amber' : 'blue'}
+                    label="Pending COD Approvals"
+                    value={orderStats.pendingCod}
+                    valueColor={orderStats.pendingCod > 0 ? '#D97706' : '#0C6258'}
+                    sub="Requires Admin action"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Packing & Processing"
+                    value={orderStats.processing}
+                    sub="Ready for courier pickup"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="amber"
+                    label="Out for Delivery"
+                    value={orderStats.shipped}
+                    sub="On the road with courier"
+                  />
                 </View>
 
                 {/* COD Pending Banner if any */}
@@ -1831,6 +1920,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             ? 'COD Only'
                             : orderPaymentFilter === 'GCash'
                             ? 'GCash'
+                            : orderPaymentFilter === 'PayPal'
+                            ? 'PayPal'
                             : 'Card'}
                         </Text>
                       </View>
@@ -1853,7 +1944,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               { key: 'All', label: 'All Payments', emoji: '💳' },
                               { key: 'COD', label: 'COD Only', emoji: '💵' },
                               { key: 'GCash', label: 'GCash Express', emoji: '📱' },
-                              { key: 'Card', label: 'Credit / Debit Card', emoji: '💳' },
                             ].map((option) => {
                               const isSelected = orderPaymentFilter === option.key;
                               return (
@@ -2284,29 +2374,37 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <View>
                 {/* Inventory KPI Summary Cards */}
                 <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <Text style={styles.statLabel}>Total Inventory Value</Text>
-                    <Text style={styles.statValue}>₱{invStats.totalValue.toLocaleString()}</Text>
-                    <Text style={styles.statSub}>Across {invStats.totalUnits} items</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                    <Text style={styles.statLabel}>In Stock SKUs</Text>
-                    <Text style={[styles.statValue, { color: '#047857' }]}>{invStats.inStockCount}</Text>
-                    <Text style={styles.statSub}>5+ units on hand</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardWarningAccent]}>
-                    <Text style={styles.statLabel}>Low Stock Alert</Text>
-                    <Text style={[styles.statValue, { color: '#D97706' }]}>{invStats.lowStockCount}</Text>
-                    <Text style={styles.statSub}>1 - 4 units remaining</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardDangerAccent]}>
-                    <Text style={styles.statLabel}>Out of Stock</Text>
-                    <Text style={[styles.statValue, { color: '#DC2626' }]}>{invStats.outOfStockCount}</Text>
-                    <Text style={styles.statSub}>0 units available</Text>
-                  </View>
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Inventory Value"
+                    value={`₱${invStats.totalValue.toLocaleString()}`}
+                    sub={`Across ${invStats.totalUnits} items`}
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="blue"
+                    label="In Stock SKUs"
+                    value={invStats.inStockCount}
+                    valueColor="#0C6258"
+                    sub="5+ units on hand"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Low Stock Alert"
+                    value={invStats.lowStockCount}
+                    valueColor={invStats.lowStockCount > 0 ? '#D97706' : undefined}
+                    sub="1 - 4 units remaining"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="amber"
+                    label="Out of Stock"
+                    value={invStats.outOfStockCount}
+                    valueColor={invStats.outOfStockCount > 0 ? '#DC2626' : '#0C6258'}
+                    sub="0 units available"
+                  />
                 </View>
 
                 {/* Low Stock Warning Banner */}
@@ -2412,28 +2510,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             ₱{p.price?.toLocaleString()}
                           </Text>
 
-                          {/* Quick Adjust Buttons */}
-                          <View style={{ flex: 1.6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                            <TouchableOpacity
-                              style={styles.stockMiniBtn}
-                              onPress={() => handleQuickAdjustStock(p.id, -1)}
+                          {/* Current Stock */}
+                          <View style={{ flex: 1.6, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text
+                              style={[
+                                styles.tableTitle,
+                                {
+                                  fontWeight: '800',
+                                  fontSize: 14,
+                                  color: isOut ? '#DC2626' : isLow ? '#D97706' : '#0F172A',
+                                  textAlign: 'center',
+                                },
+                              ]}
                             >
-                              <Text style={styles.stockMiniBtnText}>-</Text>
-                            </TouchableOpacity>
-
-                            <TextInput
-                              style={[styles.tableInputInline, { width: 50 }]}
-                              keyboardType="numeric"
-                              defaultValue={String(p.stock || 0)}
-                              onEndEditing={(e) => handleUpdateStock(p.id, e.nativeEvent.text)}
-                            />
-
-                            <TouchableOpacity
-                              style={styles.stockMiniBtn}
-                              onPress={() => handleQuickAdjustStock(p.id, 1)}
-                            >
-                              <Text style={styles.stockMiniBtnText}>+</Text>
-                            </TouchableOpacity>
+                              {p.stock || 0}
+                            </Text>
                           </View>
 
                           {/* Status Badge */}
@@ -2589,7 +2680,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         )}
                         <View
                           style={{
-                            backgroundColor: '#E6F4F1',
+                            backgroundColor: '#E7F5F3',
                             paddingHorizontal: 8,
                             paddingVertical: 4,
                             borderRadius: 8,
@@ -2845,34 +2936,39 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <View>
                 {/* Key Telemetry Metrics */}
                 <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <Text style={styles.statLabel}>Gross Sales Volume</Text>
-                    <Text style={styles.statValue}>₱{analyticsData.totalRevenue.toLocaleString()}</Text>
-                    <Text style={styles.statSub}>Combined online & in-store</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                    <Text style={styles.statLabel}>Average Order Value (AOV)</Text>
-                    <Text style={styles.statValue}>₱{Math.round(analyticsData.aov).toLocaleString()}</Text>
-                    <Text style={styles.statSub}>Per transaction average</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <Text style={styles.statLabel}>Total Units Sold</Text>
-                    <Text style={styles.statValue}>{analyticsData.totalItemsSold} Items</Text>
-                    <Text style={styles.statSub}>Across {analyticsData.totalOrders} total orders</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardWarningAccent]}>
-                    <Text style={styles.statLabel}>POS In-Store Sales Share</Text>
-                    <Text style={[styles.statValue, { color: '#0C6258' }]}>
-                      {analyticsData.totalRevenue > 0
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Gross Sales Volume"
+                    value={`₱${analyticsData.totalRevenue.toLocaleString()}`}
+                    sub="Combined online & in-store"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="blue"
+                    label="Average Order Value (AOV)"
+                    value={`₱${Math.round(analyticsData.aov).toLocaleString()}`}
+                    sub="Per transaction average"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Units Sold"
+                    value={`${analyticsData.totalItemsSold} Items`}
+                    sub={`Across ${analyticsData.totalOrders} total orders`}
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="amber"
+                    label="POS In-Store Sales Share"
+                    value={`${
+                      analyticsData.totalRevenue > 0
                         ? Math.round((analyticsData.posRevenue / analyticsData.totalRevenue) * 100)
-                        : 0}
-                      %
-                    </Text>
-                    <Text style={styles.statSub}>₱{analyticsData.posRevenue.toLocaleString()} in counter sales</Text>
-                  </View>
+                        : 0
+                    }%`}
+                    valueColor="#0C6258"
+                    sub={`₱${analyticsData.posRevenue.toLocaleString()} in counter sales`}
+                  />
                 </View>
 
                 {/* Revenue Trend Visual Bar Chart */}
@@ -3031,6 +3127,16 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               </View>
             )}
 
+            {/* ─── TAB 4b: SALES FORECAST & STOCK OPTIMIZATION ─── */}
+            {activeNav === 'forecast' && (
+              <SalesForecastPanel
+                orders={orders}
+                products={products}
+                isDarkMode={false}
+                isDesktop={isDesktop}
+              />
+            )}
+
             {/* ─── TAB 5: PRODUCTS & PRICES MANAGEMENT ─── */}
             {activeNav === 'products' && (
               <View>
@@ -3108,18 +3214,20 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         </View>
 
                         {/* Actions */}
-                        <View style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'center' }}>
+                        <View style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
                           <TouchableOpacity
-                            style={styles.actionIconBtn}
+                            style={[styles.actionIconBtn, styles.actionIconBtnEdit]}
                             onPress={() => setEditingProduct({ ...p })}
+                            title="Edit Product"
                           >
-                            <BootstrapIcon name="pencil" size={13} color="#475569" />
+                            <BootstrapIcon name="pencil-square" size={16} color="#2563EB" />
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
                             onPress={() => handleDeleteProduct(p.product_id || p.id, p.name)}
+                            title="Delete Product"
                           >
-                            <BootstrapIcon name="trash" size={13} color="#DC2626" />
+                            <BootstrapIcon name="trash3" size={16} color="#EF4444" />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -3186,13 +3294,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           <BootstrapIcon name={prm.isActive ? 'toggle-on' : 'toggle-off'} size={15} color={prm.isActive ? '#D97706' : '#16A34A'} />
                         </TouchableOpacity>
 
-                        <TouchableOpacity
-                          style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
-                          onPress={() => handleDeletePromo(prm.code)}
-                          activeOpacity={0.8}
-                        >
-                          <BootstrapIcon name="trash" size={13} color="#DC2626" />
-                        </TouchableOpacity>
+                          <TouchableOpacity
+                            style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
+                            onPress={() => handleDeletePromo(prm.code)}
+                            activeOpacity={0.8}
+                          >
+                            <BootstrapIcon name="trash3" size={16} color="#EF4444" />
+                          </TouchableOpacity>
                       </View>
                     </View>
                   ))}
@@ -3200,9 +3308,102 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               </View>
             )}
 
-            {/* ─── TAB 7: GARAGE SERVICES ─── */}
+            {/* ─── TAB 7: GARAGE BOOKINGS & PACKAGES ─── */}
             {activeNav === 'garage' && (
               <View>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+                  {[
+                    { id: 'bookings', label: 'Bookings', count: garageBookings.length },
+                    { id: 'packages', label: 'Packages', count: garageServices.length },
+                  ].map((tab) => {
+                    const active = garageSubTab === tab.id;
+                    return (
+                      <TouchableOpacity
+                        key={tab.id}
+                        onPress={() => setGarageSubTab(tab.id)}
+                        style={{
+                          flex: 1,
+                          paddingVertical: 10,
+                          borderRadius: 12,
+                          borderWidth: 1.5,
+                          borderColor: active ? '#0C6258' : '#E2E8F0',
+                          backgroundColor: active ? '#0C6258' : '#FFFFFF',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: active ? '#FFFFFF' : '#475569' }}>
+                          {tab.label} ({tab.count})
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {garageSubTab === 'bookings' && (
+                  <View style={styles.tableCard}>
+                    {garageBookings.length === 0 ? (
+                      <View style={{ padding: 28, alignItems: 'center' }}>
+                        <BootstrapIcon name="calendar3" size={26} color="#94A3B8" />
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B', marginTop: 8 }}>
+                          No customer bookings yet
+                        </Text>
+                      </View>
+                    ) : (
+                      garageBookings.map((b) => {
+                        const isPending = String(b.status || '').toLowerCase() === 'pending';
+                        return (
+                          <View key={b.id || b.booking_id} style={[styles.tableRow, { flexDirection: 'column', alignItems: 'stretch' }]}>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.tableTitle}>{b.package_name || b.service_title || b.serviceName}</Text>
+                                <Text style={styles.tableSub}>
+                                  {b.customer_name || b.userName} • {b.appointment_date || b.date} • {b.time_slot || b.time}
+                                </Text>
+                                <Text style={styles.tableSub}>
+                                  {(b.bike_brand || b.bikeBrand || '')} {(b.bike_model || b.bikeModel || '')} • {b.plate_number || b.bikePlate}
+                                </Text>
+                              </View>
+                              <View
+                                style={{
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                  borderRadius: 8,
+                                  backgroundColor: isPending ? '#FEF3C7' : '#D1ECE6',
+                                  alignSelf: 'flex-start',
+                                }}
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: isPending ? '#D97706' : '#0C6258' }}>
+                                  {isPending ? 'Pending Approval' : b.status}
+                                </Text>
+                              </View>
+                            </View>
+                            {isPending && (
+                              <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                                <TouchableOpacity
+                                  style={[styles.addBtnPrimary, { flex: 1, justifyContent: 'center' }]}
+                                  onPress={() => {
+                                    setSelectedBookingForApproval(b);
+                                    setSelectedMechanicForApproval(garageMechanics[0]?.name || '');
+                                  }}
+                                >
+                                  <Text style={styles.addBtnPrimaryText}>Approve</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                  style={[styles.quickStoreBtn, { flex: 1, justifyContent: 'center', backgroundColor: '#FEE2E2', borderColor: '#FECACA' }]}
+                                  onPress={() => handleAdvisorReject(b.id || b.booking_id)}
+                                >
+                                  <Text style={[styles.quickStoreBtnText, { color: '#DC2626' }]}>Decline</Text>
+                                </TouchableOpacity>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
+                )}
+
+                {garageSubTab === 'packages' && (
                 <View style={styles.tableCard}>
                   <View style={styles.tableHeaderRow}>
                     <Text style={[styles.tableHeaderCell, { flex: 2.5 }]}>Service Package</Text>
@@ -3223,7 +3424,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       </View>
                       <Text style={[styles.tableSub, { flex: 1.2, color: '#0F172A', fontWeight: '700' }]}>{srv.category}</Text>
                       <Text style={[styles.tableTitle, { flex: 1.2, textAlign: 'right', color: '#0C6258' }]}>
-                        ₱{srv.price?.toLocaleString()}
+                        ₱{(srv.pricePhp || srv.price || 0).toLocaleString()}
                       </Text>
                       <Text style={[styles.tableSub, { flex: 1.2, textAlign: 'center' }]}>{srv.duration || '60 mins'}</Text>
                       <View style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'center' }}>
@@ -3233,10 +3434,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             setEditingGarageService(srv);
                             setServTitle(srv.title);
                             setServCategory(srv.category);
-                            setServPrice(String(srv.price));
+                            setServSubtitle(srv.subtitle || '');
+                            setServPrice(String(srv.pricePhp || srv.price || 0));
                             setServDuration(srv.duration || '60 mins');
+                            setServBadge(srv.badge || 'Popular');
                             setServImage(srv.image);
                             setServDesc(srv.description || '');
+                            setServInclusions(Array.isArray(srv.inclusions) ? srv.inclusions.join('\n') : srv.inclusions || '');
                             setIsAddGarageOpen(true);
                           }}
                         >
@@ -3246,6 +3450,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     </View>
                   ))}
                 </View>
+                )}
               </View>
             )}
 
@@ -3600,7 +3805,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           width: 44,
                           height: 44,
                           borderRadius: 22,
-                          backgroundColor: '#E6F4F1',
+                          backgroundColor: '#E7F5F3',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
@@ -4136,6 +4341,194 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           </ScrollView>
         </View>
       </View>
+
+      {/* ─── MODAL: ADD / EDIT SERVICE PACKAGE ─── */}
+      <Modal
+        visible={isAddGarageOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setIsAddGarageOpen(false);
+          resetGaragePackageForm();
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingGarageService ? 'Edit Service Package' : 'Add Service Package'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setIsAddGarageOpen(false);
+                  resetGaragePackageForm();
+                }}
+              >
+                <BootstrapIcon name="x-lg" size={16} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              <Text style={styles.formLabel}>Package Title *</Text>
+              <TextInput
+                style={styles.formInput}
+                value={servTitle}
+                onChangeText={setServTitle}
+                placeholder="e.g. Premium PMS"
+                placeholderTextColor="#94A3B8"
+              />
+              <Text style={styles.formLabel}>Subtitle</Text>
+              <TextInput
+                style={styles.formInput}
+                value={servSubtitle}
+                onChangeText={setServSubtitle}
+                placeholder="Short description customers will see"
+                placeholderTextColor="#94A3B8"
+              />
+              <Text style={styles.formLabel}>Category</Text>
+              <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                {['PMS', 'Repair', 'Customization'].map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    onPress={() => setServCategory(cat)}
+                    style={[
+                      styles.orderFilterTab,
+                      { flex: 1, alignItems: 'center' },
+                      servCategory === cat && { backgroundColor: '#0C6258', borderColor: '#0C6258' },
+                    ]}
+                  >
+                    <Text style={[styles.orderFilterTabText, servCategory === cat && { color: '#FFFFFF' }]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formLabel}>Price (₱) *</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    keyboardType="numeric"
+                    value={servPrice}
+                    onChangeText={setServPrice}
+                    placeholder="2500"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.formLabel}>Duration</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={servDuration}
+                    onChangeText={setServDuration}
+                    placeholder="60 mins"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+              </View>
+              <Text style={styles.formLabel}>Description</Text>
+              <TextInput
+                style={[styles.formInput, { minHeight: 60, textAlignVertical: 'top' }]}
+                multiline
+                value={servDesc}
+                onChangeText={setServDesc}
+                placeholder="What this package includes for the customer"
+                placeholderTextColor="#94A3B8"
+              />
+              <Text style={styles.formLabel}>Inclusions (one per line)</Text>
+              <TextInput
+                style={[styles.formInput, { minHeight: 80, textAlignVertical: 'top' }]}
+                multiline
+                value={servInclusions}
+                onChangeText={setServInclusions}
+                placeholder={"Oil change\nChain lube\nBrake inspection"}
+                placeholderTextColor="#94A3B8"
+              />
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.quickStoreBtn}
+                onPress={() => {
+                  setIsAddGarageOpen(false);
+                  resetGaragePackageForm();
+                }}
+              >
+                <Text style={styles.quickStoreBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveGarageService}>
+                <Text style={styles.addBtnPrimaryText}>
+                  {editingGarageService ? 'Save Package' : 'Add Package'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── MODAL: APPROVE CUSTOMER BOOKING ─── */}
+      <Modal
+        visible={Boolean(selectedBookingForApproval)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedBookingForApproval(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Approve Booking</Text>
+              <TouchableOpacity onPress={() => setSelectedBookingForApproval(null)}>
+                <BootstrapIcon name="x-lg" size={16} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={styles.modalBody}>
+              <Text style={styles.tableTitle}>
+                {selectedBookingForApproval?.package_name || selectedBookingForApproval?.service_title}
+              </Text>
+              <Text style={[styles.tableSub, { marginTop: 4 }]}>
+                {selectedBookingForApproval?.customer_name} • {selectedBookingForApproval?.appointment_date} • {selectedBookingForApproval?.time_slot}
+              </Text>
+              <Text style={[styles.formLabel, { marginTop: 16 }]}>Assign technician</Text>
+              {(garageMechanics.length ? garageMechanics : [{ id: 'default', name: 'Master Tech Jayson' }]).map((mech) => {
+                const selected = selectedMechanicForApproval === mech.name;
+                return (
+                  <TouchableOpacity
+                    key={mech.id || mech.name}
+                    onPress={() => setSelectedMechanicForApproval(mech.name)}
+                    style={{
+                      padding: 10,
+                      borderRadius: 10,
+                      borderWidth: 1.5,
+                      borderColor: selected ? '#0C6258' : '#E2E8F0',
+                      backgroundColor: selected ? '#F0FDF4' : '#FFFFFF',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: selected ? '#0C6258' : '#0F172A' }}>
+                      {mech.name}
+                    </Text>
+                    {mech.specialization ? (
+                      <Text style={{ fontSize: 11, color: '#64748B' }}>{mech.specialization}</Text>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+            <View style={styles.modalFooter}>
+              <TouchableOpacity style={styles.quickStoreBtn} onPress={() => setSelectedBookingForApproval(null)}>
+                <Text style={styles.quickStoreBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.addBtnPrimary}
+                onPress={() =>
+                  handleAdvisorApprove(
+                    selectedBookingForApproval?.id || selectedBookingForApproval?.booking_id,
+                    selectedMechanicForApproval
+                  )
+                }
+              >
+                <Text style={styles.addBtnPrimaryText}>Approve Booking</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* ─── MODAL 1: ADD NEW PRODUCT ─── */}
       <Modal visible={isAddProductOpen} transparent animationType="fade" onRequestClose={() => setIsAddProductOpen(false)}>
@@ -4845,6 +5238,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </View>
               </TouchableOpacity>
 
+              {/* Forecast & Stock */}
+              <TouchableOpacity
+                style={[styles.mobileMoreCard, activeNav === 'forecast' && styles.mobileMoreCardActive]}
+                onPress={() => {
+                  setActiveNav('forecast');
+                  setIsMobileMoreOpen(false);
+                }}
+              >
+                <BootstrapIcon name="clipboard-data" size={20} color={activeNav === 'forecast' ? '#0C6258' : '#475569'} />
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Forecast & Stock</Text>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>Demand & restock planner</Text>
+                </View>
+              </TouchableOpacity>
+
               {/* Notifications Center */}
               <TouchableOpacity
                 style={[styles.mobileMoreCard, activeNav === 'notifications' && styles.mobileMoreCardActive]}
@@ -5321,7 +5729,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     borderRadius: 12,
                     padding: 14,
                     borderWidth: 1,
-                    borderColor: '#FED7AA',
+                    borderColor: '#D1ECE6',
                     marginBottom: 14,
                     gap: 8,
                   }}
@@ -5521,15 +5929,15 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             onPress={() => setIsMobileMoreOpen(true)}
             activeOpacity={0.8}
           >
-            <View style={[styles.bottomNavIconWrap, ['orders', 'promos', 'garage', 'users', 'supabase'].includes(activeNav) && styles.bottomNavIconWrapActive]}>
-              <BootstrapIcon name="three-dots" size={18} color={['orders', 'promos', 'garage', 'users', 'supabase'].includes(activeNav) ? '#0C6258' : '#64748B'} />
+            <View style={[styles.bottomNavIconWrap, ['orders', 'promos', 'garage', 'users', 'supabase', 'forecast'].includes(activeNav) && styles.bottomNavIconWrapActive]}>
+              <BootstrapIcon name="three-dots" size={18} color={['orders', 'promos', 'garage', 'users', 'supabase', 'forecast'].includes(activeNav) ? '#0C6258' : '#64748B'} />
               {pendingCodCount > 0 && (
                 <View style={[styles.bottomNavBadge, { backgroundColor: '#D97706' }]}>
                   <Text style={styles.bottomNavBadgeText}>{pendingCodCount}</Text>
                 </View>
               )}
             </View>
-            <Text style={[styles.bottomNavLabel, ['orders', 'promos', 'garage', 'users', 'supabase'].includes(activeNav) && styles.bottomNavLabelActive]}>More</Text>
+            <Text style={[styles.bottomNavLabel, ['orders', 'promos', 'garage', 'users', 'supabase', 'forecast'].includes(activeNav) && styles.bottomNavLabelActive]}>More</Text>
           </TouchableOpacity>
         </View>
       )}

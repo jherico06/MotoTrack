@@ -1,4 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
+import { ANDROID_TOP_INSET } from '../utils/safeArea';
 
 export const orderStyles = StyleSheet.create({
   container: {
@@ -8,6 +9,7 @@ export const orderStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    paddingTop: ANDROID_TOP_INSET,
   },
   scrollContent: {
     paddingBottom: 110,

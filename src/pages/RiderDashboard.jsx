@@ -18,6 +18,7 @@ import { useAuth } from '../context/AuthContext';
 import { deliveryService } from '../services/deliveryService';
 import { riderService } from '../services/riderService';
 import { extractConfirmToken } from '../services/riderAccessService';
+import { ANDROID_TOP_INSET } from '../utils/safeArea';
 import { areaFromAddress, googleMapsNavigateUrl } from '../utils/geo';
 import { colors } from '../styles/theme';
 
@@ -618,7 +619,7 @@ export default function RiderDashboard({ onLogout }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  safe: { flex: 1, backgroundColor: colors.bg },
+  safe: { flex: 1, backgroundColor: colors.bg, paddingTop: ANDROID_TOP_INSET },
   body: { padding: 16, paddingBottom: 40, maxWidth: 560, width: '100%', alignSelf: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   topRow: {

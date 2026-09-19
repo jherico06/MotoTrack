@@ -15,19 +15,7 @@ import { BootstrapIcon, BrandLogo, GoogleIcon } from '../components';
 import { useAuth } from '../context/AuthContext';
 import { botanicalStyles, authWebStyles as authStyles } from '../styles/web/loginPage.web.styles';
 
-// ─── DECORATIVE BOTANICAL PLANT POT ───
-function BotanicalPotGraphic() {
-  return (
-    <View style={botanicalStyles.decorWrap}>
-      <View style={botanicalStyles.leafGroup}>
-        <View style={botanicalStyles.leftLeaf} />
-        <View style={botanicalStyles.centerLeaf} />
-        <View style={botanicalStyles.rightLeaf} />
-      </View>
-      <View style={botanicalStyles.potBody} />
-    </View>
-  );
-}
+
 
 export default function LoginPageWeb({
   onLoginSuccess,
@@ -399,10 +387,7 @@ export default function LoginPageWeb({
         {/* ─── LEFT HALF: SIGN IN FORM (Visible when overlay is on right) ─── */}
         <View style={[authStyles.formHalf, authStyles.leftFormHalf]}>
           <ScrollView contentContainerStyle={authStyles.formScrollInner} showsVerticalScrollIndicator={false}>
-            <Text style={authStyles.formHeading}>Sign In to D,Blockchain</Text>
-            <Text style={authStyles.mutedSubtext}>
-              Customers, admins, and delivery riders sign in here — your role opens the right dashboard.
-            </Text>
+            <Text style={[authStyles.formHeading, { marginBottom: 18 }]}>Sign In to MotoTrack</Text>
 
             {redirectReason ? (
               <View style={authStyles.infoBadge}>
@@ -604,7 +589,7 @@ export default function LoginPageWeb({
               // ─── SIGN UP STEP 1: CREDENTIALS & STRONG PASSWORD ───
               <>
                 <Text style={authStyles.formHeading}>Create Account</Text>
-                <Text style={authStyles.mutedSubtext}>Join D,Blockchain Community</Text>
+                <Text style={authStyles.mutedSubtext}>Join MotoTrack Community</Text>
 
                 {signUpError.length > 0 && (
                   <View style={authStyles.errorBadge}>
@@ -928,12 +913,11 @@ export default function LoginPageWeb({
           style={[authStyles.slidingOverlayPanel, { transform: [{ translateX: overlayTranslateX }] }]}
         >
           <View style={botanicalStyles.organicBlob} />
-          <BotanicalPotGraphic />
 
           <View style={authStyles.overlayContentBox}>
             <Text style={authStyles.overlayHeadingLine1}>{isSignUp ? 'Welcome Back!' : 'Hello!'}</Text>
             <Text style={authStyles.overlayHeadingLine2}>
-              {isSignUp ? 'To D,Blockchain' : 'Welcome to D,Blockchain'}
+              {isSignUp ? 'To MotoTrack' : 'Welcome to MotoTrack'}
             </Text>
 
             <Text style={authStyles.overlaySubtext}>
@@ -1013,7 +997,7 @@ export default function LoginPageWeb({
                 marginBottom: 24,
               }}
             >
-              Welcome to D,Blockchain, <Text style={{ fontWeight: '700', color: '#0F172A' }}>{createdUserName}</Text>! Your email has been verified. Please sign in with your password to continue to the storefront.
+              Welcome to MotoTrack, <Text style={{ fontWeight: '700', color: '#0F172A' }}>{createdUserName}</Text>! Your email has been verified. Please sign in with your password to continue to the storefront.
             </Text>
 
             <TouchableOpacity

@@ -3,7 +3,14 @@ import { View, Text, TouchableOpacity, ScrollView, Image, Modal } from 'react-na
 import BootstrapIcon from '../common/BootstrapIcon';
 import { shopStyles as styles } from '../../styles/shop.styles';
 
-export default function ProductSpecsModal({ visible, product, onClose, onAddToCart, onCustomizeWithPart }) {
+export default function ProductSpecsModal({
+  visible,
+  product,
+  onClose,
+  onAddToCart,
+  onBuyNow,
+  onCustomizeWithPart,
+}) {
   if (!product) return null;
 
   return (
@@ -91,6 +98,29 @@ export default function ProductSpecsModal({ visible, product, onClose, onAddToCa
             >
               <BootstrapIcon name="cart-plus-fill" size={14} color="#ffffff" />
               <Text style={styles.checkoutBtnText}>Add to Cart</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.checkoutBtn,
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1.5,
+                  borderColor: '#0C6258',
+                  marginTop: 8,
+                },
+              ]}
+              onPress={() => {
+                onBuyNow?.(product);
+              }}
+              activeOpacity={0.9}
+            >
+              <BootstrapIcon name="lightning-fill" size={14} color="#0C6258" />
+              <Text style={[styles.checkoutBtnText, { color: '#0C6258' }]}>Buy Now</Text>
             </TouchableOpacity>
           </View>
         </View>

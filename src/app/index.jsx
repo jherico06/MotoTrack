@@ -16,7 +16,7 @@ import {
   RiderDashboard,
 } from '../pages';
 
-import { Platform, View, Text, TouchableOpacity, SafeAreaView, StyleSheet } from 'react-native';
+import { Platform, View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet } from 'react-native';
 import * as ExpoLinking from 'expo-linking';
 import { BootstrapIcon } from '../components/common';
 import ErrorBoundary from '../components/common/ErrorBoundary';
@@ -24,18 +24,31 @@ import { adminSecurityService } from '../services/adminSecurityService';
 import { authService } from '../services/authService';
 import {
   useFonts,
-  Poppins_300Light,
-  Poppins_400Regular,
-  Poppins_500Medium,
-  Poppins_600SemiBold,
-  Poppins_700Bold,
-  Poppins_800ExtraBold,
-  Poppins_900Black,
-} from '@expo-google-fonts/poppins';
+  Manrope_200ExtraLight,
+  Manrope_300Light,
+  Manrope_400Regular,
+  Manrope_500Medium,
+  Manrope_600SemiBold,
+  Manrope_700Bold,
+  Manrope_800ExtraBold,
+} from '@expo-google-fonts/manrope';
 
-// Global Web Font Injection for Poppins & Bootstrap Icons
+// Global Mobile Font Defaults for React Native Text & TextInput
+if (Platform.OS !== 'web') {
+  try {
+    if (Text.defaultProps == null) Text.defaultProps = {};
+    Text.defaultProps.style = [{ fontFamily: 'Manrope' }, Text.defaultProps.style];
+  } catch (_e) {}
+
+  try {
+    if (TextInput.defaultProps == null) TextInput.defaultProps = {};
+    TextInput.defaultProps.style = [{ fontFamily: 'Manrope' }, TextInput.defaultProps.style];
+  } catch (_e) {}
+}
+
+// Global Web Font Injection for Manrope & Bootstrap Icons
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
-  document.title = 'D,Blockchain Motorparts and Accessories';
+  document.title = 'MotoTrack - Motorparts and Accessories';
   if (!document.getElementById('bootstrap-icons-cdn')) {
     const bsLink = document.createElement('link');
     bsLink.id = 'bootstrap-icons-cdn';
@@ -43,26 +56,29 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     bsLink.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';
     document.head.appendChild(bsLink);
   }
-  if (!document.getElementById('poppins-google-font')) {
+  if (!document.getElementById('manrope-google-font')) {
     const link = document.createElement('link');
-    link.id = 'poppins-google-font';
+    link.id = 'manrope-google-font';
     link.rel = 'stylesheet';
     link.href =
-      'https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,600;1,700&display=swap';
+      'https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap';
     document.head.appendChild(link);
   }
-  if (!document.getElementById('poppins-global-styles')) {
+  if (!document.getElementById('manrope-global-styles')) {
     const style = document.createElement('style');
-    style.id = 'poppins-global-styles';
+    style.id = 'manrope-global-styles';
     style.innerHTML = `
+      * {
+        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      }
       html, body {
-        font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
       }
       input, button, select, textarea, div, span, p, a, label {
-        font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       }
       code, pre, kbd, samp, .font-mono, [data-font="mono"], [style*="monospace"] {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
@@ -164,7 +180,7 @@ function MainAppRouter() {
         if (tab) return tab;
       }
     } catch (_e) {}
-    return 'profile';
+    return 'overview';
   });
   const [allowMobileAdmin, setAllowMobileAdmin] = useState(false);
   const { currentUser, logout, adminLogin, redirectReason, setRedirectReason } = useAuth();
@@ -190,7 +206,7 @@ function MainAppRouter() {
     }
   };
 
-  const handleNavigateToProfile = (tab = 'profile') => {
+  const handleNavigateToProfile = (tab = 'overview') => {
     if (!currentUser) {
       setRedirectReason(
         tab === 'orders'
@@ -509,7 +525,7 @@ function MainAppRouter() {
               setCustomizerProduct(params.product);
             }
             if (screen === 'profile') {
-              handleNavigateToProfile(params?.tab || 'profile');
+              handleNavigateToProfile(params?.tab || 'overview');
             } else if (screen === 'orders') {
               navigateScreen('orders');
             } else {
@@ -675,7 +691,7 @@ function MainAppRouter() {
           setCustomizerProduct(params.product);
         }
         if (screen === 'profile') {
-          handleNavigateToProfile(params?.tab || 'profile');
+          handleNavigateToProfile(params?.tab || 'overview');
         } else if (screen === 'orders') {
           navigateScreen('orders');
         } else {
@@ -688,21 +704,36 @@ function MainAppRouter() {
 
 export default function App() {
   const [fontsLoaded] = useFonts({
-    Poppins: Poppins_400Regular,
-    'Poppins-Light': Poppins_300Light,
-    'Poppins-Regular': Poppins_400Regular,
-    'Poppins-Medium': Poppins_500Medium,
-    'Poppins-SemiBold': Poppins_600SemiBold,
-    'Poppins-Bold': Poppins_700Bold,
-    'Poppins-ExtraBold': Poppins_800ExtraBold,
-    'Poppins-Black': Poppins_900Black,
-    Poppins_300Light,
-    Poppins_400Regular,
-    Poppins_500Medium,
-    Poppins_600SemiBold,
-    Poppins_700Bold,
-    Poppins_800ExtraBold,
-    Poppins_900Black,
+    Manrope: Manrope_400Regular,
+    'Manrope-ExtraLight': Manrope_200ExtraLight,
+    'Manrope-Light': Manrope_300Light,
+    'Manrope-Regular': Manrope_400Regular,
+    'Manrope-Medium': Manrope_500Medium,
+    'Manrope-SemiBold': Manrope_600SemiBold,
+    'Manrope-Bold': Manrope_700Bold,
+    'Manrope-ExtraBold': Manrope_800ExtraBold,
+    Manrope_200ExtraLight,
+    Manrope_300Light,
+    Manrope_400Regular,
+    Manrope_500Medium,
+    Manrope_600SemiBold,
+    Manrope_700Bold,
+    Manrope_800ExtraBold,
+    // Aliases for backwards compatibility
+    Inter: Manrope_400Regular,
+    'Inter-Regular': Manrope_400Regular,
+    'Inter-Light': Manrope_300Light,
+    'Inter-Medium': Manrope_500Medium,
+    'Inter-SemiBold': Manrope_600SemiBold,
+    'Inter-Bold': Manrope_700Bold,
+    'Inter-ExtraBold': Manrope_800ExtraBold,
+    Poppins: Manrope_400Regular,
+    'Poppins-Regular': Manrope_400Regular,
+    'Poppins-Light': Manrope_300Light,
+    'Poppins-Medium': Manrope_500Medium,
+    'Poppins-SemiBold': Manrope_600SemiBold,
+    'Poppins-Bold': Manrope_700Bold,
+    'Poppins-ExtraBold': Manrope_800ExtraBold,
   });
 
   return (

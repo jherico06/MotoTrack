@@ -93,18 +93,21 @@ class SupabaseManager {
       return;
     }
     try {
+      // Web must use localStorage so the PKCE code verifier survives the
+      // Google redirect. sessionStorage is lost if the return navigation
+      // is treated as a new browsing context.
       let authStorage = AsyncStorage;
-      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.sessionStorage) {
-        authStorage = window.sessionStorage;
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+        authStorage = window.localStorage;
       }
-      
+
       this.client = createClient(url, key, {
         auth: {
           storage: authStorage,
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: Platform.OS === 'web',
-          multiTab: false, // CRITICAL: Stop Supabase from broadcasting logins to other tabs
+          flowType: 'pkce',
         },
       });
     } catch (e) {

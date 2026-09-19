@@ -929,7 +929,7 @@ export const profileWebStyles = StyleSheet.create({
   nextPmsTitle: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#042F2E',
+    color: '#18181B',
   },
   nextPmsDetail: {
     fontSize: 11.5,

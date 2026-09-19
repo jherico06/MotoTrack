@@ -80,7 +80,22 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
   const [isGcashModalOpen, setIsGcashModalOpen] = useState(false);
   const [pendingGcashOrderData, setPendingGcashOrderData] = useState(null);
+  const [buyNowItems, setBuyNowItems] = useState(null);
   const [unreadNotifCount, setUnreadNotifCount] = useState(() => notificationService.getUnreadCount(currentUser?.id));
+
+  const isBuyNowCheckout = Array.isArray(buyNowItems) && buyNowItems.length > 0;
+  const checkoutItems = isBuyNowCheckout ? buyNowItems : cart;
+  const checkoutSubtotal = useMemo(
+    () => checkoutItems.reduce((sum, item) => sum + Number(item.product?.price || 0) * Number(item.quantity || 0), 0),
+    [checkoutItems]
+  );
+  const checkoutShipping = isBuyNowCheckout ? 150 : shippingFee;
+  const checkoutDiscount = isBuyNowCheckout ? 0 : discountAmount;
+  const checkoutTotal = Math.max(0, checkoutSubtotal - checkoutDiscount) + Number(checkoutShipping || 0);
+  const checkoutItemCount = useMemo(
+    () => checkoutItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+    [checkoutItems]
+  );
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
@@ -142,6 +157,24 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
     addToCart(product, qty);
   };
 
+  const handleBuyNowAttempt = (product, qty = 1) => {
+    if (!currentUser) {
+      setRedirectReason('Please sign in or create an account to buy this item.');
+      onNavigateToScreen?.('login');
+      return;
+    }
+    const stock = Number(product?.stock);
+    if (Number.isFinite(stock) && stock <= 0) {
+      showToast(`"${product.name?.slice(0, 20) || 'Item'}..." is out of stock`);
+      return;
+    }
+    const quantity = Math.min(Math.max(1, qty), Number.isFinite(stock) ? stock : qty);
+    setBuyNowItems([{ product, quantity }]);
+    setIsCartOpen(false);
+    setIsSpecsOpen(false);
+    setIsCheckoutOpen(true);
+  };
+
   const handleProceedToCheckout = () => {
     if (!currentUser) {
       setIsCartOpen(false);
@@ -149,6 +182,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
       onNavigateToScreen?.('login');
       return;
     }
+    setBuyNowItems(null);
     setIsCartOpen(false);
     setIsCheckoutOpen(true);
   };
@@ -164,7 +198,19 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
       return;
     }
 
-    // 2. Otherwise handle standard COD
+    // 2. Card / PayPal — prepaid path (demo confirmation, no COD approval)
+    const prepaid =
+      paymentMethod === 'Credit / Debit Card' ||
+      paymentMethod === 'PayPal' ||
+      (paymentMethod || '').toLowerCase().includes('card') ||
+      (paymentMethod || '').toLowerCase().includes('paypal');
+
+    if (prepaid) {
+      await executeCreateOrder(orderFormData, 'Processing');
+      return;
+    }
+
+    // 3. Otherwise handle standard COD
     await executeCreateOrder(orderFormData);
   };
 
@@ -207,12 +253,12 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
         gcashNumber,
         gcashReference,
         codChangeFor,
-        promoId: appliedPromoId || null,
-        total: cartSubtotal.toFixed(2),
-        discountAmount: discountAmount.toFixed(2),
-        shippingFee: Number(shippingFee || 0),
-        grandTotal: cartTotal.toFixed(2),
-        items: cart,
+        promoId: isBuyNowCheckout ? null : appliedPromoId || null,
+        total: checkoutSubtotal.toFixed(2),
+        discountAmount: checkoutDiscount.toFixed(2),
+        shippingFee: Number(checkoutShipping || 0),
+        grandTotal: checkoutTotal.toFixed(2),
+        items: checkoutItems,
         channel: 'Online Store',
         overrideStatus,
       });
@@ -223,7 +269,11 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
       }
 
       const placedOrder = res.order;
-      clearCart();
+      if (isBuyNowCheckout) {
+        setBuyNowItems(null);
+      } else {
+        clearCart();
+      }
       setIsCheckoutOpen(false);
       setIsGcashModalOpen(false);
       setSelectedOrderForTracking(placedOrder);
@@ -233,7 +283,11 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
           ? '📦 Order saved offline — will sync when connection is back.'
           : isCOD
             ? '🎉 COD Order placed! Awaiting Store Admin verification.'
-            : '🎉 GCash Payment Confirmed! Live order tracking active.'
+            : paymentMethod === 'PayPal'
+              ? '🎉 PayPal payment confirmed! Live order tracking active.'
+              : paymentMethod === 'Credit / Debit Card' || (paymentMethod || '').toLowerCase().includes('card')
+                ? '🎉 Card payment confirmed! Live order tracking active.'
+                : '🎉 GCash Payment Confirmed! Live order tracking active.'
       );
       return res;
     } catch (e) {
@@ -701,19 +755,57 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                       </View>
                     </View>
 
-                    {/* Add to Cart Button with matching App Solid Teal style */}
-                    <TouchableOpacity
-                      style={webStyles.addToCartBtn}
-                      className="bg-[#0C6258] hover:bg-[#094e46] rounded-lg py-2 flex flex-row items-center justify-center gap-1.5 mt-1.5 transition-colors cursor-pointer"
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        handleAddToCartAttempt(product);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <BootstrapIcon name="cart3" size={13} color="#FFFFFF" />
-                      <Text style={webStyles.addToCartBtnText} className="text-xs font-bold text-white">Add to Cart</Text>
-                    </TouchableOpacity>
+                    {/* Action buttons: Buy Now (First, Green) + Add to Cart (Second, Outline Icon Only) */}
+                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, alignItems: 'center' }}>
+                      <TouchableOpacity
+                        style={{
+                          flex: 1,
+                          backgroundColor: '#0C6258',
+                          borderRadius: 8,
+                          paddingVertical: 7.5,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 5,
+                          borderWidth: 1.5,
+                          borderColor: '#0C6258',
+                          cursor: 'pointer',
+                        }}
+                        className="bg-[#0C6258] hover:bg-[#094e46] rounded-lg py-2 flex flex-row items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          handleBuyNowAttempt(product);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <BootstrapIcon name="lightning-fill" size={12} color="#FFFFFF" />
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }} className="text-[11px] font-bold text-white">
+                          Buy Now
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 8,
+                          paddingVertical: 7.5,
+                          paddingHorizontal: 11,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 1.5,
+                          borderColor: '#0C6258',
+                          cursor: 'pointer',
+                        }}
+                        className="bg-white hover:bg-[#F3F7F6] rounded-lg py-2 px-3 flex flex-row items-center justify-center cursor-pointer border-[1.5px] border-[#0C6258] transition-colors"
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          handleAddToCartAttempt(product);
+                        }}
+                        activeOpacity={0.8}
+                        title="Add to Cart"
+                      >
+                        <BootstrapIcon name="cart3" size={13} color="#0C6258" />
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </TouchableOpacity>
               );
@@ -756,7 +848,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
 
             <View style={webStyles.footerBottomBar}>
               <Text style={{ fontSize: 12, color: '#94A3B8' }}>
-                © 2026 D,Blockchain Motorparts and Accessories. Official Performance Network. All rights reserved.
+                © 2026 MotoTrack Motorparts and Accessories. Official Performance Network. All rights reserved.
               </Text>
             </View>
           </View>
@@ -769,6 +861,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
         product={selectedProduct}
         onClose={() => setIsSpecsOpen(false)}
         onAddToCart={handleAddToCartAttempt}
+        onBuyNow={handleBuyNowAttempt}
         onCustomizeWithPart={(prod) => onNavigateToScreen?.('customizer', { product: prod })}
       />
 
@@ -780,11 +873,19 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
 
       <CheckoutModal
         visible={isCheckoutOpen}
-        onClose={() => !isPlacingOrder && setIsCheckoutOpen(false)}
+        onClose={() => {
+          if (isPlacingOrder) return;
+          setIsCheckoutOpen(false);
+          setBuyNowItems(null);
+        }}
         onCompleteOrder={handleCompleteOrder}
         isPlacingOrder={isPlacingOrder}
+        overrideItemCount={isBuyNowCheckout ? checkoutItemCount : null}
+        overrideTotal={isBuyNowCheckout ? checkoutTotal : null}
+        overrideItems={isBuyNowCheckout ? checkoutItems : null}
         onOpenProfile={() => {
           setIsCheckoutOpen(false);
+          setBuyNowItems(null);
           setIsProfileOpen(true);
         }}
       />

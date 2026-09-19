@@ -613,7 +613,7 @@ export default function NotificationsPage({
               style={[
                 styles.bellIconCircle,
                 {
-                  backgroundColor: isDarkMode ? '#132A26' : '#E6F4F1',
+                  backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
                 },
               ]}
             >
@@ -720,7 +720,7 @@ export default function NotificationsPage({
               style={[
                 styles.statTile,
                 activeFilter === 'all' && {
-                  backgroundColor: isDarkMode ? 'rgba(12, 98, 88, 0.2)' : '#E6F4F1',
+                  backgroundColor: isDarkMode ? 'rgba(12, 98, 88, 0.2)' : '#E7F5F3',
                   borderRadius: 10,
                 },
               ]}

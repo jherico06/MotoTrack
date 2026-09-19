@@ -573,16 +573,16 @@ export default function OrderPageWeb({
                           }}
                         >
                           {order.rider_name ? (
-                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F766E' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#084A43' }}>
                               Rider: {order.rider_name}
                             </Text>
                           ) : null}
                           {order.estimated_delivery ? (
-                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F766E' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#084A43' }}>
                               Expected: {order.estimated_delivery}
                             </Text>
                           ) : null}
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F766E' }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#084A43' }}>
                             The store will mark this delivered after drop-off.
                           </Text>
                         </View>
@@ -788,16 +788,16 @@ export default function OrderPageWeb({
                             : 'Out for Delivery'}
                         </Text>
                         {selectedOrder.rider_name ? (
-                          <Text style={{ fontSize: 12.5, color: '#0F766E', marginBottom: 4, fontWeight: '600' }}>
+                          <Text style={{ fontSize: 12.5, color: '#084A43', marginBottom: 4, fontWeight: '600' }}>
                             Rider: {selectedOrder.rider_name}
                           </Text>
                         ) : null}
                         {selectedOrder.estimated_delivery ? (
-                          <Text style={{ fontSize: 12.5, color: '#0F766E', marginBottom: 4, fontWeight: '600' }}>
+                          <Text style={{ fontSize: 12.5, color: '#084A43', marginBottom: 4, fontWeight: '600' }}>
                             Expected: {selectedOrder.estimated_delivery}
                           </Text>
                         ) : null}
-                        <Text style={{ fontSize: 12.5, color: '#0F766E', fontWeight: '600', marginBottom: 10 }}>
+                        <Text style={{ fontSize: 12.5, color: '#084A43', fontWeight: '600', marginBottom: 10 }}>
                           {isReportedStatus(selectedOrder.status)
                             ? 'The rider reported drop-off. The store will confirm delivery shortly.'
                             : 'Optional: tap below if you already received your package. Final delivery is confirmed by the store.'}

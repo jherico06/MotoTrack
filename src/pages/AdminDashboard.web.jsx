@@ -28,6 +28,7 @@ import {
   PIT_BAY_PRESETS,
   MECHANIC_SPECIALIZATION_PRESETS,
   MECHANIC_AVATAR_PRESETS,
+  getPackagePricePhp,
 } from '../services/garageService';
 import {
   riderService,
@@ -46,12 +47,13 @@ import { AdminPinLockScreen, ConfirmModal, ProfileModal, AssignDeliveryModal, De
 import { notificationService } from '../services/notificationService';
 import { supabaseManager } from '../services/supabaseClient';
 import { CATEGORY_NAMES, CATEGORY_PILLS, ADMIN_IMAGE_PRESETS } from '../data/motorParts';
-import { BootstrapIcon, BrandLogo, ExpectedDeliveryEditor } from '../components/common';
+import { AdminStatCard, BootstrapIcon, BrandLogo, ExpectedDeliveryEditor } from '../components/common';
 import { pickImageFromFile } from '../utils/imagePickerHelper';
 import { usdToPhp } from '../utils/currency';
 import { systemSettingsService } from '../services/systemSettingsService';
 import NotificationsPage from './NotificationsPage.web';
 import { auditLogService } from '../services/auditLogService';
+import { SalesForecastPanel } from '../components/admin';
 
 export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const { width: windowWidth } = useWindowDimensions();
@@ -84,7 +86,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const { currentUser: authUser, logout, setRedirectReason, adminLogin } = useAuth();
   const currentUser = authUser || authService.getCurrentUser();
 
-  // Active Navigation Tab: 'overview' | 'orders' | 'inventory' | 'pos' | 'analytics' | 'products' | 'promos' | 'garage' | 'users' | 'supabase'
+  // Active Navigation Tab: 'overview' | 'orders' | 'inventory' | 'pos' | 'analytics' | 'forecast' | 'products' | 'promos' | 'garage' | 'users' | 'supabase'
   const [activeNav, setActiveNav] = useState('overview');
 
   // Admin PIN Unlock State (Locks by default when leaving/entering)
@@ -1055,14 +1057,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     categoryRegression.sort((a, b) => b.totalRevenue - a.totalRevenue);
 
     // Payment Methods breakdown
-    const paymentBreakdown = { Cash: 0, Card: 0, GCash: 0, PayPal: 0 };
+    const paymentBreakdown = { Cash: 0, GCash: 0 };
     allOrders.forEach((o) => {
       const pm = (o.payment_method || '').toLowerCase();
-      if (pm.includes('cash')) paymentBreakdown.Cash += 1;
-      else if (pm.includes('card') || pm.includes('apple') || pm.includes('credit'))
-        paymentBreakdown.Card += 1;
-      else if (pm.includes('gcash') || pm.includes('wallet')) paymentBreakdown.GCash += 1;
-      else paymentBreakdown.PayPal += 1;
+      if (pm.includes('gcash') || pm.includes('wallet')) paymentBreakdown.GCash += 1;
+      else paymentBreakdown.Cash += 1;
     });
 
     // Top Selling Products
@@ -1633,11 +1632,17 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     const downpaymentAmount = Math.round(priceNum * 0.20);
     const remainingBalance = priceNum - downpaymentAmount;
 
+    const selectedPkg = garageServices.find((pkg) => pkg.title === newBkServiceTitle);
     const created = await garageService.createAdminBooking({
       customer_name: newBkCustomerName.trim(),
       customer_phone: newBkCustomerPhone.trim() || 'N/A',
       customer_email: newBkCustomerEmail.trim() || '',
       category: newBkCategory,
+      package_id: selectedPkg?.id || selectedPkg?.service_id,
+      package_name: newBkServiceTitle || selectedPkg?.title,
+      package_price: priceNum,
+      included_services: selectedPkg?.inclusions || [],
+      service_id: selectedPkg?.id || selectedPkg?.service_id,
       service_title:
         newBkServiceTitle ||
         (newBkCategory === 'PMS' ? 'Pro Performance Full PMS' : 'Full System Exhaust Fitting & Dyno Tuning'),
@@ -2241,7 +2246,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       let matchPayment = true;
       if (orderPaymentFilter === 'COD') matchPayment = pm.includes('cash') || pm.includes('cod');
       else if (orderPaymentFilter === 'GCash') matchPayment = pm.includes('gcash');
-      else if (orderPaymentFilter === 'Card') matchPayment = pm.includes('card') || pm.includes('apple');
+      else if (orderPaymentFilter === 'Card')
+        matchPayment = pm.includes('card') || pm.includes('apple') || pm.includes('credit') || pm.includes('debit');
+      else if (orderPaymentFilter === 'PayPal') matchPayment = pm.includes('paypal');
 
       const q = orderSearchQuery.toLowerCase().trim();
       const matchSearch =
@@ -2376,6 +2383,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     inventory: 'Inventory & Stock Telemetry',
     pos: 'Point of Sale (POS) Cashier Terminal',
     analytics: 'Sales Analytics & Reports',
+    forecast: 'Sales Forecast & Stock Optimization',
     products: 'Products & Price Management',
     promos: 'Promo Vouchers & Discounts',
     suppliers: 'Suppliers & Parts Vendors',
@@ -2394,6 +2402,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     inventory: 'box-seam-fill',
     pos: 'cart-check-fill',
     analytics: 'graph-up-arrow',
+    forecast: 'clipboard-data',
     products: 'tag-fill',
     promos: 'ticket-perforated-fill',
     suppliers: 'truck',
@@ -2789,6 +2798,29 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     ]}
                   >
                     Analytics & Reports
+                  </Text>
+                </TouchableOpacity>
+
+                {/* 5b. Forecast */}
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, activeNav === 'forecast' && styles.sidebarNavItemActive]}
+                  onPress={() => setActiveNav('forecast')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 22, alignItems: 'center' }}>
+                    <BootstrapIcon
+                      name="clipboard-data"
+                      size={16}
+                      color={activeNav === 'forecast' ? '#FFFFFF' : '#64748B'}
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.sidebarNavLabel,
+                      activeNav === 'forecast' && styles.sidebarNavLabelActive,
+                    ]}
+                  >
+                    Forecast & Stock
                   </Text>
                 </TouchableOpacity>
 
@@ -3396,7 +3428,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     isDarkMode && { backgroundColor: '#1E293B', borderColor: '#334155' },
                     activeNav === 'notifications' && {
                       borderColor: '#0C6258',
-                      backgroundColor: isDarkMode ? '#132A26' : '#E6F4F1',
+                      backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
                     },
                   ]}
                   onPress={() => {
@@ -3459,7 +3491,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     isDarkMode && { backgroundColor: '#1E293B', borderColor: '#334155' },
                     isProfileDropdownOpen && {
                       borderColor: '#0C6258',
-                      backgroundColor: isDarkMode ? '#132A26' : '#E6F4F1',
+                      backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
                     },
                   ]}
                   onPress={() => {
@@ -3815,58 +3847,36 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             {activeNav === 'overview' && (
               <View>
                 {/* Stats Grid */}
-                <View style={styles.statsGrid} className="flex flex-row flex-wrap gap-4 mb-6 w-full">
-                  <View style={[styles.statCard, styles.statCardTealAccent]} className="admin-stat-card border-l-4 border-l-teal-600">
-                    <View style={styles.statIconWrap} className="admin-icon-pill admin-icon-pill-teal mb-3">
-                      <BootstrapIcon name="currency-dollar" size={18} color="#0C6258" />
-                    </View>
-                    <Text style={styles.statLabel} className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Total Store Revenue</Text>
-                    <Text style={styles.statValue} className="text-[26px] font-bold text-slate-900 dark:text-white tracking-tight block">₱{analyticsData.totalRevenue.toLocaleString()}</Text>
-                    <Text style={styles.statSub} className="text-[12px] font-normal text-slate-500 dark:text-slate-400 mt-1 block">Online + Walk-in POS</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardSuccessAccent]} className="admin-stat-card border-l-4 border-l-emerald-500">
-                    <View style={styles.statIconWrap} className="admin-icon-pill admin-icon-pill-teal mb-3">
-                      <BootstrapIcon name="box-seam" size={18} color="#10B981" />
-                    </View>
-                    <Text style={styles.statLabel} className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Active SKUs</Text>
-                    <Text style={styles.statValue} className="text-[26px] font-bold text-slate-900 dark:text-white tracking-tight block">{products.length}</Text>
-                    <Text style={styles.statSub} className="text-[12px] font-normal text-slate-500 dark:text-slate-400 mt-1 block">{invStats.totalUnits} total units in stock</Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.statCard,
-                      invStats.lowStockCount > 0
-                        ? styles.statCardWarningAccent
-                        : styles.statCardSuccessAccent,
-                    ]}
-                    className={`admin-stat-card border-l-4 ${invStats.lowStockCount > 0 ? 'border-l-amber-500' : 'border-l-emerald-500'}`}
-                  >
-                    <View style={styles.statIconWrap} className={`admin-icon-pill mb-3 ${invStats.lowStockCount > 0 ? 'admin-icon-pill-amber' : 'admin-icon-pill-teal'}`}>
-                      <BootstrapIcon
-                        name={invStats.lowStockCount > 0 ? "exclamation-triangle" : "check2-circle"}
-                        size={18}
-                        color={invStats.lowStockCount > 0 ? '#F59E0B' : '#10B981'}
-                      />
-                    </View>
-                    <Text style={styles.statLabel} className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Stock Alerts</Text>
-                    <Text style={[styles.statValue, invStats.lowStockCount > 0 && { color: '#D97706' }]} className="text-[26px] font-bold text-slate-900 dark:text-white tracking-tight block">
-                      {invStats.lowStockCount} Low / {invStats.outOfStockCount} Out
-                    </Text>
-                    <Text style={styles.statSub} className="text-[12px] font-normal text-slate-500 dark:text-slate-400 mt-1 block">Needs reorder attention</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardTealAccent]} className="admin-stat-card border-l-4 border-l-blue-500">
-                    <View style={styles.statIconWrap} className="admin-icon-pill admin-icon-pill-blue mb-3">
-                      <BootstrapIcon name="receipt" size={18} color="#2563EB" />
-                    </View>
-                    <Text style={styles.statLabel} className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block mb-1">Dispatches & Orders</Text>
-                    <Text style={styles.statValue} className="text-[26px] font-bold text-slate-900 dark:text-white tracking-tight block">{orders.length}</Text>
-                    <Text style={styles.statSub} className="text-[12px] font-normal text-slate-500 dark:text-slate-400 mt-1 block">
-                      {analyticsData.posOrdersCount} POS / {analyticsData.onlineOrdersCount} Online
-                    </Text>
-                  </View>
+                <View style={styles.statsGrid}>
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Store Revenue"
+                    value={`₱${analyticsData.totalRevenue.toLocaleString()}`}
+                    sub="Online + Walk-in POS"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="blue"
+                    label="Active SKUs"
+                    value={products.length}
+                    sub={`${invStats.totalUnits} total units in stock`}
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent={invStats.lowStockCount > 0 ? 'amber' : 'teal'}
+                    label="Stock Alerts"
+                    value={`${invStats.lowStockCount} Low / ${invStats.outOfStockCount} Out`}
+                    valueColor={invStats.lowStockCount > 0 ? '#D97706' : undefined}
+                    sub="Needs reorder attention"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="amber"
+                    label="Dispatches & Orders"
+                    value={orders.length}
+                    sub={`${analyticsData.posOrdersCount} POS / ${analyticsData.onlineOrdersCount} Online`}
+                  />
                 </View>
 
                 {/* Urgent Pending COD Approvals Alert in Overview */}
@@ -4042,9 +4052,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={true}
-                    contentContainerStyle={{ minWidth: 740 }}
+                    contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                   >
-                    <View style={{ width: '100%', minWidth: 740 }}>
+                    <View style={{ width: '100%', minWidth: 740, flexGrow: 1 }}>
                       <View style={styles.tableHeaderRow} className="admin-table-head flex flex-row items-center px-5 py-3">
                         <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 120 }]}>Order Ref</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 2, minWidth: 160 }]}>Customer</Text>
@@ -4146,59 +4156,35 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <View>
                 {/* Orders KPI Grid */}
                 <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="receipt" size={18} color="#0C6258" />
-                    </View>
-                    <Text style={styles.statLabel}>Total Orders</Text>
-                    <Text style={styles.statValue}>{orderStats.total}</Text>
-                    <Text style={styles.statSub}>₱{orderStats.totalRevenue.toLocaleString()} volume</Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.statCard,
-                      orderStats.pendingCod > 0 ? styles.statCardWarningAccent : styles.statCardSuccessAccent,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.statIconWrap,
-                        { backgroundColor: orderStats.pendingCod > 0 ? '#FEF3C7' : '#ECFDF5' },
-                      ]}
-                    >
-                      <BootstrapIcon
-                        name="shield-lock-fill"
-                        size={18}
-                        color={orderStats.pendingCod > 0 ? '#D97706' : '#10B981'}
-                      />
-                    </View>
-                    <Text style={styles.statLabel}>Pending COD Approvals</Text>
-                    <Text
-                      style={[styles.statValue, { color: orderStats.pendingCod > 0 ? '#D97706' : '#047857' }]}
-                    >
-                      {orderStats.pendingCod}
-                    </Text>
-                    <Text style={styles.statSub}>Requires Admin action</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={[styles.statIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                      <BootstrapIcon name="box-seam-fill" size={18} color="#1D4ED8" />
-                    </View>
-                    <Text style={styles.statLabel}>Packing & Processing</Text>
-                    <Text style={[styles.statValue, { color: '#1D4ED8' }]}>{orderStats.processing}</Text>
-                    <Text style={styles.statSub}>Ready for courier pickup</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                    <View style={[styles.statIconWrap, { backgroundColor: '#F3E8FF' }]}>
-                      <BootstrapIcon name="truck" size={18} color="#9333EA" />
-                    </View>
-                    <Text style={styles.statLabel}>Out for Delivery</Text>
-                    <Text style={[styles.statValue, { color: '#9333EA' }]}>{orderStats.shipped}</Text>
-                    <Text style={styles.statSub}>On the road with courier</Text>
-                  </View>
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Orders"
+                    value={orderStats.total}
+                    sub={`₱${orderStats.totalRevenue.toLocaleString()} volume`}
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent={orderStats.pendingCod > 0 ? 'amber' : 'blue'}
+                    label="Pending COD Approvals"
+                    value={orderStats.pendingCod}
+                    valueColor={orderStats.pendingCod > 0 ? '#D97706' : '#0C6258'}
+                    sub="Requires Admin action"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Packing & Processing"
+                    value={orderStats.processing}
+                    sub="Ready for courier pickup"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="amber"
+                    label="Out for Delivery"
+                    value={orderStats.shipped}
+                    sub="On the road with courier"
+                  />
                 </View>
 
                 {/* COD Pending Banner if any */}
@@ -4440,7 +4426,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       paddingVertical: 9,
                                       borderRadius: 9,
                                       backgroundColor: isSelected
-                                        ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                        ? isDarkMode ? '#132A26' : '#E7F5F3'
                                         : 'transparent',
                                       cursor: 'pointer',
                                     }}
@@ -4548,7 +4534,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   ? 'phone-fill'
                                   : orderPaymentFilter === 'Card'
                                     ? 'credit-card-fill'
-                                    : 'credit-card'
+                                    : orderPaymentFilter === 'PayPal'
+                                      ? 'wallet2'
+                                      : 'credit-card'
                             }
                             size={13}
                             color={orderPaymentFilter !== 'All' ? '#0C6258' : '#64748B'}
@@ -4566,7 +4554,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 ? 'COD Only'
                                 : orderPaymentFilter === 'GCash'
                                   ? 'GCash'
-                                  : 'Card'}
+                                  : orderPaymentFilter === 'PayPal'
+                                    ? 'PayPal'
+                                    : 'Card'}
                           </Text>
                         </View>
                         <BootstrapIcon
@@ -4619,7 +4609,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             { key: 'All', label: 'All Payments', icon: 'credit-card' },
                             { key: 'COD', label: 'COD Only', icon: 'cash-coin' },
                             { key: 'GCash', label: 'GCash Express', icon: 'phone' },
-                            { key: 'Card', label: 'Credit / Debit Card', icon: 'credit-card-2-front' },
                           ].map((option) => {
                             const isSelected = orderPaymentFilter === option.key;
                             return (
@@ -4633,7 +4622,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   paddingVertical: 9,
                                   borderRadius: 9,
                                   backgroundColor: isSelected
-                                    ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                    ? isDarkMode ? '#132A26' : '#E7F5F3'
                                     : 'transparent',
                                   cursor: 'pointer',
                                 }}
@@ -4738,9 +4727,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={true}
-                    contentContainerStyle={{ minWidth: 1280 }}
+                    contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                   >
-                    <View style={{ width: '100%', minWidth: 1280 }}>
+                    <View style={{ width: '100%', minWidth: 1280, flexGrow: 1 }}>
                       <View style={styles.tableHeaderRow}>
                         <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 140 }]}>Order Ref & Date</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 170 }]}>Customer & Destination</Text>
@@ -5191,29 +5180,37 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <View>
                 {/* Inventory KPI Summary Cards */}
                 <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <Text style={styles.statLabel}>Total Inventory Value</Text>
-                    <Text style={styles.statValue}>₱{invStats.totalValue.toLocaleString()}</Text>
-                    <Text style={styles.statSub}>Across {invStats.totalUnits} items</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                    <Text style={styles.statLabel}>In Stock SKUs</Text>
-                    <Text style={[styles.statValue, { color: '#047857' }]}>{invStats.inStockCount}</Text>
-                    <Text style={styles.statSub}>5+ units on hand</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardWarningAccent]}>
-                    <Text style={styles.statLabel}>Low Stock Alert</Text>
-                    <Text style={[styles.statValue, { color: '#D97706' }]}>{invStats.lowStockCount}</Text>
-                    <Text style={styles.statSub}>1 - 4 units remaining</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardDangerAccent]}>
-                    <Text style={styles.statLabel}>Out of Stock</Text>
-                    <Text style={[styles.statValue, { color: '#DC2626' }]}>{invStats.outOfStockCount}</Text>
-                    <Text style={styles.statSub}>0 units available</Text>
-                  </View>
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Inventory Value"
+                    value={`₱${invStats.totalValue.toLocaleString()}`}
+                    sub={`Across ${invStats.totalUnits} items`}
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="blue"
+                    label="In Stock SKUs"
+                    value={invStats.inStockCount}
+                    valueColor="#0C6258"
+                    sub="5+ units on hand"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Low Stock Alert"
+                    value={invStats.lowStockCount}
+                    valueColor={invStats.lowStockCount > 0 ? '#D97706' : undefined}
+                    sub="1 - 4 units remaining"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="amber"
+                    label="Out of Stock"
+                    value={invStats.outOfStockCount}
+                    valueColor={invStats.outOfStockCount > 0 ? '#DC2626' : '#0C6258'}
+                    sub="0 units available"
+                  />
                 </View>
 
                 {/* Low Stock Warning Banner */}
@@ -5376,7 +5373,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 paddingVertical: 9,
                                 borderRadius: 9,
                                 backgroundColor: isSelected
-                                  ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                  ? isDarkMode ? '#132A26' : '#E7F5F3'
                                   : 'transparent',
                                 cursor: 'pointer',
                               }}
@@ -5482,9 +5479,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   horizontal
                   showsHorizontalScrollIndicator={true}
                   style={{ width: '100%' }}
-                  contentContainerStyle={{ minWidth: 920 }}
+                  contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                 >
-                  <View style={[styles.tableCard, { width: '100%', minWidth: 920 }]}>
+                  <View style={[styles.tableCard, { width: '100%', minWidth: 920, flexGrow: 1 }]}>
                     <View style={styles.tableHeaderRow}>
                       <Text style={[styles.tableHeaderCell, { flex: 2.5, minWidth: 200 }]}>Product Part & SKU</Text>
                       <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 110 }]}>Category</Text>
@@ -5541,37 +5538,28 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             ₱{p.price?.toLocaleString()}
                           </Text>
 
-                          {/* Quick Adjust Buttons */}
+                          {/* Current Stock */}
                           <View
                             style={{
                               flex: 1.6,
                               minWidth: 130,
-                              flexDirection: 'row',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              gap: 6,
                             }}
                           >
-                            <TouchableOpacity
-                              style={styles.stockMiniBtn}
-                              onPress={() => handleQuickAdjustStock(p.id, -1)}
+                            <Text
+                              style={[
+                                styles.tableTitle,
+                                {
+                                  fontWeight: '800',
+                                  fontSize: 14,
+                                  color: isOut ? '#DC2626' : isLow ? '#D97706' : isDarkMode ? '#F8FAFC' : '#0F172A',
+                                  textAlign: 'center',
+                                },
+                              ]}
                             >
-                              <Text style={styles.stockMiniBtnText}>-</Text>
-                            </TouchableOpacity>
-
-                            <TextInput
-                              style={[styles.tableInputInline, { width: 50 }]}
-                              keyboardType="numeric"
-                              defaultValue={String(p.stock || 0)}
-                              onEndEditing={(e) => handleUpdateStock(p.id, e.nativeEvent.text)}
-                            />
-
-                            <TouchableOpacity
-                              style={styles.stockMiniBtn}
-                              onPress={() => handleQuickAdjustStock(p.id, 1)}
-                            >
-                              <Text style={styles.stockMiniBtnText}>+</Text>
-                            </TouchableOpacity>
+                              {p.stock || 0}
+                            </Text>
                           </View>
 
                           {/* Status Badge */}
@@ -5780,7 +5768,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   paddingVertical: 9,
                                   borderRadius: 9,
                                   backgroundColor: isSelected
-                                    ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                    ? isDarkMode ? '#132A26' : '#E7F5F3'
                                     : 'transparent',
                                   cursor: 'pointer',
                                 }}
@@ -5903,7 +5891,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         )}
                         <View
                           style={{
-                            backgroundColor: '#E6F4F1',
+                            backgroundColor: '#E7F5F3',
                             paddingHorizontal: 8,
                             paddingVertical: 4,
                             borderRadius: 8,
@@ -6222,36 +6210,39 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <View>
                 {/* Key Telemetry Metrics */}
                 <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, styles.statCardTealAccent]} className="border border-teal-600">
-                    <Text style={styles.statLabel}>Gross Sales Volume</Text>
-                    <Text style={styles.statValue}>₱{analyticsData.totalRevenue.toLocaleString()}</Text>
-                    <Text style={styles.statSub}>Combined online & in-store</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardSuccessAccent]} className="border border-blue-500">
-                    <Text style={styles.statLabel}>Average Order Value (AOV)</Text>
-                    <Text style={styles.statValue}>₱{Math.round(analyticsData.aov).toLocaleString()}</Text>
-                    <Text style={styles.statSub}>Per transaction average</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardTealAccent]} className="border border-teal-600">
-                    <Text style={styles.statLabel}>Total Units Sold</Text>
-                    <Text style={styles.statValue}>{analyticsData.totalItemsSold} Items</Text>
-                    <Text style={styles.statSub}>Across {analyticsData.totalOrders} total orders</Text>
-                  </View>
-
-                  <View style={[styles.statCard, styles.statCardWarningAccent]} className="border border-amber-500">
-                    <Text style={styles.statLabel}>POS In-Store Sales Share</Text>
-                    <Text style={[styles.statValue, { color: '#0C6258' }]}>
-                      {analyticsData.totalRevenue > 0
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Gross Sales Volume"
+                    value={`₱${analyticsData.totalRevenue.toLocaleString()}`}
+                    sub="Combined online & in-store"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="blue"
+                    label="Average Order Value (AOV)"
+                    value={`₱${Math.round(analyticsData.aov).toLocaleString()}`}
+                    sub="Per transaction average"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Units Sold"
+                    value={`${analyticsData.totalItemsSold} Items`}
+                    sub={`Across ${analyticsData.totalOrders} total orders`}
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="amber"
+                    label="POS In-Store Sales Share"
+                    value={`${
+                      analyticsData.totalRevenue > 0
                         ? Math.round((analyticsData.posRevenue / analyticsData.totalRevenue) * 100)
-                        : 0}
-                      %
-                    </Text>
-                    <Text style={styles.statSub}>
-                      ₱{analyticsData.posRevenue.toLocaleString()} in counter sales
-                    </Text>
-                  </View>
+                        : 0
+                    }%`}
+                    valueColor="#0C6258"
+                    sub={`₱${analyticsData.posRevenue.toLocaleString()} in counter sales`}
+                  />
                 </View>
 
                 {/* Revenue Trend Area Chart */}
@@ -6545,6 +6536,16 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               </View>
             )}
 
+            {/* ─── TAB 4b: SALES FORECAST & STOCK OPTIMIZATION ─── */}
+            {activeNav === 'forecast' && (
+              <SalesForecastPanel
+                orders={orders}
+                products={products}
+                isDarkMode={isDarkMode}
+                isDesktop={isDesktop}
+              />
+            )}
+
             {/* ─── TAB 5: PRODUCTS & PRICES MANAGEMENT ─── */}
             {activeNav === 'products' && (
               <View>
@@ -6681,7 +6682,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 paddingVertical: 9,
                                 borderRadius: 9,
                                 backgroundColor: isSelected
-                                  ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                  ? isDarkMode ? '#132A26' : '#E7F5F3'
                                   : 'transparent',
                                 cursor: 'pointer',
                               }}
@@ -6755,9 +6756,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   style={{ width: '100%' }}
-                  contentContainerStyle={{ minWidth: '100%' }}
+                  contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                 >
-                  <View style={[styles.tableCard, { width: '100%', minWidth: 700 }]}>
+                  <View style={[styles.tableCard, { width: '100%', minWidth: 700, flexGrow: 1 }]}>
                     <View style={styles.tableHeaderRow}>
                       <Text style={[styles.tableHeaderCell, { flex: 2.5 }]}>Product & Brand</Text>
                       <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Category</Text>
@@ -6809,18 +6810,22 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         </View>
 
                         {/* Actions */}
-                        <View style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'center' }}>
+                        <View style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
                           <TouchableOpacity
-                            style={styles.actionIconBtn}
+                            style={[styles.actionIconBtn, styles.actionIconBtnEdit]}
                             onPress={() => setEditingProduct({ ...p })}
+                            title="Edit Product"
+                            activeOpacity={0.7}
                           >
-                            <BootstrapIcon name="pencil" size={13} color="#475569" />
+                            <BootstrapIcon name="pencil-square" size={17} color="#2563EB" />
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
                             onPress={() => handleDeleteProduct(p.product_id || p.id, p.name)}
+                            title="Delete Product"
+                            activeOpacity={0.7}
                           >
-                            <BootstrapIcon name="trash" size={13} color="#DC2626" />
+                            <BootstrapIcon name="trash3" size={17} color="#EF4444" />
                           </TouchableOpacity>
                         </View>
                       </View>
@@ -6837,9 +6842,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={true}
-                    contentContainerStyle={{ minWidth: 840 }}
+                    contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                   >
-                    <View style={{ width: '100%', minWidth: 840 }}>
+                    <View style={{ width: '100%', minWidth: 840, flexGrow: 1 }}>
                       <View style={styles.tableHeaderRow}>
                         <Text style={[styles.tableHeaderCell, { flex: 2, minWidth: 140 }]}>Promo Code</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 100, textAlign: 'center' }]}>Discount</Text>
@@ -6956,7 +6961,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               onPress={() => handleDeletePromo(prm.code)}
                               activeOpacity={0.8}
                             >
-                              <BootstrapIcon name="trash" size={13} color="#DC2626" />
+                              <BootstrapIcon name="trash3" size={17} color="#EF4444" />
                             </TouchableOpacity>
                           </View>
                         </View>
@@ -7050,7 +7055,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 width: 32,
                                 height: 32,
                                 borderRadius: 8,
-                                backgroundColor: isDarkMode ? '#132A26' : '#E6F4F1',
+                                backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                               }}
@@ -7181,7 +7186,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 padding: 10,
                                 borderRadius: 10,
                                 backgroundColor: isSelected
-                                  ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                  ? isDarkMode ? '#132A26' : '#E7F5F3'
                                   : 'transparent',
                                 gap: 10,
                                 cursor: 'pointer',
@@ -7275,77 +7280,44 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <View>
                     {/* Booking Stats Cards */}
                     <View style={styles.statsGrid}>
-                      <View style={[styles.statCard, styles.statCardTealAccent]}>
-                        <View style={styles.statIconWrap}>
-                          <BootstrapIcon name="calendar-check" size={18} color="#0C6258" />
-                        </View>
-                        <Text style={styles.statLabel}>Total Bookings</Text>
-                        <Text style={styles.statValue}>{bookingStats.total}</Text>
-                        <Text style={styles.statSub}>All Repair & PMS</Text>
-                      </View>
-
-                      <View
-                        style={[
-                          styles.statCard,
-                          {
-                            borderLeftColor: bookingStats.pending > 0 ? '#F59E0B' : '#CBD5E1',
-                            borderLeftWidth: 4,
-                            backgroundColor: bookingStats.pending > 0 ? '#FFFBEB' : undefined,
-                          },
-                        ]}
-                      >
-                        <View
-                          style={[
-                            styles.statIconWrap,
-                            { backgroundColor: bookingStats.pending > 0 ? '#FEF3C7' : '#F1F5F9' },
-                          ]}
-                        >
-                          <BootstrapIcon
-                            name="hourglass-split"
-                            size={18}
-                            color={bookingStats.pending > 0 ? '#D97706' : '#64748B'}
-                          />
-                        </View>
-                        <Text style={styles.statLabel}>Pending Review</Text>
-                        <Text
-                          style={[
-                            styles.statValue,
-                            { color: bookingStats.pending > 0 ? '#D97706' : '#64748B' },
-                          ]}
-                        >
-                          {bookingStats.pending}
-                        </Text>
-                        <Text style={styles.statSub}>Awaiting advisor approval</Text>
-                      </View>
-
-                      <View style={[styles.statCard, { borderLeftColor: '#3B82F6', borderLeftWidth: 4 }]}>
-                        <View style={[styles.statIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                          <BootstrapIcon name="clock-history" size={18} color="#1D4ED8" />
-                        </View>
-                        <Text style={styles.statLabel}>Confirmed / Upcoming</Text>
-                        <Text style={[styles.statValue, { color: '#1D4ED8' }]}>{bookingStats.confirmed}</Text>
-                        <Text style={styles.statSub}>Mechanic assigned</Text>
-                      </View>
-
-                      <View style={[styles.statCard, styles.statCardWarningAccent]}>
-                        <View style={styles.statIconWrap}>
-                          <BootstrapIcon name="gear-wide-connected" size={18} color="#D97706" />
-                        </View>
-                        <Text style={styles.statLabel}>In Pit Bay / Progress</Text>
-                        <Text style={[styles.statValue, { color: '#D97706' }]}>
-                          {bookingStats.inProgress}
-                        </Text>
-                        <Text style={styles.statSub}>Currently on service lifts</Text>
-                      </View>
-
-                      <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                        <View style={styles.statIconWrap}>
-                          <BootstrapIcon name="check-circle-fill" size={18} color="#10B981" />
-                        </View>
-                        <Text style={styles.statLabel}>Completed Services</Text>
-                        <Text style={[styles.statValue, { color: '#059669' }]}>{bookingStats.completed}</Text>
-                        <Text style={styles.statSub}>Released to customer</Text>
-                      </View>
+                      <AdminStatCard
+                        styles={styles}
+                        accent="teal"
+                        label="Total Bookings"
+                        value={bookingStats.total}
+                        sub="All Repair & PMS"
+                      />
+                      <AdminStatCard
+                        styles={styles}
+                        accent={bookingStats.pending > 0 ? 'amber' : 'blue'}
+                        label="Pending Review"
+                        value={bookingStats.pending}
+                        valueColor={bookingStats.pending > 0 ? '#D97706' : undefined}
+                        sub="Awaiting advisor approval"
+                      />
+                      <AdminStatCard
+                        styles={styles}
+                        accent="teal"
+                        label="Confirmed / Upcoming"
+                        value={bookingStats.confirmed}
+                        sub="Mechanic assigned"
+                      />
+                      <AdminStatCard
+                        styles={styles}
+                        accent="amber"
+                        label="In Pit Bay / Progress"
+                        value={bookingStats.inProgress}
+                        valueColor={bookingStats.inProgress > 0 ? '#D97706' : undefined}
+                        sub="Currently on service lifts"
+                      />
+                      <AdminStatCard
+                        styles={styles}
+                        accent="green"
+                        label="Completed Services"
+                        value={bookingStats.completed}
+                        valueColor="#0C6258"
+                        sub="Released to customer"
+                      />
                     </View>
 
                     {/* Toolbar (Search, Filter Tabs, Add Walk-in) */}
@@ -7561,7 +7533,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                           paddingVertical: 9,
                                           borderRadius: 9,
                                           backgroundColor: isSelected
-                                            ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                            ? isDarkMode ? '#132A26' : '#E7F5F3'
                                             : 'transparent',
                                           cursor: 'pointer',
                                         }}
@@ -7660,9 +7632,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={true}
-                        contentContainerStyle={{ minWidth: 1140 }}
+                        contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                       >
-                        <View style={{ width: '100%', minWidth: 1140 }}>
+                        <View style={{ width: '100%', minWidth: 1140, flexGrow: 1 }}>
                           <View style={styles.tableHeaderRow}>
                             <Text style={[styles.tableHeaderCell, { flex: 2, minWidth: 160 }]}>Booking Ref & Schedule</Text>
                             <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 150 }]}>Customer Info</Text>
@@ -7827,7 +7799,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   {/* 4. Service Package */}
                                   <View style={{ flex: 2.2, minWidth: 180, gap: 2 }}>
                                     <Text style={styles.tableTitle} numberOfLines={2}>
-                                      {b.service_title || b.serviceName || 'Pitstop Service'}
+                                      {b.package_name || b.service_title || b.serviceName || 'Pitstop Service'}
                                     </Text>
                                     {b.repair_type ? (
                                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
@@ -8092,9 +8064,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={true}
-                        contentContainerStyle={{ minWidth: 840 }}
+                        contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                       >
-                        <View style={{ width: '100%', minWidth: 840 }}>
+                        <View style={{ width: '100%', minWidth: 840, flexGrow: 1 }}>
                           <View style={styles.tableHeaderRow}>
                             <Text style={[styles.tableHeaderCell, { flex: 2.5, minWidth: 200 }]}>Service Package</Text>
                             <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 100 }]}>Category</Text>
@@ -8142,7 +8114,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   style={{ flex: 1.2, minWidth: 90, flexDirection: 'row', justifyContent: 'center', gap: 6 }}
                                 >
                                   <TouchableOpacity
-                                    style={styles.actionIconBtn}
+                                    style={[styles.actionIconBtn, styles.actionIconBtnEdit]}
                                     onPress={() => {
                                       setEditingGarageService(srv);
                                       setServTitle(srv.title);
@@ -8161,14 +8133,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       setIsAddGarageOpen(true);
                                     }}
                                   >
-                                    <BootstrapIcon name="pencil" size={13} color="#475569" />
+                                    <BootstrapIcon name="pencil-square" size={17} color="#2563EB" />
                                   </TouchableOpacity>
 
                                   <TouchableOpacity
                                     style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
                                     onPress={() => handleDeleteGarageService(srv.id, srv.title)}
                                   >
-                                    <BootstrapIcon name="trash" size={13} color="#DC2626" />
+                                    <BootstrapIcon name="trash3" size={17} color="#EF4444" />
                                   </TouchableOpacity>
                                 </View>
                               </View>
@@ -8186,90 +8158,36 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <View>
                 {/* Technician Stats Cards */}
                 <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="people-fill" size={18} color="#0C6258" />
-                    </View>
-                    <Text style={styles.statLabel}>Total Mechanics</Text>
-                    <Text style={styles.statValue}>{mechanicsStats.total}</Text>
-                    <Text style={styles.statSub}>Certified Pit Bay Crew</Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.statCard,
-                      {
-                        borderLeftColor: '#10B981',
-                        borderLeftWidth: 4,
-                        backgroundColor: isDarkMode ? undefined : '#F0FDF4',
-                      },
-                    ]}
-                  >
-                    <View style={[styles.statIconWrap, { backgroundColor: '#DCFCE7' }]}>
-                      <BootstrapIcon name="check-circle-fill" size={18} color="#16A34A" />
-                    </View>
-                    <Text style={styles.statLabel}>On-Duty & Available</Text>
-                    <Text style={[styles.statValue, { color: '#16A34A' }]}>
-                      {mechanicsStats.available}
-                    </Text>
-                    <Text style={styles.statSub}>Ready for Bay Assignment</Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.statCard,
-                      {
-                        borderLeftColor: mechanicsStats.busy > 0 ? '#F59E0B' : '#94A3B8',
-                        borderLeftWidth: 4,
-                        backgroundColor:
-                          mechanicsStats.busy > 0 && !isDarkMode ? '#FFFBEB' : undefined,
-                      },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.statIconWrap,
-                        {
-                          backgroundColor: mechanicsStats.busy > 0 ? '#FEF3C7' : '#F1F5F9',
-                        },
-                      ]}
-                    >
-                      <BootstrapIcon
-                        name="tools"
-                        size={18}
-                        color={mechanicsStats.busy > 0 ? '#D97706' : '#64748B'}
-                      />
-                    </View>
-                    <Text style={styles.statLabel}>In Pit Bay (Servicing)</Text>
-                    <Text
-                      style={[
-                        styles.statValue,
-                        { color: mechanicsStats.busy > 0 ? '#D97706' : '#64748B' },
-                      ]}
-                    >
-                      {mechanicsStats.busy}
-                    </Text>
-                    <Text style={styles.statSub}>Active Work Orders</Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.statCard,
-                      {
-                        borderLeftColor: '#8B5CF6',
-                        borderLeftWidth: 4,
-                      },
-                    ]}
-                  >
-                    <View style={[styles.statIconWrap, { backgroundColor: '#EDE9FE' }]}>
-                      <BootstrapIcon name="award-fill" size={18} color="#7C3AED" />
-                    </View>
-                    <Text style={styles.statLabel}>Master Techs</Text>
-                    <Text style={[styles.statValue, { color: '#7C3AED' }]}>
-                      {mechanicsStats.masterCertified}
-                    </Text>
-                    <Text style={styles.statSub}>OEM & Race Certified</Text>
-                  </View>
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Mechanics"
+                    value={mechanicsStats.total}
+                    sub="Certified Pit Bay Crew"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="blue"
+                    label="On-Duty & Available"
+                    value={mechanicsStats.available}
+                    valueColor="#0C6258"
+                    sub="Ready for Bay Assignment"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent={mechanicsStats.busy > 0 ? 'amber' : 'teal'}
+                    label="In Pit Bay (Servicing)"
+                    value={mechanicsStats.busy}
+                    valueColor={mechanicsStats.busy > 0 ? '#D97706' : undefined}
+                    sub="Active Work Orders"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="amber"
+                    label="Master Techs"
+                    value={mechanicsStats.masterCertified}
+                    sub="OEM & Race Certified"
+                  />
                 </View>
 
                 {/* Toolbar & Filter Bar */}
@@ -8454,7 +8372,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       paddingVertical: 9,
                                       borderRadius: 9,
                                       backgroundColor: isSelected
-                                        ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                        ? isDarkMode ? '#132A26' : '#E7F5F3'
                                         : 'transparent',
                                       cursor: 'pointer',
                                     }}
@@ -8635,9 +8553,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={true}
-                      contentContainerStyle={{ minWidth: 960 }}
+                      contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                     >
-                      <View style={{ width: '100%', minWidth: 960 }}>
+                      <View style={{ width: '100%', minWidth: 960, flexGrow: 1 }}>
                         <View style={styles.tableHeaderRow}>
                           <Text style={[styles.tableHeaderCell, { flex: 2.3, minWidth: 200 }]}>Technician / Profile</Text>
                           <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 120 }]}>Status</Text>
@@ -9283,16 +9201,16 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               <BootstrapIcon name="geo-alt" size={13} color="#0C6258" />
                             </TouchableOpacity>
                             <TouchableOpacity
-                              style={styles.actionIconBtn}
+                              style={[styles.actionIconBtn, styles.actionIconBtnEdit]}
                               onPress={() => handleOpenEditRider(rider)}
                             >
-                              <BootstrapIcon name="pencil" size={13} color="#475569" />
+                              <BootstrapIcon name="pencil-square" size={17} color="#2563EB" />
                             </TouchableOpacity>
                             <TouchableOpacity
-                              style={[styles.actionIconBtn, { backgroundColor: '#FEF2F2' }]}
+                              style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
                               onPress={() => handleDeleteRider(rider)}
                             >
-                              <BootstrapIcon name="trash3-fill" size={13} color="#DC2626" />
+                              <BootstrapIcon name="trash3" size={17} color="#EF4444" />
                             </TouchableOpacity>
                           </View>
                         </View>
@@ -9313,7 +9231,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     alignItems: 'center',
                     justifyContent: 'space-between',
                     backgroundColor: isDarkMode ? '#0F2922' : '#F0FDF9',
-                    borderColor: isDarkMode ? '#115E59' : '#99F6E4',
+                    borderColor: isDarkMode ? '#063D37' : '#99F6E4',
                     borderWidth: 1,
                     borderRadius: 10,
                     paddingHorizontal: 14,
@@ -9334,7 +9252,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       style={{
                         fontSize: 12,
                         fontWeight: '700',
-                        color: isDarkMode ? '#5EEAD4' : '#0F766E',
+                        color: isDarkMode ? '#5EEAD4' : '#084A43',
                       }}
                     >
                       Live Database Connected (Supabase public.suppliers)
@@ -9362,12 +9280,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     }}
                     disabled={isSuppliersLoading}
                   >
-                    <BootstrapIcon name="arrow-clockwise" size={13} color="#0F766E" />
+                    <BootstrapIcon name="arrow-clockwise" size={13} color="#084A43" />
                     <Text
                       style={{
                         fontSize: 11.5,
                         fontWeight: '700',
-                        color: isDarkMode ? '#5EEAD4' : '#0F766E',
+                        color: isDarkMode ? '#5EEAD4' : '#084A43',
                       }}
                     >
                       {isSuppliersLoading ? 'Syncing...' : 'Sync with DB'}
@@ -9377,90 +9295,36 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
                 {/* Supplier Stats Telemetry */}
                 <View style={styles.statsGrid}>
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="truck" size={18} color="#0C6258" />
-                    </View>
-                    <Text style={styles.statLabel}>Total Suppliers</Text>
-                    <Text style={styles.statValue}>{supplierStats.total}</Text>
-                    <Text style={styles.statSub}>Catalogued Part Vendors</Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.statCard,
-                      {
-                        borderLeftColor: '#10B981',
-                        borderLeftWidth: 4,
-                        backgroundColor: isDarkMode ? undefined : '#F0FDF4',
-                      },
-                    ]}
-                  >
-                    <View style={[styles.statIconWrap, { backgroundColor: '#DCFCE7' }]}>
-                      <BootstrapIcon name="check-circle-fill" size={18} color="#16A34A" />
-                    </View>
-                    <Text style={styles.statLabel}>Active Sourcing</Text>
-                    <Text style={[styles.statValue, { color: '#16A34A' }]}>
-                      {supplierStats.active}
-                    </Text>
-                    <Text style={styles.statSub}>Fulfilling Purchase Orders</Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.statCard,
-                      {
-                        borderLeftColor: supplierStats.pending > 0 ? '#F59E0B' : '#94A3B8',
-                        borderLeftWidth: 4,
-                        backgroundColor:
-                          supplierStats.pending > 0 && !isDarkMode ? '#FFFBEB' : undefined,
-                      },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.statIconWrap,
-                        {
-                          backgroundColor: supplierStats.pending > 0 ? '#FEF3C7' : '#F1F5F9',
-                        },
-                      ]}
-                    >
-                      <BootstrapIcon
-                        name="hourglass-split"
-                        size={18}
-                        color={supplierStats.pending > 0 ? '#D97706' : '#64748B'}
-                      />
-                    </View>
-                    <Text style={styles.statLabel}>Pending Review</Text>
-                    <Text
-                      style={[
-                        styles.statValue,
-                        { color: supplierStats.pending > 0 ? '#D97706' : '#64748B' },
-                      ]}
-                    >
-                      {supplierStats.pending}
-                    </Text>
-                    <Text style={styles.statSub}>Onboarding Contracts</Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.statCard,
-                      {
-                        borderLeftColor: '#8B5CF6',
-                        borderLeftWidth: 4,
-                      },
-                    ]}
-                  >
-                    <View style={[styles.statIconWrap, { backgroundColor: '#EDE9FE' }]}>
-                      <BootstrapIcon name="star-fill" size={18} color="#7C3AED" />
-                    </View>
-                    <Text style={styles.statLabel}>Top Rated Partners</Text>
-                    <Text style={[styles.statValue, { color: '#7C3AED' }]}>
-                      {supplierStats.topRated}
-                    </Text>
-                    <Text style={styles.statSub}>4.8+ Quality Score</Text>
-                  </View>
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Suppliers"
+                    value={supplierStats.total}
+                    sub="Catalogued Part Vendors"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="blue"
+                    label="Active Sourcing"
+                    value={supplierStats.active}
+                    valueColor="#0C6258"
+                    sub="Fulfilling Purchase Orders"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent={supplierStats.pending > 0 ? 'amber' : 'teal'}
+                    label="Pending Review"
+                    value={supplierStats.pending}
+                    valueColor={supplierStats.pending > 0 ? '#D97706' : undefined}
+                    sub="Onboarding Contracts"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="amber"
+                    label="Top Rated Partners"
+                    value={supplierStats.topRated}
+                    sub="4.8+ Quality Score"
+                  />
                 </View>
 
                 {/* Toolbar & Search Bar */}
@@ -9669,7 +9533,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       paddingVertical: 9,
                                       borderRadius: 9,
                                       backgroundColor: isSelected
-                                        ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                        ? isDarkMode ? '#132A26' : '#E7F5F3'
                                         : 'transparent',
                                       cursor: 'pointer',
                                     }}
@@ -9889,9 +9753,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator={true}
-                      contentContainerStyle={{ minWidth: 1040 }}
+                      contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                     >
-                      <View style={{ width: '100%', minWidth: 1040 }}>
+                      <View style={{ width: '100%', minWidth: 1040, flexGrow: 1 }}>
                         <View style={styles.tableHeaderRow}>
                           <Text style={[styles.tableHeaderCell, { flex: 2.4, minWidth: 200 }]}>Supplier & Contact</Text>
                           <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 110 }]}>Status</Text>
@@ -10212,7 +10076,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           >
                             <View
                               style={{
-                                backgroundColor: isDarkMode ? 'rgba(12,98,88,0.2)' : '#E6F4F1',
+                                backgroundColor: isDarkMode ? 'rgba(12, 98, 88,0.2)' : '#E7F5F3',
                                 paddingHorizontal: 9,
                                 paddingVertical: 4,
                                 borderRadius: 6,
@@ -10359,9 +10223,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={true}
-                    contentContainerStyle={{ minWidth: 880 }}
+                    contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                   >
-                    <View style={{ width: '100%', minWidth: 880 }}>
+                    <View style={{ width: '100%', minWidth: 880, flexGrow: 1 }}>
                       <View style={styles.tableHeaderRow}>
                         <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 170 }]}>User Profile</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 160 }]}>Email</Text>
@@ -10444,7 +10308,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 >
                                   <Text
                                     style={{
-                                      color: u.role === 'admin' ? '#0F766E' : '#475569',
+                                      color: u.role === 'admin' ? '#084A43' : '#475569',
                                       fontSize: 11,
                                       fontWeight: '800',
                                       textTransform: 'uppercase',
@@ -10535,7 +10399,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   onPress={() => handleDeleteUser(u.id, u.name)}
                                   disabled={isSelf}
                                 >
-                                  <BootstrapIcon name="trash" size={13} color="#DC2626" />
+                                  <BootstrapIcon name="trash3" size={17} color="#EF4444" />
                                 </TouchableOpacity>
                               </View>
                             </View>
@@ -10723,7 +10587,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           width: 46,
                           height: 46,
                           borderRadius: 14,
-                          backgroundColor: isDarkMode ? '#132A26' : '#E6F4F1',
+                          backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
                           alignItems: 'center',
                           justifyContent: 'center',
                           borderWidth: 1,
@@ -10746,7 +10610,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           </Text>
                           <View
                             style={{
-                              backgroundColor: isDarkMode ? '#1E293B' : '#E6F4F1',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#E7F5F3',
                               paddingHorizontal: 8,
                               paddingVertical: 2,
                               borderRadius: 6,
@@ -10893,7 +10757,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   width: 32,
                                   height: 32,
                                   borderRadius: 8,
-                                  backgroundColor: isDarkMode ? '#132A26' : '#E6F4F1',
+                                  backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                 }}
@@ -10998,7 +10862,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   padding: 10,
                                   borderRadius: 10,
                                   backgroundColor: isSelected
-                                    ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                    ? isDarkMode ? '#132A26' : '#E7F5F3'
                                     : 'transparent',
                                   gap: 10,
                                   cursor: 'pointer',
@@ -11391,7 +11255,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             width: 40,
                             height: 40,
                             borderRadius: 12,
-                            backgroundColor: isDarkMode ? '#132A26' : '#E6F4F1',
+                            backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
@@ -12255,7 +12119,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           width: 42,
                           height: 42,
                           borderRadius: 10,
-                          backgroundColor: isDarkMode ? '#132A26' : '#E6F4F1',
+                          backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
@@ -12276,7 +12140,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           </Text>
                           <View
                             style={{
-                              backgroundColor: isDarkMode ? '#132A26' : '#E6F4F1',
+                              backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
                               paddingHorizontal: 7,
                               paddingVertical: 2,
                               borderRadius: 6,
@@ -12380,7 +12244,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           width: 36,
                           height: 36,
                           borderRadius: 8,
-                          backgroundColor: isDarkMode ? '#132A26' : '#E6F4F1',
+                          backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
@@ -12674,7 +12538,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   paddingVertical: 9,
                                   borderRadius: 9,
                                   backgroundColor: isSelected
-                                    ? isDarkMode ? '#132A26' : '#E6F4F1'
+                                    ? isDarkMode ? '#132A26' : '#E7F5F3'
                                     : 'transparent',
                                   cursor: 'pointer',
                                 }}
@@ -12816,7 +12680,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           case 'ORDER_CANCELLED':
                             return { title: 'Cancelled Order', icon: 'x-circle-fill', color: '#DC2626', bg: isDarkMode ? '#341515' : '#FEE2E2' };
                           case 'STOCK_REPLENISHED':
-                            return { title: 'Replenished Inventory', icon: 'boxes', color: '#0C6258', bg: isDarkMode ? '#132A26' : '#E6F4F1' };
+                            return { title: 'Replenished Inventory', icon: 'boxes', color: '#0C6258', bg: isDarkMode ? '#132A26' : '#E7F5F3' };
                           case 'PRICE_OVERRIDE':
                             return { title: 'Price Override', icon: 'tag-fill', color: '#D97706', bg: isDarkMode ? '#2D2012' : '#FEF3C7' };
                           case 'BOOKING_CREATED':
@@ -12832,7 +12696,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           case 'STAFF_PERMISSION_CHANGED':
                             return { title: 'Modified Staff Permissions', icon: 'shield-lock-fill', color: '#7C3AED', bg: isDarkMode ? '#281A42' : '#EDE9FE' };
                           case 'SYSTEM_SETTINGS_SAVED':
-                            return { title: 'Updated System Settings', icon: 'sliders', color: '#0C6258', bg: isDarkMode ? '#132A26' : '#E6F4F1' };
+                            return { title: 'Updated System Settings', icon: 'sliders', color: '#0C6258', bg: isDarkMode ? '#132A26' : '#E7F5F3' };
                           case 'AI_RESTOCK_RECOMMENDED':
                             return { title: 'AI Restock Advice', icon: 'cpu-fill', color: '#7C3AED', bg: isDarkMode ? '#281A42' : '#EDE9FE' };
                           default: {
@@ -12840,7 +12704,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               .replace(/_/g, ' ')
                               .toLowerCase()
                               .replace(/\b\w/g, (c) => c.toUpperCase());
-                            return { title: readable, icon: 'journal-check', color: '#0C6258', bg: isDarkMode ? '#132A26' : '#E6F4F1' };
+                            return { title: readable, icon: 'journal-check', color: '#0C6258', bg: isDarkMode ? '#132A26' : '#E7F5F3' };
                           }
                         }
                       };
@@ -13074,7 +12938,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     width: 36,
                     height: 36,
                     borderRadius: 9,
-                    backgroundColor: isDarkMode ? '#132A26' : '#E6F4F1',
+                    backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -13730,7 +13594,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         >
           <View style={styles.modalOverlay}>
             <View style={styles.receiptSheet}>
-              <Text style={styles.receiptLogo}>D,Blockchain Motorparts & Accessories</Text>
+              <Text style={styles.receiptLogo}>MotoTrack Motorparts & Accessories</Text>
               <Text style={styles.receiptSub}>Official Counter POS Sales Invoice</Text>
               <Text style={styles.receiptSub}>
                 Receipt No: {posReceiptOrder.order_id} • {posReceiptOrder.order_date}
@@ -13819,7 +13683,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               </View>
 
               <Text style={[styles.receiptSub, { marginTop: 6 }]}>
-                Thank you for choosing D,Blockchain! Drive safe.
+                Thank you for choosing MotoTrack! Drive safe.
               </Text>
 
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
@@ -14841,7 +14705,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     ]}
                     onPress={() => {
                       setNewBkCategory(c.key);
-                      if (c.key === 'Repair') {
+                      const match = garageServices.find((pkg) => pkg.category === c.key);
+                      if (match) {
+                        setNewBkServiceTitle(match.title);
+                        setNewBkPrice(String(getPackagePricePhp(match) || match.pricePhp || ''));
+                      } else if (c.key === 'Repair') {
                         setNewBkServiceTitle('Track Diagnostic & Mechanical Repair');
                         setNewBkPrice('1500');
                       } else if (c.key === 'PMS') {
@@ -14866,6 +14734,42 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               </View>
 
               {/* Service Title & Price */}
+              <Text style={styles.formLabel}>Shop Service Package</Text>
+              <View style={{ gap: 8, marginBottom: 12 }}>
+                {garageServices
+                  .filter((pkg) => !newBkCategory || pkg.category === newBkCategory)
+                  .map((pkg) => {
+                    const selected = newBkServiceTitle === pkg.title;
+                    const price = getPackagePricePhp(pkg);
+                    return (
+                      <TouchableOpacity
+                        key={pkg.id || pkg.service_id}
+                        onPress={() => {
+                          setNewBkServiceTitle(pkg.title);
+                          setNewBkPrice(String(price));
+                          setNewBkCategory(pkg.category || newBkCategory);
+                        }}
+                        style={{
+                          padding: 10,
+                          borderRadius: 10,
+                          borderWidth: 1.5,
+                          borderColor: selected ? '#0C6258' : '#E2E8F0',
+                          backgroundColor: selected ? '#F0FDF4' : '#FFFFFF',
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: selected ? '#0C6258' : '#0F172A', flex: 1 }}>
+                            {pkg.title}
+                          </Text>
+                          <Text style={{ fontSize: 13, fontWeight: '900', color: '#0C6258' }}>₱{price.toLocaleString()}</Text>
+                        </View>
+                        <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                          {pkg.category} • {pkg.duration || '60 mins'}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+              </View>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <View style={{ flex: 2 }}>
                   <Text style={styles.formLabel}>Service Package Name</Text>
@@ -16000,8 +15904,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         justifyContent: 'center',
                         backgroundColor: selected
                           ? isDarkMode
-                            ? 'rgba(12,98,88,0.3)'
-                            : '#E6F4F1'
+                            ? 'rgba(12, 98, 88,0.3)'
+                            : '#E7F5F3'
                           : isDarkMode
                             ? '#1E293B'
                             : '#F8FAFC',
@@ -16332,6 +16236,25 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Supabase DB</Text>
                   <Text style={{ fontSize: 11, color: '#64748B' }}>Cloud Database</Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Forecast & Stock */}
+              <TouchableOpacity
+                style={[styles.mobileMoreCard, activeNav === 'forecast' && styles.mobileMoreCardActive]}
+                onPress={() => {
+                  setActiveNav('forecast');
+                  setIsMobileMoreOpen(false);
+                }}
+              >
+                <BootstrapIcon
+                  name="clipboard-data"
+                  size={20}
+                  color={activeNav === 'forecast' ? '#0C6258' : '#475569'}
+                />
+                <View>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Forecast & Stock</Text>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>Demand & restock planner</Text>
                 </View>
               </TouchableOpacity>
 
@@ -17020,7 +16943,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     borderRadius: 12,
                     padding: 14,
                     borderWidth: 1,
-                    borderColor: '#FED7AA',
+                    borderColor: '#D1ECE6',
                     marginBottom: 14,
                     gap: 8,
                   }}
@@ -17318,7 +17241,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             <View
               style={[
                 styles.bottomNavIconWrap,
-                ['orders', 'promos', 'garage', 'users', 'supabase'].includes(activeNav) &&
+                ['orders', 'promos', 'garage', 'users', 'supabase', 'forecast', 'audit'].includes(activeNav) &&
                   styles.bottomNavIconWrapActive,
               ]}
             >
@@ -17326,7 +17249,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 name="three-dots"
                 size={18}
                 color={
-                  ['orders', 'promos', 'garage', 'users', 'supabase'].includes(activeNav)
+                  ['orders', 'promos', 'garage', 'users', 'supabase', 'forecast', 'audit'].includes(activeNav)
                     ? '#0C6258'
                     : '#64748B'
                 }
@@ -17340,7 +17263,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             <Text
               style={[
                 styles.bottomNavLabel,
-                ['orders', 'promos', 'garage', 'users', 'supabase'].includes(activeNav) &&
+                ['orders', 'promos', 'garage', 'users', 'supabase', 'forecast', 'audit'].includes(activeNav) &&
                   styles.bottomNavLabelActive,
               ]}
             >

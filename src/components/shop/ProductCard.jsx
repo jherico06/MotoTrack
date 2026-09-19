@@ -4,7 +4,7 @@ import BootstrapIcon from '../common/BootstrapIcon';
 import { shopStyles as styles } from '../../styles/shop.styles';
 import { useWishlist } from '../../context/WishlistContext';
 
-export default function ProductCard({ product, onPress, onAddToCart }) {
+export default function ProductCard({ product, onPress, onAddToCart, onBuyNow }) {
   const { width } = useWindowDimensions();
   const isTablet = width >= 700 && width < 1024;
   const isDesktop = width >= 1024;
@@ -75,18 +75,31 @@ export default function ProductCard({ product, onPress, onAddToCart }) {
           </Text>
         </View>
 
-        {/* Minimalist Flat Add to Cart Button */}
-        <TouchableOpacity
-          style={styles.addToCartBtn}
-          onPress={(e) => {
-            e.stopPropagation?.();
-            onAddToCart?.(product);
-          }}
-          activeOpacity={0.8}
-        >
-          <BootstrapIcon name="cart3" size={13} color="#FFFFFF" />
-          <Text style={styles.addToCartBtnText}>Add to Cart</Text>
-        </TouchableOpacity>
+        {/* Action buttons: Buy Now (First, Green) + Add to Cart (Second, Outline Icon Only) */}
+        <View style={styles.productActionRow}>
+          <TouchableOpacity
+            style={styles.buyNowBtn}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onBuyNow?.(product);
+            }}
+            activeOpacity={0.8}
+          >
+            <BootstrapIcon name="lightning-fill" size={12} color="#FFFFFF" />
+            <Text style={styles.buyNowBtnText}>Buy Now</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addToCartIconBtn}
+            onPress={(e) => {
+              e.stopPropagation?.();
+              onAddToCart?.(product);
+            }}
+            activeOpacity={0.8}
+            accessibilityLabel="Add to Cart"
+          >
+            <BootstrapIcon name="cart3" size={13} color="#0C6258" />
+          </TouchableOpacity>
+        </View>
       </View>
     </TouchableOpacity>
   );

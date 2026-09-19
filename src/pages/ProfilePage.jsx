@@ -26,13 +26,37 @@ import { pickImageFromFile } from '../utils/imagePickerHelper';
 
 const ADDRESS_PRESETS = [
   { label: 'Inoburan, Naga', address: 'Purok Avocado 4, Inoburan, City of Naga, Cebu' },
-  { label: 'East Poblacion, Naga', address: 'D,Blockchain Hub, East Poblacion, City of Naga, Cebu' },
+  { label: 'East Poblacion, Naga', address: 'MotoTrack Hub, East Poblacion, City of Naga, Cebu' },
   { label: 'Naga Boardwalk', address: 'Naga City Boardwalk, South Road, City of Naga, Cebu' },
   { label: 'Minglanilla Border', address: 'Poblacion Ward 2, Minglanilla, Cebu' },
   { label: 'BGC Central, Taguig', address: '7th Ave & 28th St, Bonifacio Global City, Taguig' },
 ];
 
 const ORDER_STATUS_FILTERS = ['All', 'Processing', 'Shipped', 'Delivered', 'Cancelled'];
+
+function formatOrderItemsSummary(order, fallback = 'Motorcycle Performance Equipment') {
+  if (!order) return fallback;
+  if (typeof order.itemsSummary === 'string' && order.itemsSummary.trim()) {
+    return order.itemsSummary;
+  }
+  const items = order.items;
+  if (typeof items === 'string' && items.trim()) return items;
+  if (Array.isArray(items) && items.length > 0) {
+    return items
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          const name = item.name || item.product_name || 'Item';
+          const qty = item.quantity != null ? item.quantity : 1;
+          return qty > 1 ? `${name} ×${qty}` : name;
+        }
+        return null;
+      })
+      .filter(Boolean)
+      .join(', ');
+  }
+  return fallback;
+}
 
 export default function ProfilePage({
   initialTab = 'overview',
@@ -756,7 +780,7 @@ export default function ProfilePage({
                   onPress={onNavigateToOrders}
                   activeOpacity={0.85}
                 >
-                  <View style={[styles.statIconWrap, { backgroundColor: '#E6F4F1' }]}>
+                  <View style={[styles.statIconWrap, { backgroundColor: '#E7F5F3' }]}>
                     <BootstrapIcon name="receipt" size={17} color="#0C6258" />
                   </View>
                   <Text style={styles.statLabel}>Orders Placed</Text>
@@ -822,12 +846,13 @@ export default function ProfilePage({
                     <Text style={styles.liveOrderEta}>ETA: 25-35 mins</Text>
                   </View>
                   <Text style={styles.liveOrderTitle}>
-                    Order #{activeOngoingOrder.id} • {activeOngoingOrder.status || 'On the Way'}
+                    {activeOngoingOrder.status || 'Order in Progress'}
                   </Text>
                   <Text style={styles.liveOrderSubtitle}>
-                    {activeOngoingOrder.itemsSummary ||
-                      activeOngoingOrder.items ||
-                      'Genuine Motorparts & High Performance Accessories'}
+                    {formatOrderItemsSummary(
+                      activeOngoingOrder,
+                      'Genuine Motorparts & High Performance Accessories'
+                    )}
                   </Text>
                   <TouchableOpacity
                     style={styles.trackMapBtn}
@@ -955,16 +980,22 @@ export default function ProfilePage({
                 return (
                   <View key={order.id} style={styles.orderCard}>
                     <View style={styles.orderCardHeader}>
-                      <Text style={styles.orderIdText}>Order #{order.id}</Text>
+                      <Text style={[styles.orderIdText, { flex: 1, marginRight: 8 }]} numberOfLines={1}>
+                        {formatOrderItemsSummary(order)}
+                      </Text>
                       <View style={[styles.statusPill, { backgroundColor: badge.bg }]}>
                         <Text style={[styles.statusPillText, { color: badge.text }]}>
                           {order.status || 'Processing'}
                         </Text>
                       </View>
                     </View>
-                    <Text style={styles.orderItemsSummary} numberOfLines={2}>
-                      {order.itemsSummary || order.items || 'Motorcycle Performance Equipment'}
-                    </Text>
+                    {order.date || order.created_at ? (
+                      <Text style={[styles.orderDateText, { marginBottom: 10 }]}>
+                        Placed on {order.date || (typeof order.created_at === 'string' ? order.created_at.slice(0, 10) : 'Recent')}
+                      </Text>
+                    ) : (
+                      <View style={{ marginBottom: 4 }} />
+                    )}
                     <View style={styles.orderCardFooter}>
                       <View>
                         <Text style={styles.orderTotalLabel}>Total Amount</Text>
@@ -1316,7 +1347,7 @@ export default function ProfilePage({
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 6,
-                    backgroundColor: '#E6F4F1',
+                    backgroundColor: '#E7F5F3',
                     paddingVertical: 8,
                     paddingHorizontal: 14,
                     borderRadius: 10,

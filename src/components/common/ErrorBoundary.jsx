@@ -75,7 +75,7 @@ export default class ErrorBoundary extends React.Component {
                 marginBottom: 8,
               }}
             >
-              D,Blockchain Experience Recovered
+              MotoTrack Experience Recovered
             </Text>
 
             <Text

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,19 +13,19 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { garageStyles as styles } from '../styles/garagePage.styles';
-import { usdToPhp } from '../utils/currency';
 import {
   garageService,
-  GARAGE_SERVICES,
   GARAGE_BRANCHES,
   TIME_SLOTS,
   REPAIR_COMMON_ISSUES,
   BOOKING_CATEGORIES,
   FIXED_GARAGE_SERVICES,
-  AVAILABLE_MECHANICS,
+  getPackagePricePhp,
+  getPackageDownpaymentPhp,
+  normalizeServicePackage,
 } from '../services/garageService';
 import { motorcycleService } from '../services/motorcycleService';
-import { BootstrapIcon, BottomNavBar, BrandLogo } from '../components/common';
+import { BootstrapIcon, BottomNavBar, BrandLogo, BookingSelect } from '../components/common';
 import { GCashPaymentModal, ConfirmModal } from '../components/modals';
 import { useAuth } from '../context/AuthContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -57,7 +57,7 @@ export default function GaragePage({
   const isTablet = windowWidth >= 700 && windowWidth < 1024;
 
   const [activeFilter, setActiveFilter] = useState('Services'); // 'Services' | 'MyBookings'
-  const [servicesList, setServicesList] = useState(() => garageService.getServices());
+  const [servicesList, setServicesList] = useState(() => garageService.getActivePackages());
   const [userBookings, setUserBookings] = useState([]);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
@@ -66,11 +66,17 @@ export default function GaragePage({
       onNavigateToStore?.();
     } else if (tab === 'Garage') {
       setActiveFilter('Services');
-    } else if (tab === 'Dashboard' || tab === 'Profile') {
+    } else if (tab === 'Dashboard') {
       if (!currentUser) {
         onNavigateToLogin?.();
       } else {
-        onNavigateToProfile?.();
+        onNavigateToProfile?.('overview');
+      }
+    } else if (tab === 'Profile') {
+      if (!currentUser) {
+        onNavigateToLogin?.();
+      } else {
+        onNavigateToProfile?.('profile');
       }
     } else if (tab === 'Customize') {
       if (onNavigateToCustomizer) onNavigateToCustomizer();
@@ -96,9 +102,6 @@ export default function GaragePage({
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [bookingToCancel, setBookingToCancel] = useState(null);
 
-  // Service Package Detail Modal State ('Repair' | 'PMS' | null)
-  const [serviceDetailModal, setServiceDetailModal] = useState(null);
-
   // Booking Form State
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [selectedServiceForBooking, setSelectedServiceForBooking] = useState(null);
@@ -121,6 +124,8 @@ export default function GaragePage({
   const [garageMotorcycles, setGarageMotorcycles] = useState(() =>
     motorcycleService.getMotorcycles(currentUser?.id)
   );
+  const [bikeInfoMode, setBikeInfoMode] = useState('registered');
+  const [selectedMotorcycleId, setSelectedMotorcycleId] = useState('');
   const [motorcyclePhotos, setMotorcyclePhotos] = useState([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
@@ -164,23 +169,32 @@ export default function GaragePage({
   const [ownerPhone, setOwnerPhone] = useState(currentUser?.phone || '+63 917 882 9102');
   const [serviceNotes, setServiceNotes] = useState('');
 
+  const applyRegisteredMotorcycle = (m) => {
+    if (!m) return;
+    setSelectedMotorcycleId(m.motorcycle_id);
+    setBikeBrand(m.brand || 'Yamaha');
+    setBikeModel(m.model || '');
+    setBikePlate(m.plate_number || '');
+    if (m.odometer) setBikeOdo(String(m.odometer));
+  };
+
   // Sync registered garage motorcycles from service
   useEffect(() => {
     let unsub = null;
     try {
       if (typeof motorcycleService?.subscribe === 'function') {
         unsub = motorcycleService.subscribe((list) => {
-          setGarageMotorcycles([...list]);
+          setGarageMotorcycles(currentUser ? [...list] : []);
         });
       }
-      const list = motorcycleService.getMotorcycles(currentUser?.id) || [];
+      const list = currentUser ? motorcycleService.getMotorcycles(currentUser?.id) || [] : [];
       setGarageMotorcycles(list);
-      const primary = list.find((m) => m.is_primary) || list[0];
-      if (primary) {
-        setBikeBrand(primary.brand);
-        setBikeModel(primary.model);
-        setBikePlate(primary.plate_number);
-        if (primary.odometer) setBikeOdo(primary.odometer);
+      if (currentUser && bikeInfoMode !== 'manual') {
+        const existing = list.find((m) => m.motorcycle_id === selectedMotorcycleId);
+        const nextBike = existing || list.find((m) => m.is_primary) || list[0];
+        if (nextBike) applyRegisteredMotorcycle(nextBike);
+      } else if (!currentUser) {
+        setSelectedMotorcycleId('');
       }
     } catch (_e) {}
 
@@ -201,10 +215,41 @@ export default function GaragePage({
   const refreshServices = async () => {
     try {
       const data = await garageService.fetchServices();
-      setServicesList(data || []);
+      setServicesList(data || garageService.getActivePackages());
     } catch (e) {
-      setServicesList(garageService.getServices());
+      setServicesList(garageService.getActivePackages());
     }
+  };
+
+  const packagesForCategory = (category) => {
+    const list = (servicesList || []).map((pkg) => normalizeServicePackage(pkg)).filter(Boolean);
+    const cat = category === 'Repair' ? 'Repair' : 'PMS';
+    return list.filter((pkg) => pkg.category === cat);
+  };
+
+  const resolveBookingPackage = (pkgOrType) => {
+    if (pkgOrType && typeof pkgOrType === 'object') {
+      return normalizeServicePackage(pkgOrType);
+    }
+    const cat = pkgOrType === 'Repair' ? 'Repair' : 'PMS';
+    return packagesForCategory(cat)[0] || normalizeServicePackage(FIXED_GARAGE_SERVICES[cat] || FIXED_GARAGE_SERVICES.PMS);
+  };
+
+  // Open booking popup modal
+  const handleOpenBooking = (pkgOrType) => {
+    const pkg = resolveBookingPackage(pkgOrType);
+    setBookingType(pkg?.category === 'Repair' ? 'Repair' : 'PMS');
+    setSelectedServiceForBooking(pkg);
+    const list = currentUser && Array.isArray(garageMotorcycles) ? garageMotorcycles : [];
+    if (list.length > 0) {
+      setBikeInfoMode('registered');
+      const current = list.find((m) => m.motorcycle_id === selectedMotorcycleId) || list.find((m) => m.is_primary) || list[0];
+      applyRegisteredMotorcycle(current);
+    } else {
+      setBikeInfoMode('manual');
+      setSelectedMotorcycleId('');
+    }
+    setIsBookingModalOpen(true);
   };
 
   const refreshUserBookings = () => {
@@ -245,14 +290,6 @@ export default function GaragePage({
     };
   }, [currentUser]);
 
-  // Open booking popup modal
-  const handleOpenBooking = (forcedType) => {
-    const cat = forcedType === 'Repair' ? 'Repair' : 'PMS';
-    setBookingType(cat);
-    setSelectedServiceForBooking(FIXED_GARAGE_SERVICES[cat]);
-    setIsBookingModalOpen(true);
-  };
-
   // Quick book from hero CTA
   const handleQuickBook = (type, forceTomorrow = false) => {
     if (forceTomorrow || todaySlotsData.isFullyBooked) {
@@ -269,11 +306,15 @@ export default function GaragePage({
   const handleSwitchBookingType = (newType) => {
     const target = newType === 'Repair' ? 'Repair' : 'PMS';
     setBookingType(target);
-    setSelectedServiceForBooking(FIXED_GARAGE_SERVICES[target]);
+    setSelectedServiceForBooking(resolveBookingPackage(target));
   };
 
   // Submit Booking - Initiates 20% Downpayment via GCash
   const handleConfirmBooking = () => {
+    if (bikeInfoMode === 'registered' && !selectedMotorcycleId) {
+      showToast('Please select a registered motorcycle, or switch to Enter details.');
+      return;
+    }
     if (!bikeModel.trim()) {
       showToast('Please enter your motorcycle model (e.g. NMAX 155, Ninja 400)');
       return;
@@ -283,25 +324,34 @@ export default function GaragePage({
       return;
     }
 
-    const currentSvc = FIXED_GARAGE_SERVICES[bookingType] || FIXED_GARAGE_SERVICES.PMS;
+    const currentSvc =
+      selectedServiceForBooking ||
+      resolveBookingPackage(bookingType) ||
+      FIXED_GARAGE_SERVICES[bookingType] ||
+      FIXED_GARAGE_SERVICES.PMS;
 
     const finalNotes =
-      bookingType === 'Repair' && selectedRepairIssue
+      currentSvc.category === 'Repair' && selectedRepairIssue
         ? `[Fault: ${selectedRepairIssue}] ${serviceNotes.trim()}`
         : serviceNotes.trim();
 
-    const catPrefix = bookingType === 'Repair' ? 'REP' : 'PMS';
+    const catPrefix = currentSvc.category === 'Repair' ? 'REP' : currentSvc.category === 'Customization' ? 'CUST' : 'PMS';
     const bookingId = `BK-${catPrefix}-` + Math.floor(10000 + Math.random() * 90000);
-    const fullPricePhp = currentSvc.pricePhp;
-    const calculatedDownpayment = currentSvc.downpaymentPhp;
+    const fullPricePhp = getPackagePricePhp(currentSvc);
+    const calculatedDownpayment = getPackageDownpaymentPhp(currentSvc);
     const calculatedBalance = Math.max(0, fullPricePhp - calculatedDownpayment);
 
     const bookingDraft = {
       id: bookingId,
       booking_id: bookingId,
       service_id: currentSvc.id,
+      package_id: currentSvc.id,
+      package_name: currentSvc.title,
+      package_price: fullPricePhp,
+      included_services: currentSvc.inclusions || [],
+      estimated_duration: currentSvc.duration,
       service_title: currentSvc.title,
-      service_price: currentSvc.pricePhp / 50,
+      service_price: fullPricePhp / 50,
       pricePhp: fullPricePhp,
       category: bookingType,
       repair_type: bookingType === 'Repair' ? selectedRepairIssue : undefined,
@@ -311,6 +361,7 @@ export default function GaragePage({
       remaining_balance: calculatedBalance,
       is_non_refundable: true,
       non_refundable_policy_acknowledged: true,
+      motorcycle_id: bikeInfoMode === 'registered' ? selectedMotorcycleId : undefined,
       bike_brand: bikeBrand,
       bike_model: bikeModel,
       plate_number: bikePlate.trim() || 'Pending Registration',
@@ -430,9 +481,9 @@ export default function GaragePage({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 7,
-                  backgroundColor: serviceDetailModal === 'PMS' ? '#0C6258' : '#FFFFFF',
+                  backgroundColor: isBookingModalOpen && bookingType === 'PMS' ? '#0C6258' : '#FFFFFF',
                   borderWidth: 1.5,
-                  borderColor: serviceDetailModal === 'PMS' ? '#0C6258' : '#E2E8F0',
+                  borderColor: isBookingModalOpen && bookingType === 'PMS' ? '#0C6258' : '#E2E8F0',
                   paddingVertical: 10,
                   paddingHorizontal: 14,
                   borderRadius: 12,
@@ -442,19 +493,19 @@ export default function GaragePage({
                   shadowRadius: 3,
                   elevation: 1,
                 }}
-                onPress={() => setServiceDetailModal('PMS')}
+                onPress={() => handleOpenBooking('PMS')}
                 activeOpacity={0.85}
               >
                 <BootstrapIcon
                   name="wrench-adjustable"
                   size={14}
-                  color={serviceDetailModal === 'PMS' ? '#FFFFFF' : '#0C6258'}
+                  color={isBookingModalOpen && bookingType === 'PMS' ? '#FFFFFF' : '#0C6258'}
                 />
                 <Text
                   style={{
                     fontSize: 13,
                     fontWeight: '700',
-                    color: serviceDetailModal === 'PMS' ? '#FFFFFF' : '#0F172A',
+                    color: isBookingModalOpen && bookingType === 'PMS' ? '#FFFFFF' : '#0F172A',
                   }}
                 >
                   PMS Service
@@ -468,9 +519,9 @@ export default function GaragePage({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 7,
-                  backgroundColor: serviceDetailModal === 'Repair' ? '#0F172A' : '#FFFFFF',
+                  backgroundColor: isBookingModalOpen && bookingType === 'Repair' ? '#0F172A' : '#FFFFFF',
                   borderWidth: 1.5,
-                  borderColor: serviceDetailModal === 'Repair' ? '#0F172A' : '#E2E8F0',
+                  borderColor: isBookingModalOpen && bookingType === 'Repair' ? '#0F172A' : '#E2E8F0',
                   paddingVertical: 10,
                   paddingHorizontal: 14,
                   borderRadius: 12,
@@ -480,19 +531,19 @@ export default function GaragePage({
                   shadowRadius: 3,
                   elevation: 1,
                 }}
-                onPress={() => setServiceDetailModal('Repair')}
+                onPress={() => handleOpenBooking('Repair')}
                 activeOpacity={0.85}
               >
                 <BootstrapIcon
                   name="wrench"
                   size={13}
-                  color={serviceDetailModal === 'Repair' ? '#FFFFFF' : '#475569'}
+                  color={isBookingModalOpen && bookingType === 'Repair' ? '#FFFFFF' : '#475569'}
                 />
                 <Text
                   style={{
                     fontSize: 13,
                     fontWeight: '700',
-                    color: serviceDetailModal === 'Repair' ? '#FFFFFF' : '#0F172A',
+                    color: isBookingModalOpen && bookingType === 'Repair' ? '#FFFFFF' : '#0F172A',
                   }}
                 >
                   Repair Request
@@ -511,7 +562,7 @@ export default function GaragePage({
             >
               <View>
                 <View style={[styles.statIconWrap, { backgroundColor: '#F0FDFA' }]}>
-                  <BootstrapIcon name="people-fill" size={17} color="#0D9488" />
+                  <BootstrapIcon name="people-fill" size={17} color="#0C6258" />
                 </View>
                 <Text style={styles.statLabel}>MECHANICS AVAILABLE</Text>
                 <Text style={styles.statValue}>{mechanicsData.availableCount}</Text>
@@ -738,7 +789,7 @@ export default function GaragePage({
                       shadowRadius: 4,
                       elevation: 2,
                     }}
-                    onPress={() => setServiceDetailModal('PMS')}
+                    onPress={() => handleOpenBooking('PMS')}
                     activeOpacity={0.85}
                   >
                     <BootstrapIcon name="wrench-adjustable" size={13} color="#FFFFFF" />
@@ -758,7 +809,7 @@ export default function GaragePage({
                       paddingHorizontal: 14,
                       borderRadius: 12,
                     }}
-                    onPress={() => setServiceDetailModal('Repair')}
+                    onPress={() => handleOpenBooking('Repair')}
                     activeOpacity={0.85}
                   >
                     <BootstrapIcon name="wrench" size={13} color="#334155" />
@@ -973,141 +1024,94 @@ export default function GaragePage({
                       <Text style={styles.formSectionHeading}>1. Service Package Selection</Text>
                     </View>
 
-                    {/* Category Selector Tabs */}
-                    <View style={[styles.serviceTypeSegment, { marginBottom: 12 }]}>
-                      <TouchableOpacity
-                        style={[
-                          styles.serviceTypeTab,
-                          bookingType === 'PMS' && styles.serviceTypeTabActivePMS,
-                        ]}
-                        onPress={() => handleSwitchBookingType('PMS')}
-                      >
-                        <BootstrapIcon
-                          name="wrench-adjustable"
-                          size={14}
-                          color={bookingType === 'PMS' ? '#FFFFFF' : '#0C6258'}
-                        />
-                        <Text
-                          style={[
-                            styles.serviceTypeTabText,
-                            bookingType === 'PMS' && styles.serviceTypeTabTextActive,
-                          ]}
-                        >
-                          ⚙️ PMS (₱2,500 • ₱500 DP)
-                        </Text>
-                      </TouchableOpacity>
+                    <BookingSelect
+                      label="Service Category *"
+                      value={bookingType}
+                      accentColor={bookingType === 'Repair' ? '#DC2626' : '#0C6258'}
+                      options={BOOKING_CATEGORIES.map((cat) => ({
+                        value: cat.id,
+                        label: cat.label,
+                      }))}
+                      onChange={(cat) => handleSwitchBookingType(cat)}
+                    />
 
-                      <TouchableOpacity
-                        style={[
-                          styles.serviceTypeTab,
-                          bookingType === 'Repair' && styles.serviceTypeTabActiveRepair,
-                        ]}
-                        onPress={() => handleSwitchBookingType('Repair')}
-                      >
-                        <BootstrapIcon
-                          name="wrench"
-                          size={14}
-                          color={bookingType === 'Repair' ? '#FFFFFF' : '#DC2626'}
-                        />
-                        <Text
-                          style={[
-                            styles.serviceTypeTabText,
-                            bookingType === 'Repair' && styles.serviceTypeTabTextActive,
-                          ]}
-                        >
-                          🛠️ Mechanical Repair (₱1,500 • ₱300 DP)
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* If Repair: Common Fault Area Chips */}
-                    {bookingType === 'Repair' && (
-                      <View style={{ marginBottom: 12 }}>
-                        <Text style={styles.fieldLabel}>
-                          Primary Mechanical Fault Area *
-                        </Text>
-                        <View style={styles.repairFaultChipsGrid}>
-                          {REPAIR_COMMON_ISSUES.map((issue) => {
-                            const isSelected = selectedRepairIssue === issue.label;
-                            return (
-                              <TouchableOpacity
-                                key={issue.id}
-                                style={[styles.repairFaultChip, isSelected && styles.repairFaultChipActive]}
-                                onPress={() => setSelectedRepairIssue(issue.label)}
-                              >
-                                <BootstrapIcon
-                                  name={issue.icon}
-                                  size={13}
-                                  color={isSelected ? '#DC2626' : '#64748B'}
-                                />
-                                <Text
-                                  style={[
-                                    styles.repairFaultChipText,
-                                    isSelected && styles.repairFaultChipTextActive,
-                                  ]}
-                                >
-                                  {issue.label}
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    )}
-
-                    {/* Fixed Service Package Summary Card */}
                     {(() => {
-                      const fixedSvc = FIXED_GARAGE_SERVICES[bookingType] || FIXED_GARAGE_SERVICES.PMS;
-                      const isRepair = bookingType === 'Repair';
+                      const categoryPackages = packagesForCategory(bookingType);
+                      const selectedPkg =
+                        selectedServiceForBooking ||
+                        categoryPackages.find(
+                          (pkg) =>
+                            String(pkg.id) === String(selectedServiceForBooking?.id) ||
+                            String(pkg.service_id) === String(selectedServiceForBooking?.service_id)
+                        ) ||
+                        categoryPackages[0];
+                      const selectedPkgId = selectedPkg?.id || selectedPkg?.service_id || '';
+                      const selectedDescription = selectedPkg?.description || selectedPkg?.subtitle || '';
+                      const selectedPrice = selectedPkg ? getPackagePricePhp(selectedPkg) : 0;
+                      const selectedDp = selectedPkg ? getPackageDownpaymentPhp(selectedPkg) : 0;
                       return (
-                        <View
-                          style={{
-                            padding: 12,
-                            borderRadius: 12,
-                            backgroundColor: isRepair ? '#FEF2F2' : '#F0FDF4',
-                            borderWidth: 1.5,
-                            borderColor: isRepair ? '#FECACA' : '#BBF7D0',
-                          }}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-                              <BootstrapIcon
-                                name={isRepair ? 'wrench' : 'wrench-adjustable'}
-                                size={14}
-                                color={isRepair ? '#DC2626' : '#0C6258'}
-                              />
-                              <Text style={{ fontSize: 13.5, fontWeight: '800', color: isRepair ? '#991B1B' : '#064E3B' }}>
-                                {fixedSvc.title}
+                        <>
+                          <BookingSelect
+                            label={bookingType === 'Repair' ? 'Repair Package *' : 'PMS Package *'}
+                            value={selectedPkgId}
+                            placeholder="Select a package"
+                            emptyText="No packages available for this service yet."
+                            accentColor={bookingType === 'Repair' ? '#DC2626' : '#0C6258'}
+                            options={categoryPackages.map((pkg) => ({
+                              value: pkg.id || pkg.service_id,
+                              label: `${pkg.title} — ₱${getPackagePricePhp(pkg).toLocaleString()}`,
+                            }))}
+                            onChange={(pkgId) => {
+                              const pkg = categoryPackages.find(
+                                (item) => String(item.id) === String(pkgId) || String(item.service_id) === String(pkgId)
+                              );
+                              if (pkg) setSelectedServiceForBooking(pkg);
+                            }}
+                          />
+                          {selectedPkg ? (
+                            <View
+                              style={{
+                                marginTop: -4,
+                                marginBottom: 12,
+                                padding: 12,
+                                borderRadius: 10,
+                                backgroundColor: bookingType === 'Repair' ? '#FEF2F2' : '#F0FDF4',
+                                borderWidth: 1,
+                                borderColor: bookingType === 'Repair' ? '#FECACA' : '#BBF7D0',
+                              }}
+                            >
+                              {selectedDescription ? (
+                                <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17, marginBottom: 6 }}>
+                                  {selectedDescription}
+                                </Text>
+                              ) : null}
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: '800',
+                                  color: bookingType === 'Repair' ? '#DC2626' : '#0C6258',
+                                }}
+                              >
+                                ₱{selectedPrice.toLocaleString()} • 20% DP due now: ₱{selectedDp.toLocaleString()}
                               </Text>
                             </View>
-                            <View style={{ backgroundColor: isRepair ? '#FEE2E2' : '#DCFCE7', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
-                              <Text style={{ fontSize: 10.5, fontWeight: '800', color: isRepair ? '#991B1B' : '#166534' }}>
-                                ⏱️ {fixedSvc.duration}
-                              </Text>
-                            </View>
-                          </View>
-
-                          <Text style={{ fontSize: 11.5, color: '#475569', marginBottom: 8, lineHeight: 16 }}>
-                            {fixedSvc.subtitle}
-                          </Text>
-
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#FFFFFF', padding: 8, borderRadius: 8 }}>
-                            <View>
-                              <Text style={{ fontSize: 10.5, color: '#64748B' }}>Fixed Total Fee</Text>
-                              <Text style={{ fontSize: 15, fontWeight: '900', color: isRepair ? '#DC2626' : '#0C6258' }}>
-                                ₱{fixedSvc.pricePhp.toLocaleString()}
-                              </Text>
-                            </View>
-                            <View style={{ alignItems: 'flex-end' }}>
-                              <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#DC2626' }}>20% Downpayment (Due Now)</Text>
-                              <Text style={{ fontSize: 15, fontWeight: '900', color: '#DC2626' }}>
-                                ₱{fixedSvc.downpaymentPhp.toLocaleString()}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
+                          ) : null}
+                        </>
                       );
                     })()}
+
+                    {bookingType === 'Repair' && (
+                      <BookingSelect
+                        label="Primary Mechanical Fault Area *"
+                        value={selectedRepairIssue}
+                        accentColor="#DC2626"
+                        options={REPAIR_COMMON_ISSUES.map((issue) => ({
+                          value: issue.label,
+                          label: issue.label,
+                        }))}
+                        onChange={(issue) => setSelectedRepairIssue(issue)}
+                      />
+                    )}
                   </View>
 
                   {/* SECTION 2: MOTORCYCLE INFORMATION */}
@@ -1117,126 +1121,209 @@ export default function GaragePage({
                       <Text style={styles.formSectionHeading}>2. Motorcycle Information</Text>
                     </View>
 
-                    {/* Quick Select from My Garage */}
-                    {Array.isArray(garageMotorcycles) && garageMotorcycles.length > 0 && (
-                      <View
-                        style={{
-                          marginBottom: 12,
-                          backgroundColor: '#F0FDFA',
-                          borderWidth: 1,
-                          borderColor: '#CCFBF1',
-                          borderRadius: 10,
-                          padding: 8,
+                    <Text style={styles.fieldLabel}>How do you want to provide motorcycle details? *</Text>
+                    <View style={[styles.serviceTypeSegment, { marginBottom: 12 }]}>
+                      <TouchableOpacity
+                        style={[styles.serviceTypeTab, bikeInfoMode === 'registered' && styles.serviceTypeTabActivePMS]}
+                        onPress={() => {
+                          setBikeInfoMode('registered');
+                          const current =
+                            garageMotorcycles.find((m) => m.motorcycle_id === selectedMotorcycleId) ||
+                            garageMotorcycles.find((m) => m.is_primary) ||
+                            garageMotorcycles[0];
+                          if (current) applyRegisteredMotorcycle(current);
                         }}
+                        activeOpacity={0.85}
                       >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 6 }}>
-                          <BootstrapIcon name="wrench-adjustable" size={12} color="#0C6258" />
-                          <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#0C6258' }}>
-                            Quick Select from My Garage:
-                          </Text>
-                        </View>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                          {garageMotorcycles.map((m) => {
-                            const isSelected = bikePlate === m.plate_number;
-                            return (
-                              <TouchableOpacity
-                                key={m.motorcycle_id}
-                                style={{
-                                  backgroundColor: isSelected ? '#0C6258' : '#FFFFFF',
-                                  borderWidth: 1.5,
-                                  borderColor: isSelected ? '#0C6258' : '#99F6E4',
-                                  borderRadius: 8,
-                                  paddingHorizontal: 10,
-                                  paddingVertical: 5,
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  gap: 5,
-                                }}
-                                onPress={() => {
-                                  setBikeBrand(m.brand);
-                                  setBikeModel(m.model);
-                                  setBikePlate(m.plate_number);
-                                  if (m.odometer) setBikeOdo(m.odometer);
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 11.5,
-                                    fontWeight: isSelected ? '800' : '700',
-                                    color: isSelected ? '#FFFFFF' : '#0F172A',
-                                  }}
-                                >
-                                  {m.is_primary ? '★ ' : ''}{m.brand} {m.model} ({m.plate_number})
-                                </Text>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </ScrollView>
-                      </View>
-                    )}
-
-                    {/* Brand Selector */}
-                    <Text style={styles.fieldLabel}>Motorcycle Brand *</Text>
-                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
-                      {['Yamaha', 'Honda', 'Kawasaki', 'Suzuki', 'BMW', 'Ducati', 'KTM', 'Vespa', 'Other'].map((b) => (
-                        <TouchableOpacity
-                          key={b}
-                          style={{
-                            paddingHorizontal: 10,
-                            paddingVertical: 5,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: bikeBrand === b ? '#0C6258' : '#CBD5E1',
-                            backgroundColor: bikeBrand === b ? '#D1ECE6' : '#FFFFFF',
-                          }}
-                          onPress={() => setBikeBrand(b)}
+                        <Text
+                          style={[
+                            styles.serviceTypeTabText,
+                            bikeInfoMode === 'registered' && styles.serviceTypeTabTextActive,
+                            { fontSize: 11 },
+                          ]}
                         >
-                          <Text
+                          Registered motorcycle
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.serviceTypeTab, bikeInfoMode === 'manual' && styles.serviceTypeTabActivePMS]}
+                        onPress={() => setBikeInfoMode('manual')}
+                        activeOpacity={0.85}
+                      >
+                        <Text
+                          style={[
+                            styles.serviceTypeTabText,
+                            bikeInfoMode === 'manual' && styles.serviceTypeTabTextActive,
+                            { fontSize: 11 },
+                          ]}
+                        >
+                          Enter details
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+
+                    {bikeInfoMode === 'registered' ? (
+                      !currentUser ? (
+                        <View
+                          style={{
+                            marginBottom: 8,
+                            backgroundColor: '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: '#E2E8F0',
+                            borderRadius: 10,
+                            padding: 12,
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 6 }}>
+                            Sign in to choose a registered motorcycle
+                          </Text>
+                          <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 10, lineHeight: 17 }}>
+                            Your saved bikes will appear here. You can also enter motorcycle details without signing in.
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              setIsBookingModalOpen(false);
+                              onNavigateToLogin?.();
+                            }}
                             style={{
-                              fontSize: 11.5,
-                              fontWeight: bikeBrand === b ? '800' : '600',
-                              color: bikeBrand === b ? '#0C6258' : '#475569',
+                              alignSelf: 'flex-start',
+                              backgroundColor: '#0C6258',
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                              borderRadius: 10,
                             }}
                           >
-                            {b}
+                            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Sign In</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : !garageMotorcycles.length ? (
+                        <View
+                          style={{
+                            marginBottom: 8,
+                            backgroundColor: '#FFFBEB',
+                            borderWidth: 1,
+                            borderColor: '#FDE68A',
+                            borderRadius: 10,
+                            padding: 12,
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#92400E', marginBottom: 6 }}>
+                            No registered motorcycle yet
                           </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-
-                    <View style={{ marginBottom: 10 }}>
-                      <Text style={styles.fieldLabel}>Motorcycle Model *</Text>
-                      <TextInput
-                        style={styles.modalInput}
-                        placeholder="e.g. Aerox 155, Ninja 400, CB650R"
-                        placeholderTextColor="#94A3B8"
-                        value={bikeModel}
-                        onChangeText={setBikeModel}
-                      />
-                    </View>
-
-                    <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.fieldLabel}>Plate Number / Temp Tag *</Text>
-                        <TextInput
-                          style={styles.modalInput}
-                          placeholder="e.g. 123-ABC"
-                          placeholderTextColor="#94A3B8"
-                          value={bikePlate}
-                          onChangeText={setBikePlate}
+                          <Text style={{ fontSize: 12, color: '#B45309', marginBottom: 10, lineHeight: 17 }}>
+                            Add a bike to My Garage, or enter the motorcycle details for this booking.
+                          </Text>
+                          <TouchableOpacity
+                            onPress={() => setBikeInfoMode('manual')}
+                            style={{
+                              alignSelf: 'flex-start',
+                              backgroundColor: '#0C6258',
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                              borderRadius: 10,
+                            }}
+                          >
+                            <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Enter details instead</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <>
+                          <BookingSelect
+                            label="Registered Motorcycle *"
+                            value={selectedMotorcycleId}
+                            placeholder="Select a registered motorcycle"
+                            accentColor="#0C6258"
+                            options={garageMotorcycles.map((m) => ({
+                              value: m.motorcycle_id,
+                              label: `${m.is_primary ? '★ ' : ''}${m.brand} ${m.model} (${m.plate_number})`,
+                            }))}
+                            onChange={(id) => {
+                              const bike = garageMotorcycles.find((m) => String(m.motorcycle_id) === String(id));
+                              applyRegisteredMotorcycle(bike);
+                            }}
+                          />
+                          {(() => {
+                            const selectedBike = garageMotorcycles.find((m) => m.motorcycle_id === selectedMotorcycleId);
+                            if (!selectedBike) return null;
+                            return (
+                              <View
+                                style={{
+                                  marginTop: -4,
+                                  marginBottom: 12,
+                                  padding: 12,
+                                  borderRadius: 10,
+                                  backgroundColor: '#F0FDF4',
+                                  borderWidth: 1,
+                                  borderColor: '#BBF7D0',
+                                }}
+                              >
+                                <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0F172A' }}>
+                                  {selectedBike.nickname || `${selectedBike.brand} ${selectedBike.model}`}
+                                </Text>
+                                <Text style={{ fontSize: 12, color: '#475569', marginTop: 4 }}>
+                                  {selectedBike.brand} {selectedBike.model}
+                                  {selectedBike.year ? ` • ${selectedBike.year}` : ''}
+                                  {selectedBike.plate_number ? ` • ${selectedBike.plate_number}` : ''}
+                                </Text>
+                              </View>
+                            );
+                          })()}
+                          <Text style={styles.fieldLabel}>Current Odometer</Text>
+                          <TextInput
+                            style={[styles.modalInput, { marginBottom: 4 }]}
+                            placeholder="e.g. 6,500 km"
+                            placeholderTextColor="#94A3B8"
+                            value={bikeOdo}
+                            onChangeText={setBikeOdo}
+                          />
+                        </>
+                      )
+                    ) : (
+                      <>
+                        <BookingSelect
+                          label="Motorcycle Brand *"
+                          value={bikeBrand}
+                          options={['Yamaha', 'Honda', 'Kawasaki', 'Suzuki', 'BMW', 'Ducati', 'KTM', 'Vespa', 'Other'].map(
+                            (b) => ({ value: b, label: b })
+                          )}
+                          onChange={setBikeBrand}
                         />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.fieldLabel}>Current Odometer</Text>
-                        <TextInput
-                          style={styles.modalInput}
-                          placeholder="e.g. 6,500 km"
-                          placeholderTextColor="#94A3B8"
-                          value={bikeOdo}
-                          onChangeText={setBikeOdo}
-                        />
-                      </View>
-                    </View>
+
+                        <View style={{ marginBottom: 10 }}>
+                          <Text style={styles.fieldLabel}>Motorcycle Model *</Text>
+                          <TextInput
+                            style={styles.modalInput}
+                            placeholder="e.g. Aerox 155, Ninja 400, CB650R"
+                            placeholderTextColor="#94A3B8"
+                            value={bikeModel}
+                            onChangeText={setBikeModel}
+                          />
+                        </View>
+
+                        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 4 }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.fieldLabel}>Plate Number / Temp Tag *</Text>
+                            <TextInput
+                              style={styles.modalInput}
+                              placeholder="e.g. 123-ABC"
+                              placeholderTextColor="#94A3B8"
+                              value={bikePlate}
+                              onChangeText={setBikePlate}
+                            />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.fieldLabel}>Current Odometer</Text>
+                            <TextInput
+                              style={styles.modalInput}
+                              placeholder="e.g. 6,500 km"
+                              placeholderTextColor="#94A3B8"
+                              value={bikeOdo}
+                              onChangeText={setBikeOdo}
+                            />
+                          </View>
+                        </View>
+                      </>
+                    )}
                   </View>
 
                   {/* SECTION 3: PITSTOP BAY HUB & SCHEDULE */}
@@ -1665,15 +1752,15 @@ export default function GaragePage({
 
                     {/* Fee Breakdown */}
                     {(() => {
-                      const fixedSvc = FIXED_GARAGE_SERVICES[bookingType] || FIXED_GARAGE_SERVICES.PMS;
-                      const fullPrice = fixedSvc.pricePhp;
-                      const dp = fixedSvc.downpaymentPhp;
-                      const rem = fullPrice - dp;
+                      const currentSvc = selectedServiceForBooking || resolveBookingPackage(bookingType);
+                      const fullPrice = getPackagePricePhp(currentSvc);
+                      const dp = getPackageDownpaymentPhp(currentSvc);
+                      const rem = Math.max(0, fullPrice - dp);
 
                       return (
                         <View style={{ backgroundColor: '#FFFFFF', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#FEF3C7', marginBottom: 8 }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5 }}>
-                            <Text style={{ fontSize: 12, color: '#64748B' }}>Fixed Service Fee ({bookingType}):</Text>
+                            <Text style={{ fontSize: 12, color: '#64748B', flex: 1, paddingRight: 8 }}>Package ({currentSvc?.title}):</Text>
                             <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A' }}>₱{fullPrice.toLocaleString()}</Text>
                           </View>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5, alignItems: 'center' }}>
@@ -1744,319 +1831,6 @@ export default function GaragePage({
               </View>
             </View>
           </Modal>
-
-      {/* ─── SERVICE PACKAGE DETAIL MODAL (REPAIR & PMS - MATCHING WEB) ─── */}
-      <Modal
-        visible={serviceDetailModal !== null}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setServiceDetailModal(null)}
-      >
-        <View style={styles.popupModalOverlay}>
-          <TouchableOpacity
-            style={styles.popupModalBackdropTouchable}
-            activeOpacity={1}
-            onPress={() => setServiceDetailModal(null)}
-          />
-
-          <View
-            style={[
-              styles.popupModalCard,
-              {
-                maxWidth: 600,
-                width: '100%',
-                padding: 0,
-                overflow: 'hidden',
-                borderRadius: 24,
-              },
-            ]}
-          >
-            {serviceDetailModal === 'Repair' ? (
-              <View>
-                {/* Header Banner */}
-                <View
-                  style={{
-                    backgroundColor: '#DC2626',
-                    paddingHorizontal: 20,
-                    paddingVertical: 16,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <BootstrapIcon name="wrench" size={18} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 }}>
-                      MECHANICAL & ELECTRICAL REPAIR
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <View
-                      style={{
-                        backgroundColor: 'rgba(255,255,255,0.2)',
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 16,
-                      }}
-                    >
-                      <Text style={{ color: '#FFFFFF', fontSize: 10.5, fontWeight: '700' }}>
-                        ⏱️ 60 - 120 mins
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => setServiceDetailModal(null)}
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 13,
-                        backgroundColor: 'rgba(255,255,255,0.2)',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <BootstrapIcon name="x-lg" size={12} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Body Content */}
-                <ScrollView style={{ padding: 20, maxHeight: 520 }}>
-                  <Text style={{ fontSize: 20, fontWeight: '900', color: '#0F172A', marginBottom: 6 }}>
-                    Precision Diagnosis & Repair
-                  </Text>
-                  <Text style={{ fontSize: 12.5, color: '#64748B', lineHeight: 18, marginBottom: 16 }}>
-                    Master technician isolation of engine knocks, electrical gremlins, transmission slip, or suspension leaks using OBD-II diagnostics and track-proven tools.
-                  </Text>
-
-                  {/* Pricing Box */}
-                  <View
-                    style={{
-                      backgroundColor: '#FEF2F2',
-                      borderWidth: 1,
-                      borderColor: '#FECACA',
-                      borderRadius: 14,
-                      padding: 14,
-                      marginBottom: 16,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-                      <Text style={{ fontSize: 12.5, color: '#991B1B', fontWeight: '700' }}>Fixed Diagnostic & Labor Base</Text>
-                      <Text style={{ fontSize: 22, fontWeight: '900', color: '#DC2626' }}>₱1,500</Text>
-                    </View>
-                    <View style={{ height: 1, backgroundColor: '#FEE2E2', marginVertical: 6 }} />
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <BootstrapIcon name="shield-lock-fill" size={12} color="#DC2626" />
-                        <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#DC2626' }}>20% Downpayment (Due Now):</Text>
-                      </View>
-                      <Text style={{ fontSize: 14, fontWeight: '900', color: '#DC2626' }}>₱300</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                      <Text style={{ fontSize: 11, color: '#64748B' }}>Balance at Pit Bay Completion:</Text>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#334155' }}>₱1,200</Text>
-                    </View>
-                  </View>
-
-                  {/* Inclusions */}
-                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#334155', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                    What's Included in this Fixed Service:
-                  </Text>
-                  <View style={{ gap: 8, marginBottom: 18 }}>
-                    {FIXED_GARAGE_SERVICES.Repair.inclusions.map((item, idx) => (
-                      <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                        <BootstrapIcon name="check-circle-fill" size={13} color="#DC2626" style={{ marginTop: 2 }} />
-                        <Text style={{ fontSize: 12, color: '#334155', flex: 1, lineHeight: 16 }}>
-                          {item}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  {/* Actions */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 10, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-                    <TouchableOpacity
-                      style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 9,
-                        borderRadius: 10,
-                        backgroundColor: '#F1F5F9',
-                        borderWidth: 1,
-                        borderColor: '#E2E8F0',
-                      }}
-                      onPress={() => setServiceDetailModal(null)}
-                    >
-                      <Text style={{ color: '#475569', fontSize: 12.5, fontWeight: '700' }}>Cancel</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={{
-                        paddingHorizontal: 20,
-                        paddingVertical: 9,
-                        borderRadius: 10,
-                        backgroundColor: '#DC2626',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 8,
-                      }}
-                      onPress={() => {
-                        setServiceDetailModal(null);
-                        handleOpenBooking('Repair');
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <BootstrapIcon name="calendar2-check-fill" size={13} color="#FFFFFF" />
-                      <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>
-                        Book Repair (₱300 DP)
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </ScrollView>
-              </View>
-            ) : serviceDetailModal === 'PMS' ? (
-              <View>
-                {/* Header Banner */}
-                <View
-                  style={{
-                    backgroundColor: '#0C6258',
-                    paddingHorizontal: 20,
-                    paddingVertical: 16,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <BootstrapIcon name="wrench-adjustable" size={18} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800', letterSpacing: 0.5 }}>
-                      PREVENTIVE MAINTENANCE (PMS)
-                    </Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <View
-                      style={{
-                        backgroundColor: 'rgba(255,255,255,0.2)',
-                        paddingHorizontal: 8,
-                        paddingVertical: 3,
-                        borderRadius: 16,
-                      }}
-                    >
-                      <Text style={{ color: '#FFFFFF', fontSize: 10.5, fontWeight: '700' }}>
-                        ⏱️ 90 mins
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => setServiceDetailModal(null)}
-                      style={{
-                        width: 26,
-                        height: 26,
-                        borderRadius: 13,
-                        backgroundColor: 'rgba(255,255,255,0.2)',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <BootstrapIcon name="x-lg" size={12} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Body Content */}
-                <ScrollView style={{ padding: 20, maxHeight: 520 }}>
-                  <Text style={{ fontSize: 20, fontWeight: '900', color: '#0F172A', marginBottom: 6 }}>
-                    Comprehensive 20-Point PMS
-                  </Text>
-                  <Text style={{ fontSize: 12.5, color: '#64748B', lineHeight: 18, marginBottom: 16 }}>
-                    Track-grade comprehensive fluid flush, chassis torque check, and multi-point safety inspection to keep your motorcycle in peak operating condition.
-                  </Text>
-
-                  {/* Pricing Box */}
-                  <View
-                    style={{
-                      backgroundColor: '#F0FDF4',
-                      borderWidth: 1,
-                      borderColor: '#BBF7D0',
-                      borderRadius: 14,
-                      padding: 14,
-                      marginBottom: 16,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-                      <Text style={{ fontSize: 12.5, color: '#166534', fontWeight: '700' }}>Fixed Total Package Fee</Text>
-                      <Text style={{ fontSize: 22, fontWeight: '900', color: '#0C6258' }}>₱2,500</Text>
-                    </View>
-                    <View style={{ height: 1, backgroundColor: '#DCFCE7', marginVertical: 6 }} />
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <BootstrapIcon name="shield-lock-fill" size={12} color="#DC2626" />
-                        <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#DC2626' }}>20% Downpayment (Due Now):</Text>
-                      </View>
-                      <Text style={{ fontSize: 14, fontWeight: '900', color: '#DC2626' }}>₱500</Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
-                      <Text style={{ fontSize: 11, color: '#64748B' }}>Balance at Pit Bay Completion:</Text>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#334155' }}>₱2,000</Text>
-                    </View>
-                  </View>
-
-                  {/* Inclusions */}
-                  <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#334155', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
-                    What's Included in this Fixed Service:
-                  </Text>
-                  <View style={{ gap: 8, marginBottom: 18 }}>
-                    {FIXED_GARAGE_SERVICES.PMS.inclusions.map((item, idx) => (
-                      <View key={idx} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                        <BootstrapIcon name="check-circle-fill" size={13} color="#0C6258" style={{ marginTop: 2 }} />
-                        <Text style={{ fontSize: 12, color: '#334155', flex: 1, lineHeight: 16 }}>
-                          {item}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  {/* Actions */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 10, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-                    <TouchableOpacity
-                      style={{
-                        paddingHorizontal: 16,
-                        paddingVertical: 9,
-                        borderRadius: 10,
-                        backgroundColor: '#F1F5F9',
-                        borderWidth: 1,
-                        borderColor: '#E2E8F0',
-                      }}
-                      onPress={() => setServiceDetailModal(null)}
-                    >
-                      <Text style={{ color: '#475569', fontSize: 12.5, fontWeight: '700' }}>Cancel</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={{
-                        paddingHorizontal: 20,
-                        paddingVertical: 9,
-                        borderRadius: 10,
-                        backgroundColor: '#0C6258',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 8,
-                      }}
-                      onPress={() => {
-                        setServiceDetailModal(null);
-                        handleOpenBooking('PMS');
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <BootstrapIcon name="calendar2-check-fill" size={13} color="#FFFFFF" />
-                      <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>
-                        Book PMS (₱500 DP)
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </ScrollView>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      </Modal>
 
       {/* ─── 7. PERSISTENT MOBILE BOTTOM NAVIGATION ─── */}
       <BottomNavBar

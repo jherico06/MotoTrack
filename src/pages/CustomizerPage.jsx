@@ -1759,12 +1759,19 @@ export default function CustomizerPage({
           else if (tab === 'Garage') onNavigateToGarage?.();
           else if (tab === 'Orders') onNavigateToOrders?.();
           else if (tab === 'Favorites') onNavigateToWishlist?.();
-          else if (tab === 'Profile') {
+          else if (tab === 'Dashboard') {
             if (!currentUser) {
               setRedirectReason('');
               onNavigateToLogin?.();
             } else {
-              onNavigateToProfile?.();
+              onNavigateToProfile?.('overview');
+            }
+          } else if (tab === 'Profile') {
+            if (!currentUser) {
+              setRedirectReason('');
+              onNavigateToLogin?.();
+            } else {
+              onNavigateToProfile?.('profile');
             }
           }
         }}

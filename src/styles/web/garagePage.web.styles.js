@@ -1159,7 +1159,7 @@ export const garageWebStyles = StyleSheet.create({
   singleHubTitle: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#042F2E',
+    color: '#18181B',
     marginBottom: 4,
   },
   singleHubAddress: {

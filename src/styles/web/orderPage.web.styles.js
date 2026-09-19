@@ -81,7 +81,7 @@ export const orderWebStyles = StyleSheet.create({
   userNameText: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#042F2E',
+    color: '#18181B',
   },
   signInBtn: {
     paddingHorizontal: 16,

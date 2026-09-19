@@ -1,9 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
-import * as WebBrowser from 'expo-web-browser';
 import { authService } from '../services/authService';
-import { userService } from '../services/userService';
 import { supabase } from '../services/supabaseClient';
 
 const AuthContext = createContext(null);
@@ -32,86 +30,53 @@ export function AuthProvider({ children }) {
       setIsLoadingAuth(false);
     }
 
-    // Helper to sync Supabase Google OAuth session into app state
-    const syncGoogleSession = async (sessionUser) => {
+    // Helper to sync Supabase Google OAuth session into app state.
+    // Must not run other Supabase calls inside onAuthStateChange — that deadlocks
+    // the auth lock and Google web login never finishes.
+    const syncGoogleSession = (sessionUser) => {
       if (!sessionUser) return;
-      const u = sessionUser;
-      const googleEmail = (u.email || '').toLowerCase();
-      const fullName =
-        u.user_metadata?.full_name ||
-        u.user_metadata?.name ||
-        u.email?.split('@')[0] ||
-        'Google Rider';
-      const avatarUrl =
-        u.user_metadata?.avatar_url ||
-        u.user_metadata?.picture ||
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
+      setTimeout(() => {
+        void (async () => {
+          try {
+            const safeUser = await authService.syncOAuthUser(sessionUser);
+            if (!safeUser) return;
+            authService.setCurrentUser(safeUser);
+            setCurrentUser(safeUser);
+            setRedirectReason('');
 
-      // Check if user already exists in storage to preserve real phone and address
-      let existingRecord = null;
-      try {
-        const allUsers = await userService.getAllUsers();
-        existingRecord = (allUsers || []).find(
-          (user) => (user.email || '').toLowerCase() === googleEmail
-        );
-      } catch (_e) {}
-
-      const safeUser = {
-        id: existingRecord?.id || u.id,
-        name: existingRecord?.name || fullName,
-        email: googleEmail,
-        role: existingRecord?.role || u.user_metadata?.role || 'user',
-        avatar: existingRecord?.avatar || avatarUrl,
-        phone: existingRecord?.phone || u.phone || '',
-        address: existingRecord?.address || '',
-        bikeBrand: existingRecord?.bikeBrand || '',
-        bikeModel: existingRecord?.bikeModel || '',
-        bikePlate: existingRecord?.bikePlate || '',
-        bikeOdo: existingRecord?.bikeOdo || '',
-        auth_provider: 'google',
-      };
-
-      authService.setCurrentUser(safeUser);
-      setCurrentUser(safeUser);
-      setRedirectReason('');
-
-      // Clean OAuth token fragments only — never strip rider/confirm public links
-      if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        const params = new URLSearchParams(window.location.search);
-        const publicScreen = params.get('screen');
-        const keepPublic =
-          publicScreen === 'rider-run' ||
-          publicScreen === 'confirm-delivery' ||
-          publicScreen === 'rider-dashboard';
-        const hash = String(window.location.hash || '');
-        const isOAuthHash =
-          hash.includes('access_token') ||
-          hash.includes('id_token') ||
-          hash.includes('error=') ||
-          window.location.search.includes('code=');
-        if (isOAuthHash && !keepPublic) {
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-      }
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              const params = new URLSearchParams(window.location.search);
+              const publicScreen = params.get('screen');
+              const keepPublic =
+                publicScreen === 'rider-run' ||
+                publicScreen === 'confirm-delivery' ||
+                publicScreen === 'rider-dashboard';
+              const hash = String(window.location.hash || '');
+              const isOAuthCallback =
+                hash.includes('access_token') ||
+                hash.includes('id_token') ||
+                hash.includes('error=') ||
+                window.location.search.includes('code=');
+              if (isOAuthCallback && !keepPublic) {
+                window.history.replaceState({}, document.title, window.location.pathname);
+              }
+            }
+          } catch (e) {
+            console.warn('Google session sync failed:', e);
+          }
+        })();
+      }, 0);
     };
 
     // Listen for Supabase OAuth redirect (Google Sign In callback)
     let authListenerUnsub = null;
     if (supabase) {
       try {
-        // 1. Initial check for existing active session / newly redirected session
-        supabase.auth
-          .getSession()
-          .then(({ data }) => {
-            if (data?.session?.user) {
-              syncGoogleSession(data.session.user);
-            }
-          })
-          .catch((e) => console.warn('Supabase getSession error:', e));
-
-        // 2. Real-time auth state listener
         const { data: authSub } = supabase.auth.onAuthStateChange((event, session) => {
-          if ((event === 'SIGNED_IN' || event === 'USER_UPDATED') && session?.user) {
+          if (
+            (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'USER_UPDATED') &&
+            session?.user
+          ) {
             syncGoogleSession(session.user);
           }
         });
@@ -127,9 +92,6 @@ export function AuthProvider({ children }) {
       const handleDeepLink = async (event) => {
         const url = event?.url;
         if (url && (url.includes('code=') || url.includes('access_token='))) {
-          try {
-            WebBrowser.dismissBrowser();
-          } catch (_e) {}
           const res = await authService.handleOAuthCallbackUrl(url);
           if (res?.success && res.user) {
             setCurrentUser(res.user);

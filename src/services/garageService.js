@@ -312,6 +312,89 @@ export const TIME_SLOTS = [
   '04:30 PM - 06:00 PM',
 ];
 
+export const PACKAGE_CATEGORIES = [
+  { id: 'PMS', label: 'Preventive Maintenance', icon: 'wrench-adjustable', color: '#0C6258' },
+  { id: 'Repair', label: 'Mechanical Repair', icon: 'wrench', color: '#DC2626' },
+  { id: 'Customization', label: 'Customization & Tuning', icon: 'tools', color: '#7C3AED' },
+];
+
+function parseInclusions(value) {
+  if (Array.isArray(value)) return value.filter(Boolean);
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+    } catch (_e) {}
+    return trimmed
+      .split('\n')
+      .map((line) => line.replace(/^[-•]\s*/, '').trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+export function getPackagePricePhp(pkg) {
+  if (!pkg) return 0;
+  const php = Number(pkg.pricePhp ?? pkg.price_php ?? pkg.package_price ?? 0);
+  if (php > 0) return php;
+  const price = Number(pkg.price ?? pkg.service_price ?? 0);
+  if (price >= 200) return price;
+  return price > 0 ? usdToPhp(price) : 0;
+}
+
+export function getPackageDownpaymentPhp(pkg) {
+  if (!pkg) return 0;
+  if (pkg.downpaymentPhp != null && pkg.downpaymentPhp !== '') return Number(pkg.downpaymentPhp);
+  return Math.max(0, Math.round(getPackagePricePhp(pkg) * 0.2));
+}
+
+export function isActivePackage(pkg) {
+  const status = String(pkg?.status || 'active').toLowerCase();
+  return status === 'active' || status === '';
+}
+
+export function getPackageCategoryName(category) {
+  if (category === 'Repair') return 'Mechanical & Electrical Repair';
+  if (category === 'PMS') return 'Preventive Maintenance';
+  if (category === 'Customization') return 'Customization & Tuning';
+  return 'Shop Service Package';
+}
+
+export function normalizeServicePackage(item) {
+  if (!item) return null;
+  const category = item.category || 'PMS';
+  const inclusions = parseInclusions(item.inclusions);
+  const pricePhp = getPackagePricePhp(item);
+  const id = item.service_id || item.id || item.package_id;
+  return {
+    ...item,
+    id,
+    service_id: id,
+    package_id: item.package_id || id,
+    category,
+    categoryName: item.categoryName || getPackageCategoryName(category),
+    title: item.title || item.name || item.package_name || 'Garage Service Package',
+    name: item.name || item.title || item.package_name || 'Garage Service Package',
+    subtitle: item.subtitle || 'Professional motorcycle service package',
+    price: Number(item.price || 0),
+    pricePhp,
+    downpaymentPhp: getPackageDownpaymentPhp({ ...item, pricePhp }),
+    duration: item.duration || '60 mins',
+    badge: item.badge || 'Package',
+    icon:
+      item.icon ||
+      (category === 'Repair' ? 'wrench' : category === 'PMS' ? 'wrench-adjustable' : 'tools'),
+    image:
+      item.image ||
+      'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
+    description: item.description || '',
+    inclusions,
+    status: item.status || 'Active',
+  };
+}
+
 const GARAGE_STORAGE_KEY = 'mototrack_garage_bookings';
 const GARAGE_SERVICES_STORAGE_KEY = 'mototrack_garage_services_list';
 const GARAGE_MECHANICS_STORAGE_KEY = 'mototrack_garage_mechanics_list';
@@ -415,38 +498,10 @@ export const garageService = {
           .order('created_at', { ascending: false });
 
         if (!error && Array.isArray(data) && data.length > 0) {
-          const normalized = data.map((item) => ({
-            id: item.service_id || item.id,
-            service_id: item.service_id || item.id,
-            category: item.category || 'PMS',
-            categoryName:
-              item.category === 'Repair'
-                ? 'Mechanical & Electrical Repair'
-                : item.category === 'PMS'
-                ? 'Preventive Maintenance'
-                : 'Customization & Tuning',
-            title: item.name || item.title || 'Garage Service',
-            subtitle: item.subtitle || 'Professional Motorcycle Service',
-            price: Number(item.price || 0),
-            pricePhp: item.price_php ? Number(item.price_php) : usdToPhp(item.price || 0),
-            duration: item.duration || '60 mins',
-            badge: item.badge || 'Popular',
-            icon:
-              item.category === 'Repair'
-                ? 'wrench'
-                : item.category === 'PMS'
-                ? 'wrench-adjustable'
-                : 'tools',
-            image:
-              item.image ||
-              'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
-            description: item.description || '',
-            inclusions: Array.isArray(item.inclusions)
-              ? item.inclusions
-              : typeof item.inclusions === 'string'
-                ? JSON.parse(item.inclusions || '[]')
-                : [],
-          }));
+          const normalized = data
+            .map((item) => normalizeServicePackage(item))
+            .filter(Boolean)
+            .filter(isActivePackage);
 
           this.saveServices(normalized);
           return normalized;
@@ -464,11 +519,26 @@ export const garageService = {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
+          return parsed.map((item) => normalizeServicePackage(item)).filter(Boolean);
         }
       }
     } catch (e) {}
-    return GARAGE_SERVICES;
+    return GARAGE_SERVICES.map((item) => normalizeServicePackage(item));
+  },
+
+  getActivePackages(category) {
+    const list = this.getServices().filter(isActivePackage);
+    if (!category || category === 'All') return list;
+    return list.filter((pkg) => String(pkg.category || '').toLowerCase() === String(category).toLowerCase());
+  },
+
+  getPackageById(packageId) {
+    if (!packageId) return null;
+    return (
+      this.getServices().find(
+        (pkg) => pkg.id === packageId || pkg.service_id === packageId || pkg.package_id === packageId
+      ) || null
+    );
   },
 
   saveServices(services) {
@@ -480,71 +550,56 @@ export const garageService = {
 
   async addService(serviceData) {
     const services = this.getServices();
-    const id = serviceData.id || `srv-${Date.now()}`;
-    const priceNum = Number(serviceData.price) || 0;
-    const pricePhp = serviceData.pricePhp || usdToPhp(priceNum);
-    const inclusionsList = Array.isArray(serviceData.inclusions)
-      ? serviceData.inclusions
-      : (serviceData.inclusions || '')
-          .split('\n')
-          .map((s) => s.trim())
-          .filter(Boolean);
+    const id = serviceData.id || serviceData.service_id || `pkg-${Date.now()}`;
+    const pricePhp = getPackagePricePhp({
+      pricePhp: serviceData.pricePhp,
+      price: serviceData.price,
+    });
+    const inclusionsList = parseInclusions(serviceData.inclusions);
 
-    const newService = {
+    const newService = normalizeServicePackage({
       id,
       service_id: id,
       category: serviceData.category || 'PMS',
-      categoryName:
-        serviceData.category === 'Repair'
-          ? 'Mechanical & Electrical Repair'
-          : serviceData.category === 'PMS'
-          ? 'Preventive Maintenance'
-          : 'Customization & Tuning',
-      title: serviceData.title || 'New Garage Service',
-      subtitle: serviceData.subtitle || 'Professional Motorcycle Service',
-      price: priceNum,
+      title: serviceData.title || serviceData.name || 'New Service Package',
+      subtitle: serviceData.subtitle || 'Professional motorcycle service package',
+      price: pricePhp,
       pricePhp,
       duration: serviceData.duration || '60 mins',
-      badge: serviceData.badge || 'New Service',
-      icon:
-        serviceData.icon ||
-        (serviceData.category === 'Repair'
-          ? 'wrench'
-          : serviceData.category === 'PMS'
-          ? 'wrench-adjustable'
-          : 'tools'),
-      image:
-        serviceData.image ||
-        'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
-      description: serviceData.description || 'Quality professional motorcycle service and maintenance.',
+      badge: serviceData.badge || 'New Package',
+      icon: serviceData.icon,
+      image: serviceData.image,
+      description: serviceData.description || 'Quality professional motorcycle service package.',
       inclusions: inclusionsList,
-    };
+      status: 'Active',
+    });
 
     try {
       const client = supabaseManager.getClient();
       if (client) {
-        await client.from('services').insert([
+        const { error } = await client.from('services').insert([
           {
             service_id: id,
             name: newService.title,
             category: newService.category,
             subtitle: newService.subtitle,
-            price: newService.price,
-            price_php: newService.pricePhp,
+            price: pricePhp,
+            price_php: pricePhp,
             duration: newService.duration,
             badge: newService.badge,
             image: newService.image,
             description: newService.description,
             inclusions: inclusionsList,
-            status: 'active',
+            status: 'Active',
           },
         ]);
+        if (error) console.warn('Supabase service insert error:', error.message || error);
       }
     } catch (e) {
       console.warn('Supabase service insert error:', e);
     }
 
-    const updated = [newService, ...services];
+    const updated = [newService, ...services.filter((s) => s.id !== id && s.service_id !== id)];
     this.saveServices(updated);
     return newService;
   },
@@ -552,7 +607,12 @@ export const garageService = {
   async updateService(serviceId, updatedData) {
     const services = this.getServices();
     const priceNum = updatedData.price !== undefined ? Number(updatedData.price) : undefined;
-    const pricePhp = priceNum !== undefined ? usdToPhp(priceNum) : undefined;
+    const pricePhp =
+      updatedData.pricePhp !== undefined
+        ? Number(updatedData.pricePhp)
+        : priceNum !== undefined
+          ? getPackagePricePhp({ price: priceNum, pricePhp: priceNum })
+          : undefined;
 
     try {
       const client = supabaseManager.getClient();
@@ -563,8 +623,8 @@ export const garageService = {
         if (updatedData.title) updatePayload.name = updatedData.title;
         if (updatedData.category) updatePayload.category = updatedData.category;
         if (updatedData.subtitle !== undefined) updatePayload.subtitle = updatedData.subtitle;
-        if (priceNum !== undefined) {
-          updatePayload.price = priceNum;
+        if (pricePhp !== undefined) {
+          updatePayload.price = pricePhp;
           updatePayload.price_php = pricePhp;
         }
         if (updatedData.duration) updatePayload.duration = updatedData.duration;
@@ -591,7 +651,7 @@ export const garageService = {
         return {
           ...s,
           ...updatedData,
-          price: priceNum !== undefined ? priceNum : s.price,
+          price: pricePhp !== undefined ? pricePhp : s.price,
           pricePhp: pricePhp !== undefined ? pricePhp : s.pricePhp,
           categoryName:
             (updatedData.category || s.category) === 'Repair'
@@ -1072,13 +1132,33 @@ export const garageService = {
         }
       } catch (_e) {}
 
-      // Resolve valid service_id in Supabase
-      const validServiceId =
-        booking.service_id && (booking.service_id.startsWith('repair-') || booking.service_id.startsWith('pms-') || booking.service_id.startsWith('srv-'))
-          ? booking.service_id
-          : booking.category === 'Repair'
-          ? 'repair-diag'
-          : 'srv-pms-pro';
+      // Keep the selected shop package. Only fall back when no package id exists.
+      const requestedServiceId =
+        booking.package_id || booking.service_id || booking.serviceId || booking.packageId || null;
+      let validServiceId = requestedServiceId || null;
+      if (validServiceId) {
+        try {
+          const { data: svcRow } = await client
+            .from('services')
+            .select('service_id')
+            .eq('service_id', validServiceId)
+            .maybeSingle();
+          if (!svcRow?.service_id) validServiceId = null;
+        } catch (_e) {
+          validServiceId = requestedServiceId;
+        }
+      }
+
+      const packageName =
+        booking.package_name ||
+        booking.service_title ||
+        booking.serviceName ||
+        booking.service_title ||
+        '';
+      const packagePrice = getPackagePricePhp(booking);
+      const includedServices = parseInclusions(
+        booking.included_services || booking.inclusions || booking.package_inclusions
+      );
 
       // Ensure schedule is a valid ISO timestamp for Supabase timestamptz column
       let scheduleIso = new Date().toISOString();
@@ -1128,8 +1208,26 @@ export const garageService = {
         customer_name: booking.customer_name || booking.userName || 'Guest Rider',
         customer_phone: booking.customer_phone || booking.userPhone || '',
         notes: notesToStore,
-        price: booking.pricePhp || 2500,
+        price: packagePrice || booking.pricePhp || 2500,
         status: booking.status || 'Pending',
+        category: booking.category || 'PMS',
+        time_slot: booking.time_slot || booking.time || '10:30 AM - 12:00 PM',
+        appointment_date: booking.appointment_date || booking.date || '',
+        repair_type: booking.repair_type || '',
+        package_id: validServiceId || requestedServiceId,
+        package_name: packageName,
+        package_price: packagePrice || booking.pricePhp || 0,
+        included_services: includedServices,
+        estimated_duration: booking.estimated_duration || booking.duration || '',
+        service_title: packageName,
+        current_stage: booking.current_stage || 'Pending Advisor Review',
+        service_progress: booking.service_progress || 0,
+        downpayment_amount: booking.downpayment_amount || getPackageDownpaymentPhp(booking),
+        downpayment_ref: booking.downpayment_ref || '',
+        downpayment_paid_at: booking.downpayment_paid_at || null,
+        downpayment_method: booking.downpayment_method || 'GCash',
+        remaining_balance: booking.remaining_balance,
+        user_id: booking.user_id || booking.customer_id || null,
       };
 
       const { data, error } = await client
@@ -1173,6 +1271,7 @@ export const garageService = {
     const deletedIds = this.getDeletedBookingIds();
     const demoIds = new Set(['BK-REP-4921', 'BK-PMS-8012', 'BK-REP-3044', 'BK-PMS-1902', 'BK-PMS-3094', 'bk-01', 'BK-REP-VERIFY-1788803844337']);
     try {
+      await this.fetchServices();
       const client = supabaseManager.getClient();
       if (client) {
         // Asynchronously delete any lingering demo bookings from the database
@@ -1195,14 +1294,26 @@ export const garageService = {
             'srv-pms-basic': 'Quick PMS Lube & Safety Check',
           };
 
+          const catalog = this.getServices();
+          const catalogById = new Map(
+            catalog.map((pkg) => [pkg.id || pkg.service_id, pkg])
+          );
+
           const normalized = data
             .filter((b) => b && !deletedIds.has(String(b.booking_id)) && !deletedIds.has(String(b.id)) && !demoIds.has(String(b.booking_id)) && !demoIds.has(String(b.id)))
             .map((b) => {
+            const catalogPkg = catalogById.get(b.package_id || b.service_id);
             const resolvedTitle =
+              b.package_name ||
+              b.service_title ||
+              catalogPkg?.title ||
+              catalogPkg?.name ||
               serviceCatalogTitles[b.service_id] ||
               (b.category === 'Repair'
                 ? 'Track Diagnostic & Mechanical Repair'
                 : 'PMS Maintenance');
+            const includedServices = parseInclusions(b.included_services || catalogPkg?.inclusions);
+            const pricePhp = Number(b.package_price || b.price || catalogPkg?.pricePhp || 0) || 2500;
 
             let cleanNotes = b.notes || '';
             let parsedMeta = {};
@@ -1221,12 +1332,16 @@ export const garageService = {
               id: b.booking_id || b.id,
               booking_id: b.booking_id || b.id,
               customer_id: b.customer_id,
-              service_id: b.service_id,
-              serviceId: b.service_id,
+              service_id: b.package_id || b.service_id,
+              serviceId: b.package_id || b.service_id,
+              package_id: b.package_id || b.service_id,
+              package_name: resolvedTitle,
+              package_price: pricePhp,
+              included_services: includedServices,
               service_title: resolvedTitle,
               serviceName: resolvedTitle,
-              servicePrice: b.price ? Math.round(b.price / 50) : 0,
-              pricePhp: b.price || 2500,
+              servicePrice: pricePhp ? Math.round(pricePhp / 50) : 0,
+              pricePhp,
               category:
                 b.category ||
                 (b.service_id && b.service_id.includes('repair')
@@ -1266,6 +1381,12 @@ export const garageService = {
               created_at: b.created_at || new Date().toISOString(),
               service_progress: b.service_progress || 0,
               additional_estimates: b.additional_estimates || [],
+              approved_at: b.approved_at || null,
+              approved_by: b.approved_by || null,
+              current_stage: b.current_stage || (b.status === 'Pending' ? 'Pending Advisor Review' : ''),
+              estimated_duration: b.estimated_duration || catalogPkg?.duration || '',
+              downpayment_amount: b.downpayment_amount,
+              remaining_balance: b.remaining_balance,
             };
           });
 
@@ -1283,6 +1404,7 @@ export const garageService = {
     }
 
     // Fallback safely to local bookings without ever clearing them
+    const local = this.getLocalBookings();
     if (customerId) {
       return local.filter((b) => b.customer_id === customerId || b.userId === customerId);
     }
@@ -1349,13 +1471,32 @@ export const garageService = {
       newBookingData.plate_number || newBookingData.bikePlate || 'TEMP-PLATE';
     const odometer =
       newBookingData.odometer || newBookingData.bikeOdo || '';
+    const selectedPackage =
+      normalizeServicePackage(
+        this.getPackageById(newBookingData.package_id || newBookingData.service_id || newBookingData.serviceId) ||
+          (newBookingData.package_name || newBookingData.service_title
+            ? newBookingData
+            : null)
+      ) || null;
     const serviceTitle =
+      newBookingData.package_name ||
       newBookingData.service_title ||
       newBookingData.serviceName ||
+      selectedPackage?.title ||
       (newBookingData.category === 'Repair' ? 'Track Diagnostic & Mechanical Repair' : 'PMS Maintenance');
     const pricePhp =
       newBookingData.pricePhp ||
+      selectedPackage?.pricePhp ||
       (newBookingData.servicePrice ? newBookingData.servicePrice * 50 : 2500);
+    const includedServices = parseInclusions(
+      newBookingData.included_services || selectedPackage?.inclusions || newBookingData.inclusions
+    );
+    const packageId =
+      newBookingData.package_id ||
+      newBookingData.service_id ||
+      newBookingData.serviceId ||
+      selectedPackage?.id ||
+      'repair-diag';
 
     const downpaymentPercent = 20;
     const downpaymentAmount =
@@ -1380,9 +1521,14 @@ export const garageService = {
       mechanic: newBookingData.mechanic || 'Pending Assignment',
       branch: newBookingData.branch || defaultBranch.name,
       branch_address: defaultBranch.address,
-      category: newBookingData.category || 'Repair',
-      service_id: newBookingData.service_id || newBookingData.serviceId || 'repair-diag',
-      serviceId: newBookingData.service_id || newBookingData.serviceId || 'repair-diag',
+      category: newBookingData.category || selectedPackage?.category || 'Repair',
+      service_id: packageId,
+      serviceId: packageId,
+      package_id: packageId,
+      package_name: serviceTitle,
+      package_price: pricePhp,
+      included_services: includedServices,
+      estimated_duration: newBookingData.estimated_duration || selectedPackage?.duration || '',
       service_title: serviceTitle,
       serviceName: serviceTitle,
       servicePrice: newBookingData.servicePrice || Math.round(pricePhp / 50),
@@ -1424,6 +1570,16 @@ export const garageService = {
       current_stage: `20% Downpayment Verified (₱${downpaymentAmount.toLocaleString()}) • Pending Advisor Review`,
       additional_estimates: [],
       ...newBookingData,
+      package_id: packageId,
+      package_name: serviceTitle,
+      package_price: pricePhp,
+      included_services: includedServices,
+      service_id: packageId,
+      serviceId: packageId,
+      service_title: serviceTitle,
+      serviceName: serviceTitle,
+      pricePhp,
+      status: newBookingData.status || 'Pending',
     };
 
     // 1. Save locally and notify immediately for instant UI reactivity
@@ -1441,7 +1597,7 @@ export const garageService = {
         notificationService.addNotification({
           user_id: newBookingData.customer_id || 'guest',
           title: 'Pit Bay Booking Reserved (20% Downpayment Paid)',
-          message: `Your booking #${bookingId} for ${booking.service_title} is confirmed with ₱${downpaymentAmount.toLocaleString()} downpayment. Our Service Advisor will review and assign a technician shortly. Note: Downpayment is non-refundable.`,
+          message: `Your booking #${bookingId} for ${booking.service_title} is pending admin approval. ₱${downpaymentAmount.toLocaleString()} downpayment received. We'll notify you once a technician is assigned.`,
           type: 'booking',
           link: 'bookings',
         });
@@ -1486,6 +1642,8 @@ export const garageService = {
     const updated = await this.updateBooking(bookingId, {
       status: 'Confirmed',
       mechanic: assignedMech,
+      approved_at: new Date().toISOString(),
+      approved_by: assignedMech,
       current_stage: `Appointment Confirmed • Assigned to ${assignedMech}`,
     });
 
@@ -1880,6 +2038,15 @@ export const garageService = {
           ...(updatedFields.customer_name && { customer_name: updatedFields.customer_name }),
           ...(updatedFields.customer_phone && { customer_phone: updatedFields.customer_phone }),
           ...(updatedFields.service_price !== undefined && { price: updatedFields.service_price }),
+          ...(updatedFields.pricePhp !== undefined && { price: updatedFields.pricePhp, package_price: updatedFields.pricePhp }),
+          ...(updatedFields.package_id && { package_id: updatedFields.package_id, service_id: updatedFields.package_id }),
+          ...(updatedFields.package_name && { package_name: updatedFields.package_name, service_title: updatedFields.package_name }),
+          ...(updatedFields.service_title && { service_title: updatedFields.service_title, package_name: updatedFields.service_title }),
+          ...(updatedFields.approved_at && { approved_at: updatedFields.approved_at }),
+          ...(updatedFields.approved_by && { approved_by: updatedFields.approved_by }),
+          ...(updatedFields.current_stage && { current_stage: updatedFields.current_stage }),
+          ...(updatedFields.appointment_date && { appointment_date: updatedFields.appointment_date }),
+          ...(updatedFields.time_slot && { time_slot: updatedFields.time_slot }),
         };
 
         await client.from('bookings').update(updatePayload).eq('booking_id', bookingId);

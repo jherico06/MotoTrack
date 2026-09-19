@@ -821,7 +821,7 @@ export const customizerWebStyles = StyleSheet.create({
   selectedTrayTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#042F2E',
+    color: '#18181B',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },

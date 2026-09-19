@@ -15,7 +15,8 @@ class UniversalStorage {
     this.clear = this.clear.bind(this);
     this.isWebStorageAvailable = this.isWebStorageAvailable.bind(this);
     
-    // Clean up old localStorage so old shared sessions don't linger
+    // Remove legacy app keys from localStorage. Do not touch sb-* PKCE keys —
+    // Google web sign-in stores the code verifier and session there.
     this._cleanupOldLocalStorage();
     
     this.initNativeStorage();
@@ -27,13 +28,6 @@ class UniversalStorage {
         window.localStorage.removeItem('mototrack_current_session');
         window.localStorage.removeItem('mototrack_supabase_url');
         window.localStorage.removeItem('mototrack_supabase_anon_key');
-        // Clear Supabase's default localStorage keys (they start with sb-)
-        for (let i = 0; i < window.localStorage.length; i++) {
-          const key = window.localStorage.key(i);
-          if (key && key.startsWith('sb-') && key.endsWith('-auth-token')) {
-            window.localStorage.removeItem(key);
-          }
-        }
       }
     } catch (e) {
       // Ignore errors if localStorage is restricted

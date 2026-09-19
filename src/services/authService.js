@@ -2,6 +2,7 @@
 import { Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import Constants, { ExecutionEnvironment } from 'expo-constants';
 import { appStorage } from './storageAdapter';
 import { supabase, supabaseManager } from './supabaseClient';
 import { userService, ADMIN_USER, CUSTOMER_USER, ADMIN_SECRET_KEY } from './userService';
@@ -64,6 +65,26 @@ export function extractAuthParamsFromUrl(urlString) {
     console.warn('[extractAuthParamsFromUrl] Error parsing auth params:', _err);
   }
   return params;
+}
+
+function getGoogleRedirectUrl() {
+  if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+    return `${window.location.origin}${window.location.pathname || '/'}`;
+  }
+  if (Constants.executionEnvironment === ExecutionEnvironment.StoreClient) {
+    return Linking.createURL('auth-callback');
+  }
+  return Linking.createURL('auth-callback', { scheme: 'mototrack' });
+}
+
+function isLanExpoGoRedirect(url) {
+  return typeof url === 'string' && /exp:\/\/\d{1,3}(?:\.\d{1,3}){3}/.test(url);
+}
+
+let oauthCallbackInFlight = null;
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export const authService = {
@@ -489,20 +510,23 @@ export const authService = {
       return await this.loginWithGoogleSimulated();
     }
 
+    const redirectUrl = getGoogleRedirectUrl();
+    const oauthOptions = {
+      provider: 'google',
+      options: {
+        redirectTo: redirectUrl,
+        skipBrowserRedirect: true,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
+      },
+    };
+
     // ─── 1. WEB BROWSER FLOW ───
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
       try {
-        const redirectUrl = window.location.origin + window.location.pathname;
-        const { data, error } = await client.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: redirectUrl,
-            queryParams: {
-              access_type: 'offline',
-              prompt: 'consent',
-            },
-          },
-        });
+        const { data, error } = await client.auth.signInWithOAuth(oauthOptions);
 
         if (error) {
           const errMsg = error.message || '';
@@ -521,10 +545,10 @@ export const authService = {
         }
 
         if (data?.url) {
-          // Immediately redirect browser to Google consent screen
-          window.location.href = data.url;
+          window.location.assign(data.url);
           return { success: true, redirecting: true };
         }
+        return { success: false, error: 'Could not start Google sign-in.' };
       } catch (err) {
         console.warn('Supabase OAuth Google initialization error (web):', err);
         return { success: false, error: err?.message || 'Failed to initialize Google sign in' };
@@ -535,23 +559,9 @@ export const authService = {
     if (Platform.OS !== 'web') {
       try {
         WebBrowser.maybeCompleteAuthSession();
-
-        // In Expo Go: exp://<ip>:<port>/--/auth-callback
-        // In Standalone/build: mototrack://auth-callback
-        const redirectUrl = Linking.createURL('auth-callback');
         console.log('[Google Auth Mobile] Starting OAuth flow with redirectUrl:', redirectUrl);
 
-        const { data, error } = await client.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: redirectUrl,
-            skipBrowserRedirect: true,
-            queryParams: {
-              access_type: 'offline',
-              prompt: 'consent',
-            },
-          },
-        });
+        const { data, error } = await client.auth.signInWithOAuth(oauthOptions);
 
         if (error) {
           const errMsg = error.message || '';
@@ -574,19 +584,62 @@ export const authService = {
           return { success: false, error: 'Could not obtain Google authentication URL from Supabase.' };
         }
 
-        console.log('[Google Auth Mobile] Opening in-app browser session...');
-        const authResponse = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
-        console.log('[Google Auth Mobile] WebBrowser result type:', authResponse?.type);
+        console.log('[Google Auth Mobile] Opening auth session...', redirectUrl);
+        let capturedUrl = null;
+        const linkSub = Linking.addEventListener('url', ({ url }) => {
+          if (url && (url.includes('code=') || url.includes('access_token=') || url.includes('error='))) {
+            capturedUrl = url;
+            try {
+              WebBrowser.dismissBrowser();
+            } catch (_e) {}
+          }
+        });
 
-        if (authResponse.type === 'cancel' || authResponse.type === 'dismiss') {
-          return { success: false, cancelled: true, message: 'Google sign-in was cancelled.' };
+        let authResponse;
+        try {
+          // Never use openBrowserAsync on iOS — Safari tries to load localhost/LAN
+          // and shows "couldn't connect to the server".
+          authResponse = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl);
+          if (!capturedUrl) {
+            await sleep(800);
+          }
+        } finally {
+          linkSub?.remove?.();
         }
 
-        if (authResponse.type === 'success' && authResponse.url) {
-          return await this.handleOAuthCallbackUrl(authResponse.url);
+        console.log('[Google Auth Mobile] WebBrowser result type:', authResponse?.type, 'captured:', Boolean(capturedUrl));
+
+        const callbackUrl = capturedUrl || (authResponse?.type === 'success' ? authResponse.url : null);
+        if (callbackUrl) {
+          return await this.handleOAuthCallbackUrl(callbackUrl);
         }
 
-        return { success: false, error: 'Google sign-in was interrupted.' };
+        const pending = await this.waitForPendingGoogleCallback();
+        if (pending?.success) return pending;
+
+        if (isLanExpoGoRedirect(redirectUrl)) {
+          return {
+            success: false,
+            error:
+              'iPhone cannot open your computer address after Google login. Stop Expo, run npx expo start --tunnel, reload Expo Go, then add the new exp://…exp.direct Redirect URL in Supabase.',
+          };
+        }
+
+        if (authResponse?.type === 'cancel' || authResponse?.type === 'dismiss') {
+          return {
+            success: false,
+            cancelled: true,
+            error:
+              'Google sign-in was closed before the app got the result. In Supabase → Authentication → URL Configuration, add this exact Redirect URL: ' +
+              redirectUrl,
+          };
+        }
+
+        return {
+          success: false,
+          error:
+            'Google sign-in did not return to the app. Add this Redirect URL in Supabase: ' + redirectUrl,
+        };
       } catch (err) {
         console.error('[Google Auth Mobile] Error in mobile sign in:', err);
         return { success: false, error: err?.message || 'Mobile Google sign-in failed' };
@@ -597,7 +650,35 @@ export const authService = {
     return await this.loginWithGoogleSimulated();
   },
 
+  async waitForPendingGoogleCallback(timeoutMs = 2500) {
+    const started = Date.now();
+    while (Date.now() - started < timeoutMs) {
+      if (oauthCallbackInFlight) {
+        try {
+          const res = await oauthCallbackInFlight;
+          if (res?.success) return res;
+        } catch (_e) {}
+      }
+      const existing = this.getCurrentUser();
+      if (existing?.auth_provider === 'google') {
+        return { success: true, user: existing };
+      }
+      await sleep(120);
+    }
+    return null;
+  },
+
   async handleOAuthCallbackUrl(url) {
+    if (oauthCallbackInFlight) {
+      return oauthCallbackInFlight;
+    }
+    oauthCallbackInFlight = this.completeOAuthCallbackUrl(url).finally(() => {
+      oauthCallbackInFlight = null;
+    });
+    return oauthCallbackInFlight;
+  },
+
+  async completeOAuthCallbackUrl(url) {
     const client = supabase || supabaseManager?.getClient();
     if (!client || !url) {
       return { success: false, error: 'Authentication service unavailable or missing URL.' };

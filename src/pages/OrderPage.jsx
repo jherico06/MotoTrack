@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BootstrapIcon, BottomNavBar } from '../components/common';
+import { ANDROID_TOP_INSET } from '../utils/safeArea';
 import {
   LiveOrderTrackingMapModal,
   RateDeliveredOrderModal,
@@ -296,7 +297,8 @@ export default function OrderPage({
   const handleBottomNavChange = (tab) => {
     if (tab === 'Home' || tab === 'Search' || tab === 'Cart') onNavigateToStore?.();
     else if (tab === 'Garage') onNavigateToGarage?.();
-    else if (tab === 'Dashboard' || tab === 'Profile') onNavigateToProfile?.();
+    else if (tab === 'Dashboard') onNavigateToProfile?.('overview');
+    else if (tab === 'Profile') onNavigateToProfile?.('profile');
     else if (tab === 'Customize') {
       if (onNavigateToCustomizer) onNavigateToCustomizer();
       else if (onNavigateToCustomize) onNavigateToCustomize();
@@ -713,6 +715,7 @@ const tailwind = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+    paddingTop: ANDROID_TOP_INSET,
   },
   container: {
     flex: 1,
@@ -876,7 +879,7 @@ const tailwind = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   chevronBoxOpen: {
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#E7F5F3',
     borderColor: '#CCFBF1',
   },
   dropdownMenuCard: {
@@ -1121,7 +1124,7 @@ const tailwind = StyleSheet.create({
   deliveryMetaText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#0F766E',
+    color: '#084A43',
     marginBottom: 2,
   },
   confirmedBanner: {

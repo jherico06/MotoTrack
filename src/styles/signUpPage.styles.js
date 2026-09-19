@@ -1,4 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
+import { ANDROID_TOP_INSET } from '../utils/safeArea';
 
 export const signUpPageStyles = StyleSheet.create({
   container: {
@@ -14,7 +15,7 @@ export const signUpPageStyles = StyleSheet.create({
   // ─── TOP TEAL HEADER SECTION ───
   topHeroSection: {
     backgroundColor: '#0C6258',
-    paddingTop: Platform.OS === 'ios' ? 44 : 24,
+    paddingTop: Platform.OS === 'ios' ? 44 : Math.max(24, ANDROID_TOP_INSET + 8),
     paddingHorizontal: 28,
     paddingBottom: 20,
     position: 'relative',
@@ -165,7 +166,7 @@ export const signUpPageStyles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#E7F5F3',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,

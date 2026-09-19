@@ -1,9 +1,11 @@
 import { StyleSheet } from 'react-native';
+import { ANDROID_TOP_INSET } from '../utils/safeArea';
 
 export const profileMobileStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#0C6258',
+    paddingTop: ANDROID_TOP_INSET,
   },
   container: {
     flex: 1,
@@ -113,7 +115,7 @@ export const profileMobileStyles = StyleSheet.create({
     borderRadius: 30,
     borderWidth: 2.5,
     borderColor: '#FFFFFF',
-    backgroundColor: '#0F766E',
+    backgroundColor: '#084A43',
   },
   avatarEditBadge: {
     position: 'absolute',
@@ -295,7 +297,7 @@ export const profileMobileStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   statCardTealAccent: {
-    borderColor: '#0D9488',
+    borderColor: '#0C6258',
     borderTopWidth: 3.5,
     borderTopColor: '#0C6258',
   },
@@ -318,7 +320,7 @@ export const profileMobileStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#E7F5F3',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
@@ -964,7 +966,7 @@ export const profileMobileStyles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#E7F5F3',
     alignItems: 'center',
     justifyContent: 'center',
   },

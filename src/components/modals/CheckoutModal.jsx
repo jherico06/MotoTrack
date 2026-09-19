@@ -8,6 +8,7 @@ import {
   Modal,
   StyleSheet,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon';
 import { shopStyles as styles } from '../../styles/shop.styles';
@@ -15,9 +16,24 @@ import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
 import { formatPHPhone } from './LiveOrderTrackingMapModal';
 
-export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpenProfile, isPlacingOrder = false }) {
+export default function CheckoutModal({
+  visible,
+  onClose,
+  onCompleteOrder,
+  onOpenProfile,
+  isPlacingOrder = false,
+  overrideItemCount = null,
+  overrideTotal = null,
+  overrideItems = null,
+}) {
   const { currentUser, updateProfile } = useAuth();
-  const { cartItemCount, cartTotal, showToast } = useCart();
+  const { cart, cartItemCount, cartTotal, showToast } = useCart();
+
+  const displayItemCount = overrideItemCount != null ? overrideItemCount : cartItemCount;
+  const displayTotal = overrideTotal != null ? overrideTotal : cartTotal;
+  const displayItems = Array.isArray(overrideItems) && overrideItems.length > 0
+    ? overrideItems
+    : (Array.isArray(cart) ? cart : []);
 
   // Delivery Notes & Payment State
   const [deliveryNotes, setDeliveryNotes] = useState('');
@@ -107,7 +123,7 @@ export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpe
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={{ maxHeight: 440 }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
             {/* ─── 1. PROFILE SAVED DELIVERY ADDRESS CARD (AUTOMATIC FROM PROFILE) ─── */}
             <View style={checkoutStyles.addressCardContainer}>
               <View style={checkoutStyles.addressCardHeader}>
@@ -182,7 +198,121 @@ export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpe
               )}
             </View>
 
-            {/* ─── 2. DELIVERY INSTRUCTIONS (OPTIONAL) ─── */}
+            {/* ─── 2. ORDERED PRODUCTS & DESCRIPTIONS ─── */}
+            {displayItems.length > 0 && (
+              <View style={{ marginBottom: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <BootstrapIcon name="box-seam-fill" size={14} color="#0C6258" />
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                      Items in this Order ({displayItemCount})
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0C6258' }}>
+                    ₱{displayTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </Text>
+                </View>
+
+                <View style={{ gap: 8 }}>
+                  {displayItems.map((item, idx) => {
+                    const prod = item.product || item;
+                    const qty = item.quantity || prod.quantity || 1;
+                    const name = prod.name || prod.title || 'Motorcycle Part';
+                    const brand = prod.brand || '';
+                    const description = prod.description || prod.desc || 'Genuine high-performance motorcycle component.';
+                    const image = prod.image || prod.img || '';
+                    const itemPrice = Number(prod.price || 0);
+
+                    return (
+                      <View
+                        key={prod.id ? `checkout-item-${prod.id}-${idx}` : `checkout-item-${idx}`}
+                        style={{
+                          flexDirection: 'row',
+                          gap: 10,
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: 12,
+                          padding: 10,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                        }}
+                      >
+                        {image ? (
+                          <Image
+                            source={{ uri: image }}
+                            style={{
+                              width: 52,
+                              height: 52,
+                              borderRadius: 8,
+                              backgroundColor: '#FFFFFF',
+                              borderWidth: 1,
+                              borderColor: '#E2E8F0',
+                            }}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View
+                            style={{
+                              width: 52,
+                              height: 52,
+                              borderRadius: 8,
+                              backgroundColor: '#E7F5F3',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <BootstrapIcon name="box-seam" size={18} color="#0C6258" />
+                          </View>
+                        )}
+
+                        <View style={{ flex: 1, justifyContent: 'center' }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0F172A', flex: 1 }} numberOfLines={1}>
+                              {name}
+                            </Text>
+                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#0C6258' }}>
+                              ₱{(itemPrice * qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </Text>
+                          </View>
+
+                          {brand ? (
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', marginTop: 1 }}>
+                              {brand}{prod.category ? ` • ${prod.category}` : ''}
+                            </Text>
+                          ) : null}
+
+                          {description ? (
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                color: '#475569',
+                                marginTop: 3,
+                                lineHeight: 15,
+                              }}
+                              numberOfLines={2}
+                            >
+                              {description}
+                            </Text>
+                          ) : null}
+
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 }}>
+                            <View style={{ backgroundColor: '#E2E8F0', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#334155' }}>
+                                Qty: {qty}
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 10.5, color: '#94A3B8' }}>
+                              ₱{itemPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })} each
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* ─── 3. DELIVERY INSTRUCTIONS (OPTIONAL) ─── */}
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Delivery Instructions (Optional)</Text>
               <TextInput
@@ -257,7 +387,7 @@ export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpe
                       <BootstrapIcon name="cash-coin" size={14} color="#16A34A" />
                       <Text style={{ fontSize: 11.5, color: '#166534', fontWeight: '700', flex: 1 }}>
                         Exact amount to prepare: ₱
-                        {cartTotal.toLocaleString(undefined, {
+                        {displayTotal.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
                           maximumFractionDigits: 2,
                         })}
@@ -372,7 +502,7 @@ export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpe
                         </Text>
                       </View>
                       <Text style={{ fontSize: 11, color: '#475569' }}>
-                        Account Name: D,Blockchain Motorparts and Accessories
+                        Account Name: MotoTrack Motorparts and Accessories
                       </Text>
                     </View>
 
@@ -435,11 +565,11 @@ export default function CheckoutModal({ visible, onClose, onCompleteOrder, onOpe
               }}
             >
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
-                Order Summary ({cartItemCount} items)
+                Order Summary ({displayItemCount} items)
               </Text>
               <Text style={{ fontSize: 18, fontWeight: '900', color: '#0C6258', marginTop: 4 }}>
                 Total to Pay: ₱
-                {cartTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {displayTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </Text>
             </View>
           </ScrollView>

@@ -1,4 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
+import { ANDROID_TOP_INSET } from '../utils/safeArea';
 
 export const shopStyles = StyleSheet.create({
   // ─── BASE CONTAINER ───
@@ -9,6 +10,7 @@ export const shopStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+    paddingTop: ANDROID_TOP_INSET,
   },
   scrollContent: {
     paddingBottom: 100,
@@ -48,7 +50,7 @@ export const shopStyles = StyleSheet.create({
   // ─── MOBILE TOP HEADER ───
   headerWrapper: {
     backgroundColor: '#F8FAFC',
-    paddingTop: Platform.OS === 'web' ? 14 : 6,
+    paddingTop: Platform.OS === 'web' ? 14 : Platform.OS === 'android' ? 10 : 6,
     paddingBottom: 8,
   },
   headerRow: {
@@ -629,10 +631,50 @@ export const shopStyles = StyleSheet.create({
     marginTop: 2,
   },
   addToCartBtnText: {
-    fontSize: 11.5,
+    fontSize: 11,
     fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: -0.1,
+  },
+  productActionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  productActionBtn: {
+    flex: 1,
+    marginTop: 0,
+    paddingVertical: 7,
+    paddingHorizontal: 4,
+  },
+  buyNowBtn: {
+    flex: 1,
+    backgroundColor: '#0C6258',
+    borderRadius: 8,
+    paddingVertical: 7.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    borderWidth: 1.5,
+    borderColor: '#0C6258',
+  },
+  buyNowBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.1,
+  },
+  addToCartIconBtn: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingVertical: 7.5,
+    paddingHorizontal: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#0C6258',
   },
 
   // ─── 10. FLOATING BOTTOM CART BAR (MOBILE) ───

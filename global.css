@@ -1,6 +1,14 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html, body {
+    font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+}
 
 @layer components {
   /* Ultra-Premium Glassmorphism Cards */
@@ -63,7 +71,7 @@
   }
 
   .admin-stat-card {
-    @apply bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-5 flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.03)] hover:shadow-md hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-200;
+    @apply bg-white dark:bg-slate-900 rounded-2xl p-5 flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
   }
 
   .admin-icon-pill {
@@ -91,11 +99,11 @@
   }
 
   .admin-table-head {
-    @apply bg-slate-50/75 dark:bg-slate-900/80 text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border-b border-slate-200/80 dark:border-slate-800;
+    @apply bg-[#F0F4FA] dark:bg-[#162032] text-[13px] font-bold text-slate-800 dark:text-slate-100 border-b border-slate-200 dark:border-slate-800;
   }
 
   .admin-table-row {
-    @apply border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/60 dark:hover:bg-slate-800/30 transition-colors duration-150;
+    @apply border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors duration-150;
   }
 
   .admin-nav-item {

@@ -27,7 +27,7 @@ import { pickImageFromFile } from '../utils/imagePickerHelper';
 
 const ADDRESS_PRESETS = [
   { label: 'Inoburan, Naga', address: 'Purok Avocado 4, Inoburan, City of Naga, Cebu' },
-  { label: 'East Poblacion, Naga', address: 'D,Blockchain Hub, East Poblacion, City of Naga, Cebu' },
+  { label: 'East Poblacion, Naga', address: 'MotoTrack Hub, East Poblacion, City of Naga, Cebu' },
   { label: 'Naga Boardwalk', address: 'Naga City Boardwalk, South Road, City of Naga, Cebu' },
   { label: 'Minglanilla Border', address: 'Poblacion Ward 2, Minglanilla, Cebu' },
   { label: 'BGC Central, Taguig', address: '7th Ave & 28th St, Bonifacio Global City, Taguig' },
@@ -920,7 +920,7 @@ export default function ProfilePage({
                   width: 32,
                   height: 32,
                   borderRadius: 8,
-                  backgroundColor: '#E6F4F1',
+                  backgroundColor: '#E7F5F3',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -956,7 +956,7 @@ export default function ProfilePage({
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 6,
-                    backgroundColor: '#E6F4F1',
+                    backgroundColor: '#E7F5F3',
                     paddingHorizontal: isSmallMobile ? 10 : 12,
                     paddingVertical: 7,
                     borderRadius: 10,
@@ -1158,8 +1158,8 @@ export default function ProfilePage({
                             }}
                           >
                             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: tokens.textPrimary }}>
-                                Order #{ord.id}
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: tokens.textPrimary, flex: 1, marginRight: 8 }} numberOfLines={1}>
+                                {ord.itemsSummary || (Array.isArray(ord.items) && ord.items.length > 0 ? ord.items.map((i) => typeof i === 'string' ? i : (i?.name || i?.product_name || 'Item')).join(', ') : 'Motorcycle Performance Equipment')}
                               </Text>
                               <View
                                 style={{
@@ -1274,7 +1274,7 @@ export default function ProfilePage({
                               📅 {bk.appointment_date} • ⏰ {bk.time_slot}
                             </Text>
                             <Text style={{ fontSize: 12, color: tokens.textMuted, marginBottom: 10 }}>
-                              📍 {bk.branch || 'D,Blockchain Flagship Central Hub'}
+                              📍 {bk.branch || 'MotoTrack Flagship Central Hub'}
                             </Text>
 
                             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -2622,7 +2622,7 @@ export default function ProfilePage({
                           width: 38,
                           height: 38,
                           borderRadius: 10,
-                          backgroundColor: '#E6F4F1',
+                          backgroundColor: '#E7F5F3',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
@@ -2963,7 +2963,7 @@ export default function ProfilePage({
                           width: 38,
                           height: 38,
                           borderRadius: 10,
-                          backgroundColor: '#E6F4F1',
+                          backgroundColor: '#E7F5F3',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
@@ -2992,10 +2992,10 @@ export default function ProfilePage({
                         borderColor: '#CCFBF1',
                       }}
                     >
-                      <BootstrapIcon name="check2-circle" size={12} color="#0D9488" />
+                      <BootstrapIcon name="check2-circle" size={12} color="#0C6258" />
                       <Text
                         className="text-[11.5px] font-bold text-teal-700"
-                        style={{ fontSize: 11.5, fontWeight: '700', color: '#0D9488' }}
+                        style={{ fontSize: 11.5, fontWeight: '700', color: '#0C6258' }}
                       >
                         {bikeBrand} {bikeModel ? `• ${bikeModel}` : ''}
                       </Text>

@@ -291,7 +291,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#E7F5F3',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   chevronWrapOpen: {
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#E7F5F3',
     borderColor: '#A7F3D0',
   },
   menuCard: {
@@ -436,14 +436,14 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   categoryOptionActive: {
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#E7F5F3',
     borderColor: '#0C6258',
   },
   optionIconBox: {
     width: 24,
     height: 24,
     borderRadius: 7,
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#E7F5F3',
     alignItems: 'center',
     justifyContent: 'center',
   },

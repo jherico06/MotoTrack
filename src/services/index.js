@@ -17,3 +17,4 @@ export * from './supplierService';
 export * from './excelService';
 export * from './systemSettingsService';
 export * from './auditLogService';
+export * from './forecastService';

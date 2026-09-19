@@ -20,7 +20,7 @@ import { orderService, canCustomerCancelStatus, canCustomerRequestReturnStatus, 
 
 // Route Waypoints focused across City of Naga, Cebu, Philippines
 const ROUTE_WAYPOINTS = [
-  { x: 14, y: 82, label: 'D,Blockchain Hub (East Poblacion, Naga City)' },
+  { x: 14, y: 82, label: 'MotoTrack Hub (East Poblacion, Naga City)' },
   { x: 28, y: 70, label: 'Naga Boardwalk & Baywalk Coastal Highway' },
   { x: 42, y: 54, label: 'Cebu South Road & Toledo Junction' },
   { x: 56, y: 45, label: 'Inoburan Barangay Road' },
@@ -131,7 +131,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
     {
       id: 'msg-1',
       sender: 'rider',
-      text: 'Hi! I picked up your motorcycle parts from the D,Blockchain warehouse. On my way now!',
+      text: 'Hi! I picked up your motorcycle parts from the MotoTrack warehouse. On my way now!',
       time: '10:15 AM',
     },
     {
@@ -275,7 +275,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   // Dynamic route waypoints
   const routeWaypoints = useMemo(() => {
     return [
-      { x: 14, y: 82, label: 'D,Blockchain Hub (East Poblacion, Naga City)' },
+      { x: 14, y: 82, label: 'MotoTrack Hub (East Poblacion, Naga City)' },
       { x: 28, y: 70, label: 'Naga Boardwalk & Baywalk Coastal Highway' },
       { x: 42, y: 54, label: 'Cebu South Road & Toledo Junction' },
       { x: 56, y: 45, label: `${destCity} Access Road` },
@@ -948,7 +948,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                           <BootstrapIcon name="building" size={13} color="#FFFFFF" />
                         </View>
                         <View style={styles.originMarkerBadgeRealistic}>
-                          <Text style={styles.originMarkerBadgeText}>D,Blockchain Hub (Poblacion, Naga)</Text>
+                          <Text style={styles.originMarkerBadgeText}>MotoTrack Hub (Poblacion, Naga)</Text>
                         </View>
                       </View>
 
@@ -1105,7 +1105,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                   <View style={styles.storeAvatarCircle}>
                     <BootstrapIcon name="shield-check" size={14} color="#0C6258" />
                   </View>
-                  <Text style={styles.storeNameText}>D,Blockchain Motorparts and Accessories</Text>
+                  <Text style={styles.storeNameText}>MotoTrack Motorparts and Accessories</Text>
                 </View>
 
                 <TouchableOpacity
@@ -1126,12 +1126,12 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                 : [
                     {
                       product_id: 'p-default',
-                      name: activeOrder?.items_summary || 'D,Blockchain Motorcycle Part',
+                      name: activeOrder?.items_summary || 'MotoTrack Motorcycle Part',
                       price: activeOrder?.total_amount || 68500,
                       quantity: activeOrder?.items_count || 1,
                       image:
                         'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=600&q=80',
-                      brand: 'D,Blockchain',
+                      brand: 'MotoTrack',
                       category: 'High Performance Spec',
                     },
                   ]
@@ -1961,7 +1961,7 @@ const styles = StyleSheet.create({
     left: '22%',
     right: 0,
     height: 16,
-    backgroundColor: '#FED7AA',
+    backgroundColor: '#D1ECE6',
     borderTopWidth: 1.5,
     borderBottomWidth: 1.5,
     borderColor: '#F59E0B',

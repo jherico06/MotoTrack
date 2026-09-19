@@ -73,6 +73,21 @@ export default function ShopPage({ onNavigateToScreen }) {
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
   const [isGcashModalOpen, setIsGcashModalOpen] = useState(false);
   const [pendingGcashOrderData, setPendingGcashOrderData] = useState(null);
+  const [buyNowItems, setBuyNowItems] = useState(null); // null = use cart; array = buy-now checkout
+
+  const isBuyNowCheckout = Array.isArray(buyNowItems) && buyNowItems.length > 0;
+  const checkoutItems = isBuyNowCheckout ? buyNowItems : cart;
+  const checkoutSubtotal = useMemo(
+    () => checkoutItems.reduce((sum, item) => sum + Number(item.product?.price || 0) * Number(item.quantity || 0), 0),
+    [checkoutItems]
+  );
+  const checkoutShipping = isBuyNowCheckout ? 150 : shippingFee;
+  const checkoutDiscount = isBuyNowCheckout ? 0 : discountAmount;
+  const checkoutTotal = Math.max(0, checkoutSubtotal - checkoutDiscount) + Number(checkoutShipping || 0);
+  const checkoutItemCount = useMemo(
+    () => checkoutItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+    [checkoutItems]
+  );
 
   // Load products from DB or fallback
   const refreshProducts = useCallback(async () => {
@@ -151,6 +166,25 @@ export default function ShopPage({ onNavigateToScreen }) {
     addToCart(product, qty);
   };
 
+  // Buy Now — skip cart, go straight to checkout (login required)
+  const handleBuyNowAttempt = (product, qty = 1) => {
+    if (!currentUser) {
+      setRedirectReason('Please sign in or create an account to buy this item.');
+      onNavigateToScreen?.('login');
+      return;
+    }
+    const stock = Number(product?.stock);
+    if (Number.isFinite(stock) && stock <= 0) {
+      showToast(`"${product.name?.slice(0, 20) || 'Item'}..." is out of stock`);
+      return;
+    }
+    const quantity = Math.min(Math.max(1, qty), Number.isFinite(stock) ? stock : qty);
+    setBuyNowItems([{ product, quantity }]);
+    setIsCartOpen(false);
+    setIsSpecsOpen(false);
+    setIsCheckoutOpen(true);
+  };
+
   // Checkout attempt with auth check
   const handleProceedToCheckout = () => {
     if (!currentUser) {
@@ -159,6 +193,7 @@ export default function ShopPage({ onNavigateToScreen }) {
       onNavigateToScreen?.('login');
       return;
     }
+    setBuyNowItems(null);
     setIsCartOpen(false);
     setIsCheckoutOpen(true);
   };
@@ -175,7 +210,19 @@ export default function ShopPage({ onNavigateToScreen }) {
       return;
     }
 
-    // 2. Otherwise handle standard COD
+    // 2. Card / PayPal — prepaid path (demo confirmation, no COD approval)
+    const prepaid =
+      paymentMethod === 'Credit / Debit Card' ||
+      paymentMethod === 'PayPal' ||
+      (paymentMethod || '').toLowerCase().includes('card') ||
+      (paymentMethod || '').toLowerCase().includes('paypal');
+
+    if (prepaid) {
+      await executeCreateOrder(orderFormData, 'Processing');
+      return;
+    }
+
+    // 3. Otherwise handle standard COD
     await executeCreateOrder(orderFormData);
   };
 
@@ -218,12 +265,12 @@ export default function ShopPage({ onNavigateToScreen }) {
         gcashNumber,
         gcashReference,
         codChangeFor,
-        promoId: appliedPromoId || null,
-        total: cartSubtotal.toFixed(2),
-        discountAmount: discountAmount.toFixed(2),
-        shippingFee: Number(shippingFee || 0),
-        grandTotal: cartTotal.toFixed(2),
-        items: cart,
+        promoId: isBuyNowCheckout ? null : appliedPromoId || null,
+        total: checkoutSubtotal.toFixed(2),
+        discountAmount: checkoutDiscount.toFixed(2),
+        shippingFee: Number(checkoutShipping || 0),
+        grandTotal: checkoutTotal.toFixed(2),
+        items: checkoutItems,
         channel: 'Online Store',
         overrideStatus,
       });
@@ -234,7 +281,11 @@ export default function ShopPage({ onNavigateToScreen }) {
       }
 
       const placedOrder = res.order;
-      clearCart();
+      if (isBuyNowCheckout) {
+        setBuyNowItems(null);
+      } else {
+        clearCart();
+      }
       setIsCheckoutOpen(false);
       setIsGcashModalOpen(false);
       setSelectedOrderForTracking(placedOrder);
@@ -244,7 +295,11 @@ export default function ShopPage({ onNavigateToScreen }) {
           ? '📦 Order saved offline — will sync when connection is back.'
           : isCOD
             ? '🎉 COD Order placed! Awaiting Store Admin verification.'
-            : '🎉 GCash Payment Confirmed! Live order tracking active.'
+            : paymentMethod === 'PayPal'
+              ? '🎉 PayPal payment confirmed! Live order tracking active.'
+              : paymentMethod === 'Credit / Debit Card' || (paymentMethod || '').toLowerCase().includes('card')
+                ? '🎉 Card payment confirmed! Live order tracking active.'
+                : '🎉 GCash Payment Confirmed! Live order tracking active.'
       );
       return res;
     } catch (e) {
@@ -352,6 +407,7 @@ export default function ShopPage({ onNavigateToScreen }) {
                   setIsSpecsOpen(true);
                 }}
                 onAddToCart={handleAddToCartAttempt}
+                onBuyNow={handleBuyNowAttempt}
               />
             ))}
           </View>
@@ -377,12 +433,19 @@ export default function ShopPage({ onNavigateToScreen }) {
             }
           } else if (tab === 'Wishlist' || tab === 'Favorites') {
             onNavigateToScreen?.('wishlist');
-          } else if (tab === 'Profile' || tab === 'Dashboard') {
+          } else if (tab === 'Dashboard') {
+            if (!currentUser) {
+              setRedirectReason?.('Please sign in to access your Customer Dashboard.');
+              onNavigateToScreen?.('login');
+            } else {
+              onNavigateToScreen?.('profile', { tab: 'overview' });
+            }
+          } else if (tab === 'Profile') {
             if (!currentUser) {
               setRedirectReason?.('Please sign in to access your Customer Profile.');
               onNavigateToScreen?.('login');
             } else {
-              onNavigateToScreen?.('profile');
+              onNavigateToScreen?.('profile', { tab: 'profile' });
             }
           } else if (tab === 'Customize') {
             onNavigateToScreen?.('customizer');
@@ -408,6 +471,7 @@ export default function ShopPage({ onNavigateToScreen }) {
         product={selectedProduct}
         onClose={() => setIsSpecsOpen(false)}
         onAddToCart={handleAddToCartAttempt}
+        onBuyNow={handleBuyNowAttempt}
         onCustomizeWithPart={(prod) => onNavigateToScreen?.('customizer', { product: prod })}
       />
 
@@ -419,11 +483,19 @@ export default function ShopPage({ onNavigateToScreen }) {
 
       <CheckoutModal
         visible={isCheckoutOpen}
-        onClose={() => !isPlacingOrder && setIsCheckoutOpen(false)}
+        onClose={() => {
+          if (isPlacingOrder) return;
+          setIsCheckoutOpen(false);
+          setBuyNowItems(null);
+        }}
         onCompleteOrder={handleCompleteOrder}
         isPlacingOrder={isPlacingOrder}
+        overrideItemCount={isBuyNowCheckout ? checkoutItemCount : null}
+        overrideTotal={isBuyNowCheckout ? checkoutTotal : null}
+        overrideItems={isBuyNowCheckout ? checkoutItems : null}
         onOpenProfile={() => {
           setIsCheckoutOpen(false);
+          setBuyNowItems(null);
           setIsProfileOpen(true);
         }}
       />

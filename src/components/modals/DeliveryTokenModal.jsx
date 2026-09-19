@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
   slipKicker: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#0F766E',
+    color: '#084A43',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     marginBottom: 4,
@@ -326,7 +326,7 @@ const styles = StyleSheet.create({
   slipName: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
   slipLine: { fontSize: 13, fontWeight: '700', color: '#334155', marginTop: 2 },
   slipAddr: { fontSize: 13, color: '#475569', lineHeight: 18, marginTop: 4 },
-  slipItems: { fontSize: 12, color: '#0F766E', marginTop: 8, lineHeight: 17 },
+  slipItems: { fontSize: 12, color: '#084A43', marginTop: 8, lineHeight: 17 },
   slipPay: { fontSize: 12, fontWeight: '700', color: '#92400E', marginTop: 8 },
   meta: { fontSize: 12, color: '#047857', fontWeight: '700', textAlign: 'center', marginBottom: 8 },
   link: {

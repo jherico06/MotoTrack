@@ -76,10 +76,10 @@ export function getThemeTokens(isDark = false) {
       modalBg: '#111827',
       modalOverlay: 'rgba(0, 0, 0, 0.75)',
       cardShadow: colors.black,
-      accent: colors.accent,
-      accentBrand: colors.accent,
-      accentBg: 'rgba(16, 185, 129, 0.12)',
-      accentBorder: 'rgba(16, 185, 129, 0.25)',
+      accent: colors.brand,
+      accentBrand: colors.brand,
+      accentBg: 'rgba(12, 98, 88, 0.15)',
+      accentBorder: 'rgba(12, 98, 88, 0.3)',
       tableHeaderBg: '#162032',
       tableRowBg: 'transparent',
       tableRowBorder: 'rgba(255, 255, 255, 0.05)',
@@ -124,7 +124,7 @@ export function getThemeTokens(isDark = false) {
     accentBrand: colors.brand,
     accentBg: colors.brandLight,
     accentBorder: colors.brandMuted,
-    tableHeaderBg: colors.bgMainAlt,
+    tableHeaderBg: '#F0F4FA',
     tableRowBg: colors.surface,
     tableRowBorder: colors.bgSubtle,
     tableRowHighlight: colors.warningSoft,
@@ -144,5 +144,16 @@ export function getThemeTokens(isDark = false) {
     statusInfoText: colors.infoAlt,
   };
 }
+
+export const fonts = {
+  sans: 'Manrope',
+  regular: 'Manrope',
+  extraLight: 'Manrope-ExtraLight',
+  light: 'Manrope-Light',
+  medium: 'Manrope-Medium',
+  semiBold: 'Manrope-SemiBold',
+  bold: 'Manrope-Bold',
+  extraBold: 'Manrope-ExtraBold',
+};
 
 export default colors;

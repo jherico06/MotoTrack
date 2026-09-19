@@ -110,6 +110,7 @@ const ICON_MAP = {
   // Admin & Dashboard Navigation Tabs
   'graph-up': { type: 'mci', name: 'chart-line' },
   'graph-up-arrow': { type: 'mci', name: 'chart-line' },
+  'clipboard-data': { type: 'mci', name: 'clipboard-text-outline' },
   'bar-chart-fill': { type: 'ion', name: 'bar-chart' },
   'pie-chart-fill': { type: 'ion', name: 'pie-chart' },
   'ticket-perforated': { type: 'mci', name: 'ticket-percent-outline' },
@@ -279,6 +280,7 @@ const ICON_MAP = {
   'calendar-event': { type: 'ion', name: 'calendar-outline' },
   'calendar-event-fill': { type: 'ion', name: 'calendar' },
   calendar3: { type: 'ion', name: 'calendar-outline' },
+  'calendar-range': { type: 'ion', name: 'calendar-outline' },
   'calendar-x': { type: 'ion', name: 'calendar-clear-outline' },
   'calendar-x-fill': { type: 'ion', name: 'calendar-clear' },
   clock: { type: 'ion', name: 'time-outline' },

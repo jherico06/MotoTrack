@@ -1,4 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
+import { ANDROID_TOP_INSET } from '../utils/safeArea';
 
 export const garageStyles = StyleSheet.create({
   container: {
@@ -8,6 +9,7 @@ export const garageStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+    paddingTop: ANDROID_TOP_INSET,
   },
   scrollContent: {
     paddingTop: 20,
@@ -906,7 +908,7 @@ export const garageStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#E7F5F3',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
@@ -1245,7 +1247,7 @@ export const garageStyles = StyleSheet.create({
   singleHubTitle: {
     fontSize: 14.5,
     fontWeight: '900',
-    color: '#042F2E',
+    color: '#18181B',
     marginBottom: 3,
   },
   singleHubAddress: {

@@ -1,4 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
+import { ANDROID_TOP_INSET } from '../utils/safeArea';
 
 export const loginPageStyles = StyleSheet.create({
   container: {
@@ -14,7 +15,7 @@ export const loginPageStyles = StyleSheet.create({
   // ─── TOP DECORATIVE ART & HERO ───
   topHeroSection: {
     backgroundColor: '#0C6258',
-    paddingTop: Platform.OS === 'ios' ? 44 : 32,
+    paddingTop: Platform.OS === 'ios' ? 44 : Math.max(32, ANDROID_TOP_INSET + 8),
     paddingHorizontal: 28,
     paddingBottom: 20,
     position: 'relative',

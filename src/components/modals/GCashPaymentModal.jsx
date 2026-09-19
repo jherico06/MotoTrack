@@ -269,7 +269,7 @@ export default function GCashPaymentModal({
                 </TouchableOpacity>
 
                 <TouchableOpacity style={gStyles.cancelBtn} onPress={onClose}>
-                  <Text style={gStyles.cancelBtnText}>Cancel and return to D,Blockchain</Text>
+                  <Text style={gStyles.cancelBtnText}>Cancel and return to MotoTrack</Text>
                 </TouchableOpacity>
               </View>
             )}
