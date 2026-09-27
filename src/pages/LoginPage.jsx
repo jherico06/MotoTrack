@@ -92,47 +92,46 @@ export default function LoginPage({
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
-      <SafeAreaView style={{ flex: 0, backgroundColor: '#0C6258' }} />
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.innerContainer}>
-          {/* Top Navigation Row (Back / Guest) */}
-          <View style={styles.topNavRow}>
-            <TouchableOpacity style={styles.navBackBtn} onPress={onNavigateToStore} activeOpacity={0.7}>
-              <BootstrapIcon name="chevron-left" size={16} color="#FFFFFF" />
-              <Text style={styles.navBackText}>Shop</Text>
-            </TouchableOpacity>
+        <ScrollView
+          style={{ flex: 1, backgroundColor: '#1D4533' }}
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.innerContainer}>
+            {/* Top Navigation Row (Back / Guest) */}
+            <View style={styles.topNavRow}>
+              <TouchableOpacity style={styles.navBackBtn} onPress={onNavigateToStore} activeOpacity={0.7}>
+                <BootstrapIcon name="chevron-left" size={16} color="#FFFFFF" />
+                <Text style={styles.navBackText}>Shop</Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity style={styles.navBackBtn} onPress={onNavigateToStore} activeOpacity={0.7}>
-              <Text style={styles.navBackText}>Guest ➔</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* ─── 1. TOP TEAL HEADER SECTION WITH PLANT ART ─── */}
-          <View style={styles.topHeroSection}>
-            <View style={styles.abstractOrganicShape}>
-              <View style={styles.abstractOrganicShapeInner} />
+              <TouchableOpacity style={styles.navBackBtn} onPress={onNavigateToStore} activeOpacity={0.7}>
+                <Text style={styles.navBackText}>Guest ➔</Text>
+              </TouchableOpacity>
             </View>
 
+            {/* ─── 1. TOP TEAL HEADER SECTION WITH PLANT ART ─── */}
+            <View style={styles.topHeroSection}>
+              <View style={styles.abstractOrganicShape}>
+                <View style={styles.abstractOrganicShapeInner} />
+              </View>
 
-            <Text style={styles.heroTitle}>Hello!</Text>
-            <Text style={styles.heroSubtitle}>Welcome to MotoTrack Motorparts and Accessories</Text>
-          </View>
+              <Text style={styles.heroTitle}>Hello!</Text>
+              <Text style={styles.heroSubtitle}>Welcome to MotoTrack Motorparts and Accessories</Text>
+            </View>
 
-          {/* ─── 2. WHITE CARD CONTAINER SHEET ─── */}
-          <View style={styles.whiteCardSheet}>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ flexGrow: 1 }}
-              keyboardShouldPersistTaps="handled"
-            >
+            {/* ─── 2. WHITE CARD CONTAINER SHEET ─── */}
+            <View style={styles.whiteCardSheet}>
               <Text style={styles.cardTitle}>Login</Text>
 
               {/* Redirect Notice */}
               {redirectReason ? (
                 <View style={styles.errorBanner}>
-                  <BootstrapIcon name="info-circle" size={14} color="#0C6258" />
-                  <Text style={[styles.errorBannerText, { color: '#0C6258' }]}>{redirectReason}</Text>
+                  <BootstrapIcon name="info-circle" size={14} color="#1D4533" />
+                  <Text style={[styles.errorBannerText, { color: '#1D4533' }]}>{redirectReason}</Text>
                 </View>
               ) : null}
 
@@ -237,7 +236,7 @@ export default function LoginPage({
                   borderRadius: 25,
                   height: 48,
                   paddingHorizontal: 16,
-                  shadowColor: '#0C6258',
+                  shadowColor: '#1D4533',
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.06,
                   shadowRadius: 6,
@@ -278,7 +277,7 @@ export default function LoginPage({
 
                   <TouchableOpacity
                     style={{
-                      backgroundColor: '#0C6258',
+                      backgroundColor: '#1D4533',
                       borderRadius: 10,
                       paddingVertical: 9,
                       paddingHorizontal: 12,
@@ -297,7 +296,7 @@ export default function LoginPage({
                     <Text style={{ fontSize: 10.5, color: '#64748B', marginBottom: 2 }}>
                       Your Supabase Redirect URI:
                     </Text>
-                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#0C6258' }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#1D4533' }}>
                       https://vtbdmurblidtdghaotne.supabase.co/auth/v1/callback
                     </Text>
                   </View>
@@ -311,9 +310,9 @@ export default function LoginPage({
                   <Text style={styles.footerSwitchLink}>Sign Up with OTP</Text>
                 </TouchableOpacity>
               </View>
-            </ScrollView>
+            </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
       <SafeAreaView style={{ flex: 0, backgroundColor: '#FFFFFF' }} />
     </View>

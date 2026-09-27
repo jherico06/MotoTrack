@@ -13,13 +13,13 @@ export const shopStyles = StyleSheet.create({
     paddingTop: ANDROID_TOP_INSET,
   },
   scrollContent: {
-    paddingBottom: 100,
+    paddingBottom: 115,
   },
   maxContainer: {
     width: '100%',
     maxWidth: 1320,
     alignSelf: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: Platform.OS === 'web' ? 20 : 14,
   },
 
   // ─── TOAST NOTIFICATION ───
@@ -50,7 +50,7 @@ export const shopStyles = StyleSheet.create({
   // ─── MOBILE TOP HEADER ───
   headerWrapper: {
     backgroundColor: '#F8FAFC',
-    paddingTop: Platform.OS === 'web' ? 14 : Platform.OS === 'android' ? 10 : 6,
+    paddingTop: Platform.OS === 'web' ? 14 : 4,
     paddingBottom: 8,
   },
   headerRow: {
@@ -201,9 +201,9 @@ export const shopStyles = StyleSheet.create({
     elevation: 1,
   },
   categoryPillActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
-    shadowColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
+    shadowColor: '#1D4533',
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 4,
@@ -226,7 +226,7 @@ export const shopStyles = StyleSheet.create({
     marginBottom: 24,
   },
   heroBannerCard: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 16,
     padding: 20,
     flexDirection: 'row',
@@ -235,7 +235,7 @@ export const shopStyles = StyleSheet.create({
     minHeight: 150,
     position: 'relative',
     overflow: 'hidden',
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 10,
@@ -271,7 +271,7 @@ export const shopStyles = StyleSheet.create({
   },
   heroBannerSub: {
     fontSize: 12.5,
-    color: '#D1ECE6',
+    color: '#C8DDD3',
     marginTop: 6,
     marginBottom: 14,
     fontWeight: '400',
@@ -287,7 +287,7 @@ export const shopStyles = StyleSheet.create({
     gap: 6,
   },
   heroShopBtnText: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '700',
     fontSize: 12.5,
   },
@@ -318,7 +318,7 @@ export const shopStyles = StyleSheet.create({
     width: 16,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   dotInactive: {
     width: 5,
@@ -356,9 +356,9 @@ export const shopStyles = StyleSheet.create({
     marginBottom: 6,
   },
   squircleBoxActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
-    shadowColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
+    shadowColor: '#1D4533',
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
@@ -373,7 +373,7 @@ export const shopStyles = StyleSheet.create({
     textAlign: 'center',
   },
   squircleLabelActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
 
@@ -406,7 +406,7 @@ export const shopStyles = StyleSheet.create({
     color: '#475569',
   },
   filterChipTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '700',
   },
 
@@ -522,7 +522,7 @@ export const shopStyles = StyleSheet.create({
     fontWeight: '600',
     color: '#0F172A',
     lineHeight: 16,
-    height: 32,
+    minHeight: 34,
     marginBottom: 3,
   },
   priceRow: {
@@ -533,7 +533,7 @@ export const shopStyles = StyleSheet.create({
   priceMainText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   priceOldText: {
     fontSize: 10.5,
@@ -556,6 +556,11 @@ export const shopStyles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '600',
     color: '#0F172A',
+  },
+  unratedMinimalText: {
+    fontSize: 10,
+    color: '#94A3B8',
+    fontWeight: '500',
   },
   reviewCountText: {
     fontSize: 10,
@@ -621,7 +626,7 @@ export const shopStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   addToCartBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 8,
     paddingVertical: 7.5,
     flexDirection: 'row',
@@ -650,7 +655,7 @@ export const shopStyles = StyleSheet.create({
   },
   buyNowBtn: {
     flex: 1,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 8,
     paddingVertical: 7.5,
     flexDirection: 'row',
@@ -658,7 +663,7 @@ export const shopStyles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
     borderWidth: 1.5,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
   },
   buyNowBtnText: {
     fontSize: 11,
@@ -674,7 +679,7 @@ export const shopStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
   },
 
   // ─── 10. FLOATING BOTTOM CART BAR (MOBILE) ───
@@ -687,7 +692,7 @@ export const shopStyles = StyleSheet.create({
     zIndex: 900,
   },
   floatingCartBar: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 28,
     height: 52,
     width: '92%',
@@ -696,7 +701,7 @@ export const shopStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 18,
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
@@ -719,7 +724,7 @@ export const shopStyles = StyleSheet.create({
     paddingVertical: 2,
   },
   floatingCartQtyText: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontSize: 11.5,
     fontWeight: '900',
   },
@@ -760,7 +765,7 @@ export const shopStyles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     marginBottom: 3,
   },
   bottomNavActiveDotHidden: {
@@ -780,7 +785,7 @@ export const shopStyles = StyleSheet.create({
     marginTop: 2,
   },
   bottomNavLabelActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
 
@@ -806,10 +811,10 @@ export const shopStyles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#D1ECE6',
+    borderColor: '#C8DDD3',
   },
   footerBadgeText: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -898,7 +903,7 @@ export const shopStyles = StyleSheet.create({
   cartItemPrice: {
     fontSize: 13.5,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   cartQtyControls: {
     flexDirection: 'row',
@@ -961,16 +966,16 @@ export const shopStyles = StyleSheet.create({
   cartTotalValue: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   checkoutBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 18,
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 14,
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1009,7 +1014,7 @@ export const shopStyles = StyleSheet.create({
     borderRadius: 8,
   },
   specBrandText: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1022,7 +1027,7 @@ export const shopStyles = StyleSheet.create({
   specPriceMain: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   specPriceOld: {
     fontSize: 15,
@@ -1080,7 +1085,7 @@ export const shopStyles = StyleSheet.create({
   },
   paymentOptionCardActive: {
     backgroundColor: '#F3F7F6',
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
   },
   paymentOptionCardHeader: {
     flexDirection: 'row',
@@ -1098,8 +1103,8 @@ export const shopStyles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   paymentRadioDotActive: {
-    borderColor: '#0C6258',
-    backgroundColor: '#0C6258',
+    borderColor: '#1D4533',
+    backgroundColor: '#1D4533',
   },
   paymentRadioInner: {
     width: 6,
@@ -1121,7 +1126,7 @@ export const shopStyles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#D1ECE6',
+    borderTopColor: '#C8DDD3',
   },
 
   // ─── ORDER CONFIRMATION MODAL ───
@@ -1130,7 +1135,7 @@ export const shopStyles = StyleSheet.create({
     borderRadius: 20,
     padding: 18,
     borderWidth: 1,
-    borderColor: '#D1ECE6',
+    borderColor: '#C8DDD3',
     marginBottom: 14,
   },
   trackOnMapBtn: {

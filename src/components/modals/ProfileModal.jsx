@@ -282,7 +282,7 @@ export default function ProfileModal({
   const getLogIconConfig = (action) => {
     const act = (action || '').toUpperCase();
     if (act.includes('PASSWORD')) {
-      return { icon: 'key-fill', color: '#0C6258', bg: '#F3F7F6', label: 'Password Security' };
+      return { icon: 'key-fill', color: '#1D4533', bg: '#F3F7F6', label: 'Password Security' };
     }
     if (act.includes('EMAIL')) {
       return { icon: 'envelope-fill', color: '#0284C7', bg: '#E0F2FE', label: 'Email Security' };
@@ -291,7 +291,7 @@ export default function ProfileModal({
       return { icon: 'shield-lock-fill', color: '#16A34A', bg: '#DCFCE7', label: 'Sign In Event' };
     }
     if (act.includes('PROFILE')) {
-      return { icon: 'person-fill', color: '#0C6258', bg: '#F3F7F6', label: 'Profile Update' };
+      return { icon: 'person-fill', color: '#1D4533', bg: '#F3F7F6', label: 'Profile Update' };
     }
     return { icon: 'star-fill', color: '#7C3AED', bg: '#EDE9FE', label: 'Account Event' };
   };
@@ -303,7 +303,7 @@ export default function ProfileModal({
           {/* ─── HEADER ─── */}
           <View style={styles.modalHeaderRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <BootstrapIcon name="gear-wide-connected" size={18} color="#0C6258" />
+              <BootstrapIcon name="gear-wide-connected" size={18} color="#1D4533" />
               <Text style={styles.modalTitle}>User Account & Settings</Text>
             </View>
             <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
@@ -336,7 +336,7 @@ export default function ProfileModal({
                   alignSelf: 'flex-start',
                   backgroundColor: currentUser.role === 'admin' ? '#F3F7F6' : '#F1F5F9',
                   borderWidth: currentUser.role === 'admin' ? 1 : 0,
-                  borderColor: '#D1ECE6',
+                  borderColor: '#C8DDD3',
                   paddingHorizontal: 8,
                   paddingVertical: 2,
                   borderRadius: 8,
@@ -349,13 +349,13 @@ export default function ProfileModal({
                 <BootstrapIcon
                   name={currentUser.role === 'admin' ? 'shield-lock-fill' : 'person-fill'}
                   size={10}
-                  color={currentUser.role === 'admin' ? '#0C6258' : '#475569'}
+                  color={currentUser.role === 'admin' ? '#1D4533' : '#475569'}
                 />
                 <Text
                   style={{
                     fontSize: 10.5,
                     fontWeight: '800',
-                    color: currentUser.role === 'admin' ? '#0C6258' : '#475569',
+                    color: currentUser.role === 'admin' ? '#1D4533' : '#475569',
                   }}
                 >
                   {currentUser.role === 'admin' ? 'Store Administrator' : 'Customer Account'}
@@ -374,7 +374,7 @@ export default function ProfileModal({
               <BootstrapIcon
                 name="geo-alt-fill"
                 size={12}
-                color={activeTab === 'settings' ? '#0C6258' : '#64748B'}
+                color={activeTab === 'settings' ? '#1D4533' : '#64748B'}
               />
               <Text
                 style={[customStyles.tabBtnText, activeTab === 'settings' && customStyles.tabBtnTextActive]}
@@ -391,7 +391,7 @@ export default function ProfileModal({
               <BootstrapIcon
                 name="shield-lock-fill"
                 size={12}
-                color={activeTab === 'security' ? '#0C6258' : '#64748B'}
+                color={activeTab === 'security' ? '#1D4533' : '#64748B'}
               />
               <Text
                 style={[customStyles.tabBtnText, activeTab === 'security' && customStyles.tabBtnTextActive]}
@@ -408,7 +408,7 @@ export default function ProfileModal({
               <BootstrapIcon
                 name="clock-history"
                 size={12}
-                color={activeTab === 'logs' ? '#0C6258' : '#64748B'}
+                color={activeTab === 'logs' ? '#1D4533' : '#64748B'}
               />
               <Text style={[customStyles.tabBtnText, activeTab === 'logs' && customStyles.tabBtnTextActive]}>
                 Logs
@@ -423,7 +423,7 @@ export default function ProfileModal({
               <BootstrapIcon
                 name="grid-fill"
                 size={12}
-                color={activeTab === 'overview' ? '#0C6258' : '#64748B'}
+                color={activeTab === 'overview' ? '#1D4533' : '#64748B'}
               />
               <Text
                 style={[customStyles.tabBtnText, activeTab === 'overview' && customStyles.tabBtnTextActive]}
@@ -438,7 +438,7 @@ export default function ProfileModal({
             {activeTab === 'settings' && (
               <View style={{ gap: 12, paddingBottom: 10 }}>
                 <View style={customStyles.infoBanner}>
-                  <BootstrapIcon name="info-circle" size={14} color="#0C6258" />
+                  <BootstrapIcon name="info-circle" size={14} color="#1D4533" />
                   <Text style={customStyles.infoBannerText}>
                     Your saved address and phone number are automatically used for checkout and live GPS
                     courier delivery tracking.
@@ -476,7 +476,7 @@ export default function ProfileModal({
                     style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                   >
                     <Text style={styles.formLabel}>Primary Delivery Address *</Text>
-                    <Text style={{ fontSize: 11, color: '#0C6258', fontWeight: '700' }}>GPS Sync Active</Text>
+                    <Text style={{ fontSize: 11, color: '#1D4533', fontWeight: '700' }}>GPS Sync Active</Text>
                   </View>
                   <TextInput
                     style={[styles.formInput, { minHeight: 65, textAlignVertical: 'top' }]}
@@ -513,7 +513,7 @@ export default function ProfileModal({
                         <BootstrapIcon
                           name="geo-alt-fill"
                           size={11}
-                          color={address.includes(p.label) ? '#FFFFFF' : '#0C6258'}
+                          color={address.includes(p.label) ? '#FFFFFF' : '#1D4533'}
                         />
                         <Text
                           style={[
@@ -541,7 +541,7 @@ export default function ProfileModal({
                   style={[
                     styles.checkoutBtn,
                     {
-                      backgroundColor: '#0C6258',
+                      backgroundColor: '#1D4533',
                       marginTop: 6,
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -657,7 +657,7 @@ export default function ProfileModal({
                 <View style={customStyles.securityCard}>
                   <View style={customStyles.securityCardHeader}>
                     <View style={[customStyles.cardIconWrap, { backgroundColor: '#F3F7F6' }]}>
-                      <BootstrapIcon name="key-fill" size={15} color="#0C6258" />
+                      <BootstrapIcon name="key-fill" size={15} color="#1D4533" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={customStyles.cardTitle}>Change Password</Text>
@@ -832,7 +832,7 @@ export default function ProfileModal({
                   ) : null}
 
                   <TouchableOpacity
-                    style={[customStyles.securityActionBtn, { backgroundColor: '#0C6258' }]}
+                    style={[customStyles.securityActionBtn, { backgroundColor: '#1D4533' }]}
                     onPress={handleChangePassword}
                     disabled={isChangingPassword}
                     activeOpacity={0.85}
@@ -869,7 +869,7 @@ export default function ProfileModal({
                     disabled={isLoadingLogs}
                     activeOpacity={0.7}
                   >
-                    <BootstrapIcon name="arrow-clockwise" size={13} color="#0C6258" />
+                    <BootstrapIcon name="arrow-clockwise" size={13} color="#1D4533" />
                   </TouchableOpacity>
                 </View>
 
@@ -902,7 +902,7 @@ export default function ProfileModal({
                 {/* Log List */}
                 {isLoadingLogs ? (
                   <View style={{ padding: 24, alignItems: 'center' }}>
-                    <ActivityIndicator size="small" color="#0C6258" />
+                    <ActivityIndicator size="small" color="#1D4533" />
                     <Text style={{ fontSize: 12, color: '#64748B', marginTop: 8 }}>
                       Loading security audit logs...
                     </Text>
@@ -962,7 +962,7 @@ export default function ProfileModal({
                 {/* Current Saved Address Preview Card */}
                 <View style={customStyles.addressPreviewCard}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <BootstrapIcon name="geo-alt-fill" size={14} color="#0C6258" />
+                    <BootstrapIcon name="geo-alt-fill" size={14} color="#1D4533" />
                     <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>
                       Current Saved Address
                     </Text>
@@ -982,7 +982,7 @@ export default function ProfileModal({
                     {
                       backgroundColor: '#F3F7F6',
                       borderWidth: 1,
-                      borderColor: '#D1ECE6',
+                      borderColor: '#C8DDD3',
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -995,8 +995,8 @@ export default function ProfileModal({
                   }}
                   activeOpacity={0.85}
                 >
-                  <BootstrapIcon name="box-seam-fill" size={15} color="#0C6258" />
-                  <Text style={{ color: '#0C6258', fontWeight: '800', fontSize: 13.5 }}>
+                  <BootstrapIcon name="box-seam-fill" size={15} color="#1D4533" />
+                  <Text style={{ color: '#1D4533', fontWeight: '800', fontSize: 13.5 }}>
                     View My Orders & Live Tracking
                   </Text>
                 </TouchableOpacity>
@@ -1033,7 +1033,7 @@ export default function ProfileModal({
                     style={[
                       styles.checkoutBtn,
                       {
-                        backgroundColor: '#0C6258',
+                        backgroundColor: '#1D4533',
                         flexDirection: 'row',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -1127,7 +1127,7 @@ const customStyles = StyleSheet.create({
     color: '#64748B',
   },
   tabBtnTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '900',
   },
   infoBanner: {
@@ -1138,12 +1138,12 @@ const customStyles = StyleSheet.create({
     padding: 10,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#D1ECE6',
+    borderColor: '#C8DDD3',
   },
   infoBannerText: {
     flex: 1,
     fontSize: 11.5,
-    color: '#0C6258',
+    color: '#1D4533',
     lineHeight: 16,
     fontWeight: '600',
   },
@@ -1162,7 +1162,7 @@ const customStyles = StyleSheet.create({
   },
   presetChipActive: {
     backgroundColor: '#F3F7F6',
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
   },
   presetChipText: {
     fontSize: 10.5,
@@ -1170,7 +1170,7 @@ const customStyles = StyleSheet.create({
     color: '#475569',
   },
   presetChipTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '900',
   },
   successBanner: {
@@ -1317,7 +1317,7 @@ const customStyles = StyleSheet.create({
     borderRadius: 14,
     backgroundColor: '#F3F7F6',
     borderWidth: 1,
-    borderColor: '#D1ECE6',
+    borderColor: '#C8DDD3',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1328,7 +1328,7 @@ const customStyles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
   },
   filterPillActive: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   filterPillText: {
     fontSize: 11,

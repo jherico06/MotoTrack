@@ -51,7 +51,7 @@ export default function ExpectedDeliveryEditor({
         activeOpacity={0.85}
       >
         {busy ? (
-          <ActivityIndicator color="#0C6258" />
+          <ActivityIndicator color="#1D4533" />
         ) : (
           <Text style={styles.saveBtnText}>Save expected date</Text>
         )}
@@ -72,5 +72,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
-  saveBtnText: { color: '#0C6258', fontWeight: '800', fontSize: 12 },
+  saveBtnText: { color: '#1D4533', fontWeight: '800', fontSize: 12 },
 });

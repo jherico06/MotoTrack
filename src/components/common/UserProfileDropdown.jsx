@@ -79,7 +79,7 @@ export default function UserProfileDropdown({
               <BootstrapIcon
                 name="shield-lock-fill"
                 size={11}
-                color="#0C6258"
+                color="#1D4533"
               />
               <Text style={[styles.roleBadgeText, styles.roleBadgeTextAdmin]}>
                 Store Administrator
@@ -117,8 +117,8 @@ export default function UserProfileDropdown({
           }}
           activeOpacity={0.7}
         >
-          <View style={[styles.menuIconBox, { backgroundColor: '#E7F5F3' }]}>
-            <BootstrapIcon name="speedometer2" size={15} color="#0C6258" />
+          <View style={[styles.menuIconBox, { backgroundColor: '#E8F0EC' }]}>
+            <BootstrapIcon name="speedometer2" size={15} color="#1D4533" />
           </View>
           <View style={styles.menuTextWrap}>
             <Text style={styles.menuTitle}>My Dashboard</Text>
@@ -143,7 +143,7 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
         >
           <View style={[styles.menuIconBox, { backgroundColor: '#F0FDF4' }]}>
-            <BootstrapIcon name="receipt" size={15} color="#0C6258" />
+            <BootstrapIcon name="receipt" size={15} color="#1D4533" />
           </View>
           <View style={styles.menuTextWrap}>
             <Text style={styles.menuTitle}>My Orders</Text>
@@ -200,19 +200,19 @@ export default function UserProfileDropdown({
             }}
             activeOpacity={0.7}
           >
-            <View style={[styles.menuIconBox, { backgroundColor: '#D1ECE6' }]}>
-              <BootstrapIcon name="shield-lock-fill" size={15} color="#0C6258" />
+            <View style={[styles.menuIconBox, { backgroundColor: '#C8DDD3' }]}>
+              <BootstrapIcon name="shield-lock-fill" size={15} color="#1D4533" />
             </View>
             <View style={styles.menuTextWrap}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Text style={[styles.menuTitle, { color: '#0C6258' }]}>Admin Dashboard</Text>
+                <Text style={[styles.menuTitle, { color: '#1D4533' }]}>Admin Dashboard</Text>
                 <View style={styles.adminChip}>
                   <Text style={styles.adminChipText}>CONSOLE</Text>
                 </View>
               </View>
               <Text style={styles.menuSub}>Orders, inventory & garage slots</Text>
             </View>
-            <BootstrapIcon name="chevron-right" size={12} color="#0C6258" />
+            <BootstrapIcon name="chevron-right" size={12} color="#1D4533" />
           </TouchableOpacity>
         )}
       </View>
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 23,
     borderWidth: 2,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#F1F5F9',
   },
   userInfo: {
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   roleBadgeAdmin: {
     backgroundColor: '#F3F7F6',
     borderWidth: 1,
-    borderColor: '#D1ECE6',
+    borderColor: '#C8DDD3',
   },
   roleBadgeText: {
     fontSize: 10,
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   roleBadgeTextAdmin: {
-    color: '#0C6258',
+    color: '#1D4533',
   },
   divider: {
     height: 1,
@@ -433,7 +433,7 @@ const styles = StyleSheet.create({
   menuItemAdmin: {
     backgroundColor: '#F3F7F6',
     borderWidth: 1,
-    borderColor: '#D1ECE6',
+    borderColor: '#C8DDD3',
   },
   menuIconBox: {
     width: 32,
@@ -456,7 +456,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   adminChip: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 6,
     paddingVertical: 1,
     borderRadius: 4,

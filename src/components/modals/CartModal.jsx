@@ -11,16 +11,24 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
     updateCartQuantity,
     removeFromCart,
     cartItemCount,
-    cartSubtotal,
+    selectedLineKeys,
+    selectedCartItems,
+    selectedCartItemCount,
+    selectedCartSubtotal,
+    selectedDiscountAmount,
+    selectedShippingFee,
+    selectedCartTotal,
+    isAllSelected,
+    isItemSelected,
+    toggleSelectItem,
+    toggleSelectAll,
     discountPercent,
-    discountAmount,
-    shippingFee,
     isFreeShipping,
-    cartTotal,
     promoCode,
     setPromoCode,
     applyPromo,
     promoFeedback,
+    showToast,
   } = useCart();
 
   const [availablePromos, setAvailablePromos] = useState([]);
@@ -34,13 +42,23 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
     }
   }, [visible]);
 
+  const hasSelectedItems = selectedCartItems.length > 0;
+
+  const handleCheckoutPress = () => {
+    if (!hasSelectedItems) {
+      showToast?.('Please select at least one item to proceed to checkout');
+      return;
+    }
+    onProceedToCheckout?.(selectedCartItems);
+  };
+
   return (
     <Modal visible={visible} transparent animationType="slide">
       <View style={styles.modalOverlay}>
         <View style={styles.modalSheet}>
           <View style={styles.modalHeaderRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <BootstrapIcon name="cart-fill" size={16} color="#0C6258" />
+              <BootstrapIcon name="cart-fill" size={16} color="#1D4533" />
               <Text style={styles.modalTitle}>Your Cart ({cartItemCount} items)</Text>
             </View>
             <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
@@ -57,43 +75,142 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
               </Text>
             </View>
           ) : (
-            <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
-              {cart.map(({ product, quantity }, cIdx) => (
-                <View
-                  key={product.id ? `cart-${product.id}` : `cart-item-${cIdx}`}
-                  style={styles.cartItemRow}
+            <>
+              {/* ─── SELECT ALL ROW ─── */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 10,
+                  paddingHorizontal: 4,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#F1F5F9',
+                  marginBottom: 6,
+                }}
+              >
+                <TouchableOpacity
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                  onPress={toggleSelectAll}
+                  activeOpacity={0.7}
                 >
-                  <Image source={{ uri: product.image }} style={styles.cartItemThumb} />
-                  <View style={styles.cartItemInfo}>
-                    <Text style={styles.cartItemTitle} numberOfLines={1}>
-                      {product.name}
+                  <View
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 6,
+                      borderWidth: 1.8,
+                      borderColor: isAllSelected ? '#1D4533' : '#CBD5E1',
+                      backgroundColor: isAllSelected ? '#1D4533' : '#FFFFFF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    {isAllSelected && <BootstrapIcon name="check" size={15} color="#FFFFFF" />}
+                  </View>
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>
+                    Select All ({cart.length})
+                  </Text>
+                </TouchableOpacity>
+
+                {hasSelectedItems ? (
+                  <View
+                    style={{
+                      backgroundColor: '#E8F0EC',
+                      paddingHorizontal: 8,
+                      paddingVertical: 3,
+                      borderRadius: 12,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#1D4533' }}>
+                      {selectedCartItems.length} selected ({selectedCartItemCount} {selectedCartItemCount === 1 ? 'unit' : 'units'})
                     </Text>
-                    <Text style={styles.cartItemBrand}>{product.brand}</Text>
-                    <Text style={styles.cartItemPrice}>₱{(product.price * quantity).toFixed(2)}</Text>
                   </View>
+                ) : (
+                  <Text style={{ fontSize: 12, color: '#94A3B8', fontWeight: '500' }}>
+                    0 selected
+                  </Text>
+                )}
+              </View>
 
-                  <View style={styles.cartQtyControls}>
-                    <TouchableOpacity
-                      style={styles.cartQtyBtn}
-                      onPress={() => updateCartQuantity(product.id, -1)}
+              <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+                {cart.map(({ product, quantity, size }, cIdx) => {
+                  const lineSize = size || product.selectedSize || '';
+                  const isChecked = isItemSelected(product.id, lineSize);
+                  return (
+                    <View
+                      key={product.id ? `cart-${product.id}-${lineSize || cIdx}` : `cart-item-${cIdx}`}
+                      style={[
+                        styles.cartItemRow,
+                        !isChecked && { opacity: 0.72 },
+                      ]}
                     >
-                      <Text style={styles.cartQtyBtnText}>-</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.cartQtyNumber}>{quantity}</Text>
-                    <TouchableOpacity
-                      style={styles.cartQtyBtn}
-                      onPress={() => updateCartQuantity(product.id, 1)}
-                    >
-                      <Text style={styles.cartQtyBtnText}>+</Text>
-                    </TouchableOpacity>
-                  </View>
+                      {/* Selection Checkbox */}
+                      <TouchableOpacity
+                        style={{
+                          paddingRight: 2,
+                          paddingVertical: 6,
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                        }}
+                        onPress={() => toggleSelectItem(product.id, lineSize)}
+                        activeOpacity={0.7}
+                      >
+                        <View
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: 6,
+                            borderWidth: 1.8,
+                            borderColor: isChecked ? '#1D4533' : '#CBD5E1',
+                            backgroundColor: isChecked ? '#1D4533' : '#FFFFFF',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {isChecked && <BootstrapIcon name="check" size={15} color="#FFFFFF" />}
+                        </View>
+                      </TouchableOpacity>
 
-                  <TouchableOpacity onPress={() => removeFromCart(product.id)} style={{ padding: 6 }}>
-                    <BootstrapIcon name="trash3-fill" size={14} color="#EF4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
+                      <Image source={{ uri: product.image }} style={styles.cartItemThumb} />
+                      <View style={styles.cartItemInfo}>
+                        <Text style={styles.cartItemTitle} numberOfLines={1}>
+                          {product.name}
+                        </Text>
+                        <Text style={styles.cartItemBrand}>
+                          {product.brand}
+                          {lineSize ? ` · Size ${lineSize}` : ''}
+                        </Text>
+                        <Text style={styles.cartItemPrice}>₱{(product.price * quantity).toFixed(2)}</Text>
+                      </View>
+
+                      <View style={styles.cartQtyControls}>
+                        <TouchableOpacity
+                          style={styles.cartQtyBtn}
+                          onPress={() => updateCartQuantity(product.id, -1, lineSize)}
+                        >
+                          <Text style={styles.cartQtyBtnText}>-</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.cartQtyNumber}>{quantity}</Text>
+                        <TouchableOpacity
+                          style={styles.cartQtyBtn}
+                          onPress={() => updateCartQuantity(product.id, 1, lineSize)}
+                        >
+                          <Text style={styles.cartQtyBtnText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      <TouchableOpacity
+                        onPress={() => removeFromCart(product.id, lineSize)}
+                        style={{ padding: 6 }}
+                      >
+                        <BootstrapIcon name="trash3-fill" size={14} color="#EF4444" />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </>
           )}
 
           {cart.length > 0 && (
@@ -119,8 +236,8 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                             flexDirection: 'row',
                             alignItems: 'center',
                             gap: 5,
-                            backgroundColor: isSelected ? '#0C6258' : '#F1F5F9',
-                            borderColor: isSelected ? '#0C6258' : '#CBD5E1',
+                            backgroundColor: isSelected ? '#1D4533' : '#F1F5F9',
+                            borderColor: isSelected ? '#1D4533' : '#CBD5E1',
                             borderWidth: 1,
                             borderRadius: 12,
                             paddingHorizontal: 9,
@@ -131,7 +248,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                           <BootstrapIcon
                             name={isSelected ? 'check-circle-fill' : 'ticket-perforated-fill'}
                             size={11}
-                            color={isSelected ? '#FFFFFF' : '#0C6258'}
+                            color={isSelected ? '#FFFFFF' : '#1D4533'}
                           />
                           <Text
                             style={{
@@ -182,7 +299,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
 
               <View style={styles.cartSummaryRow}>
                 <Text style={styles.cartSummaryLabel}>Subtotal</Text>
-                <Text style={styles.cartSummaryValue}>₱{cartSubtotal.toFixed(2)}</Text>
+                <Text style={styles.cartSummaryValue}>₱{selectedCartSubtotal.toFixed(2)}</Text>
               </View>
 
               {discountPercent > 0 && (
@@ -191,7 +308,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                     Discount ({discountPercent}%)
                   </Text>
                   <Text style={[styles.cartSummaryValue, { color: '#16A34A' }]}>
-                    -₱{discountAmount.toFixed(2)}
+                    -₱{selectedDiscountAmount.toFixed(2)}
                   </Text>
                 </View>
               )}
@@ -199,24 +316,29 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
               <View style={styles.cartSummaryRow}>
                 <Text style={styles.cartSummaryLabel}>Shipping</Text>
                 <Text style={styles.cartSummaryValue}>
-                  {isFreeShipping ? 'Free' : `₱${shippingFee.toFixed(2)}`}
+                  {selectedCartItems.length === 0 ? '₱0.00' : (isFreeShipping ? 'Free' : `₱${selectedShippingFee.toFixed(2)}`)}
                 </Text>
               </View>
 
               <View style={styles.cartSummaryRow}>
                 <Text style={styles.cartTotalLabel}>Total</Text>
-                <Text style={styles.cartTotalValue}>₱{cartTotal.toFixed(2)}</Text>
+                <Text style={styles.cartTotalValue}>₱{selectedCartTotal.toFixed(2)}</Text>
               </View>
 
               <TouchableOpacity
                 style={[
                   styles.checkoutBtn,
                   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+                  !hasSelectedItems && { opacity: 0.5, backgroundColor: '#94A3B8' },
                 ]}
-                onPress={onProceedToCheckout}
+                onPress={handleCheckoutPress}
                 activeOpacity={0.9}
               >
-                <Text style={styles.checkoutBtnText}>Proceed to Checkout</Text>
+                <Text style={styles.checkoutBtnText}>
+                  {hasSelectedItems
+                    ? `Proceed to Checkout (${selectedCartItemCount})`
+                    : 'Select Items to Checkout'}
+                </Text>
                 <BootstrapIcon name="arrow-right" size={14} color="#ffffff" />
               </TouchableOpacity>
             </View>

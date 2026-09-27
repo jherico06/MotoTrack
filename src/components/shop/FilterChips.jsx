@@ -12,7 +12,7 @@ import BootstrapIcon from '../common/BootstrapIcon';
 import { CATEGORY_PILLS } from '../../data/motorParts';
 
 const RATING_OPTIONS = [
-  { id: 'all', label: 'All Ratings', desc: 'Show all catalog items', icon: 'grid-fill', color: '#0C6258', bgColor: '#ECFDF5', borderColor: '#A7F3D0' },
+  { id: 'all', label: 'All Ratings', desc: 'Show all catalog items', icon: 'grid-fill', color: '#1D4533', bgColor: '#ECFDF5', borderColor: '#A7F3D0' },
   { id: '5', label: '5.0 Stars Only', desc: 'Highest rated rider gear', icon: 'star-fill', color: '#B45309', bgColor: '#FEF3C7', borderColor: '#FDE68A' },
   { id: '4.5', label: '4.5 Stars & Above', desc: 'Top tier customer reviews', icon: 'star-half', color: '#B45309', bgColor: '#FEF3C7', borderColor: '#FDE68A' },
   { id: '4', label: '4.0 Stars & Above', desc: 'Popular community selections', icon: 'star-half', color: '#B45309', bgColor: '#FEF3C7', borderColor: '#FDE68A' },
@@ -20,7 +20,7 @@ const RATING_OPTIONS = [
 ];
 
 const PRICE_OPTIONS = [
-  { id: 'all', label: 'All Prices', desc: 'Products of any price tier', icon: 'grid-fill', color: '#0C6258', bgColor: '#ECFDF5', borderColor: '#A7F3D0' },
+  { id: 'all', label: 'All Prices', desc: 'Products of any price tier', icon: 'grid-fill', color: '#1D4533', bgColor: '#ECFDF5', borderColor: '#A7F3D0' },
   { id: 'price-low', label: 'Price: Low to High', desc: 'Most affordable items first', icon: 'sort-numeric-down', color: '#0284C7', bgColor: '#E0F2FE', borderColor: '#BAE6FD' },
   { id: 'price-high', label: 'Price: High to Low', desc: 'Premium performance items first', icon: 'sort-numeric-up-alt', color: '#0284C7', bgColor: '#E0F2FE', borderColor: '#BAE6FD' },
   { id: 'under-1000', label: 'Under ₱1,000', desc: 'Affordable maintenance, oils & parts', icon: 'cash', color: '#16A34A', bgColor: '#DCFCE7', borderColor: '#BBF7D0' },
@@ -122,11 +122,16 @@ export default function FilterChips({
 
   return (
     <>
-      {/* ─── FILTER CHIPS ROW (PERFECTLY ALIGNED SINGLE ROW) ─── */}
-      <View style={styles.filterChipsRow}>
+      {/* ─── FILTER CHIPS ROW (HORIZONTAL SCROLLABLE FOR MAXIMUM MOBILE RESPONSIVENESS) ─── */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.filterChipsScroll}
+        style={styles.filterChipsScrollView}
+      >
         {/* 1. Category Dropdown Button */}
         <TouchableOpacity
-          style={[styles.chipBtn, styles.categoryChip, isCategoryActive && styles.chipBtnActive]}
+          style={[styles.chipBtn, isCategoryActive && styles.chipBtnActive]}
           onPress={() => setIsCategoryModalOpen(true)}
           activeOpacity={0.8}
           accessibilityRole="button"
@@ -135,12 +140,11 @@ export default function FilterChips({
           <BootstrapIcon
             name={activeCategoryObj.biIcon || 'grid-fill'}
             size={11.5}
-            color={isCategoryActive ? '#FFFFFF' : '#0C6258'}
+            color={isCategoryActive ? '#FFFFFF' : '#1D4533'}
           />
           <Text
             style={[styles.chipBtnText, isCategoryActive && styles.chipBtnTextActive]}
             numberOfLines={1}
-            ellipsizeMode="tail"
           >
             {isCategoryActive ? `${activeCategoryObj.name} ⌵` : 'Category ⌵'}
           </Text>
@@ -148,7 +152,7 @@ export default function FilterChips({
 
         {/* 2. Rating Dropdown Button */}
         <TouchableOpacity
-          style={[styles.chipBtn, styles.ratingChip, isRatingActive && styles.chipBtnActive]}
+          style={[styles.chipBtn, isRatingActive && styles.chipBtnActive]}
           onPress={() => setIsRatingModalOpen(true)}
           activeOpacity={0.8}
           accessibilityRole="button"
@@ -157,7 +161,6 @@ export default function FilterChips({
           <Text
             style={[styles.chipBtnText, isRatingActive && styles.chipBtnTextActive]}
             numberOfLines={1}
-            ellipsizeMode="tail"
           >
             {ratingChipLabel}
           </Text>
@@ -165,7 +168,7 @@ export default function FilterChips({
 
         {/* 3. Price Dropdown Button */}
         <TouchableOpacity
-          style={[styles.chipBtn, styles.priceChip, isPriceActive && styles.chipBtnActive]}
+          style={[styles.chipBtn, isPriceActive && styles.chipBtnActive]}
           onPress={() => setIsPriceModalOpen(true)}
           activeOpacity={0.8}
           accessibilityRole="button"
@@ -174,7 +177,6 @@ export default function FilterChips({
           <Text
             style={[styles.chipBtnText, isPriceActive && styles.chipBtnTextActive]}
             numberOfLines={1}
-            ellipsizeMode="tail"
           >
             {priceChipLabel}
           </Text>
@@ -188,6 +190,11 @@ export default function FilterChips({
           accessibilityRole="button"
           accessibilityLabel="Reset filters dropdown"
         >
+          <BootstrapIcon
+            name="arrow-counterclockwise"
+            size={11}
+            color={isAnyFilterActive ? '#1D4533' : '#64748B'}
+          />
           <Text
             style={[styles.chipBtnText, isAnyFilterActive && styles.resetChipTextActive]}
             numberOfLines={1}
@@ -195,7 +202,7 @@ export default function FilterChips({
             Reset ⌵
           </Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       {/* ─── 1. CATEGORY SELECTION BOTTOM SHEET MODAL ─── */}
       <Modal
@@ -211,7 +218,7 @@ export default function FilterChips({
                 <View style={chipModalStyles.sheetHeader}>
                   <View style={chipModalStyles.headerLeft}>
                     <View style={chipModalStyles.headerIconWrap}>
-                      <BootstrapIcon name="grid-fill" size={16} color="#0C6258" />
+                      <BootstrapIcon name="grid-fill" size={16} color="#1D4533" />
                     </View>
                     <View>
                       <Text style={chipModalStyles.sheetTitle}>Select Category</Text>
@@ -265,7 +272,7 @@ export default function FilterChips({
                           <BootstrapIcon
                             name={item.biIcon || 'grid-fill'}
                             size={14}
-                            color={isSelected ? '#FFFFFF' : '#0C6258'}
+                            color={isSelected ? '#FFFFFF' : '#1D4533'}
                           />
                         </View>
                         <View style={chipModalStyles.itemTextWrap}>
@@ -299,7 +306,7 @@ export default function FilterChips({
                           <BootstrapIcon
                             name="check-circle-fill"
                             size={16}
-                            color="#0C6258"
+                            color="#1D4533"
                             style={{ marginLeft: 6 }}
                           />
                         )}
@@ -318,7 +325,7 @@ export default function FilterChips({
                       }}
                       activeOpacity={0.8}
                     >
-                      <BootstrapIcon name="arrow-counterclockwise" size={13} color="#0C6258" />
+                      <BootstrapIcon name="arrow-counterclockwise" size={13} color="#1D4533" />
                       <Text style={chipModalStyles.resetFooterBtnText}>Reset to All</Text>
                     </TouchableOpacity>
                   )}
@@ -392,7 +399,7 @@ export default function FilterChips({
                           style={[
                             chipModalStyles.itemIconWrap,
                             { backgroundColor: opt.bgColor, borderColor: opt.borderColor },
-                            isSelected && { backgroundColor: '#0C6258', borderColor: '#0C6258' },
+                            isSelected && { backgroundColor: '#1D4533', borderColor: '#1D4533' },
                           ]}
                         >
                           <BootstrapIcon
@@ -416,7 +423,7 @@ export default function FilterChips({
                           <BootstrapIcon
                             name="check-circle-fill"
                             size={16}
-                            color="#0C6258"
+                            color="#1D4533"
                             style={{ marginLeft: 6 }}
                           />
                         )}
@@ -435,7 +442,7 @@ export default function FilterChips({
                       }}
                       activeOpacity={0.8}
                     >
-                      <BootstrapIcon name="arrow-counterclockwise" size={13} color="#0C6258" />
+                      <BootstrapIcon name="arrow-counterclockwise" size={13} color="#1D4533" />
                       <Text style={chipModalStyles.resetFooterBtnText}>Reset Rating</Text>
                     </TouchableOpacity>
                   )}
@@ -509,7 +516,7 @@ export default function FilterChips({
                           style={[
                             chipModalStyles.itemIconWrap,
                             { backgroundColor: opt.bgColor, borderColor: opt.borderColor },
-                            isSelected && { backgroundColor: '#0C6258', borderColor: '#0C6258' },
+                            isSelected && { backgroundColor: '#1D4533', borderColor: '#1D4533' },
                           ]}
                         >
                           <BootstrapIcon
@@ -533,7 +540,7 @@ export default function FilterChips({
                           <BootstrapIcon
                             name="check-circle-fill"
                             size={16}
-                            color="#0C6258"
+                            color="#1D4533"
                             style={{ marginLeft: 6 }}
                           />
                         )}
@@ -552,7 +559,7 @@ export default function FilterChips({
                       }}
                       activeOpacity={0.8}
                     >
-                      <BootstrapIcon name="arrow-counterclockwise" size={13} color="#0C6258" />
+                      <BootstrapIcon name="arrow-counterclockwise" size={13} color="#1D4533" />
                       <Text style={chipModalStyles.resetFooterBtnText}>Reset Price</Text>
                     </TouchableOpacity>
                   )}
@@ -584,7 +591,7 @@ export default function FilterChips({
                 <View style={chipModalStyles.sheetHeader}>
                   <View style={chipModalStyles.headerLeft}>
                     <View style={[chipModalStyles.headerIconWrap, { backgroundColor: '#F0FDFA' }]}>
-                      <BootstrapIcon name="arrow-counterclockwise" size={16} color="#0C6258" />
+                      <BootstrapIcon name="arrow-counterclockwise" size={16} color="#1D4533" />
                     </View>
                     <View>
                       <Text style={chipModalStyles.sheetTitle}>Reset Filters</Text>
@@ -614,11 +621,11 @@ export default function FilterChips({
                     }}
                     activeOpacity={0.8}
                   >
-                    <View style={[chipModalStyles.itemIconWrap, { backgroundColor: '#0C6258' }]}>
+                    <View style={[chipModalStyles.itemIconWrap, { backgroundColor: '#1D4533' }]}>
                       <BootstrapIcon name="arrow-counterclockwise" size={14} color="#FFFFFF" />
                     </View>
                     <View style={chipModalStyles.itemTextWrap}>
-                      <Text style={[chipModalStyles.itemTitle, { color: '#0C6258', fontWeight: '800' }]}>
+                      <Text style={[chipModalStyles.itemTitle, { color: '#1D4533', fontWeight: '800' }]}>
                         Reset All Filters
                       </Text>
                       <Text style={chipModalStyles.itemSubtitle}>
@@ -713,41 +720,36 @@ export default function FilterChips({
 }
 
 const styles = StyleSheet.create({
-  filterChipsRow: {
+  filterChipsScrollView: {
+    marginVertical: 8,
+  },
+  filterChipsScroll: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginVertical: 10,
-    gap: 6,
+    gap: 8,
+    paddingVertical: 2,
+    paddingHorizontal: 2,
   },
   chipBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 35,
+    height: 36,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-  },
-  categoryChip: {
-    flex: 1.15,
-    gap: 4,
-  },
-  ratingChip: {
-    flex: 0.95,
-  },
-  priceChip: {
-    flex: 0.95,
-  },
-  resetChip: {
-    flex: 0.85,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    gap: 5,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   chipBtnActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
   },
   chipBtnText: {
     fontSize: 11.5,
@@ -760,11 +762,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   resetChipActive: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#F0FDFA',
   },
   resetChipTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '700',
   },
 });
@@ -807,7 +809,7 @@ const chipModalStyles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#E7F5F3',
+    backgroundColor: '#E8F0EC',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -851,7 +853,7 @@ const chipModalStyles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#E7F5F3',
+    backgroundColor: '#E8F0EC',
     borderWidth: 1,
     borderColor: '#CCFBF1',
     alignItems: 'center',
@@ -859,8 +861,8 @@ const chipModalStyles = StyleSheet.create({
     marginRight: 10,
   },
   itemIconWrapSelected: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
   },
   itemTextWrap: {
     flex: 1,
@@ -871,7 +873,7 @@ const chipModalStyles = StyleSheet.create({
     color: '#1E293B',
   },
   itemTitleSelected: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
   itemSubtitle: {
@@ -919,13 +921,13 @@ const chipModalStyles = StyleSheet.create({
   resetFooterBtnText: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   doneFooterBtn: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
   },

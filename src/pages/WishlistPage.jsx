@@ -8,7 +8,6 @@ import {
   Image,
   Modal,
   SafeAreaView,
-  Platform,
   useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -20,6 +19,7 @@ import { useWishlist } from '../context/WishlistContext';
 import { useCart } from '../context/CartContext';
 import { productService } from '../services/productService';
 import { MOTOR_PARTS, CATEGORY_NAMES } from '../data/motorParts';
+import { getRatedScore, productHasCustomerRatings, sanitizeCompareAtPrice } from '../utils/productCatalog';
 
 const CATEGORIES = CATEGORY_NAMES;
 
@@ -35,24 +35,34 @@ export default function WishlistPage({
   onNavigateToProfile,
   onNavigateToAdmin,
   onAddToCart,
-  onOpenCart,
-  cartItemCount: propCartItemCount,
-  cartTotal: propCartTotal,
+  onOpenCart: _onOpenCart,
+  cartItemCount: _cartItemCount,
+  cartTotal: _cartTotal,
   showToast: propShowToast,
+  onNavigateToProductDetails,
+  onNavigateToScreen,
 }) {
   const auth = useAuth();
   const wishlistCtx = useWishlist();
   const cartCtx = useCart();
 
   const currentUser = propCurrentUser !== undefined ? propCurrentUser : auth?.currentUser;
-  const cartItemCount = propCartItemCount !== undefined ? propCartItemCount : cartCtx?.cartItemCount || 0;
-  const cartTotal = propCartTotal !== undefined ? propCartTotal : cartCtx?.cartTotal || 0;
   const showToast = propShowToast || cartCtx?.showToast || (() => {});
   const { width: windowWidth } = useWindowDimensions();
-  const isDesktop = windowWidth >= 1024;
-  const isTablet = windowWidth >= 700 && windowWidth < 1024;
 
-  const [wishlistIds, setWishlistIds] = useState([]);
+  const userId = currentUser?.id || 'guest';
+  const [prevUserId, setPrevUserId] = useState(userId);
+  const [wishlistIds, setWishlistIds] = useState(() => {
+    const ids = wishlistService.getWishlistIds(userId);
+    return Array.isArray(ids) ? ids : [];
+  });
+
+  if (prevUserId !== userId) {
+    setPrevUserId(userId);
+    const ids = wishlistService.getWishlistIds(userId);
+    setWishlistIds(Array.isArray(ids) ? ids : []);
+  }
+
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('default'); // 'default' | 'price-low' | 'price-high' | 'rating'
@@ -67,12 +77,26 @@ export default function WishlistPage({
       onNavigateToStore?.();
     } else if (tab === 'Wishlist' || tab === 'Favorites') {
       setSelectedCategory('All');
+    } else if (tab === 'More') {
+      if (!currentUser) {
+        onNavigateToLogin?.();
+      } else {
+        onNavigateToProfile?.('menu');
+      }
     } else if (tab === 'Dashboard') {
       if (!currentUser) {
         onNavigateToLogin?.();
       } else {
         onNavigateToProfile?.('overview');
       }
+    } else if (tab === 'Bookings') {
+      if (!currentUser) {
+        onNavigateToLogin?.();
+      } else {
+        onNavigateToProfile?.('bookings');
+      }
+    } else if (tab === 'Notifications') {
+      onNavigateToProfile?.('notifications');
     } else if (tab === 'Profile') {
       if (!currentUser) {
         onNavigateToLogin?.();
@@ -98,14 +122,7 @@ export default function WishlistPage({
     Array.isArray(productsList) && productsList.length > 0 ? productsList : MOTOR_PARTS
   );
 
-  // Load wishlist IDs on mount or when user changes
-  const loadWishlist = () => {
-    const ids = wishlistService.getWishlistIds(currentUser?.id || 'guest');
-    setWishlistIds(Array.isArray(ids) ? ids : []);
-  };
-
   useEffect(() => {
-    loadWishlist();
     productService.getProducts().then((data) => {
       if (Array.isArray(data)) setCatalogProducts(data);
     });
@@ -113,7 +130,7 @@ export default function WishlistPage({
       if (Array.isArray(data)) setCatalogProducts(data);
     });
     return () => unsubscribe();
-  }, [currentUser]);
+  }, []);
 
   // Wishlisted product objects from catalog
   const wishlistedProducts = useMemo(() => {
@@ -142,7 +159,7 @@ export default function WishlistPage({
     } else if (sortBy === 'price-high') {
       list = [...list].sort((a, b) => b.price - a.price);
     } else if (sortBy === 'rating') {
-      list = [...list].sort((a, b) => (b.rating || 5) - (a.rating || 5));
+      list = [...list].sort((a, b) => getRatedScore(b) - getRatedScore(a));
     }
 
     return list;
@@ -197,17 +214,24 @@ export default function WishlistPage({
     showToast('Favorites cleared');
   };
 
-  // Determine grid column layout
+  // Determine grid column layout with responsive 2-column mobile support
   const getGridItemStyle = () => {
     if (windowWidth >= 1200) return styles.gridItemCol4;
     if (windowWidth >= 880) return styles.gridItemCol3;
-    if (windowWidth >= 600) return styles.gridItemCol2;
-    return styles.gridItemCol1;
+    const isMobile = windowWidth < 700;
+    const hPad = windowWidth < 380 ? 12 : 16;
+    const cardGap = isMobile ? 10 : 16;
+    if (isMobile) {
+      return {
+        width: Math.floor((windowWidth - hPad * 2 - cardGap) / 2),
+      };
+    }
+    return styles.gridItemCol2;
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
 
       {/* ─── TOP NAVBAR (CROSS-PLATFORM) ─── */}
       <View style={styles.navbarWrapper}>
@@ -370,13 +394,27 @@ export default function WishlistPage({
               </TouchableOpacity>
             </View>
           ) : (
-            <View style={styles.grid}>
+            <View style={[styles.grid, windowWidth < 700 && { gap: 10 }]}>
               {displayedProducts.map((product) => {
                 const isOutOfStock = Number(product.stock || 0) <= 0;
+                const compareAt = sanitizeCompareAtPrice(product.oldPrice, product.price);
                 return (
                   <View key={product.id} style={[styles.productCard, getGridItemStyle()]}>
                     {/* Image & Badges */}
-                    <View style={styles.imageWrap}>
+                    <TouchableOpacity
+                      style={styles.imageWrap}
+                      activeOpacity={0.9}
+                      onPress={() => {
+                        if (onNavigateToProductDetails) {
+                          onNavigateToProductDetails(product);
+                        } else if (onNavigateToScreen) {
+                          onNavigateToScreen('product-details', { product });
+                        } else {
+                          setSelectedProductForSpecs(product);
+                          setIsSpecsModalOpen(true);
+                        }
+                      }}
+                    >
                       <Image source={{ uri: product.image }} style={styles.productImage} />
                       {product.discount ? (
                         <View style={styles.discountBadge}>
@@ -390,13 +428,16 @@ export default function WishlistPage({
 
                       <TouchableOpacity
                         style={styles.removeIconBtn}
-                        onPress={() => handleRemove(product.id, product.name)}
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          handleRemove(product.id, product.name);
+                        }}
                         activeOpacity={0.8}
                         title="Remove from favorites"
                       >
                         <BootstrapIcon name="heart-fill" size={16} color="#EF4444" />
                       </TouchableOpacity>
-                    </View>
+                    </TouchableOpacity>
 
                     {/* Card Body */}
                     <View style={styles.cardBody}>
@@ -405,14 +446,37 @@ export default function WishlistPage({
                         <Text style={styles.categoryText}>{product.category}</Text>
                       </View>
 
-                      <Text style={styles.productName} numberOfLines={2}>
-                        {product.name}
-                      </Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (onNavigateToProductDetails) {
+                            onNavigateToProductDetails(product);
+                          } else if (onNavigateToScreen) {
+                            onNavigateToScreen('product-details', { product });
+                          } else {
+                            setSelectedProductForSpecs(product);
+                            setIsSpecsModalOpen(true);
+                          }
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.productName} numberOfLines={2}>
+                          {product.name}
+                        </Text>
+                      </TouchableOpacity>
 
                       <View style={styles.ratingRow}>
-                        <BootstrapIcon name="star-fill" size={12} color="#F59E0B" />
-                        <Text style={styles.ratingText}>{(product.rating || 5.0).toFixed(1)}</Text>
-                        <Text style={styles.reviewCountText}>({product.reviews || 0} reviews)</Text>
+                        {productHasCustomerRatings(product) ? (
+                          <>
+                            <BootstrapIcon name="star-fill" size={12} color="#F59E0B" />
+                            <Text style={styles.ratingText}>{Number(product.rating).toFixed(1)}</Text>
+                            <Text style={styles.reviewCountText}>({product.reviews} reviews)</Text>
+                          </>
+                        ) : (
+                          <>
+                            <BootstrapIcon name="star" size={12} color="#94A3B8" />
+                            <Text style={[styles.reviewCountText, { color: '#94A3B8' }]}>No ratings yet</Text>
+                          </>
+                        )}
                       </View>
 
                       {/* Stock Indicator */}
@@ -430,9 +494,9 @@ export default function WishlistPage({
                       {/* Price Row */}
                       <View style={styles.priceRow}>
                         <Text style={styles.mainPrice}>₱{product.price.toFixed(2)}</Text>
-                        {product.oldPrice && (
-                          <Text style={styles.oldPrice}>₱{product.oldPrice.toFixed(2)}</Text>
-                        )}
+                        {compareAt ? (
+                          <Text style={styles.oldPrice}>₱{compareAt.toFixed(2)}</Text>
+                        ) : null}
                       </View>
 
                       {/* Action Buttons */}
@@ -452,8 +516,14 @@ export default function WishlistPage({
                         <TouchableOpacity
                           style={styles.quickViewBtn}
                           onPress={() => {
-                            setSelectedProductForSpecs(product);
-                            setIsSpecsModalOpen(true);
+                            if (onNavigateToProductDetails) {
+                              onNavigateToProductDetails(product);
+                            } else if (onNavigateToScreen) {
+                              onNavigateToScreen('product-details', { product });
+                            } else {
+                              setSelectedProductForSpecs(product);
+                              setIsSpecsModalOpen(true);
+                            }
                           }}
                           activeOpacity={0.8}
                           title="View specifications"
@@ -550,7 +620,7 @@ export default function WishlistPage({
                   <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A', marginBottom: 4 }}>
                     {selectedProductForSpecs.name}
                   </Text>
-                  <Text style={{ fontSize: 12.5, color: '#0C6258', fontWeight: '700', marginBottom: 10 }}>
+                  <Text style={{ fontSize: 12.5, color: '#1D4533', fontWeight: '700', marginBottom: 10 }}>
                     {selectedProductForSpecs.brand} • {selectedProductForSpecs.category}
                   </Text>
                   <Text style={{ fontSize: 20, fontWeight: '900', color: '#0F172A', marginBottom: 12 }}>
@@ -565,7 +635,7 @@ export default function WishlistPage({
                       key={idx}
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 }}
                     >
-                      <BootstrapIcon name="check2" size={13} color="#0C6258" />
+                      <BootstrapIcon name="check2" size={13} color="#1D4533" />
                       <Text style={{ fontSize: 13, color: '#334155' }}>{feat}</Text>
                     </View>
                   ))}
@@ -573,7 +643,7 @@ export default function WishlistPage({
 
                 <TouchableOpacity
                   style={{
-                    backgroundColor: '#0C6258',
+                    backgroundColor: '#1D4533',
                     paddingVertical: 12,
                     borderRadius: 14,
                     flexDirection: 'row',

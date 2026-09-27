@@ -6,7 +6,7 @@ export const shopWebStyles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
   },
   headerWrapper: {
-    backgroundColor: 'rgba(10, 15, 28, 0.85)',
+    backgroundColor: '#1D4533',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
     position: 'sticky',
@@ -14,7 +14,7 @@ export const shopWebStyles = StyleSheet.create({
     zIndex: 1000,
     boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.10)',
   },
   headerInner: {
     maxWidth: 1360,
@@ -49,7 +49,7 @@ export const shopWebStyles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   logoAccent: {
-    color: '#0C6258',
+    color: '#1D4533',
   },
   logoSubText: {
     fontSize: 11,
@@ -114,7 +114,7 @@ export const shopWebStyles = StyleSheet.create({
     borderRadius: 19,
     backgroundColor: '#0F172A',
     borderWidth: 1.5,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -238,11 +238,11 @@ export const shopWebStyles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    boxShadow: '0 4px 12px rgba(12, 98, 88, 0.25)',
+    boxShadow: '0 4px 12px rgba(29, 69, 51, 0.25)',
   },
   headerBadgeCircle: {
     position: 'absolute',
@@ -274,12 +274,12 @@ export const shopWebStyles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: '#F3F7F6',
     borderWidth: 1,
-    borderColor: '#D1ECE6',
+    borderColor: '#C8DDD3',
   },
   adminPillBtnText: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   cartSummaryBtn: {
     flexDirection: 'row',
@@ -288,7 +288,7 @@ export const shopWebStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 20,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     boxShadow: '0 4px 14px rgba(37, 99, 235, 0.3)',
   },
   cartSummaryBtnText: {
@@ -332,7 +332,9 @@ export const shopWebStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 20,
-    backgroundColor: '#1E293B',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   signInHeaderBtnText: {
     fontSize: 13,
@@ -346,7 +348,7 @@ export const shopWebStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 20,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   signUpHeaderBtnText: {
     fontSize: 13,
@@ -501,7 +503,7 @@ export const shopWebStyles = StyleSheet.create({
     boxShadow: '0 2px 8px -2px rgba(15, 23, 42, 0.06)',
   },
   categoryDropdownBtnActive: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#F3F7F6',
   },
   categoryDropdownBtnText: {
@@ -510,7 +512,7 @@ export const shopWebStyles = StyleSheet.create({
     color: '#334155',
   },
   categoryDropdownBtnTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
   },
   categoryDropdownMenu: {
     position: 'absolute',
@@ -549,7 +551,7 @@ export const shopWebStyles = StyleSheet.create({
     color: '#334155',
   },
   categoryDropdownItemTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '700',
   },
   categoryDropdownBadge: {
@@ -562,7 +564,7 @@ export const shopWebStyles = StyleSheet.create({
     borderRadius: 8,
   },
   categoryDropdownBadgeActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     backgroundColor: '#DCFCE7',
   },
   dropdownBackdrop: {
@@ -612,8 +614,8 @@ export const shopWebStyles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   catPillActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
   },
   catPillText: {
     fontSize: 13,
@@ -640,7 +642,7 @@ export const shopWebStyles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   sortBtnActive: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#F3F7F6',
   },
   sortBtnText: {
@@ -649,7 +651,7 @@ export const shopWebStyles = StyleSheet.create({
     color: '#64748B',
   },
   sortBtnTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
   },
   catalogHeaderRow: {
     marginBottom: 16,
@@ -727,7 +729,7 @@ export const shopWebStyles = StyleSheet.create({
   priceMainText: {
     fontSize: 15.5,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   tagsRow: {
     flexDirection: 'row',
@@ -790,7 +792,7 @@ export const shopWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   addToCartBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 8,
     paddingVertical: 7.5,
     flexDirection: 'row',
@@ -807,51 +809,101 @@ export const shopWebStyles = StyleSheet.create({
     color: '#FFFFFF',
   },
   desktopFooter: {
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    backgroundColor: '#E2E8F0',
     borderRadius: 24,
-    padding: 36,
-    marginTop: 20,
+    paddingTop: 48,
+    paddingBottom: 32,
+    paddingHorizontal: 48,
+    marginTop: 32,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04)',
   },
-  footerTopRow: {
+  footerColumnsRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    gap: 40,
-    flexWrap: 'wrap',
-    paddingBottom: 28,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  footerBrandBlock: {
-    flex: 1,
-    minWidth: 280,
-  },
-  footerTrustGrid: {
-    flex: 2,
-    flexDirection: 'row',
-    gap: 24,
+    gap: 36,
     flexWrap: 'wrap',
   },
-  trustItem: {
+  footerCol: {
+    minWidth: 160,
+  },
+  footerColTitle: {
+    fontSize: 12.5,
+    fontWeight: '800',
+    color: '#334155',
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginBottom: 22,
+  },
+  footerContactRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    marginBottom: 16,
+    cursor: 'pointer',
   },
-  trustTitle: {
-    fontSize: 13.5,
-    fontWeight: '800',
+  footerContactText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#0F172A',
   },
-  trustSub: {
-    fontSize: 11.5,
-    color: '#64748B',
-    marginTop: 2,
+  footerLinkItem: {
+    marginBottom: 14,
+    cursor: 'pointer',
   },
-  footerBottomBar: {
-    paddingTop: 20,
+  footerLinkText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#475569',
+  },
+  footerSocialRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 14,
+  },
+  footerSocialBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.06)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
+  },
+  footerDivider: {
+    height: 1,
+    backgroundColor: '#CBD5E1',
+    marginTop: 40,
+    marginBottom: 24,
+    width: '100%',
+  },
+  footerBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  footerCopyrightText: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  footerLegalLinksRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 28,
+  },
+  footerLegalLinkText: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '500',
+    cursor: 'pointer',
   },
 });
 

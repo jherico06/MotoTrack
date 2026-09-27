@@ -6,13 +6,13 @@ export const orderWebStyles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   headerWrapper: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#1D4533',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: 'rgba(255, 255, 255, 0.10)',
     position: 'sticky',
     top: 0,
     zIndex: 1000,
-    boxShadow: '0 4px 20px -2px rgba(15, 23, 42, 0.05)',
+    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
   },
   headerInner: {
     maxWidth: 1360,
@@ -33,7 +33,7 @@ export const orderWebStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -71,7 +71,7 @@ export const orderWebStyles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: '#F3F7F6',
     borderWidth: 1,
-    borderColor: '#D1ECE6',
+    borderColor: '#C8DDD3',
   },
   userAvatar: {
     width: 30,
@@ -87,7 +87,9 @@ export const orderWebStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 18,
-    backgroundColor: '#0F172A',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   signInBtnText: {
     fontSize: 13,
@@ -156,8 +158,8 @@ export const orderWebStyles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   tabBtnActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
   },
   tabBtnText: {
     fontSize: 13,
@@ -205,7 +207,7 @@ export const orderWebStyles = StyleSheet.create({
     boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
   },
   orderCardSelected: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#F8FAF9',
   },
   orderCardTop: {
@@ -217,7 +219,7 @@ export const orderWebStyles = StyleSheet.create({
   orderNumber: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   orderDate: {
     fontSize: 12,
@@ -233,7 +235,7 @@ export const orderWebStyles = StyleSheet.create({
     backgroundColor: '#F3F7F6',
   },
   statusTextProcessing: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontSize: 11.5,
     fontWeight: '800',
   },
@@ -273,12 +275,12 @@ export const orderWebStyles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#F3F7F6',
     borderWidth: 1,
-    borderColor: '#D1ECE6',
+    borderColor: '#C8DDD3',
   },
   trackBtnText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   invoiceDrawerCol: {
     flex: 1.2,
@@ -307,7 +309,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   invoiceSub: {
     fontSize: 12.5,
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '700',
     marginTop: 2,
   },
@@ -315,7 +317,7 @@ export const orderWebStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 14,
@@ -341,7 +343,7 @@ export const orderWebStyles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   timelineDotPending: {
     width: 10,
@@ -438,7 +440,7 @@ export const orderWebStyles = StyleSheet.create({
   grandTotalVal: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
   },
 });
 

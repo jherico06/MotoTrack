@@ -12,12 +12,22 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.moto.shop",
       "infoPlist": {
-        "NSCameraUsageDescription": "MotoTrack riders use the camera to scan order QR codes and confirm deliveries."
+        "NSCameraUsageDescription": "MotoTrack riders use the camera to scan order QR codes and take delivery proof photos.",
+        "NSPhotoLibraryUsageDescription": "MotoTrack needs photo library access so riders and staff can attach delivery proof and product images."
       }
+    },
+    "androidStatusBar": {
+      "translucent": true,
+      "backgroundColor": "#00000000"
     },
     "android": {
       "package": "com.moto.shop",
-      "permissions": ["CAMERA", "android.permission.CAMERA"],
+      "permissions": [
+        "CAMERA",
+        "android.permission.CAMERA",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -36,6 +46,14 @@
           "microphonePermission": "MotoTrack does not record audio during delivery scans.",
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "MotoTrack needs photo access to attach delivery proof and product images.",
+          "cameraPermission": "MotoTrack needs camera access to take delivery proof photos and scan delivery QR codes.",
+          "microphonePermission": false
         }
       ]
     ]

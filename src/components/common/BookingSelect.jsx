@@ -4,16 +4,18 @@ import BootstrapIcon from './BootstrapIcon';
 
 const SELECT_STYLE = {
   width: '100%',
-  backgroundColor: '#F8FAFC',
-  border: '1.5px solid #E2E8F0',
+  backgroundColor: '#FFFFFF',
+  border: '1.5px solid #94A3B8',
   borderRadius: 12,
-  padding: '10px 14px',
+  padding: '11px 14px',
   fontSize: 13,
   fontWeight: 700,
   color: '#0F172A',
   fontFamily: 'inherit',
   outline: 'none',
   cursor: 'pointer',
+  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
+  transition: 'border-color 0.15s ease',
 };
 
 export default function BookingSelect({
@@ -23,7 +25,7 @@ export default function BookingSelect({
   onChange,
   placeholder = 'Select an option',
   emptyText = 'No options available',
-  accentColor = '#0C6258',
+  accentColor = '#1D4533',
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const selected = options.find((opt) => String(opt.value) === String(value));
@@ -75,9 +77,9 @@ export default function BookingSelect({
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              backgroundColor: '#F8FAFC',
+              backgroundColor: '#FFFFFF',
               borderWidth: 1.5,
-              borderColor: isOpen ? accentColor : '#E2E8F0',
+              borderColor: isOpen ? accentColor : '#94A3B8',
               borderRadius: 12,
               paddingHorizontal: 14,
               paddingVertical: 10,
@@ -104,7 +106,7 @@ export default function BookingSelect({
                 marginTop: 6,
                 backgroundColor: '#FFFFFF',
                 borderWidth: 1.5,
-                borderColor: '#E2E8F0',
+                borderColor: '#94A3B8',
                 borderRadius: 12,
                 overflow: 'hidden',
               }}

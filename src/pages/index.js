@@ -1,4 +1,4 @@
-﻿export { default as ShopPage } from './ShopPage';
+export { default as ShopPage } from './ShopPage';
 export { default as LoginPage } from './LoginPage';
 export { default as SignUpPage } from './SignUpPage';
 export { default as OrderPage } from './OrderPage';
@@ -11,3 +11,4 @@ export { default as NotificationsPage } from './NotificationsPage';
 export { default as DeliveryConfirmPage } from './DeliveryConfirmPage';
 export { default as RiderRunPage } from './RiderRunPage';
 export { default as RiderDashboard } from './RiderDashboard';
+export { default as ProductDetailsPage } from './ProductDetailsPage';

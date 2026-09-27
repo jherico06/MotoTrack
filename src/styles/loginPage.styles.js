@@ -4,23 +4,23 @@ import { ANDROID_TOP_INSET } from '../utils/safeArea';
 export const loginPageStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   innerContainer: {
     flex: 1,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     justifyContent: 'space-between',
   },
 
   // ─── TOP DECORATIVE ART & HERO ───
   topHeroSection: {
-    backgroundColor: '#0C6258',
-    paddingTop: Platform.OS === 'ios' ? 44 : Math.max(32, ANDROID_TOP_INSET + 8),
+    backgroundColor: '#1D4533',
+    paddingTop: 8,
     paddingHorizontal: 28,
-    paddingBottom: 20,
+    paddingBottom: 22,
     position: 'relative',
-    minHeight: 180,
-    justifyContent: 'flex-end',
+    minHeight: 125,
+    justifyContent: 'center',
   },
   abstractOrganicShape: {
     position: 'absolute',
@@ -39,7 +39,7 @@ export const loginPageStyles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
 
   heroTitle: {
@@ -142,7 +142,7 @@ export const loginPageStyles = StyleSheet.create({
   cardTitle: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
     marginBottom: 20,
     letterSpacing: -0.3,
   },
@@ -163,7 +163,7 @@ export const loginPageStyles = StyleSheet.create({
     borderColor: 'transparent',
   },
   inputPillFocused: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#FFFFFF',
   },
   textInput: {
@@ -187,12 +187,12 @@ export const loginPageStyles = StyleSheet.create({
 
   // ─── PRIMARY BUTTON ───
   primaryPillBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 25,
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28,
     shadowRadius: 8,
@@ -260,7 +260,7 @@ export const loginPageStyles = StyleSheet.create({
   },
   footerSwitchLink: {
     fontSize: 13,
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
 
@@ -297,7 +297,7 @@ export const loginPageStyles = StyleSheet.create({
   },
   demoPillText: {
     fontSize: 11.5,
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '700',
   },
 
@@ -307,22 +307,20 @@ export const loginPageStyles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 12 : 8,
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    paddingTop: Platform.OS === 'ios' ? 52 : ANDROID_TOP_INSET + 12,
+    paddingBottom: 6,
     zIndex: 30,
   },
   navBackBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    padding: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
   },
   navBackText: {
-    color: 'rgba(255, 255, 255, 0.85)',
-    fontSize: 12.5,
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: 13,
     fontWeight: '700',
   },
 });

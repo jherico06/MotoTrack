@@ -345,7 +345,9 @@ export const riderService = {
 
       const { data, error } = await client
         .from('riders')
-        .select('*')
+        .select(
+          'id,name,short_name,phone,vehicle_info,plate_number,avatar,status,notes,user_id,email,username,account_status,total_earnings,created_at,updated_at'
+        )
         .order('created_at', { ascending: true });
 
       if (error) {

@@ -230,20 +230,22 @@ export function AuthProvider({ children }) {
     return res;
   };
 
-  const changeEmail = async ({ newEmail, currentPassword }) => {
+  const changeEmail = async (param1, param2) => {
     if (!currentUser) return { success: false, error: 'No active session' };
-    const userId = currentUser.id || currentUser.user_id;
-    const res = await authService.changeEmail(userId, { newEmail, currentPassword });
+    const userId = param2 ? param1 : (currentUser.id || currentUser.user_id);
+    const payload = param2 || param1;
+    const res = await authService.changeEmail(userId, payload);
     if (res.success && res.user) {
       setCurrentUser(res.user);
     }
     return res;
   };
 
-  const changePassword = async ({ currentPassword, newPassword }) => {
+  const changePassword = async (param1, param2) => {
     if (!currentUser) return { success: false, error: 'No active session' };
-    const userId = currentUser.id || currentUser.user_id;
-    return await authService.changePassword(userId, { currentPassword, newPassword });
+    const userId = param2 ? param1 : (currentUser.id || currentUser.user_id);
+    const payload = param2 || param1;
+    return await authService.changePassword(userId, payload);
   };
 
   const getAccountLogs = async () => {

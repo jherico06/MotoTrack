@@ -27,13 +27,25 @@ export default function CheckoutModal({
   overrideItems = null,
 }) {
   const { currentUser, updateProfile } = useAuth();
-  const { cart, cartItemCount, cartTotal, showToast } = useCart();
+  const {
+    cart,
+    cartItemCount,
+    cartTotal,
+    selectedCartItems,
+    selectedCartItemCount,
+    selectedCartTotal,
+    showToast,
+  } = useCart();
 
-  const displayItemCount = overrideItemCount != null ? overrideItemCount : cartItemCount;
-  const displayTotal = overrideTotal != null ? overrideTotal : cartTotal;
+  const activeCartItems = selectedCartItems && selectedCartItems.length > 0 ? selectedCartItems : cart;
+  const activeCartCount = selectedCartItems && selectedCartItems.length > 0 ? selectedCartItemCount : cartItemCount;
+  const activeCartTotal = selectedCartItems && selectedCartItems.length > 0 ? selectedCartTotal : cartTotal;
+
+  const displayItemCount = overrideItemCount != null ? overrideItemCount : activeCartCount;
+  const displayTotal = overrideTotal != null ? overrideTotal : activeCartTotal;
   const displayItems = Array.isArray(overrideItems) && overrideItems.length > 0
     ? overrideItems
-    : (Array.isArray(cart) ? cart : []);
+    : (Array.isArray(activeCartItems) ? activeCartItems : []);
 
   // Delivery Notes & Payment State
   const [deliveryNotes, setDeliveryNotes] = useState('');
@@ -128,7 +140,7 @@ export default function CheckoutModal({
             <View style={checkoutStyles.addressCardContainer}>
               <View style={checkoutStyles.addressCardHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <BootstrapIcon name="geo-alt-fill" size={15} color="#0C6258" />
+                  <BootstrapIcon name="geo-alt-fill" size={15} color="#1D4533" />
                   <Text style={checkoutStyles.addressCardTitle}>Delivery Destination</Text>
                 </View>
                 <TouchableOpacity
@@ -155,7 +167,7 @@ export default function CheckoutModal({
                   <Text style={checkoutStyles.addressFullText}>{customerAddress}</Text>
 
                   <View style={checkoutStyles.profileSyncBadge}>
-                    <BootstrapIcon name="shield-check" size={12} color="#0C6258" />
+                    <BootstrapIcon name="shield-check" size={12} color="#1D4533" />
                     <Text style={checkoutStyles.profileSyncBadgeText}>
                       Linked directly to your user profile & live GPS map
                     </Text>
@@ -203,12 +215,12 @@ export default function CheckoutModal({
               <View style={{ marginBottom: 14 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <BootstrapIcon name="box-seam-fill" size={14} color="#0C6258" />
+                    <BootstrapIcon name="box-seam-fill" size={14} color="#1D4533" />
                     <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
                       Items in this Order ({displayItemCount})
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#0C6258' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#1D4533' }}>
                     ₱{displayTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Text>
                 </View>
@@ -255,12 +267,12 @@ export default function CheckoutModal({
                               width: 52,
                               height: 52,
                               borderRadius: 8,
-                              backgroundColor: '#E7F5F3',
+                              backgroundColor: '#E8F0EC',
                               alignItems: 'center',
                               justifyContent: 'center',
                             }}
                           >
-                            <BootstrapIcon name="box-seam" size={18} color="#0C6258" />
+                            <BootstrapIcon name="box-seam" size={18} color="#1D4533" />
                           </View>
                         )}
 
@@ -269,7 +281,7 @@ export default function CheckoutModal({
                             <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0F172A', flex: 1 }} numberOfLines={1}>
                               {name}
                             </Text>
-                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#0C6258' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#1D4533' }}>
                               ₱{(itemPrice * qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </Text>
                           </View>
@@ -399,15 +411,15 @@ export default function CheckoutModal({
                         padding: 9,
                         borderRadius: 9,
                         borderWidth: 1,
-                        borderColor: '#D1ECE6',
+                        borderColor: '#C8DDD3',
                         marginBottom: 8,
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 6,
                       }}
                     >
-                      <BootstrapIcon name="shield-lock-fill" size={13} color="#0C6258" />
-                      <Text style={{ fontSize: 11, color: '#0C6258', fontWeight: '700', flex: 1 }}>
+                      <BootstrapIcon name="shield-lock-fill" size={13} color="#1D4533" />
+                      <Text style={{ fontSize: 11, color: '#1D4533', fontWeight: '700', flex: 1 }}>
                         COD orders require Store Admin verification before dispatch.
                       </Text>
                     </View>
@@ -456,7 +468,7 @@ export default function CheckoutModal({
                             borderRadius: 6,
                           }}
                         >
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#0C6258' }}>INSTANT</Text>
+                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#1D4533' }}>INSTANT</Text>
                         </View>
                       </View>
                       <Text style={styles.paymentOptionSub}>
@@ -482,7 +494,7 @@ export default function CheckoutModal({
                         padding: 12,
                         borderRadius: 12,
                         borderWidth: 1,
-                        borderColor: '#D1ECE6',
+                        borderColor: '#C8DDD3',
                         marginBottom: 10,
                       }}
                     >
@@ -497,7 +509,7 @@ export default function CheckoutModal({
                         <Text style={{ fontSize: 11, fontWeight: '800', color: '#64748B' }}>
                           OFFICIAL GCASH MERCHANT:
                         </Text>
-                        <Text style={{ fontSize: 12, fontWeight: '900', color: '#0C6258' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '900', color: '#1D4533' }}>
                           0917-582-9410
                         </Text>
                       </View>
@@ -567,7 +579,7 @@ export default function CheckoutModal({
               <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
                 Order Summary ({displayItemCount} items)
               </Text>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: '#0C6258', marginTop: 4 }}>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: '#1D4533', marginTop: 4 }}>
                 Total to Pay: ₱
                 {displayTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </Text>
@@ -631,12 +643,12 @@ const checkoutStyles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#F3F7F6',
     borderWidth: 1,
-    borderColor: '#D1ECE6',
+    borderColor: '#C8DDD3',
   },
   editProfileAddressText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   addressDisplayWrap: {
     paddingTop: 8,
@@ -670,7 +682,7 @@ const checkoutStyles = StyleSheet.create({
   },
   profileSyncBadgeText: {
     fontSize: 10.5,
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '700',
   },
   inlineAddressForm: {
@@ -694,7 +706,7 @@ const checkoutStyles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   inlineSaveBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingVertical: 10,
     borderRadius: 10,
     alignItems: 'center',

@@ -220,8 +220,7 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
-      <SafeAreaView style={{ flex: 0, backgroundColor: '#0C6258' }} />
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.innerContainer}>
           {/* ─── TOP TEAL HEADER SECTION ─── */}
@@ -246,7 +245,7 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
                     onPress={onNavigateToLogin}
                     activeOpacity={0.8}
                   >
-                    <BootstrapIcon name="arrow-left" size={14} color="#0C6258" />
+                    <BootstrapIcon name="arrow-left" size={14} color="#1D4533" />
                     <Text style={styles.backLinkText}>Back to login</Text>
                   </TouchableOpacity>
 
@@ -521,13 +520,13 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
                 // ─── STEP 2: OTP VERIFICATION SCREEN ───
                 <>
                   <TouchableOpacity style={styles.backLinkRow} onPress={() => setStep(1)} activeOpacity={0.8}>
-                    <BootstrapIcon name="arrow-left" size={14} color="#0C6258" />
+                    <BootstrapIcon name="arrow-left" size={14} color="#1D4533" />
                     <Text style={styles.backLinkText}>Edit registration details</Text>
                   </TouchableOpacity>
 
                   <View style={styles.otpHeroBox}>
                     <View style={styles.otpIconBadge}>
-                      <BootstrapIcon name="shield-lock-fill" size={28} color="#0C6258" />
+                      <BootstrapIcon name="shield-lock-fill" size={28} color="#1D4533" />
                     </View>
                     <Text style={styles.otpTitle}>Verify Your Email</Text>
                     <Text style={styles.otpSubtitle}>

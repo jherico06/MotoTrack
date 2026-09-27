@@ -12,6 +12,7 @@ export const DEFAULT_SYSTEM_SETTINGS = {
   taxRate: 12,
 
   // Operational & Fulfillment Rules
+  freeShippingEnabled: false,
   freeShippingThreshold: 3500,
   maxCodAmount: 50000,
   lowStockThreshold: 5,

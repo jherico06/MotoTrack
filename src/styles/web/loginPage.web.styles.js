@@ -67,11 +67,16 @@ export const botanicalStyles = StyleSheet.create({
 export const authWebStyles = StyleSheet.create({
   pageWrapper: {
     flex: 1,
-    backgroundColor: '#18181B',
+    backgroundColor: '#132E22', // App deep pine green background
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
     minHeight: '100vh',
+  },
+  modalTopLogo: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   topNav: {
     width: '100%',
@@ -90,7 +95,7 @@ export const authWebStyles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -143,10 +148,19 @@ export const authWebStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  modalFooterCopyright: {
+    fontSize: 11,
+    color: '#88A9A3',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 4,
+    letterSpacing: 0.2,
+  },
   formHeading: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
     marginBottom: 4,
     textAlign: 'center',
   },
@@ -158,16 +172,16 @@ export const authWebStyles = StyleSheet.create({
   },
   inputWrap: {
     width: '100%',
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    height: 42,
+    height: 44,
     paddingHorizontal: 14,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    marginBottom: 10,
+    marginBottom: 12,
     borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderColor: '#CBD5E1',
   },
   textInput: {
     flex: 1,
@@ -187,7 +201,7 @@ export const authWebStyles = StyleSheet.create({
     fontWeight: '600',
   },
   primaryTealBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 22,
     paddingVertical: 11,
     paddingHorizontal: 36,
@@ -195,7 +209,7 @@ export const authWebStyles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 4px 14px rgba(12, 98, 88, 0.35)',
+    boxShadow: '0 4px 14px rgba(29, 69, 51, 0.35)',
   },
   primaryTealBtnDisabled: {
     backgroundColor: '#94A3B8',
@@ -278,7 +292,7 @@ export const authWebStyles = StyleSheet.create({
   },
   otpBackBtnText: {
     fontSize: 11.5,
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '700',
   },
   otpHeader: {
@@ -289,7 +303,7 @@ export const authWebStyles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#E7F5F3',
+    backgroundColor: '#E8F0EC',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 6,
@@ -302,7 +316,7 @@ export const authWebStyles = StyleSheet.create({
   },
   otpEmailHighlight: {
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   instantOtpBadge: {
     backgroundColor: '#EFF6FF',
@@ -343,11 +357,11 @@ export const authWebStyles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 20,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
     outlineStyle: 'none',
   },
   otpBoxFilled: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#FFFFFF',
   },
   resendRow: {
@@ -362,7 +376,7 @@ export const authWebStyles = StyleSheet.create({
   },
   resendLink: {
     fontSize: 11.5,
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
   resendCountdown: {
@@ -398,7 +412,7 @@ export const authWebStyles = StyleSheet.create({
   fastPillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#0C6258',
+    color: '#1D4533',
   },
 
   // Badges
@@ -420,7 +434,7 @@ export const authWebStyles = StyleSheet.create({
     flex: 1,
   },
   infoBadge: {
-    backgroundColor: '#E7F5F3',
+    backgroundColor: '#E8F0EC',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
@@ -431,7 +445,7 @@ export const authWebStyles = StyleSheet.create({
     gap: 6,
   },
   infoBadgeText: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontSize: 11.5,
     fontWeight: '700',
     flex: 1,
@@ -461,12 +475,31 @@ export const authWebStyles = StyleSheet.create({
     left: 0,
     width: 410,
     height: '100%',
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 36,
     zIndex: 10,
     overflow: 'hidden',
+  },
+  overlayStoreBtn: {
+    position: 'absolute',
+    top: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.16)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.28)',
+    zIndex: 20,
+  },
+  overlayStoreBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   overlayContentBox: {
     alignItems: 'center',

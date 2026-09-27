@@ -70,7 +70,7 @@ function buildPackingSlipHtml(fields) {
     * { box-sizing: border-box; }
     body {
       margin: 0;
-      font-family: 'Segoe UI', Tahoma, sans-serif;
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       color: #0f172a;
       background: #fff;
     }
@@ -78,7 +78,7 @@ function buildPackingSlipHtml(fields) {
       width: 100%;
       max-width: 420px;
       margin: 0 auto;
-      border: 2px solid #0C6258;
+      border: 2px solid #1D4533;
       border-radius: 12px;
       padding: 16px 18px 18px;
     }
@@ -86,13 +86,13 @@ function buildPackingSlipHtml(fields) {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
-      border-bottom: 2px solid #0C6258;
+      border-bottom: 2px solid #1D4533;
       padding-bottom: 10px;
       margin-bottom: 12px;
     }
-    .brand h1 { margin: 0; font-size: 18px; letter-spacing: 0.02em; color: #0C6258; }
+    .brand h1 { margin: 0; font-size: 18px; letter-spacing: 0.02em; color: #1D4533; }
     .brand p { margin: 2px 0 0; font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.08em; }
-    .order-id { font-size: 13px; font-weight: 800; color: #0C6258; text-align: right; }
+    .order-id { font-size: 13px; font-weight: 800; color: #1D4533; text-align: right; }
     .qr-wrap { text-align: center; margin: 8px 0 10px; }
     .qr-wrap img { width: 220px; height: 220px; background: #fff; }
     .scan {
@@ -101,7 +101,7 @@ function buildPackingSlipHtml(fields) {
       font-weight: 800;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: #0C6258;
+      color: #1D4533;
       margin: 0 0 12px;
     }
     .section { margin-bottom: 10px; }

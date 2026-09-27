@@ -1,0 +1,22 @@
+{
+  "name": "mototrack-ai-customizer-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MotoTrack AI Motorcycle Customizer — Express + Google GenAI (Gemini + Imagen)",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@google/genai": "^1.30.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "multer": "^2.4.0"
+  }
+}

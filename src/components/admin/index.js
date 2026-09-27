@@ -1,2 +1,11 @@
 export { default as ForecastChart } from './ForecastChart';
 export { default as SalesForecastPanel } from './SalesForecastPanel';
+export { default as RevenueTrendChart } from './RevenueTrendChart';
+export { default as BookingCategoryPieChart } from './BookingCategoryPieChart';
+export { default as ProductSizesEditor } from './ProductSizesEditor';
+export { default as ProductColorsEditor } from './ProductColorsEditor';
+export { default as CustomizationsAdminPanel } from './CustomizationsAdminPanel';
+export { default as ServiceQuotationPanel } from './ServiceQuotationPanel';
+export { default as PickupQrScannerPanel } from './PickupQrScannerPanel';
+export { default as AdminBookingManager } from './AdminBookingManager';
+export { default as AdminBookingDetailsPanel } from './AdminBookingDetailsPanel';

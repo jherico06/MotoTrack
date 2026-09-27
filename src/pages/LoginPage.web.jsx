@@ -362,36 +362,21 @@ export default function LoginPageWeb({
     <View style={authStyles.pageWrapper}>
       <StatusBar style="light" />
 
-      {/* Top Floating Header */}
-      <View style={authStyles.topNav}>
-        <TouchableOpacity
-          style={authStyles.topBrand}
-          onPress={() => onNavigateToStore?.()}
-          activeOpacity={0.8}
-        >
-          <BrandLogo size={36} textColor="#FFFFFF" accentColor="#EF4444" />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={authStyles.backStoreBtn}
-          onPress={() => onNavigateToStore?.()}
-          activeOpacity={0.8}
-        >
-          <BootstrapIcon name="arrow-left" size={13} color="#88A9A3" />
-          <Text style={authStyles.backStoreBtnText}>Back to Store</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* ─── MAIN SLIDING AUTHENTICATION CARD ─── */}
       <View style={authStyles.cardContainer}>
         {/* ─── LEFT HALF: SIGN IN FORM (Visible when overlay is on right) ─── */}
         <View style={[authStyles.formHalf, authStyles.leftFormHalf]}>
           <ScrollView contentContainerStyle={authStyles.formScrollInner} showsVerticalScrollIndicator={false}>
+            {/* Logo at the top of modal login details */}
+            <View style={authStyles.modalTopLogo}>
+              <BrandLogo size={36} textColor="#1D4533" accentColor="#16A34A" />
+            </View>
+
             <Text style={[authStyles.formHeading, { marginBottom: 18 }]}>Sign In to MotoTrack</Text>
 
             {redirectReason ? (
               <View style={authStyles.infoBadge}>
-                <BootstrapIcon name="info-circle" size={13} color="#0C6258" />
+                <BootstrapIcon name="info-circle" size={13} color="#1D4533" />
                 <Text style={authStyles.infoBadgeText}>{redirectReason}</Text>
               </View>
             ) : null}
@@ -507,7 +492,7 @@ export default function LoginPageWeb({
                 borderRadius: 22,
                 paddingVertical: 12,
                 paddingHorizontal: 18,
-                shadowColor: '#0C6258',
+                shadowColor: '#1D4533',
                 shadowOffset: { width: 0, height: 2 },
                 shadowOpacity: 0.06,
                 shadowRadius: 6,
@@ -554,7 +539,7 @@ export default function LoginPageWeb({
 
                 <TouchableOpacity
                   style={{
-                    backgroundColor: '#0C6258',
+                    backgroundColor: '#1D4533',
                     borderRadius: 10,
                     paddingVertical: 9,
                     paddingHorizontal: 12,
@@ -573,18 +558,27 @@ export default function LoginPageWeb({
                   <Text style={{ fontSize: 10.5, color: '#64748B', marginBottom: 2 }}>
                     Your Supabase Redirect URI:
                   </Text>
-                  <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#0C6258' }}>
+                  <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#1D4533' }}>
                     https://vtbdmurblidtdghaotne.supabase.co/auth/v1/callback
                   </Text>
                 </View>
               </View>
             )}
+
+            <Text style={authStyles.modalFooterCopyright}>
+              © 2026 MotoTrack. All Rights Reserved.
+            </Text>
           </ScrollView>
         </View>
 
         {/* ─── RIGHT HALF: SIGN UP FORM WITH STRONG PASSWORD & OTP ─── */}
         <View style={[authStyles.formHalf, authStyles.rightFormHalf]}>
           <ScrollView contentContainerStyle={authStyles.formScrollInner} showsVerticalScrollIndicator={false}>
+            {/* Logo at the top of modal login details */}
+            <View style={authStyles.modalTopLogo}>
+              <BrandLogo size={36} textColor="#1D4533" accentColor="#16A34A" />
+            </View>
+
             {signUpStep === 1 ? (
               // ─── SIGN UP STEP 1: CREDENTIALS & STRONG PASSWORD ───
               <>
@@ -823,7 +817,7 @@ export default function LoginPageWeb({
                   disabled={!passwordAnalysis.isStrong || isSignUpLoading}
                 >
                   <Text style={authStyles.primaryTealBtnText}>
-                    {isSignUpLoading ? 'SENDING OTP...' : 'CONTINUE (SEND OTP)'}
+                    {isSignUpLoading ? 'SENDING...' : 'CONTINUE'}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -835,13 +829,13 @@ export default function LoginPageWeb({
                   onPress={() => setSignUpStep(1)}
                   activeOpacity={0.8}
                 >
-                  <BootstrapIcon name="arrow-left" size={13} color="#0C6258" />
+                  <BootstrapIcon name="arrow-left" size={13} color="#1D4533" />
                   <Text style={authStyles.otpBackBtnText}>Back to details</Text>
                 </TouchableOpacity>
 
                 <View style={authStyles.otpHeader}>
                   <View style={authStyles.otpBadge}>
-                    <BootstrapIcon name="shield-lock-fill" size={24} color="#0C6258" />
+                    <BootstrapIcon name="shield-lock-fill" size={24} color="#1D4533" />
                   </View>
                   <Text style={authStyles.formHeading}>Enter OTP Code</Text>
                   <Text style={authStyles.otpSubtitle}>
@@ -905,6 +899,10 @@ export default function LoginPageWeb({
                 </View>
               </View>
             )}
+
+            <Text style={authStyles.modalFooterCopyright}>
+              © 2026 MotoTrack. All Rights Reserved.
+            </Text>
           </ScrollView>
         </View>
 
@@ -912,6 +910,19 @@ export default function LoginPageWeb({
         <Animated.View
           style={[authStyles.slidingOverlayPanel, { transform: [{ translateX: overlayTranslateX }] }]}
         >
+          {/* Store button placed on the green side */}
+          <TouchableOpacity
+            style={[
+              authStyles.overlayStoreBtn,
+              isSignUp ? { left: 20, right: undefined } : { right: 20, left: undefined },
+            ]}
+            onPress={() => onNavigateToStore?.()}
+            activeOpacity={0.8}
+          >
+            <BootstrapIcon name="arrow-left" size={13} color="#FFFFFF" />
+            <Text style={authStyles.overlayStoreBtnText}>Back to Store</Text>
+          </TouchableOpacity>
+
           <View style={botanicalStyles.organicBlob} />
 
           <View style={authStyles.overlayContentBox}>
@@ -980,7 +991,7 @@ export default function LoginPageWeb({
               style={{
                 fontSize: 22,
                 fontWeight: '900',
-                color: '#0C6258',
+                color: '#1D4533',
                 textAlign: 'center',
                 marginBottom: 8,
               }}
@@ -1002,14 +1013,14 @@ export default function LoginPageWeb({
 
             <TouchableOpacity
               style={{
-                backgroundColor: '#0C6258',
+                backgroundColor: '#1D4533',
                 paddingVertical: 13,
                 paddingHorizontal: 28,
                 borderRadius: 22,
                 width: '100%',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(12, 98, 88, 0.35)',
+                boxShadow: '0 4px 14px rgba(29, 69, 51, 0.35)',
               }}
               onPress={() => setSuccessModalVisible(false)}
               activeOpacity={0.85}

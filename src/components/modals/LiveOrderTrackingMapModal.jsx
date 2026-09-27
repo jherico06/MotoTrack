@@ -20,8 +20,8 @@ import { orderService, canCustomerCancelStatus, canCustomerRequestReturnStatus, 
 
 // Route Waypoints focused across City of Naga, Cebu, Philippines
 const ROUTE_WAYPOINTS = [
-  { x: 14, y: 82, label: 'MotoTrack Hub (East Poblacion, Naga City)' },
-  { x: 28, y: 70, label: 'Naga Boardwalk & Baywalk Coastal Highway' },
+  { x: 14, y: 82, label: "D'Blockchain Motorparts and Accessories (South Poblacion, Naga)" },
+  { x: 28, y: 70, label: 'Natalio B. Bacalso S National Hwy' },
   { x: 42, y: 54, label: 'Cebu South Road & Toledo Junction' },
   { x: 56, y: 45, label: 'Inoburan Barangay Road' },
   { x: 72, y: 34, label: 'Avocado Street Corridor' },
@@ -104,7 +104,6 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   const [progress, setProgress] = useState(0.45); // 0 to 1
   const [isPlaying, setIsPlaying] = useState(true);
   const [showLiveMapDrawer, setShowLiveMapDrawer] = useState(true); // Open by default for instant Google Map experience
-  const [mapMode, setMapMode] = useState('google'); // 'google' | 'satellite' | 'simulation'
   const [isSummaryExpanded, setIsSummaryExpanded] = useState(false);
   const [webViewFailed, setWebViewFailed] = useState(false);
 
@@ -275,8 +274,8 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   // Dynamic route waypoints
   const routeWaypoints = useMemo(() => {
     return [
-      { x: 14, y: 82, label: 'MotoTrack Hub (East Poblacion, Naga City)' },
-      { x: 28, y: 70, label: 'Naga Boardwalk & Baywalk Coastal Highway' },
+      { x: 14, y: 82, label: "D'Blockchain Motorparts and Accessories (South Poblacion, Naga)" },
+      { x: 28, y: 70, label: 'Natalio B. Bacalso S National Hwy' },
       { x: 42, y: 54, label: 'Cebu South Road & Toledo Junction' },
       { x: 56, y: 45, label: `${destCity} Access Road` },
       { x: 72, y: 34, label: `${destArea} Corridor` },
@@ -317,13 +316,8 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
 
   // Self-contained, robust interactive Leaflet HTML map that works 100% on Mobile WebViews without blinking
   const leafletMapHtml = useMemo(() => {
-    const isSat = mapMode === 'satellite';
-    const tileLayerUrl = isSat
-      ? 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
-      : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
-
-    const hubLat = 10.2085;
-    const hubLng = 123.7588;
+    const hubLat = 10.20663;
+    const hubLng = 123.75675;
     const destLat = 10.224;
     const destLng = 123.77;
 
@@ -337,122 +331,174 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    html, body, #map {
+    html, body {
       margin: 0; padding: 0; width: 100%; height: 100%;
-      background: #0F172A;
+      background: #F1F5F9;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       overflow: hidden;
     }
+    #map {
+      width: 100%; height: 100%;
+      background: #E2E8F0;
+    }
     .custom-hub-pin {
-      background: #0C6258;
+      background: #1D4533;
       color: #FFF;
       border: 2px solid #FFFFFF;
       border-radius: 50%;
-      width: 26px; height: 26px;
+      width: 32px; height: 32px;
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 3px 8px rgba(12, 98, 88,0.5);
-      font-size: 13px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.35);
+      font-size: 16px;
+      cursor: pointer;
     }
+    .hub-label {
+      background: #0F172A !important;
+      color: #FFFFFF !important;
+      border: 1px solid #1D4533 !important;
+      border-radius: 6px !important;
+      font-size: 11px !important;
+      font-weight: 800 !important;
+      padding: 3px 8px !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+      white-space: nowrap !important;
+    }
+    .leaflet-tooltip-top:before { border-top-color: #0F172A !important; }
     .custom-dest-pin {
       background: #EF4444;
       color: #FFF;
       border: 2px solid #FFFFFF;
       border-radius: 50%;
-      width: 28px; height: 28px;
+      width: 30px; height: 30px;
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 0 14px rgba(239,68,68,0.7);
-      font-size: 13px;
+      box-shadow: 0 3px 10px rgba(239,68,68,0.6);
+      font-size: 14px;
     }
     .custom-rider-badge {
       background: #0F172A;
-      color: #EAB308;
-      border: 2px solid #0C6258;
+      color: #FBBF24;
+      border: 2px solid #1D4533;
       border-radius: 20px;
       padding: 4px 10px;
       font-size: 11px;
-      font-weight: 900;
+      font-weight: 800;
       box-shadow: 0 4px 12px rgba(0,0,0,0.4);
       white-space: nowrap;
       display: flex; align-items: center; gap: 4px;
-      transition: all 0.3s ease;
     }
     .leaflet-control-attribution { display: none !important; }
   </style>
 </head>
 <body>
   <div id="map"></div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    var map = L.map('map', { zoomControl: false }).setView([${hubLat}, ${hubLng}], 13);
-    L.tileLayer('${tileLayerUrl}', { maxZoom: 19 }).addTo(map);
-
-    var routeCoords = [
-      [${hubLat}, ${hubLng}],
-      [10.2135, 123.7625],
-      [10.2185, 123.7665],
-      [${destLat}, ${destLng}]
-    ];
-
-    var routeLine = L.polyline(routeCoords, {
-      color: '#0C6258',
-      weight: 5,
-      opacity: 0.9,
-      dashArray: '8, 6'
-    }).addTo(map);
-
-    // Hub Pin
-    var hubIcon = L.divIcon({
-      className: '',
-      html: '<div class="custom-hub-pin">🏭</div>',
-      iconSize: [26, 26],
-      iconAnchor: [13, 13]
-    });
-    L.marker([${hubLat}, ${hubLng}], { icon: hubIcon }).addTo(map);
-
-    // Dest Pin
-    var destIcon = L.divIcon({
-      className: '',
-      html: '<div class="custom-dest-pin">📍</div>',
-      iconSize: [28, 28],
-      iconAnchor: [14, 14]
-    });
-    L.marker([${destLat}, ${destLng}], { icon: destIcon }).addTo(map);
-
-    // Dynamic Rider Pin with Internal Animation
-    var currentProgress = 0.45;
-    var hub = [${hubLat}, ${hubLng}];
-    var dest = [${destLat}, ${destLng}];
-
-    var riderIcon = L.divIcon({
-      className: '',
-      html: '<div id="rider-badge-wrap" class="custom-rider-badge"><span id="rider-badge-text">🏍️ ${safeRiderName} (12m)</span></div>',
-      iconSize: [120, 28],
-      iconAnchor: [60, 14]
-    });
-
-    var riderMarker = L.marker([hub[0] + (dest[0] - hub[0]) * currentProgress, hub[1] + (dest[1] - hub[1]) * currentProgress], { icon: riderIcon }).addTo(map);
-
-    // Smooth In-Map GPS Movement (Zero Page Reloads)
-    setInterval(function() {
-      currentProgress += 0.01;
-      if (currentProgress >= 1) currentProgress = 0.05;
-      var newLat = hub[0] + (dest[0] - hub[0]) * currentProgress;
-      var newLng = hub[1] + (dest[1] - hub[1]) * currentProgress;
-      riderMarker.setLatLng([newLat, newLng]);
-      var mins = Math.max(1, Math.round((1 - currentProgress) * 22));
-      var textEl = document.getElementById('rider-badge-text');
-      if (textEl) {
-        textEl.innerText = '🏍️ ${safeRiderName} (' + mins + 'm)';
+    function run() {
+      if (typeof L === 'undefined') {
+        setTimeout(run, 60);
+        return;
       }
-    }, 1000);
+      try {
+        var hubLat = ${hubLat};
+        var hubLng = ${hubLng};
+        var destLat = ${destLat};
+        var destLng = ${destLng};
 
-    map.fitBounds(routeLine.getBounds(), { padding: [40, 40] });
+        var map = L.map('map', {
+          zoomControl: true,
+          attributionControl: false
+        }).setView([hubLat, hubLng], 14);
+
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19
+        }).addTo(map);
+
+        var routeCoords = [
+          [hubLat, hubLng],
+          [10.2115, 123.7605],
+          [10.2175, 123.7655],
+          [destLat, destLng]
+        ];
+
+        var routeLine = L.polyline(routeCoords, {
+          color: '#1D4533',
+          weight: 5,
+          opacity: 0.9,
+          dashArray: '8, 6'
+        }).addTo(map);
+
+        // Store Pin: D'Blockchain Motorparts and Accessories
+        var hubIcon = L.divIcon({
+          className: '',
+          html: '<div class="custom-hub-pin" title="D\\'Blockchain Motorparts and Accessories">🏪</div>',
+          iconSize: [32, 32],
+          iconAnchor: [16, 16]
+        });
+        var hubMarker = L.marker([hubLat, hubLng], { icon: hubIcon }).addTo(map);
+        hubMarker.bindTooltip("D'Blockchain Motorparts & Accessories", { permanent: true, direction: 'top', className: 'hub-label', offset: [0, -12] });
+        hubMarker.bindPopup("<b>D'Blockchain Motorparts and Accessories</b><br/>Natalio B. Bacalso S National Hwy, South Poblacion, Naga, 6037 Cebu<br/><span style='color:#1D4533;font-size:11px;font-weight:700;'>📍 Plus Code: 6Q44+MPQ</span>").openPopup();
+
+        // Destination Pin
+        var destIcon = L.divIcon({
+          className: '',
+          html: '<div class="custom-dest-pin">📍</div>',
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+        });
+        L.marker([destLat, destLng], { icon: destIcon }).addTo(map).bindPopup("<b>Delivery Destination</b><br/>${safeDestTitle}");
+
+        // Animated Rider Pin
+        var currentProgress = 0.45;
+        var riderIcon = L.divIcon({
+          className: '',
+          html: '<div id="rider-badge-wrap" class="custom-rider-badge"><span id="rider-badge-text">🏍️ ${safeRiderName} (12m)</span></div>',
+          iconSize: [130, 28],
+          iconAnchor: [65, 14]
+        });
+        var riderMarker = L.marker([hubLat + (destLat - hubLat) * currentProgress, hubLng + (destLng - hubLng) * currentProgress], { icon: riderIcon }).addTo(map);
+
+        setInterval(function() {
+          currentProgress += 0.01;
+          if (currentProgress >= 1) currentProgress = 0.05;
+          var newLat = hubLat + (destLat - hubLat) * currentProgress;
+          var newLng = hubLng + (destLng - hubLng) * currentProgress;
+          riderMarker.setLatLng([newLat, newLng]);
+          var mins = Math.max(1, Math.round((1 - currentProgress) * 22));
+          var textEl = document.getElementById('rider-badge-text');
+          if (textEl) {
+            textEl.innerText = '🏍️ ${safeRiderName} (' + mins + 'm)';
+          }
+        }, 1000);
+
+        try {
+          map.fitBounds(routeLine.getBounds(), { padding: [45, 45] });
+        } catch (e) {}
+
+        setTimeout(function() {
+          map.invalidateSize();
+        }, 300);
+      } catch (err) {
+        console.error('Leaflet error:', err);
+      }
+    }
+
+    // Fallback: if Leaflet CDN takes more than 2.5s, embed OpenStreetMap directly
+    setTimeout(function() {
+      if (typeof L === 'undefined') {
+        var mapEl = document.getElementById('map');
+        if (mapEl) {
+          mapEl.innerHTML = '<iframe width="100%" height="100%" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="https://www.openstreetmap.org/export/embed.html?bbox=123.74%2C10.19%2C123.78%2C10.23&amp;layer=mapnik&amp;marker=' + 10.20663 + '%2C' + 123.75675 + '" style="border:0;width:100%;height:100%;"></iframe>';
+        }
+      }
+    }, 2500);
+
+    run();
   </script>
 </body>
 </html>
     `;
-  }, [mapMode, destSummary, riderInfo?.name]);
+  }, [destSummary, riderInfo?.name]);
 
   // Live GPS movement ticker
   useEffect(() => {
@@ -612,7 +658,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
               onPress={() => setShowLiveMapDrawer(!showLiveMapDrawer)}
               activeOpacity={0.8}
             >
-              <BootstrapIcon name={showLiveMapDrawer ? 'receipt' : 'compass'} size={14} color="#0C6258" />
+              <BootstrapIcon name={showLiveMapDrawer ? 'receipt' : 'compass'} size={14} color="#1D4533" />
               <Text style={styles.headerGpsBtnText}>{showLiveMapDrawer ? 'Details' : 'Google Map'}</Text>
             </TouchableOpacity>
           </View>
@@ -683,10 +729,10 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
             {/* ─── 3. GUARANTEED ON-TIME DELIVERY BANNER ─── */}
             <View style={styles.guaranteeBanner}>
               <View style={styles.guaranteeIconWrap}>
-                <BootstrapIcon name="clock-history" size={17} color="#0C6258" />
+                <BootstrapIcon name="clock-history" size={17} color="#1D4533" />
               </View>
               <Text style={styles.guaranteeText}>
-                <Text style={{ fontWeight: '800', color: '#0C6258' }}>Guaranteed On-Time Delivery</Text>{' '}
+                <Text style={{ fontWeight: '800', color: '#1D4533' }}>Guaranteed On-Time Delivery</Text>{' '}
                 assures that a delivery will be attempted by {arrivalRangeText.replace('Arriving ', '')}. Get
                 a coupon if your order arrives late.
               </Text>
@@ -694,66 +740,17 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
 
             {/* ─── 4. REAL GOOGLE MAP / GPS TRACKING DRAWER ─── */}
             {showLiveMapDrawer && (
-              <View style={styles.googleMapSectionCard}>
-                {/* Google Map Mode Toolbar */}
+              <View style={styles.mapCard}>
+                {/* Map Header Toolbar */}
                 <View style={styles.mapToolbarRow}>
-                  <View style={styles.mapModePills}>
-                    <TouchableOpacity
-                      style={[styles.mapModePill, mapMode === 'google' && styles.mapModePillActive]}
-                      onPress={() => setMapMode('google')}
-                      activeOpacity={0.8}
-                    >
-                      <BootstrapIcon
-                        name="map-fill"
-                        size={12}
-                        color={mapMode === 'google' ? '#0C6258' : '#64748B'}
-                      />
-                      <Text
-                        style={[styles.mapModePillText, mapMode === 'google' && styles.mapModePillTextActive]}
-                      >
-                        Live Map
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.mapModePill, mapMode === 'satellite' && styles.mapModePillActive]}
-                      onPress={() => setMapMode('satellite')}
-                      activeOpacity={0.8}
-                    >
-                      <BootstrapIcon
-                        name="globe-americas"
-                        size={12}
-                        color={mapMode === 'satellite' ? '#0C6258' : '#64748B'}
-                      />
-                      <Text
-                        style={[
-                          styles.mapModePillText,
-                          mapMode === 'satellite' && styles.mapModePillTextActive,
-                        ]}
-                      >
-                        Satellite
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.mapModePill, mapMode === 'simulation' && styles.mapModePillActive]}
-                      onPress={() => setMapMode('simulation')}
-                      activeOpacity={0.8}
-                    >
-                      <BootstrapIcon
-                        name="bicycle"
-                        size={12}
-                        color={mapMode === 'simulation' ? '#0C6258' : '#64748B'}
-                      />
-                      <Text
-                        style={[
-                          styles.mapModePillText,
-                          mapMode === 'simulation' && styles.mapModePillTextActive,
-                        ]}
-                      >
-                        Vector GPS
-                      </Text>
-                    </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={styles.mapHudLiveDot} />
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                      Live GPS Tracking
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>
+                      • City of Naga
+                    </Text>
                   </View>
 
                   <TouchableOpacity
@@ -761,39 +758,36 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     onPress={handleOpenGoogleMapsApp}
                     activeOpacity={0.8}
                   >
-                    <BootstrapIcon name="box-arrow-up-right" size={11} color="#0C6258" />
-                    <Text style={styles.openGoogleMapsBtnText}>Open App</Text>
+                    <BootstrapIcon name="box-arrow-up-right" size={11} color="#1D4533" />
+                    <Text style={styles.openGoogleMapsBtnText}>Open in Google Maps</Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* Map Canvas Container */}
                 <View style={styles.mapCanvasWrapper}>
-                  {/* Option A & B: Embedded Real Interactive Map (Roadmap or Satellite) */}
-                  {(mapMode === 'google' || mapMode === 'satellite') && !webViewFailed ? (
+                  {!webViewFailed ? (
                     Platform.OS === 'web' ? (
                       <View style={styles.iframeMapContainer}>
                         <iframe
-                          key={`map-web-${mapMode}-${deliveryAddressStr}`}
-                          title={`Live Map ${mapMode === 'satellite' ? 'Satellite' : 'Roadmap'} View`}
+                          key={`map-web-${deliveryAddressStr}`}
+                          title="Live Street Map"
                           width="100%"
                           height="100%"
-                          style={{ border: 0, width: '100%', height: 260, minHeight: 260, borderRadius: 16 }}
-                          loading="lazy"
+                          style={{ border: 0, width: '100%', height: 280, minHeight: 280, borderRadius: 16 }}
                           srcDoc={leafletMapHtml}
                         />
                         {/* Floating Courier Badge on Live Map */}
                         <View style={styles.googleMapLiveBadge}>
                           <View style={styles.mapHudLiveDot} />
                           <Text style={styles.googleMapLiveText} numberOfLines={1}>
-                            {mapMode === 'satellite' ? 'Satellite GPS' : 'Live Street GPS'} • {destCity}{' '}
-                            Active
+                            Live Street GPS • D'Blockchain to {destCity}
                           </Text>
                         </View>
                       </View>
                     ) : (
                       <View style={styles.iframeMapContainer}>
                         <WebView
-                          key={`map-native-${mapMode}-${deliveryAddressStr}`}
+                          key={`map-native-${deliveryAddressStr}`}
                           source={{ html: leafletMapHtml, baseUrl: 'https://unpkg.com' }}
                           style={styles.nativeWebView}
                           originWhitelist={['*']}
@@ -808,7 +802,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                           onHttpError={() => setWebViewFailed(true)}
                           renderLoading={() => (
                             <View style={styles.mapLoadingOverlay}>
-                              <ActivityIndicator size="small" color="#0C6258" />
+                              <ActivityIndicator size="small" color="#1D4533" />
                               <Text style={styles.mapLoadingText}>Loading Live GPS Map...</Text>
                             </View>
                           )}
@@ -817,205 +811,21 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                         <View style={styles.googleMapLiveBadge}>
                           <View style={styles.mapHudLiveDot} />
                           <Text style={styles.googleMapLiveText} numberOfLines={1}>
-                            {mapMode === 'satellite' ? 'Satellite GPS' : 'Live Street GPS'} • {destCity}{' '}
-                            Active
+                            Live Street GPS • D'Blockchain to {destCity}
                           </Text>
                         </View>
                       </View>
                     )
                   ) : (
-                    /* Option C: High-Fidelity Google Maps Vector Street Simulation */
-                    <View style={styles.mapRealisticTerrain}>
-                      {/* Waterway / Coastal Bay */}
-                      <View style={styles.mapCoastalWater}>
-                        <Text style={styles.mapWaterLabel}>CEBU STRAIT (NAGA COAST)</Text>
-                      </View>
-
-                      {/* Green Parks & Landscaping */}
-                      <View
-                        style={[styles.mapParkArea, { top: '10%', left: '8%', width: '30%', height: '26%' }]}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                          <BootstrapIcon name="tree-fill" size={9} color="#059669" />
-                          <Text style={styles.mapParkLabel}>Naga Boardwalk Park</Text>
-                        </View>
-                      </View>
-                      <View
-                        style={[
-                          styles.mapParkArea,
-                          { bottom: '12%', right: '8%', width: '28%', height: '28%' },
-                        ]}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                          <BootstrapIcon name="tree-fill" size={9} color="#059669" />
-                          <Text style={styles.mapParkLabel}>{destArea} District</Text>
-                        </View>
-                      </View>
-
-                      {/* Urban City Blocks */}
-                      <View
-                        style={[
-                          styles.mapCityBlock,
-                          { top: '44%', left: '10%', width: '24%', height: '28%' },
-                        ]}
+                    /* Fallback Direct Embed */
+                    <View style={styles.iframeMapContainer}>
+                      <iframe
+                        title="Google Maps Fallback"
+                        width="100%"
+                        height="100%"
+                        style={{ border: 0, width: '100%', height: 280, minHeight: 280, borderRadius: 16 }}
+                        src="https://maps.google.com/maps?q=10.20663,123.75675&z=15&output=embed"
                       />
-                      <View
-                        style={[
-                          styles.mapCityBlock,
-                          { top: '10%', right: '28%', width: '24%', height: '24%' },
-                        ]}
-                      />
-                      <View
-                        style={[
-                          styles.mapCityBlock,
-                          { top: '42%', right: '10%', width: '22%', height: '24%' },
-                        ]}
-                      />
-
-                      {/* Secondary Local Street Grid */}
-                      <View style={[styles.mapStreetLocalH, { top: '22%' }]} />
-                      <View style={[styles.mapStreetLocalH, { top: '52%' }]} />
-                      <View style={[styles.mapStreetLocalH, { top: '80%' }]} />
-                      <View style={[styles.mapStreetLocalV, { left: '18%' }]} />
-                      <View style={[styles.mapStreetLocalV, { left: '46%' }]} />
-                      <View style={[styles.mapStreetLocalV, { left: '76%' }]} />
-
-                      {/* Primary Expressways & Highways */}
-                      <View style={[styles.mapHighwayH, { top: '36%' }]}>
-                        <Text style={styles.mapHighwayLabel}>CEBU SOUTH ROAD (NAGA HIGHWAY)</Text>
-                      </View>
-                      <View style={[styles.mapAvenueV, { left: '38%' }]}>
-                        <Text style={styles.mapAvenueLabel}>{destCity.toUpperCase()} ACCESS BLVD</Text>
-                      </View>
-
-                      {/* Street Name Labels */}
-                      <Text style={[styles.mapStreetNameTag, { top: '24%', left: '20%' }]}>
-                        Poblacion Naga City Hall
-                      </Text>
-                      <Text style={[styles.mapStreetNameTag, { top: '70%', left: '48%' }]}>
-                        {destArea} Junction
-                      </Text>
-
-                      {/* Delivery Route Polyline */}
-                      {routeWaypoints.map((pt, i) => {
-                        if (i === routeWaypoints.length - 1) return null;
-                        const nextPt = routeWaypoints[i + 1];
-                        const left = Math.min(pt.x, nextPt.x);
-                        const top = Math.min(pt.y, nextPt.y);
-                        const width = Math.abs(nextPt.x - pt.x);
-                        const height = Math.abs(nextPt.y - pt.y);
-
-                        return (
-                          <React.Fragment key={`route-frag-${i}`}>
-                            <View
-                              style={{
-                                position: 'absolute',
-                                left: `${left}%`,
-                                top: `${top}%`,
-                                width: `${Math.max(width, 2.5)}%`,
-                                height: `${Math.max(height, 2.5)}%`,
-                                borderLeftWidth: pt.x === nextPt.x ? 6 : 0,
-                                borderTopWidth: pt.y === nextPt.y ? 6 : 0,
-                                borderColor: 'rgba(12, 98, 88, 0.25)',
-                                zIndex: 15,
-                              }}
-                            />
-                            <View
-                              style={{
-                                position: 'absolute',
-                                left: `${left}%`,
-                                top: `${top}%`,
-                                width: `${Math.max(width, 2.5)}%`,
-                                height: `${Math.max(height, 2.5)}%`,
-                                borderLeftWidth: pt.x === nextPt.x ? 3.5 : 0,
-                                borderTopWidth: pt.y === nextPt.y ? 3.5 : 0,
-                                borderColor: '#0C6258',
-                                zIndex: 16,
-                              }}
-                            />
-                          </React.Fragment>
-                        );
-                      })}
-
-                      {/* Origin Hub Marker */}
-                      <View
-                        style={[
-                          styles.mapOriginMarkerRealistic,
-                          { left: `${routeWaypoints[0].x}%`, top: `${routeWaypoints[0].y}%` },
-                        ]}
-                      >
-                        <View style={styles.originMarkerBubbleRealistic}>
-                          <BootstrapIcon name="building" size={13} color="#FFFFFF" />
-                        </View>
-                        <View style={styles.originMarkerBadgeRealistic}>
-                          <Text style={styles.originMarkerBadgeText}>MotoTrack Hub (Poblacion, Naga)</Text>
-                        </View>
-                      </View>
-
-                      {/* Destination Marker */}
-                      <View
-                        style={[
-                          styles.mapDestMarkerRealistic,
-                          {
-                            left: `${routeWaypoints[routeWaypoints.length - 1].x}%`,
-                            top: `${routeWaypoints[routeWaypoints.length - 1].y}%`,
-                          },
-                        ]}
-                      >
-                        <View style={styles.destRadarPulseRealistic} />
-                        <View style={styles.destMarkerBubbleRealistic}>
-                          <BootstrapIcon name="house-door-fill" size={14} color="#FFFFFF" />
-                        </View>
-                        <View style={styles.destMarkerBadgeRealistic}>
-                          <Text style={styles.destMarkerBadgeText} numberOfLines={1}>
-                            Delivery: {destSummary}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Live Moving Courier Rider Marker */}
-                      <View
-                        style={[
-                          styles.mapRiderMarkerRealistic,
-                          { left: `${riderPos.x}%`, top: `${riderPos.y}%` },
-                        ]}
-                      >
-                        <View style={styles.riderLivePulseRing} />
-                        <View style={styles.riderBikeAvatarWrap}>
-                          <Image source={{ uri: riderInfo.avatar }} style={styles.riderPinAvatarRealistic} />
-                          <View style={styles.riderMotorcycleBadge}>
-                            <BootstrapIcon name="compass-fill" size={10} color="#FFFFFF" />
-                          </View>
-                        </View>
-                        <View style={styles.riderTooltipPillRealistic}>
-                          <Text style={styles.riderTooltipNameRealistic}>
-                            🏍️ {riderInfo.name || 'Awaiting rider'} ({etaMinutes}m)
-                          </Text>
-                          <Text style={styles.riderTooltipSpeedRealistic}>
-                            {currentSpeed} km/h • {destCity}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Google Watermark Brand */}
-                      <View style={styles.googleWatermark}>
-                        <Text style={styles.googleWatermarkText}>
-                          <Text style={{ color: '#4285F4' }}>G</Text>
-                          <Text style={{ color: '#EA4335' }}>o</Text>
-                          <Text style={{ color: '#FBBC05' }}>o</Text>
-                          <Text style={{ color: '#4285F4' }}>g</Text>
-                          <Text style={{ color: '#34A853' }}>l</Text>
-                          <Text style={{ color: '#EA4335' }}>e</Text>
-                        </Text>
-                      </View>
-
-                      {/* Map HUD Overlay */}
-                      <View style={styles.mapHudTopLeft}>
-                        <View style={styles.mapHudLiveDot} />
-                        <Text style={styles.mapHudLiveText} numberOfLines={1}>
-                          LIVE GPS • {destCity} ({distanceKm} km)
-                        </Text>
-                      </View>
                     </View>
                   )}
                 </View>
@@ -1075,7 +885,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
             <View style={styles.addressCard}>
               <View style={styles.addressHeaderRow}>
                 <View style={styles.addressPinWrap}>
-                  <BootstrapIcon name="geo-alt-fill" size={16} color="#0C6258" />
+                  <BootstrapIcon name="geo-alt-fill" size={16} color="#1D4533" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.addressRecipientName}>
@@ -1103,7 +913,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
               <View style={styles.storeHeaderRow}>
                 <View style={styles.storeHeaderLeft}>
                   <View style={styles.storeAvatarCircle}>
-                    <BootstrapIcon name="shield-check" size={14} color="#0C6258" />
+                    <BootstrapIcon name="shield-check" size={14} color="#1D4533" />
                   </View>
                   <Text style={styles.storeNameText}>MotoTrack Motorparts and Accessories</Text>
                 </View>
@@ -1199,7 +1009,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
               {/* Payment Method & Total Row */}
               <View style={styles.paymentMethodRow}>
                 <View style={styles.paymentBadgeWrap}>
-                  <View style={[styles.codIndicatorBadge, !isCOD && { backgroundColor: '#0C6258' }]}>
+                  <View style={[styles.codIndicatorBadge, !isCOD && { backgroundColor: '#1D4533' }]}>
                     <Text style={styles.codIndicatorText}>{isCOD ? 'COD' : 'GCASH'}</Text>
                   </View>
                   <Text style={styles.paymentMethodLabel}>
@@ -1233,7 +1043,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                   {Number(discountValue) > 0 && (
                     <View style={styles.priceBreakdownLine}>
                       <Text style={styles.priceBreakdownLabel}>Voucher Discount</Text>
-                      <Text style={[styles.priceBreakdownVal, { color: '#0C6258' }]}>-₱{discountValue}</Text>
+                      <Text style={[styles.priceBreakdownVal, { color: '#1D4533' }]}>-₱{discountValue}</Text>
                     </View>
                   )}
                   <View style={styles.priceBreakdownLine}>
@@ -1241,7 +1051,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     <Text
                       style={[
                         styles.priceBreakdownVal,
-                        shippingFeeNum === 0 ? { color: '#0C6258' } : null,
+                        shippingFeeNum === 0 ? { color: '#1D4533' } : null,
                       ]}
                     >
                       {shippingFeeNum > 0 ? `₱${shippingFeeValue}` : '₱0.00'}
@@ -1259,9 +1069,9 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
               activeOpacity={0.85}
             >
               <View style={styles.freeReturnsLeft}>
-                <BootstrapIcon name="bag-check-fill" size={15} color="#0C6258" />
+                <BootstrapIcon name="bag-check-fill" size={15} color="#1D4533" />
                 <Text style={styles.freeReturnsText}>
-                  <Text style={{ color: '#0C6258', fontWeight: '800' }}>Free returns</Text> at your
+                  <Text style={{ color: '#1D4533', fontWeight: '800' }}>Free returns</Text> at your
                   convenience (30-day policy)
                 </Text>
               </View>
@@ -1332,8 +1142,8 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     }}
                     activeOpacity={0.8}
                   >
-                    <BootstrapIcon name="geo-alt-fill" size={13} color="#0C6258" />
-                    <Text style={{ fontSize: 11.5, color: '#0C6258', fontWeight: '800', flex: 1 }}>
+                    <BootstrapIcon name="geo-alt-fill" size={13} color="#1D4533" />
+                    <Text style={{ fontSize: 11.5, color: '#1D4533', fontWeight: '800', flex: 1 }}>
                       Use Profile Address: {currentUser.address.slice(0, 35)}...
                     </Text>
                   </TouchableOpacity>
@@ -1448,7 +1258,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
             <View style={styles.editAddressOverlay}>
               <View style={styles.editAddressCard}>
                 <View style={{ alignItems: 'center', marginBottom: 10 }}>
-                  <BootstrapIcon name="arrow-counterclockwise" size={32} color="#0C6258" />
+                  <BootstrapIcon name="arrow-counterclockwise" size={32} color="#1D4533" />
                 </View>
                 <Text style={[styles.editAddressTitle, { textAlign: 'center' }]}>
                   Request Return & Refund
@@ -1480,7 +1290,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     <BootstrapIcon
                       name={returnReason === reason ? 'check-circle-fill' : 'circle'}
                       size={15}
-                      color={returnReason === reason ? '#0C6258' : '#94A3B8'}
+                      color={returnReason === reason ? '#1D4533' : '#94A3B8'}
                     />
                     <Text
                       style={{
@@ -1510,7 +1320,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     <Text style={styles.editAddressCancelText}>Back</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.editAddressSaveBtn, { backgroundColor: '#0C6258' }]}
+                    style={[styles.editAddressSaveBtn, { backgroundColor: '#1D4533' }]}
                     disabled={isSubmittingAction}
                     onPress={handleConfirmReturn}
                   >
@@ -1617,7 +1427,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitleText: {
     fontSize: 13,
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '700',
     marginTop: 2,
   },
@@ -1633,7 +1443,7 @@ const styles = StyleSheet.create({
     borderColor: '#FDE68A',
   },
   headerGpsBtnText: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -1677,7 +1487,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     height: 2.5,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     top: 15,
     zIndex: 2,
   },
@@ -1690,10 +1500,10 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.35,
     shadowRadius: 6,
@@ -1703,7 +1513,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1728,7 +1538,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepLabelTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '900',
   },
   stepLabelTextCompleted: {
@@ -1805,7 +1615,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   mapModePillTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
   openGoogleMapsBtn: {
@@ -1822,7 +1632,7 @@ const styles = StyleSheet.create({
   openGoogleMapsBtnText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
 
   mapCanvasWrapper: {
@@ -1961,7 +1771,7 @@ const styles = StyleSheet.create({
     left: '22%',
     right: 0,
     height: 16,
-    backgroundColor: '#D1ECE6',
+    backgroundColor: '#C8DDD3',
     borderTopWidth: 1.5,
     borderBottomWidth: 1.5,
     borderColor: '#F59E0B',
@@ -2014,12 +1824,12 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
     shadowRadius: 4,
@@ -2094,7 +1904,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: 'rgba(12, 98, 88, 0.25)',
+    backgroundColor: 'rgba(29, 69, 51, 0.25)',
     top: -7,
     left: -7,
   },
@@ -2103,7 +1913,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 2.5,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#FFFFFF',
     overflow: 'visible',
     alignItems: 'center',
@@ -2118,7 +1928,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -3,
     right: -3,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     width: 14,
     height: 14,
     borderRadius: 7,
@@ -2134,7 +1944,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 3,
     borderWidth: 1,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     alignItems: 'center',
   },
   riderTooltipNameRealistic: {
@@ -2222,7 +2032,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
@@ -2274,7 +2084,7 @@ const styles = StyleSheet.create({
   changeAddressLinkText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
 
   // 7. Order Items Card
@@ -2385,7 +2195,7 @@ const styles = StyleSheet.create({
   },
   freeReturnsPillText: {
     fontSize: 9.5,
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
   genuinePill: {
@@ -2465,7 +2275,7 @@ const styles = StyleSheet.create({
   totalPriceBig: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
   },
 
   expandedPriceSummary: {
@@ -2607,7 +2417,7 @@ const styles = StyleSheet.create({
   },
   editAddressSaveBtn: {
     flex: 1,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingVertical: 11,
     borderRadius: 10,
     alignItems: 'center',
@@ -2668,7 +2478,7 @@ const styles = StyleSheet.create({
   },
   callStatusText: {
     fontSize: 12,
-    color: '#0C6258',
+    color: '#1D4533',
     marginTop: 8,
     fontWeight: '700',
   },

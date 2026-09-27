@@ -69,7 +69,7 @@ class EmailService {
             from: 'MotoTrack Security <onboarding@resend.dev>',
             to: [cleanEmail],
             subject: `${otpCode} is your MotoTrack Verification Code`,
-            html: `<div style="font-family: sans-serif; padding: 20px;"><h2>MotoTrack Account Verification</h2><p>Your 6-digit OTP code is:</p><h1 style="font-size: 32px; letter-spacing: 4px; color: #0C6258;">${otpCode}</h1><p>Enter this code to complete registration. Expires in 5 minutes.</p></div>`,
+            html: `<div style="font-family: sans-serif; padding: 20px;"><h2>MotoTrack Account Verification</h2><p>Your 6-digit OTP code is:</p><h1 style="font-size: 32px; letter-spacing: 4px; color: #1D4533;">${otpCode}</h1><p>Enter this code to complete registration. Expires in 5 minutes.</p></div>`,
           }),
         });
         if (resendRes.ok) {
@@ -157,14 +157,14 @@ class EmailService {
             subject: `Order Confirmed: #${orderId} - MotoTrack Pro Gear`,
             html: `
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #E2E8F0; borderRadius: 12px;">
-                <h2 style="color: #0C6258; margin-top: 0;">🎉 Thank you for your order!</h2>
+                <h2 style="color: #1D4533; margin-top: 0;">🎉 Thank you for your order!</h2>
                 <p style="color: #475569;">Hi <strong>${customerName || 'Rider'}</strong>,</p>
                 <p style="color: #475569;">We have received your MotoTrack purchase. Your gear is being prepared for dispatch.</p>
                 <div style="background: #F8FAFC; border-radius: 8px; padding: 16px; margin: 20px 0;">
                   <p style="margin: 0 0 8px; font-weight: bold; color: #0F172A;">Order #${orderId}</p>
                   <p style="margin: 0 0 4px; color: #64748B; font-size: 14px;"><strong>Items:</strong> ${itemsDesc}</p>
                   <p style="margin: 0 0 4px; color: #64748B; font-size: 14px;"><strong>Payment:</strong> ${order.payment_method}</p>
-                  <p style="margin: 0; color: #0C6258; font-size: 16px; font-weight: bold;"><strong>Total:</strong> ₱${total}</p>
+                  <p style="margin: 0; color: #1D4533; font-size: 16px; font-weight: bold;"><strong>Total:</strong> ₱${total}</p>
                 </div>
                 <p style="color: #64748B; font-size: 13px;">Courier: ${order.courier || 'MotoTrack Express SuperAir'}</p>
                 <p style="color: #64748B; font-size: 13px;">Tracking Number: <strong>${order.tracking_number || 'Pending'}</strong></p>
@@ -234,7 +234,7 @@ class EmailService {
             subject: `Order #${orderId} Update: ${newStatus}`,
             html: `
               <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; background: #ffffff; border: 1px solid #E2E8F0; borderRadius: 12px;">
-                <h3 style="color: #0C6258;">Order Status Update</h3>
+                <h3 style="color: #1D4533;">Order Status Update</h3>
                 <p style="color: #475569;">Hi <strong>${customerName || 'Rider'}</strong>,</p>
                 <p style="color: #0F172A; font-size: 16px;">${message}</p>
                 ${notes ? `<p style="color: #64748B; font-size: 14px;"><em>${notes}</em></p>` : ''}

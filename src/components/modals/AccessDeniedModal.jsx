@@ -28,7 +28,7 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
     <Modal visible={visible} transparent animationType="fade">
       <View style={styles.modalOverlay}>
         <View style={[styles.modalSheet, { maxWidth: 460, alignItems: 'center', textAlign: 'center' }]}>
-          <BootstrapIcon name="shield-lock-fill" size={44} color="#0C6258" style={{ marginBottom: 10 }} />
+          <BootstrapIcon name="shield-lock-fill" size={44} color="#1D4533" style={{ marginBottom: 10 }} />
           <Text style={{ fontSize: 19, fontWeight: '900', color: '#0F172A', marginBottom: 8 }}>
             Admin Privileges Required
           </Text>
@@ -49,7 +49,7 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
             style={[
               styles.checkoutBtn,
               {
-                backgroundColor: '#0C6258',
+                backgroundColor: '#1D4533',
                 width: '100%',
                 marginBottom: 8,
                 flexDirection: 'row',

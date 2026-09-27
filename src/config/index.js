@@ -23,7 +23,11 @@ export const APP_CONFIG = {
   gemini: {
     apiKey: env.EXPO_PUBLIC_GEMINI_API_KEY || '',
     model: env.EXPO_PUBLIC_GEMINI_MODEL || 'gemini-1.5-flash',
+    // Image generation / editing model (Nano Banana family)
+    imageModel: env.EXPO_PUBLIC_GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image',
   },
+  // Express AI Customizer API (bike+part multipart). Use LAN IP for physical devices.
+  customizeApiUrl: String(env.EXPO_PUBLIC_CUSTOMIZE_API_URL || '').trim(),
   gcash: {
     merchantId: env.EXPO_PUBLIC_GCASH_MERCHANT_ID || 'MOTOTRACK-GRABPAY-DEMO',
     clientKey: env.EXPO_PUBLIC_GCASH_CLIENT_KEY || 'gcash-sandbox-key',
@@ -42,6 +46,7 @@ export const SUPABASE_URL = APP_CONFIG.supabase.url;
 export const SUPABASE_ANON_KEY = APP_CONFIG.supabase.anonKey;
 export const ADMIN_SECRET_KEY = APP_CONFIG.admin.secretKey;
 export const GEMINI_API_KEY = APP_CONFIG.gemini.apiKey;
+export const GEMINI_IMAGE_MODEL = APP_CONFIG.gemini.imageModel;
 export const USD_TO_PHP_RATE = APP_CONFIG.currency.usdToPhpRate;
 
 export default APP_CONFIG;

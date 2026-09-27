@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
   StyleSheet,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { BootstrapIcon } from '../components/common';
 import { notificationService, stripEmojis } from '../services/notificationService';
@@ -40,11 +41,51 @@ export default function NotificationsPage({
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
   const [toastMessage, setToastMessage] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const [dbAlertCount, setDbAlertCount] = useState(() =>
+    isAdmin ? notificationService.getDatabaseAlertsCount() : 0
+  );
+
+  const handleSyncDatabase = async (isManual = false) => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      const res = await notificationService.syncFromDatabase({ force: true });
+      if (isAdmin) {
+        const fresh = notificationService.getAdminNotifications();
+        setNotifications(fresh);
+        const count = notificationService.getDatabaseAlertsCount();
+        setDbAlertCount(count);
+        setLastSyncedAt(new Date());
+        if (isManual) {
+          showToast(`✓ Database synchronized: ${count} live alerts active`);
+        }
+      }
+    } catch (err) {
+      console.warn('[NotificationsPage.web] sync error:', err);
+      if (isManual) {
+        showToast('⚠️ Sync complete with cached system events');
+      }
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleClearSampleAlerts = async () => {
+    if (!isAdmin) return;
+    const remaining = await notificationService.clearSampleNotifications();
+    setNotifications(remaining);
+    const count = notificationService.getDatabaseAlertsCount();
+    setDbAlertCount(count);
+    showToast(`✓ Mock notifications removed (${count} live database alerts remaining)`);
+  };
 
   useEffect(() => {
     const unsub = notificationService.subscribe((data) => {
       if (isAdmin) {
         setNotifications(data?.admin || notificationService.getAdminNotifications());
+        setDbAlertCount(notificationService.getDatabaseAlertsCount());
       } else {
         setNotifications(
           data?.customer || notificationService.getCustomerNotifications(currentUser?.id)
@@ -53,6 +94,12 @@ export default function NotificationsPage({
     });
     return () => unsub?.();
   }, [isAdmin, currentUser?.id]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      handleSyncDatabase(false);
+    }
+  }, [isAdmin]);
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -168,7 +215,11 @@ export default function NotificationsPage({
           n.type === 'sales'
       ).length;
 
-      return { total, unread, orders, inventory, bookings, customers, system };
+      const liveDb = notifications.filter(
+        (n) => n.isDatabaseLive || (n.id && String(n.id).startsWith('db-'))
+      ).length;
+
+      return { total, unread, orders, inventory, bookings, customers, system, liveDb };
     }
 
     const bookings = notifications.filter((n) => n.type === 'booking').length;
@@ -182,6 +233,11 @@ export default function NotificationsPage({
       if (activeFilter === 'unread' && notif.status !== 'unread') return false;
 
       if (isAdmin) {
+        if (activeFilter === 'live_db') {
+          const isDb = notif.isDatabaseLive || (notif.id && String(notif.id).startsWith('db-'));
+          if (!isDb) return false;
+        }
+
         if (activeFilter === 'orders') {
           const match =
             notif.category === 'order_placed' ||
@@ -283,7 +339,7 @@ export default function NotificationsPage({
         return {
           icon: 'bag-check-fill',
           color: '#2563EB',
-          bg: isDarkMode ? '#1E293B' : '#DBEAFE',
+          bg: isDarkMode ? '#1C2422' : '#DBEAFE',
           label: 'New Order',
           priorityLabel: 'ORDER',
           priorityColor: '#2563EB',
@@ -301,7 +357,7 @@ export default function NotificationsPage({
         return {
           icon: 'truck',
           color: '#2563EB',
-          bg: isDarkMode ? '#1E293B' : '#DBEAFE',
+          bg: isDarkMode ? '#1C2422' : '#DBEAFE',
           label: 'Order Update',
           priorityLabel: 'STATUS',
           priorityColor: '#2563EB',
@@ -327,11 +383,11 @@ export default function NotificationsPage({
       case 'booking_new':
         return {
           icon: 'wrench-adjustable-circle-fill',
-          color: '#0C6258',
-          bg: isDarkMode ? '#132A26' : '#D1ECE6',
+          color: '#1D4533',
+          bg: isDarkMode ? '#132A26' : '#C8DDD3',
           label: 'New Booking',
           priorityLabel: 'PIT BAY',
-          priorityColor: '#0C6258',
+          priorityColor: '#1D4533',
         };
       case 'booking_cancelled':
         return {
@@ -345,11 +401,11 @@ export default function NotificationsPage({
       case 'service_approaching':
         return {
           icon: 'clock-history',
-          color: '#0C6258',
-          bg: isDarkMode ? '#132A26' : '#D1ECE6',
+          color: '#1D4533',
+          bg: isDarkMode ? '#132A26' : '#C8DDD3',
           label: 'Service Due',
           priorityLabel: 'TODAY',
-          priorityColor: '#0C6258',
+          priorityColor: '#1D4533',
         };
       case 'service_completed':
         return {
@@ -422,15 +478,15 @@ export default function NotificationsPage({
       case 'booking':
         return {
           icon: 'tools',
-          color: '#0C6258',
-          bg: isDarkMode ? '#132A26' : '#D1ECE6',
+          color: '#1D4533',
+          bg: isDarkMode ? '#132A26' : '#C8DDD3',
           label: 'Pit Bay',
         };
       case 'order':
         return {
           icon: 'box-seam-fill',
           color: '#2563EB',
-          bg: isDarkMode ? '#1E293B' : '#DBEAFE',
+          bg: isDarkMode ? '#1C2422' : '#DBEAFE',
           label: 'Order',
         };
       case 'inventory':
@@ -459,8 +515,8 @@ export default function NotificationsPage({
       default:
         return {
           icon: 'bell-fill',
-          color: '#0C6258',
-          bg: isDarkMode ? '#132A26' : '#D1ECE6',
+          color: '#1D4533',
+          bg: isDarkMode ? '#132A26' : '#C8DDD3',
           label: 'Notification',
         };
     }
@@ -562,7 +618,7 @@ export default function NotificationsPage({
     <SafeAreaView
       style={[
         styles.safeArea,
-        { backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC' },
+        { backgroundColor: isDarkMode ? '#0E1311' : '#F8FAFC' },
       ]}
     >
       {/* Toast Alert */}
@@ -577,8 +633,8 @@ export default function NotificationsPage({
         style={[
           styles.navbar,
           {
-            backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-            borderBottomColor: isDarkMode ? '#334155' : '#E2E8F0',
+            backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
+            borderBottomColor: isDarkMode ? 'rgba(255, 255, 255, 0.10)' : '#E2E8F0',
           },
         ]}
       >
@@ -587,7 +643,7 @@ export default function NotificationsPage({
             <TouchableOpacity
               style={[
                 styles.backBtn,
-                { backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9' },
+                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
               ]}
               onPress={onNavigateBack}
               activeOpacity={0.7}
@@ -613,11 +669,11 @@ export default function NotificationsPage({
               style={[
                 styles.bellIconCircle,
                 {
-                  backgroundColor: isDarkMode ? '#132A26' : '#E7F5F3',
+                  backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
                 },
               ]}
             >
-              <BootstrapIcon name="bell-fill" size={16} color="#0C6258" />
+              <BootstrapIcon name="bell-fill" size={16} color="#1D4533" />
             </View>
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -665,19 +721,93 @@ export default function NotificationsPage({
         </View>
 
         <View style={styles.navRight}>
+          {isAdmin && (
+            <View
+              style={[
+                styles.liveStatusBadge,
+                {
+                  backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                  borderColor: isDarkMode ? '#1F4D45' : '#C1E7E0',
+                },
+              ]}
+              title="Live database alert synchronization active"
+            >
+              <View style={styles.livePulseDot} />
+              <Text
+                style={[
+                  styles.liveStatusBadgeText,
+                  { color: isDarkMode ? '#34D399' : '#1D4533' },
+                ]}
+              >
+                Database Live ({stats.liveDb || dbAlertCount})
+              </Text>
+            </View>
+          )}
+
+          {isAdmin && (
+            <TouchableOpacity
+              style={[
+                styles.actionBtnOutline,
+                {
+                  backgroundColor: isDarkMode ? '#132A26' : '#FFFFFF',
+                  borderColor: '#1D4533',
+                },
+              ]}
+              onPress={() => handleSyncDatabase(true)}
+              disabled={isSyncing}
+              activeOpacity={0.7}
+              title="Fetch fresh data from database and update alerts"
+            >
+              {isSyncing ? (
+                <ActivityIndicator
+                  size="small"
+                  color="#1D4533"
+                  style={{ transform: [{ scale: 0.75 }] }}
+                />
+              ) : (
+                <BootstrapIcon name="arrow-repeat" size={13} color="#1D4533" />
+              )}
+              <Text style={[styles.actionBtnOutlineText, { color: '#1D4533' }]}>
+                {isSyncing ? 'Syncing...' : 'Sync Database'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {isAdmin && stats.total > (stats.liveDb || 0) && (
+            <TouchableOpacity
+              style={[
+                styles.actionBtnGhost,
+                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
+              ]}
+              onPress={handleClearSampleAlerts}
+              activeOpacity={0.7}
+              title="Remove mock demo notifications and only keep live database items"
+            >
+              <BootstrapIcon name="funnel" size={12} color="#D97706" />
+              <Text
+                style={[
+                  styles.actionBtnGhostText,
+                  { color: isDarkMode ? '#FBBF24' : '#D97706' },
+                ]}
+              >
+                Clear Mock Data
+              </Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             style={[
               styles.actionBtnOutline,
               {
                 backgroundColor: isDarkMode ? '#132A26' : '#FFFFFF',
-                borderColor: '#0C6258',
+                borderColor: '#1D4533',
               },
             ]}
             onPress={handleMarkAllRead}
             activeOpacity={0.7}
           >
-            <BootstrapIcon name="check2-all" size={13} color="#0C6258" />
-            <Text style={[styles.actionBtnOutlineText, { color: '#0C6258' }]}>
+            <BootstrapIcon name="check2-all" size={13} color="#1D4533" />
+            <Text style={[styles.actionBtnOutlineText, { color: '#1D4533' }]}>
               Mark all read
             </Text>
           </TouchableOpacity>
@@ -685,7 +815,7 @@ export default function NotificationsPage({
           <TouchableOpacity
             style={[
               styles.actionBtnGhost,
-              { backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9' },
+              { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
             ]}
             onPress={handleClearRead}
             activeOpacity={0.7}
@@ -710,8 +840,8 @@ export default function NotificationsPage({
             style={[
               styles.statsBar,
               {
-                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
+                borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.10)' : '#E2E8F0',
               },
             ]}
           >
@@ -720,7 +850,7 @@ export default function NotificationsPage({
               style={[
                 styles.statTile,
                 activeFilter === 'all' && {
-                  backgroundColor: isDarkMode ? 'rgba(12, 98, 88, 0.2)' : '#E7F5F3',
+                  backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.2)' : '#E8F0EC',
                   borderRadius: 10,
                 },
               ]}
@@ -730,7 +860,7 @@ export default function NotificationsPage({
               <View
                 style={[
                   styles.statIconBox,
-                  { backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9' },
+                  { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
                 ]}
               >
                 <BootstrapIcon name="layers-fill" size={14} color="#64748B" />
@@ -751,7 +881,47 @@ export default function NotificationsPage({
             <View
               style={[
                 styles.statDivider,
-                { backgroundColor: isDarkMode ? '#334155' : '#F1F5F9' },
+                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
+              ]}
+            />
+
+            {/* Live DB Filter Tile */}
+            <TouchableOpacity
+              style={[
+                styles.statTile,
+                activeFilter === 'live_db' && {
+                  backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#C8DDD3',
+                  borderRadius: 10,
+                },
+              ]}
+              onPress={() => setActiveFilter('live_db')}
+              activeOpacity={0.7}
+            >
+              <View
+                style={[
+                  styles.statIconBox,
+                  { backgroundColor: isDarkMode ? '#132A26' : '#C8DDD3' },
+                ]}
+              >
+                <BootstrapIcon name="database-check" size={14} color="#1D4533" />
+              </View>
+              <View>
+                <Text
+                  style={[
+                    styles.statNumber,
+                    { color: isDarkMode ? '#34D399' : '#1D4533' },
+                  ]}
+                >
+                  {stats.liveDb || 0}
+                </Text>
+                <Text style={styles.statLabel}>Live DB</Text>
+              </View>
+            </TouchableOpacity>
+
+            <View
+              style={[
+                styles.statDivider,
+                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
               ]}
             />
 
@@ -770,7 +940,7 @@ export default function NotificationsPage({
               <View
                 style={[
                   styles.statIconBox,
-                  { backgroundColor: stats.unread > 0 ? '#FFE4E6' : isDarkMode ? '#0F172A' : '#F1F5F9' },
+                  { backgroundColor: stats.unread > 0 ? '#FFE4E6' : isDarkMode ? '#1C2422' : '#F1F5F9' },
                 ]}
               >
                 <BootstrapIcon
@@ -795,7 +965,7 @@ export default function NotificationsPage({
             <View
               style={[
                 styles.statDivider,
-                { backgroundColor: isDarkMode ? '#334155' : '#F1F5F9' },
+                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
               ]}
             />
 
@@ -814,7 +984,7 @@ export default function NotificationsPage({
               <View
                 style={[
                   styles.statIconBox,
-                  { backgroundColor: isDarkMode ? '#1E293B' : '#DBEAFE' },
+                  { backgroundColor: isDarkMode ? '#1C2422' : '#DBEAFE' },
                 ]}
               >
                 <BootstrapIcon name="box-seam-fill" size={14} color="#2563EB" />
@@ -835,7 +1005,7 @@ export default function NotificationsPage({
             <View
               style={[
                 styles.statDivider,
-                { backgroundColor: isDarkMode ? '#334155' : '#F1F5F9' },
+                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
               ]}
             />
 
@@ -875,7 +1045,7 @@ export default function NotificationsPage({
             <View
               style={[
                 styles.statDivider,
-                { backgroundColor: isDarkMode ? '#334155' : '#F1F5F9' },
+                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
               ]}
             />
 
@@ -884,7 +1054,7 @@ export default function NotificationsPage({
               style={[
                 styles.statTile,
                 activeFilter === 'garage' && {
-                  backgroundColor: isDarkMode ? 'rgba(12, 98, 88, 0.2)' : '#D1ECE6',
+                  backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.2)' : '#C8DDD3',
                   borderRadius: 10,
                 },
               ]}
@@ -894,10 +1064,10 @@ export default function NotificationsPage({
               <View
                 style={[
                   styles.statIconBox,
-                  { backgroundColor: isDarkMode ? '#132A26' : '#D1ECE6' },
+                  { backgroundColor: isDarkMode ? '#132A26' : '#C8DDD3' },
                 ]}
               >
-                <BootstrapIcon name="wrench" size={14} color="#0C6258" />
+                <BootstrapIcon name="wrench" size={14} color="#1D4533" />
               </View>
               <View>
                 <Text
@@ -915,7 +1085,7 @@ export default function NotificationsPage({
             <View
               style={[
                 styles.statDivider,
-                { backgroundColor: isDarkMode ? '#334155' : '#F1F5F9' },
+                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
               ]}
             />
 
@@ -955,7 +1125,7 @@ export default function NotificationsPage({
             <View
               style={[
                 styles.statDivider,
-                { backgroundColor: isDarkMode ? '#334155' : '#F1F5F9' },
+                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
               ]}
             />
 
@@ -1000,8 +1170,8 @@ export default function NotificationsPage({
             style={[
               styles.searchBox,
               {
-                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
+                borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.10)' : '#E2E8F0',
               },
             ]}
           >
@@ -1029,8 +1199,8 @@ export default function NotificationsPage({
           style={[
             styles.feedCard,
             {
-              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+              backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.10)' : '#E2E8F0',
             },
           ]}
         >
@@ -1039,7 +1209,7 @@ export default function NotificationsPage({
               <View
                 style={[
                   styles.emptyIconCircle,
-                  { backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9' },
+                  { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
                 ]}
               >
                 <BootstrapIcon name="bell-slash" size={28} color="#94A3B8" />
@@ -1074,16 +1244,16 @@ export default function NotificationsPage({
                   style={[
                     styles.notifItem,
                     {
-                      borderBottomColor: isDarkMode ? '#334155' : '#F1F5F9',
+                      borderBottomColor: isDarkMode ? '#1C2422' : '#F1F5F9',
                       backgroundColor: isUnread
                         ? isDarkMode
-                          ? 'rgba(12, 98, 88, 0.08)'
+                          ? 'rgba(29, 69, 51, 0.08)'
                           : '#F7FBFA'
                         : 'transparent',
                     },
                     isUnread && {
                       borderLeftWidth: 3,
-                      borderLeftColor: '#0C6258',
+                      borderLeftColor: '#1D4533',
                     },
                     index === filteredNotifications.length - 1 && {
                       borderBottomWidth: 0,
@@ -1123,6 +1293,28 @@ export default function NotificationsPage({
                         >
                           {meta.label}
                         </Text>
+                        {(notif.isDatabaseLive ||
+                          (notif.id && String(notif.id).startsWith('db-'))) && (
+                          <View
+                            style={[
+                              styles.liveDbTag,
+                              {
+                                backgroundColor: isDarkMode ? '#132A26' : '#C8DDD3',
+                                borderColor: isDarkMode ? '#1F4D45' : '#A7D9D0',
+                              },
+                            ]}
+                          >
+                            <View style={styles.liveDbDot} />
+                            <Text
+                              style={[
+                                styles.liveDbTagText,
+                                { color: isDarkMode ? '#34D399' : '#1D4533' },
+                              ]}
+                            >
+                              DATABASE LIVE
+                            </Text>
+                          </View>
+                        )}
                         {isUnread && <View style={styles.unreadDot} />}
                       </View>
                       <Text style={styles.notifTimeText}>
@@ -1168,7 +1360,7 @@ export default function NotificationsPage({
                                 style={[
                                   styles.metaChip,
                                   {
-                                    backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
+                                    backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
                                   },
                                 ]}
                               >
@@ -1210,7 +1402,7 @@ export default function NotificationsPage({
                           style={[
                             styles.actionIconBtn,
                             {
-                              backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
+                              backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
                             },
                           ]}
                           onPress={() =>
@@ -1231,7 +1423,7 @@ export default function NotificationsPage({
                           style={[
                             styles.actionIconBtn,
                             {
-                              backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
+                              backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
                             },
                           ]}
                           onPress={() => handleDeleteSingle(notif.id)}
@@ -1260,7 +1452,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     alignSelf: 'center',
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 20,
@@ -1484,7 +1676,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   notifTimeText: {
     fontSize: 11,
@@ -1536,10 +1728,50 @@ const styles = StyleSheet.create({
   primaryActionText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   actionIconBtn: {
     padding: 6,
     borderRadius: 6,
+  },
+  liveStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  livePulseDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10B981',
+  },
+  liveStatusBadgeText: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  liveDbTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    borderRadius: 5,
+    borderWidth: 1,
+  },
+  liveDbDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#1D4533',
+  },
+  liveDbTagText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.3,
   },
 });

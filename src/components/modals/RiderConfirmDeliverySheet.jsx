@@ -32,7 +32,7 @@ export default function RiderConfirmDeliverySheet({ visible, token, onClose, onD
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     ...(Platform.OS === 'web' ? { minHeight: '100vh' } : null),
   },
 });

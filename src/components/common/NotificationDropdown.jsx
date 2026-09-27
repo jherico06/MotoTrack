@@ -38,8 +38,8 @@ function getCategoryTheme(type) {
       return {
         icon: 'tools',
         bg: '#DCFCE7',
-        color: '#0C6258',
-        badgeBg: '#0C6258',
+        color: '#1D4533',
+        badgeBg: '#1D4533',
       };
     case 'order':
       return {
@@ -66,8 +66,8 @@ function getCategoryTheme(type) {
       return {
         icon: 'bell-fill',
         bg: '#F1F5F9',
-        color: '#0C6258',
-        badgeBg: '#0C6258',
+        color: '#1D4533',
+        badgeBg: '#1D4533',
       };
   }
 }
@@ -177,7 +177,7 @@ export default function NotificationDropdown({
               onPress={handleMarkAllRead}
               activeOpacity={0.7}
             >
-              <BootstrapIcon name="check2-all" size={13} color="#0C6258" />
+              <BootstrapIcon name="check2-all" size={13} color="#1D4533" />
               <Text style={styles.markAllBtnText}>Mark all read</Text>
             </TouchableOpacity>
           )}
@@ -310,7 +310,7 @@ export default function NotificationDropdown({
                     <BootstrapIcon
                       name="three-dots"
                       size={14}
-                      color={isMenuOpen ? '#0C6258' : '#64748B'}
+                      color={isMenuOpen ? '#1D4533' : '#64748B'}
                     />
                   </TouchableOpacity>
 
@@ -338,7 +338,7 @@ export default function NotificationDropdown({
                             <BootstrapIcon
                               name={isUnread ? 'check-circle' : 'circle-fill'}
                               size={13}
-                              color="#0C6258"
+                              color="#1D4533"
                             />
                           </View>
                           <Text style={styles.popoverItemText}>
@@ -396,7 +396,7 @@ export default function NotificationDropdown({
             activeOpacity={0.8}
           >
             <Text style={styles.footerBtnText}>See all notifications</Text>
-            <BootstrapIcon name="chevron-right" size={11} color="#0C6258" />
+            <BootstrapIcon name="chevron-right" size={11} color="#1D4533" />
           </TouchableOpacity>
         </View>
       </View>
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
   headerBadge: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 10,
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   markAllBtnText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   filterPillsRow: {
     flexDirection: 'row',
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
   },
   filterPillActive: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   filterPillText: {
     fontSize: 12,
@@ -597,14 +597,14 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
   },
   itemTimeUnread: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '700',
   },
   unreadDot: {
     width: 9,
     height: 9,
     borderRadius: 4.5,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     marginLeft: 4,
   },
   dotsBtn: {
@@ -623,7 +623,7 @@ const styles = StyleSheet.create({
   },
   dotsBtnActive: {
     backgroundColor: '#E6F0EE',
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
   },
   actionPopover: {
     position: 'absolute',
@@ -686,6 +686,6 @@ const styles = StyleSheet.create({
   footerBtnText: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
 });

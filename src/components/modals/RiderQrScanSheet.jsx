@@ -238,7 +238,7 @@ export default function RiderQrScanSheet({ visible, order, onClose, onScanned })
             onPress={() => setShowPaste((v) => !v)}
             accessibilityRole="button"
           >
-            <BootstrapIcon name="clipboard" size={14} color="#0C6258" />
+            <BootstrapIcon name="clipboard" size={14} color="#1D4533" />
             <Text style={styles.secondaryBtnText}>
               {showPaste ? 'Hide paste option' : 'Paste QR link instead'}
             </Text>
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#ECFDF5',
   },
-  secondaryBtnText: { color: '#0C6258', fontWeight: '800', fontSize: 13 },
+  secondaryBtnText: { color: '#1D4533', fontWeight: '800', fontSize: 13 },
   pasteBlock: { gap: 8 },
   label: { fontSize: 12, fontWeight: '800', color: '#CBD5E1' },
   input: {
@@ -406,7 +406,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#111827',
   },
   primaryBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 14,
     minHeight: 48,
     alignItems: 'center',

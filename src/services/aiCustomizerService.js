@@ -67,8 +67,8 @@ export const CUSTOM_THEMES = [
     name: 'Factory Racing Edition',
     badge: 'Track Spec',
     description: 'High-contrast racing decals, anodized gold hardware, and titanium blue flame pipe accents.',
-    accentColor: '#0C6258',
-    previewGradient: ['#0C6258', '#F59E0B'],
+    accentColor: '#1D4533',
+    previewGradient: ['#1D4533', '#F59E0B'],
   },
   {
     id: 'theme-stealth-carbon',

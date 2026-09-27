@@ -13,7 +13,13 @@ import {
 } from 'react-native';
 import BootstrapIcon from '../components/common/BootstrapIcon';
 import { deliveryService } from '../services/deliveryService';
-import { pickImageFromFile } from '../utils/imagePickerHelper';
+import { pickImageFromFile, pickImageFromCamera, openAppPermissionSettings } from '../utils/imagePickerHelper';
+
+function formatPeso(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return '—';
+  return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 /**
  * Public, no-login delivery confirmation page for riders.
@@ -69,10 +75,20 @@ export default function DeliveryConfirmPage({ token: tokenProp, onDone }) {
     };
   }, [token]);
 
-  const handlePickPhoto = async () => {
-    const res = await pickImageFromFile();
-    if (res.success) setPhoto(res.uri);
-    else if (res.error && res.error !== 'No file selected') setError(res.error);
+  const handlePickPhoto = async (source = 'library') => {
+    setError('');
+    const res = source === 'camera' ? await pickImageFromCamera() : await pickImageFromFile();
+    if (res.success) {
+      setPhoto(res.uri);
+      return;
+    }
+    if (res.error && res.error !== 'No file selected' && res.error !== 'Selection cancelled' && res.error !== 'Capture cancelled') {
+      setError(res.error);
+      if (res.openSettings) {
+        // Best-effort: open Settings so the rider can re-enable Photos/Camera.
+        openAppPermissionSettings();
+      }
+    }
   };
 
   const handleConfirm = async () => {
@@ -121,6 +137,8 @@ export default function DeliveryConfirmPage({ token: tokenProp, onDone }) {
     );
   }
 
+  const items = Array.isArray(preview?.items) ? preview.items : [];
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
@@ -128,12 +146,12 @@ export default function DeliveryConfirmPage({ token: tokenProp, onDone }) {
         <Text style={styles.title}>Confirm delivery</Text>
         <Text style={styles.sub}>
           {onDone
-            ? 'Review the delivery, then tap Confirm Delivered after drop-off.'
-            : 'No login required. Review the delivery, then tap Confirm Delivered after drop-off.'}
+            ? 'Review the order details, then tap Confirm Delivered after drop-off.'
+            : 'No login required. Review the order details, then tap Confirm Delivered after drop-off.'}
         </Text>
 
         {loading ? (
-          <ActivityIndicator color="#0C6258" style={{ marginTop: 32 }} />
+          <ActivityIndicator color="#1D4533" style={{ marginTop: 32 }} />
         ) : (
           <View style={styles.card}>
             {error ? (
@@ -145,18 +163,71 @@ export default function DeliveryConfirmPage({ token: tokenProp, onDone }) {
 
             {preview ? (
               <>
+                <Text style={styles.sectionTitle}>Order</Text>
                 <Row label="Order" value={`#${preview.orderId || '—'}`} />
-                <Row label="Rider" value={preview.riderName || 'Assigned rider'} />
-                {preview.riderContact ? <Row label="Contact" value={preview.riderContact} /> : null}
-                <Row
-                  label="Items"
-                  value={preview.itemCount ? `${preview.itemCount} item(s)` : 'Order items'}
-                />
-                <Row label="Area" value={preview.destinationHint || 'On file'} />
                 <Row
                   label="Status"
                   value={preview.orderStatus || preview.deliveryStatus || '—'}
                 />
+                <Row label="Rider" value={preview.riderName || 'Assigned rider'} />
+                {preview.riderContact ? <Row label="Contact" value={preview.riderContact} /> : null}
+
+                <Text style={styles.sectionTitle}>Customer</Text>
+                <Row label="Name" value={preview.customerName || '—'} />
+                {preview.customerPhone ? <Row label="Phone" value={preview.customerPhone} /> : null}
+                <View style={styles.addressBlock}>
+                  <Text style={styles.rowLabel}>Deliver to</Text>
+                  <Text style={styles.addressValue}>
+                    {preview.customerAddress || preview.destinationHint || 'Address on file'}
+                  </Text>
+                </View>
+
+                <Text style={styles.sectionTitle}>Items</Text>
+                {items.length > 0 ? (
+                  <View style={styles.itemsList}>
+                    {items.map((item, idx) => (
+                      <View key={`${item.name}-${idx}`} style={styles.itemRow}>
+                        {item.image ? (
+                          <Image source={{ uri: item.image }} style={styles.itemThumb} />
+                        ) : (
+                          <View style={[styles.itemThumb, styles.itemThumbPlaceholder]}>
+                            <BootstrapIcon name="box-seam" size={16} color="#94A3B8" />
+                          </View>
+                        )}
+                        <View style={styles.itemMeta}>
+                          <Text style={styles.itemName} numberOfLines={2}>
+                            {item.name}
+                          </Text>
+                          <Text style={styles.itemSub}>
+                            {[item.brand, item.size ? `Size ${item.size}` : null, `×${item.quantity}`]
+                              .filter(Boolean)
+                              .join(' · ')}
+                          </Text>
+                        </View>
+                        {Number(item.price) > 0 ? (
+                          <Text style={styles.itemPrice}>{formatPeso(item.price * Number(item.quantity || 1))}</Text>
+                        ) : null}
+                      </View>
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={styles.itemsFallback}>
+                    {preview.itemsSummary ||
+                      (preview.itemCount ? `${preview.itemCount} item(s)` : 'Order items on file')}
+                  </Text>
+                )}
+
+                <Text style={styles.sectionTitle}>Payment</Text>
+                <Row label="Method" value={preview.paymentMethod || '—'} />
+                {preview.shippingFee != null ? (
+                  <Row label="Shipping" value={formatPeso(preview.shippingFee)} />
+                ) : null}
+                {preview.discountAmount > 0 ? (
+                  <Row label="Discount" value={`−${formatPeso(preview.discountAmount)}`} />
+                ) : null}
+                {preview.totalAmount != null ? (
+                  <Row label="Total" value={formatPeso(preview.totalAmount)} emphasize />
+                ) : null}
 
                 {preview.isValid ? (
                   <>
@@ -172,12 +243,26 @@ export default function DeliveryConfirmPage({ token: tokenProp, onDone }) {
                     />
 
                     <Text style={styles.label}>Photo (optional)</Text>
-                    <TouchableOpacity style={styles.photoBtn} onPress={handlePickPhoto} activeOpacity={0.85}>
-                      <BootstrapIcon name="camera" size={14} color="#1D4ED8" />
-                      <Text style={styles.photoBtnText}>
-                        {photo ? 'Change photo' : 'Add delivery photo'}
-                      </Text>
-                    </TouchableOpacity>
+                    <View style={styles.photoActions}>
+                      <TouchableOpacity
+                        style={styles.photoBtn}
+                        onPress={() => handlePickPhoto('camera')}
+                        activeOpacity={0.85}
+                      >
+                        <BootstrapIcon name="camera" size={14} color="#1D4ED8" />
+                        <Text style={styles.photoBtnText}>Take photo</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.photoBtn}
+                        onPress={() => handlePickPhoto('library')}
+                        activeOpacity={0.85}
+                      >
+                        <BootstrapIcon name="image" size={14} color="#1D4ED8" />
+                        <Text style={styles.photoBtnText}>
+                          {photo ? 'Change from gallery' : 'Choose from gallery'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                     {photo ? (
                       <Image source={{ uri: photo }} style={styles.photoPreview} />
                     ) : null}
@@ -212,11 +297,11 @@ export default function DeliveryConfirmPage({ token: tokenProp, onDone }) {
   );
 }
 
-function Row({ label, value }) {
+function Row({ label, value, emphasize }) {
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
+      <Text style={[styles.rowValue, emphasize && styles.rowValueEmphasize]}>{value}</Text>
     </View>
   );
 }
@@ -261,6 +346,15 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 4,
   },
+  sectionTitle: {
+    marginTop: 14,
+    marginBottom: 4,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1D4533',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -271,6 +365,29 @@ const styles = StyleSheet.create({
   },
   rowLabel: { fontSize: 12, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' },
   rowValue: { fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, textAlign: 'right' },
+  rowValueEmphasize: { color: '#1D4533', fontSize: 15 },
+  addressBlock: {
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E2E8F0',
+    gap: 4,
+  },
+  addressValue: { fontSize: 14, fontWeight: '600', color: '#0F172A', lineHeight: 20 },
+  itemsList: { gap: 10, marginTop: 4, marginBottom: 4 },
+  itemRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  itemThumb: { width: 44, height: 44, borderRadius: 8, backgroundColor: '#E2E8F0' },
+  itemThumbPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  itemMeta: { flex: 1, gap: 2 },
+  itemName: { fontSize: 13, fontWeight: '700', color: '#0F172A' },
+  itemSub: { fontSize: 11, color: '#64748B', fontWeight: '600' },
+  itemPrice: { fontSize: 12, fontWeight: '800', color: '#1D4533' },
+  itemsFallback: {
+    fontSize: 13,
+    color: '#334155',
+    fontWeight: '600',
+    paddingVertical: 8,
+    lineHeight: 18,
+  },
   label: {
     fontSize: 11,
     fontWeight: '800',
@@ -291,8 +408,10 @@ const styles = StyleSheet.create({
     minHeight: 72,
   },
   photoBtn: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
     borderWidth: 1,
     borderColor: '#BFDBFE',
@@ -300,6 +419,10 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 14,
+  },
+  photoActions: {
+    flexDirection: 'row',
+    gap: 8,
   },
   photoBtnText: { color: '#1D4ED8', fontWeight: '700', fontSize: 13 },
   photoPreview: {
@@ -311,7 +434,7 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     marginTop: 18,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 14,
     height: 52,
     alignItems: 'center',

@@ -35,11 +35,24 @@ import { AssignDeliveryModal, DeliveryAdminActionModal, DeliveryTokenModal, Ride
 import { pickImageFromFile } from '../utils/imagePickerHelper';
 import { systemSettingsService } from '../services/systemSettingsService';
 import NotificationsPage from './NotificationsPage';
-import { SalesForecastPanel } from '../components/admin';
+import { SalesForecastPanel, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, CustomizationsAdminPanel } from '../components/admin';
+import {
+  cartLineKey,
+  getProductSizeEntries,
+  getSizePrice,
+  isSizeSoldOut,
+  normalizeProductSizes,
+  productNeedsSizes,
+  serializeProductSizes,
+  validateSizeDrafts,
+} from '../utils/productSizes';
+import { serializeProductColors, validateColorDrafts } from '../utils/productColors';
+import { supplierService } from '../services/supplierService';
 
 export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
+  const isDarkMode = false;
 
   const { currentUser: authUser, adminLogin, login } = useAuth();
   const currentUser = authUser || authService.getCurrentUser() || {
@@ -61,6 +74,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [usersList, setUsersList] = useState([]);
   const [toastMessage, setToastMessage] = useState('');
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
+  const [overviewModuleCategory, setOverviewModuleCategory] = useState('all');
 
   // ─── ORDERS & COD MANAGEMENT STATE ───
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
@@ -69,8 +83,23 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [isPaymentDropdownOpen, setIsPaymentDropdownOpen] = useState(false);
   const [selectedOrderForModal, setSelectedOrderForModal] = useState(null);
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false);
+  const [isOrderEditMode, setIsOrderEditMode] = useState(false);
+  const [orderEditForm, setOrderEditForm] = useState({
+    customer_name: '',
+    customer_phone: '',
+    customer_address: '',
+    delivery_notes: '',
+    cod_change_for: '',
+    status: '',
+    payment_method: '',
+    rider_name: '',
+    rider_contact: '',
+    channel: '',
+  });
+  const [isSavingOrderEdits, setIsSavingOrderEdits] = useState(false);
   const [assignDeliveryOrder, setAssignDeliveryOrder] = useState(null);
   const [orderDeliveryDetail, setOrderDeliveryDetail] = useState(null);
+  const [proofViewer, setProofViewer] = useState(null); // { uri, notes, reportedAt, riderName }
   const [orderDeliveryHistory, setOrderDeliveryHistory] = useState([]);
   const [deliveryAction, setDeliveryAction] = useState(null);
   const [deliveryTokenModal, setDeliveryTokenModal] = useState(null);
@@ -81,7 +110,20 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [invStockFilter, setInvStockFilter] = useState('All'); // 'All' | 'inStock' | 'lowStock' | 'outOfStock'
   const [invCategoryFilter, setInvCategoryFilter] = useState('All');
   const [restockModalProduct, setRestockModalProduct] = useState(null);
+  const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
   const [restockAmount, setRestockAmount] = useState('10');
+  const [restockUnitCost, setRestockUnitCost] = useState('0');
+  const [restockSellPrice, setRestockSellPrice] = useState('0');
+  const [restockSupplierId, setRestockSupplierId] = useState('');
+  const [restockSearchQuery, setRestockSearchQuery] = useState('');
+  const [restockSizeAdds, setRestockSizeAdds] = useState([]); // [{ label, currentStock, addQty }]
+  const [restockSelectedSize, setRestockSelectedSize] = useState(''); // chosen size label or 'all'
+  const [suppliers, setSuppliers] = useState(() =>
+    supplierService && supplierService.getSuppliers ? supplierService.getSuppliers() : []
+  );
+  const [supplierPurchases, setSupplierPurchases] = useState(() =>
+    productService.getSupplierPurchases ? productService.getSupplierPurchases() : []
+  );
 
   // ─── POS STATE ───
   const [posSearchQuery, setPosSearchQuery] = useState('');
@@ -94,6 +136,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [posDiscountCode, setPosDiscountCode] = useState('');
   const [posDiscountPercent, setPosDiscountPercent] = useState(0);
   const [posReceiptOrder, setPosReceiptOrder] = useState(null);
+  const [posSizePickerProduct, setPosSizePickerProduct] = useState(null);
+  const [posSelectedSize, setPosSelectedSize] = useState('');
 
   // ─── ANALYTICS STATE ───
   const [analyticsPeriod, setAnalyticsPeriod] = useState('month'); // 'today' | 'week' | 'month' | 'all'
@@ -108,8 +152,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [newProdName, setNewProdName] = useState('');
   const [newProdBrand, setNewProdBrand] = useState('Akrapovič');
   const [newProdCategory, setNewProdCategory] = useState('Exhaust');
-  const [newProdPrice, setNewProdPrice] = useState('39000');
-  const [newProdOldPrice, setNewProdOldPrice] = useState('42500');
+  const [newProdPrice, setNewProdPrice] = useState('');
+  const [newProdCost, setNewProdCost] = useState('0');
+  const [newProdSizes, setNewProdSizes] = useState([]);
+  const [newProdColors, setNewProdColors] = useState([]);
+  const [newProdOldPrice, setNewProdOldPrice] = useState('');
   const [newProdStock, setNewProdStock] = useState('15');
   const [newProdBadge, setNewProdBadge] = useState('New');
   const [newProdImage, setNewProdImage] = useState(
@@ -405,6 +452,62 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     return { totalSkus, inStockCount, lowStockCount, outOfStockCount, totalValue, totalUnits };
   }, [products]);
 
+  const profitOverview = useMemo(() => {
+    const productMap = {};
+    products.forEach((p) => {
+      const id = p.product_id || p.id;
+      if (id) productMap[id] = p;
+    });
+
+    let inventoryCost = 0;
+    let inventorySellValue = 0;
+    let catalogProfit = 0;
+    products.forEach((p) => {
+      const cost = Number(p.unit_cost ?? p.unitCost ?? 0);
+      const price = Number(p.price || 0);
+      const stock = Number(p.stock || 0);
+      inventoryCost += cost * stock;
+      inventorySellValue += price * stock;
+      catalogProfit += (price - cost) * stock;
+    });
+
+    const cancelled = new Set(['cancelled', 'canceled', 'refunded', 'returned', 'declined', 'rejected']);
+    let soldRevenue = 0;
+    let soldCost = 0;
+    (orders || []).forEach((o) => {
+      const status = String(o.status || '').toLowerCase();
+      if (cancelled.has(status)) return;
+      soldRevenue += Number(o.grand_total ?? o.total_amount ?? 0);
+      const items = Array.isArray(o.items) ? o.items : [];
+      items.forEach((it) => {
+        const qty = Number(it.quantity || 1);
+        const pid = it.product_id || it.id;
+        const lineCost =
+          it.unit_cost != null && it.unit_cost !== ''
+            ? Number(it.unit_cost)
+            : Number(productMap[pid]?.unit_cost ?? productMap[pid]?.unitCost ?? 0);
+        soldCost += lineCost * qty;
+      });
+    });
+    const soldProfit = soldRevenue - soldCost;
+    const soldMargin = soldRevenue > 0 ? (soldProfit / soldRevenue) * 100 : 0;
+    const purchaseExpense = (supplierPurchases || []).reduce(
+      (sum, row) => sum + Number(row.expense || 0),
+      0
+    );
+
+    return {
+      inventoryCost,
+      inventorySellValue,
+      catalogProfit,
+      soldRevenue,
+      soldCost,
+      soldProfit,
+      soldMargin,
+      purchaseExpense,
+    };
+  }, [products, orders, supplierPurchases]);
+
   const filteredInventory = useMemo(() => {
     return products.filter((p) => {
       const matchCat = invCategoryFilter === 'All' || p.category.toLowerCase() === invCategoryFilter.toLowerCase();
@@ -428,18 +531,171 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     }
   };
 
+  const seedRestockSizeAdds = (product) => {
+    const sizes = normalizeProductSizes(product);
+    if (!sizes.length) {
+      setRestockSizeAdds([]);
+      setRestockSelectedSize('');
+      return;
+    }
+    setRestockSelectedSize(sizes[0].label);
+    setRestockSizeAdds(
+      sizes.map((s) => ({
+        label: s.label,
+        currentStock:
+          s.stock === null || s.stock === undefined
+            ? Number(product.stock || 0)
+            : Number(s.stock || 0),
+        addQty: '',
+      }))
+    );
+    if (sizes[0].price) {
+      setRestockSellPrice(String(sizes[0].price));
+    }
+  };
+
   const handleExecuteRestock = async () => {
-    if (!restockModalProduct) return;
-    const amountNum = parseInt(restockAmount, 10);
-    if (isNaN(amountNum) || amountNum <= 0) {
-      showAlert('Invalid Quantity', 'Please enter a valid positive restock number.');
+    if (!restockModalProduct) {
+      showAlert('Select Product', 'Choose a product to restock first.');
+      return;
+    }
+    const costNum = parseFloat(restockUnitCost);
+    const priceNum = parseFloat(restockSellPrice);
+    const availSizes = normalizeProductSizes(restockModalProduct);
+    const hasSizes = availSizes.length > 0;
+
+    let sizeDeltas = null;
+    let amountNum = 0;
+
+    if (hasSizes) {
+      if (restockSelectedSize && restockSelectedSize !== 'all') {
+        const qty = parseInt(restockAmount, 10);
+        if (isNaN(qty) || qty <= 0) {
+          showAlert('Invalid Quantity', `Please enter a valid positive purchase quantity for size "${restockSelectedSize}".`);
+          return;
+        }
+        amountNum = qty;
+        sizeDeltas = [{ label: restockSelectedSize, quantity: qty }];
+      } else {
+        // 'all' multi-size breakdown
+        sizeDeltas = (restockSizeAdds || [])
+          .map((row) => ({
+            label: row.label,
+            quantity: parseInt(String(row.addQty || '0'), 10) || 0,
+          }))
+          .filter((row) => row.quantity > 0);
+        if (!sizeDeltas.length) {
+          showAlert('Invalid Quantity', 'Enter how many units to add for at least one size.');
+          return;
+        }
+        amountNum = sizeDeltas.reduce((sum, row) => sum + row.quantity, 0);
+      }
+    } else {
+      amountNum = parseInt(restockAmount, 10);
+      if (isNaN(amountNum) || amountNum <= 0) {
+        showAlert('Invalid Quantity', 'Please enter a valid positive purchase quantity.');
+        return;
+      }
+    }
+
+    if (isNaN(costNum) || costNum < 0) {
+      showAlert('Invalid Cost', 'Please enter the supplier purchase cost (₱).');
+      return;
+    }
+    if (isNaN(priceNum) || priceNum < 0) {
+      showAlert('Invalid Price', 'Please enter the selling price (₱).');
+      return;
+    }
+    if (priceNum < costNum) {
+      showAlert(
+        'Price Below Cost',
+        'Selling price is lower than purchase cost. Increase the selling price to keep a profit.'
+      );
       return;
     }
 
-    await handleQuickAdjustStock(restockModalProduct.id, amountNum);
+    const supplier = (suppliers || []).find(
+      (s) => (s.supplier_id || s.id) === restockSupplierId
+    );
+
+    const res = await productService.purchaseFromSupplier({
+      productId: restockModalProduct.id || restockModalProduct.product_id,
+      quantity: amountNum,
+      unitCost: costNum,
+      sellPrice: priceNum,
+      supplierId: restockSupplierId || null,
+      supplierName: supplier?.name || '',
+      sizeDeltas: hasSizes ? sizeDeltas : null,
+    });
+
+    if (!res.success) {
+      showAlert('Purchase Failed', res.error || 'Unable to record supplier purchase.');
+      return;
+    }
+
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === restockModalProduct.id || p.product_id === restockModalProduct.id
+          ? { ...p, ...res.product }
+          : p
+      )
+    );
+    setSupplierPurchases(productService.getSupplierPurchases());
+
+    const sizeNote = hasSizes && restockSelectedSize && restockSelectedSize !== 'all' ? ` (Size: ${restockSelectedSize})` : '';
+
+    const productName = restockModalProduct.name;
+    setIsRestockModalOpen(false);
     setRestockModalProduct(null);
     setRestockAmount('10');
-    showToast(`Restocked ${amountNum} units of "${restockModalProduct.name.slice(0, 18)}..."! 🚀`);
+    setRestockUnitCost('0');
+    setRestockSellPrice('0');
+    setRestockSupplierId('');
+    setRestockSearchQuery('');
+    setRestockSizeAdds([]);
+    setRestockSelectedSize('');
+    showToast(
+      `Purchase saved${sizeNote} · Expense ₱${res.purchase.expense.toLocaleString()} · Profit ₱${res.purchase.profitPerUnit.toLocaleString()}/pc`
+    );
+    showAlert(
+      'Purchase Complete',
+      `"${productName}"${sizeNote}\n\nExpense: ₱${res.purchase.expense.toLocaleString()}\nProfit/unit: ₱${res.purchase.profitPerUnit.toLocaleString()} (${res.purchase.margin.toFixed(1)}%)\nIf all sell: ₱${res.purchase.expectedProfit.toLocaleString()}`
+    );
+  };
+
+  const openSupplierPurchase = (product = null) => {
+    setIsRestockModalOpen(true);
+    setRestockSearchQuery('');
+    if (product) {
+      const cost = Number(product.unit_cost ?? product.unitCost ?? 0);
+      const price = Number(product.price || 0);
+      setRestockModalProduct(product);
+      setRestockAmount('10');
+      setRestockUnitCost(String(cost || 0));
+      setRestockSellPrice(String(price || 0));
+      setRestockSupplierId(product.supplier_id || '');
+      seedRestockSizeAdds(product);
+    } else {
+      setRestockModalProduct(null);
+      setRestockAmount('10');
+      setRestockUnitCost('0');
+      setRestockSellPrice('0');
+      setRestockSupplierId('');
+      setRestockSizeAdds([]);
+      setRestockSelectedSize('');
+    }
+  };
+
+  const selectRestockProduct = (product) => {
+    const cost = Number(product.unit_cost ?? product.unitCost ?? 0);
+    const price = Number(product.price || 0);
+    setRestockModalProduct(product);
+    setRestockAmount('10');
+    setRestockUnitCost(String(cost || 0));
+    setRestockSellPrice(String(price || 0));
+    setRestockSupplierId(product.supplier_id || '');
+    setRestockSearchQuery('');
+    seedRestockSizeAdds(product);
   };
 
   // ─── POS CASHIER TERMINAL ACTIONS ───
@@ -452,37 +708,69 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     });
   }, [products, posSearchQuery, posCategoryFilter]);
 
-  const handlePOSAddToCart = (product) => {
+  const addPOSLine = (product, size = '') => {
     if (product.stock <= 0) {
       showToast('⚠️ Product is Out of Stock!');
       return;
     }
+    const lineId = cartLineKey(product.id, size);
+    const unitPrice = size ? getSizePrice(product, size) : Number(product.price) || 0;
+    const displayName = size ? `${product.name} [${size}]` : product.name;
 
     setPosCart((prev) => {
-      const existing = prev.find((item) => item.id === product.id);
+      const existing = prev.find((item) => item.id === lineId);
       if (existing) {
         if (existing.quantity >= product.stock) {
           showToast(`⚠️ Only ${product.stock} units available in inventory.`);
           return prev;
         }
-        return prev.map((item) => (item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
+        return prev.map((item) =>
+          item.id === lineId ? { ...item, quantity: item.quantity + 1 } : item
+        );
       }
       return [
         ...prev,
         {
-          id: product.id,
+          id: lineId,
           product_id: product.id,
-          name: product.name,
+          name: displayName,
           brand: product.brand,
           category: product.category,
-          price: product.price,
+          price: unitPrice,
           quantity: 1,
           image: product.image,
           stock: product.stock,
+          size: size || null,
+          unit_cost: Number(product.unit_cost ?? product.unitCost ?? 0),
         },
       ];
     });
-    showToast(`Added "${product.name.slice(0, 16)}..." to POS Cart 🛒`);
+    showToast(`Added "${displayName.slice(0, 18)}..." to POS Cart 🛒`);
+  };
+
+  const handlePOSAddToCart = (product) => {
+    if (product.stock <= 0) {
+      showToast('⚠️ Product is Out of Stock!');
+      return;
+    }
+    if (productNeedsSizes(product)) {
+      const opts = getProductSizeEntries(product);
+      setPosSizePickerProduct(product);
+      setPosSelectedSize(opts.length === 1 ? opts[0].label : '');
+      return;
+    }
+    addPOSLine(product);
+  };
+
+  const handlePOSConfirmSize = () => {
+    if (!posSizePickerProduct) return;
+    if (!posSelectedSize) {
+      showToast('⚠️ Select a size first');
+      return;
+    }
+    addPOSLine(posSizePickerProduct, posSelectedSize);
+    setPosSizePickerProduct(null);
+    setPosSelectedSize('');
   };
 
   const handlePOSUpdateQty = (id, delta) => {
@@ -628,7 +916,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
     const topProducts = Object.values(productSales)
       .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 5);
+      .slice(0, 5)
+      .map((tp) => {
+        const match = products?.find((p) => (p.name || p.title) === tp.name);
+        return { ...tp, image_url: match ? match.image_url || match.imageUrl || match.image : null };
+      });
 
     // Trend Simulation for 7 periods
     const trendBars = [
@@ -669,6 +961,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     showToast(`Price updated to ₱${parsed.toFixed(2)}`);
   };
 
+  const handleUpdateCost = async (id, newCost) => {
+    const parsed = parseFloat(newCost);
+    if (isNaN(parsed) || parsed < 0) return;
+
+    await productService.updateProduct(id, { unit_cost: parsed, unitCost: parsed });
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === id || p.product_id === id
+          ? { ...p, unit_cost: parsed, unitCost: parsed }
+          : p
+      )
+    );
+    showToast(`Cost updated to ₱${parsed.toFixed(2)}`);
+  };
+
   const handleUpdateStock = async (id, newStock) => {
     const parsed = parseInt(newStock, 10);
     if (isNaN(parsed) || parsed < 0) return;
@@ -680,10 +987,55 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
   const handleSaveProductEdit = async () => {
     if (!editingProduct) return;
-    await productService.updateProduct(editingProduct.id, editingProduct);
-    setProducts((prev) => prev.map((p) => (p.id === editingProduct.id ? editingProduct : p)));
+    const sizeIssues = validateSizeDrafts(editingProduct.sizes || []);
+    const colorIssues = validateColorDrafts(editingProduct.colors || []);
+    const issues = [...sizeIssues, ...colorIssues];
+    if (issues.length) {
+      showToast(issues[0]);
+      return;
+    }
+    const cost = Number(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0);
+    const payload = {
+      ...editingProduct,
+      unit_cost: cost,
+      unitCost: cost,
+      sizes: serializeProductSizes(
+        editingProduct.sizes || [],
+        Number(editingProduct.price) || 0
+      ),
+      colors: serializeProductColors(editingProduct.colors || []),
+    };
+    const res = await productService.updateProduct(
+      editingProduct.id || editingProduct.product_id,
+      payload
+    );
+    if (res?.product) {
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === editingProduct.id || p.product_id === editingProduct.product_id
+            ? { ...p, ...res.product }
+            : p
+        )
+      );
+    } else {
+      setProducts((prev) =>
+        prev.map((p) =>
+          p.id === editingProduct.id || p.product_id === editingProduct.product_id
+            ? { ...p, ...payload }
+            : p
+        )
+      );
+    }
     setEditingProduct(null);
-    showToast(`Saved changes for "${editingProduct.name.slice(0, 18)}..."`);
+    const sizeCount = (payload.sizes || []).length;
+    const colorCount = (payload.colors || []).length;
+    if (res?.error) {
+      showToast(`Saved locally, but database sync failed: ${res.error}`);
+    } else {
+      showToast(
+        `Saved "${String(editingProduct.name || '').slice(0, 18)}..." (${sizeCount} sizes, ${colorCount} colors)`
+      );
+    }
   };
 
   const handleDeleteProduct = async (id, name) => {
@@ -712,12 +1064,27 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       return;
     }
 
+    const sizeIssues = validateSizeDrafts(newProdSizes || []);
+    const colorIssues = validateColorDrafts(newProdColors || []);
+    const issues = [...sizeIssues, ...colorIssues];
+    if (issues.length) {
+      showToast(issues[0]);
+      return;
+    }
+
     const created = await productService.addProduct({
       name: newProdName,
       brand: newProdBrand,
       category: newProdCategory,
       price: parseFloat(newProdPrice),
-      oldPrice: newProdOldPrice ? parseFloat(newProdOldPrice) : undefined,
+      unit_cost: parseFloat(newProdCost) || 0,
+      unitCost: parseFloat(newProdCost) || 0,
+      sizes: serializeProductSizes(newProdSizes, parseFloat(newProdPrice) || 0),
+      colors: serializeProductColors(newProdColors),
+      oldPrice:
+        newProdOldPrice && parseFloat(newProdOldPrice) > parseFloat(newProdPrice)
+          ? parseFloat(newProdOldPrice)
+          : undefined,
       stock: parseInt(newProdStock, 10) || 10,
       badge: newProdBadge,
       image: newProdImage || 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
@@ -725,14 +1092,29 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       description: newProdDesc || 'Precision engineered motorcycle upgrade part.',
     });
 
-    if (created.success) {
-      setProducts((prev) => [created.product, ...prev]);
+    if (created.product) {
+      setProducts((prev) => {
+        const id = created.product.id || created.product.product_id;
+        const without = prev.filter((p) => p.id !== id && p.product_id !== id);
+        return [created.product, ...without];
+      });
       setIsAddProductOpen(false);
       setNewProdName('');
       setNewProdPrice('');
+      setNewProdCost('0');
+      setNewProdSizes([]);
+      setNewProdColors([]);
       setNewProdOldPrice('');
       setNewProdDesc('');
-      showToast(`Added new product "${created.product.name.slice(0, 18)}..."`);
+      const sizeCount = (created.product.sizes || []).length;
+      const colorCount = (created.product.colors || []).length;
+      if (created.error) {
+        showToast(`Product saved locally, DB sync failed: ${created.error}`);
+      } else {
+        showToast(
+          `Added "${created.product.name.slice(0, 18)}..." (${sizeCount} sizes, ${colorCount} colors)`
+        );
+      }
     }
   };
 
@@ -1009,6 +1391,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         matchStatus = st.includes('pending') || st.includes('approval');
       } else if (orderStatusFilter === 'Shipped' || orderStatusFilter === 'Out for Delivery') {
         matchStatus = st === 'shipped' || st === 'out for delivery' || st === 'in transit';
+      } else if (orderStatusFilter === 'Delivery Reported') {
+        matchStatus = st === 'delivery reported' || st === 'reported';
+      } else if (orderStatusFilter === 'Delivery Failed' || orderStatusFilter === 'Delivery Issue') {
+        matchStatus = st === 'delivery failed' || st === 'delivery issue';
+      } else if (orderStatusFilter === 'Delivered') {
+        matchStatus = st === 'delivered' || st === 'completed';
       } else if (orderStatusFilter !== 'All') {
         matchStatus = st === orderStatusFilter.toLowerCase();
       }
@@ -1032,6 +1420,105 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       return matchStatus && matchPayment && matchSearch;
     });
   }, [orders, orderStatusFilter, orderPaymentFilter, orderSearchQuery]);
+
+  const lowStockProducts = useMemo(() => {
+    return products
+      .filter((p) => (Number(p.stock) || 0) < 5)
+      .slice(0, 3);
+  }, [products]);
+
+  const overviewHubs = useMemo(() => {
+    return [
+      {
+        id: 'stocks',
+        title: 'Stocks & Inventory',
+        categoryLabel: 'Warehouse & Catalog',
+        subtitle: 'Warehouse SKU levels, reorder alerts, and catalog valuation',
+        icon: 'box-seam-fill',
+        color: '#0284C7',
+        colorBg: '#E0F2FE',
+        borderColor: '#BAE6FD',
+        badge: invStats.lowStockCount > 0 ? `${invStats.lowStockCount} Reorder Alerts` : 'Stock Healthy',
+        badgeType: invStats.lowStockCount > 0 ? 'warning' : 'success',
+        metrics: [
+          { label: 'Stock Valuation', value: `₱${invStats.totalValue.toLocaleString()}` },
+          { label: 'Total Units', value: invStats.totalUnits.toLocaleString() },
+          { label: 'Low Stock', value: invStats.lowStockCount, color: invStats.lowStockCount > 0 ? '#D97706' : undefined },
+          { label: 'Out of Stock', value: invStats.outOfStockCount, color: invStats.outOfStockCount > 0 ? '#DC2626' : undefined },
+        ],
+        detailsType: 'stocks',
+        actions: [
+          { label: 'Audit & Restock Inventory', nav: 'inventory', primary: true, icon: 'box-seam-fill' },
+          { label: 'Manage Products', nav: 'products', primary: false, icon: 'tag-fill' },
+        ],
+      },
+      {
+        id: 'trends',
+        title: 'Sales & Demand Trends',
+        categoryLabel: 'Velocity & Forecasting',
+        subtitle: 'Revenue momentum, channel split, and predictive demand',
+        icon: 'graph-up-arrow',
+        color: '#10B981',
+        colorBg: '#ECFDF5',
+        borderColor: '#A7F3D0',
+        badge: `${orders.length} Total Orders`,
+        badgeType: 'neutral',
+        metrics: [
+          { label: 'Gross Revenue', value: `₱${analyticsData.totalRevenue.toLocaleString()}` },
+          { label: 'Avg Order Value', value: `₱${Math.round(analyticsData.avgOrderValue || 0).toLocaleString()}` },
+          { label: 'Delivered', value: orderStats.delivered, color: '#10B981' },
+          { label: 'Active Orders', value: orderStats.processing + orderStats.shipped + orderStats.ready },
+        ],
+        detailsType: 'trends',
+        actions: [
+          { label: 'Sales & Demand Forecast', nav: 'forecast', primary: true, icon: 'graph-up-arrow' },
+          { label: 'Revenue Trends & Charts', nav: 'analytics', primary: false, icon: 'pie-chart-fill' },
+        ],
+      },
+      {
+        id: 'reports',
+        title: 'Financial & Operational Reports',
+        categoryLabel: 'Margins & Reconciliation',
+        subtitle: 'Profit margins, supplier cost accounting, and order reconciliation',
+        icon: 'file-earmark-bar-graph-fill',
+        color: '#8B5CF6',
+        colorBg: '#F5F3FF',
+        borderColor: '#DDD6FE',
+        badge: `${profitOverview.soldMargin.toFixed(1)}% Realized Margin`,
+        badgeType: 'success',
+        metrics: [
+          { label: 'Realized Profit', value: `₱${profitOverview.soldProfit.toLocaleString()}`, color: '#10B981' },
+          { label: 'Sold Cost', value: `₱${profitOverview.soldCost.toLocaleString()}` },
+          { label: 'Supplier Expense', value: `₱${profitOverview.purchaseExpense.toLocaleString()}` },
+          { label: 'Catalog Potential', value: `₱${profitOverview.catalogProfit.toLocaleString()}` },
+        ],
+        detailsType: 'reports',
+        actions: [
+          { label: 'Financial Reports & P&L', nav: 'analytics', primary: true, icon: 'file-earmark-bar-graph-fill' },
+          { label: 'Orders Ledger & COD', nav: 'orders', primary: false, icon: 'receipt' },
+        ],
+      },
+    ];
+  }, [
+    invStats,
+    orders.length,
+    orderStats,
+    analyticsData,
+    profitOverview,
+    lowStockProducts,
+  ]);
+
+  const overviewHubTabs = useMemo(() => [
+    { id: 'all', label: 'All 3 Hubs', count: 'Stocks · Trends · Reports' },
+    { id: 'stocks', label: 'Stocks & Inventory', count: invStats.lowStockCount > 0 ? `${invStats.lowStockCount} Low` : 'Healthy' },
+    { id: 'trends', label: 'Sales & Trends', count: `${orders.length} Orders` },
+    { id: 'reports', label: 'Financial Reports', count: `${profitOverview.soldMargin.toFixed(1)}% Margin` },
+  ], [invStats.lowStockCount, orders.length, profitOverview.soldMargin]);
+
+  const filteredOverviewHubs = useMemo(() => {
+    if (overviewModuleCategory === 'all') return overviewHubs;
+    return overviewHubs.filter((h) => h.id === overviewModuleCategory);
+  }, [overviewHubs, overviewModuleCategory]);
 
   const handleApproveCOD = async (orderId) => {
     const res = await orderService.approveCODOrder(orderId);
@@ -1062,6 +1549,57 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       showToast(`Order status updated to "${newStatus}"`);
     } else {
       showToast(res.error || 'Status update blocked');
+    }
+  };
+
+  const openOrderModalWithOrder = (order, editMode = false) => {
+    setSelectedOrderForModal(order);
+    setIsOrderEditMode(editMode);
+    setOrderEditForm({
+      customer_name: order?.customer_name || '',
+      customer_phone: order?.customer_phone || '',
+      customer_address: order?.customer_address || '',
+      delivery_notes: order?.delivery_notes || '',
+      cod_change_for: order?.cod_change_for ? String(order.cod_change_for) : '',
+      status: order?.status || 'Pending Approval',
+      payment_method: order?.payment_method || 'Cash on Delivery (COD)',
+      rider_name: order?.rider_name || '',
+      rider_contact: order?.rider_contact || '',
+      channel: order?.channel || 'Online Store',
+    });
+    setIsOrderModalOpen(true);
+  };
+
+  const handleSaveOrderEdits = async () => {
+    if (!selectedOrderForModal) return;
+    const orderId = selectedOrderForModal.order_id || selectedOrderForModal.id;
+    if (!orderId) return;
+
+    setIsSavingOrderEdits(true);
+    try {
+      const updates = {
+        customer_name: (orderEditForm.customer_name || '').trim(),
+        customer_phone: (orderEditForm.customer_phone || '').trim(),
+        customer_address: (orderEditForm.customer_address || '').trim(),
+        delivery_notes: (orderEditForm.delivery_notes || '').trim(),
+        cod_change_for: orderEditForm.cod_change_for ? Number(orderEditForm.cod_change_for) : null,
+        status: orderEditForm.status || selectedOrderForModal.status,
+        rider_name: (orderEditForm.rider_name || '').trim(),
+        rider_contact: (orderEditForm.rider_contact || '').trim(),
+      };
+
+      const res = await orderService.updateOrderDetails(orderId, updates);
+      if (res.success) {
+        showToast(`Order #${orderId.slice(0, 10)} details saved successfully!`);
+        setSelectedOrderForModal((prev) => (prev ? { ...prev, ...updates } : prev));
+        await loadData();
+      } else {
+        showToast(res.error || 'Failed to update order details');
+      }
+    } catch (e) {
+      showToast('Error saving order details');
+    } finally {
+      setIsSavingOrderEdits(false);
     }
   };
 
@@ -1150,17 +1688,17 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   }, [products, selectedCategory, searchQuery]);
 
   const navTitles = {
-    overview: '📊 Store Overview & Activity',
-    orders: '📦 Orders & COD Fulfillment Management',
-    inventory: '📦 Inventory & Stock Telemetry',
+    overview: '📊 Dashboard',
+    orders: '📦 Orders Fulfillment Management',
+    inventory: '📦 Inventory Telemetry',
     pos: '💻 Point of Sale (POS) Cashier Terminal',
-    analytics: '📈 Sales Analytics & Reports',
-    forecast: '📊 Sales Forecast & Stock Optimization',
+    analytics: '📈 Sales Analytics',
+    forecast: '📊 Sales Forecast Optimization',
     products: '🏷️ Products & Price Management',
     promos: '🎟️ Promo Vouchers & Discounts',
-    garage: '🛠️ Garage Services (PMS & Tuning)',
+    garage: '🛠️ Bookings (PMS & Tuning)',
     riders: '🛵 Riders / Delivery Staff',
-    users: '👥 User Accounts Management',
+    users: '👥 Users Management',
     supabase: '⚡ Supabase Database Settings',
     notifications: '🔔 Notifications & Alerts Center',
     settings: '⚙️ System & Platform Settings',
@@ -1176,7 +1714,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             position: 'absolute',
             top: 20,
             alignSelf: 'center',
-            backgroundColor: '#0C6258',
+            backgroundColor: '#1D4533',
             paddingHorizontal: 22,
             paddingVertical: 12,
             borderRadius: 9999,
@@ -1239,8 +1777,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     <BootstrapIcon name="grid-1x2-fill" size={16} color={activeNav === 'overview' ? '#FFFFFF' : '#64748B'} />
                   </View>
                   <Text style={[styles.sidebarNavLabel, activeNav === 'overview' && styles.sidebarNavLabelActive]}>
-                    Overview
+                    Dashboard
                   </Text>
+                  {activeNav === 'overview' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* 2. Customer Orders & COD Fulfillment */}
@@ -1266,6 +1805,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       </Text>
                     </View>
                   )}
+                  {activeNav === 'orders' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* 3. Inventory */}
@@ -1285,6 +1825,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       <Text style={{ color: '#92400E', fontSize: 10.5, fontWeight: '800' }}>{invStats.lowStockCount} LOW</Text>
                     </View>
                   )}
+                  {activeNav === 'inventory' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* 4. Point of Sale (POS) */}
@@ -1304,6 +1845,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       <Text style={{ color: '#FFFFFF', fontSize: 10.5, fontWeight: '900' }}>{posCart.length}</Text>
                     </View>
                   )}
+                  {activeNav === 'pos' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* 5. Analytics */}
@@ -1318,6 +1860,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <Text style={[styles.sidebarNavLabel, activeNav === 'analytics' && styles.sidebarNavLabelActive]}>
                     Analytics & Reports
                   </Text>
+                  {activeNav === 'analytics' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* 5b. Forecast */}
@@ -1332,6 +1875,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <Text style={[styles.sidebarNavLabel, activeNav === 'forecast' && styles.sidebarNavLabelActive]}>
                     Forecast & Stock
                   </Text>
+                  {activeNav === 'forecast' && <View style={styles.sidebarActiveDot} />}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, activeNav === 'customizations' && styles.sidebarNavItemActive]}
+                  onPress={() => setActiveNav('customizations')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 22, alignItems: 'center' }}>
+                    <BootstrapIcon name="magic" size={16} color={activeNav === 'customizations' ? '#FFFFFF' : '#64748B'} />
+                  </View>
+                  <Text style={[styles.sidebarNavLabel, activeNav === 'customizations' && styles.sidebarNavLabelActive]}>
+                    Customizations
+                  </Text>
+                  {activeNav === 'customizations' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 <Text style={styles.navHeading}>Store Management</Text>
@@ -1346,13 +1904,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     <BootstrapIcon name="tag-fill" size={16} color={activeNav === 'products' ? '#FFFFFF' : '#64748B'} />
                   </View>
                   <Text style={[styles.sidebarNavLabel, activeNav === 'products' && styles.sidebarNavLabelActive]}>
-                    Products & Prices
+                    Products
                   </Text>
                   <View style={[styles.sidebarCountBadge, activeNav === 'products' && styles.sidebarCountBadgeActive]}>
                     <Text style={[styles.sidebarCountText, activeNav === 'products' && styles.sidebarCountTextActive]}>
                       {products.length}
                     </Text>
                   </View>
+                  {activeNav === 'products' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* 7. Promos */}
@@ -1367,6 +1926,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <Text style={[styles.sidebarNavLabel, activeNav === 'promos' && styles.sidebarNavLabelActive]}>
                     Promo Vouchers
                   </Text>
+                  {activeNav === 'promos' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* ─── SECTION 3: GARAGE & SERVICES ─── */}
@@ -1382,8 +1942,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     <BootstrapIcon name="tools" size={16} color={activeNav === 'garage' ? '#FFFFFF' : '#64748B'} />
                   </View>
                   <Text style={[styles.sidebarNavLabel, activeNav === 'garage' && styles.sidebarNavLabelActive]}>
-                    Garage Services
+                    Bookings
                   </Text>
+                  {activeNav === 'garage' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* 8.5 Riders / Delivery Staff */}
@@ -1403,6 +1964,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       {deliveryRiders.length}
                     </Text>
                   </View>
+                  {activeNav === 'riders' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* ─── SECTION 4: USER MANAGEMENT ─── */}
@@ -1420,6 +1982,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <Text style={[styles.sidebarNavLabel, activeNav === 'users' && styles.sidebarNavLabelActive]}>
                     User Accounts
                   </Text>
+                  {activeNav === 'users' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* ─── SECTION 5: SYSTEM & SETTINGS ─── */}
@@ -1441,6 +2004,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <Text style={[styles.sidebarNavLabel, activeNav === 'notifications' && styles.sidebarNavLabelActive]}>
                     Notifications
                   </Text>
+                  {activeNav === 'notifications' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* 11. Supabase DB */}
@@ -1455,6 +2019,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <Text style={[styles.sidebarNavLabel, activeNav === 'supabase' && styles.sidebarNavLabelActive]}>
                     Supabase DB
                   </Text>
+                  {activeNav === 'supabase' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* 12. System Settings */}
@@ -1473,6 +2038,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <Text style={[styles.sidebarNavLabel, activeNav === 'settings' && styles.sidebarNavLabelActive]}>
                     System Settings
                   </Text>
+                  {activeNav === 'settings' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
                 {/* ─── SECTION 6: QUICK LINKS ─── */}
@@ -1481,9 +2047,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 {/* 13. Live Storefront Link */}
                 <TouchableOpacity style={styles.sidebarNavItem} onPress={onNavigateToStore} activeOpacity={0.8}>
                   <View style={{ width: 22, alignItems: 'center' }}>
-                    <BootstrapIcon name="shop" size={16} color="#0C6258" />
+                    <BootstrapIcon name="shop" size={16} color="#1D4533" />
                   </View>
-                  <Text style={[styles.sidebarNavLabel, { color: '#0C6258', fontWeight: '800' }]}>Live Storefront</Text>
+                  <Text style={[styles.sidebarNavLabel, { color: '#1D4533', fontWeight: '800' }]}>Live Storefront</Text>
                 </TouchableOpacity>
               </View>
             </ScrollView>
@@ -1515,7 +2081,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             <View style={styles.topActionsRow}>
               {activeNav === 'orders' && pendingCodCount > 0 && (
                 <TouchableOpacity
-                  style={[styles.addBtnPrimary, { backgroundColor: '#0C6258' }]}
+                  style={[styles.addBtnPrimary, { backgroundColor: '#1D4533' }]}
                   onPress={handleApproveAllPendingCOD}
                   activeOpacity={0.85}
                 >
@@ -1526,14 +2092,26 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </TouchableOpacity>
               )}
               {activeNav === 'inventory' && (
-                <TouchableOpacity
-                  style={styles.addBtnPrimary}
-                  onPress={() => setIsAddProductOpen(true)}
-                  activeOpacity={0.85}
-                >
-                  <BootstrapIcon name="plus-lg" size={14} color="#FFFFFF" />
-                  <Text style={styles.addBtnPrimaryText}>{isDesktop ? 'Add New Product SKU' : '+ SKU'}</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <TouchableOpacity
+                    style={[styles.addBtnPrimary, { backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#FDE68A' }]}
+                    onPress={() => openSupplierPurchase(null)}
+                    activeOpacity={0.85}
+                  >
+                    <BootstrapIcon name="box-arrow-in-down" size={14} color="#1D4533" />
+                    <Text style={[styles.addBtnPrimaryText, { color: '#1D4533' }]}>
+                      {isDesktop ? 'Restock Inventory' : 'Restock'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.addBtnPrimary}
+                    onPress={() => setIsAddProductOpen(true)}
+                    activeOpacity={0.85}
+                  >
+                    <BootstrapIcon name="plus-lg" size={14} color="#FFFFFF" />
+                    <Text style={styles.addBtnPrimaryText}>{isDesktop ? 'Add New Product SKU' : '+ SKU'}</Text>
+                  </TouchableOpacity>
+                </View>
               )}
               {activeNav === 'products' && (
                 <TouchableOpacity
@@ -1595,12 +2173,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 onPress={() => setActiveNav('notifications')}
                 activeOpacity={0.8}
               >
-                <BootstrapIcon name="bell-fill" size={13} color="#0C6258" />
+                <BootstrapIcon name="bell-fill" size={13} color="#1D4533" />
                 {isDesktop && <Text style={styles.quickStoreBtnText}>Notifications</Text>}
               </TouchableOpacity>
 
               <TouchableOpacity style={styles.quickStoreBtn} onPress={onNavigateToStore}>
-                <BootstrapIcon name="box-arrow-up-right" size={12} color="#0C6258" />
+                <BootstrapIcon name="box-arrow-up-right" size={12} color="#1D4533" />
                 {isDesktop && <Text style={styles.quickStoreBtnText}>Storefront</Text>}
               </TouchableOpacity>
 
@@ -1627,10 +2205,106 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
           <ScrollView contentContainerStyle={[styles.mainScroll, !isDesktop && { paddingBottom: 110, paddingHorizontal: 12 }]}>
             {/* ─── TAB 1: OVERVIEW ─── */}
+            {/* ─── TAB 1: DASHBOARD (STORE DASHBOARD & ACTIVITY) ─── */}
             {activeNav === 'overview' && (
               <View>
-                {/* Stats Grid */}
+                {/* 1. Live Telemetry & Actions Bar */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    flexWrap: 'wrap',
+                    gap: 10,
+                    marginBottom: 16,
+                  }}
+                >
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 7,
+                        backgroundColor: '#F8FAFC',
+                        paddingHorizontal: 12,
+                        paddingVertical: 6.5,
+                        borderRadius: 20,
+                        borderWidth: 1,
+                        borderColor: '#E2E8F0',
+                      }}
+                    >
+                      <View
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: '#10B981',
+                        }}
+                      />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A' }}>
+                        Live{' '}
+                        <Text style={{ fontWeight: '500', color: '#64748B' }}>
+                          · Last synced just now
+                        </Text>
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
+                      onPress={loadData}
+                      activeOpacity={0.8}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingHorizontal: 14,
+                        paddingVertical: 7,
+                        borderRadius: 10,
+                        backgroundColor: '#FFFFFF',
+                        borderWidth: 1.5,
+                        borderColor: '#CBD5E1',
+                      }}
+                    >
+                      <BootstrapIcon name="arrow-repeat" size={14} color="#0F172A" />
+                      <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0F172A' }}>
+                        Refresh
+                      </Text>
+                    </TouchableOpacity>
+                </View>
+
+                {/* 2. Primary KPI Stat Cards (AdminStatCard design system matching photo) */}
                 <View style={styles.statsGrid}>
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Orders"
+                    value={orderStats.total}
+                    sub={`₱${orderStats.totalRevenue.toLocaleString()} volume`}
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent={orderStats.pendingCod > 0 ? 'amber' : 'blue'}
+                    label="Pending COD Approvals"
+                    value={orderStats.pendingCod}
+                    valueColor={orderStats.pendingCod > 0 ? '#D97706' : undefined}
+                    sub="Requires Admin action"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Packing & Processing"
+                    value={orderStats.processing}
+                    sub="Ready for courier pickup"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="amber"
+                    label="Total Inventory Value"
+                    value={`₱${invStats.totalValue.toLocaleString()}`}
+                    sub={`Across ${invStats.totalUnits} items in stock`}
+                  />
+                </View>
+
+                {/* Secondary Store Telemetry Cards */}
+                <View style={[styles.statsGrid, { marginTop: -8 }]}>
                   <AdminStatCard
                     styles={styles}
                     accent="teal"
@@ -1649,159 +2323,496 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     styles={styles}
                     accent={invStats.lowStockCount > 0 ? 'amber' : 'teal'}
                     label="Stock Alerts"
-                    value={`${invStats.lowStockCount} Low / ${invStats.outOfStockCount} Out`}
+                    value={`${invStats.lowStockCount} Low`}
                     valueColor={invStats.lowStockCount > 0 ? '#D97706' : undefined}
                     sub="Needs reorder attention"
                   />
                   <AdminStatCard
                     styles={styles}
-                    accent="amber"
-                    label="Dispatches & Orders"
-                    value={orders.length}
-                    sub={`${analyticsData.posOrdersCount} POS / ${analyticsData.onlineOrdersCount} Online`}
+                    accent="green"
+                    label="Sales Profit"
+                    value={`₱${profitOverview.soldProfit.toLocaleString()}`}
+                    sub={`Sold cost ₱${profitOverview.soldCost.toLocaleString()} · ${profitOverview.soldMargin.toFixed(1)}% margin`}
                   />
                 </View>
 
-                {/* Urgent Pending COD Approvals Alert in Overview */}
-                {pendingCodCount > 0 && (
-                  <View style={[styles.codAlertBanner, { marginBottom: 20 }]}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#FDE68A', justifyContent: 'center', alignItems: 'center' }}>
-                        <BootstrapIcon name="shield-lock-fill" size={20} color="#92400E" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.codAlertBannerText}>
-                          ⚠️ {pendingCodCount} Cash on Delivery order(s) awaiting store verification
-                        </Text>
-                        <Text style={styles.codAlertBannerSub}>
-                          Review recipient shipping address and click "Approve COD" to authorize warehouse packing.
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-                      <TouchableOpacity
-                        style={styles.approveAllCodBtn}
-                        onPress={handleApproveAllPendingCOD}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="check2-circle" size={14} color="#FFFFFF" />
-                        <Text style={styles.approveAllCodBtnText}>Approve All ({pendingCodCount})</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.addBtnPrimary, { backgroundColor: '#92400E', paddingHorizontal: 14, paddingVertical: 8 }]}
-                        onPress={() => {
-                          setOrderStatusFilter('Pending Approval');
-                          setActiveNav('orders');
-                        }}
-                      >
-                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Review Orders</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-
-                {/* Quick Action Banner */}
-                <View style={[styles.tableCard, { padding: 22, marginBottom: 24, backgroundColor: '#FFFFFF' }]}>
-                  <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A', marginBottom: 6 }}>
-                    Backoffice Quick Control Center
-                  </Text>
-                  <Text style={{ color: '#64748B', fontSize: 13.5, lineHeight: 20, marginBottom: 20 }}>
-                    Manage customer orders and Cash on Delivery approvals, audit warehouse inventory levels, process in-store walk-in sales via POS, and track revenue telemetry.
-                  </Text>
-
-                  <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
-                    <TouchableOpacity
-                      style={[styles.addBtnPrimary, { backgroundColor: '#0C6258', flexDirection: 'row', alignItems: 'center', gap: 8 }]}
-                      onPress={() => setActiveNav('orders')}
-                    >
-                      <BootstrapIcon name="receipt" size={15} color="#FFFFFF" />
-                      <Text style={styles.addBtnPrimaryText}>
-                        Manage Orders & COD {pendingCodCount > 0 ? `(${pendingCodCount} Pending)` : ''}
+                {/* 3. REVENUE TREND Sparkline Banner */}
+                <View
+                  style={{
+                    backgroundColor: '#FFFFFF',
+                    borderRadius: 16,
+                    borderWidth: 1.5,
+                    borderColor: '#CBD5E1',
+                    paddingVertical: 38,
+                    paddingHorizontal: 28,
+                    minHeight: 168,
+                    justifyContent: 'center',
+                    marginBottom: 22,
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 3 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 8,
+                    elevation: 2,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 24 }}>
+                    {/* Left Metric */}
+                    <View style={{ minWidth: 160 }}>
+                      <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                        REVENUE TREND
                       </Text>
-                    </TouchableOpacity>
+                      <Text style={{ fontSize: 32, fontWeight: '900', color: '#0F172A', marginTop: 8, letterSpacing: -0.8 }}>
+                        ₱{analyticsData.totalRevenue.toLocaleString()}
+                      </Text>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#10B981', marginTop: 5 }}>
+                        ↑ +12.4% this period
+                      </Text>
+                    </View>
 
-                    <TouchableOpacity
-                      style={[styles.addBtnPrimary, { backgroundColor: '#F3F7F6', borderWidth: 1, borderColor: '#D1ECE6', flexDirection: 'row', alignItems: 'center', gap: 8 }]}
-                      onPress={() => setActiveNav('pos')}
-                    >
-                      <BootstrapIcon name="cart-check-fill" size={15} color="#0C6258" />
-                      <Text style={[styles.addBtnPrimaryText, { color: '#0C6258' }]}>Launch POS Cashier</Text>
-                    </TouchableOpacity>
+                    {/* Center Sparkline */}
+                    <View style={{ flex: 1, minWidth: 260, height: 104, justifyContent: 'center' }}>
+                      <View style={{ height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}>
+                        <View style={{ height: '100%', width: '75%', backgroundColor: '#0D9488', borderRadius: 4 }} />
+                      </View>
+                    </View>
 
-                    <TouchableOpacity
-                      style={[styles.addBtnPrimary, { backgroundColor: '#F3F7F6', borderWidth: 1, borderColor: '#D1ECE6', flexDirection: 'row', alignItems: 'center', gap: 8 }]}
-                      onPress={() => setActiveNav('inventory')}
-                    >
-                      <BootstrapIcon name="box-seam-fill" size={15} color="#0C6258" />
-                      <Text style={[styles.addBtnPrimaryText, { color: '#0C6258' }]}>Audit Inventory</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[styles.addBtnPrimary, { backgroundColor: '#F3F7F6', borderWidth: 1, borderColor: '#D1ECE6', flexDirection: 'row', alignItems: 'center', gap: 8 }]}
-                      onPress={() => setActiveNav('analytics')}
-                    >
-                      <BootstrapIcon name="graph-up-arrow" size={15} color="#0C6258" />
-                      <Text style={[styles.addBtnPrimaryText, { color: '#0C6258' }]}>Revenue Analytics</Text>
-                    </TouchableOpacity>
+                    {/* Right Stats Breakdown */}
+                    <View style={{ flexDirection: 'row', gap: 28, flexWrap: 'wrap' }}>
+                      <View>
+                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '700' }}>Online Sales</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 4 }}>
+                          ₱{analyticsData.onlineRevenue.toLocaleString()}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '700', marginTop: 16 }}>Orders</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 4 }}>
+                          {orders.length}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '700' }}>Walk-in POS</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 4 }}>
+                          ₱{analyticsData.posRevenue.toLocaleString()}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '700', marginTop: 16 }}>Delivered</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 4 }}>
+                          {orderStats.delivered}
+                        </Text>
+                      </View>
+                      <View>
+                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '700' }}>Net Margin</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 4 }}>
+                          {profitOverview.soldMargin.toFixed(1)}%
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '700', marginTop: 16 }}>Pending</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 4 }}>
+                          {pendingCodCount}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
 
-                {/* Recent Transactions Table */}
-                <View style={styles.tableCard}>
-                  <View style={{ paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 15, fontWeight: '900', color: '#0F172A' }}>Recent Orders & POS Sales</Text>
-                    <TouchableOpacity onPress={() => setActiveNav('orders')}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#0C6258' }}>View All Orders ({orders.length}) →</Text>
+                {/* 3b. EXECUTIVE ANALYTICS: SERVICE BOOKINGS & TOP EARNER PRODUCTS */}
+                <View style={{ marginBottom: 24 }}>
+                  {/* Service Bookings Share & Top Earners Products (Side by Side) */}
+                  <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 20, alignItems: 'stretch' }}>
+                    {/* 1. Service Bookings Share (Pie Chart: PMS vs Repair vs Customization) */}
+                    <BookingCategoryPieChart
+                      bookings={garageBookings}
+                      isDark={isDarkMode}
+                      isDesktop={isDesktop}
+                      style={{ flex: 1, minWidth: isDesktop ? 340 : '100%', marginBottom: 0 }}
+                    />
+
+                    {/* 2. Top Earners Products Leaderboard */}
+                    <View
+                      style={[
+                        styles.analyticsCard,
+                        {
+                          flex: 1,
+                          minWidth: isDesktop ? 320 : '100%',
+                          marginBottom: 0,
+                          backgroundColor: '#FFFFFF',
+                          borderColor: '#E2E8F0',
+                        },
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                        <View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <BootstrapIcon name="trophy-fill" size={15} color="#D97706" />
+                            <Text style={[styles.analyticsCardTitle, { color: '#0F172A' }]}>
+                              Top Earners
+                            </Text>
+                          </View>
+                          <Text style={[styles.analyticsCardSubtitle, { color: '#64748B', marginTop: 4 }]}>
+                            Ranked by cumulative sales volume
+                          </Text>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => setActiveNav('products')}
+                          activeOpacity={0.8}
+                          style={{
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            backgroundColor: '#F1F5F9',
+                            borderRadius: 8,
+                          }}
+                        >
+                          <Text style={{ color: '#64748B', fontSize: 12, fontWeight: '600' }}>
+                            View products →
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {analyticsData.topProducts.length === 0 ? (
+                        <View style={{ paddingVertical: 32, alignItems: 'center', justifyContent: 'center' }}>
+                          <BootstrapIcon name="box-seam" size={32} color="#94A3B8" />
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginTop: 8 }}>
+                            No Product Sales Yet
+                          </Text>
+                          <Text style={{ fontSize: 11.5, color: '#64748B', marginTop: 2, textAlign: 'center' }}>
+                            As orders are fulfilled, top grossing catalog items will automatically appear here.
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={{ marginTop: 4 }}>
+                          {analyticsData.topProducts.map((tp, idx) => {
+                            const maxRev = analyticsData.topProducts[0]?.revenue || 1;
+                            const barWidth = Math.max(5, (tp.revenue / maxRev) * 100);
+                            const rankBadges = [
+                              { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A' },
+                              { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1' },
+                              { bg: '#FFEDD5', text: '#C2410C', border: '#FED7AA' },
+                            ];
+                            const badge = rankBadges[idx] || {
+                              bg: '#F8FAFC',
+                              text: '#64748B',
+                              border: '#E2E8F0',
+                            };
+
+                            return (
+                              <View
+                                key={idx}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  marginBottom: idx === analyticsData.topProducts.length - 1 ? 0 : 16,
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: 12,
+                                    backgroundColor: badge.bg,
+                                    borderWidth: 1,
+                                    borderColor: badge.border,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    marginRight: 10,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 10.5, fontWeight: '900', color: badge.text }}>
+                                    #{idx + 1}
+                                  </Text>
+                                </View>
+
+                                <View
+                                  style={{
+                                    width: 48,
+                                    height: 40,
+                                    backgroundColor: '#F1F5F9',
+                                    borderRadius: 8,
+                                    overflow: 'hidden',
+                                    marginRight: 12,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  {tp.image_url ? (
+                                    <Image
+                                      source={{ uri: tp.image_url }}
+                                      style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
+                                    />
+                                  ) : (
+                                    <View
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                      }}
+                                    >
+                                      <BootstrapIcon
+                                        name="box-seam"
+                                        size={16}
+                                        color="#CBD5E1"
+                                      />
+                                    </View>
+                                  )}
+                                </View>
+
+                                <View style={{ flex: 1, justifyContent: 'center' }}>
+                                  <View
+                                    style={{
+                                      flexDirection: 'row',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      marginBottom: 6,
+                                    }}
+                                  >
+                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                      <Text
+                                        style={{
+                                          fontSize: 13,
+                                          fontWeight: '700',
+                                          color: '#0F172A',
+                                        }}
+                                        numberOfLines={1}
+                                      >
+                                        {tp.name}
+                                      </Text>
+                                      <Text
+                                        style={{
+                                          fontSize: 11,
+                                          color: '#64748B',
+                                          marginTop: 1,
+                                        }}
+                                      >
+                                        {tp.brand || 'MotoTrack'} • {tp.unitsSold || 0} sold
+                                      </Text>
+                                    </View>
+                                    <Text
+                                      style={{
+                                        fontSize: 13,
+                                        fontWeight: '800',
+                                        color: '#1D4533',
+                                      }}
+                                    >
+                                      ₱{tp.revenue.toLocaleString()}
+                                    </Text>
+                                  </View>
+
+                                  <View
+                                    style={{
+                                      height: 6,
+                                      backgroundColor: '#E2E8F0',
+                                      borderRadius: 3,
+                                      width: '100%',
+                                      overflow: 'hidden',
+                                    }}
+                                  >
+                                    <View
+                                      style={{
+                                        height: '100%',
+                                        width: `${barWidth}%`,
+                                        backgroundColor: '#1D4533',
+                                        borderRadius: 3,
+                                      }}
+                                    />
+                                  </View>
+                                </View>
+                              </View>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                {/* 5. Recent Orders & POS Sales Table */}
+                <View
+                  style={[
+                    styles.tableCard,
+                    {
+                      padding: 0,
+                      borderRadius: 14,
+                      borderWidth: 1.5,
+                      borderColor: '#CBD5E1',
+                      backgroundColor: '#FFFFFF',
+                      overflow: 'hidden',
+                      marginBottom: 24,
+                    },
+                  ]}
+                >
+                  <View
+                    style={{
+                      paddingHorizontal: 20,
+                      paddingVertical: 16,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#E2E8F0',
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: 10,
+                    }}
+                  >
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: '900', color: '#0F172A' }}>
+                        Recent Orders & POS Sales
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                        Latest transactions across all sales channels
+                      </Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setActiveNav('orders')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#334155' }}>
+                        View All Orders ({orders.length}) →
+                      </Text>
                     </TouchableOpacity>
                   </View>
 
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={{ minWidth: 640 }}>
-                      <View style={styles.tableHeaderRow}>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Order Ref</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Customer</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Channel</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.5, textAlign: 'right' }]}>Amount</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.5, textAlign: 'center' }]}>Status</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={{ width: '100%' }}
+                    contentContainerStyle={{ width: '100%', minWidth: '100%', flexGrow: 1 }}
+                  >
+                    <View style={{ width: '100%', minWidth: isDesktop ? '100%' : 720, flex: 1 }}>
+                      {/* Table Header Row */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          width: '100%',
+                          paddingHorizontal: 20,
+                          paddingVertical: 12,
+                          backgroundColor: '#F8FAFC',
+                          borderBottomWidth: 1,
+                          borderBottomColor: '#E2E8F0',
+                        }}
+                      >
+                        <Text style={{ flex: 2.5, fontSize: 11, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>ORDER REF</Text>
+                        <Text style={{ flex: 2.5, fontSize: 11, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>CUSTOMER</Text>
+                        <Text style={{ flex: 1.8, fontSize: 11, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>CHANNEL</Text>
+                        <Text style={{ flex: 1.6, fontSize: 11, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>AMOUNT</Text>
+                        <Text style={{ flex: 1.6, fontSize: 11, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>STATUS</Text>
                       </View>
 
-                      {orders.slice(0, 5).map((o, idx) => (
-                        <View key={o.order_id || idx} style={styles.tableRow}>
-                          <Text style={[styles.tableTitle, { flex: 1.5, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 12.5 }]}>
-                            {o.order_id || o.id}
-                          </Text>
-                          <View style={{ flex: 2 }}>
-                            <Text style={styles.tableTitle}>{o.customer_name || 'Customer'}</Text>
-                            <Text style={styles.tableSub}>{o.order_date || 'Recent'}</Text>
-                          </View>
-                          <View style={{ flex: 1.5 }}>
-                            <View style={{ backgroundColor: o.channel === 'POS (In-Store)' ? '#F3F7F6' : '#EFF6FF', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start' }}>
-                              <Text style={{ color: o.channel === 'POS (In-Store)' ? '#0C6258' : '#1D4ED8', fontSize: 11, fontWeight: '800' }}>
-                                {o.channel || 'Online Store'}
+                      {/* Rows */}
+                      {orders.slice(0, 6).map((o, idx) => {
+                        const orderId = o.order_id || o.id || `ORD-${idx}`;
+                        const rawChannel = String(o.channel || '').toLowerCase();
+                        const isInStore = rawChannel.includes('pos') || rawChannel.includes('in-store') || rawChannel.includes('walk-in') || (rawChannel.includes('store') && !rawChannel.includes('online'));
+                        const displayChannel = isInStore ? 'In Store' : 'Online Store';
+                        const status = (o.status || 'Delivered').trim();
+                        const isDelivered = status.toLowerCase() === 'delivered' || status.toLowerCase() === 'completed';
+                        const isPending = status.toLowerCase().includes('pending');
+
+                        return (
+                          <View
+                            key={orderId}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              width: '100%',
+                              paddingHorizontal: 20,
+                              paddingVertical: 14,
+                              borderBottomWidth: 1,
+                              borderBottomColor: '#E2E8F0',
+                            }}
+                          >
+                            {/* ORDER REF: pill box */}
+                            <View style={{ flex: 2.5, paddingRight: 12 }}>
+                              <View
+                                style={{
+                                  alignSelf: 'flex-start',
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 4.5,
+                                  borderRadius: 6,
+                                  borderWidth: 1,
+                                  borderColor: '#CBD5E1',
+                                  backgroundColor: '#F8FAFC',
+                                }}
+                              >
+                                <Text
+                                  numberOfLines={1}
+                                  style={{
+                                    fontSize: 11.5,
+                                    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                                    fontWeight: '700',
+                                    color: '#334155',
+                                  }}
+                                >
+                                  {orderId}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* CUSTOMER & DATE */}
+                            <View style={{ flex: 2.5, paddingRight: 12 }}>
+                              <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                                {o.customer_name || 'Customer'}
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                                {o.order_date || 'Recent'}
                               </Text>
                             </View>
-                          </View>
-                          <Text style={[styles.tableTitle, { flex: 1.5, textAlign: 'right', color: '#0C6258', fontWeight: '900' }]}>
-                            ₱{(Number(o.grand_total) || Number(o.total_amount) || 0).toLocaleString()}
-                          </Text>
-                          <View style={{ flex: 1.5, alignItems: 'center' }}>
-                            <View style={{
-                              backgroundColor: (o.status || '').toLowerCase().includes('pending') ? '#FEF3C7' : '#D1FAE5',
-                              paddingHorizontal: 8,
-                              paddingVertical: 3,
-                              borderRadius: 6
-                            }}>
-                              <Text style={{
-                                color: (o.status || '').toLowerCase().includes('pending') ? '#92400E' : '#065F46',
-                                fontSize: 11,
-                                fontWeight: '800'
-                              }}>
-                                {(o.status || '').toLowerCase().includes('pending') ? '⏳ Pending COD' : (o.status || 'Completed')}
+
+                            {/* CHANNEL */}
+                            <View style={{ flex: 1.8, paddingRight: 12 }}>
+                              <View
+                                style={{
+                                  alignSelf: 'flex-start',
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 3.5,
+                                  borderRadius: 6,
+                                  borderWidth: 1,
+                                  backgroundColor: isInStore ? '#ECFDF5' : '#EFF6FF',
+                                  borderColor: isInStore ? '#A7F3D0' : '#BFDBFE',
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: '800',
+                                    color: isInStore ? '#059669' : '#2563EB',
+                                  }}
+                                >
+                                  {displayChannel}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* AMOUNT */}
+                            <View style={{ flex: 1.6, paddingRight: 12 }}>
+                              <Text style={{ fontSize: 13.5, fontWeight: '900', color: '#0F172A' }}>
+                                ₱{(Number(o.grand_total) || Number(o.total_amount) || 0).toLocaleString()}
                               </Text>
                             </View>
+
+                            {/* STATUS */}
+                            <View style={{ flex: 1.6, alignItems: 'center' }}>
+                              <View
+                                style={{
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 4,
+                                  borderRadius: 14,
+                                  borderWidth: 1,
+                                  backgroundColor: isDelivered
+                                    ? '#DCFCE7'
+                                    : isPending
+                                    ? '#FEF3C7'
+                                    : '#FEE2E2',
+                                  borderColor: isDelivered ? '#86EFAC' : isPending ? '#FDE68A' : '#FECACA',
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: '800',
+                                    color: isDelivered ? '#15803D' : isPending ? '#B45309' : '#B91C1C',
+                                  }}
+                                >
+                                  {isDelivered ? 'Delivered' : isPending ? 'Pending COD' : status}
+                                </Text>
+                              </View>
+                            </View>
                           </View>
-                        </View>
-                      ))}
+                        );
+                      })}
                     </View>
                   </ScrollView>
                 </View>
@@ -1825,7 +2836,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     accent={orderStats.pendingCod > 0 ? 'amber' : 'blue'}
                     label="Pending COD Approvals"
                     value={orderStats.pendingCod}
-                    valueColor={orderStats.pendingCod > 0 ? '#D97706' : '#0C6258'}
+                    valueColor={orderStats.pendingCod > 0 ? '#D97706' : '#1D4533'}
                     sub="Requires Admin action"
                   />
                   <AdminStatCard
@@ -1911,9 +2922,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               : 'credit-card'
                           }
                           size={13}
-                          color={orderPaymentFilter !== 'All' ? '#0C6258' : '#64748B'}
+                          color={orderPaymentFilter !== 'All' ? '#1D4533' : '#64748B'}
                         />
-                        <Text style={[styles.paymentDropdownTriggerText, orderPaymentFilter !== 'All' && { color: '#0C6258', fontWeight: '800' }]}>
+                        <Text style={[styles.paymentDropdownTriggerText, orderPaymentFilter !== 'All' && { color: '#1D4533', fontWeight: '800' }]}>
                           {orderPaymentFilter === 'All'
                             ? 'All Payments'
                             : orderPaymentFilter === 'COD'
@@ -1971,7 +2982,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     </Text>
                                   </View>
                                   {isSelected && (
-                                    <BootstrapIcon name="check2" size={14} color="#0C6258" />
+                                    <BootstrapIcon name="check2" size={14} color="#1D4533" />
                                   )}
                                 </TouchableOpacity>
                               );
@@ -2028,21 +3039,20 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
                       onPress={loadData}
                     >
-                      <BootstrapIcon name="arrow-repeat" size={13} color="#0C6258" />
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#0C6258' }}>Refresh</Text>
+                      <BootstrapIcon name="arrow-repeat" size={13} color="#1D4533" />
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4533' }}>Refresh</Text>
                     </TouchableOpacity>
                   </View>
 
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    <View style={{ minWidth: 920 }}>
+                    <View style={{ minWidth: 880 }}>
                       <View style={styles.tableHeaderRow}>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.6 }]}>Order Ref & Date</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 2.4 }]}>Customer & Destination</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 2.2 }]}>Items Summary</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.6 }]}>Payment Method</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.4, textAlign: 'right' }]}>Total</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.8, textAlign: 'center' }]}>Status</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 2.6, textAlign: 'center' }]}>Fulfillment Actions</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 2.8, minWidth: 230 }]}>Customer & Destination</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 180 }]}>Items Summary</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 95 }]}>Payment</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 95, textAlign: 'right' }]}>Total</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110, textAlign: 'center' }]}>Status</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 150, textAlign: 'center' }]}>Action</Text>
                       </View>
 
                       {filteredOrdersList.length === 0 ? (
@@ -2066,20 +3076,20 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           const isCancelled = st === 'cancelled';
                           const isCOD = (o.payment_method || '').toLowerCase().includes('cash') || (o.payment_method || '').includes('COD');
                           const statusLabel = isPending
-                            ? '⏳ Pending COD'
+                            ? 'Pending COD'
                             : isProcessing
-                              ? '⚙️ Processing'
+                              ? 'Processing'
                               : isReady
-                                ? '📦 Ready'
+                                ? 'Ready'
                                 : isShipped
-                                  ? '🚚 Out for Delivery'
+                                  ? 'Out for Delivery'
                                   : isFailed
-                                    ? '⚠️ Failed'
+                                    ? 'Failed'
                                     : isRescheduled
-                                      ? '🔄 Rescheduled'
+                                      ? 'Rescheduled'
                                       : isDelivered
-                                        ? '✅ Delivered'
-                                        : '❌ Cancelled';
+                                        ? 'Delivered'
+                                        : 'Cancelled';
 
                           return (
                             <View
@@ -2089,53 +3099,43 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 isPending && { backgroundColor: '#FFFBEB' },
                               ]}
                             >
-                              {/* 1. Order Ref */}
-                              <View style={{ flex: 1.6 }}>
-                                <Text style={[styles.tableTitle, { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', fontSize: 12.5, fontWeight: '900', color: '#0F172A' }]}>
-                                  {orderId}
-                                </Text>
-                                <Text style={styles.tableSub}>{o.order_date || 'Recent'}</Text>
-                                <View style={{ backgroundColor: o.channel === 'POS (In-Store)' ? '#F3F7F6' : '#EFF6FF', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, alignSelf: 'flex-start', marginTop: 4 }}>
-                                  <Text style={{ color: o.channel === 'POS (In-Store)' ? '#0C6258' : '#1D4ED8', fontSize: 9.5, fontWeight: '800' }}>
-                                    {o.channel || 'Online Store'}
-                                  </Text>
+                              {/* 1. Customer & Destination */}
+                              <View style={{ flex: 2.8, minWidth: 230 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                  <BootstrapIcon name="person-fill" size={12} color="#1D4533" />
+                                  <Text style={[styles.tableTitle, { fontWeight: '800', fontSize: 13 }]}>{o.customer_name || 'Walk-in Customer'}</Text>
                                 </View>
-                              </View>
-
-                              {/* 2. Customer & Address */}
-                              <View style={{ flex: 2.4 }}>
-                                <Text style={[styles.tableTitle, { fontWeight: '800' }]}>{o.customer_name || 'Walk-in Customer'}</Text>
-                                {o.customer_phone && <Text style={styles.tableSub}>📞 {o.customer_phone}</Text>}
+                                {o.customer_phone && <Text style={[styles.tableSub, { marginTop: 2 }]}>📞 {o.customer_phone}</Text>}
                                 {o.customer_address && (
-                                  <Text style={[styles.tableSub, { color: '#475569', fontSize: 11 }]} numberOfLines={1}>
+                                  <Text style={[styles.tableSub, { color: '#334155', fontSize: 11, marginTop: 2 }]} numberOfLines={2}>
                                     📍 {o.customer_address}
                                   </Text>
                                 )}
-                                {o.cod_change_for && (
-                                  <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, alignSelf: 'flex-start', marginTop: 3 }}>
-                                    <Text style={{ color: '#92400E', fontSize: 10, fontWeight: '700' }}>
-                                      💵 Change for ₱{Number(o.cod_change_for).toLocaleString()}
+                                {o.delivery_notes ? (
+                                  <View style={{ backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4, alignSelf: 'flex-start', marginTop: 3, maxWidth: 220 }}>
+                                    <Text style={{ color: '#475569', fontSize: 9.5, fontStyle: 'italic' }} numberOfLines={1}>
+                                      💬 "{o.delivery_notes}"
                                     </Text>
                                   </View>
-                                )}
+                                ) : null}
                               </View>
 
-                              {/* 3. Items Summary */}
-                              <View style={{ flex: 2.2 }}>
-                                <Text style={[styles.tableTitle, { fontSize: 12 }]} numberOfLines={2}>
-                                  {o.items_summary || (o.items ? `${o.items.length} items` : 'Motorcycle Parts')}
+                              {/* 2. Items Summary */}
+                              <View style={{ flex: 2.2, minWidth: 180 }}>
+                                <Text style={[styles.tableTitle, { fontSize: 12.5, lineHeight: 17 }]} numberOfLines={2}>
+                                  {o.items_summary || (o.items && o.items.length > 0 ? o.items.map(it => `${it.quantity || 1}x ${it.name}`).join(', ') : 'Motorcycle Parts')}
                                 </Text>
-                                <Text style={styles.tableSub}>{o.items_count || (o.items ? o.items.length : 1)} item(s)</Text>
+                                <Text style={[styles.tableSub, { marginTop: 3 }]}>{o.items_count || (o.items ? o.items.length : 1)} item(s)</Text>
                               </View>
 
-                              {/* 4. Payment Method */}
-                              <View style={{ flex: 1.6 }}>
+                              {/* 3. Payment */}
+                              <View style={{ flex: 1.1, minWidth: 95 }}>
                                 <View
                                   style={{
                                     backgroundColor: isCOD ? '#FEF3C7' : '#EFF6FF',
                                     borderWidth: 1,
                                     borderColor: isCOD ? '#FDE68A' : '#BFDBFE',
-                                    paddingHorizontal: 8,
+                                    paddingHorizontal: 7,
                                     paddingVertical: 3,
                                     borderRadius: 6,
                                     alignSelf: 'flex-start',
@@ -2144,24 +3144,29 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   <Text
                                     style={{
                                       color: isCOD ? '#92400E' : '#1D4ED8',
-                                      fontSize: 11,
+                                      fontSize: 10.5,
                                       fontWeight: '800',
                                     }}
                                   >
-                                    {isCOD ? '💵 Cash on Delivery' : o.payment_method || 'Online'}
+                                    {isCOD ? 'COD' : o.payment_method || 'Online'}
                                   </Text>
                                 </View>
+                                {o.cod_change_for ? (
+                                  <Text style={{ color: '#92400E', fontSize: 9.5, fontWeight: '700', marginTop: 3 }}>
+                                    Change: ₱{Number(o.cod_change_for).toLocaleString()}
+                                  </Text>
+                                ) : null}
                               </View>
 
-                              {/* 5. Grand Total */}
-                              <View style={{ flex: 1.4, alignItems: 'flex-end' }}>
-                                <Text style={[styles.tableTitle, { color: '#0C6258', fontWeight: '900', fontSize: 13.5 }]}>
+                              {/* 4. Total */}
+                              <View style={{ flex: 1.1, minWidth: 95, alignItems: 'flex-end' }}>
+                                <Text style={[styles.tableTitle, { color: '#1D4533', fontWeight: '900', fontSize: 13.5 }]}>
                                   ₱{(Number(o.grand_total) || Number(o.total_amount) || 0).toLocaleString()}
                                 </Text>
                               </View>
 
-                              {/* 6. Status Badge */}
-                              <View style={{ flex: 1.8, alignItems: 'center' }}>
+                              {/* 5. Status */}
+                              <View style={{ flex: 1.3, minWidth: 110, alignItems: 'center' }}>
                                 <View
                                   style={{
                                     backgroundColor: isPending
@@ -2183,8 +3188,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       : isDelivered
                                       ? '#A7F3D0'
                                       : '#FECACA',
-                                    paddingHorizontal: 8,
-                                    paddingVertical: 4,
+                                    paddingHorizontal: 7,
+                                    paddingVertical: 3.5,
                                     borderRadius: 6,
                                   }}
                                 >
@@ -2199,7 +3204,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                         : isDelivered
                                         ? '#065F46'
                                         : '#DC2626',
-                                      fontSize: 10.5,
+                                      fontSize: 10,
                                       fontWeight: '900',
                                     }}
                                   >
@@ -2208,162 +3213,43 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 </View>
                               </View>
 
-                              {/* 7. Fulfillment Actions */}
-                              <View style={{ flex: 2.6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                                {isPending && (
+                              {/* 6. Action */}
+                              <View style={{ flex: 1.8, minWidth: 150, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexShrink: 0 }}>
+                                {isDelivered ? (
                                   <TouchableOpacity
-                                    style={styles.btnApproveCod}
-                                    onPress={() => handleApproveCOD(orderId)}
+                                    style={styles.btnViewOrder}
+                                    onPress={() => openOrderModalWithOrder(o, false)}
                                     activeOpacity={0.85}
                                   >
-                                    <BootstrapIcon name="check-circle-fill" size={12} color="#FFFFFF" />
-                                    <Text style={styles.btnApproveCodText}>Approve COD</Text>
+                                    <BootstrapIcon name="eye" size={12} color="#334155" />
+                                    <Text style={styles.btnViewOrderText}>Details</Text>
                                   </TouchableOpacity>
-                                )}
+                                ) : (
+                                  <>
+                                    <TouchableOpacity
+                                      style={styles.btnEditOrder}
+                                      onPress={() => openOrderModalWithOrder(o, true)}
+                                      activeOpacity={0.85}
+                                    >
+                                      <BootstrapIcon name="pencil-square" size={12} color="#1D4533" />
+                                      <Text style={styles.btnEditOrderText}>Edit</Text>
+                                    </TouchableOpacity>
 
-                                {(isProcessing || isRescheduled) && (
-                                  <TouchableOpacity
-                                    style={styles.btnAdvanceOrder}
-                                    onPress={() => setAssignDeliveryOrder(o)}
-                                    activeOpacity={0.85}
-                                  >
-                                    <BootstrapIcon name="truck" size={12} color="#1D4ED8" />
-                                    <Text style={styles.btnAdvanceOrderText}>Assign</Text>
-                                  </TouchableOpacity>
-                                )}
-
-                                {isReady && (
-                                  <TouchableOpacity
-                                    style={styles.btnAdvanceOrder}
-                                    onPress={async () => {
-                                      const res = await deliveryService.markOutForDelivery(orderId, currentUser);
-                                      if (res.success) {
-                                        showToast('Out for delivery — share QR with rider');
-                                        setDeliveryTokenModal({
-                                          order: o,
-                                          bundle: {
-                                            token: res.token,
-                                            confirmUrl: res.confirmUrl,
-                                            qrImageUrl: res.qrImageUrl,
-                                            expiresAt: res.expiresAt,
-                                          },
-                                        });
-                                        await loadData();
-                                      } else {
-                                        showToast(res.error || 'Failed to dispatch');
-                                      }
-                                    }}
-                                    activeOpacity={0.85}
-                                  >
-                                    <BootstrapIcon name="box-seam" size={12} color="#1D4ED8" />
-                                    <Text style={styles.btnAdvanceOrderText}>Dispatch</Text>
-                                  </TouchableOpacity>
-                                )}
-
-                                {(isShipped ||
-                                  (o.status || '').toLowerCase() === 'delivery reported' ||
-                                  (o.rider_reported_delivered && !o.admin_confirmed)) && (
-                                  <TouchableOpacity
-                                    style={[
-                                      styles.btnAdvanceOrder,
-                                      { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
-                                    ]}
-                                    onPress={() =>
-                                      setDeliveryAction({
-                                        mode: 'mark_delivered',
-                                        order: o,
-                                      })
-                                    }
-                                    activeOpacity={0.85}
-                                  >
-                                    <BootstrapIcon name="check-circle-fill" size={12} color="#047857" />
-                                    <Text style={[styles.btnAdvanceOrderText, { color: '#047857' }]}>
-                                      Confirm Delivery
-                                    </Text>
-                                  </TouchableOpacity>
-                                )}
-
-                                {isShipped && (
-                                  <TouchableOpacity
-                                    style={styles.btnAdvanceOrder}
-                                    onPress={() => setDeliveryTokenModal({ order: o, bundle: null })}
-                                    activeOpacity={0.85}
-                                  >
-                                    <BootstrapIcon name="qr-code" size={12} color="#1D4ED8" />
-                                    <Text style={styles.btnAdvanceOrderText}>QR</Text>
-                                  </TouchableOpacity>
-                                )}
-
-                                {(isReady || isShipped) && (o.rider_id || o.rider_name) && (
-                                  <TouchableOpacity
-                                    style={styles.btnAdvanceOrder}
-                                    onPress={() =>
-                                      setRiderAccessModal({
-                                        rider: {
-                                          id: o.rider_id,
-                                          name: o.rider_name,
-                                          phone: o.rider_contact,
-                                        },
-                                        bundle: null,
-                                      })
-                                    }
-                                    activeOpacity={0.85}
-                                  >
-                                    <BootstrapIcon name="geo-alt" size={12} color="#1D4ED8" />
-                                    <Text style={styles.btnAdvanceOrderText}>Rider link</Text>
-                                  </TouchableOpacity>
-                                )}
-
-                                {isFailed && (
-                                  <TouchableOpacity
-                                    style={styles.btnAdvanceOrder}
-                                    onPress={async () => {
-                                      const res = await deliveryService.rescheduleDelivery(
-                                        orderId,
-                                        currentUser,
-                                        'Rescheduled by admin'
-                                      );
-                                      if (res.success) {
-                                        showToast('Delivery rescheduled');
-                                        await loadData();
-                                      } else {
-                                        showToast(res.error || 'Reschedule failed');
-                                      }
-                                    }}
-                                    activeOpacity={0.85}
-                                  >
-                                    <BootstrapIcon name="arrow-repeat" size={12} color="#1D4ED8" />
-                                    <Text style={styles.btnAdvanceOrderText}>Reschedule</Text>
-                                  </TouchableOpacity>
-                                )}
-
-                                <TouchableOpacity
-                                  style={styles.btnViewOrder}
-                                  onPress={() => {
-                                    setSelectedOrderForModal(o);
-                                    setIsOrderModalOpen(true);
-                                  }}
-                                  activeOpacity={0.85}
-                                >
-                                  <BootstrapIcon name="eye" size={12} color="#334155" />
-                                  <Text style={styles.btnViewOrderText}>Details</Text>
-                                </TouchableOpacity>
-
-                                {!isDelivered && !isCancelled && (
-                                  <TouchableOpacity
-                                    style={styles.btnCancelOrder}
-                                    onPress={() => handleCancelOrder(orderId)}
-                                    activeOpacity={0.85}
-                                  >
-                                    <BootstrapIcon name="x-lg" size={11} color="#DC2626" />
-                                  </TouchableOpacity>
+                                    <TouchableOpacity
+                                      style={styles.btnViewOrder}
+                                      onPress={() => openOrderModalWithOrder(o, false)}
+                                      activeOpacity={0.85}
+                                    >
+                                      <BootstrapIcon name="eye" size={12} color="#334155" />
+                                      <Text style={styles.btnViewOrderText}>Details</Text>
+                                    </TouchableOpacity>
+                                  </>
                                 )}
                               </View>
                             </View>
                           );
                         })
-                      )}
-                    </View>
+                      )}</View>
                   </ScrollView>
                 </View>
               </View>
@@ -2386,7 +3272,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     accent="blue"
                     label="In Stock SKUs"
                     value={invStats.inStockCount}
-                    valueColor="#0C6258"
+                    valueColor="#1D4533"
                     sub="5+ units on hand"
                   />
                   <AdminStatCard
@@ -2402,7 +3288,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     accent="amber"
                     label="Out of Stock"
                     value={invStats.outOfStockCount}
-                    valueColor={invStats.outOfStockCount > 0 ? '#DC2626' : '#0C6258'}
+                    valueColor={invStats.outOfStockCount > 0 ? '#DC2626' : '#1D4533'}
                     sub="0 units available"
                   />
                 </View>
@@ -2506,7 +3392,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
                           <Text style={[styles.tableSub, { flex: 1.2, color: '#0F172A', fontWeight: '600' }]}>{p.category}</Text>
 
-                          <Text style={[styles.tableTitle, { flex: 1.2, textAlign: 'right', color: '#0C6258' }]}>
+                          <Text style={[styles.tableTitle, { flex: 1.2, textAlign: 'right', color: '#1D4533' }]}>
                             ₱{p.price?.toLocaleString()}
                           </Text>
 
@@ -2552,14 +3438,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           {/* Restock & Edit Action */}
                           <View style={{ flex: 1.6, flexDirection: 'row', justifyContent: 'center', gap: 4 }}>
                             <TouchableOpacity
-                              style={[styles.actionIconBtn, { backgroundColor: '#F3F7F6', borderWidth: 1, borderColor: '#D1ECE6', paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }]}
-                              onPress={() => {
-                                setRestockModalProduct(p);
-                                setRestockAmount('10');
-                              }}
+                              style={[styles.actionIconBtn, { backgroundColor: '#F3F7F6', borderWidth: 1, borderColor: '#C8DDD3', paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', gap: 4 }]}
+                              onPress={() => openSupplierPurchase(p)}
                             >
-                              <BootstrapIcon name="box-arrow-in-down" size={13} color="#0C6258" />
-                              <Text style={{ fontSize: 11, fontWeight: '800', color: '#0C6258' }}>Restock</Text>
+                              <BootstrapIcon name="box-arrow-in-down" size={13} color="#1D4533" />
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533' }}>Buy / Restock</Text>
                             </TouchableOpacity>
 
                             <TouchableOpacity
@@ -2657,7 +3540,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <View style={styles.posRegisterCard}>
                     <View style={styles.posRegisterHeader}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <BootstrapIcon name="cart3" size={18} color="#0C6258" />
+                        <BootstrapIcon name="cart3" size={18} color="#1D4533" />
                         <Text style={styles.posRegisterTitle}>POS Cashier Register</Text>
                       </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -2680,13 +3563,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         )}
                         <View
                           style={{
-                            backgroundColor: '#E7F5F3',
+                            backgroundColor: '#E8F0EC',
                             paddingHorizontal: 8,
                             paddingVertical: 4,
                             borderRadius: 8,
                           }}
                         >
-                          <Text style={{ color: '#0C6258', fontSize: 11, fontWeight: '800' }}>
+                          <Text style={{ color: '#1D4533', fontSize: 11, fontWeight: '800' }}>
                             {posCart.reduce((acc, item) => acc + item.quantity, 0)} Item(s)
                           </Text>
                         </View>
@@ -2701,7 +3584,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         onPress={() => setPosCustomerDropdownOpen(!posCustomerDropdownOpen)}
                       >
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="person-circle" size={16} color="#0C6258" />
+                          <BootstrapIcon name="person-circle" size={16} color="#1D4533" />
                           <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
                             👤 {posSelectedCustomer.name}
                           </Text>
@@ -2720,7 +3603,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 setPosCustomerDropdownOpen(false);
                               }}
                             >
-                              <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0C6258' }}>👤 Walk-in Customer</Text>
+                              <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#1D4533' }}>👤 Walk-in Customer</Text>
                             </TouchableOpacity>
                             {usersList.map((u) => (
                               <TouchableOpacity
@@ -2787,6 +3670,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               <Text style={styles.posCartItemName} numberOfLines={1}>{item.name}</Text>
                               <Text style={styles.posCartItemPrice}>
                                 ₱{item.price?.toLocaleString()} each
+                                {item.size ? ` · Size ${item.size}` : ''}
                               </Text>
                             </View>
 
@@ -2801,7 +3685,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             </View>
 
                             <View style={{ minWidth: 62, alignItems: 'flex-end', marginLeft: 8 }}>
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#0C6258' }}>
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#1D4533' }}>
                                 ₱{(item.price * item.quantity).toLocaleString()}
                               </Text>
                             </View>
@@ -2828,10 +3712,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         autoCapitalize="characters"
                       />
                       <TouchableOpacity
-                        style={{ backgroundColor: '#F3F7F6', borderWidth: 1, borderColor: '#D1ECE6', paddingHorizontal: 14, borderRadius: 12, justifyContent: 'center' }}
+                        style={{ backgroundColor: '#F3F7F6', borderWidth: 1, borderColor: '#C8DDD3', paddingHorizontal: 14, borderRadius: 12, justifyContent: 'center' }}
                         onPress={handlePOSApplyDiscount}
                       >
-                        <Text style={{ color: '#0C6258', fontWeight: '800', fontSize: 12.5 }}>Apply</Text>
+                        <Text style={{ color: '#1D4533', fontWeight: '800', fontSize: 12.5 }}>Apply</Text>
                       </TouchableOpacity>
                     </View>
 
@@ -2880,7 +3764,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           Cash Tendered (₱)
                         </Text>
                         <TextInput
-                          style={[styles.formInput, { fontSize: 16, fontWeight: '900', color: '#0C6258', marginTop: 4 }]}
+                          style={[styles.formInput, { fontSize: 16, fontWeight: '900', color: '#1D4533', marginTop: 4 }]}
                           keyboardType="numeric"
                           placeholder="Enter amount given by customer..."
                           placeholderTextColor="#94A3B8"
@@ -2966,7 +3850,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         ? Math.round((analyticsData.posRevenue / analyticsData.totalRevenue) * 100)
                         : 0
                     }%`}
-                    valueColor="#0C6258"
+                    valueColor="#1D4533"
                     sub={`₱${analyticsData.posRevenue.toLocaleString()} in counter sales`}
                   />
                 </View>
@@ -3019,6 +3903,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </View>
                 </View>
 
+                {/* Service Bookings Share (Pie Chart: Repair vs PMS vs Customization) */}
+                <BookingCategoryPieChart
+                  bookings={garageBookings}
+                  isDark={isDarkMode}
+                  isDesktop={isDesktop}
+                />
+
                 {/* Sales Channels Comparison & Top Products Leaderboard */}
                 <View style={{ flexDirection: 'row', gap: 20, flexWrap: 'wrap' }}>
                   {/* Channel Breakdown */}
@@ -3029,7 +3920,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     <View style={{ marginTop: 16 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
                         <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>In-Store POS Counter</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#0C6258' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#1D4533' }}>
                           ₱{analyticsData.posRevenue.toLocaleString()}
                         </Text>
                       </View>
@@ -3091,7 +3982,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           }}
                         >
                           <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B' }}>{method}</Text>
-                          <Text style={{ fontSize: 16, fontWeight: '900', color: '#0C6258', marginTop: 2 }}>{count}</Text>
+                          <Text style={{ fontSize: 16, fontWeight: '900', color: '#1D4533', marginTop: 2 }}>{count}</Text>
                         </View>
                       ))}
                     </View>
@@ -3116,7 +4007,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               {tp.brand} • {tp.unitsSold} units sold
                             </Text>
                           </View>
-                          <Text style={{ fontSize: 13.5, fontWeight: '900', color: '#0C6258' }}>
+                          <Text style={{ fontSize: 13.5, fontWeight: '900', color: '#1D4533' }}>
                             ₱{tp.revenue.toLocaleString()}
                           </Text>
                         </View>
@@ -3135,6 +4026,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 isDarkMode={false}
                 isDesktop={isDesktop}
               />
+            )}
+
+            {activeNav === 'customizations' && (
+              <CustomizationsAdminPanel />
             )}
 
             {/* ─── TAB 5: PRODUCTS & PRICES MANAGEMENT ─── */}
@@ -3170,20 +4065,28 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </ScrollView>
                 </View>
 
-                {/* Products Table */}
+                {/* Products Table — Cost & Profit visible to admin */}
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  <View style={[styles.tableCard, { minWidth: 700 }]}>
+                  <View style={[styles.tableCard, { minWidth: 920 }]}>
                     <View style={styles.tableHeaderRow}>
-                      <Text style={[styles.tableHeaderCell, { flex: 2.5 }]}>Product & Brand</Text>
-                      <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Category</Text>
-                      <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'center' }]}>Price (₱)</Text>
-                      <Text style={[styles.tableHeaderCell, { flex: 1, textAlign: 'center' }]}>Stock</Text>
-                      <Text style={[styles.tableHeaderCell, { flex: 1.2, textAlign: 'center' }]}>Actions</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 2.4 }]}>Product & Brand</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.1 }]}>Category</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.1, textAlign: 'center' }]}>Cost (₱)</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.1, textAlign: 'center' }]}>Price (₱)</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.1, textAlign: 'center' }]}>Profit (₱)</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 0.9, textAlign: 'center' }]}>Margin</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 0.8, textAlign: 'center' }]}>Stock</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.1, textAlign: 'center' }]}>Actions</Text>
                     </View>
 
-                    {filteredProducts.map((p) => (
+                    {filteredProducts.map((p) => {
+                      const cost = Number(p.unit_cost ?? p.unitCost ?? 0);
+                      const price = Number(p.price) || 0;
+                      const profit = price - cost;
+                      const margin = price > 0 ? (profit / price) * 100 : 0;
+                      return (
                       <View key={p.id} style={styles.tableRow}>
-                        <View style={{ flex: 2.5, flexDirection: 'row', alignItems: 'center' }}>
+                        <View style={{ flex: 2.4, flexDirection: 'row', alignItems: 'center' }}>
                           <Image source={{ uri: p.image }} style={styles.productThumb} />
                           <View style={{ flex: 1 }}>
                             <Text style={styles.tableTitle} numberOfLines={1}>{p.name}</Text>
@@ -3191,10 +4094,18 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           </View>
                         </View>
 
-                        <Text style={[styles.tableSub, { flex: 1.2, color: '#0F172A', fontWeight: '600' }]}>{p.category}</Text>
+                        <Text style={[styles.tableSub, { flex: 1.1, color: '#0F172A', fontWeight: '600' }]}>{p.category}</Text>
 
-                        {/* Editable Price */}
-                        <View style={{ flex: 1.2, alignItems: 'center' }}>
+                        <View style={{ flex: 1.1, alignItems: 'center' }}>
+                          <TextInput
+                            style={[styles.tableInputInline, { width: 80 }]}
+                            keyboardType="numeric"
+                            defaultValue={String(cost)}
+                            onEndEditing={(e) => handleUpdateCost(p.id, e.nativeEvent.text)}
+                          />
+                        </View>
+
+                        <View style={{ flex: 1.1, alignItems: 'center' }}>
                           <TextInput
                             style={[styles.tableInputInline, { width: 80 }]}
                             keyboardType="numeric"
@@ -3203,8 +4114,15 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           />
                         </View>
 
-                        {/* Editable Stock */}
-                        <View style={{ flex: 1, alignItems: 'center' }}>
+                        <Text style={[styles.tableSub, { flex: 1.1, textAlign: 'center', fontWeight: '800', color: profit >= 0 ? '#059669' : '#DC2626' }]}>
+                          ₱{profit.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        </Text>
+
+                        <Text style={[styles.tableSub, { flex: 0.9, textAlign: 'center', fontWeight: '800', color: margin < 15 ? '#D97706' : '#0F172A' }]}>
+                          {margin.toFixed(1)}%
+                        </Text>
+
+                        <View style={{ flex: 0.8, alignItems: 'center' }}>
                           <TextInput
                             style={[styles.tableInputInline, { width: 50 }]}
                             keyboardType="numeric"
@@ -3213,11 +4131,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           />
                         </View>
 
-                        {/* Actions */}
-                        <View style={{ flex: 1.2, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+                        <View style={{ flex: 1.1, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
                           <TouchableOpacity
                             style={[styles.actionIconBtn, styles.actionIconBtnEdit]}
-                            onPress={() => setEditingProduct({ ...p })}
+                            onPress={() => setEditingProduct({ ...p, unit_cost: cost, unitCost: cost })}
                             title="Edit Product"
                           >
                             <BootstrapIcon name="pencil-square" size={16} color="#2563EB" />
@@ -3231,7 +4148,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           </TouchableOpacity>
                         </View>
                       </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 </ScrollView>
               </View>
@@ -3252,7 +4170,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   {promos.map((prm) => (
                     <View key={prm.code} style={[styles.tableRow, !prm.isActive && { opacity: 0.65, backgroundColor: '#F8FAFC' }]}>
                       <View style={{ flex: 2, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={[styles.tableTitle, { color: prm.isActive ? '#0C6258' : '#64748B', fontWeight: '900', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
+                        <Text style={[styles.tableTitle, { color: prm.isActive ? '#1D4533' : '#64748B', fontWeight: '900', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }]}>
                           {prm.code}
                         </Text>
                         {!prm.isActive && (
@@ -3326,8 +4244,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           paddingVertical: 10,
                           borderRadius: 12,
                           borderWidth: 1.5,
-                          borderColor: active ? '#0C6258' : '#E2E8F0',
-                          backgroundColor: active ? '#0C6258' : '#FFFFFF',
+                          borderColor: active ? '#1D4533' : '#E2E8F0',
+                          backgroundColor: active ? '#1D4533' : '#FFFFFF',
                           alignItems: 'center',
                         }}
                       >
@@ -3368,11 +4286,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   paddingHorizontal: 8,
                                   paddingVertical: 4,
                                   borderRadius: 8,
-                                  backgroundColor: isPending ? '#FEF3C7' : '#D1ECE6',
+                                  backgroundColor: isPending ? '#FEF3C7' : '#C8DDD3',
                                   alignSelf: 'flex-start',
                                 }}
                               >
-                                <Text style={{ fontSize: 11, fontWeight: '800', color: isPending ? '#D97706' : '#0C6258' }}>
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: isPending ? '#D97706' : '#1D4533' }}>
                                   {isPending ? 'Pending Approval' : b.status}
                                 </Text>
                               </View>
@@ -3423,7 +4341,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         </View>
                       </View>
                       <Text style={[styles.tableSub, { flex: 1.2, color: '#0F172A', fontWeight: '700' }]}>{srv.category}</Text>
-                      <Text style={[styles.tableTitle, { flex: 1.2, textAlign: 'right', color: '#0C6258' }]}>
+                      <Text style={[styles.tableTitle, { flex: 1.2, textAlign: 'right', color: '#1D4533' }]}>
                         ₱{(srv.pricePhp || srv.price || 0).toLocaleString()}
                       </Text>
                       <Text style={[styles.tableSub, { flex: 1.2, textAlign: 'center' }]}>{srv.duration || '60 mins'}</Text>
@@ -3504,8 +4422,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             paddingVertical: 7,
                             borderRadius: 999,
                             borderWidth: 1.5,
-                            borderColor: active ? '#0C6258' : '#E2E8F0',
-                            backgroundColor: active ? '#0C6258' : '#FFFFFF',
+                            borderColor: active ? '#1D4533' : '#E2E8F0',
+                            backgroundColor: active ? '#1D4533' : '#FFFFFF',
                             flexDirection: 'row',
                             alignItems: 'center',
                             gap: 6,
@@ -3555,7 +4473,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               height: 40,
                               borderRadius: 20,
                               borderWidth: 1.5,
-                              borderColor: '#0C6258',
+                              borderColor: '#1D4533',
                               backgroundColor: '#E2E8F0',
                             }}
                           />
@@ -3569,7 +4487,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             <Text style={[styles.tableSub, { fontSize: 11 }]} numberOfLines={1}>
                               Plate: {rider.plateNumber || '—'}
                             </Text>
-                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#0C6258', marginTop: 4 }}>
+                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#1D4533', marginTop: 4 }}>
                               Earnings: ₱
                               {Number(rider.totalEarnings || 0).toLocaleString(undefined, {
                                 minimumFractionDigits: 2,
@@ -3597,7 +4515,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               style={styles.actionIconBtn}
                               onPress={() => setRiderAccessModal({ rider, bundle: null })}
                             >
-                              <BootstrapIcon name="geo-alt" size={13} color="#0C6258" />
+                              <BootstrapIcon name="geo-alt" size={13} color="#1D4533" />
                             </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.actionIconBtn}
@@ -3659,7 +4577,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <Text style={[styles.tableSub, { flex: 2 }]}>{u.email}</Text>
                         <View style={{ flex: 1.5 }}>
                           <View style={{ backgroundColor: u.role === 'admin' ? '#F3F7F6' : '#F1F5F9', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, alignSelf: 'flex-start' }}>
-                            <Text style={{ color: u.role === 'admin' ? '#0C6258' : '#475569', fontSize: 11, fontWeight: '800' }}>
+                            <Text style={{ color: u.role === 'admin' ? '#1D4533' : '#475569', fontSize: 11, fontWeight: '800' }}>
                               {u.role === 'admin' ? '👑 Admin' : '👤 Customer'}
                             </Text>
                           </View>
@@ -3669,7 +4587,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             style={[styles.actionIconBtn, { backgroundColor: '#F1F5F9', paddingHorizontal: 8, paddingVertical: 4 }]}
                             onPress={() => handleToggleUserRole(u.id, u.role)}
                           >
-                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#0C6258' }}>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4533' }}>
                               {u.role === 'admin' ? 'Demote' : 'Promote'}
                             </Text>
                           </TouchableOpacity>
@@ -3694,7 +4612,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <View style={[styles.tableCard, { padding: 24 }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                     <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F7F6', alignItems: 'center', justifyContent: 'center' }}>
-                      <BootstrapIcon name="database-fill-check" size={20} color="#0C6258" />
+                      <BootstrapIcon name="database-fill-check" size={20} color="#1D4533" />
                     </View>
                     <Text style={{ fontSize: 18, fontWeight: '900', color: '#0F172A' }}>
                       Cloud Database Connection (Supabase)
@@ -3714,7 +4632,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     autoCapitalize="none"
                   />
                   <Text style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 3, marginBottom: 14 }}>
-                    Correct format: <Text style={{ color: '#0C6258', fontWeight: '600' }}>https://vtbdmurblidtdghaotne.supabase.co</Text>
+                    Correct format: <Text style={{ color: '#1D4533', fontWeight: '600' }}>https://vtbdmurblidtdghaotne.supabase.co</Text>
                   </Text>
 
                   <Text style={styles.formLabel}>Supabase Public Anon Key</Text>
@@ -3748,7 +4666,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     </TouchableOpacity>
 
                     <TouchableOpacity
-                      style={[styles.addBtnPrimary, { backgroundColor: '#F3F7F6', borderWidth: 1, borderColor: '#0C6258' }]}
+                      style={[styles.addBtnPrimary, { backgroundColor: '#F3F7F6', borderWidth: 1, borderColor: '#1D4533' }]}
                       onPress={async () => {
                         const defs = supabaseManager.resetToDefaults();
                         setSupabaseUrl(defs.url);
@@ -3759,8 +4677,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       }}
                       activeOpacity={0.85}
                     >
-                      <BootstrapIcon name="arrow-counterclockwise" size={14} color="#0C6258" />
-                      <Text style={[styles.addBtnPrimaryText, { color: '#0C6258' }]}>Restore Default Project Credentials</Text>
+                      <BootstrapIcon name="arrow-counterclockwise" size={14} color="#1D4533" />
+                      <Text style={[styles.addBtnPrimaryText, { color: '#1D4533' }]}>Restore Default Project Credentials</Text>
                     </TouchableOpacity>
                   </View>
 
@@ -3805,12 +4723,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           width: 44,
                           height: 44,
                           borderRadius: 22,
-                          backgroundColor: '#E7F5F3',
+                          backgroundColor: '#E8F0EC',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
                       >
-                        <BootstrapIcon name="gear-fill" size={22} color="#0C6258" />
+                        <BootstrapIcon name="gear-fill" size={22} color="#1D4533" />
                       </View>
                       <View>
                         <Text style={{ fontSize: 20, fontWeight: '900', color: '#0F172A' }}>
@@ -3824,7 +4742,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
                     <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
                       <TouchableOpacity
-                        style={[styles.addBtnPrimary, { backgroundColor: '#0C6258' }]}
+                        style={[styles.addBtnPrimary, { backgroundColor: '#1D4533' }]}
                         onPress={handleSaveSystemSettings}
                         activeOpacity={0.85}
                       >
@@ -4068,7 +4986,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           width: 48,
                           height: 28,
                           borderRadius: 14,
-                          backgroundColor: setForm.autoVerifyCodOrders ? '#0C6258' : '#CBD5E1',
+                          backgroundColor: setForm.autoVerifyCodOrders ? '#1D4533' : '#CBD5E1',
                           padding: 2,
                           justifyContent: 'center',
                         }}
@@ -4164,7 +5082,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           width: 48,
                           height: 28,
                           borderRadius: 14,
-                          backgroundColor: setForm.allowWeekendBookings ? '#0C6258' : '#CBD5E1',
+                          backgroundColor: setForm.allowWeekendBookings ? '#1D4533' : '#CBD5E1',
                           padding: 2,
                           justifyContent: 'center',
                         }}
@@ -4210,7 +5128,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           width: 48,
                           height: 28,
                           borderRadius: 14,
-                          backgroundColor: setForm.autoAssignMechanic ? '#0C6258' : '#CBD5E1',
+                          backgroundColor: setForm.autoAssignMechanic ? '#1D4533' : '#CBD5E1',
                           padding: 2,
                           justifyContent: 'center',
                         }}
@@ -4393,7 +5311,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     style={[
                       styles.orderFilterTab,
                       { flex: 1, alignItems: 'center' },
-                      servCategory === cat && { backgroundColor: '#0C6258', borderColor: '#0C6258' },
+                      servCategory === cat && { backgroundColor: '#1D4533', borderColor: '#1D4533' },
                     ]}
                   >
                     <Text style={[styles.orderFilterTabText, servCategory === cat && { color: '#FFFFFF' }]}>{cat}</Text>
@@ -4495,12 +5413,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       padding: 10,
                       borderRadius: 10,
                       borderWidth: 1.5,
-                      borderColor: selected ? '#0C6258' : '#E2E8F0',
+                      borderColor: selected ? '#1D4533' : '#E2E8F0',
                       backgroundColor: selected ? '#F0FDF4' : '#FFFFFF',
                       marginBottom: 8,
                     }}
                   >
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: selected ? '#0C6258' : '#0F172A' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: selected ? '#1D4533' : '#0F172A' }}>
                       {mech.name}
                     </Text>
                     {mech.specialization ? (
@@ -4550,14 +5468,24 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <View style={{ flex: 1 }}>
+                  <Text style={styles.formLabel}>Cost (₱)</Text>
+                  <TextInput style={styles.formInput} keyboardType="numeric" value={newProdCost} onChangeText={setNewProdCost} placeholder="25000" placeholderTextColor="#94A3B8" />
+                </View>
+                <View style={{ flex: 1 }}>
                   <Text style={styles.formLabel}>Price (₱)</Text>
                   <TextInput style={styles.formInput} keyboardType="numeric" value={newProdPrice} onChangeText={setNewProdPrice} placeholder="39000" placeholderTextColor="#94A3B8" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Initial Stock</Text>
+                  <Text style={styles.formLabel}>Stock</Text>
                   <TextInput style={styles.formInput} keyboardType="numeric" value={newProdStock} onChangeText={setNewProdStock} placeholder="15" placeholderTextColor="#94A3B8" />
                 </View>
               </View>
+              {Number(newProdPrice) > 0 && (
+                <Text style={{ fontSize: 12, color: '#059669', fontWeight: '700', marginBottom: 8 }}>
+                  Profit: ₱{(Number(newProdPrice) - Number(newProdCost || 0)).toLocaleString()} (
+                  {(((Number(newProdPrice) - Number(newProdCost || 0)) / Number(newProdPrice)) * 100).toFixed(1)}% margin)
+                </Text>
+              )}
 
               <Text style={styles.formLabel}>Category</Text>
               <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -4572,6 +5500,24 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 ))}
               </View>
 
+              <ProductSizesEditor
+                sizes={newProdSizes}
+                basePrice={parseFloat(newProdPrice) || 0}
+                onChange={setNewProdSizes}
+                formInputStyle={styles.formInput}
+                formLabelStyle={styles.formLabel}
+                productKey={isAddProductOpen ? 'new-open' : 'new-closed'}
+              />
+
+              <ProductColorsEditor
+                colors={newProdColors}
+                onChange={setNewProdColors}
+                formInputStyle={styles.formInput}
+                formLabelStyle={styles.formLabel}
+                onToast={showToast}
+                productKey={isAddProductOpen ? 'new-open' : 'new-closed'}
+              />
+
               {/* Image Selection: File Picker / URL / Presets */}
               <Text style={styles.formLabel}>Product Image</Text>
               <View style={{ flexDirection: 'row', gap: 14, alignItems: 'center', marginBottom: 12, padding: 12, backgroundColor: '#F8FAFC', borderRadius: 14, borderWidth: 1, borderColor: '#E2E8F0' }}>
@@ -4582,7 +5528,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 />
                 <View style={{ flex: 1, gap: 6 }}>
                   <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#0C6258', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 }}
+                    style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1D4533', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 }}
                     onPress={async () => {
                       const res = await pickImageFromFile();
                       if (res.success && res.uri) {
@@ -4641,21 +5587,68 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
               <ScrollView style={styles.modalBody}>
                 <Text style={styles.formLabel}>Part Name</Text>
-                <TextInput style={styles.formInput} value={editingProduct.name} onChangeText={(val) => setEditingProduct({ ...editingProduct, name: val })} />
+                <TextInput style={styles.formInput} value={editingProduct.name} onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, name: val }))} />
 
                 <Text style={styles.formLabel}>Brand</Text>
-                <TextInput style={styles.formInput} value={editingProduct.brand} onChangeText={(val) => setEditingProduct({ ...editingProduct, brand: val })} />
+                <TextInput style={styles.formInput} value={editingProduct.brand} onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, brand: val }))} />
 
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <View style={{ flex: 1 }}>
+                    <Text style={styles.formLabel}>Cost (₱)</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      keyboardType="numeric"
+                      value={String(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0)}
+                      onChangeText={(val) => {
+                        const cost = parseFloat(val) || 0;
+                        setEditingProduct((prev) => ({ ...prev, unit_cost: cost, unitCost: cost }));
+                      }}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
                     <Text style={styles.formLabel}>Price (₱)</Text>
-                    <TextInput style={styles.formInput} keyboardType="numeric" value={String(editingProduct.price)} onChangeText={(val) => setEditingProduct({ ...editingProduct, price: parseFloat(val) || 0 })} />
+                    <TextInput style={styles.formInput} keyboardType="numeric" value={String(editingProduct.price)} onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, price: parseFloat(val) || 0 }))} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.formLabel}>Stock</Text>
-                    <TextInput style={styles.formInput} keyboardType="numeric" value={String(editingProduct.stock)} onChangeText={(val) => setEditingProduct({ ...editingProduct, stock: parseInt(val, 10) || 0 })} />
+                    <TextInput style={styles.formInput} keyboardType="numeric" value={String(editingProduct.stock)} onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, stock: parseInt(val, 10) || 0 }))} />
                   </View>
                 </View>
+                {Number(editingProduct.price) > 0 && (
+                  <Text style={{ fontSize: 12, color: '#059669', fontWeight: '700', marginBottom: 8 }}>
+                    Profit: ₱
+                    {(
+                      Number(editingProduct.price) -
+                      Number(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0)
+                    ).toLocaleString()}{' '}
+                    (
+                    {(
+                      ((Number(editingProduct.price) -
+                        Number(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0)) /
+                        Number(editingProduct.price)) *
+                      100
+                    ).toFixed(1)}
+                    % margin)
+                  </Text>
+                )}
+
+                <ProductSizesEditor
+                  sizes={editingProduct.sizes || []}
+                  basePrice={Number(editingProduct.price) || 0}
+                  onChange={(next) => setEditingProduct((prev) => ({ ...prev, sizes: next }))}
+                  formInputStyle={styles.formInput}
+                  formLabelStyle={styles.formLabel}
+                  productKey={editingProduct.id || editingProduct.product_id || 'edit'}
+                />
+
+                <ProductColorsEditor
+                  colors={editingProduct.colors || []}
+                  onChange={(next) => setEditingProduct((prev) => ({ ...prev, colors: next }))}
+                  formInputStyle={styles.formInput}
+                  formLabelStyle={styles.formLabel}
+                  onToast={showToast}
+                  productKey={editingProduct.id || editingProduct.product_id || 'edit'}
+                />
 
                 {/* Edit Product Image with File Picker */}
                 <Text style={styles.formLabel}>Product Image</Text>
@@ -4667,11 +5660,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   />
                   <View style={{ flex: 1, gap: 6 }}>
                     <TouchableOpacity
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#0C6258', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 }}
+                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#1D4533', paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10 }}
                       onPress={async () => {
                         const res = await pickImageFromFile();
                         if (res.success && res.uri) {
-                          setEditingProduct({ ...editingProduct, image: res.uri });
+                          setEditingProduct((prev) => ({ ...prev, image: res.uri }));
                           showToast('✅ Image updated from file!');
                         } else if (res.error && res.error !== 'Selection cancelled') {
                           showAlert('Image Picker', res.error);
@@ -4687,10 +5680,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </View>
 
                 <Text style={[styles.formLabel, { fontSize: 12, color: '#64748B' }]}>Or Paste Image URL</Text>
-                <TextInput style={styles.formInput} value={editingProduct.image || ''} onChangeText={(val) => setEditingProduct({ ...editingProduct, image: val })} placeholder="https://..." placeholderTextColor="#94A3B8" />
+                <TextInput style={styles.formInput} value={editingProduct.image || ''} onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, image: val }))} placeholder="https://..." placeholderTextColor="#94A3B8" />
 
                 <Text style={styles.formLabel}>Description</Text>
-                <TextInput style={[styles.formInput, { height: 60 }]} multiline value={editingProduct.description} onChangeText={(val) => setEditingProduct({ ...editingProduct, description: val })} />
+                <TextInput style={[styles.formInput, { height: 60 }]} multiline value={editingProduct.description} onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, description: val }))} />
               </ScrollView>
 
               <View style={styles.modalFooter}>
@@ -4706,51 +5699,590 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         </Modal>
       )}
 
-      {/* ─── MODAL 3: QUICK RESTOCK DIALOG ─── */}
-      {restockModalProduct && (
-        <Modal visible={Boolean(restockModalProduct)} transparent animationType="fade" onRequestClose={() => setRestockModalProduct(null)}>
+      {/* ─── MODAL 3: SUPPLIER PURCHASE / RESTOCK ─── */}
+      <Modal
+        visible={isRestockModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setIsRestockModalOpen(false);
+          setRestockModalProduct(null);
+          setRestockSearchQuery('');
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { maxWidth: 480 }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Purchase from Supplier</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setIsRestockModalOpen(false);
+                  setRestockModalProduct(null);
+                  setRestockSearchQuery('');
+                  setRestockSizeAdds([]);
+                  setRestockSelectedSize('');
+                }}
+              >
+                <BootstrapIcon name="x-lg" size={16} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ maxHeight: 480 }} keyboardShouldPersistTaps="handled">
+              <Text style={styles.formLabel}>Select Product SKU</Text>
+              <TextInput
+                style={styles.formInput}
+                value={restockSearchQuery}
+                onChangeText={setRestockSearchQuery}
+                placeholder="Search name or brand…"
+                placeholderTextColor="#94A3B8"
+              />
+
+              {(!restockModalProduct || restockSearchQuery.trim()) && (
+                <View style={{ maxHeight: 160, marginBottom: 10, borderWidth: 1, borderColor: '#E2E8F0', borderRadius: 12, overflow: 'hidden' }}>
+                  <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+                    {(products || [])
+                      .filter((p) => {
+                        const q = restockSearchQuery.toLowerCase().trim();
+                        if (!q) return true;
+                        return (
+                          (p.name || '').toLowerCase().includes(q) ||
+                          (p.brand || '').toLowerCase().includes(q)
+                        );
+                      })
+                      .slice(0, 10)
+                      .map((p) => (
+                        <TouchableOpacity
+                          key={p.id || p.product_id}
+                          style={{ paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#F1F5F9' }}
+                          onPress={() => selectRestockProduct(p)}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>{p.name}</Text>
+                          <Text style={{ fontSize: 11, color: '#64748B' }}>
+                            Stock {p.stock || 0} · ₱{Number(p.price || 0).toLocaleString()}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {restockModalProduct ? (
+                <>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      gap: 12,
+                      alignItems: 'center',
+                      marginBottom: 12,
+                      padding: 10,
+                      backgroundColor: '#F8FAFC',
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: '#E2E8F0',
+                    }}
+                  >
+                    <Image
+                      source={{
+                        uri:
+                          restockModalProduct.image ||
+                          'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=200&q=80',
+                      }}
+                      style={{
+                        width: 54,
+                        height: 54,
+                        borderRadius: 10,
+                        backgroundColor: '#E2E8F0',
+                        borderWidth: 1,
+                        borderColor: '#CBD5E1',
+                      }}
+                      resizeMode="cover"
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>{restockModalProduct.name}</Text>
+                      <Text style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
+                        {restockModalProduct.brand} · {restockModalProduct.category}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#1D4533', fontWeight: '700', marginTop: 2 }}>
+                        Current stock: {restockModalProduct.stock || 0} · Cost ₱
+                        {Number(restockModalProduct.unit_cost ?? restockModalProduct.unitCost ?? 0).toLocaleString()} · Price ₱
+                        {Number(restockModalProduct.price || 0).toLocaleString()}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setRestockModalProduct(null);
+                          setRestockSizeAdds([]);
+                          setRestockSelectedSize('');
+                          setRestockSearchQuery('');
+                        }}
+                        style={{ marginTop: 4 }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#B45309' }}>Change product</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <Text style={styles.formLabel}>Supplier</Text>
+                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                    <TouchableOpacity
+                      style={[styles.filterPill, !restockSupplierId && styles.filterPillActive]}
+                      onPress={() => setRestockSupplierId('')}
+                    >
+                      <Text style={[styles.filterPillText, !restockSupplierId && styles.filterPillTextActive]}>
+                        No supplier
+                      </Text>
+                    </TouchableOpacity>
+                    {(suppliers || []).slice(0, 8).map((s) => {
+                      const sid = s.supplier_id || s.id;
+                      return (
+                        <TouchableOpacity
+                          key={sid}
+                          style={[styles.filterPill, restockSupplierId === sid && styles.filterPillActive]}
+                          onPress={() => setRestockSupplierId(sid)}
+                        >
+                          <Text style={[styles.filterPillText, restockSupplierId === sid && styles.filterPillTextActive]}>
+                            {s.name}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+
+                  {/* ─── SIZE PICKER SECTION ─── */}
+                  {(() => {
+                    const availSizes = normalizeProductSizes(restockModalProduct);
+                    if (!availSizes.length) return null;
+
+                    return (
+                      <View style={{ marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <Text style={styles.formLabel}>Select Size to Restock</Text>
+                          <Text style={{ fontSize: 11, color: '#64748B' }}>
+                            {availSizes.length} variant{availSizes.length !== 1 ? 's' : ''} available
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
+                          {availSizes.map((sz) => {
+                            const isSelected = restockSelectedSize === sz.label;
+                            const currentStock =
+                              sz.stock === null || sz.stock === undefined
+                                ? Number(restockModalProduct.stock || 0)
+                                : Number(sz.stock || 0);
+                            return (
+                              <TouchableOpacity
+                                key={sz.label}
+                                style={[
+                                  styles.filterPill,
+                                  isSelected && styles.filterPillActive,
+                                  {
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                    paddingVertical: 6,
+                                    paddingHorizontal: 10,
+                                    borderRadius: 10,
+                                    borderColor: isSelected ? '#1D4533' : '#CBD5E1',
+                                    borderWidth: 1.5,
+                                    backgroundColor: isSelected ? '#1D4533' : '#F8FAFC',
+                                  },
+                                ]}
+                                onPress={() => {
+                                  setRestockSelectedSize(sz.label);
+                                  if (sz.price) {
+                                    setRestockSellPrice(String(sz.price));
+                                  }
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: '800',
+                                    color: isSelected ? '#FFFFFF' : '#0F172A',
+                                  }}
+                                >
+                                  {sz.label}
+                                </Text>
+                                <View
+                                  style={{
+                                    backgroundColor: isSelected ? 'rgba(255,255,255,0.22)' : '#E2E8F0',
+                                    paddingHorizontal: 5,
+                                    paddingVertical: 2,
+                                    borderRadius: 6,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: '700',
+                                      color: isSelected ? '#FFFFFF' : '#475569',
+                                    }}
+                                  >
+                                    {currentStock} in stock
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                          <TouchableOpacity
+                            style={[
+                              styles.filterPill,
+                              restockSelectedSize === 'all' && styles.filterPillActive,
+                              {
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 5,
+                                paddingVertical: 6,
+                                paddingHorizontal: 10,
+                                borderRadius: 10,
+                                borderColor: restockSelectedSize === 'all' ? '#1D4533' : '#CBD5E1',
+                                borderWidth: 1.5,
+                                backgroundColor: restockSelectedSize === 'all' ? '#1D4533' : '#F8FAFC',
+                              },
+                            ]}
+                            onPress={() => setRestockSelectedSize('all')}
+                          >
+                            <BootstrapIcon
+                              name="grid-3x3-gap-fill"
+                              size={11}
+                              color={restockSelectedSize === 'all' ? '#FFFFFF' : '#64748B'}
+                            />
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: '800',
+                                color: restockSelectedSize === 'all' ? '#FFFFFF' : '#0F172A',
+                              }}
+                            >
+                              All Sizes
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {restockSelectedSize && restockSelectedSize !== 'all' && (() => {
+                          const activeSize = availSizes.find((s) => s.label === restockSelectedSize);
+                          const curStock =
+                            activeSize?.stock === null || activeSize?.stock === undefined
+                              ? Number(restockModalProduct.stock || 0)
+                              : Number(activeSize?.stock || 0);
+                          const addQty = parseInt(restockAmount, 10) || 0;
+                          return (
+                            <View
+                              style={{
+                                marginTop: 6,
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                backgroundColor: '#F0FDFA',
+                                borderWidth: 1,
+                                borderColor: '#CCFBF1',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              <Text style={{ fontSize: 11, color: '#0F766E', fontWeight: '700' }}>
+                                Restocking: <Text style={{ fontWeight: '900' }}>{restockSelectedSize}</Text> ({curStock} units)
+                              </Text>
+                              <Text style={{ fontSize: 11, color: '#059669', fontWeight: '800' }}>
+                                → {curStock + addQty} units
+                              </Text>
+                            </View>
+                          );
+                        })()}
+                      </View>
+                    );
+                  })()}
+
+                  {/* ─── QUANTITY SECTION ─── */}
+                  {(() => {
+                    const availSizes = normalizeProductSizes(restockModalProduct);
+                    const isAll = availSizes.length > 0 && restockSelectedSize === 'all';
+
+                    if (isAll) {
+                      return (
+                        <>
+                          <Text style={styles.formLabel}>Restock by size (add units)</Text>
+                          <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 6 }}>
+                            Enter how many units to add for each size.
+                          </Text>
+                          {restockSizeAdds.map((row, idx) => (
+                            <View
+                              key={row.label}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 8,
+                                marginBottom: 6,
+                              }}
+                            >
+                              <View style={{ flex: 1.2 }}>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>
+                                  {row.label}
+                                </Text>
+                                <Text style={{ fontSize: 10, color: '#64748B' }}>
+                                  Now: {row.currentStock}
+                                </Text>
+                              </View>
+                              <TextInput
+                                style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
+                                keyboardType="numeric"
+                                value={row.addQty}
+                                placeholder="+ qty"
+                                placeholderTextColor="#94A3B8"
+                                onChangeText={(val) => {
+                                  setRestockSizeAdds((prev) =>
+                                    prev.map((r, i) => (i === idx ? { ...r, addQty: val } : r))
+                                  );
+                                }}
+                              />
+                            </View>
+                          ))}
+                          <View style={{ flexDirection: 'row', gap: 6, marginBottom: 8 }}>
+                            {[5, 10, 25].map((qty) => (
+                              <TouchableOpacity
+                                key={qty}
+                                style={{
+                                  flex: 1,
+                                  backgroundColor: '#FEF3C7',
+                                  paddingVertical: 6,
+                                  borderRadius: 8,
+                                  alignItems: 'center',
+                                  borderWidth: 1,
+                                  borderColor: '#FDE68A',
+                                }}
+                                onPress={() =>
+                                  setRestockSizeAdds((prev) =>
+                                    prev.map((r) => ({ ...r, addQty: String(qty) }))
+                                  )
+                                }
+                              >
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533' }}>
+                                  +{qty} all
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </>
+                      );
+                    }
+
+                    return (
+                      <>
+                        <Text style={styles.formLabel}>Quantity purchased</Text>
+                        <TextInput
+                          style={[styles.formInput, { fontSize: 16, fontWeight: '900', color: '#1D4533' }]}
+                          keyboardType="numeric"
+                          value={restockAmount}
+                          onChangeText={setRestockAmount}
+                          placeholder="10"
+                          placeholderTextColor="#94A3B8"
+                        />
+                        <View style={{ flexDirection: 'row', gap: 6, marginTop: 4, marginBottom: 8 }}>
+                          {[5, 10, 25, 50].map((qty) => (
+                            <TouchableOpacity
+                              key={qty}
+                              style={{
+                                flex: 1,
+                                backgroundColor: '#FEF3C7',
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                alignItems: 'center',
+                                borderWidth: 1,
+                                borderColor: '#FDE68A',
+                              }}
+                              onPress={() => setRestockAmount(String(qty))}
+                            >
+                              <Text style={{ fontSize: 12, fontWeight: '800', color: '#1D4533' }}>
+                                +{qty}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </>
+                    );
+                  })()}
+
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.formLabel}>Cost / Purchase (₱)</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        keyboardType="numeric"
+                        value={restockUnitCost}
+                        onChangeText={setRestockUnitCost}
+                        placeholder="Paid to supplier"
+                        placeholderTextColor="#94A3B8"
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.formLabel}>Selling Price (₱)</Text>
+                      <TextInput
+                        style={styles.formInput}
+                        keyboardType="numeric"
+                        value={restockSellPrice}
+                        onChangeText={setRestockSellPrice}
+                        placeholder="Customer price"
+                        placeholderTextColor="#94A3B8"
+                      />
+                    </View>
+                  </View>
+
+                  {(() => {
+                    const availSizes = normalizeProductSizes(restockModalProduct);
+                    const isAll = availSizes.length > 0 && restockSelectedSize === 'all';
+                    const sizeTotal = (restockSizeAdds || []).reduce(
+                      (sum, r) => sum + (parseInt(String(r.addQty || '0'), 10) || 0),
+                      0
+                    );
+                    const qty = isAll ? sizeTotal : Number(restockAmount) || 0;
+                    const cost = Number(restockUnitCost) || 0;
+                    const price = Number(restockSellPrice) || 0;
+                    const expense = qty * cost;
+                    const profitUnit = price - cost;
+                    const expected = profitUnit * qty;
+                    const margin = price > 0 ? (profitUnit / price) * 100 : 0;
+                    return (
+                      <View style={{ marginTop: 10, padding: 10, borderRadius: 12, backgroundColor: '#F0FDFA', borderWidth: 1, borderColor: '#99F6E4', gap: 4 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#0F766E' }}>Expense & Profit preview</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#B45309' }}>
+                          Expense (paid to supplier): ₱{expense.toLocaleString()}
+                        </Text>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: profitUnit >= 0 ? '#059669' : '#DC2626' }}>
+                          Profit/unit: ₱{profitUnit.toLocaleString()} ({margin.toFixed(1)}%)
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#475569' }}>
+                          If all {qty || 0} units sell: ₱{expected.toLocaleString()} profit
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                </>
+              ) : (
+                <Text style={{ fontSize: 13, color: '#64748B', marginBottom: 12 }}>
+                  Search and select a product, then enter quantity and cost — same idea as adding an SKU.
+                </Text>
+              )}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.quickStoreBtn}
+                onPress={() => {
+                  setIsRestockModalOpen(false);
+                  setRestockModalProduct(null);
+                  setRestockSearchQuery('');
+                  setRestockSizeAdds([]);
+                  setRestockSelectedSize('');
+                }}
+              >
+                <Text style={styles.quickStoreBtnText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.addBtnPrimary, !restockModalProduct && { opacity: 0.5 }]}
+                onPress={handleExecuteRestock}
+                disabled={!restockModalProduct}
+              >
+                <BootstrapIcon name="box-arrow-in-down" size={14} color="#FFFFFF" />
+                <Text style={styles.addBtnPrimaryText}>Confirm Purchase</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── MODAL 4: DIGITAL POS THERMAL RECEIPT ─── */}
+      {/* ─── POS SIZE PICKER (tires / rims) ─── */}
+      {posSizePickerProduct && (
+        <Modal
+          visible={Boolean(posSizePickerProduct)}
+          transparent
+          animationType="fade"
+          onRequestClose={() => {
+            setPosSizePickerProduct(null);
+            setPosSelectedSize('');
+          }}
+        >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalSheet, { maxWidth: 420 }]}>
+            <View style={styles.modalSheet}>
               <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Quick Restock Inventory</Text>
-                <TouchableOpacity onPress={() => setRestockModalProduct(null)}>
+                <Text style={styles.modalTitle}>Select Size</Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setPosSizePickerProduct(null);
+                    setPosSelectedSize('');
+                  }}
+                >
                   <BootstrapIcon name="x-lg" size={16} color="#64748B" />
                 </TouchableOpacity>
               </View>
-
-              <View style={{ paddingVertical: 10 }}>
-                <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>{restockModalProduct.name}</Text>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                  Current Stock: {restockModalProduct.stock || 0} unit(s)
+              <View style={styles.modalBody}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 4 }}>
+                  {posSizePickerProduct.name}
                 </Text>
-
-                <Text style={[styles.formLabel, { marginTop: 16 }]}>Units to Add to Stock</Text>
-                <TextInput
-                  style={[styles.formInput, { fontSize: 16, fontWeight: '900', color: '#0C6258' }]}
-                  keyboardType="numeric"
-                  value={restockAmount}
-                  onChangeText={setRestockAmount}
-                />
-
-                <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
-                  {[5, 10, 25, 50].map((qty) => (
-                    <TouchableOpacity
-                      key={qty}
-                      style={{ flex: 1, backgroundColor: '#F3F7F6', paddingVertical: 6, borderRadius: 8, alignItems: 'center', borderWidth: 1, borderColor: '#D1ECE6' }}
-                      onPress={() => setRestockAmount(String(qty))}
-                    >
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#0C6258' }}>+{qty}</Text>
-                    </TouchableOpacity>
-                  ))}
+                <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 12 }}>
+                  Choose a size before adding to the POS cart.
+                </Text>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {getProductSizeEntries(posSizePickerProduct).map((entry) => {
+                    const soldOut = isSizeSoldOut(posSizePickerProduct, entry.label);
+                    const active = posSelectedSize === entry.label;
+                    return (
+                      <TouchableOpacity
+                        key={entry.label}
+                        disabled={soldOut}
+                        onPress={() => setPosSelectedSize(entry.label)}
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 10,
+                          borderWidth: 1.5,
+                          borderColor: soldOut ? '#FECACA' : active ? '#1D4533' : '#E2E8F0',
+                          backgroundColor: soldOut ? '#FEF2F2' : active ? '#1D4533' : '#F8FAFC',
+                          minWidth: 110,
+                          opacity: soldOut ? 0.7 : 1,
+                        }}
+                        activeOpacity={0.85}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '800',
+                            color: soldOut ? '#991B1B' : active ? '#FFFFFF' : '#0F172A',
+                            textDecorationLine: soldOut ? 'line-through' : 'none',
+                          }}
+                        >
+                          {entry.label}
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '700',
+                            marginTop: 2,
+                            color: soldOut ? '#DC2626' : active ? '#CCFBF1' : '#1D4533',
+                          }}
+                        >
+                          {soldOut ? 'Sold Out' : `₱${Number(entry.price || 0).toLocaleString()}`}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
-
               <View style={styles.modalFooter}>
-                <TouchableOpacity style={styles.quickStoreBtn} onPress={() => setRestockModalProduct(null)}>
+                <TouchableOpacity
+                  style={styles.quickStoreBtn}
+                  onPress={() => {
+                    setPosSizePickerProduct(null);
+                    setPosSelectedSize('');
+                  }}
+                >
                   <Text style={styles.quickStoreBtnText}>Cancel</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.addBtnPrimary} onPress={handleExecuteRestock}>
-                  <Text style={styles.addBtnPrimaryText}>Confirm Restock</Text>
+                <TouchableOpacity
+                  style={[styles.addBtnPrimary, !posSelectedSize && { opacity: 0.5 }]}
+                  onPress={handlePOSConfirmSize}
+                  disabled={!posSelectedSize}
+                >
+                  <Text style={styles.addBtnPrimaryText}>Add to Cart</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -4758,7 +6290,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         </Modal>
       )}
 
-      {/* ─── MODAL 4: DIGITAL POS THERMAL RECEIPT ─── */}
       {posReceiptOrder && (
         <Modal visible={Boolean(posReceiptOrder)} transparent animationType="fade" onRequestClose={() => setPosReceiptOrder(null)}>
           <View style={styles.modalOverlay}>
@@ -4811,7 +6342,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
               <View style={[styles.receiptRow, { marginTop: 4 }]}>
                 <Text style={[styles.receiptTextBold, { fontSize: 14 }]}>TOTAL PAID:</Text>
-                <Text style={[styles.receiptTextBold, { fontSize: 16, color: '#0C6258' }]}>
+                <Text style={[styles.receiptTextBold, { fontSize: 16, color: '#1D4533' }]}>
                   ₱{posReceiptOrder.grand_total?.toLocaleString()}
                 </Text>
               </View>
@@ -4931,7 +6462,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         height: 44,
                         borderRadius: 22,
                         borderWidth: riderAvatar === url ? 2.5 : 1,
-                        borderColor: riderAvatar === url ? '#0C6258' : '#CBD5E1',
+                        borderColor: riderAvatar === url ? '#1D4533' : '#CBD5E1',
                       }}
                     />
                   </TouchableOpacity>
@@ -5029,11 +6560,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         paddingVertical: 8,
                         borderRadius: 10,
                         borderWidth: 1.5,
-                        borderColor: isSelected ? '#0C6258' : '#CBD5E1',
+                        borderColor: isSelected ? '#1D4533' : '#CBD5E1',
                         backgroundColor: isSelected ? '#F3F7F6' : '#FFFFFF',
                       }}
                     >
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isSelected ? '#0C6258' : '#0F172A' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: isSelected ? '#1D4533' : '#0F172A' }}>
                         {st}
                       </Text>
                     </TouchableOpacity>
@@ -5071,7 +6602,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       paddingVertical: 8,
                       borderRadius: 10,
                       borderWidth: 1.5,
-                      borderColor: riderStatus === st ? '#0C6258' : '#CBD5E1',
+                      borderColor: riderStatus === st ? '#1D4533' : '#CBD5E1',
                       backgroundColor: riderStatus === st ? '#F3F7F6' : '#FFFFFF',
                     }}
                   >
@@ -5079,7 +6610,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       style={{
                         fontSize: 12,
                         fontWeight: '800',
-                        color: riderStatus === st ? '#0C6258' : '#0F172A',
+                        color: riderStatus === st ? '#1D4533' : '#0F172A',
                       }}
                     >
                       {st}
@@ -5136,7 +6667,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#F3F7F6', justifyContent: 'center', alignItems: 'center' }}>
-                  <BootstrapIcon name="grid-fill" size={16} color="#0C6258" />
+                  <BootstrapIcon name="grid-fill" size={16} color="#1D4533" />
                 </View>
                 <Text style={styles.modalTitle}>Admin Management Menu</Text>
               </View>
@@ -5154,7 +6685,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   setIsMobileMoreOpen(false);
                 }}
               >
-                <BootstrapIcon name="receipt" size={20} color={activeNav === 'orders' ? '#0C6258' : '#475569'} />
+                <BootstrapIcon name="receipt" size={20} color={activeNav === 'orders' ? '#1D4533' : '#475569'} />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Orders & COD</Text>
                   <Text style={{ fontSize: 11, color: pendingCodCount > 0 ? '#D97706' : '#64748B', fontWeight: pendingCodCount > 0 ? '700' : '400' }}>
@@ -5171,7 +6702,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   setIsMobileMoreOpen(false);
                 }}
               >
-                <BootstrapIcon name="ticket-perforated-fill" size={20} color={activeNav === 'promos' ? '#0C6258' : '#475569'} />
+                <BootstrapIcon name="ticket-perforated-fill" size={20} color={activeNav === 'promos' ? '#1D4533' : '#475569'} />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Promo Codes</Text>
                   <Text style={{ fontSize: 11, color: '#64748B' }}>{promos.length} active vouchers</Text>
@@ -5186,7 +6717,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   setIsMobileMoreOpen(false);
                 }}
               >
-                <BootstrapIcon name="tools" size={20} color={activeNav === 'garage' ? '#0C6258' : '#475569'} />
+                <BootstrapIcon name="tools" size={20} color={activeNav === 'garage' ? '#1D4533' : '#475569'} />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Pitstop Services</Text>
                   <Text style={{ fontSize: 11, color: '#64748B' }}>PMS & Tuning</Text>
@@ -5201,7 +6732,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   setIsMobileMoreOpen(false);
                 }}
               >
-                <BootstrapIcon name="bicycle" size={20} color={activeNav === 'riders' ? '#0C6258' : '#475569'} />
+                <BootstrapIcon name="bicycle" size={20} color={activeNav === 'riders' ? '#1D4533' : '#475569'} />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Riders</Text>
                   <Text style={{ fontSize: 11, color: '#64748B' }}>{deliveryRiders.length} delivery staff</Text>
@@ -5216,7 +6747,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   setIsMobileMoreOpen(false);
                 }}
               >
-                <BootstrapIcon name="people-fill" size={20} color={activeNav === 'users' ? '#0C6258' : '#475569'} />
+                <BootstrapIcon name="people-fill" size={20} color={activeNav === 'users' ? '#1D4533' : '#475569'} />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>User Accounts</Text>
                   <Text style={{ fontSize: 11, color: '#64748B' }}>{usersList.length} registered</Text>
@@ -5231,7 +6762,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   setIsMobileMoreOpen(false);
                 }}
               >
-                <BootstrapIcon name="database-fill-gear" size={20} color={activeNav === 'supabase' ? '#0C6258' : '#475569'} />
+                <BootstrapIcon name="database-fill-gear" size={20} color={activeNav === 'supabase' ? '#1D4533' : '#475569'} />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Supabase DB</Text>
                   <Text style={{ fontSize: 11, color: '#64748B' }}>Cloud Database</Text>
@@ -5246,7 +6777,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   setIsMobileMoreOpen(false);
                 }}
               >
-                <BootstrapIcon name="clipboard-data" size={20} color={activeNav === 'forecast' ? '#0C6258' : '#475569'} />
+                <BootstrapIcon name="clipboard-data" size={20} color={activeNav === 'forecast' ? '#1D4533' : '#475569'} />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Forecast & Stock</Text>
                   <Text style={{ fontSize: 11, color: '#64748B' }}>Demand & restock planner</Text>
@@ -5261,7 +6792,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   setIsMobileMoreOpen(false);
                 }}
               >
-                <BootstrapIcon name="bell-fill" size={20} color={activeNav === 'notifications' ? '#0C6258' : '#475569'} />
+                <BootstrapIcon name="bell-fill" size={20} color={activeNav === 'notifications' ? '#1D4533' : '#475569'} />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Notifications</Text>
                   <Text style={{ fontSize: 11, color: '#64748B' }}>Alerts & Updates</Text>
@@ -5276,7 +6807,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   setIsMobileMoreOpen(false);
                 }}
               >
-                <BootstrapIcon name="gear-fill" size={20} color={activeNav === 'settings' ? '#0C6258' : '#475569'} />
+                <BootstrapIcon name="gear-fill" size={20} color={activeNav === 'settings' ? '#1D4533' : '#475569'} />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>System Settings</Text>
                   <Text style={{ fontSize: 11, color: '#64748B' }}>Store rules & maintenance</Text>
@@ -5285,16 +6816,16 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
               {/* Live Storefront */}
               <TouchableOpacity
-                style={[styles.mobileMoreCard, { backgroundColor: '#F3F7F6', borderColor: '#D1ECE6' }]}
+                style={[styles.mobileMoreCard, { backgroundColor: '#F3F7F6', borderColor: '#C8DDD3' }]}
                 onPress={() => {
                   setIsMobileMoreOpen(false);
                   onNavigateToStore?.();
                 }}
               >
-                <BootstrapIcon name="shop" size={20} color="#0C6258" />
+                <BootstrapIcon name="shop" size={20} color="#1D4533" />
                 <View>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0C6258' }}>Live Storefront</Text>
-                  <Text style={{ fontSize: 11, color: '#0C6258' }}>View Store</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#1D4533' }}>Live Storefront</Text>
+                  <Text style={{ fontSize: 11, color: '#1D4533' }}>View Store</Text>
                 </View>
               </TouchableOpacity>
 
@@ -5324,12 +6855,17 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         animationType="fade"
         onRequestClose={() => setIsOrderModalOpen(false)}
       >
+        {(() => {
+          const modalStatus = (selectedOrderForModal?.status || '').toLowerCase();
+          const isDeliveredModal = modalStatus === 'delivered' || modalStatus === 'completed';
+          const isPendingModal = modalStatus.includes('pending') || modalStatus.includes('approval');
+          return (
         <View style={styles.modalOverlay}>
           <View style={[styles.modalSheet, { maxWidth: 640, maxHeight: '90%' }]}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F3F7F6', justifyContent: 'center', alignItems: 'center' }}>
-                  <BootstrapIcon name="receipt" size={18} color="#0C6258" />
+                  <BootstrapIcon name="receipt" size={18} color="#1D4533" />
                 </View>
                 <View>
                   <Text style={styles.modalTitle}>
@@ -5375,39 +6911,120 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </View>
                 )}
 
-              {/* Customer & Delivery Card */}
+              {/* Form Fields: Customer & Delivery Details in textfield type */}
               <View style={{ backgroundColor: '#F8FAFC', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#E2E8F0', marginBottom: 14 }}>
-                <Text style={{ fontSize: 12, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>
-                  Customer & Shipping Address
-                </Text>
-                <View style={{ gap: 4 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
-                    👤 {selectedOrderForModal?.customer_name || 'Walk-in Customer'}
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Customer & Shipping Information
                   </Text>
-                  {selectedOrderForModal?.customer_phone && (
-                    <Text style={{ fontSize: 12.5, color: '#334155' }}>
-                      📞 {selectedOrderForModal.customer_phone}
+                  <View style={{ backgroundColor: isOrderEditMode ? '#E8F5E9' : '#EFF6FF', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '800', color: isOrderEditMode ? '#1D4533' : '#1D4ED8' }}>
+                      {isDeliveredModal ? 'Delivered · Order Details' : isOrderEditMode ? 'Editable Fields Active' : 'Order Information'}
                     </Text>
-                  )}
-                  {selectedOrderForModal?.customer_address && (
-                    <Text style={{ fontSize: 12.5, color: '#334155' }}>
-                      📍 {selectedOrderForModal.customer_address}
-                    </Text>
-                  )}
-                  {selectedOrderForModal?.delivery_notes ? (
-                    <View style={{ backgroundColor: '#FFFFFF', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#E2E8F0', marginTop: 4 }}>
-                      <Text style={{ fontSize: 11.5, color: '#64748B', fontStyle: 'italic' }}>
-                        💬 Note: "{selectedOrderForModal.delivery_notes}"
-                      </Text>
-                    </View>
-                  ) : null}
-                  {selectedOrderForModal?.cod_change_for ? (
-                    <View style={{ backgroundColor: '#FEF3C7', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A', marginTop: 4 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#92400E' }}>
-                        💵 Change requested for: ₱{Number(selectedOrderForModal.cod_change_for).toLocaleString()}
-                      </Text>
-                    </View>
-                  ) : null}
+                  </View>
+                </View>
+
+                {/* Recipient Full Name */}
+                <View style={styles.orderFormField}>
+                  <Text style={styles.orderFormLabel}>Customer / Recipient Full Name</Text>
+                  <TextInput
+                    style={styles.orderFormInput}
+                    value={orderEditForm.customer_name}
+                    onChangeText={(val) => setOrderEditForm((prev) => ({ ...prev, customer_name: val }))}
+                    placeholder="Enter customer name"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+
+                {/* Contact Phone */}
+                <View style={styles.orderFormField}>
+                  <Text style={styles.orderFormLabel}>Contact Phone Number</Text>
+                  <TextInput
+                    style={styles.orderFormInput}
+                    value={orderEditForm.customer_phone}
+                    onChangeText={(val) => setOrderEditForm((prev) => ({ ...prev, customer_phone: val }))}
+                    placeholder="e.g. 09614904841"
+                    placeholderTextColor="#94A3B8"
+                    keyboardType="phone-pad"
+                  />
+                </View>
+
+                {/* Delivery Address */}
+                <View style={styles.orderFormField}>
+                  <Text style={styles.orderFormLabel}>Delivery Destination / Full Address</Text>
+                  <TextInput
+                    style={[styles.orderFormInput, { minHeight: 60, textAlignVertical: 'top' }]}
+                    multiline
+                    numberOfLines={3}
+                    value={orderEditForm.customer_address}
+                    onChangeText={(val) => setOrderEditForm((prev) => ({ ...prev, customer_address: val }))}
+                    placeholder="House / Street, Barangay, City, Province"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+
+                {/* Delivery Notes */}
+                <View style={styles.orderFormField}>
+                  <Text style={styles.orderFormLabel}>Delivery Notes & Special Instructions</Text>
+                  <TextInput
+                    style={styles.orderFormInput}
+                    value={orderEditForm.delivery_notes}
+                    onChangeText={(val) => setOrderEditForm((prev) => ({ ...prev, delivery_notes: val }))}
+                    placeholder="Landmark, house color, or special gate instructions"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+
+                {/* Payment Method & Change Requested in Textfields */}
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={[styles.orderFormField, { flex: 1 }]}>
+                    <Text style={styles.orderFormLabel}>Payment Method</Text>
+                    <TextInput
+                      style={styles.orderFormInput}
+                      value={orderEditForm.payment_method}
+                      onChangeText={(val) => setOrderEditForm((prev) => ({ ...prev, payment_method: val }))}
+                      placeholder="e.g. Cash on Delivery (COD)"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+
+                  <View style={[styles.orderFormField, { flex: 1 }]}>
+                    <Text style={styles.orderFormLabel}>COD Change For (₱)</Text>
+                    <TextInput
+                      style={styles.orderFormInput}
+                      value={orderEditForm.cod_change_for}
+                      onChangeText={(val) => setOrderEditForm((prev) => ({ ...prev, cod_change_for: val }))}
+                      placeholder="e.g. 1000"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
+
+                {/* Assigned Rider & Contact in Textfields */}
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={[styles.orderFormField, { flex: 1 }]}>
+                    <Text style={styles.orderFormLabel}>Assigned Courier / Rider</Text>
+                    <TextInput
+                      style={styles.orderFormInput}
+                      value={orderEditForm.rider_name}
+                      onChangeText={(val) => setOrderEditForm((prev) => ({ ...prev, rider_name: val }))}
+                      placeholder="Rider Name"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+
+                  <View style={[styles.orderFormField, { flex: 1 }]}>
+                    <Text style={styles.orderFormLabel}>Rider Phone Number</Text>
+                    <TextInput
+                      style={styles.orderFormInput}
+                      value={orderEditForm.rider_contact}
+                      onChangeText={(val) => setOrderEditForm((prev) => ({ ...prev, rider_contact: val }))}
+                      placeholder="Rider Contact"
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="phone-pad"
+                    />
+                  </View>
                 </View>
               </View>
 
@@ -5442,7 +7059,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         key={st}
                         style={[
                           styles.orderFilterTab,
-                          isCur && { backgroundColor: '#0C6258', borderColor: '#0C6258' },
+                          isCur && { backgroundColor: '#1D4533', borderColor: '#1D4533' },
                         ]}
                         onPress={() => {
                           const oid = selectedOrderForModal?.order_id || selectedOrderForModal?.id;
@@ -5575,8 +7192,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     }
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
                   >
-                    <BootstrapIcon name="truck" size={12} color="#0C6258" />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0C6258' }}>
+                    <BootstrapIcon name="truck" size={12} color="#1D4533" />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4533' }}>
                       Assign / Update
                     </Text>
                   </TouchableOpacity>
@@ -5587,7 +7204,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       Rider: <Text style={{ fontWeight: '800' }}>{orderDeliveryDetail.rider_name || '—'}</Text>
                       {orderDeliveryDetail.rider_contact ? ` · ${orderDeliveryDetail.rider_contact}` : ''}
                     </Text>
-                    <Text style={{ fontSize: 12.5, color: '#0C6258', fontWeight: '700' }}>
+                    <Text style={{ fontSize: 12.5, color: '#1D4533', fontWeight: '700' }}>
                       Shipping → rider earning: ₱
                       {Number(
                         orderDeliveryDetail.rider_earning ??
@@ -5682,12 +7299,56 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         Notes: {orderDeliveryDetail.delivery_notes}
                       </Text>
                     ) : null}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 }}>
-                      {orderDeliveryDetail.proof_of_delivery ? (
-                        <Image
-                          source={{ uri: orderDeliveryDetail.proof_of_delivery }}
-                          style={{ width: 72, height: 72, borderRadius: 8, backgroundColor: '#E2E8F0' }}
-                        />
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6, flexWrap: 'wrap' }}>
+                      {(orderDeliveryDetail.delivery_photo || orderDeliveryDetail.proof_of_delivery) ? (
+                        <TouchableOpacity
+                          activeOpacity={0.85}
+                          onPress={() =>
+                            setProofViewer({
+                              uri:
+                                orderDeliveryDetail.delivery_photo ||
+                                orderDeliveryDetail.proof_of_delivery,
+                              notes:
+                                orderDeliveryDetail.rider_report_notes ||
+                                orderDeliveryDetail.delivery_notes ||
+                                '',
+                              reportedAt:
+                                orderDeliveryDetail.rider_reported_at ||
+                                orderDeliveryDetail.delivered_at ||
+                                null,
+                              riderName: orderDeliveryDetail.rider_name || '',
+                              orderId:
+                                selectedOrderForModal?.order_id || selectedOrderForModal?.id || '',
+                            })
+                          }
+                          style={{ position: 'relative' }}
+                        >
+                          <Image
+                            source={{
+                              uri:
+                                orderDeliveryDetail.delivery_photo ||
+                                orderDeliveryDetail.proof_of_delivery,
+                            }}
+                            style={{ width: 88, height: 88, borderRadius: 10, backgroundColor: '#E2E8F0' }}
+                          />
+                          <View
+                            style={{
+                              position: 'absolute',
+                              right: 4,
+                              bottom: 4,
+                              backgroundColor: 'rgba(15,23,42,0.72)',
+                              borderRadius: 6,
+                              paddingHorizontal: 6,
+                              paddingVertical: 3,
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                            }}
+                          >
+                            <BootstrapIcon name="eye" size={10} color="#fff" />
+                            <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>View</Text>
+                          </View>
+                        </TouchableOpacity>
                       ) : (
                         <Text style={{ fontSize: 12, color: '#94A3B8' }}>No proof photo yet</Text>
                       )}
@@ -5697,7 +7358,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       >
                         <BootstrapIcon name="camera" size={12} color="#1D4ED8" />
                         <Text style={styles.btnAdvanceOrderText}>
-                          {orderDeliveryDetail.proof_of_delivery ? 'Replace Proof' : 'Upload Proof'}
+                          {(orderDeliveryDetail.delivery_photo || orderDeliveryDetail.proof_of_delivery)
+                            ? 'Replace Proof'
+                            : 'Upload Proof'}
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -5729,7 +7392,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     borderRadius: 12,
                     padding: 14,
                     borderWidth: 1,
-                    borderColor: '#D1ECE6',
+                    borderColor: '#C8DDD3',
                     marginBottom: 14,
                     gap: 8,
                   }}
@@ -5802,7 +7465,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   )}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4, paddingTop: 4, borderTopWidth: 1, borderTopColor: '#E2E8F0' }}>
                     <Text style={{ fontSize: 14, fontWeight: '900', color: '#0F172A' }}>Grand Total</Text>
-                    <Text style={{ fontSize: 15, fontWeight: '900', color: '#0C6258' }}>
+                    <Text style={{ fontSize: 15, fontWeight: '900', color: '#1D4533' }}>
                       ₱{Number(selectedOrderForModal?.grand_total || selectedOrderForModal?.total_amount || 0).toLocaleString()}
                     </Text>
                   </View>
@@ -5810,7 +7473,41 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               </View>
             </ScrollView>
 
-            <View style={styles.modalFooter}>
+            <View style={[styles.modalFooter, { flexWrap: 'wrap', gap: 8 }]}>
+              {selectedOrderForModal &&
+                !isDeliveredModal &&
+                isPendingModal && (
+                  <TouchableOpacity
+                    style={[styles.btnApproveCod, { paddingHorizontal: 16, paddingVertical: 10 }]}
+                    onPress={async () => {
+                      await handleApproveCOD(selectedOrderForModal.order_id || selectedOrderForModal.id);
+                      setIsOrderModalOpen(false);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <BootstrapIcon name="check-circle-fill" size={13} color="#FFFFFF" />
+                    <Text style={[styles.btnApproveCodText, { fontSize: 13 }]}>Approve & Confirm</Text>
+                  </TouchableOpacity>
+                )}
+
+              {!isDeliveredModal && (
+                <TouchableOpacity
+                  style={[styles.addBtnPrimary, { backgroundColor: '#1D4533', paddingHorizontal: 16 }]}
+                  onPress={handleSaveOrderEdits}
+                  disabled={isSavingOrderEdits}
+                  activeOpacity={0.85}
+                >
+                  {isSavingOrderEdits ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <BootstrapIcon name="floppy" size={13} color="#FFFFFF" />
+                      <Text style={styles.addBtnPrimaryText}>Save Order Changes</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={styles.quickStoreBtn}
                 onPress={() => {
@@ -5820,8 +7517,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   }
                 }}
               >
-                <BootstrapIcon name="download" size={13} color="#0C6258" />
-                <Text style={styles.quickStoreBtnText}>Print / Receipt</Text>
+                <BootstrapIcon name="printer" size={13} color="#1D4533" />
+                <Text style={styles.quickStoreBtnText}>Print</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -5833,6 +7530,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             </View>
           </View>
         </View>
+          );
+        })()}
       </Modal>
 
       {/* ─── 3. ADMIN MOBILE BOTTOM NAVIGATION BAR (MOBILE ONLY) ─── */}
@@ -5848,9 +7547,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             activeOpacity={0.8}
           >
             <View style={[styles.bottomNavIconWrap, activeNav === 'overview' && styles.bottomNavIconWrapActive]}>
-              <BootstrapIcon name="grid-1x2-fill" size={17} color={activeNav === 'overview' ? '#0C6258' : '#64748B'} />
+              <BootstrapIcon name="grid-1x2-fill" size={17} color={activeNav === 'overview' ? '#1D4533' : '#64748B'} />
             </View>
-            <Text style={[styles.bottomNavLabel, activeNav === 'overview' && styles.bottomNavLabelActive]}>Overview</Text>
+            <Text style={[styles.bottomNavLabel, activeNav === 'overview' && styles.bottomNavLabelActive]}>Dashboard</Text>
           </TouchableOpacity>
 
           {/* 2. Inventory */}
@@ -5863,7 +7562,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             activeOpacity={0.8}
           >
             <View style={[styles.bottomNavIconWrap, activeNav === 'inventory' && styles.bottomNavIconWrapActive]}>
-              <BootstrapIcon name="box-seam-fill" size={17} color={activeNav === 'inventory' ? '#0C6258' : '#64748B'} />
+              <BootstrapIcon name="box-seam-fill" size={17} color={activeNav === 'inventory' ? '#1D4533' : '#64748B'} />
               {invStats.lowStockCount > 0 && (
                 <View style={styles.bottomNavBadge}>
                   <Text style={styles.bottomNavBadgeText}>{invStats.lowStockCount}</Text>
@@ -5883,7 +7582,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             activeOpacity={0.8}
           >
             <View style={[styles.bottomNavIconWrap, activeNav === 'pos' && styles.bottomNavIconWrapActive]}>
-              <BootstrapIcon name="cart-check-fill" size={17} color={activeNav === 'pos' ? '#0C6258' : '#64748B'} />
+              <BootstrapIcon name="cart-check-fill" size={17} color={activeNav === 'pos' ? '#1D4533' : '#64748B'} />
               {posCart.length > 0 && (
                 <View style={styles.bottomNavBadge}>
                   <Text style={styles.bottomNavBadgeText}>{posCart.length}</Text>
@@ -5903,7 +7602,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             activeOpacity={0.8}
           >
             <View style={[styles.bottomNavIconWrap, activeNav === 'analytics' && styles.bottomNavIconWrapActive]}>
-              <BootstrapIcon name="graph-up-arrow" size={17} color={activeNav === 'analytics' ? '#0C6258' : '#64748B'} />
+              <BootstrapIcon name="graph-up-arrow" size={17} color={activeNav === 'analytics' ? '#1D4533' : '#64748B'} />
             </View>
             <Text style={[styles.bottomNavLabel, activeNav === 'analytics' && styles.bottomNavLabelActive]}>Analytics</Text>
           </TouchableOpacity>
@@ -5918,7 +7617,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             activeOpacity={0.8}
           >
             <View style={[styles.bottomNavIconWrap, activeNav === 'products' && styles.bottomNavIconWrapActive]}>
-              <BootstrapIcon name="tag-fill" size={17} color={activeNav === 'products' ? '#0C6258' : '#64748B'} />
+              <BootstrapIcon name="tag-fill" size={17} color={activeNav === 'products' ? '#1D4533' : '#64748B'} />
             </View>
             <Text style={[styles.bottomNavLabel, activeNav === 'products' && styles.bottomNavLabelActive]}>Products</Text>
           </TouchableOpacity>
@@ -5930,7 +7629,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             activeOpacity={0.8}
           >
             <View style={[styles.bottomNavIconWrap, ['orders', 'promos', 'garage', 'users', 'supabase', 'forecast'].includes(activeNav) && styles.bottomNavIconWrapActive]}>
-              <BootstrapIcon name="three-dots" size={18} color={['orders', 'promos', 'garage', 'users', 'supabase', 'forecast'].includes(activeNav) ? '#0C6258' : '#64748B'} />
+              <BootstrapIcon name="three-dots" size={18} color={['orders', 'promos', 'garage', 'users', 'supabase', 'forecast'].includes(activeNav) ? '#1D4533' : '#64748B'} />
               {pendingCodCount > 0 && (
                 <View style={[styles.bottomNavBadge, { backgroundColor: '#D97706' }]}>
                   <Text style={styles.bottomNavBadgeText}>{pendingCodCount}</Text>
@@ -5979,6 +7678,116 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         onClose={() => setDeliveryTokenModal(null)}
         showToast={showToast}
       />
+
+      <Modal
+        visible={Boolean(proofViewer?.uri)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setProofViewer(null)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(15,23,42,0.88)',
+            justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#fff',
+              borderRadius: 16,
+              overflow: 'hidden',
+              maxHeight: '92%',
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: '#E2E8F0',
+              }}
+            >
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>
+                  Proof of delivery
+                </Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                  {proofViewer?.orderId ? `Order #${proofViewer.orderId}` : 'Delivery photo'}
+                  {proofViewer?.riderName ? ` · ${proofViewer.riderName}` : ''}
+                </Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setProofViewer(null)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: '#F1F5F9',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <BootstrapIcon name="x-lg" size={16} color="#334155" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView contentContainerStyle={{ padding: 14, gap: 12 }}>
+              {proofViewer?.uri ? (
+                <Image
+                  source={{ uri: proofViewer.uri }}
+                  resizeMode="contain"
+                  style={{
+                    width: '100%',
+                    height: 360,
+                    borderRadius: 12,
+                    backgroundColor: '#0F172A',
+                  }}
+                />
+              ) : null}
+              {proofViewer?.reportedAt ? (
+                <Text style={{ fontSize: 13, color: '#334155' }}>
+                  Reported:{' '}
+                  <Text style={{ fontWeight: '700' }}>
+                    {new Date(proofViewer.reportedAt).toLocaleString()}
+                  </Text>
+                </Text>
+              ) : null}
+              {proofViewer?.notes ? (
+                <View
+                  style={{
+                    backgroundColor: '#F8FAFC',
+                    borderRadius: 10,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '800',
+                      color: '#64748B',
+                      textTransform: 'uppercase',
+                      marginBottom: 4,
+                    }}
+                  >
+                    Rider notes
+                  </Text>
+                  <Text style={{ fontSize: 13, color: '#0F172A', lineHeight: 18 }}>
+                    {proofViewer.notes}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={{ fontSize: 12, color: '#94A3B8' }}>No rider notes attached.</Text>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
 
       <RiderAccessModal
         visible={Boolean(riderAccessModal)}

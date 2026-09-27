@@ -22,6 +22,8 @@ import { notificationService } from '../services/notificationService';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { productNeedsSizes, withSelectedSize, isSizeSoldOut } from '../utils/productSizes';
+import { getRatedScore, productHasCustomerRatings } from '../utils/productCatalog';
 
 // ─── COMPONENTS & MODALS ───────────────────────────────────────────────────
 import {
@@ -35,8 +37,14 @@ import {
   AccessDeniedModal,
   LiveOrderTrackingMapModal,
   GCashPaymentModal,
+  CompanyInfoModal,
 } from '../components';
-import { UserProfileDropdown, UserProfileButton, BrandLogo, NotificationDropdown } from '../components/common';
+import {
+  UserProfileDropdown,
+  UserProfileButton,
+  BrandLogo,
+  NotificationDropdown,
+} from '../components/common';
 import HeroBanner from '../components/shop/HeroBanner';
 import { shopWebStyles as webStyles } from '../styles/web/shopPage.web.styles';
 
@@ -47,11 +55,18 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
     cart,
     addToCart,
     clearCart,
-    cartSubtotal,
+    removeSelectedFromCart,
+    selectedCartItems,
+    selectedCartItemCount,
+    selectedCartSubtotal,
+    selectedDiscountAmount,
+    selectedShippingFee,
+    selectedCartTotal,
     cartItemCount,
+    cartTotal,
+    cartSubtotal,
     discountAmount,
     shippingFee,
-    cartTotal,
     appliedPromoId,
     toastMessage,
     showToast,
@@ -81,21 +96,30 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
   const [isGcashModalOpen, setIsGcashModalOpen] = useState(false);
   const [pendingGcashOrderData, setPendingGcashOrderData] = useState(null);
   const [buyNowItems, setBuyNowItems] = useState(null);
-  const [unreadNotifCount, setUnreadNotifCount] = useState(() => notificationService.getUnreadCount(currentUser?.id));
+  const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
+    notificationService.getUnreadCount(currentUser?.id)
+  );
+  const [isCompanyInfoOpen, setIsCompanyInfoOpen] = useState(false);
+  const [companyInfoTab, setCompanyInfoTab] = useState('about');
+
+  const handleOpenCompanyInfo = (tab = 'about') => {
+    setCompanyInfoTab(tab);
+    setIsCompanyInfoOpen(true);
+  };
 
   const isBuyNowCheckout = Array.isArray(buyNowItems) && buyNowItems.length > 0;
-  const checkoutItems = isBuyNowCheckout ? buyNowItems : cart;
-  const checkoutSubtotal = useMemo(
-    () => checkoutItems.reduce((sum, item) => sum + Number(item.product?.price || 0) * Number(item.quantity || 0), 0),
-    [checkoutItems]
-  );
-  const checkoutShipping = isBuyNowCheckout ? 150 : shippingFee;
-  const checkoutDiscount = isBuyNowCheckout ? 0 : discountAmount;
-  const checkoutTotal = Math.max(0, checkoutSubtotal - checkoutDiscount) + Number(checkoutShipping || 0);
-  const checkoutItemCount = useMemo(
-    () => checkoutItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-    [checkoutItems]
-  );
+  const checkoutItems = isBuyNowCheckout ? buyNowItems : selectedCartItems;
+  const checkoutSubtotal = isBuyNowCheckout
+    ? buyNowItems.reduce((sum, item) => sum + Number(item.product?.price || 0) * Number(item.quantity || 0), 0)
+    : selectedCartSubtotal;
+  const checkoutShipping = isBuyNowCheckout ? 150 : selectedShippingFee;
+  const checkoutDiscount = isBuyNowCheckout ? 0 : selectedDiscountAmount;
+  const checkoutTotal = isBuyNowCheckout
+    ? Math.max(0, checkoutSubtotal - checkoutDiscount) + Number(checkoutShipping || 0)
+    : selectedCartTotal;
+  const checkoutItemCount = isBuyNowCheckout
+    ? buyNowItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+    : selectedCartItemCount;
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
@@ -142,25 +166,51 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
     } else if (filterSort === 'price-high') {
       list = [...list].sort((a, b) => b.price - a.price);
     } else if (filterSort === 'rating') {
-      list = [...list].sort((a, b) => (b.rating || 5) - (a.rating || 5));
+      list = [...list].sort((a, b) => getRatedScore(b) - getRatedScore(a));
     }
 
     return list;
   }, [productsList, selectedCategory, searchQuery, filterSort]);
 
-  const handleAddToCartAttempt = (product, qty = 1) => {
+  const handleAddToCartAttempt = (product, qty = 1, options = {}) => {
     if (!currentUser) {
       setRedirectReason('Please sign in to add performance items to your cart.');
       onNavigateToScreen?.('login');
       return;
     }
-    addToCart(product, qty);
+    const size = options.size || product?.selectedSize || '';
+    if (productNeedsSizes(product) && !size) {
+      setSelectedProduct(product);
+      setIsSpecsOpen(true);
+      showToast('Select a size for this product');
+      return;
+    }
+    if (size && isSizeSoldOut(product, size)) {
+      setSelectedProduct(product);
+      setIsSpecsOpen(true);
+      showToast(`Size ${size} is sold out`);
+      return;
+    }
+    addToCart(product, qty, { size });
   };
 
-  const handleBuyNowAttempt = (product, qty = 1) => {
+  const handleBuyNowAttempt = (product, qty = 1, options = {}) => {
     if (!currentUser) {
       setRedirectReason('Please sign in or create an account to buy this item.');
       onNavigateToScreen?.('login');
+      return;
+    }
+    const size = options.size || product?.selectedSize || '';
+    if (productNeedsSizes(product) && !size) {
+      setSelectedProduct(product);
+      setIsSpecsOpen(true);
+      showToast('Select a size for this product');
+      return;
+    }
+    if (size && isSizeSoldOut(product, size)) {
+      setSelectedProduct(product);
+      setIsSpecsOpen(true);
+      showToast(`Size ${size} is sold out`);
       return;
     }
     const stock = Number(product?.stock);
@@ -169,7 +219,8 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
       return;
     }
     const quantity = Math.min(Math.max(1, qty), Number.isFinite(stock) ? stock : qty);
-    setBuyNowItems([{ product, quantity }]);
+    const sizedProduct = size ? withSelectedSize(product, size) : product;
+    setBuyNowItems([{ product: sizedProduct, quantity, size }]);
     setIsCartOpen(false);
     setIsSpecsOpen(false);
     setIsCheckoutOpen(true);
@@ -180,6 +231,10 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
       setIsCartOpen(false);
       setRedirectReason('Please sign in to complete your checkout and delivery.');
       onNavigateToScreen?.('login');
+      return;
+    }
+    if (selectedCartItems.length === 0) {
+      showToast('Please select at least one item to checkout');
       return;
     }
     setBuyNowItems(null);
@@ -272,7 +327,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
       if (isBuyNowCheckout) {
         setBuyNowItems(null);
       } else {
-        clearCart();
+        removeSelectedFromCart();
       }
       setIsCheckoutOpen(false);
       setIsGcashModalOpen(false);
@@ -285,7 +340,8 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
             ? '🎉 COD Order placed! Awaiting Store Admin verification.'
             : paymentMethod === 'PayPal'
               ? '🎉 PayPal payment confirmed! Live order tracking active.'
-              : paymentMethod === 'Credit / Debit Card' || (paymentMethod || '').toLowerCase().includes('card')
+              : paymentMethod === 'Credit / Debit Card' ||
+                  (paymentMethod || '').toLowerCase().includes('card')
                 ? '🎉 Card payment confirmed! Live order tracking active.'
                 : '🎉 GCash Payment Confirmed! Live order tracking active.'
       );
@@ -309,9 +365,9 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
       <StatusBar style="dark" />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── 1. FULL-WIDTH DESKTOP STICKY NAVBAR ─── */}
+      {/* ─── 1. FULL-WIDTH RESPONSIVE STICKY NAVBAR ─── */}
       <View style={webStyles.headerWrapper}>
-        <View style={webStyles.headerInner}>
+        <View style={[webStyles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
           {/* Logo */}
           <TouchableOpacity
             style={webStyles.logoWrap}
@@ -321,52 +377,56 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
             }}
             activeOpacity={0.8}
           >
-            <BrandLogo size={42} textColor="#FFFFFF" />
+            <BrandLogo size={windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
           </TouchableOpacity>
 
-          {/* Center Navigation: AI Vision & Repair */}
-          <View style={webStyles.headerCenterNav}>
-            {/* Repair Button */}
-            <TouchableOpacity
-              style={webStyles.headerRepairBtn}
-              onPress={() => onNavigateToScreen?.('garage')}
-              activeOpacity={0.8}
-              title="Book a Service"
-            >
-              <BootstrapIcon name="tools" size={16} color="#FFFFFF" />
-              <Text style={webStyles.headerRepairBtnText}>Book a Service</Text>
-            </TouchableOpacity>
+          {/* Center Navigation: AI Vision & Repair (Desktop / Tablet only) */}
+          {windowWidth >= 768 && (
+            <View style={webStyles.headerCenterNav}>
+              {/* Repair Button */}
+              <TouchableOpacity
+                style={webStyles.headerRepairBtn}
+                onPress={() => onNavigateToScreen?.('garage')}
+                activeOpacity={0.8}
+                title="Book a Service"
+              >
+                <BootstrapIcon name="tools" size={16} color="#FFFFFF" />
+                <Text style={webStyles.headerRepairBtnText}>Book a Service</Text>
+              </TouchableOpacity>
 
-            {/* Customize Button */}
-            <TouchableOpacity
-              style={webStyles.headerAiVisionBtn}
-              onPress={() => onNavigateToScreen?.('customizer')}
-              activeOpacity={0.85}
-              title="Customize"
-            >
-              <BootstrapIcon name="magic" size={16} color="#FFFFFF" />
-              <Text style={webStyles.headerAiVisionBtnText}>Customize</Text>
-            </TouchableOpacity>
-          </View>
+              {/* Customize Button */}
+              <TouchableOpacity
+                style={webStyles.headerAiVisionBtn}
+                onPress={() => onNavigateToScreen?.('customizer')}
+                activeOpacity={0.85}
+                title="Customize"
+              >
+                <BootstrapIcon name="magic" size={16} color="#FFFFFF" />
+                <Text style={webStyles.headerAiVisionBtnText}>Customize</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Right Header Navigation & Actions */}
-          <View style={webStyles.headerActions}>
-            {/* Search Bar inside Header */}
-            <View style={webStyles.navSearchContainer}>
-              <BootstrapIcon name="search" size={14} color="#94A3B8" />
-              <TextInput
-                style={webStyles.navSearchInput}
-                placeholder="Search products, brands..."
-                placeholderTextColor="#94A3B8"
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-              {searchQuery.length > 0 && (
-                <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
-                  <BootstrapIcon name="x-circle-fill" size={14} color="#94A3B8" />
-                </TouchableOpacity>
-              )}
-            </View>
+          <View style={[webStyles.headerActions, windowWidth < 768 && { gap: 8 }]}>
+            {/* Search Bar inside Header (Desktop only - mobile uses toolbar search below) */}
+            {windowWidth >= 768 && (
+              <View style={webStyles.navSearchContainer}>
+                <BootstrapIcon name="search" size={14} color="#94A3B8" />
+                <TextInput
+                  style={webStyles.navSearchInput}
+                  placeholder="Search products, brands..."
+                  placeholderTextColor="#94A3B8"
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+                {searchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
+                    <BootstrapIcon name="x-circle-fill" size={14} color="#94A3B8" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
 
             {/* Favorites Button (Icon Only with Badge) */}
             <TouchableOpacity
@@ -397,7 +457,9 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                 <BootstrapIcon name="bell" size={16} color="#FFFFFF" />
                 {unreadNotifCount > 0 && (
                   <View style={webStyles.navBadgeCircle}>
-                    <Text style={webStyles.navBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
+                    <Text style={webStyles.navBadgeText}>
+                      {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                    </Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -485,7 +547,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
       >
         <View style={webStyles.maxContainer}>
           <HeroBanner onSelectCategory={setSelectedCategory} showToast={showToast} />
-          
+
           {/* ─── CATEGORY DROPDOWN, SEARCH & SORTING TOOLBAR ─── */}
           <View style={webStyles.toolbarRow}>
             {/* Left Cluster: Category Dropdown & Relocated Search Bar */}
@@ -495,7 +557,8 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                 <TouchableOpacity
                   style={[
                     webStyles.categoryDropdownBtn,
-                    (isCategoryDropdownOpen || selectedCategory !== 'All') && webStyles.categoryDropdownBtnActive,
+                    (isCategoryDropdownOpen || selectedCategory !== 'All') &&
+                      webStyles.categoryDropdownBtnActive,
                   ]}
                   onPress={() => setIsCategoryDropdownOpen((prev) => !prev)}
                   activeOpacity={0.85}
@@ -503,7 +566,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                   <BootstrapIcon
                     name="grid-fill"
                     size={13}
-                    color={selectedCategory !== 'All' ? '#0C6258' : '#64748B'}
+                    color={selectedCategory !== 'All' ? '#1D4533' : '#64748B'}
                   />
                   <Text
                     style={[
@@ -516,7 +579,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                   <BootstrapIcon
                     name={isCategoryDropdownOpen ? 'chevron-up' : 'chevron-down'}
                     size={12}
-                    color={selectedCategory !== 'All' ? '#0C6258' : '#94A3B8'}
+                    color={selectedCategory !== 'All' ? '#1D4533' : '#94A3B8'}
                   />
                 </TouchableOpacity>
 
@@ -554,7 +617,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                             >
                               <View style={webStyles.categoryDropdownItemLeft}>
                                 {isActive ? (
-                                  <BootstrapIcon name="check-circle-fill" size={13} color="#0C6258" />
+                                  <BootstrapIcon name="check-circle-fill" size={13} color="#1D4533" />
                                 ) : (
                                   <BootstrapIcon name="circle" size={9} color="#CBD5E1" />
                                 )}
@@ -599,7 +662,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                   <BootstrapIcon
                     name="sort-down"
                     size={13}
-                    color={filterSort !== 'all' ? '#0C6258' : '#64748B'}
+                    color={filterSort !== 'all' ? '#1D4533' : '#64748B'}
                   />
                   <Text
                     style={[
@@ -610,15 +673,15 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                     {filterSort === 'all'
                       ? 'Sort By'
                       : filterSort === 'rating'
-                      ? 'Top Rated'
-                      : filterSort === 'price-low'
-                      ? 'Price: Low'
-                      : 'Price: High'}
+                        ? 'Top Rated'
+                        : filterSort === 'price-low'
+                          ? 'Price: Low'
+                          : 'Price: High'}
                   </Text>
                   <BootstrapIcon
                     name={isSortDropdownOpen ? 'chevron-up' : 'chevron-down'}
                     size={12}
-                    color={filterSort !== 'all' ? '#0C6258' : '#94A3B8'}
+                    color={filterSort !== 'all' ? '#1D4533' : '#94A3B8'}
                   />
                 </TouchableOpacity>
 
@@ -655,7 +718,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                               <BootstrapIcon
                                 name={option.icon}
                                 size={12}
-                                color={isActive ? '#0C6258' : '#64748B'}
+                                color={isActive ? '#1D4533' : '#64748B'}
                               />
                               <Text
                                 style={[
@@ -666,7 +729,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                                 {option.label}
                               </Text>
                             </View>
-                            {isActive && <BootstrapIcon name="check" size={14} color="#0C6258" />}
+                            {isActive && <BootstrapIcon name="check" size={14} color="#1D4533" />}
                           </TouchableOpacity>
                         );
                       })}
@@ -683,9 +746,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
               <Text style={webStyles.catalogTitle}>
                 {selectedCategory === 'All' ? 'Featured Products' : `${selectedCategory} Collection`}
               </Text>
-              <Text style={webStyles.catalogSub}>
-                {filteredProducts.length} items available
-              </Text>
+              <Text style={webStyles.catalogSub}>{filteredProducts.length} items available</Text>
             </View>
           </View>
 
@@ -705,8 +766,16 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                   activeOpacity={0.92}
                 >
                   {/* 1:1 Square Product Image */}
-                  <View style={webStyles.productImgContainer} className="w-full aspect-square bg-slate-100 relative overflow-hidden">
-                    <Image source={{ uri: product.image }} style={webStyles.productImg} resizeMode="cover" className="w-full h-full object-cover" />
+                  <View
+                    style={webStyles.productImgContainer}
+                    className="w-full aspect-square bg-slate-100 relative overflow-hidden"
+                  >
+                    <Image
+                      source={{ uri: product.image }}
+                      style={webStyles.productImg}
+                      resizeMode="cover"
+                      className="w-full h-full object-cover"
+                    />
 
                     {/* Wishlist Button (Top-Right) */}
                     <TouchableOpacity
@@ -727,84 +796,87 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                   </View>
 
                   {/* Details - Compact Square Layout */}
-                  <View style={webStyles.productDetails} className="p-2.5 bg-white flex flex-col justify-between">
+                  <View
+                    style={webStyles.productDetails}
+                    className="p-2.5 bg-white flex flex-col justify-between"
+                  >
                     {/* Product Name (2 Lines Max) */}
-                    <Text style={webStyles.productName} numberOfLines={2} className="text-[12.5px] font-semibold text-slate-800 leading-[17px] mb-1 h-[34px]">
+                    <Text
+                      style={webStyles.productName}
+                      numberOfLines={2}
+                      className="text-[12.5px] font-semibold text-slate-800 leading-[17px] mb-1 h-[34px]"
+                    >
                       {product.name}
                     </Text>
 
                     {/* Price Row: Bold Teal Brand Color (matching app) */}
                     <View style={webStyles.priceRow} className="flex flex-row items-baseline gap-1.5 mb-1.5">
-                      <Text style={webStyles.priceMainText} className="text-[15px] font-extrabold text-[#0C6258]">₱{product.price?.toFixed(2)}</Text>
+                      <Text
+                        style={webStyles.priceMainText}
+                        className="text-[15px] font-extrabold text-[#1D4533]"
+                      >
+                        ₱{product.price?.toFixed(2)}
+                      </Text>
                     </View>
 
                     {/* Tags Row: COD, Actual Stock & Rating */}
-                    <View style={webStyles.tagsRow} className="flex flex-row items-center gap-1.5 mb-1.5 flex-wrap">
+                    <View
+                      style={webStyles.tagsRow}
+                      className="flex flex-row items-center gap-1.5 mb-1.5 flex-wrap"
+                    >
                       <View style={webStyles.codTag} className="bg-amber-100 px-1.5 py-0.5 rounded">
-                        <Text style={webStyles.codTagText} className="text-[10px] font-extrabold text-amber-700">COD</Text>
+                        <Text
+                          style={webStyles.codTagText}
+                          className="text-[10px] font-extrabold text-amber-700"
+                        >
+                          COD
+                        </Text>
                       </View>
                       <View style={webStyles.stockTag} className="bg-emerald-50 px-1.5 py-0.5 rounded">
-                        <Text style={webStyles.stockTagText} className="text-[10px] font-bold text-emerald-700">
-                          {product.stock <= 5 ? `Only ${product.stock} left` : `${product.stock} in stock`}
+                        <Text
+                          style={webStyles.stockTagText}
+                          className="text-[10px] font-bold text-emerald-700"
+                        >
+                          {product.stock <= 0
+                            ? 'Sold out'
+                            : product.stock <= 5
+                              ? `Only ${product.stock} left`
+                              : `${product.stock} in stock`}
                         </Text>
                       </View>
-                      <View style={[webStyles.ratingLeft, { marginLeft: 'auto' }]} className="flex flex-row items-center gap-1 ml-auto">
-                        <BootstrapIcon name="star-fill" size={10} color="#F59E0B" />
-                        <Text style={webStyles.ratingValText} className="text-[11.5px] font-bold text-amber-500">{product.rating?.toFixed(1) || '5.0'}</Text>
-                        <Text style={webStyles.reviewCountText} className="text-[10.5px] text-slate-500 font-medium">({product.reviews || 0})</Text>
-                      </View>
-                    </View>
-
-                    {/* Action buttons: Buy Now (First, Green) + Add to Cart (Second, Outline Icon Only) */}
-                    <View style={{ flexDirection: 'row', gap: 6, marginTop: 6, alignItems: 'center' }}>
-                      <TouchableOpacity
-                        style={{
-                          flex: 1,
-                          backgroundColor: '#0C6258',
-                          borderRadius: 8,
-                          paddingVertical: 7.5,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 5,
-                          borderWidth: 1.5,
-                          borderColor: '#0C6258',
-                          cursor: 'pointer',
-                        }}
-                        className="bg-[#0C6258] hover:bg-[#094e46] rounded-lg py-2 flex flex-row items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                        onPress={(e) => {
-                          e?.stopPropagation?.();
-                          handleBuyNowAttempt(product);
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <BootstrapIcon name="lightning-fill" size={12} color="#FFFFFF" />
-                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }} className="text-[11px] font-bold text-white">
-                          Buy Now
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: '#FFFFFF',
-                          borderRadius: 8,
-                          paddingVertical: 7.5,
-                          paddingHorizontal: 11,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderWidth: 1.5,
-                          borderColor: '#0C6258',
-                          cursor: 'pointer',
-                        }}
-                        className="bg-white hover:bg-[#F3F7F6] rounded-lg py-2 px-3 flex flex-row items-center justify-center cursor-pointer border-[1.5px] border-[#0C6258] transition-colors"
-                        onPress={(e) => {
-                          e?.stopPropagation?.();
-                          handleAddToCartAttempt(product);
-                        }}
-                        activeOpacity={0.8}
-                        title="Add to Cart"
-                      >
-                        <BootstrapIcon name="cart3" size={13} color="#0C6258" />
-                      </TouchableOpacity>
+                      {productHasCustomerRatings(product) ? (
+                        <View
+                          style={[webStyles.ratingLeft, { marginLeft: 'auto' }]}
+                          className="flex flex-row items-center gap-1 ml-auto"
+                        >
+                          <BootstrapIcon name="star-fill" size={10} color="#F59E0B" />
+                          <Text
+                            style={webStyles.ratingValText}
+                            className="text-[11.5px] font-bold text-amber-500"
+                          >
+                            {Number(product.rating).toFixed(1)}
+                          </Text>
+                          <Text
+                            style={webStyles.reviewCountText}
+                            className="text-[10.5px] text-slate-500 font-medium"
+                          >
+                            ({product.reviews})
+                          </Text>
+                        </View>
+                      ) : (
+                        <View
+                          style={[webStyles.ratingLeft, { marginLeft: 'auto' }]}
+                          className="flex flex-row items-center gap-1 ml-auto"
+                        >
+                          <BootstrapIcon name="star" size={10} color="#94A3B8" />
+                          <Text
+                            style={webStyles.reviewCountText}
+                            className="text-[10.5px] text-slate-500 font-medium"
+                          >
+                            No ratings yet
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -812,57 +884,187 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
             })}
           </View>
 
-          {/* Desktop Footer with Trust Badges */}
+          {/* Desktop Footer Matching Design Reference */}
           <View style={webStyles.desktopFooter}>
-            <View style={webStyles.footerTopRow}>
-              <View style={webStyles.footerBrandBlock}>
-                <View>
-                  <BrandLogo size={36} />
-                </View>
+            <View style={webStyles.footerColumnsRow}>
+              {/* Column 1: CONTACT INFORMATION */}
+              <View style={[webStyles.footerCol, { flex: 1.2, minWidth: 220 }]}>
+                <Text style={webStyles.footerColTitle}>CONTACT INFORMATION</Text>
+
+                <TouchableOpacity
+                  style={webStyles.footerContactRow}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    try {
+                      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+                        navigator.clipboard.writeText('support@mototrack.com');
+                      }
+                    } catch (e) {}
+                    showToast?.('Copied support@mototrack.com to clipboard');
+                  }}
+                >
+                  <BootstrapIcon name="envelope-fill" size={17} color="#10B981" />
+                  <Text style={webStyles.footerContactText}>support@mototrack.com</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={webStyles.footerContactRow}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    try {
+                      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+                        navigator.clipboard.writeText('1800-3232-8686');
+                      }
+                    } catch (e) {}
+                    showToast?.('Copied hotline 1800-3232-8686 to clipboard');
+                  }}
+                >
+                  <BootstrapIcon name="telephone-fill" size={17} color="#10B981" />
+                  <Text style={webStyles.footerContactText}>1800-3232-8686</Text>
+                </TouchableOpacity>
               </View>
 
-              <View style={webStyles.footerTrustGrid}>
-                <View style={webStyles.trustItem}>
-                  <BootstrapIcon name="shield-lock-fill" size={20} color="#0C6258" />
-                  <View>
-                    <Text style={webStyles.trustTitle}>256-Bit SSL Checkout</Text>
-                    <Text style={webStyles.trustSub}>GCash, COD, Card & Crypto</Text>
-                  </View>
-                </View>
-                <View style={webStyles.trustItem}>
-                  <BootstrapIcon name="lightning-charge-fill" size={20} color="#0C6258" />
-                  <View>
-                    <Text style={webStyles.trustTitle}>Express Dispatch</Text>
-                    <Text style={webStyles.trustSub}>Same-day track delivery</Text>
-                  </View>
-                </View>
-                <View style={webStyles.trustItem}>
-                  <BootstrapIcon name="patch-check-fill" size={20} color="#0C6258" />
-                  <View>
-                    <Text style={webStyles.trustTitle}>100% Authentic Parts</Text>
-                    <Text style={webStyles.trustSub}>Factory warranty included</Text>
-                  </View>
+              {/* Column 2: COMPANY */}
+              <View style={[webStyles.footerCol, { flex: 1, minWidth: 140 }]}>
+                <Text style={webStyles.footerColTitle}>COMPANY</Text>
+
+                <TouchableOpacity
+                  style={webStyles.footerLinkItem}
+                  activeOpacity={0.7}
+                  onPress={() => onNavigateToScreen?.('garage')}
+                >
+                  <Text style={webStyles.footerLinkText}>Features</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={webStyles.footerLinkItem}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenCompanyInfo('about')}
+                >
+                  <Text style={webStyles.footerLinkText}>About Us</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={webStyles.footerLinkItem}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenCompanyInfo('contact')}
+                >
+                  <Text style={webStyles.footerLinkText}>Contact</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={webStyles.footerLinkItem}
+                  activeOpacity={0.7}
+                  onPress={() => onNavigateToScreen?.('garage')}
+                >
+                  <Text style={webStyles.footerLinkText}>Pricing</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Column 3: HELP */}
+              <View style={[webStyles.footerCol, { flex: 1, minWidth: 140 }]}>
+                <Text style={webStyles.footerColTitle}>HELP</Text>
+
+                <TouchableOpacity
+                  style={webStyles.footerLinkItem}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenCompanyInfo('about')}
+                >
+                  <Text style={webStyles.footerLinkText}>FAQ</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={webStyles.footerLinkItem}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenCompanyInfo('contact')}
+                >
+                  <Text style={webStyles.footerLinkText}>Help Center</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={webStyles.footerLinkItem}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenCompanyInfo('contact')}
+                >
+                  <Text style={webStyles.footerLinkText}>Support</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Column 4: FOLLOW US */}
+              <View style={[webStyles.footerCol, { flex: 1, minWidth: 160 }]}>
+                <Text style={webStyles.footerColTitle}>FOLLOW US</Text>
+
+                <View style={webStyles.footerSocialRow}>
+                  <TouchableOpacity
+                    style={webStyles.footerSocialBtn}
+                    activeOpacity={0.75}
+                    onPress={() => showToast?.('Opening MotoTrack Facebook')}
+                  >
+                    <BootstrapIcon name="facebook" size={17} color="#111827" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={webStyles.footerSocialBtn}
+                    activeOpacity={0.75}
+                    onPress={() => showToast?.('Opening MotoTrack Instagram')}
+                  >
+                    <BootstrapIcon name="instagram" size={17} color="#111827" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={webStyles.footerSocialBtn}
+                    activeOpacity={0.75}
+                    onPress={() => showToast?.('Opening MotoTrack YouTube')}
+                  >
+                    <BootstrapIcon name="youtube" size={17} color="#111827" />
+                  </TouchableOpacity>
                 </View>
               </View>
             </View>
 
-            <View style={webStyles.footerBottomBar}>
-              <Text style={{ fontSize: 12, color: '#94A3B8' }}>
-                © 2026 MotoTrack Motorparts and Accessories. Official Performance Network. All rights reserved.
+            {/* Horizontal Divider Line */}
+            <View style={webStyles.footerDivider} />
+
+            {/* Bottom Row */}
+            <View style={webStyles.footerBottomRow}>
+              <Text style={webStyles.footerCopyrightText}>
+                © 2026 MotoTrack. All Rights Reserved.
               </Text>
+
+              <View style={webStyles.footerLegalLinksRow}>
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenCompanyInfo('privacy')}
+                >
+                  <Text style={webStyles.footerLegalLinkText}>Privacy</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenCompanyInfo('terms')}
+                >
+                  <Text style={webStyles.footerLegalLinkText}>Terms & condition</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
       </ScrollView>
 
       {/* ─── MODALS ─── */}
+      <CompanyInfoModal
+        visible={isCompanyInfoOpen}
+        initialTab={companyInfoTab}
+        onClose={() => setIsCompanyInfoOpen(false)}
+        showToast={showToast}
+      />
+
       <ProductSpecsModal
         visible={isSpecsOpen}
         product={selectedProduct}
         onClose={() => setIsSpecsOpen(false)}
         onAddToCart={handleAddToCartAttempt}
         onBuyNow={handleBuyNowAttempt}
-        onCustomizeWithPart={(prod) => onNavigateToScreen?.('customizer', { product: prod })}
       />
 
       <CartModal
@@ -945,8 +1147,31 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
               onNavigateToScreen?.('garage');
             } else if (tab === 'Orders') {
               onNavigateToScreen?.('orders');
-            } else if (tab === 'Favorites') {
+            } else if (tab === 'Wishlist' || tab === 'Favorites') {
               onNavigateToScreen?.('wishlist');
+            } else if (tab === 'More') {
+              if (!currentUser) {
+                setRedirectReason('Please sign in to access your Customer Dashboard.');
+                onNavigateToScreen?.('login');
+              } else {
+                onNavigateToScreen?.('profile', { tab: 'menu' });
+              }
+            } else if (tab === 'Dashboard') {
+              if (!currentUser) {
+                setRedirectReason('Please sign in to access your Customer Dashboard.');
+                onNavigateToScreen?.('login');
+              } else {
+                onNavigateToScreen?.('profile', { tab: 'overview' });
+              }
+            } else if (tab === 'Bookings') {
+              if (!currentUser) {
+                setRedirectReason('Please sign in to view your pit bookings.');
+                onNavigateToScreen?.('login');
+              } else {
+                onNavigateToScreen?.('profile', { tab: 'bookings' });
+              }
+            } else if (tab === 'Notifications') {
+              onNavigateToScreen?.('notifications');
             } else if (tab === 'Admin') {
               if (currentUser?.role === 'admin') {
                 onNavigateToScreen?.('admin');

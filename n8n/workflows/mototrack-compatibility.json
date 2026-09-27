@@ -1,0 +1,123 @@
+{
+  "name": "MotoTrack — Compatibility Check",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mototrack-compatibility",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-compat",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.headers['x-mototrack-secret'] || $json.headers['X-MotoTrack-Secret']}}",
+              "value2": "={{$env.MOTOTRACK_WEBHOOK_SECRET}}"
+            }
+          ]
+        }
+      },
+      "id": "validate-secret",
+      "name": "Validate Request Secret",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { compatible: false, items: [], errors: [{ code: 'unauthorized', message: 'Invalid webhook secret' }] } }}"
+      },
+      "id": "reject-unauthorized",
+      "name": "Reject Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [460, 160]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/customer_motorcycles",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "motorcycle_id", "value": "eq.{{$json.body.motorcycleId}}" },
+            { "name": "select", "value": "*" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-motorcycle",
+      "name": "Get Motorcycle",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [460, -40]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/product_compatibility",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "product_id", "value": "in.({{($json.body.productIds || []).join(',')}})" },
+            { "name": "select", "value": "*" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get-compat",
+      "name": "Get Compatibility Rows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [680, -40]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Webhook').item.json.body || {};\nconst bike = body.motorcycle || ($('Get Motorcycle').first().json || {});\nconst rows = $input.all().map(i => i.json);\nconst productIds = body.productIds || [];\n\nfunction brandMatches(a,b){a=(a||'').toLowerCase();b=(b||'').toLowerCase();if(!a||!b)return false;if(a==='universal')return true;return a===b||a.includes(b)||b.includes(a);}\nfunction modelMatches(a,b){a=(a||'').toLowerCase();b=(b||'').toLowerCase();if(!a||!b)return false;if(a==='all models'||a==='universal')return true;return a===b||a.includes(b)||b.includes(a);}\nfunction yearMatches(row,y){if(y==null)return true;y=Number(y);if(row.year_exact!=null)return Number(row.year_exact)===y;if(row.year_from!=null&&y<Number(row.year_from))return false;if(row.year_to!=null&&y>Number(row.year_to))return false;return true;}\n\nconst brand = bike.brand || bike.motorcycle_brand;\nconst model = bike.model || bike.motorcycle_model;\nconst year = bike.year || bike.motorcycle_year;\nconst items=[]; const errors=[];\nfor (const pid of productIds) {\n  const hit = rows.find(r => r.product_id===pid && brandMatches(r.brand,brand) && modelMatches(r.model,model) && yearMatches(r,year));\n  const compatible = !!hit;\n  items.push({ productId: pid, compatible, reason: compatible ? null : 'This product is not marked as compatible with your selected motorcycle.' });\n  if (!compatible) errors.push({ productId: pid, code: 'incompatible', message: 'This product is not marked as compatible with your selected motorcycle.' });\n}\nreturn [{ json: { compatible: errors.length===0, items, errors, motorcycle: { brand, model, year }, customerId: body.customerId } }];"
+      },
+      "id": "check-compat",
+      "name": "Check Compatibility",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, -40]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{$json}}"
+      },
+      "id": "respond-ok",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, -40]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Validate Request Secret", "type": "main", "index": 0 }]] },
+    "Validate Request Secret": {
+      "main": [
+        [{ "node": "Get Motorcycle", "type": "main", "index": 0 }],
+        [{ "node": "Reject Unauthorized", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Motorcycle": { "main": [[{ "node": "Get Compatibility Rows", "type": "main", "index": 0 }]] },
+    "Get Compatibility Rows": { "main": [[{ "node": "Check Compatibility", "type": "main", "index": 0 }]] },
+    "Check Compatibility": { "main": [[{ "node": "Return Result", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "description": "MotoTrack compatibility automation. Validates webhook secret, loads motorcycle + product_compatibility from Supabase, returns compatible boolean. Does NOT use AI for fitment."
+  }
+}

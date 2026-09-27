@@ -14,16 +14,37 @@ import {
   DeliveryConfirmPage,
   RiderRunPage,
   RiderDashboard,
+  ProductDetailsPage,
 } from '../pages';
 
-import { Platform, View, Text, TextInput, TouchableOpacity, SafeAreaView, StyleSheet } from 'react-native';
+import {
+  Platform,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  SafeAreaView,
+  StyleSheet,
+  StatusBar as RNStatusBar,
+  LogBox,
+} from 'react-native';
 import * as ExpoLinking from 'expo-linking';
 import { BootstrapIcon } from '../components/common';
+import CartModal from '../components/modals/CartModal';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import { adminSecurityService } from '../services/adminSecurityService';
 import { authService } from '../services/authService';
 import {
   useFonts,
+  PlusJakartaSans_200ExtraLight,
+  PlusJakartaSans_300Light,
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_500Medium,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
+import {
   Manrope_200ExtraLight,
   Manrope_300Light,
   Manrope_400Regular,
@@ -33,20 +54,36 @@ import {
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
 
-// Global Mobile Font Defaults for React Native Text & TextInput
-if (Platform.OS !== 'web') {
+// Configure Android status bar to be translucent edge-to-edge
+if (Platform.OS === 'android') {
   try {
-    if (Text.defaultProps == null) Text.defaultProps = {};
-    Text.defaultProps.style = [{ fontFamily: 'Manrope' }, Text.defaultProps.style];
-  } catch (_e) {}
-
-  try {
-    if (TextInput.defaultProps == null) TextInput.defaultProps = {};
-    TextInput.defaultProps.style = [{ fontFamily: 'Manrope' }, TextInput.defaultProps.style];
+    RNStatusBar.setTranslucent(true);
+    RNStatusBar.setBackgroundColor('transparent');
   } catch (_e) {}
 }
 
-// Global Web Font Injection for Manrope & Bootstrap Icons
+// Suppress LogBox developer warning popups on mobile screen
+LogBox.ignoreLogs([
+  'Text.defaultProps',
+  'TextInput.defaultProps',
+  'Sending `onAnimatedValueUpdate`',
+]);
+LogBox.ignoreAllLogs(true);
+
+// Enforce Plus Jakarta Sans as the default font across all React Native Text & TextInput elements
+try {
+  if (Text.defaultProps == null) {
+    Text.defaultProps = {};
+  }
+  Text.defaultProps.style = [{ fontFamily: 'PlusJakartaSans' }, Text.defaultProps.style];
+
+  if (TextInput.defaultProps == null) {
+    TextInput.defaultProps = {};
+  }
+  TextInput.defaultProps.style = [{ fontFamily: 'PlusJakartaSans' }, TextInput.defaultProps.style];
+} catch (_e) {}
+
+// Global Web Font Injection for Plus Jakarta Sans & Bootstrap Icons
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.title = 'MotoTrack - Motorparts and Accessories';
   if (!document.getElementById('bootstrap-icons-cdn')) {
@@ -56,29 +93,34 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     bsLink.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';
     document.head.appendChild(bsLink);
   }
-  if (!document.getElementById('manrope-google-font')) {
+  if (!document.getElementById('plus-jakarta-google-font')) {
     const link = document.createElement('link');
-    link.id = 'manrope-google-font';
+    link.id = 'plus-jakarta-google-font';
     link.rel = 'stylesheet';
     link.href =
-      'https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap';
+      'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap';
     document.head.appendChild(link);
   }
-  if (!document.getElementById('manrope-global-styles')) {
+  if (!document.getElementById('plus-jakarta-global-styles')) {
     const style = document.createElement('style');
-    style.id = 'manrope-global-styles';
+    style.id = 'plus-jakarta-global-styles';
     style.innerHTML = `
-      * {
-        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      *, *::before, *::after {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
       }
-      html, body {
-        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+      html, body, #root, #__next, [data-reactroot] {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
       }
-      input, button, select, textarea, div, span, p, a, label {
-        font-family: 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      div, span, p, a, button, input, textarea, select, label, h1, h2, h3, h4, h5, h6,
+      [class*="css-text"], [class*="r-fontFamily"], [dir="auto"], [dir] {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+      }
+      /* Ensure React Native Web inner text elements always use Plus Jakarta Sans */
+      [class*="r-fontFamily-"] {
+        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
       }
       code, pre, kbd, samp, .font-mono, [data-font="mono"], [style*="monospace"] {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
@@ -171,6 +213,8 @@ function MainAppRouter() {
 
   const [currentScreen, setCurrentScreen] = useState(getInitialScreen);
   const [customizerProduct, setCustomizerProduct] = useState(null);
+  const [selectedProductDetails, setSelectedProductDetails] = useState(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [profileInitialTab, setProfileInitialTab] = useState(() => {
     try {
       const { screen: s } = parsePublicRoute();
@@ -187,7 +231,14 @@ function MainAppRouter() {
   const { addToCart, cartItemCount, cartTotal, showToast } = useCart();
   const { wishlistCount } = useWishlist();
 
-  const navigateScreen = (screen) => {
+  const navigateScreen = (screen, params = null) => {
+    if (params?.product) {
+      if (screen === 'customizer') {
+        setCustomizerProduct(params.product);
+      } else if (screen === 'product-details') {
+        setSelectedProductDetails(params.product);
+      }
+    }
     setCurrentScreen(screen);
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.history?.pushState) {
       try {
@@ -250,7 +301,8 @@ function MainAppRouter() {
       currentScreen !== 'confirm-delivery' &&
       currentScreen !== 'rider-run'
     ) {
-      navigateScreen('admin');
+      const t = setTimeout(() => navigateScreen('admin'), 0);
+      return () => clearTimeout(t);
     }
   }, [currentUser, currentScreen]);
 
@@ -261,20 +313,24 @@ function MainAppRouter() {
       currentScreen !== 'rider-run' &&
       currentScreen !== 'confirm-delivery'
     ) {
-      navigateScreen('rider-dashboard');
+      const t = setTimeout(() => navigateScreen('rider-dashboard'), 0);
+      return () => clearTimeout(t);
     }
   }, [currentUser, currentScreen]);
 
   // 2. If user is already authenticated and on login/signup, route appropriately
   useEffect(() => {
     if (currentUser && (currentScreen === 'login' || currentScreen === 'signup')) {
-      if (currentUser.role === 'admin') {
-        navigateScreen('admin');
-      } else if (currentUser.role === 'rider') {
-        navigateScreen('rider-dashboard');
-      } else if (!redirectReason) {
-        navigateScreen('shop');
-      }
+      const t = setTimeout(() => {
+        if (currentUser.role === 'admin') {
+          navigateScreen('admin');
+        } else if (currentUser.role === 'rider') {
+          navigateScreen('rider-dashboard');
+        } else if (!redirectReason) {
+          navigateScreen('shop');
+        }
+      }, 0);
+      return () => clearTimeout(t);
     }
   }, [currentUser, currentScreen, redirectReason]);
 
@@ -318,7 +374,8 @@ function MainAppRouter() {
   // If user logs out or session ends while on protected screen (profile, orders), return to storefront
   useEffect(() => {
     if (!currentUser && (currentScreen === 'profile' || currentScreen === 'orders')) {
-      navigateScreen('shop');
+      const t = setTimeout(() => navigateScreen('shop'), 0);
+      return () => clearTimeout(t);
     }
   }, [currentUser, currentScreen]);
 
@@ -439,7 +496,7 @@ function MainAppRouter() {
                 marginBottom: 16,
               }}
             >
-              <BootstrapIcon name="display" size={30} color="#0C6258" />
+              <BootstrapIcon name="display" size={30} color="#1D4533" />
             </View>
             <Text
               style={{
@@ -465,7 +522,7 @@ function MainAppRouter() {
             </Text>
             <TouchableOpacity
               style={{
-                backgroundColor: '#0C6258',
+                backgroundColor: '#1D4533',
                 paddingVertical: 14,
                 paddingHorizontal: 24,
                 borderRadius: 14,
@@ -584,6 +641,8 @@ function MainAppRouter() {
         onNavigateToCustomizer={() => navigateScreen('customizer')}
         onNavigateToCustomize={() => navigateScreen('customizer')}
         onNavigateToAdmin={() => navigateScreen('admin')}
+        onNavigateToProductDetails={(product) => navigateScreen('product-details', { product })}
+        onNavigateToScreen={(screen, params) => navigateScreen(screen, params)}
         onLogout={handleLogout}
       />
     );
@@ -683,19 +742,36 @@ function MainAppRouter() {
     );
   }
 
+  if (currentScreen === 'product-details') {
+    return (
+      <ProductDetailsPage
+        product={selectedProductDetails}
+        onNavigateBack={() => navigateScreen('shop')}
+        onNavigateToStore={() => navigateScreen('shop')}
+        onNavigateToWishlist={() => navigateScreen('wishlist')}
+        onNavigateToOrders={() => navigateScreen('orders')}
+        onNavigateToLogin={() => navigateScreen('login')}
+      />
+    );
+  }
+
   // Default: Main Shop Page (Storefront)
   return (
     <ShopPage
       onNavigateToScreen={(screen, params) => {
         if (params?.product) {
-          setCustomizerProduct(params.product);
+          if (screen === 'customizer') {
+            setCustomizerProduct(params.product);
+          } else if (screen === 'product-details') {
+            setSelectedProductDetails(params.product);
+          }
         }
         if (screen === 'profile') {
           handleNavigateToProfile(params?.tab || 'overview');
         } else if (screen === 'orders') {
           navigateScreen('orders');
         } else {
-          navigateScreen(screen);
+          navigateScreen(screen, params);
         }
       }}
     />
@@ -704,14 +780,32 @@ function MainAppRouter() {
 
 export default function App() {
   const [fontsLoaded] = useFonts({
-    Manrope: Manrope_400Regular,
-    'Manrope-ExtraLight': Manrope_200ExtraLight,
-    'Manrope-Light': Manrope_300Light,
-    'Manrope-Regular': Manrope_400Regular,
-    'Manrope-Medium': Manrope_500Medium,
-    'Manrope-SemiBold': Manrope_600SemiBold,
-    'Manrope-Bold': Manrope_700Bold,
-    'Manrope-ExtraBold': Manrope_800ExtraBold,
+    // Plus Jakarta Sans (Primary Application Font)
+    PlusJakartaSans: PlusJakartaSans_400Regular,
+    'Plus Jakarta Sans': PlusJakartaSans_400Regular,
+    'PlusJakartaSans-ExtraLight': PlusJakartaSans_200ExtraLight,
+    'PlusJakartaSans-Light': PlusJakartaSans_300Light,
+    'PlusJakartaSans-Regular': PlusJakartaSans_400Regular,
+    'PlusJakartaSans-Medium': PlusJakartaSans_500Medium,
+    'PlusJakartaSans-SemiBold': PlusJakartaSans_600SemiBold,
+    'PlusJakartaSans-Bold': PlusJakartaSans_700Bold,
+    'PlusJakartaSans-ExtraBold': PlusJakartaSans_800ExtraBold,
+    PlusJakartaSans_200ExtraLight,
+    PlusJakartaSans_300Light,
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_500Medium,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+    // Native aliases mapped to Plus Jakarta Sans for instant adoption
+    Manrope: PlusJakartaSans_400Regular,
+    'Manrope-ExtraLight': PlusJakartaSans_200ExtraLight,
+    'Manrope-Light': PlusJakartaSans_300Light,
+    'Manrope-Regular': PlusJakartaSans_400Regular,
+    'Manrope-Medium': PlusJakartaSans_500Medium,
+    'Manrope-SemiBold': PlusJakartaSans_600SemiBold,
+    'Manrope-Bold': PlusJakartaSans_700Bold,
+    'Manrope-ExtraBold': PlusJakartaSans_800ExtraBold,
     Manrope_200ExtraLight,
     Manrope_300Light,
     Manrope_400Regular,
@@ -719,21 +813,20 @@ export default function App() {
     Manrope_600SemiBold,
     Manrope_700Bold,
     Manrope_800ExtraBold,
-    // Aliases for backwards compatibility
-    Inter: Manrope_400Regular,
-    'Inter-Regular': Manrope_400Regular,
-    'Inter-Light': Manrope_300Light,
-    'Inter-Medium': Manrope_500Medium,
-    'Inter-SemiBold': Manrope_600SemiBold,
-    'Inter-Bold': Manrope_700Bold,
-    'Inter-ExtraBold': Manrope_800ExtraBold,
-    Poppins: Manrope_400Regular,
-    'Poppins-Regular': Manrope_400Regular,
-    'Poppins-Light': Manrope_300Light,
-    'Poppins-Medium': Manrope_500Medium,
-    'Poppins-SemiBold': Manrope_600SemiBold,
-    'Poppins-Bold': Manrope_700Bold,
-    'Poppins-ExtraBold': Manrope_800ExtraBold,
+    Inter: PlusJakartaSans_400Regular,
+    'Inter-Regular': PlusJakartaSans_400Regular,
+    'Inter-Light': PlusJakartaSans_300Light,
+    'Inter-Medium': PlusJakartaSans_500Medium,
+    'Inter-SemiBold': PlusJakartaSans_600SemiBold,
+    'Inter-Bold': PlusJakartaSans_700Bold,
+    'Inter-ExtraBold': PlusJakartaSans_800ExtraBold,
+    Poppins: PlusJakartaSans_400Regular,
+    'Poppins-Regular': PlusJakartaSans_400Regular,
+    'Poppins-Light': PlusJakartaSans_300Light,
+    'Poppins-Medium': PlusJakartaSans_500Medium,
+    'Poppins-SemiBold': PlusJakartaSans_600SemiBold,
+    'Poppins-Bold': PlusJakartaSans_700Bold,
+    'Poppins-ExtraBold': PlusJakartaSans_800ExtraBold,
   });
 
   return (

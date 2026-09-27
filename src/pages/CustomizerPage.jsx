@@ -19,6 +19,9 @@ import { GARAGE_BRANCHES, TIME_SLOTS } from '../services/garageService';
 import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../services/motorcycleService';
 import { BootstrapIcon, BottomNavBar, ToastNotification, BrandLogo } from '../components/common';
 import { RegisterMotorcycleModal, CheckoutModal, CartModal } from '../components/modals';
+import CustomizationWorkspace from '../components/customizer/CustomizationWorkspace';
+import AiMotorcycleInstallStudio from '../components/customizer/AiMotorcycleInstallStudio';
+import { useCustomizationBuilder } from '../hooks/useCustomizationBuilder';
 import { pickImageFromFile } from '../utils/imagePickerHelper';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -38,6 +41,13 @@ export default function CustomizerPage({
   const { currentUser, setRedirectReason } = useAuth();
   const { addToCart, showToast, toastMessage, cartItemCount } = useCart();
   const { wishlistCount, addToWishlist } = useWishlist();
+
+  // Parts Builder | Install Studio (Express Gemini/Imagen) | legacy AI Studio
+  const [studioMode, setStudioMode] = useState('builder'); // 'builder' | 'install' | 'studio'
+  const customizationBuilder = useCustomizationBuilder({
+    currentUser,
+    initialProduct: initialSelectedProduct,
+  });
 
   // ─── 1. WORKFLOW STEP STATE ───
   // 'bike' (1) -> 'parts' (2) -> 'review' (3) -> 'total' (4)
@@ -63,7 +73,8 @@ export default function CustomizerPage({
   useEffect(() => {
     const unsub = motorcycleService.subscribe(() => {
       const userBikes = motorcycleService.getMotorcycles(currentUser?.id);
-      const bikes = Array.isArray(userBikes) && userBikes.length > 0 ? userBikes : motorcycleService.getMotorcycles();
+      const bikes =
+        Array.isArray(userBikes) && userBikes.length > 0 ? userBikes : motorcycleService.getMotorcycles();
       setRegisteredBikes(bikes);
       if (!selectedRegisteredBike && bikes.length > 0) {
         setSelectedRegisteredBike(bikes.find((b) => b.is_primary) || bikes[0]);
@@ -97,7 +108,14 @@ export default function CustomizerPage({
       };
     }
     return registeredBikes[0] || BIKE_PRESETS[0];
-  }, [selectedRegisteredBike, selectedPreset, customBikeBrand, customBikeName, customPhotoUri, registeredBikes]);
+  }, [
+    selectedRegisteredBike,
+    selectedPreset,
+    customBikeBrand,
+    customBikeName,
+    customPhotoUri,
+    registeredBikes,
+  ]);
 
   const currentBasePhoto = useMemo(() => {
     if (selectedRegisteredBike?.photo_url) {
@@ -443,17 +461,13 @@ export default function CustomizerPage({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
       <ToastNotification message={toastMessage} />
 
       {/* ─── 1. TOP HEADER ─── */}
       <View style={styles.headerWrapper}>
         <View style={[styles.maxContainer, styles.headerInner]}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => onNavigateToStore?.()}
-            activeOpacity={0.8}
-          >
+          <TouchableOpacity style={styles.backBtn} onPress={() => onNavigateToStore?.()} activeOpacity={0.8}>
             <BootstrapIcon name="arrow-left" size={15} color="#334155" />
             <Text style={styles.backBtnText}>Store</Text>
           </TouchableOpacity>
@@ -475,22 +489,18 @@ export default function CustomizerPage({
             >
               <BootstrapIcon name="heart" size={14} color="#334155" />
               {wishlistCount > 0 && (
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#0C6258' }}>
-                  {wishlistCount}
-                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533' }}>{wishlistCount}</Text>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[styles.backBtn, { backgroundColor: '#0C6258', borderColor: '#0C6258' }]}
+              style={[styles.backBtn, { backgroundColor: '#1D4533', borderColor: '#1D4533' }]}
               onPress={() => setIsCartModalOpen(true)}
               activeOpacity={0.8}
             >
               <BootstrapIcon name="cart3" size={14} color="#FFFFFF" />
               {cartItemCount > 0 && (
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>
-                  {cartItemCount}
-                </Text>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>{cartItemCount}</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -504,6 +514,68 @@ export default function CustomizerPage({
         showsVerticalScrollIndicator={true}
       >
         <View style={styles.maxContainer}>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 8,
+              marginBottom: 14,
+              backgroundColor: '#F1F5F9',
+              borderRadius: 12,
+              padding: 4,
+            }}
+          >
+            {[
+              { id: 'builder', label: 'Parts Builder' },
+              { id: 'install', label: 'AI Install' },
+              { id: 'studio', label: 'AI Studio' },
+            ].map((tab) => (
+              <TouchableOpacity
+                key={tab.id}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: studioMode === tab.id ? '#1D4533' : 'transparent',
+                  alignItems: 'center',
+                }}
+                onPress={() => setStudioMode(tab.id)}
+              >
+                <Text
+                  style={{
+                    fontWeight: '700',
+                    fontSize: 11,
+                    color: studioMode === tab.id ? '#FFFFFF' : '#64748B',
+                  }}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {studioMode === 'builder' && (
+            <CustomizationWorkspace
+              builder={customizationBuilder}
+              addToCart={addToCart}
+              onRequireLogin={() => {
+                setRedirectReason?.('save-customization');
+                onNavigateToLogin?.();
+              }}
+            />
+          )}
+
+          {studioMode === 'install' && (
+            <AiMotorcycleInstallStudio
+              currentUser={currentUser}
+              onRequireLogin={() => {
+                setRedirectReason?.('ai-install');
+                onNavigateToLogin?.();
+              }}
+            />
+          )}
+
+          {studioMode === 'studio' && (
+            <>
           {/* ─── MINIMALIST STEPPER ─── */}
           <View style={styles.workflowStepperCard}>
             <View style={styles.stepperTrack}>
@@ -557,10 +629,7 @@ export default function CustomizerPage({
                     <BootstrapIcon name="check" size={12} color="#FFFFFF" />
                   ) : (
                     <Text
-                      style={[
-                        styles.stepBadgeText,
-                        workflowStep === 'parts' && styles.stepBadgeTextActive,
-                      ]}
+                      style={[styles.stepBadgeText, workflowStep === 'parts' && styles.stepBadgeTextActive]}
                     >
                       2
                     </Text>
@@ -597,10 +666,7 @@ export default function CustomizerPage({
                     <BootstrapIcon name="check" size={12} color="#FFFFFF" />
                   ) : (
                     <Text
-                      style={[
-                        styles.stepBadgeText,
-                        workflowStep === 'review' && styles.stepBadgeTextActive,
-                      ]}
+                      style={[styles.stepBadgeText, workflowStep === 'review' && styles.stepBadgeTextActive]}
                     >
                       3
                     </Text>
@@ -613,12 +679,7 @@ export default function CustomizerPage({
                 </View>
               </TouchableOpacity>
 
-              <View
-                style={[
-                  styles.stepConnector,
-                  workflowStep === 'total' && styles.stepConnectorActive,
-                ]}
-              />
+              <View style={[styles.stepConnector, workflowStep === 'total' && styles.stepConnectorActive]} />
 
               {/* Step 4 */}
               <TouchableOpacity
@@ -626,17 +687,9 @@ export default function CustomizerPage({
                 onPress={() => setWorkflowStep('total')}
                 activeOpacity={0.85}
               >
-                <View
-                  style={[
-                    styles.stepBadge,
-                    workflowStep === 'total' && styles.stepBadgeActive,
-                  ]}
-                >
+                <View style={[styles.stepBadge, workflowStep === 'total' && styles.stepBadgeActive]}>
                   <Text
-                    style={[
-                      styles.stepBadgeText,
-                      workflowStep === 'total' && styles.stepBadgeTextActive,
-                    ]}
+                    style={[styles.stepBadgeText, workflowStep === 'total' && styles.stepBadgeTextActive]}
                   >
                     4
                   </Text>
@@ -664,7 +717,7 @@ export default function CustomizerPage({
                     </Text>
                   </View>
                   <TouchableOpacity
-                    style={[styles.emptyRegBikesBtn, { backgroundColor: '#0C6258', paddingHorizontal: 10 }]}
+                    style={[styles.emptyRegBikesBtn, { backgroundColor: '#1D4533', paddingHorizontal: 10 }]}
                     onPress={() => setIsRegisterBikeModalOpen(true)}
                     activeOpacity={0.85}
                   >
@@ -691,7 +744,10 @@ export default function CustomizerPage({
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[styles.bikeSourceTab, bikeSourceMode === 'registered' && styles.bikeSourceTabActive]}
+                    style={[
+                      styles.bikeSourceTab,
+                      bikeSourceMode === 'registered' && styles.bikeSourceTabActive,
+                    ]}
                     onPress={() => setBikeSourceMode('registered')}
                     activeOpacity={0.85}
                   >
@@ -749,7 +805,7 @@ export default function CustomizerPage({
                       }}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <BootstrapIcon name="bicycle" size={14} color="#0C6258" />
+                        <BootstrapIcon name="bicycle" size={14} color="#1D4533" />
                         <Text
                           style={[
                             styles.formLabel,
@@ -766,11 +822,8 @@ export default function CustomizerPage({
                           Choose From Your Registered Motorcycles:
                         </Text>
                       </View>
-                      <TouchableOpacity
-                        onPress={() => setIsRegisterBikeModalOpen(true)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#0C6258' }}>
+                      <TouchableOpacity onPress={() => setIsRegisterBikeModalOpen(true)} activeOpacity={0.8}>
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4533' }}>
                           + Register Bike
                         </Text>
                       </TouchableOpacity>
@@ -798,7 +851,8 @@ export default function CustomizerPage({
                               />
                               <View style={styles.regBikeHeader}>
                                 <Text style={styles.regBikeTitle} numberOfLines={1}>
-                                  {bike.year ? `${bike.year} ` : ''}{bike.brand} {bike.model}
+                                  {bike.year ? `${bike.year} ` : ''}
+                                  {bike.brand} {bike.model}
                                 </Text>
                                 <View
                                   style={[
@@ -853,19 +907,19 @@ export default function CustomizerPage({
                               width: 38,
                               height: 38,
                               borderRadius: 19,
-                              backgroundColor: '#D1ECE6',
+                              backgroundColor: '#C8DDD3',
                               justifyContent: 'center',
                               alignItems: 'center',
                               marginBottom: 6,
                             }}
                           >
-                            <BootstrapIcon name="plus-lg" size={18} color="#0C6258" />
+                            <BootstrapIcon name="plus-lg" size={18} color="#1D4533" />
                           </View>
                           <Text
                             style={{
                               fontSize: 11.5,
                               fontWeight: '700',
-                              color: '#0C6258',
+                              color: '#1D4533',
                               textAlign: 'center',
                             }}
                           >
@@ -875,7 +929,7 @@ export default function CustomizerPage({
                       </ScrollView>
                     ) : (
                       <View style={styles.emptyRegBikesBox}>
-                        <BootstrapIcon name="info-circle" size={20} color="#0C6258" />
+                        <BootstrapIcon name="info-circle" size={20} color="#1D4533" />
                         <Text style={styles.emptyRegBikesText}>
                           No bikes registered yet in your garage. Tap Register below or pick a preset!
                         </Text>
@@ -969,7 +1023,7 @@ export default function CustomizerPage({
                       <BootstrapIcon
                         name={customPhotoUri ? 'check-circle-fill' : 'camera-fill'}
                         size={22}
-                        color={customPhotoUri ? '#0C6258' : '#94A3B8'}
+                        color={customPhotoUri ? '#1D4533' : '#94A3B8'}
                       />
                       <Text style={styles.uploadTitle}>
                         {customPhotoUri ? 'Custom Bike Photo Loaded' : 'Upload Bike Photo'}
@@ -986,7 +1040,7 @@ export default function CustomizerPage({
                     padding: 14,
                     marginTop: 8,
                     borderWidth: 1.5,
-                    borderColor: '#0C6258',
+                    borderColor: '#1D4533',
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}>
@@ -1004,13 +1058,13 @@ export default function CustomizerPage({
                     />
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#0C6258' }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#1D4533' }}>
                           SELECTED MOTORCYCLE
                         </Text>
                         {selectedRegisteredBike ? (
                           <View
                             style={{
-                              backgroundColor: '#0C6258',
+                              backgroundColor: '#1D4533',
                               paddingHorizontal: 5,
                               paddingVertical: 1,
                               borderRadius: 4,
@@ -1029,9 +1083,7 @@ export default function CustomizerPage({
                               borderRadius: 4,
                             }}
                           >
-                            <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>
-                              PRESET
-                            </Text>
+                            <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>PRESET</Text>
                           </View>
                         ) : (
                           <View
@@ -1042,9 +1094,7 @@ export default function CustomizerPage({
                               borderRadius: 4,
                             }}
                           >
-                            <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>
-                              UPLOAD
-                            </Text>
+                            <Text style={{ color: '#FFFFFF', fontSize: 9, fontWeight: '800' }}>UPLOAD</Text>
                           </View>
                         )}
                       </View>
@@ -1056,8 +1106,8 @@ export default function CustomizerPage({
                         {selectedRegisteredBike
                           ? `Plate: ${selectedRegisteredBike.plate_number || 'N/A'} • ${selectedRegisteredBike.color || 'Standard'}`
                           : selectedPreset
-                          ? `${selectedPreset.brand} • ${selectedPreset.category}`
-                          : 'Custom photo'}
+                            ? `${selectedPreset.brand} • ${selectedPreset.category}`
+                            : 'Custom photo'}
                       </Text>
                     </View>
                   </View>
@@ -1067,9 +1117,7 @@ export default function CustomizerPage({
                     onPress={() => setWorkflowStep('parts')}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.reviewActionPrimaryText}>
-                      Confirm Motorcycle & Choose Parts ➔
-                    </Text>
+                    <Text style={styles.reviewActionPrimaryText}>Confirm Motorcycle & Choose Parts ➔</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1091,7 +1139,7 @@ export default function CustomizerPage({
                   />
                   <View style={styles.canvasOverlayHeader}>
                     <View style={styles.bikeTagBadge}>
-                      <BootstrapIcon name="bicycle" size={13} color="#0C6258" />
+                      <BootstrapIcon name="bicycle" size={13} color="#1D4533" />
                       <Text style={styles.bikeTagText} numberOfLines={1}>
                         {currentBikeTitle}
                       </Text>
@@ -1147,7 +1195,7 @@ export default function CustomizerPage({
               <View style={styles.workbenchCard}>
                 <View style={styles.sectionHeadingRow}>
                   <Text style={styles.sectionHeading}>2. Choose Customization Category</Text>
-                  <Text style={{ fontSize: 11, color: '#0C6258', fontWeight: '700' }}>
+                  <Text style={{ fontSize: 11, color: '#1D4533', fontWeight: '700' }}>
                     {selectedParts.length} Parts
                   </Text>
                 </View>
@@ -1167,10 +1215,7 @@ export default function CustomizerPage({
                         activeOpacity={0.8}
                       >
                         <Text
-                          style={[
-                            styles.partsCategoryText,
-                            isCatActive && styles.partsCategoryTextActive,
-                          ]}
+                          style={[styles.partsCategoryText, isCatActive && styles.partsCategoryTextActive]}
                         >
                           {cat}
                         </Text>
@@ -1219,9 +1264,11 @@ export default function CustomizerPage({
                             {product.brand} • {product.category}
                           </Text>
                           {isSelected && (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}>
-                              <BootstrapIcon name="check2-circle" size={11} color="#0C6258" />
-                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#0C6258' }}>
+                            <View
+                              style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 }}
+                            >
+                              <BootstrapIcon name="check2-circle" size={11} color="#1D4533" />
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#1D4533' }}>
                                 Installed on {activeMotorcycle?.model || 'Bike'}
                               </Text>
                             </View>
@@ -1278,9 +1325,7 @@ export default function CustomizerPage({
                       disabled={selectedParts.length === 0}
                       activeOpacity={0.85}
                     >
-                      <Text style={styles.reviewActionPrimaryText}>
-                        Review Customization ➔
-                      </Text>
+                      <Text style={styles.reviewActionPrimaryText}>Review Customization ➔</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1328,7 +1373,11 @@ export default function CustomizerPage({
                   {selectedParts.map((part) => (
                     <View key={part.id || part.product_id} style={styles.reviewPartRow}>
                       <View style={styles.reviewPartLeft}>
-                        <Image source={{ uri: part.image }} style={styles.reviewPartThumb} resizeMode="cover" />
+                        <Image
+                          source={{ uri: part.image }}
+                          style={styles.reviewPartThumb}
+                          resizeMode="cover"
+                        />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.reviewPartName} numberOfLines={1}>
                             {part.name}
@@ -1360,12 +1409,19 @@ export default function CustomizerPage({
                     padding: 14,
                     marginVertical: 14,
                     borderWidth: 1.5,
-                    borderColor: '#D1ECE6',
+                    borderColor: '#C8DDD3',
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: 6,
+                    }}
+                  >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <BootstrapIcon name="magic" size={15} color="#0C6258" />
+                      <BootstrapIcon name="magic" size={15} color="#1D4533" />
                       <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0F172A' }}>
                         Generate AI Preview (Optional)
                       </Text>
@@ -1405,7 +1461,9 @@ export default function CustomizerPage({
                   </TouchableOpacity>
 
                   {generationResult && (
-                    <View style={{ marginTop: 12, position: 'relative', borderRadius: 12, overflow: 'hidden' }}>
+                    <View
+                      style={{ marginTop: 12, position: 'relative', borderRadius: 12, overflow: 'hidden' }}
+                    >
                       <Image
                         source={{ uri: displayedCanvasImage }}
                         style={{ width: '100%', height: 220, borderRadius: 12 }}
@@ -1414,7 +1472,12 @@ export default function CustomizerPage({
                       <TouchableOpacity
                         style={[
                           styles.toggleViewBtn,
-                          { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(15,23,42,0.85)' },
+                          {
+                            position: 'absolute',
+                            top: 10,
+                            right: 10,
+                            backgroundColor: 'rgba(15,23,42,0.85)',
+                          },
                         ]}
                         onPress={() =>
                           setActiveViewMode((prev) => (prev === 'generated' ? 'original' : 'generated'))
@@ -1458,9 +1521,7 @@ export default function CustomizerPage({
                     onPress={() => setWorkflowStep('total')}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.reviewActionPrimaryText}>
-                      View Estimated Total ➔
-                    </Text>
+                    <Text style={styles.reviewActionPrimaryText}>View Estimated Total ➔</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1488,9 +1549,7 @@ export default function CustomizerPage({
                       <Text style={styles.totalRowLabel} numberOfLines={1}>
                         {part.name}
                       </Text>
-                      <Text style={styles.totalRowValue}>
-                        ₱{usdToPhp(part.price || 0).toLocaleString()}
-                      </Text>
+                      <Text style={styles.totalRowValue}>₱{usdToPhp(part.price || 0).toLocaleString()}</Text>
                     </View>
                   ))}
 
@@ -1511,11 +1570,9 @@ export default function CustomizerPage({
                   <View style={styles.totalGrandBox}>
                     <View>
                       <Text style={styles.totalGrandLabel}>Total Investment</Text>
-                      <Text style={{ fontSize: 10.5, color: '#0C6258' }}>Parts + Fitting</Text>
+                      <Text style={{ fontSize: 10.5, color: '#1D4533' }}>Parts + Fitting</Text>
                     </View>
-                    <Text style={styles.totalGrandAmount}>
-                      ₱{grandTotalPhp.toLocaleString()}
-                    </Text>
+                    <Text style={styles.totalGrandAmount}>₱{grandTotalPhp.toLocaleString()}</Text>
                   </View>
                 </View>
 
@@ -1551,6 +1608,8 @@ export default function CustomizerPage({
               </View>
             </View>
           )}
+            </>
+          )}
         </View>
       </ScrollView>
 
@@ -1561,7 +1620,7 @@ export default function CustomizerPage({
             <View style={styles.partModalSheet}>
               <View style={styles.partModalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <BootstrapIcon name="info-circle-fill" size={16} color="#0C6258" />
+                  <BootstrapIcon name="info-circle-fill" size={16} color="#1D4533" />
                   <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
                     Part Details & Price
                   </Text>
@@ -1598,7 +1657,7 @@ export default function CustomizerPage({
 
               <View style={styles.partModalSpecsRow}>
                 <View style={styles.partModalSpecChip}>
-                  <BootstrapIcon name="check-circle" size={11} color="#0C6258" />
+                  <BootstrapIcon name="check-circle" size={11} color="#1D4533" />
                   <Text style={styles.partModalSpecText}>
                     Fits {activeMotorcycle?.brand} {activeMotorcycle?.model}
                   </Text>
@@ -1659,7 +1718,7 @@ export default function CustomizerPage({
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <BootstrapIcon name="calendar-check-fill" size={16} color="#0C6258" />
+                <BootstrapIcon name="calendar-check-fill" size={16} color="#1D4533" />
                 <Text style={styles.modalTitle}>Book Installation Pitstop</Text>
               </View>
               <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsBookingModalOpen(false)}>
@@ -1677,9 +1736,7 @@ export default function CustomizerPage({
                   marginBottom: 10,
                 }}
               >
-                <Text style={{ fontWeight: '700', color: '#0F172A', fontSize: 12 }}>
-                  {currentBikeTitle}
-                </Text>
+                <Text style={{ fontWeight: '700', color: '#0F172A', fontSize: 12 }}>{currentBikeTitle}</Text>
                 <Text style={{ fontSize: 10.5, color: '#64748B' }}>
                   {selectedParts.length} Custom Parts to be Installed
                 </Text>
@@ -1758,14 +1815,30 @@ export default function CustomizerPage({
           if (tab === 'Home') onNavigateToStore?.();
           else if (tab === 'Garage') onNavigateToGarage?.();
           else if (tab === 'Orders') onNavigateToOrders?.();
-          else if (tab === 'Favorites') onNavigateToWishlist?.();
-          else if (tab === 'Dashboard') {
+          else if (tab === 'Wishlist' || tab === 'Favorites') onNavigateToWishlist?.();
+          else if (tab === 'More') {
+            if (!currentUser) {
+              setRedirectReason('');
+              onNavigateToLogin?.();
+            } else {
+              onNavigateToProfile?.('menu');
+            }
+          } else if (tab === 'Dashboard') {
             if (!currentUser) {
               setRedirectReason('');
               onNavigateToLogin?.();
             } else {
               onNavigateToProfile?.('overview');
             }
+          } else if (tab === 'Bookings') {
+            if (!currentUser) {
+              setRedirectReason('');
+              onNavigateToLogin?.();
+            } else {
+              onNavigateToProfile?.('bookings');
+            }
+          } else if (tab === 'Notifications') {
+            onNavigateToProfile?.('notifications');
           } else if (tab === 'Profile') {
             if (!currentUser) {
               setRedirectReason('');
@@ -1773,6 +1846,8 @@ export default function CustomizerPage({
             } else {
               onNavigateToProfile?.('profile');
             }
+          } else if (tab === 'Admin') {
+            onNavigateToAdmin?.();
           }
         }}
         currentUser={currentUser}

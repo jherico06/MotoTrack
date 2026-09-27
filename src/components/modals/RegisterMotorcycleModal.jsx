@@ -16,17 +16,17 @@ import {
   MOTORCYCLE_BRANDS,
   MOTORCYCLE_PHOTO_PRESETS,
 } from '../../services/motorcycleService';
+import { pickImageFromFile } from '../../utils/imagePickerHelper';
 
 export default function RegisterMotorcycleModal({
   visible = false,
-  motorcycle = null, // null for add, object for edit
+  motorcycle = null,
   isDarkMode = false,
   onClose,
   onSave,
 }) {
   const isEditing = Boolean(motorcycle && motorcycle.motorcycle_id);
 
-  // Form Fields
   const [brand, setBrand] = useState('Yamaha');
   const [model, setModel] = useState('');
   const [plateNumber, setPlateNumber] = useState('');
@@ -35,15 +35,13 @@ export default function RegisterMotorcycleModal({
   const [color, setColor] = useState('');
   const [odometer, setOdometer] = useState('');
   const [nickname, setNickname] = useState('');
-  const [vinNumber, setVinNumber] = useState('');
   const [photoUrl, setPhotoUrl] = useState('');
   const [isPrimary, setIsPrimary] = useState(false);
   const [notes, setNotes] = useState('');
-
   const [errorMessage, setErrorMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
-  // Reset or pre-fill form
   useEffect(() => {
     if (motorcycle) {
       setBrand(motorcycle.brand || 'Yamaha');
@@ -54,7 +52,6 @@ export default function RegisterMotorcycleModal({
       setColor(motorcycle.color || '');
       setOdometer(motorcycle.odometer || '');
       setNickname(motorcycle.nickname || '');
-      setVinNumber(motorcycle.vin_number || '');
       setPhotoUrl(motorcycle.photo_url || '');
       setIsPrimary(Boolean(motorcycle.is_primary));
       setNotes(motorcycle.notes || '');
@@ -64,11 +61,10 @@ export default function RegisterMotorcycleModal({
       setPlateNumber('');
       setYear(String(new Date().getFullYear()));
       setEngineCc('155');
-      setColor('Matte Black');
-      setOdometer('0 km');
+      setColor('');
+      setOdometer('');
       setNickname('');
-      setVinNumber('');
-      setPhotoUrl(MOTORCYCLE_PHOTO_PRESETS[0]?.url || '');
+      setPhotoUrl('');
       setIsPrimary(false);
       setNotes('');
     }
@@ -83,20 +79,41 @@ export default function RegisterMotorcycleModal({
   const textMain = isDarkMode ? '#F8FAFC' : '#0F172A';
   const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
 
-  const handleSelectPresetPhoto = (preset) => {
-    setPhotoUrl(preset.url);
-    if (!brand || brand === 'Yamaha') {
-      setBrand(preset.brand);
+  const defaultPhotoForBrand = (brandName) => {
+    const preset = MOTORCYCLE_PHOTO_PRESETS.find(
+      (p) => p.brand.toLowerCase() === String(brandName || '').toLowerCase()
+    );
+    return preset?.url || MOTORCYCLE_PHOTO_PRESETS[0]?.url || '';
+  };
+
+  const handleUploadPhoto = async () => {
+    setErrorMessage('');
+    setIsUploadingPhoto(true);
+    try {
+      const res = await pickImageFromFile();
+      if (res?.success && res.uri) {
+        setPhotoUrl(res.uri);
+      } else if (res?.error && res.error !== 'Selection cancelled' && res.error !== 'No file selected') {
+        setErrorMessage(res.error);
+      }
+    } catch (e) {
+      setErrorMessage(e?.message || 'Could not upload photo.');
+    } finally {
+      setIsUploadingPhoto(false);
     }
+  };
+
+  const handleRemovePhoto = () => {
+    setPhotoUrl('');
   };
 
   const handleFormSubmit = async () => {
     if (!model.trim()) {
-      setErrorMessage('Please enter the motorcycle model / variant.');
+      setErrorMessage('Please enter the motorcycle model.');
       return;
     }
     if (!plateNumber.trim()) {
-      setErrorMessage('Please enter the motorcycle plate or registration number.');
+      setErrorMessage('Please enter the plate or MV file number.');
       return;
     }
 
@@ -110,11 +127,11 @@ export default function RegisterMotorcycleModal({
         plate_number: plateNumber.trim().toUpperCase(),
         year: parseInt(year, 10) || new Date().getFullYear(),
         engine_cc: parseInt(engineCc, 10) || 150,
-        color: color.trim() || 'Standard Fairing',
+        color: color.trim() || 'Standard',
         odometer: odometer.trim() || '0 km',
         nickname: nickname.trim() || `${brand} ${model.trim()}`,
-        vin_number: vinNumber.trim(),
-        photo_url: photoUrl.trim() || MOTORCYCLE_PHOTO_PRESETS[0]?.url,
+        vin_number: '',
+        photo_url: photoUrl.trim() || defaultPhotoForBrand(brand),
         is_primary: isPrimary,
         notes: notes.trim(),
       };
@@ -126,7 +143,7 @@ export default function RegisterMotorcycleModal({
       await onSave(payload);
       onClose();
     } catch (e) {
-      setErrorMessage(e.message || 'Failed to save motorcycle details.');
+      setErrorMessage(e.message || 'Failed to save motorcycle.');
     } finally {
       setIsSaving(false);
     }
@@ -134,126 +151,128 @@ export default function RegisterMotorcycleModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={modalStyles.overlay}>
-        <TouchableOpacity style={modalStyles.backdrop} activeOpacity={1} onPress={onClose} />
+      <View style={styles.overlay}>
+        <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
-        <View style={[modalStyles.card, { backgroundColor: bgModal, borderColor: borderCol }]}>
-          {/* Top Brand Accent Bar */}
-          <View style={modalStyles.accentBar} />
+        <View style={[styles.card, { backgroundColor: bgModal, borderColor: borderCol }]}>
+          <View style={styles.accentBar} />
 
-          {/* Modal Header */}
-          <View style={[modalStyles.header, { borderBottomColor: borderCol }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-              <View style={modalStyles.iconCircle}>
-                <BootstrapIcon name="tools" size={18} color="#0C6258" />
+          <View style={[styles.header, { borderBottomColor: borderCol }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <View style={styles.iconCircle}>
+                <BootstrapIcon name="bicycle" size={18} color="#1D4533" />
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[modalStyles.title, { color: textMain }]}>
-                  {isEditing ? 'Edit Motorcycle Specs' : 'Register Motorcycle in My Garage'}
-                </Text>
-                <Text style={[modalStyles.subtitle, { color: textMuted }]}>
-                  Keep your garage fleet up-to-date for fast pit bay bookings and PMS scheduling.
-                </Text>
-              </View>
+              <Text style={[styles.title, { color: textMain }]}>
+                {isEditing ? 'Edit Motorcycle' : 'Register Motorcycle'}
+              </Text>
             </View>
-
             <TouchableOpacity
               onPress={onClose}
-              style={[modalStyles.closeBtn, { backgroundColor: bgInput }]}
+              style={[styles.closeBtn, { backgroundColor: bgInput }]}
               activeOpacity={0.8}
             >
               <BootstrapIcon name="x-lg" size={16} color={textMuted} />
             </TouchableOpacity>
           </View>
 
-          {/* Form Content Scroll */}
           <ScrollView
-            style={modalStyles.bodyScroll}
-            contentContainerStyle={modalStyles.bodyContent}
+            style={styles.bodyScroll}
+            contentContainerStyle={styles.bodyContent}
             showsVerticalScrollIndicator={true}
           >
-            {/* Error Banner */}
             {errorMessage ? (
-              <View style={modalStyles.errorBanner}>
+              <View style={styles.errorBanner}>
                 <BootstrapIcon name="exclamation-triangle-fill" size={14} color="#DC2626" />
-                <Text style={modalStyles.errorText}>{errorMessage}</Text>
+                <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             ) : null}
 
-            {/* Photo Preview & Presets */}
-            <View style={modalStyles.fieldGroup}>
-              <Text style={[modalStyles.fieldLabel, { color: textMain }]}>
-                Motorcycle Photo & Appearance
-              </Text>
-              <View style={modalStyles.photoRow}>
-                {photoUrl ? (
-                  <Image source={{ uri: photoUrl }} style={modalStyles.photoPreview} />
-                ) : (
-                  <View style={[modalStyles.photoPreview, { backgroundColor: bgInput, justifyContent: 'center', alignItems: 'center' }]}>
-                    <BootstrapIcon name="camera-fill" size={24} color={textMuted} />
-                  </View>
-                )}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 12, color: textMuted, marginBottom: 6 }}>
-                    Quick-pick styling preset or enter custom image URL below:
-                  </Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-                    {MOTORCYCLE_PHOTO_PRESETS.map((preset) => (
-                      <TouchableOpacity
-                        key={preset.id}
-                        style={[
-                          modalStyles.presetChip,
-                          photoUrl === preset.url && modalStyles.presetChipActive,
-                        ]}
-                        onPress={() => handleSelectPresetPhoto(preset)}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={[
-                            modalStyles.presetChipText,
-                            photoUrl === preset.url && modalStyles.presetChipTextActive,
-                          ]}
-                        >
-                          {preset.brand}
+            {/* Photo upload */}
+            <View style={styles.section}>
+              <Text style={[styles.label, { color: textMain }]}>Photo</Text>
+              <View style={styles.photoBlock}>
+                <TouchableOpacity
+                  style={[styles.photoDrop, { borderColor: borderCol, backgroundColor: bgInput }]}
+                  onPress={handleUploadPhoto}
+                  activeOpacity={0.85}
+                  disabled={isUploadingPhoto}
+                >
+                  {photoUrl ? (
+                    <Image source={{ uri: photoUrl }} style={styles.photoPreview} />
+                  ) : (
+                    <View style={styles.photoEmpty}>
+                      {isUploadingPhoto ? (
+                        <ActivityIndicator color="#1D4533" />
+                      ) : (
+                        <>
+                          <BootstrapIcon name="cloud-upload" size={28} color="#1D4533" />
+                          <Text style={[styles.photoEmptyTitle, { color: textMain }]}>
+                            Upload photo
+                          </Text>
+                          <Text style={[styles.photoEmptyHint, { color: textMuted }]}>
+                            Tap to choose from your device
+                          </Text>
+                        </>
+                      )}
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <View style={styles.photoActions}>
+                  <TouchableOpacity
+                    style={styles.uploadBtn}
+                    onPress={handleUploadPhoto}
+                    disabled={isUploadingPhoto}
+                    activeOpacity={0.85}
+                  >
+                    {isUploadingPhoto ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <BootstrapIcon name="camera-fill" size={14} color="#FFFFFF" />
+                        <Text style={styles.uploadBtnText}>
+                          {photoUrl ? 'Change photo' : 'Choose photo'}
                         </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                  {photoUrl ? (
+                    <TouchableOpacity
+                      style={[styles.removeBtn, { borderColor: borderCol }]}
+                      onPress={handleRemovePhoto}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.removeBtnText, { color: textMuted }]}>Remove</Text>
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
               </View>
-
-              {/* Custom Image URL input */}
-              <TextInput
-                style={[modalStyles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain, marginTop: 8 }]}
-                placeholder="https://example.com/my-motorcycle.jpg (optional)"
-                placeholderTextColor={textMuted}
-                value={photoUrl}
-                onChangeText={setPhotoUrl}
-              />
             </View>
 
-            {/* Brand Selection */}
-            <View style={modalStyles.fieldGroup}>
-              <Text style={[modalStyles.fieldLabel, { color: textMain }]}>
-                Manufacturer / Brand *
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+            {/* Brand — single selector */}
+            <View style={styles.section}>
+              <Text style={[styles.label, { color: textMain }]}>Brand *</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.brandRow}
+              >
                 {MOTORCYCLE_BRANDS.map((b) => (
                   <TouchableOpacity
                     key={b}
                     style={[
-                      modalStyles.brandPill,
+                      styles.brandPill,
                       { borderColor: borderCol, backgroundColor: bgInput },
-                      brand === b && modalStyles.brandPillActive,
+                      brand === b && styles.brandPillActive,
                     ]}
                     onPress={() => setBrand(b)}
                     activeOpacity={0.8}
                   >
                     <Text
                       style={[
-                        modalStyles.brandPillText,
+                        styles.brandPillText,
                         { color: textMain },
-                        brand === b && modalStyles.brandPillTextActive,
+                        brand === b && styles.brandPillTextActive,
                       ]}
                     >
                       {b}
@@ -263,123 +282,98 @@ export default function RegisterMotorcycleModal({
               </ScrollView>
             </View>
 
-            {/* Model & Nickname Row */}
-            <View style={modalStyles.twoColRow}>
-              <View style={{ flex: 1, minWidth: 220 }}>
-                <Text style={[modalStyles.fieldLabel, { color: textMain }]}>
-                  Model / Variant *
-                </Text>
-                <TextInput
-                  style={[modalStyles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
-                  placeholder="e.g. NMAX 155 Connected, Ninja ZX-6R"
-                  placeholderTextColor={textMuted}
-                  value={model}
-                  onChangeText={setModel}
-                />
-              </View>
-
-              <View style={{ flex: 1, minWidth: 200 }}>
-                <Text style={[modalStyles.fieldLabel, { color: textMain }]}>
-                  Garage Nickname (Optional)
-                </Text>
-                <TextInput
-                  style={[modalStyles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
-                  placeholder="e.g. Daily Commuter, Weekend Weapon"
-                  placeholderTextColor={textMuted}
-                  value={nickname}
-                  onChangeText={setNickname}
-                />
-              </View>
-            </View>
-
-            {/* Plate Number & Year & Engine CC */}
-            <View style={modalStyles.threeColRow}>
-              <View style={{ flex: 1.2, minWidth: 140 }}>
-                <Text style={[modalStyles.fieldLabel, { color: textMain }]}>
-                  Plate / MV File No. *
-                </Text>
-                <TextInput
-                  style={[
-                    modalStyles.input,
-                    {
-                      backgroundColor: bgInput,
-                      borderColor: borderCol,
-                      color: textMain,
-                      textTransform: 'uppercase',
-                      fontWeight: '700',
-                      letterSpacing: 1,
-                    },
-                  ]}
-                  placeholder="NM-4892"
-                  placeholderTextColor={textMuted}
-                  value={plateNumber}
-                  onChangeText={setPlateNumber}
-                  autoCapitalize="characters"
-                />
-              </View>
-
-              <View style={{ flex: 1, minWidth: 100 }}>
-                <Text style={[modalStyles.fieldLabel, { color: textMain }]}>
-                  Model Year
-                </Text>
-                <TextInput
-                  style={[modalStyles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
-                  placeholder="2024"
-                  placeholderTextColor={textMuted}
-                  value={year}
-                  onChangeText={setYear}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <View style={{ flex: 1, minWidth: 110 }}>
-                <Text style={[modalStyles.fieldLabel, { color: textMain }]}>
-                  Engine (CC)
-                </Text>
-                <TextInput
-                  style={[modalStyles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
-                  placeholder="e.g. 155"
-                  placeholderTextColor={textMuted}
-                  value={engineCc}
-                  onChangeText={setEngineCc}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            {/* Color & Odometer */}
-            <View style={modalStyles.twoColRow}>
-              <View style={{ flex: 1, minWidth: 180 }}>
-                <Text style={[modalStyles.fieldLabel, { color: textMain }]}>
-                  Color / Fairing Theme
-                </Text>
-                <TextInput
-                  style={[modalStyles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
-                  placeholder="e.g. Matte Dark Gray, KRT Lime Green"
-                  placeholderTextColor={textMuted}
-                  value={color}
-                  onChangeText={setColor}
-                />
-              </View>
-
-              <View style={{ flex: 1, minWidth: 180 }}>
-                <Text style={[modalStyles.fieldLabel, { color: textMain }]}>
-                  Current Odometer
-                </Text>
-                <TextInput
-                  style={[modalStyles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
-                  placeholder="e.g. 12,400 km"
-                  placeholderTextColor={textMuted}
-                  value={odometer}
-                  onChangeText={setOdometer}
-                />
+            {/* Core details */}
+            <View style={styles.section}>
+              <Text style={[styles.label, { color: textMain }]}>Details</Text>
+              <View style={styles.grid}>
+                <View style={styles.fieldHalf}>
+                  <Text style={[styles.fieldHint, { color: textMuted }]}>Model *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
+                    placeholder="e.g. Click 160"
+                    placeholderTextColor={textMuted}
+                    value={model}
+                    onChangeText={setModel}
+                  />
+                </View>
+                <View style={styles.fieldHalf}>
+                  <Text style={[styles.fieldHint, { color: textMuted }]}>Nickname</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
+                    placeholder="Optional"
+                    placeholderTextColor={textMuted}
+                    value={nickname}
+                    onChangeText={setNickname}
+                  />
+                </View>
+                <View style={styles.fieldHalf}>
+                  <Text style={[styles.fieldHint, { color: textMuted }]}>Plate / MV No. *</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      {
+                        backgroundColor: bgInput,
+                        borderColor: borderCol,
+                        color: textMain,
+                        fontWeight: '700',
+                        letterSpacing: 0.6,
+                      },
+                    ]}
+                    placeholder="ABC-1234"
+                    placeholderTextColor={textMuted}
+                    value={plateNumber}
+                    onChangeText={setPlateNumber}
+                    autoCapitalize="characters"
+                  />
+                </View>
+                <View style={styles.fieldThird}>
+                  <Text style={[styles.fieldHint, { color: textMuted }]}>Year</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
+                    placeholder="2025"
+                    placeholderTextColor={textMuted}
+                    value={year}
+                    onChangeText={setYear}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.fieldThird}>
+                  <Text style={[styles.fieldHint, { color: textMuted }]}>Engine (cc)</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
+                    placeholder="160"
+                    placeholderTextColor={textMuted}
+                    value={engineCc}
+                    onChangeText={setEngineCc}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={styles.fieldHalf}>
+                  <Text style={[styles.fieldHint, { color: textMuted }]}>Color</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
+                    placeholder="e.g. Matte Gray"
+                    placeholderTextColor={textMuted}
+                    value={color}
+                    onChangeText={setColor}
+                  />
+                </View>
+                <View style={styles.fieldHalf}>
+                  <Text style={[styles.fieldHint, { color: textMuted }]}>Odometer</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
+                    placeholder="e.g. 2,800 km"
+                    placeholderTextColor={textMuted}
+                    value={odometer}
+                    onChangeText={setOdometer}
+                  />
+                </View>
               </View>
             </View>
 
-            {/* Primary Motorcycle Toggle */}
             <TouchableOpacity
               style={[
-                modalStyles.primaryToggleBox,
+                styles.primaryToggle,
                 {
                   backgroundColor: isPrimary ? (isDarkMode ? '#064E3B' : '#ECFDF5') : bgInput,
                   borderColor: isPrimary ? '#10B981' : borderCol,
@@ -388,66 +382,55 @@ export default function RegisterMotorcycleModal({
               onPress={() => setIsPrimary((prev) => !prev)}
               activeOpacity={0.8}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                <View
-                  style={[
-                    modalStyles.checkboxBox,
-                    isPrimary && { backgroundColor: '#10B981', borderColor: '#10B981' },
-                  ]}
-                >
-                  {isPrimary && <BootstrapIcon name="check" size={14} color="#FFFFFF" />}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: '800',
-                      color: isPrimary ? (isDarkMode ? '#A7F3D0' : '#065F46') : textMain,
-                    }}
-                  >
-                    ★ Set as Primary Motorcycle
-                  </Text>
-                  <Text style={{ fontSize: 11.5, color: textMuted, marginTop: 2 }}>
-                    Auto-selects this motorcycle for quick pit bay reservations and part compatibility checks.
-                  </Text>
-                </View>
+              <View
+                style={[
+                  styles.checkbox,
+                  isPrimary && { backgroundColor: '#10B981', borderColor: '#10B981' },
+                ]}
+              >
+                {isPrimary ? <BootstrapIcon name="check" size={12} color="#FFFFFF" /> : null}
               </View>
+              <Text
+                style={{
+                  fontSize: 13,
+                  fontWeight: '700',
+                  color: isPrimary ? (isDarkMode ? '#A7F3D0' : '#065F46') : textMain,
+                }}
+              >
+                Set as primary motorcycle
+              </Text>
             </TouchableOpacity>
 
-            {/* Custom Notes / Tuning */}
-            <View style={modalStyles.fieldGroup}>
-              <Text style={[modalStyles.fieldLabel, { color: textMain }]}>
-                Installed Modifications & Notes (Optional)
-              </Text>
+            <View style={styles.section}>
+              <Text style={[styles.label, { color: textMain }]}>Notes</Text>
               <TextInput
                 style={[
-                  modalStyles.input,
-                  modalStyles.textArea,
+                  styles.input,
+                  styles.textArea,
                   { backgroundColor: bgInput, borderColor: borderCol, color: textMain },
                 ]}
-                placeholder="e.g. Stage 1 CVT tuning, Akrapovič slip-on exhaust, Pirelli Diablo Rosso IV tires..."
+                placeholder="Optional notes or mods"
                 placeholderTextColor={textMuted}
                 value={notes}
                 onChangeText={setNotes}
-                multiline={true}
+                multiline
                 numberOfLines={3}
               />
             </View>
           </ScrollView>
 
-          {/* Modal Footer */}
-          <View style={[modalStyles.footer, { borderTopColor: borderCol }]}>
+          <View style={[styles.footer, { borderTopColor: borderCol }]}>
             <TouchableOpacity
-              style={[modalStyles.cancelBtn, { borderColor: borderCol }]}
+              style={[styles.cancelBtn, { borderColor: borderCol }]}
               onPress={onClose}
               disabled={isSaving}
               activeOpacity={0.8}
             >
-              <Text style={[modalStyles.cancelBtnText, { color: textMuted }]}>Cancel</Text>
+              <Text style={[styles.cancelBtnText, { color: textMuted }]}>Cancel</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={[modalStyles.saveBtn, isSaving && { opacity: 0.7 }]}
+              style={[styles.saveBtn, isSaving && { opacity: 0.7 }]}
               onPress={handleFormSubmit}
               disabled={isSaving}
               activeOpacity={0.85}
@@ -456,9 +439,13 @@ export default function RegisterMotorcycleModal({
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <BootstrapIcon name={isEditing ? 'check-circle-fill' : 'plus-circle-fill'} size={15} color="#FFFFFF" />
-                  <Text style={modalStyles.saveBtnText}>
-                    {isEditing ? 'Save Motorcycle Changes' : 'Register Motorcycle'}
+                  <BootstrapIcon
+                    name={isEditing ? 'check-circle-fill' : 'plus-circle-fill'}
+                    size={15}
+                    color="#FFFFFF"
+                  />
+                  <Text style={styles.saveBtnText}>
+                    {isEditing ? 'Save changes' : 'Register'}
                   </Text>
                 </>
               )}
@@ -470,7 +457,7 @@ export default function RegisterMotorcycleModal({
   );
 }
 
-const modalStyles = StyleSheet.create({
+const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
@@ -486,48 +473,43 @@ const modalStyles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    maxWidth: 680,
-    maxHeight: '92%',
-    borderRadius: 20,
+    maxWidth: 560,
+    maxHeight: '90%',
+    borderRadius: 18,
     borderWidth: 1,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.28,
-    shadowRadius: 32,
-    elevation: 20,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.24,
+    shadowRadius: 24,
+    elevation: 16,
     display: 'flex',
     flexDirection: 'column',
   },
   accentBar: {
     height: 4,
     width: '100%',
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 22,
-    paddingVertical: 16,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
     borderBottomWidth: 1,
   },
   iconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#D1ECE6',
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#C8DDD3',
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
     fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: -0.2,
-  },
-  subtitle: {
-    fontSize: 12,
-    marginTop: 2,
+    fontWeight: '800',
   },
   closeBtn: {
     width: 32,
@@ -540,7 +522,7 @@ const modalStyles = StyleSheet.create({
     flex: 1,
   },
   bodyContent: {
-    padding: 22,
+    padding: 18,
     gap: 16,
   },
   errorBanner: {
@@ -548,7 +530,7 @@ const modalStyles = StyleSheet.create({
     borderColor: '#FCA5A5',
     borderWidth: 1,
     paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
@@ -560,44 +542,89 @@ const modalStyles = StyleSheet.create({
     fontWeight: '700',
     flex: 1,
   },
-  fieldGroup: {
-    gap: 6,
+  section: {
+    gap: 8,
   },
-  fieldLabel: {
+  label: {
     fontSize: 12.5,
     fontWeight: '800',
-    letterSpacing: 0.2,
   },
-  twoColRow: {
+  fieldHint: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  photoBlock: {
+    gap: 10,
+  },
+  photoDrop: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    overflow: 'hidden',
+    minHeight: 160,
+  },
+  photoPreview: {
+    width: '100%',
+    height: 180,
+    resizeMode: 'cover',
+  },
+  photoEmpty: {
+    minHeight: 160,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    padding: 16,
+  },
+  photoEmptyTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  photoEmptyHint: {
+    fontSize: 12,
+  },
+  photoActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     flexWrap: 'wrap',
   },
-  threeColRow: {
-    flexDirection: 'row',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 10,
+  uploadBtn: {
+    backgroundColor: '#1D4533',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    fontSize: 13,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  textArea: {
-    minHeight: 68,
-    textAlignVertical: 'top',
+  uploadBtnText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12.5,
+  },
+  removeBtn: {
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  removeBtnText: {
+    fontWeight: '700',
+    fontSize: 12.5,
+  },
+  brandRow: {
+    gap: 8,
+    paddingVertical: 2,
   },
   brandPill: {
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
   },
   brandPillActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
   },
   brandPillText: {
     fontSize: 12,
@@ -607,41 +634,41 @@ const modalStyles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '800',
   },
-  photoRow: {
+  grid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
+    flexWrap: 'wrap',
+    gap: 10,
   },
-  photoPreview: {
-    width: 76,
-    height: 54,
-    borderRadius: 10,
+  fieldHalf: {
+    flexGrow: 1,
+    flexBasis: '46%',
+    minWidth: 140,
+  },
+  fieldThird: {
+    flexGrow: 1,
+    flexBasis: '30%',
+    minWidth: 100,
+  },
+  input: {
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
   },
-  presetChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+  textArea: {
+    minHeight: 72,
+    textAlignVertical: 'top',
   },
-  presetChipActive: {
-    backgroundColor: '#0C6258',
-  },
-  presetChipText: {
-    fontSize: 11,
-    color: '#475569',
-    fontWeight: '700',
-  },
-  presetChipTextActive: {
-    color: '#FFFFFF',
-  },
-  primaryToggleBox: {
+  primaryToggle: {
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
-  checkboxBox: {
+  checkbox: {
     width: 20,
     height: 20,
     borderRadius: 6,
@@ -654,14 +681,14 @@ const modalStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
-    gap: 12,
-    paddingHorizontal: 22,
-    paddingVertical: 16,
+    gap: 10,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
     borderTopWidth: 1,
   },
   cancelBtn: {
     paddingVertical: 10,
-    paddingHorizontal: 18,
+    paddingHorizontal: 16,
     borderRadius: 10,
     borderWidth: 1,
   },
@@ -670,18 +697,13 @@ const modalStyles = StyleSheet.create({
     fontWeight: '700',
   },
   saveBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingVertical: 10,
-    paddingHorizontal: 22,
+    paddingHorizontal: 18,
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    shadowColor: '#0C6258',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 4,
   },
   saveBtnText: {
     color: '#FFFFFF',

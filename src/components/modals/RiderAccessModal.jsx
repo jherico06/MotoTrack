@@ -134,20 +134,21 @@ export default function RiderAccessModal({
 
   if (!visible) return null;
   const riderName = rider?.name || rider?.rider_name || 'Rider';
+  const isDark = typeof document !== 'undefined' && document.documentElement?.classList.contains('dark');
 
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, isDark && { backgroundColor: '#141A18', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>Rider dashboard link</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <BootstrapIcon name="x-lg" size={14} color="#64748b" />
+            <Text style={[styles.title, isDark && { color: '#F8FAFC' }]}>Rider dashboard link</Text>
+            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDark && { backgroundColor: '#1C2422' }]}>
+              <BootstrapIcon name="x-lg" size={14} color={isDark ? '#CBD5E1' : '#64748b'} />
             </TouchableOpacity>
           </View>
           <ScrollView showsVerticalScrollIndicator={false}>
-            <Text style={styles.meta}>{riderName}</Text>
-            <Text style={styles.hint}>
+            <Text style={[styles.meta, isDark && { color: '#34D399' }]}>{riderName}</Text>
+            <Text style={[styles.hint, isDark && { color: '#94A3B8' }]}>
               Temporary access — no rider account. Opens a phone-friendly list of this rider’s assigned
               deliveries with Google Maps navigation. The link expires after 48 hours or when all assigned
               stops are completed.
@@ -155,17 +156,17 @@ export default function RiderAccessModal({
             {bundle?.qrImageUrl ? (
               <Image source={{ uri: bundle.qrImageUrl }} style={styles.qr} />
             ) : (
-              <View style={styles.qrPlaceholder}>
-                <Text style={styles.hint}>No link yet. Generate one to share with the rider.</Text>
+              <View style={[styles.qrPlaceholder, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
+                <Text style={[styles.hint, isDark && { color: '#94A3B8' }]}>No link yet. Generate one to share with the rider.</Text>
               </View>
             )}
             {bundle?.dashboardUrl ? (
               <ExternalLink href={bundle.dashboardUrl}>
-                <Text style={styles.url}>{bundle.dashboardUrl}</Text>
+                <Text style={[styles.url, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)', color: '#34D399' }]}>{bundle.dashboardUrl}</Text>
               </ExternalLink>
             ) : null}
             {bundle?.expiresAt ? (
-              <Text style={styles.hint}>Valid until {new Date(bundle.expiresAt).toLocaleString()}</Text>
+              <Text style={[styles.hint, isDark && { color: '#94A3B8' }]}>Valid until {new Date(bundle.expiresAt).toLocaleString()}</Text>
             ) : null}
             {bundle && bundle.phoneReachable === false ? (
               <Text style={styles.warn}>
@@ -175,7 +176,7 @@ export default function RiderAccessModal({
                 restart Expo.
               </Text>
             ) : (
-              <Text style={styles.hint}>
+              <Text style={[styles.hint, isDark && { color: '#94A3B8' }]}>
                 Phone: same Wi-Fi as this computer, then scan the QR or tap the blue Open button. Do
                 not scan this with Expo Go — use the Camera / Chrome / Safari.
               </Text>
@@ -189,11 +190,11 @@ export default function RiderAccessModal({
                     <Text style={styles.primaryBtnText}>Open rider dashboard</Text>
                   </View>
                 </ExternalLink>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={handleCopy} disabled={busy}>
-                  <Text style={styles.secondaryBtnText}>Copy link</Text>
+                <TouchableOpacity style={[styles.secondaryBtn, isDark && { borderColor: 'rgba(255,255,255,0.1)' }]} onPress={handleCopy} disabled={busy}>
+                  <Text style={[styles.secondaryBtnText, isDark && { color: '#CBD5E1' }]}>Copy link</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.ghostBtn} onPress={handleShare} disabled={busy}>
-                  <Text style={styles.ghostBtnText}>Share…</Text>
+                  <Text style={[styles.ghostBtnText, isDark && { color: '#94A3B8' }]}>Share…</Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -202,7 +203,7 @@ export default function RiderAccessModal({
               </TouchableOpacity>
             )}
             <TouchableOpacity style={styles.ghostBtn} onPress={() => handleIssue(true)} disabled={busy}>
-              <Text style={styles.ghostBtnText}>{busy ? 'Working…' : 'Regenerate link'}</Text>
+              <Text style={[styles.ghostBtnText, isDark && { color: '#94A3B8' }]}>{busy ? 'Working…' : 'Regenerate link'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -241,7 +242,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  meta: { fontSize: 14, fontWeight: '800', color: '#0C6258', marginBottom: 6 },
+  meta: { fontSize: 14, fontWeight: '800', color: '#1D4533', marginBottom: 6 },
   hint: { fontSize: 12, color: '#64748B', lineHeight: 18, marginBottom: 10 },
   warn: { fontSize: 12, color: '#B45309', backgroundColor: '#FFFBEB', padding: 8, borderRadius: 8, marginTop: 8 },
   qr: { width: 220, height: 220, alignSelf: 'center', marginVertical: 8 },
@@ -263,7 +264,7 @@ const styles = StyleSheet.create({
   },
   actions: { gap: 8, marginTop: 12 },
   primaryBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 12,
     height: 46,
     alignItems: 'center',
@@ -272,13 +273,13 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
   secondaryBtn: {
     borderWidth: 1.5,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     borderRadius: 12,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryBtnText: { color: '#0C6258', fontWeight: '800', fontSize: 14 },
+  secondaryBtnText: { color: '#1D4533', fontWeight: '800', fontSize: 14 },
   ghostBtn: { height: 40, alignItems: 'center', justifyContent: 'center' },
   ghostBtnText: { color: '#64748B', fontWeight: '700', fontSize: 13 },
 });

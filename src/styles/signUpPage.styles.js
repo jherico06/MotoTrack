@@ -4,18 +4,18 @@ import { ANDROID_TOP_INSET } from '../utils/safeArea';
 export const signUpPageStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   innerContainer: {
     flex: 1,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     justifyContent: 'space-between',
   },
 
   // ─── TOP TEAL HEADER SECTION ───
   topHeroSection: {
-    backgroundColor: '#0C6258',
-    paddingTop: Platform.OS === 'ios' ? 44 : Math.max(24, ANDROID_TOP_INSET + 8),
+    backgroundColor: '#1D4533',
+    paddingTop: Platform.OS === 'ios' ? 52 : ANDROID_TOP_INSET + 12,
     paddingHorizontal: 28,
     paddingBottom: 20,
     position: 'relative',
@@ -39,7 +39,7 @@ export const signUpPageStyles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
 
   // ─── WHITE CARD CONTAINER SHEET ───
@@ -63,13 +63,13 @@ export const signUpPageStyles = StyleSheet.create({
   backLinkText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#0C6258',
+    color: '#1D4533',
   },
 
   cardTitle: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
     marginBottom: 6,
     letterSpacing: -0.3,
   },
@@ -96,7 +96,7 @@ export const signUpPageStyles = StyleSheet.create({
     borderColor: 'transparent',
   },
   inputPillFocused: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#FFFFFF',
   },
   textInput: {
@@ -166,7 +166,7 @@ export const signUpPageStyles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#E7F5F3',
+    backgroundColor: '#E8F0EC',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -174,7 +174,7 @@ export const signUpPageStyles = StyleSheet.create({
   otpTitle: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
     marginBottom: 6,
     textAlign: 'center',
   },
@@ -187,7 +187,7 @@ export const signUpPageStyles = StyleSheet.create({
   },
   otpTargetEmail: {
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   otpInputsRow: {
     flexDirection: 'row',
@@ -206,13 +206,13 @@ export const signUpPageStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   otpDigitBoxActive: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#FFFFFF',
   },
   otpDigitText: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
     textAlign: 'center',
   },
   otpInstantCodeBanner: {
@@ -252,19 +252,19 @@ export const signUpPageStyles = StyleSheet.create({
   },
   resendBtnText: {
     fontSize: 12.5,
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
 
   // ─── PRIMARY BUTTON ───
   primaryPillBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 25,
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 10,
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28,
     shadowRadius: 8,

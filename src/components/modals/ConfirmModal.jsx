@@ -22,8 +22,11 @@ export default function ConfirmModal({
   onCancel,
   isLoading = false,
   hideCancel = false, // When used as an alert dialog with single OK button
+  isDark: isDarkProp,
 }) {
   if (!visible) return null;
+
+  const isDark = isDarkProp ?? (typeof document !== 'undefined' && document.documentElement?.classList.contains('dark'));
 
   const actualType = danger ? 'danger' : type;
   const isDanger = actualType === 'danger';
@@ -45,13 +48,31 @@ export default function ConfirmModal({
           ? 'check-circle-fill'
           : 'info-circle-fill');
 
-  const badgeBg = isDanger ? '#FEF2F2' : isWarning ? '#FFFBEB' : isSuccess ? '#F0FDF4' : '#F0FDFA';
+  const badgeBg = isDanger
+    ? (isDark ? 'rgba(239, 68, 68, 0.18)' : '#FEF2F2')
+    : isWarning
+      ? (isDark ? 'rgba(245, 158, 11, 0.18)' : '#FFFBEB')
+      : isSuccess
+        ? (isDark ? 'rgba(16, 185, 129, 0.18)' : '#F0FDF4')
+        : (isDark ? 'rgba(29, 69, 51, 0.25)' : '#F0FDFA');
 
-  const badgeBorder = isDanger ? '#FEE2E2' : isWarning ? '#FEF3C7' : isSuccess ? '#DCFCE7' : '#CCFBF1';
+  const badgeBorder = isDanger
+    ? (isDark ? 'rgba(239, 68, 68, 0.4)' : '#FEE2E2')
+    : isWarning
+      ? (isDark ? 'rgba(245, 158, 11, 0.4)' : '#FEF3C7')
+      : isSuccess
+        ? (isDark ? 'rgba(16, 185, 129, 0.4)' : '#DCFCE7')
+        : (isDark ? 'rgba(29, 69, 51, 0.45)' : '#CCFBF1');
 
-  const iconColor = isDanger ? '#EF4444' : isWarning ? '#F59E0B' : isSuccess ? '#10B981' : '#0C6258';
+  const iconColor = isDanger
+    ? (isDark ? '#F87171' : '#EF4444')
+    : isWarning
+      ? (isDark ? '#FBBF24' : '#F59E0B')
+      : isSuccess
+        ? (isDark ? '#34D399' : '#10B981')
+        : (isDark ? '#34D399' : '#1D4533');
 
-  const confirmBg = isDanger ? '#DC2626' : isWarning ? '#D97706' : isSuccess ? '#059669' : '#0C6258';
+  const confirmBg = isDanger ? '#DC2626' : isWarning ? '#D97706' : isSuccess ? '#059669' : '#1D4533';
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -63,9 +84,9 @@ export default function ConfirmModal({
           onPress={hideCancel ? onConfirm : onCancel}
         />
 
-        <View style={styles.cardContainer}>
+        <View style={[styles.cardContainer, isDark && { backgroundColor: '#141A18', borderColor: 'rgba(255,255,255,0.1)' }]}>
           {/* Top Brand Accent Stripe */}
-          <View style={[styles.topAccentStripe, { backgroundColor: isDanger ? '#EF4444' : '#0C6258' }]} />
+          <View style={[styles.topAccentStripe, { backgroundColor: isDanger ? '#EF4444' : '#1D4533' }]} />
 
           <View style={styles.cardContent}>
             {/* Centered Glowing Icon Badge */}
@@ -74,17 +95,17 @@ export default function ConfirmModal({
             </View>
 
             {/* Title */}
-            <Text style={styles.titleText}>{title}</Text>
+            <Text style={[styles.titleText, isDark && { color: '#F8FAFC' }]}>{title}</Text>
 
             {/* Message Body */}
-            <Text style={styles.messageText}>{message}</Text>
+            <Text style={[styles.messageText, isDark && { color: '#94A3B8' }]}>{message}</Text>
 
             {/* Highlighted Item Badge (if provided) */}
             {itemName ? (
-              <View style={styles.itemHighlightBox}>
-                <BootstrapIcon name="box-seam" size={14} color={isDanger ? '#DC2626' : '#0C6258'} />
+              <View style={[styles.itemHighlightBox, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
+                <BootstrapIcon name="box-seam" size={14} color={isDanger ? (isDark ? '#F87171' : '#DC2626') : (isDark ? '#34D399' : '#1D4533')} />
                 <Text
-                  style={[styles.itemHighlightText, { color: isDanger ? '#991B1B' : '#064E3B' }]}
+                  style={[styles.itemHighlightText, { color: isDanger ? (isDark ? '#FCA5A5' : '#991B1B') : (isDark ? '#A7F3D0' : '#064E3B') }]}
                   numberOfLines={2}
                 >
                   "{itemName}"
@@ -96,12 +117,12 @@ export default function ConfirmModal({
             <View style={styles.buttonsRow}>
               {!hideCancel && (
                 <TouchableOpacity
-                  style={styles.cancelButton}
+                  style={[styles.cancelButton, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}
                   onPress={onCancel}
                   activeOpacity={0.8}
                   disabled={isLoading}
                 >
-                  <Text style={styles.cancelButtonText}>{resolvedCancelText}</Text>
+                  <Text style={[styles.cancelButtonText, isDark && { color: '#CBD5E1' }]}>{resolvedCancelText}</Text>
                 </TouchableOpacity>
               )}
 

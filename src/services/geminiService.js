@@ -1,9 +1,12 @@
 // ─── GOOGLE GEMINI AI SERVICE FOR MOTOTRACK CUSTOMIZER ───────────────────────
 import { storageAdapter } from './storageAdapter.js';
+import { APP_CONFIG } from '../config/index.js';
 
 const GEMINI_API_KEY_STORAGE = 'mototrack_gemini_api_key';
-const FALLBACK_ENV_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
-const DEFAULT_GEMINI_MODEL = process.env.EXPO_PUBLIC_GEMINI_MODEL || 'gemini-1.5-flash';
+const FALLBACK_ENV_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || APP_CONFIG.gemini?.apiKey || '';
+const DEFAULT_GEMINI_MODEL = process.env.EXPO_PUBLIC_GEMINI_MODEL || APP_CONFIG.gemini?.model || 'gemini-1.5-flash';
+const DEFAULT_IMAGE_MODEL =
+  process.env.EXPO_PUBLIC_GEMINI_IMAGE_MODEL || APP_CONFIG.gemini?.imageModel || 'gemini-2.5-flash-image';
 
 export const geminiService = {
   getApiKey() {
@@ -40,6 +43,218 @@ export const geminiService = {
 
   getModel() {
     return DEFAULT_GEMINI_MODEL;
+  },
+
+  getImageModel() {
+    return DEFAULT_IMAGE_MODEL;
+  },
+
+  /**
+   * Resolve a data-URL or remote http(s) image into a Gemini inline_data part.
+   */
+  async _resolveInlineImagePart(photoUri) {
+    if (!photoUri || typeof photoUri !== 'string') return null;
+
+    if (photoUri.startsWith('data:image')) {
+      try {
+        const mimeType = photoUri.split(';')[0].split(':')[1] || 'image/jpeg';
+        const base64Data = photoUri.split(',')[1];
+        if (!base64Data) return null;
+        return {
+          inline_data: {
+            mime_type: mimeType,
+            data: base64Data,
+          },
+        };
+      } catch (_e) {
+        return null;
+      }
+    }
+
+    if (!/^https?:\/\//i.test(photoUri)) return null;
+
+    try {
+      const res = await fetch(photoUri);
+      if (!res.ok) return null;
+      const mimeType = res.headers.get('content-type') || 'image/jpeg';
+      const buffer = await res.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      const chunk = 0x8000;
+      for (let i = 0; i < bytes.length; i += chunk) {
+        binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+      }
+      const base64 =
+        typeof btoa === 'function'
+          ? btoa(binary)
+          : Buffer.from(bytes).toString('base64');
+      return {
+        inline_data: {
+          mime_type: mimeType.split(';')[0] || 'image/jpeg',
+          data: base64,
+        },
+      };
+    } catch (_e) {
+      return null;
+    }
+  },
+
+  _extractGeneratedImage(resData) {
+    const parts = resData?.candidates?.[0]?.content?.parts || [];
+    for (const part of parts) {
+      const inline = part.inlineData || part.inline_data;
+      if (inline?.data) {
+        const mime = inline.mimeType || inline.mime_type || 'image/png';
+        return {
+          dataUrl: `data:${mime};base64,${inline.data}`,
+          mimeType: mime,
+          text: null,
+        };
+      }
+    }
+    const textPart = parts.find((p) => typeof p.text === 'string' && p.text.trim());
+    return {
+      dataUrl: null,
+      mimeType: null,
+      text: textPart?.text || null,
+      blockReason: resData?.promptFeedback?.blockReason || resData?.prompt_feedback?.block_reason || null,
+    };
+  },
+
+  /**
+   * Generate / edit a motorcycle customization preview with Gemini image models.
+   * When a reference photo is provided, Gemini edits that bike instead of inventing a new one.
+   */
+  async generateMotorcyclePreviewImage({
+    prompt,
+    referencePhotoUri = null,
+    motorcycle = null,
+    selectedParts = [],
+    requireReferencePhoto = true,
+    timeoutMs = 90000,
+  } = {}) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      return {
+        success: false,
+        error: 'Gemini API key is not configured. Add EXPO_PUBLIC_GEMINI_API_KEY in .env.',
+      };
+    }
+
+    const imagePart = await this._resolveInlineImagePart(referencePhotoUri);
+    if (requireReferencePhoto && !imagePart) {
+      return {
+        success: false,
+        error:
+          'Select your registered motorcycle from My Garage (with a photo) so Gemini can install parts on that exact bike.',
+      };
+    }
+
+    const brand = motorcycle?.brand || '';
+    const modelName = motorcycle?.model || '';
+    const year = motorcycle?.year || '';
+    const bikeLabel = [year, brand, modelName].filter(Boolean).join(' ') || 'registered motorcycle';
+
+    const installList =
+      (selectedParts || []).length > 0
+        ? selectedParts
+            .map((p, i) => {
+              const n = p.name || p.product_name || 'part';
+              const b = p.brand || p.product_brand || '';
+              return `${i + 1}. Install ${b ? `${b} ` : ''}${n} onto the motorcycle in the correct stock mounting position.`;
+            })
+            .join('\n')
+        : '';
+
+    const promptText = imagePart
+      ? [
+          'You are a professional motorcycle photo editor for MotoTrack.',
+          `Base image: the customer's REGISTERED ${bikeLabel}.`,
+          'CRITICAL: Keep this EXACT motorcycle — same model, same body, same proportions, same headlight and seat shape.',
+          'Do not replace it with another brand/model. Do not invent a different bike. Do not generate a car.',
+          'Edit the photo so the selected products are visibly INSTALLED on this motorcycle (mounted, fitted, realistic).',
+          'Do not show loose product cards or floating parts. Parts must look attached to the bike.',
+          installList ? `Install these selected products:\n${installList}` : '',
+          String(prompt || ''),
+          'Return exactly one photorealistic image of the same registered motorcycle with those parts installed.',
+        ]
+          .filter(Boolean)
+          .join('\n')
+      : [
+          'You are MotoTrack visual customizer.',
+          `Generate a photorealistic image of a ${bikeLabel} with these parts installed:`,
+          installList || String(prompt || ''),
+          'Keep the motorcycle model exact. Do not generate a car.',
+        ].join('\n');
+
+    const parts = [];
+    if (imagePart) parts.push(imagePart);
+    parts.push({ text: promptText });
+
+    const candidateModels = [
+      this.getImageModel(),
+      'gemini-2.5-flash-image',
+      'gemini-3.1-flash-image',
+      'gemini-2.0-flash-preview-image-generation',
+    ].filter((m, i, arr) => m && arr.indexOf(m) === i);
+
+    let lastError = 'Gemini image generation failed.';
+
+    for (const model of candidateModels) {
+      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts }],
+            generationConfig: {
+              responseModalities: ['TEXT', 'IMAGE'],
+              temperature: 0.2,
+            },
+          }),
+          signal: controller ? controller.signal : undefined,
+        });
+
+        if (timer) clearTimeout(timer);
+
+        const resData = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          lastError =
+            resData?.error?.message ||
+            `Gemini ${model} returned ${response.status}.`;
+          continue;
+        }
+
+        const extracted = this._extractGeneratedImage(resData);
+        if (extracted.dataUrl) {
+          return {
+            success: true,
+            previewImageUrl: extracted.dataUrl,
+            model,
+            usedReferencePhoto: Boolean(imagePart),
+            poweredBy: `Google Gemini (${model})`,
+          };
+        }
+
+        lastError =
+          extracted.blockReason
+            ? `Gemini blocked the image request (${extracted.blockReason}).`
+            : extracted.text
+              ? 'Gemini returned text but no image. Try again or check model access.'
+              : `Gemini ${model} returned no image data.`;
+      } catch (err) {
+        if (timer) clearTimeout(timer);
+        lastError = err?.name === 'AbortError'
+          ? 'Gemini image generation timed out.'
+          : err?.message || String(err);
+      }
+    }
+
+    return { success: false, error: lastError };
   },
 
   /**

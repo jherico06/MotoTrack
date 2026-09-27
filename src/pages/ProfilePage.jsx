@@ -21,12 +21,12 @@ import { orderService } from '../services/orderService';
 import { notificationService } from '../services/notificationService';
 import { motorcycleService } from '../services/motorcycleService';
 import { BootstrapIcon, BottomNavBar, ToastNotification } from '../components/common';
-import { LiveOrderTrackingMapModal, ConfirmModal, RegisterMotorcycleModal } from '../components/modals';
+import { LiveOrderTrackingMapModal, ConfirmModal, RegisterMotorcycleModal, EditCustomerSettingsModal } from '../components/modals';
 import { pickImageFromFile } from '../utils/imagePickerHelper';
 
 const ADDRESS_PRESETS = [
   { label: 'Inoburan, Naga', address: 'Purok Avocado 4, Inoburan, City of Naga, Cebu' },
-  { label: 'East Poblacion, Naga', address: 'MotoTrack Hub, East Poblacion, City of Naga, Cebu' },
+  { label: 'South Poblacion (Store)', address: "D'Blockchain Motorparts and Accessories, Natalio B. Bacalso S National Hwy, South Poblacion, Naga, 6037 Cebu" },
   { label: 'Naga Boardwalk', address: 'Naga City Boardwalk, South Road, City of Naga, Cebu' },
   { label: 'Minglanilla Border', address: 'Poblacion Ward 2, Minglanilla, Cebu' },
   { label: 'BGC Central, Taguig', address: '7th Ave & 28th St, Bonifacio Global City, Taguig' },
@@ -70,15 +70,17 @@ export default function ProfilePage({
   onNavigateToLogin,
   onLogout,
 }) {
-  const { currentUser, updateProfile, logout } = useAuth();
+  const { currentUser, updateProfile, changePassword, changeEmail, logout } = useAuth();
   const wishlistCtx = useWishlist();
   const scrollViewRef = useRef(null);
 
   const wishlistCount = wishlistCtx?.wishlistCount || 0;
 
-  // Active Tab: 'overview' | 'garage' | 'orders' | 'bookings' | 'notifications' | 'profile'
+  // Active Tab: 'overview' | 'garage' | 'orders' | 'bookings' | 'notifications' | 'profile' | 'menu'
   const [activeTab, setActiveTab] = useState(() => {
-    if (['overview', 'garage', 'orders', 'bookings', 'notifications', 'profile'].includes(initialTab)) {
+    if (
+      ['overview', 'garage', 'orders', 'bookings', 'notifications', 'profile', 'settings', 'menu'].includes(initialTab)
+    ) {
       return initialTab;
     }
     return 'overview';
@@ -90,60 +92,40 @@ export default function ProfilePage({
     setActiveTab(initialTab);
   }
 
-  // Hamburger Choices Drawer Menu State with Smooth Slide Animation
-  const [isMenuVisible, setIsMenuVisible] = useState(false);
-  const slideAnim = useRef(new Animated.Value(-340)).current;
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  const openMenu = () => {
-    setIsMenuVisible(true);
-    slideAnim.setValue(-340);
-    fadeAnim.setValue(0);
-    Animated.parallel([
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        damping: 24,
-        mass: 0.8,
-        stiffness: 220,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-    ]).start();
-  };
-
-  const closeMenu = (callback) => {
-    Animated.parallel([
-      Animated.timing(slideAnim, {
-        toValue: -340,
-        duration: 220,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: Platform.OS !== 'web',
-      }),
-    ]).start(() => {
-      setIsMenuVisible(false);
-      if (typeof callback === 'function') {
-        callback();
-      }
-    });
-  };
-
   // Form State (Profile Tab)
-  const [name, setName] = useState(currentUser?.name || currentUser?.fullName || '');
+  const initialName = currentUser?.name || currentUser?.fullName || '';
+  const initialParts = initialName.trim().split(' ');
+  const [name, setName] = useState(initialName);
+  const [firstName, setFirstName] = useState(currentUser?.firstName || initialParts[0] || '');
+  const [lastName, setLastName] = useState(currentUser?.lastName || (initialParts.length > 1 ? initialParts.slice(1).join(' ') : ''));
   const [phone, setPhone] = useState(currentUser?.phone || '');
   const [address, setAddress] = useState(currentUser?.address || '');
+  const [city, setCity] = useState(currentUser?.city || 'City of Naga');
+  const [country, setCountry] = useState(currentUser?.country || 'Philippines');
+  const [bio, setBio] = useState(currentUser?.bio || 'Motorcycle Enthusiast & Customer');
+  const [deliveryNotes, setDeliveryNotes] = useState(currentUser?.deliveryNotes || 'Leave at front gate / contact on delivery');
+  const [isEditingPersonalInfo, setIsEditingPersonalInfo] = useState(false);
+  const [isEditingGarageInfo, setIsEditingGarageInfo] = useState(false);
+  const [isEditingSecurity, setIsEditingSecurity] = useState(false);
   const [bikeBrand, setBikeBrand] = useState(currentUser?.bikeBrand || 'Yamaha');
   const [bikeModel, setBikeModel] = useState(currentUser?.bikeModel || 'NMAX 155');
   const [bikePlate, setBikePlate] = useState(currentUser?.bikePlate || 'NM-4892');
   const [bikeOdo, setBikeOdo] = useState(currentUser?.bikeOdo || '12,500 km');
   const [isSaving, setIsSaving] = useState(false);
+  const [isEditProfileModalOpen, setIsEditProfileModalOpen] = useState(false);
+  const [isEditSettingsModalOpen, setIsEditSettingsModalOpen] = useState(false);
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [isEditEmailOpen, setIsEditEmailOpen] = useState(false);
+
+  // Security Form State
+  const [currentPwd, setCurrentPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [isSavingPwd, setIsSavingPwd] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [emailPwd, setEmailPwd] = useState('');
+  const [isSavingEmail, setIsSavingEmail] = useState(false);
 
   // Orders Filter
   const [orderFilter, setOrderFilter] = useState('All');
@@ -229,13 +211,21 @@ export default function ProfilePage({
   const [prevUserSyncId, setPrevUserSyncId] = useState(() => currentUser?.id);
   if (currentUser && currentUser?.id !== prevUserSyncId) {
     setPrevUserSyncId(currentUser.id);
-    setName(currentUser.name || currentUser.fullName || '');
+    const syncName = currentUser.name || currentUser.fullName || '';
+    const parts = syncName.trim().split(' ');
+    setName(syncName);
+    setFirstName(currentUser.firstName || parts[0] || '');
+    setLastName(currentUser.lastName || (parts.length > 1 ? parts.slice(1).join(' ') : ''));
     setPhone(currentUser.phone || '');
     setAddress(currentUser.address || '');
     if (currentUser.bikeBrand) setBikeBrand(currentUser.bikeBrand);
     if (currentUser.bikeModel) setBikeModel(currentUser.bikeModel);
     if (currentUser.bikePlate) setBikePlate(currentUser.bikePlate);
     if (currentUser.bikeOdo) setBikeOdo(currentUser.bikeOdo);
+    if (currentUser.city) setCity(currentUser.city);
+    if (currentUser.country) setCountry(currentUser.country);
+    if (currentUser.bio) setBio(currentUser.bio);
+    if (currentUser.deliveryNotes) setDeliveryNotes(currentUser.deliveryNotes);
   }
 
   useEffect(() => {
@@ -478,7 +468,8 @@ export default function ProfilePage({
   };
 
   const handleSave = async () => {
-    if (!name.trim()) {
+    const combinedName = [firstName.trim(), lastName.trim()].filter(Boolean).join(' ') || name.trim();
+    if (!combinedName) {
       showToast('Please enter your name');
       return;
     }
@@ -486,20 +477,110 @@ export default function ProfilePage({
     try {
       if (updateProfile) {
         await updateProfile({
-          name: name.trim(),
+          name: combinedName,
+          fullName: combinedName,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
           phone: phone.trim(),
           address: address.trim(),
+          city: city.trim(),
+          country: country.trim(),
+          bio: bio.trim(),
+          deliveryNotes: deliveryNotes.trim(),
           bikeBrand,
           bikeModel: bikeModel.trim(),
           bikePlate: bikePlate.trim(),
           bikeOdo: bikeOdo.trim(),
         });
       }
-      showToast('✓ Profile updated successfully!');
+      setName(combinedName);
+      showToast('✓ Account profile successfully updated!');
+      setIsEditingPersonalInfo(false);
+      setIsEditingGarageInfo(false);
     } catch (_e) {
       showToast('Failed to save profile.');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleSaveProfileFromModal = async (payload) => {
+    try {
+      if (updateProfile) {
+        const res = await updateProfile(payload);
+        if (res && res.success === false) return res;
+      }
+      if (payload.firstName) setFirstName(payload.firstName);
+      if (payload.lastName) setLastName(payload.lastName);
+      if (payload.name) setName(payload.name);
+      if (payload.phone) setPhone(payload.phone);
+      if (payload.address) setAddress(payload.address);
+      if (payload.city) setCity(payload.city);
+      if (payload.country) setCountry(payload.country);
+      if (payload.bio) setBio(payload.bio);
+      if (payload.deliveryNotes) setDeliveryNotes(payload.deliveryNotes);
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: e?.message || 'Failed to update settings.' };
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!currentPwd || !newPwd || !confirmPwd) {
+      showToast('Please fill in all password fields');
+      return;
+    }
+    if (newPwd.length < 8) {
+      showToast('New password must be at least 8 characters');
+      return;
+    }
+    if (newPwd !== confirmPwd) {
+      showToast('New passwords do not match');
+      return;
+    }
+    setIsSavingPwd(true);
+    try {
+      const res = await changePassword({ currentPassword: currentPwd, newPassword: newPwd });
+      if (res?.success) {
+        showToast('✓ Password updated successfully!');
+        setCurrentPwd('');
+        setNewPwd('');
+        setConfirmPwd('');
+        setIsChangePasswordOpen(false);
+      } else {
+        showToast(res?.error || 'Current password incorrect.');
+      }
+    } catch (_e) {
+      showToast('Failed to change password.');
+    } finally {
+      setIsSavingPwd(false);
+    }
+  };
+
+  const handleChangeEmail = async () => {
+    if (!newEmail.trim() || !newEmail.includes('@')) {
+      showToast('Please enter a valid email address');
+      return;
+    }
+    if (!emailPwd) {
+      showToast('Please enter your current password to confirm');
+      return;
+    }
+    setIsSavingEmail(true);
+    try {
+      const res = await changeEmail({ newEmail: newEmail.trim(), currentPassword: emailPwd });
+      if (res?.success) {
+        showToast('✓ Account email updated successfully!');
+        setNewEmail('');
+        setEmailPwd('');
+        setIsEditEmailOpen(false);
+      } else {
+        showToast(res?.error || 'Could not update email.');
+      }
+    } catch (_e) {
+      showToast('Failed to update email address.');
+    } finally {
+      setIsSavingEmail(false);
     }
   };
 
@@ -511,15 +592,24 @@ export default function ProfilePage({
   const handleBottomNavChange = (tab) => {
     if (tab === 'Home') onNavigateToStore?.();
     else if (tab === 'Garage') onNavigateToGarage?.();
-    else if (tab === 'Dashboard') {
+    else if (tab === 'Customize') (onNavigateToCustomizer || onNavigateToCustomize)?.();
+    else if (tab === 'Orders') onNavigateToOrders?.();
+    else if (tab === 'More' || tab === 'menu') {
+      setActiveTab('menu');
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    } else if (tab === 'Dashboard') {
       setActiveTab('overview');
       scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-    } else if (tab === 'Customize') {
-      (onNavigateToCustomizer || onNavigateToCustomize)?.();
-    } else if (tab === 'Orders') {
-      onNavigateToOrders?.();
-    } else if (tab === 'Favorites') {
+    } else if (tab === 'Bookings') {
+      setActiveTab('bookings');
+    } else if (tab === 'Notifications') {
+      setActiveTab('notifications');
+    } else if (tab === 'Profile') {
+      setActiveTab('profile');
+    } else if (tab === 'Wishlist' || tab === 'Favorites') {
       onNavigateToWishlist?.();
+    } else if (tab === 'Admin') {
+      onNavigateToAdmin?.();
     }
   };
 
@@ -542,231 +632,284 @@ export default function ProfilePage({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── TOP APP BAR WITH HAMBURGER ON TOP-LEFT ─── */}
-      <View style={styles.headerRow}>
-        <View style={styles.headerLeftGroup}>
-          <TouchableOpacity
-            style={styles.hamburgerBtn}
-            onPress={openMenu}
-            activeOpacity={0.7}
-            accessibilityLabel="Open Dashboard Choices Menu"
-          >
-            <BootstrapIcon name="list" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          <View style={styles.titleRow}>
-            <BootstrapIcon name="speedometer2" size={18} color="#FFFFFF" />
-            <Text style={styles.titleText}>Customer Dashboard</Text>
+      {/* ─── TOP APP BAR (NO TOP HAMBURGER) ─── */}
+      {activeTab !== 'profile' && (
+        <View style={styles.headerRow}>
+          <View style={styles.headerLeftGroup}>
+            <View style={styles.titleRow}>
+              <BootstrapIcon
+                name={activeTab === 'menu' ? 'grid-fill' : 'speedometer2'}
+                size={18}
+                color="#FFFFFF"
+              />
+              <Text style={styles.titleText}>{activeTab === 'menu' ? 'Menu' : 'Customer Dashboard'}</Text>
+            </View>
           </View>
-        </View>
 
-        <TouchableOpacity
-          style={styles.headerActiveBadge}
-          onPress={openMenu}
-          activeOpacity={0.75}
-        >
-          <Text style={styles.headerActiveBadgeText}>
-            {activeTab === 'overview' && 'Overview'}
-            {activeTab === 'garage' && `Garage (${motorcycles.length})`}
-            {activeTab === 'bookings' && `Bookings (${activeBookingsCount})`}
-            {activeTab === 'notifications' && `Alerts (${unreadNotifCount})`}
-            {activeTab === 'profile' && 'Settings'}
-          </Text>
-          <BootstrapIcon name="chevron-down" size={10} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
-
-      {/* ─── HAMBURGER CHOICES DRAWER MODAL WITH SLIDING EFFECT ─── */}
-      <Modal
-        visible={isMenuVisible}
-        transparent
-        animationType="none"
-        onRequestClose={() => closeMenu()}
-      >
-        <View style={styles.menuModalContainer}>
-          {/* Animated Backdrop (fades in and out, tap to dismiss) */}
-          <Animated.View
-            style={[
-              styles.menuBackdrop,
-              { opacity: fadeAnim },
-            ]}
-          >
+          {activeTab !== 'menu' && (
             <TouchableOpacity
-              style={{ flex: 1 }}
-              activeOpacity={1}
-              onPress={() => closeMenu()}
-            />
-          </Animated.View>
-
-          {/* Animated Drawer Menu (slides in smoothly from the left) */}
-          <Animated.View
-            style={[
-              styles.menuDrawer,
-              {
-                transform: [{ translateX: slideAnim }],
-              },
-            ]}
-          >
-            {/* Drawer Header */}
-            <View style={styles.menuDrawerHeader}>
-              <View style={styles.menuDrawerHeaderInfo}>
-                <View style={styles.menuDrawerLogoWrap}>
-                  <BootstrapIcon name="speedometer2" size={20} color="#0C6258" />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.menuDrawerTitle} numberOfLines={1}>Customer Menu</Text>
-                  <Text style={styles.menuDrawerSub} numberOfLines={1}>
-                    {currentUser?.name || currentUser?.fullName || 'Valued Rider'}
-                  </Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.menuCloseBtn}
-                onPress={() => closeMenu()}
-                activeOpacity={0.7}
-              >
-                <BootstrapIcon name="x-lg" size={15} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Dashboard Choices List */}
-            <ScrollView style={styles.menuItemList} showsVerticalScrollIndicator={false}>
-              <Text style={styles.menuSectionTitle}>DASHBOARD CHOICES</Text>
-
-              {[
-                { id: 'overview', label: 'Overview Hub', icon: 'speedometer2' },
-                { id: 'garage', label: 'My Garage', icon: 'tools', count: motorcycles.length },
-                { id: 'bookings', label: 'Pit Bookings', icon: 'calendar-check', count: activeBookingsCount },
-                { id: 'notifications', label: 'Alerts', icon: 'bell', count: unreadNotifCount },
-                { id: 'profile', label: 'Settings & Profile', icon: 'gear-fill' },
-              ].map((item) => {
-                const isActive = activeTab === item.id;
-                return (
-                  <TouchableOpacity
-                    key={item.id}
-                    style={[styles.menuItemBtn, isActive && styles.menuItemBtnActive]}
-                    onPress={() => {
-                      closeMenu(() => setActiveTab(item.id));
-                    }}
-                    activeOpacity={0.75}
-                  >
-                    <View style={styles.menuItemLeft}>
-                      <View style={[styles.menuItemIconWrap, isActive && styles.menuItemIconWrapActive]}>
-                        <BootstrapIcon
-                          name={item.icon}
-                          size={16}
-                          color={isActive ? '#FFFFFF' : '#0C6258'}
-                        />
-                      </View>
-                      <Text style={[styles.menuItemText, isActive && styles.menuItemTextActive]}>
-                        {item.label}
-                      </Text>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      {item.count !== undefined && item.count !== null && (
-                        <View style={[styles.menuItemBadge, isActive && styles.menuItemBadgeActive]}>
-                          <Text style={[styles.menuItemBadgeText, isActive && styles.menuItemBadgeTextActive]}>
-                            {item.count}
-                          </Text>
-                        </View>
-                      )}
-                      {isActive && (
-                        <BootstrapIcon name="check2" size={16} color="#FFFFFF" />
-                      )}
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-
-              <View style={styles.menuDivider} />
-
-              <Text style={styles.menuSectionTitle}>QUICK NAVIGATION</Text>
-
-              <TouchableOpacity
-                style={styles.menuItemBtn}
-                onPress={() => {
-                  closeMenu(() => onNavigateToOrders?.());
-                }}
-                activeOpacity={0.75}
-              >
-                <View style={styles.menuItemLeft}>
-                  <View style={styles.menuItemIconWrap}>
-                    <BootstrapIcon name="box-seam" size={16} color="#0C6258" />
-                  </View>
-                  <Text style={styles.menuItemText}>My Orders</Text>
-                </View>
-                {orders.length > 0 && (
-                  <View style={styles.menuItemBadge}>
-                    <Text style={styles.menuItemBadgeText}>{orders.length}</Text>
-                  </View>
-                )}
-                <BootstrapIcon name="chevron-right" size={13} color="#94A3B8" />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.menuItemBtn}
-                onPress={() => {
-                  closeMenu(() => onNavigateToStore?.());
-                }}
-                activeOpacity={0.75}
-              >
-                <View style={styles.menuItemLeft}>
-                  <View style={styles.menuItemIconWrap}>
-                    <BootstrapIcon name="shop" size={16} color="#0C6258" />
-                  </View>
-                  <Text style={styles.menuItemText}>Browse Shop</Text>
-                </View>
-                <BootstrapIcon name="chevron-right" size={13} color="#94A3B8" />
-              </TouchableOpacity>
-
-              {onNavigateToGarage && (
-                <TouchableOpacity
-                  style={styles.menuItemBtn}
-                  onPress={() => {
-                    closeMenu(() => onNavigateToGarage?.());
-                  }}
-                  activeOpacity={0.75}
-                >
-                  <View style={styles.menuItemLeft}>
-                    <View style={styles.menuItemIconWrap}>
-                      <BootstrapIcon name="wrench-adjustable" size={16} color="#0C6258" />
-                    </View>
-                    <Text style={styles.menuItemText}>Garage Services</Text>
-                  </View>
-                  <BootstrapIcon name="chevron-right" size={13} color="#94A3B8" />
-                </TouchableOpacity>
-              )}
-            </ScrollView>
-
-            {/* Drawer Footer */}
-            <View style={styles.menuDrawerFooter}>
-              <TouchableOpacity
-                style={styles.menuLogoutBtn}
-                onPress={() => {
-                  closeMenu(() => setIsLogoutModalOpen(true));
-                }}
-                activeOpacity={0.8}
-              >
-                <BootstrapIcon name="box-arrow-right" size={15} color="#DC2626" />
-                <Text style={styles.menuLogoutText}>Sign Out</Text>
-              </TouchableOpacity>
-            </View>
-          </Animated.View>
+              style={styles.headerActiveBadge}
+              onPress={() => {
+                setActiveTab('menu');
+                scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+              }}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.headerActiveBadgeText}>
+                {activeTab === 'overview' && 'Overview'}
+                {activeTab === 'garage' && `Garage (${motorcycles.length})`}
+                {activeTab === 'bookings' && `Bookings (${activeBookingsCount})`}
+                {activeTab === 'notifications' && `Alerts (${unreadNotifCount})`}
+                {activeTab === 'profile' && 'Profile'}
+                {activeTab === 'settings' && 'Settings'}
+              </Text>
+              <BootstrapIcon name="chevron-down" size={10} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
         </View>
-      </Modal>
+      )}
 
       <ScrollView
         ref={scrollViewRef}
-        style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        style={[styles.container, activeTab === 'profile' && { backgroundColor: '#F8FAFC' }]}
+        contentContainerStyle={[
+          styles.scrollContent,
+          activeTab === 'menu' && styles.menuScrollContent,
+          activeTab === 'profile' && { paddingBottom: 110, paddingHorizontal: 0 }
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[styles.maxContainer, { paddingTop: 16 }]}>
+        <View style={[
+          activeTab === 'profile' ? { width: '100%', paddingHorizontal: 0 } : styles.maxContainer,
+          activeTab === 'menu' ? { paddingTop: 8 } : (activeTab === 'profile' ? { paddingTop: 0 } : { paddingTop: 16 })
+        ]}>
+          {/* ═══════════════════════════════════════════════════════
+              TAB 0: MENU SCREEN (MATCHING REFERENCE SCREENSHOT)
+             ═══════════════════════════════════════════════════════ */}
+          {activeTab === 'menu' && (
+            <View style={styles.menuContentWrapper}>
+              {/* Card 1: User Profile & Settings */}
+              <View style={styles.menuRefCard}>
+                <View style={styles.menuRefProfileRow}>
+                  <View style={[styles.menuRefAvatar, { overflow: 'hidden' }]}>
+                    {currentUser?.avatar ? (
+                      <Image source={{ uri: currentUser.avatar }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    ) : (
+                      <BootstrapIcon name="person-fill" size={24} color="#FFFFFF" />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.menuRefUserName} numberOfLines={1}>
+                      {currentUser?.name || currentUser?.fullName || 'Jherico Maurin'}
+                    </Text>
+                    <Text style={styles.menuRefUserSub} numberOfLines={1}>
+                      Customer Profile • @{currentUser?.email ? currentUser.email.split('@')[0] : 'rider'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.menuRefHairline} />
+
+                <TouchableOpacity
+                  style={styles.menuRefRowBtn}
+                  onPress={() => {
+                    setActiveTab('profile');
+                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.menuRefRowLeft}>
+                    <View style={[styles.menuRefIconWrap, { backgroundColor: '#E8F0EC' }]}>
+                      <BootstrapIcon name="person-fill" size={17} color="#1D4533" />
+                    </View>
+                    <Text style={styles.menuRefRowText}>Profile</Text>
+                  </View>
+                  <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Card 2: DASHBOARD CHOICES (Grouped Card from Reference) */}
+              <View style={styles.menuRefCard}>
+                {/* 1. Overview Hub */}
+                <TouchableOpacity
+                  style={styles.menuRefRowBtn}
+                  onPress={() => {
+                    setActiveTab('overview');
+                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.menuRefRowLeft}>
+                    <View style={styles.menuRefIconWrap}>
+                      <BootstrapIcon name="speedometer2" size={17} color="#1D4533" />
+                    </View>
+                    <Text style={styles.menuRefRowText}>Overview Hub</Text>
+                  </View>
+                  <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
+                </TouchableOpacity>
+
+                <View style={styles.menuRefHairline} />
+
+                {/* 2. My Garage */}
+                <TouchableOpacity
+                  style={styles.menuRefRowBtn}
+                  onPress={() => {
+                    setActiveTab('garage');
+                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.menuRefRowLeft}>
+                    <View style={styles.menuRefIconWrap}>
+                      <BootstrapIcon name="tools" size={17} color="#1D4533" />
+                    </View>
+                    <Text style={styles.menuRefRowText}>My Garage</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {motorcycles.length > 0 && (
+                      <View style={styles.menuRefCountBadge}>
+                        <Text style={styles.menuRefCountBadgeText}>{motorcycles.length}</Text>
+                      </View>
+                    )}
+                    <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
+                  </View>
+                </TouchableOpacity>
+
+                <View style={styles.menuRefHairline} />
+
+                {/* 3. Pit Bookings */}
+                <TouchableOpacity
+                  style={styles.menuRefRowBtn}
+                  onPress={() => {
+                    setActiveTab('bookings');
+                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.menuRefRowLeft}>
+                    <View style={styles.menuRefIconWrap}>
+                      <BootstrapIcon name="calendar-check" size={17} color="#1D4533" />
+                    </View>
+                    <Text style={styles.menuRefRowText}>Pit Bookings</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {activeBookingsCount > 0 && (
+                      <View style={styles.menuRefCountBadge}>
+                        <Text style={styles.menuRefCountBadgeText}>{activeBookingsCount}</Text>
+                      </View>
+                    )}
+                    <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
+                  </View>
+                </TouchableOpacity>
+
+                <View style={styles.menuRefHairline} />
+
+                {/* 4. Alerts & Notifications */}
+                <TouchableOpacity
+                  style={styles.menuRefRowBtn}
+                  onPress={() => {
+                    setActiveTab('notifications');
+                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.menuRefRowLeft}>
+                    <View style={styles.menuRefIconWrap}>
+                      <BootstrapIcon name="bell" size={17} color="#1D4533" />
+                    </View>
+                    <Text style={styles.menuRefRowText}>Alerts & Notifications</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    {unreadNotifCount > 0 && (
+                      <View style={[styles.menuRefCountBadge, { backgroundColor: '#EF4444' }]}>
+                        <Text style={styles.menuRefCountBadgeText}>{unreadNotifCount}</Text>
+                      </View>
+                    )}
+                    <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
+                  </View>
+                </TouchableOpacity>
+
+                <View style={styles.menuRefHairline} />
+
+                {/* 5. Account Settings */}
+                <TouchableOpacity
+                  style={styles.menuRefRowBtn}
+                  onPress={() => {
+                    setActiveTab('settings');
+                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.menuRefRowLeft}>
+                    <View style={styles.menuRefIconWrap}>
+                      <BootstrapIcon name="gear-fill" size={17} color="#1D4533" />
+                    </View>
+                    <Text style={styles.menuRefRowText}>Account Settings</Text>
+                  </View>
+                  <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
+                </TouchableOpacity>
+              </View>
+
+              {/* Card 3: Admin Console (If Admin) */}
+              {currentUser?.role === 'admin' && (
+                <>
+                  <Text style={styles.menuRefSectionTitle}>Also from Store Administration</Text>
+                  <View style={styles.menuRefCard}>
+                    <TouchableOpacity
+                      style={styles.menuRefRowBtn}
+                      onPress={() => onNavigateToAdmin?.()}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.menuRefRowLeft}>
+                        <View style={[styles.menuRefIconWrap, { backgroundColor: '#FEF3C7' }]}>
+                          <BootstrapIcon name="shield-lock-fill" size={17} color="#D97706" />
+                        </View>
+                        <Text style={styles.menuRefRowText}>Admin Console</Text>
+                      </View>
+                      <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+
+              {/* Card 4: Sign Out (or Sign In) */}
+              <View style={[styles.menuRefCard, { marginTop: 8, marginBottom: 40 }]}>
+                {currentUser ? (
+                  <TouchableOpacity
+                    style={styles.menuRefRowBtn}
+                    onPress={() => setIsLogoutModalOpen(true)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.menuRefRowLeft}>
+                      <View style={[styles.menuRefIconWrap, { backgroundColor: '#FEE2E2' }]}>
+                        <BootstrapIcon name="box-arrow-right" size={17} color="#DC2626" />
+                      </View>
+                      <Text style={[styles.menuRefRowText, { color: '#DC2626' }]}>Sign Out</Text>
+                    </View>
+                    <BootstrapIcon name="chevron-right" size={14} color="#DC2626" />
+                  </TouchableOpacity>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.menuRefRowBtn}
+                    onPress={() => onNavigateToLogin?.()}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.menuRefRowLeft}>
+                      <View style={[styles.menuRefIconWrap, { backgroundColor: '#E6F4F1' }]}>
+                        <BootstrapIcon name="box-arrow-in-right" size={17} color="#1D4533" />
+                      </View>
+                      <Text style={[styles.menuRefRowText, { color: '#1D4533' }]}>Sign In / Register</Text>
+                    </View>
+                    <BootstrapIcon name="chevron-right" size={14} color="#1D4533" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+          )}
+
           {/* ═══════════════════════════════════════════════════════
               TAB 1: OVERVIEW / DASHBOARD HUB
              ═══════════════════════════════════════════════════════ */}
@@ -780,13 +923,15 @@ export default function ProfilePage({
                   onPress={onNavigateToOrders}
                   activeOpacity={0.85}
                 >
-                  <View style={[styles.statIconWrap, { backgroundColor: '#E7F5F3' }]}>
-                    <BootstrapIcon name="receipt" size={17} color="#0C6258" />
+                  <View style={[styles.statIconWrap, { backgroundColor: '#E8F0EC' }]}>
+                    <BootstrapIcon name="receipt" size={17} color="#1D4533" />
                   </View>
                   <Text style={styles.statLabel}>Orders Placed</Text>
                   <Text style={styles.statValue}>{orders.length}</Text>
                   <Text style={styles.statSub} numberOfLines={1}>
-                    {activeOrders.length > 0 ? `${activeOrders.length} active in delivery` : 'All deliveries completed'}
+                    {activeOrders.length > 0
+                      ? `${activeOrders.length} active in delivery`
+                      : 'All deliveries completed'}
                   </Text>
                 </TouchableOpacity>
 
@@ -835,6 +980,102 @@ export default function ProfilePage({
                 </View>
               </View>
 
+              {/* Customer Account Settings & Profile Quick Card */}
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 16,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 4,
+                  elevation: 1,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <View
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: '#1D4533',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        borderWidth: 1.5,
+                        borderColor: '#C8DDD3',
+                      }}
+                    >
+                      {currentUser?.avatar || currentUser?.photoUri ? (
+                        <Image
+                          source={{ uri: currentUser?.avatar || currentUser?.photoUri }}
+                          style={{ width: '100%', height: '100%' }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <BootstrapIcon name="person-fill" size={20} color="#FFFFFF" />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }} numberOfLines={1}>
+                          {currentUser?.name || currentUser?.fullName || 'Rider Account'}
+                        </Text>
+                        <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                          <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#166534' }}>Verified</Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 11.5, color: '#64748B', marginTop: 1 }} numberOfLines={1}>
+                        {currentUser?.email || 'Customer Account'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      backgroundColor: '#1D4533',
+                      paddingHorizontal: 12,
+                      paddingVertical: 7,
+                      borderRadius: 8,
+                    }}
+                    onPress={() => setIsEditSettingsModalOpen(true)}
+                    activeOpacity={0.85}
+                  >
+                    <BootstrapIcon name="pencil-square" size={12} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Edit</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Details snippet */}
+                <View style={{ paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 6 }}>
+                  <Text style={{ fontSize: 12, color: '#334155' }} numberOfLines={2}>
+                    📍 <Text style={{ fontWeight: '700' }}>Address:</Text> {currentUser?.address ? `${currentUser.address}, ${currentUser.city || 'City of Naga'}` : 'Not set — tap Edit to configure'}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#334155' }} numberOfLines={1}>
+                    📞 <Text style={{ fontWeight: '700' }}>Phone:</Text> {currentUser?.phone || 'Not provided'}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setActiveTab('settings');
+                      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                    }}
+                    style={{ marginTop: 4, alignSelf: 'flex-start' }}
+                  >
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#1D4533' }}>
+                      View Full Settings →
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
               {/* 2. Live Order Tracking Banner (If Active Order Exists) */}
               {activeOngoingOrder && (
                 <View style={styles.liveTrackingCard}>
@@ -874,7 +1115,7 @@ export default function ProfilePage({
                   activeOpacity={0.8}
                 >
                   <View style={[styles.quickActionIconWrap, { backgroundColor: '#ECFDF5' }]}>
-                    <BootstrapIcon name="calendar-plus-fill" size={18} color="#0C6258" />
+                    <BootstrapIcon name="calendar-plus-fill" size={18} color="#1D4533" />
                   </View>
                   <Text style={styles.quickActionLabel}>Book PMS</Text>
                 </TouchableOpacity>
@@ -928,7 +1169,7 @@ export default function ProfilePage({
                     }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                      <BootstrapIcon name="calendar-check-fill" size={15} color="#0C6258" />
+                      <BootstrapIcon name="calendar-check-fill" size={15} color="#1D4533" />
                       <Text style={styles.cardTitle}>Upcoming Pit Appointment</Text>
                     </View>
                     <View style={[styles.statusPill, { backgroundColor: '#EFF6FF' }]}>
@@ -942,11 +1183,12 @@ export default function ProfilePage({
                   </Text>
                   <Text style={{ fontSize: 12, color: '#64748B', marginTop: 3 }}>
                     Motorcycle: {nextUpcomingBooking.bike_brand || 'Motorcycle'}{' '}
-                    {nextUpcomingBooking.bike_model || ''} ({nextUpcomingBooking.plate_number || 'Registered'})
+                    {nextUpcomingBooking.bike_model || ''} ({nextUpcomingBooking.plate_number || 'Registered'}
+                    )
                   </Text>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
-                    <BootstrapIcon name="clock-fill" size={12} color="#0C6258" />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#0C6258' }}>
+                    <BootstrapIcon name="clock-fill" size={12} color="#1D4533" />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4533' }}>
                       {nextUpcomingBooking.appointment_date || 'Today'} at{' '}
                       {nextUpcomingBooking.time_slot || '10:00 AM'}
                     </Text>
@@ -965,11 +1207,11 @@ export default function ProfilePage({
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                  <BootstrapIcon name="box-seam-fill" size={16} color="#0C6258" />
+                  <BootstrapIcon name="box-seam-fill" size={16} color="#1D4533" />
                   <Text style={styles.sectionTitle}>Recent Orders</Text>
                 </View>
                 <TouchableOpacity onPress={onNavigateToOrders} activeOpacity={0.7}>
-                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0C6258' }}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#1D4533' }}>
                     View All ({orders.length}) →
                   </Text>
                 </TouchableOpacity>
@@ -991,7 +1233,9 @@ export default function ProfilePage({
                     </View>
                     {order.date || order.created_at ? (
                       <Text style={[styles.orderDateText, { marginBottom: 10 }]}>
-                        Placed on {order.date || (typeof order.created_at === 'string' ? order.created_at.slice(0, 10) : 'Recent')}
+                        Placed on{' '}
+                        {order.date ||
+                          (typeof order.created_at === 'string' ? order.created_at.slice(0, 10) : 'Recent')}
                       </Text>
                     ) : (
                       <View style={{ marginBottom: 4 }} />
@@ -1060,7 +1304,7 @@ export default function ProfilePage({
                           {bike.brand} {bike.model}
                         </Text>
                         {bike.nickname ? (
-                          <Text style={{ fontSize: 12, color: '#0C6258', fontWeight: '700' }}>
+                          <Text style={{ fontSize: 12, color: '#1D4533', fontWeight: '700' }}>
                             "{bike.nickname}"
                           </Text>
                         ) : null}
@@ -1123,7 +1367,6 @@ export default function ProfilePage({
             </View>
           )}
 
-
           {/* ═══════════════════════════════════════════════════════
               TAB 4: BOOKINGS (SERVICE & PMS APPOINTMENTS)
              ═══════════════════════════════════════════════════════ */}
@@ -1173,11 +1416,15 @@ export default function ProfilePage({
                           b.status === 'Pending' && { backgroundColor: '#FEF3C7' },
                           b.status === 'Inspection' && { backgroundColor: '#EFF6FF' },
                           b.status === 'Estimate Pending' && { backgroundColor: '#FEE2E2' },
-                          (b.status === 'In Progress' || b.status === 'In-Service') && { backgroundColor: '#E0F2FE' },
+                          (b.status === 'In Progress' || b.status === 'In-Service') && {
+                            backgroundColor: '#E0F2FE',
+                          },
                           b.status === 'Service Done' && { backgroundColor: '#DCFCE7' },
-                          b.status === 'Paid' && { backgroundColor: '#D1ECE6' },
+                          b.status === 'Paid' && { backgroundColor: '#C8DDD3' },
                           b.status === 'Closed' && { backgroundColor: '#F1F5F9' },
-                          (b.status === 'Rejected' || b.status === 'Cancelled') && { backgroundColor: '#FEE2E2' },
+                          (b.status === 'Rejected' || b.status === 'Cancelled') && {
+                            backgroundColor: '#FEE2E2',
+                          },
                         ]}
                       >
                         <Text
@@ -1188,7 +1435,7 @@ export default function ProfilePage({
                             b.status === 'Estimate Pending' && { color: '#DC2626' },
                             (b.status === 'In Progress' || b.status === 'In-Service') && { color: '#0284C7' },
                             b.status === 'Service Done' && { color: '#16A34A' },
-                            b.status === 'Paid' && { color: '#0C6258' },
+                            b.status === 'Paid' && { color: '#1D4533' },
                             b.status === 'Closed' && { color: '#475569' },
                             (b.status === 'Rejected' || b.status === 'Cancelled') && { color: '#DC2626' },
                           ]}
@@ -1196,20 +1443,20 @@ export default function ProfilePage({
                           {b.status === 'Pending'
                             ? '⏳ Pending Review'
                             : b.status === 'Inspection'
-                            ? '🔍 In Inspection'
-                            : b.status === 'Estimate Pending'
-                            ? '⚠️ Estimate Pending'
-                            : b.status === 'In Progress' || b.status === 'In-Service'
-                            ? '🔧 In Progress'
-                            : b.status === 'Service Done'
-                            ? '✓ Service Done'
-                            : b.status === 'Paid'
-                            ? '✓ Bay Service Paid'
-                            : b.status === 'Closed'
-                            ? '✓ Finished & Released'
-                            : b.status === 'Cancelled'
-                            ? 'Cancelled'
-                            : b.status || 'Confirmed'}
+                              ? '🔍 In Inspection'
+                              : b.status === 'Estimate Pending'
+                                ? '⚠️ Estimate Pending'
+                                : b.status === 'In Progress' || b.status === 'In-Service'
+                                  ? '🔧 In Progress'
+                                  : b.status === 'Service Done'
+                                    ? '✓ Service Done'
+                                    : b.status === 'Paid'
+                                      ? '✓ Bay Service Paid'
+                                      : b.status === 'Closed'
+                                        ? '✓ Finished & Released'
+                                        : b.status === 'Cancelled'
+                                          ? 'Cancelled'
+                                          : b.status || 'Confirmed'}
                         </Text>
                       </View>
                     </View>
@@ -1224,23 +1471,22 @@ export default function ProfilePage({
                     <View style={styles.bookingMetaRow}>
                       <BootstrapIcon name="bicycle" size={13} color="#64748B" />
                       <Text style={styles.bookingMetaText}>
-                        {b.bike_brand || b.brand || 'Motorcycle'} {b.bike_model || b.model || ''} ({b.plate_number || b.bikePlate || 'Registered'})
+                        {b.bike_brand || b.brand || 'Motorcycle'} {b.bike_model || b.model || ''} (
+                        {b.plate_number || b.bikePlate || 'Registered'})
                       </Text>
                     </View>
 
                     {b.branch ? (
                       <View style={styles.bookingMetaRow}>
                         <BootstrapIcon name="geo-alt" size={13} color="#64748B" />
-                        <Text style={styles.bookingMetaText}>
-                          {b.branch}
-                        </Text>
+                        <Text style={styles.bookingMetaText}>{b.branch}</Text>
                       </View>
                     ) : null}
 
                     {b.mechanic ? (
                       <View style={styles.bookingMetaRow}>
-                        <BootstrapIcon name="person-badge" size={13} color="#0C6258" />
-                        <Text style={[styles.bookingMetaText, { color: '#0C6258', fontWeight: '700' }]}>
+                        <BootstrapIcon name="person-badge" size={13} color="#1D4533" />
+                        <Text style={[styles.bookingMetaText, { color: '#1D4533', fontWeight: '700' }]}>
                           Assigned: {b.mechanic}
                         </Text>
                       </View>
@@ -1256,7 +1502,13 @@ export default function ProfilePage({
                         marginTop: 6,
                       }}
                     >
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                        }}
+                      >
                         <Text
                           style={{
                             fontSize: 11.5,
@@ -1316,7 +1568,7 @@ export default function ProfilePage({
                 notifications.map((n) => (
                   <View key={n.id} style={styles.card}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <BootstrapIcon name="info-circle-fill" size={14} color="#0C6258" />
+                      <BootstrapIcon name="info-circle-fill" size={14} color="#1D4533" />
                       <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0F172A', flex: 1 }}>
                         {n.title}
                       </Text>
@@ -1335,142 +1587,864 @@ export default function ProfilePage({
           )}
 
           {/* ═══════════════════════════════════════════════════════
-              TAB 6: PROFILE DETAILS & SETTINGS
+              TAB 6: PROFILE (INSPIRATION UI DESIGN)
              ═══════════════════════════════════════════════════════ */}
           {activeTab === 'profile' && (
-            <View style={styles.card}>
-              <Text style={styles.cardTitle}>Personal & Delivery Details</Text>
+            <View style={{ width: '100%', paddingHorizontal: 16, paddingBottom: 32, gap: 18 }}>
+              {/* Heading */}
+              <View style={{ marginTop: 8, marginBottom: 4 }}>
+                <Text style={{ fontSize: 24, fontWeight: '800', color: '#0F172A', letterSpacing: -0.4 }}>
+                  My Profile
+                </Text>
+              </View>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                <TouchableOpacity
+              {/* 1. Avatar Header Card */}
+              <View
+                style={{
+                  backgroundColor: '#1D4533',
+                  borderColor: '#163527',
+                  borderWidth: 1,
+                  borderRadius: 16,
+                  paddingVertical: 26,
+                  paddingHorizontal: 20,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  position: 'relative',
+                  overflow: 'hidden',
+                  shadowColor: '#1D4533',
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.22,
+                  shadowRadius: 10,
+                  elevation: 4,
+                }}
+              >
+                {/* Subtle Background Decorative Accents */}
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: -40,
+                    right: -30,
+                    width: 160,
+                    height: 160,
+                    borderRadius: 80,
+                    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                  }}
+                  pointerEvents="none"
+                />
+                <View
+                  style={{
+                    position: 'absolute',
+                    bottom: -40,
+                    left: -30,
+                    width: 140,
+                    height: 140,
+                    borderRadius: 70,
+                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                  }}
+                  pointerEvents="none"
+                />
+
+                <View style={{ position: 'relative', width: 104, height: 104, marginBottom: 14 }}>
+                  <View
+                    style={{
+                      width: 104,
+                      height: 104,
+                      borderRadius: 52,
+                      backgroundColor: '#163527',
+                      overflow: 'hidden',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 3.5,
+                      borderColor: '#FFFFFF',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 3 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 8,
+                      elevation: 4,
+                    }}
+                  >
+                    {currentUser?.avatar || currentUser?.photoUri ? (
+                      <Image
+                        source={{ uri: currentUser?.avatar || currentUser?.photoUri }}
+                        style={{ width: 104, height: 104, borderRadius: 52 }}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <BootstrapIcon name="person-fill" size={52} color="#FFFFFF" />
+                    )}
+                  </View>
+
+                  <TouchableOpacity
+                    style={{
+                      position: 'absolute',
+                      bottom: 0,
+                      right: 0,
+                      width: 34,
+                      height: 34,
+                      borderRadius: 17,
+                      backgroundColor: '#FFFFFF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderWidth: 2,
+                      borderColor: '#1D4533',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.25,
+                      shadowRadius: 4,
+                      elevation: 4,
+                    }}
+                    onPress={handleUploadAvatar}
+                    activeOpacity={0.85}
+                  >
+                    <BootstrapIcon name="camera-fill" size={14} color="#1D4533" />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Name */}
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: '800',
+                    color: '#FFFFFF',
+                    textAlign: 'center',
+                    marginBottom: 3,
+                    letterSpacing: -0.2,
+                  }}
+                >
+                  {lastName && firstName
+                    ? `${lastName}, ${firstName}`
+                    : (name || currentUser?.name || currentUser?.fullName || 'Motorcycle Customer')}
+                </Text>
+
+                {/* Subtitle / Bio */}
+                <Text
+                  style={{
+                    fontSize: 13.5,
+                    fontWeight: '500',
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    textAlign: 'center',
+                    marginBottom: 3,
+                  }}
+                >
+                  {bio || 'Motorcycle Enthusiast & Customer'}
+                </Text>
+
+                {/* Location */}
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: '500',
+                    color: 'rgba(255, 255, 255, 0.72)',
+                    textAlign: 'center',
+                  }}
+                >
+                  {city ? `${city}, ${country || 'Philippines'}` : (country || 'Philippines')}
+                </Text>
+
+                {currentUser?.avatar && (
+                  <TouchableOpacity
+                    onPress={handleRemoveAvatar}
+                    style={{
+                      marginTop: 10,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingHorizontal: 12,
+                      paddingVertical: 5,
+                      borderRadius: 20,
+                      backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                      borderWidth: 1,
+                      borderColor: 'rgba(239, 68, 68, 0.4)',
+                    }}
+                  >
+                    <BootstrapIcon name="trash" size={11} color="#FCA5A5" />
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#FEE2E2' }}>Remove Photo</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* 2. Personal Information Card */}
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderColor: '#E2E8F0',
+                  borderWidth: 1,
+                  borderRadius: 16,
+                  padding: 18,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 3,
+                  elevation: 1,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+                    Personal Information
+                  </Text>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      paddingHorizontal: 12,
+                      paddingVertical: 5,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      backgroundColor: isEditingPersonalInfo ? '#F1F5F9' : '#FFFFFF',
+                    }}
+                    onPress={() => setIsEditingPersonalInfo(!isEditingPersonalInfo)}
+                    activeOpacity={0.7}
+                  >
+                    <BootstrapIcon name={isEditingPersonalInfo ? 'x-lg' : 'pencil'} size={11} color="#334155" />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>
+                      {isEditingPersonalInfo ? 'Cancel' : 'Edit'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {!isEditingPersonalInfo ? (
+                  <View style={{ gap: 14 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 3 }}>First Name</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>{firstName || name.split(' ')[0] || '—'}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 3 }}>Last Name</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>{lastName || '—'}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 3 }}>City</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>{city || 'City of Naga'}</Text>
+                      </View>
+                    </View>
+
+                    <View style={{ height: 1, backgroundColor: '#F1F5F9' }} />
+
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                      <View style={{ width: '48%' }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 3 }}>Email Address</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>{currentUser?.email || '—'}</Text>
+                      </View>
+                      <View style={{ width: '48%' }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 3 }}>Phone</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{phone || currentUser?.phone || '—'}</Text>
+                      </View>
+                      <View style={{ width: '48%' }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 3 }}>Country</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{country || 'Philippines'}</Text>
+                      </View>
+                      <View style={{ width: '48%' }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 3 }}>Bio</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>{bio || 'Educator'}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ gap: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>First Name</Text>
+                        <TextInput
+                          value={firstName}
+                          onChangeText={setFirstName}
+                          placeholder="First Name"
+                          style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>Last Name</Text>
+                        <TextInput
+                          value={lastName}
+                          onChangeText={setLastName}
+                          placeholder="Last Name"
+                          style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>City</Text>
+                        <TextInput
+                          value={city}
+                          onChangeText={setCity}
+                          placeholder="City"
+                          style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>Phone</Text>
+                        <TextInput
+                          value={phone}
+                          onChangeText={setPhone}
+                          placeholder="Phone"
+                          style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>Country</Text>
+                        <TextInput
+                          value={country}
+                          onChangeText={setCountry}
+                          placeholder="Country"
+                          style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>Bio</Text>
+                        <TextInput
+                          value={bio}
+                          onChangeText={setBio}
+                          placeholder="Bio"
+                          style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                      <TouchableOpacity
+                        style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1' }}
+                        onPress={() => setIsEditingPersonalInfo(false)}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569' }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ paddingHorizontal: 16, paddingVertical: 7, borderRadius: 8, backgroundColor: '#1D4533', flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                        onPress={handleSave}
+                        disabled={isSaving}
+                      >
+                        <BootstrapIcon name="check2" size={13} color="#FFFFFF" />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>Save Changes</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* 3. Garage & Delivery Information Card */}
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderColor: '#E2E8F0',
+                  borderWidth: 1,
+                  borderRadius: 16,
+                  padding: 18,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 3,
+                  elevation: 1,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+                    Garage & Delivery Information
+                  </Text>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      paddingHorizontal: 12,
+                      paddingVertical: 5,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      backgroundColor: isEditingGarageInfo ? '#F1F5F9' : '#FFFFFF',
+                    }}
+                    onPress={() => setIsEditingGarageInfo(!isEditingGarageInfo)}
+                    activeOpacity={0.7}
+                  >
+                    <BootstrapIcon name={isEditingGarageInfo ? 'x-lg' : 'pencil'} size={11} color="#334155" />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>
+                      {isEditingGarageInfo ? 'Cancel' : 'Edit'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {!isEditingGarageInfo ? (
+                  <View style={{ gap: 14 }}>
+                    <View>
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#334155', marginBottom: 8 }}>Primary Motorcycle</Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+                        <View style={{ width: '48%' }}>
+                          <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 2 }}>Brand / Make</Text>
+                          <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>{bikeBrand}</Text>
+                        </View>
+                        <View style={{ width: '48%' }}>
+                          <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 2 }}>Model</Text>
+                          <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>{bikeModel}</Text>
+                        </View>
+                        <View style={{ width: '48%' }}>
+                          <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 2 }}>Plate No.</Text>
+                          <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>{bikePlate}</Text>
+                        </View>
+                        <View style={{ width: '48%' }}>
+                          <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 2 }}>Odometer</Text>
+                          <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>{bikeOdo}</Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    <View style={{ height: 1, backgroundColor: '#F1F5F9' }} />
+
+                    <View>
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#334155', marginBottom: 8 }}>Default Delivery Destination</Text>
+                      <View style={{ gap: 8 }}>
+                        <View>
+                          <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 2 }}>Street Address</Text>
+                          <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>{address || "D'Blockchain Motorparts, South Poblacion"}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 12 }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 2 }}>City</Text>
+                            <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>{city || 'City of Naga'}</Text>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 2 }}>Instructions</Text>
+                            <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>{deliveryNotes || 'Leave at gate'}</Text>
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ gap: 12 }}>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>Brand</Text>
+                        <TextInput
+                          value={bikeBrand}
+                          onChangeText={setBikeBrand}
+                          placeholder="Brand"
+                          style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>Model</Text>
+                        <TextInput
+                          value={bikeModel}
+                          onChangeText={setBikeModel}
+                          placeholder="Model"
+                          style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                        />
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>Plate</Text>
+                        <TextInput
+                          value={bikePlate}
+                          onChangeText={setBikePlate}
+                          placeholder="Plate"
+                          style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>Odometer</Text>
+                        <TextInput
+                          value={bikeOdo}
+                          onChangeText={setBikeOdo}
+                          placeholder="Odometer"
+                          style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                        />
+                      </View>
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>Street Address</Text>
+                      <TextInput
+                        value={address}
+                        onChangeText={setAddress}
+                        placeholder="Street Address"
+                        style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                      />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#475569', marginBottom: 4 }}>Delivery Instructions</Text>
+                      <TextInput
+                        value={deliveryNotes}
+                        onChangeText={setDeliveryNotes}
+                        placeholder="e.g. Call upon arrival"
+                        style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                      />
+                    </View>
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                      <TouchableOpacity
+                        style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1' }}
+                        onPress={() => setIsEditingGarageInfo(false)}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569' }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ paddingHorizontal: 16, paddingVertical: 7, borderRadius: 8, backgroundColor: '#1D4533', flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                        onPress={handleSave}
+                        disabled={isSaving}
+                      >
+                        <BootstrapIcon name="check2" size={13} color="#FFFFFF" />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>Save Details</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* 4. Account Security & Credentials Card */}
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderColor: '#E2E8F0',
+                  borderWidth: 1,
+                  borderRadius: 16,
+                  padding: 18,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 3,
+                  elevation: 1,
+                }}
+              >
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>
+                    Account Security & Credentials
+                  </Text>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 5,
+                      paddingHorizontal: 12,
+                      paddingVertical: 5,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: '#CBD5E1',
+                      backgroundColor: isEditingSecurity ? '#F1F5F9' : '#FFFFFF',
+                    }}
+                    onPress={() => setIsEditingSecurity(!isEditingSecurity)}
+                    activeOpacity={0.7}
+                  >
+                    <BootstrapIcon name={isEditingSecurity ? 'x-lg' : 'pencil'} size={11} color="#334155" />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>
+                      {isEditingSecurity ? 'Cancel' : 'Edit'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {!isEditingSecurity ? (
+                  <View style={{ gap: 12 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                      <View style={{ flex: 1.2 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 2 }}>Login Email</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }} numberOfLines={1}>{currentUser?.email || 'customer@mototrack.ph'}</Text>
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#94A3B8', marginBottom: 2 }}>Status</Text>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#16A34A' }}>Protected</Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <View style={{ gap: 10 }}>
+                    <TextInput
+                      value={currentPwd}
+                      onChangeText={setCurrentPwd}
+                      secureTextEntry
+                      placeholder="Current Password"
+                      style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                    />
+                    <TextInput
+                      value={newPwd}
+                      onChangeText={setNewPwd}
+                      secureTextEntry
+                      placeholder="New Password"
+                      style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                    />
+                    <TextInput
+                      value={confirmPwd}
+                      onChangeText={setConfirmPwd}
+                      secureTextEntry
+                      placeholder="Confirm New Password"
+                      style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, color: '#0F172A' }}
+                    />
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                      <TouchableOpacity
+                        style={{ paddingHorizontal: 14, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: '#CBD5E1' }}
+                        onPress={() => setIsEditingSecurity(false)}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569' }}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ paddingHorizontal: 16, paddingVertical: 7, borderRadius: 8, backgroundColor: '#1D4533', flexDirection: 'row', alignItems: 'center', gap: 5 }}
+                        onPress={async () => {
+                          await handleChangePassword();
+                          setIsEditingSecurity(false);
+                        }}
+                        disabled={isSavingPwd}
+                      >
+                        <BootstrapIcon name="shield-lock" size={13} color="#FFFFFF" />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>Update Password</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Log Out Button */}
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#FEF2F2',
+                  borderWidth: 1,
+                  borderColor: '#FEE2E2',
+                  paddingVertical: 12,
+                  borderRadius: 14,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  marginTop: 6,
+                }}
+                onPress={() => setIsLogoutModalOpen(true)}
+                activeOpacity={0.85}
+              >
+                <BootstrapIcon name="box-arrow-right" size={15} color="#DC2626" />
+                <Text style={{ color: '#DC2626', fontWeight: '800', fontSize: 13.5 }}>Log Out of MotoTrack</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ═══════════════════════════════════════════════════════
+              TAB 6: SETTINGS (READABLE CUSTOMER INFORMATION WITH MODAL EDIT)
+             ═══════════════════════════════════════════════════════ */}
+          {activeTab === 'settings' && (
+            <View style={{ gap: 16 }}>
+              {/* Customer Information Card */}
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 16,
+                  padding: 18,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 4,
+                  elevation: 1,
+                }}
+              >
+                <View
                   style={{
                     flexDirection: 'row',
                     alignItems: 'center',
-                    gap: 6,
-                    backgroundColor: '#E7F5F3',
-                    paddingVertical: 8,
-                    paddingHorizontal: 14,
-                    borderRadius: 10,
+                    justifyContent: 'space-between',
+                    marginBottom: 16,
+                    paddingBottom: 14,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#F1F5F9',
                   }}
-                  onPress={handleUploadAvatar}
-                  activeOpacity={0.8}
                 >
-                  <BootstrapIcon name="camera-fill" size={13} color="#0C6258" />
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#0C6258' }}>Change Photo</Text>
-                </TouchableOpacity>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        backgroundColor: '#E8F0EC',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <BootstrapIcon name="person-vcard-fill" size={18} color="#1D4533" />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: '#0F172A' }}>
+                        Customer Settings
+                      </Text>
+                      <Text style={{ fontSize: 11.5, color: '#64748B' }}>
+                        Profile, contact & delivery destination
+                      </Text>
+                    </View>
+                  </View>
 
-                {isUploadedAvatar ? (
                   <TouchableOpacity
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: 6,
-                      backgroundColor: '#FEE2E2',
-                      paddingVertical: 8,
+                      backgroundColor: '#1D4533',
                       paddingHorizontal: 14,
-                      borderRadius: 10,
+                      paddingVertical: 8,
+                      borderRadius: 8,
                     }}
-                    onPress={handleRemoveAvatar}
-                    activeOpacity={0.8}
+                    onPress={() => setIsEditSettingsModalOpen(true)}
+                    activeOpacity={0.85}
                   >
-                    <BootstrapIcon name="trash" size={13} color="#DC2626" />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>Remove Photo</Text>
+                    <BootstrapIcon name="pencil-square" size={13} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>
+                      Edit
+                    </Text>
                   </TouchableOpacity>
-                ) : null}
-              </View>
+                </View>
 
-              {/* Full Name */}
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Full Name</Text>
-                <TextInput
-                  style={styles.input}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Your Full Name"
-                />
-              </View>
+                {/* Details List */}
+                <View style={{ gap: 12 }}>
+                  <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
+                      Customer Name
+                    </Text>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A', marginTop: 3 }}>
+                      {userDisplayName}
+                    </Text>
+                  </View>
 
-              {/* Phone */}
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Contact Phone</Text>
-                <TextInput
-                  style={styles.input}
-                  value={phone}
-                  onChangeText={setPhone}
-                  keyboardType="phone-pad"
-                  placeholder="(+63) 917 000 0000"
-                />
-              </View>
+                  <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
+                        Account Email
+                      </Text>
+                      <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 4 }}>
+                        <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#166534' }}>Verified</Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A', marginTop: 3 }}>
+                      {currentUser?.email || 'N/A'}
+                    </Text>
+                  </View>
 
-              {/* Delivery Address */}
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Primary Delivery Address</Text>
-                <TextInput
-                  style={[styles.input, { minHeight: 64, textAlignVertical: 'top' }]}
-                  value={address}
-                  onChangeText={setAddress}
-                  multiline
-                  placeholder="Street, Barangay, City, Province"
-                />
-                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 6, fontWeight: '600' }}>
-                  Quick Address Presets:
-                </Text>
-                <View style={styles.addressPresetsRow}>
-                  {ADDRESS_PRESETS.map((preset) => (
-                    <TouchableOpacity
-                      key={preset.label}
-                      style={styles.presetChip}
-                      onPress={() => setAddress(preset.address)}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={styles.presetChipText}>{preset.label}</Text>
-                    </TouchableOpacity>
-                  ))}
+                  <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
+                      Phone Number
+                    </Text>
+                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A', marginTop: 3 }}>
+                      📞 {currentUser?.phone || phone || 'Not provided'}
+                    </Text>
+                  </View>
+
+                  <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
+                      Primary Delivery Address
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A', marginTop: 3 }}>
+                      📍 {currentUser?.address || address ? `${currentUser?.address || address}, ${currentUser?.city || city || 'City of Naga'}, ${currentUser?.country || country || 'Philippines'}` : 'No street address saved'}
+                    </Text>
+                  </View>
+
+                  <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
+                      Rider Bio / Headline
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: '500', color: '#475569', marginTop: 3 }}>
+                      💬 {currentUser?.bio || bio || 'Motorcycle Enthusiast & Customer'}
+                    </Text>
+                  </View>
+
+                  <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#F1F5F9' }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
+                      Delivery Instructions
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: '500', color: '#475569', marginTop: 3 }}>
+                      📦 {currentUser?.deliveryNotes || deliveryNotes || 'Leave at front gate / contact on delivery'}
+                    </Text>
+                  </View>
                 </View>
               </View>
 
-              {/* Primary Ride Specs */}
-              <Text style={[styles.cardTitle, { marginTop: 12 }]}>Primary Motorcycle Specs</Text>
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Model & Variant</Text>
-                <TextInput
-                  style={styles.input}
-                  value={bikeModel}
-                  onChangeText={setBikeModel}
-                  placeholder="e.g. NMAX 155"
-                />
-              </View>
-              <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Plate Number</Text>
-                <TextInput
-                  style={styles.input}
-                  value={bikePlate}
-                  onChangeText={setBikePlate}
-                  placeholder="e.g. NM-4892"
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.saveBtn}
-                onPress={handleSave}
-                disabled={isSaving}
-                activeOpacity={0.85}
+              {/* Password & Security Card */}
+              <View
+                style={{
+                  backgroundColor: '#FFFFFF',
+                  borderRadius: 16,
+                  padding: 18,
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.04,
+                  shadowRadius: 4,
+                  elevation: 1,
+                }}
               >
-                {isSaving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={styles.saveBtnText}>Save Profile Changes</Text>
-                )}
-              </TouchableOpacity>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                  <View
+                    style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: 10,
+                      backgroundColor: '#FEF3C7',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <BootstrapIcon name="shield-lock-fill" size={17} color="#D97706" />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>
+                      Security & Authentication
+                    </Text>
+                    <Text style={{ fontSize: 11.5, color: '#64748B' }}>
+                      Update account password
+                    </Text>
+                  </View>
+                </View>
 
-              <TouchableOpacity
-                style={styles.logoutBtn}
-                onPress={() => setIsLogoutModalOpen(true)}
-                activeOpacity={0.85}
-              >
-                <BootstrapIcon name="box-arrow-right" size={15} color="#DC2626" />
-                <Text style={styles.logoutBtnText}>Log Out of MotoTrack</Text>
-              </TouchableOpacity>
+                <View style={{ gap: 10 }}>
+                  <TextInput
+                    value={currentPwd}
+                    onChangeText={setCurrentPwd}
+                    secureTextEntry
+                    placeholder="Current Password"
+                    placeholderTextColor="#94A3B8"
+                    style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: '#0F172A', backgroundColor: '#F8FAFC' }}
+                  />
+                  <TextInput
+                    value={newPwd}
+                    onChangeText={setNewPwd}
+                    secureTextEntry
+                    placeholder="New Password (min 8 chars)"
+                    placeholderTextColor="#94A3B8"
+                    style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: '#0F172A', backgroundColor: '#F8FAFC' }}
+                  />
+                  <TextInput
+                    value={confirmPwd}
+                    onChangeText={setConfirmPwd}
+                    secureTextEntry
+                    placeholder="Confirm New Password"
+                    placeholderTextColor="#94A3B8"
+                    style={{ borderWidth: 1, borderColor: '#CBD5E1', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 9, fontSize: 13, color: '#0F172A', backgroundColor: '#F8FAFC' }}
+                  />
+                  <TouchableOpacity
+                    style={{
+                      marginTop: 4,
+                      backgroundColor: '#1D4533',
+                      paddingVertical: 10,
+                      borderRadius: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                    onPress={handleChangePassword}
+                    disabled={isSavingPwd}
+                    activeOpacity={0.85}
+                  >
+                    {isSavingPwd ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <BootstrapIcon name="check2-circle" size={14} color="#FFFFFF" />
+                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>
+                          Update Password
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           )}
         </View>
@@ -1492,6 +2466,15 @@ export default function ProfilePage({
           setEditingMotorcycle(null);
         }}
         onSave={handleSaveMotorcycle}
+      />
+
+      {/* Edit Customer Settings Modal */}
+      <EditCustomerSettingsModal
+        visible={isEditSettingsModalOpen}
+        currentUser={currentUser}
+        onClose={() => setIsEditSettingsModalOpen(false)}
+        onSave={handleSaveProfileFromModal}
+        showToast={showToast}
       />
 
       <ConfirmModal
@@ -1543,9 +2526,326 @@ export default function ProfilePage({
         onCancel={() => setIsLogoutModalOpen(false)}
       />
 
-      {/* ─── PERSISTENT MOBILE BOTTOM NAVIGATION (CENTER DASHBOARD ACTIVE) ─── */}
+      {/* ─── EDIT PROFILE MODAL ─── */}
+      <Modal
+        visible={isEditProfileModalOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsEditProfileModalOpen(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.65)', justifyContent: 'flex-end' }}>
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              maxHeight: '90%',
+              paddingBottom: Platform.OS === 'ios' ? 34 : 20,
+            }}
+          >
+            {/* Modal Header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 20,
+                paddingTop: 18,
+                paddingBottom: 14,
+                borderBottomWidth: 1,
+                borderColor: '#F1F5F9',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <BootstrapIcon name="pencil-square" size={18} color="#1D4533" />
+                <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A' }}>Edit Profile</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsEditProfileModalOpen(false)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: '#F1F5F9',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView contentContainerStyle={{ padding: 20 }} showsVerticalScrollIndicator={false}>
+              {/* Photo Section */}
+              <Text style={styles.inputLabel}>Profile Photo</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    backgroundColor: '#E8F0EC',
+                    paddingVertical: 8,
+                    paddingHorizontal: 14,
+                    borderRadius: 10,
+                  }}
+                  onPress={handleUploadAvatar}
+                  activeOpacity={0.8}
+                >
+                  <BootstrapIcon name="camera-fill" size={13} color="#1D4533" />
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4533' }}>Upload Photo</Text>
+                </TouchableOpacity>
+
+                {isUploadedAvatar ? (
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      backgroundColor: '#FEE2E2',
+                      paddingVertical: 8,
+                      paddingHorizontal: 14,
+                      borderRadius: 10,
+                    }}
+                    onPress={handleRemoveAvatar}
+                    activeOpacity={0.8}
+                  >
+                    <BootstrapIcon name="trash" size={13} color="#DC2626" />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>Remove</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {/* Name (2 Columns) */}
+              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>First Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={firstName}
+                    onChangeText={setFirstName}
+                    placeholder="First Name"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>Last Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={lastName}
+                    onChangeText={setLastName}
+                    placeholder="Last Name"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+              </View>
+
+              {/* Contact Phone */}
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Contact Phone</Text>
+                <TextInput
+                  style={styles.input}
+                  value={phone}
+                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                  placeholder="(+63) 917 000 0000"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              {/* Delivery Address */}
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Primary Delivery Address</Text>
+                <TextInput
+                  style={[styles.input, { minHeight: 64, textAlignVertical: 'top' }]}
+                  value={address}
+                  onChangeText={setAddress}
+                  multiline
+                  placeholder="Street, Barangay, City, Province"
+                  placeholderTextColor="#94A3B8"
+                />
+                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 6, fontWeight: '600' }}>
+                  Quick Address Presets:
+                </Text>
+                <View style={styles.addressPresetsRow}>
+                  {ADDRESS_PRESETS.map((preset) => (
+                    <TouchableOpacity
+                      key={preset.label}
+                      style={styles.presetChip}
+                      onPress={() => setAddress(preset.address)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={styles.presetChipText}>{preset.label}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Motorcycle Specs */}
+              <Text style={[styles.cardTitle, { marginTop: 8, fontSize: 13.5 }]}>Primary Motorcycle Specs</Text>
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Model & Variant</Text>
+                <TextInput
+                  style={styles.input}
+                  value={bikeModel}
+                  onChangeText={setBikeModel}
+                  placeholder="e.g. NMAX 155"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+              <View style={styles.formGroup}>
+                <Text style={styles.inputLabel}>Plate Number</Text>
+                <TextInput
+                  style={styles.input}
+                  value={bikePlate}
+                  onChangeText={setBikePlate}
+                  placeholder="e.g. NM-4892"
+                  placeholderTextColor="#94A3B8"
+                />
+              </View>
+
+              {/* Save Button */}
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: '#1D4533', marginTop: 14 }]}
+                onPress={async () => {
+                  await handleSave();
+                  setIsEditProfileModalOpen(false);
+                }}
+                disabled={isSaving}
+                activeOpacity={0.85}
+              >
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Save Profile Changes</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ─── CHANGE PASSWORD MODAL ─── */}
+      <Modal
+        visible={isChangePasswordModalOpen}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setIsChangePasswordModalOpen(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.65)', justifyContent: 'center', padding: 20 }}>
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 20,
+              padding: 20,
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 10 },
+              shadowOpacity: 0.2,
+              shadowRadius: 16,
+              elevation: 8,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: 14,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <BootstrapIcon name="shield-lock" size={18} color="#1D4533" />
+                <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A' }}>Change Password</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setIsChangePasswordModalOpen(false)}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 15,
+                  backgroundColor: '#F1F5F9',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <BootstrapIcon name="x-lg" size={13} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 14 }}>
+              Set a secure password of at least 8 characters.
+            </Text>
+
+            <TextInput
+              style={[styles.input, { marginBottom: 10 }]}
+              value={currentPwd}
+              onChangeText={setCurrentPwd}
+              placeholder="Current Password"
+              placeholderTextColor="#94A3B8"
+              secureTextEntry
+            />
+            <TextInput
+              style={[styles.input, { marginBottom: 10 }]}
+              value={newPwd}
+              onChangeText={setNewPwd}
+              placeholder="New Password (min 8 characters)"
+              placeholderTextColor="#94A3B8"
+              secureTextEntry
+            />
+            <TextInput
+              style={[styles.input, { marginBottom: 16 }]}
+              value={confirmPwd}
+              onChangeText={setConfirmPwd}
+              placeholder="Confirm New Password"
+              placeholderTextColor="#94A3B8"
+              secureTextEntry
+            />
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#1D4533',
+                  paddingVertical: 12,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                }}
+                onPress={async () => {
+                  await handleChangePassword();
+                  if (newPwd && newPwd === confirmPwd && newPwd.length >= 8) {
+                    setIsChangePasswordModalOpen(false);
+                  }
+                }}
+                disabled={isSavingPwd}
+                activeOpacity={0.85}
+              >
+                {isSavingPwd ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13.5 }}>Update Password</Text>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  borderRadius: 12,
+                  backgroundColor: '#F1F5F9',
+                  alignItems: 'center',
+                }}
+                onPress={() => setIsChangePasswordModalOpen(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 13.5 }}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ─── PERSISTENT MOBILE BOTTOM NAVIGATION (BOTTOM NAVBAR STAYS) ─── */}
       <BottomNavBar
-        activeTab={activeTab === 'orders' ? 'Orders' : 'Dashboard'}
+        activeTab={activeTab === 'orders' ? 'Orders' : 'More'}
         onTabChange={handleBottomNavChange}
         wishlistCount={wishlistCount}
         currentUser={currentUser}

@@ -132,7 +132,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#0B1220',
   },
   primaryBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 14,
     minHeight: 50,
     alignItems: 'center',

@@ -139,28 +139,30 @@ export default function DeliveryTokenModal({
 
   if (!visible) return null;
 
+  const isDark = typeof document !== 'undefined' && document.documentElement?.classList.contains('dark');
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, isDark && { backgroundColor: '#141A18', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>Print delivery QR label</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <BootstrapIcon name="x-lg" size={14} color="#64748b" />
+            <Text style={[styles.title, isDark && { color: '#F8FAFC' }]}>Print delivery QR label</Text>
+            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDark && { backgroundColor: '#1C2422' }]}>
+              <BootstrapIcon name="x-lg" size={14} color={isDark ? '#CBD5E1' : '#64748b'} />
             </TouchableOpacity>
           </View>
 
           <ScrollView style={styles.scroll} showsVerticalScrollIndicator={false}>
             <View>
-              <Text style={styles.body}>
+              <Text style={[styles.body, isDark && { color: '#94A3B8' }]}>
                 Print this label, wrap it on the parcel, then the rider scans the QR with the phone
                 Camera after drop-off — no app or login needed. Single use.
               </Text>
 
               {bundle && bundle.phoneReachable === false ? (
-                <View style={styles.warnBox}>
-                  <Text style={styles.warnTitle}>iPhone cannot open this QR yet</Text>
-                  <Text style={styles.warnBody}>
+                <View style={[styles.warnBox, isDark && { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: 'rgba(245, 158, 11, 0.35)' }]}>
+                  <Text style={[styles.warnTitle, isDark && { color: '#FBBF24' }]}>iPhone cannot open this QR yet</Text>
+                  <Text style={[styles.warnBody, isDark && { color: '#CBD5E1' }]}>
                     The link still points at this computer ({bundle.confirmUrl || 'localhost'}). Put
                     the iPhone on the same Wi-Fi, allow port 8081 in Windows Firewall, then tap
                     Regenerate QR. For deliveries away from the shop, set EXPO_PUBLIC_APP_URL to a
@@ -172,20 +174,20 @@ export default function DeliveryTokenModal({
               {bundle?.qrImageUrl ? (
                 <Image source={{ uri: bundle.qrImageUrl }} style={styles.qr} />
               ) : (
-                <View style={styles.qrPlaceholder}>
-                  <Text style={styles.qrPlaceholderText}>
+                <View style={[styles.qrPlaceholder, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
+                  <Text style={[styles.qrPlaceholderText, isDark && { color: '#94A3B8' }]}>
                     No active token on this device. Generate a new QR to share with the rider.
                   </Text>
                 </View>
               )}
 
-              <View style={styles.slipCard}>
+              <View style={[styles.slipCard, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
                 <Text style={styles.slipKicker}>Wrap on parcel · Deliver to</Text>
-                <Text style={styles.slipName}>{slip.customerName}</Text>
-                {slip.phone ? <Text style={styles.slipLine}>{slip.phone}</Text> : null}
-                <Text style={styles.slipAddr}>{slip.address || 'No address on file'}</Text>
+                <Text style={[styles.slipName, isDark && { color: '#F8FAFC' }]}>{slip.customerName}</Text>
+                {slip.phone ? <Text style={[styles.slipLine, isDark && { color: '#94A3B8' }]}>{slip.phone}</Text> : null}
+                <Text style={[styles.slipAddr, isDark && { color: '#CBD5E1' }]}>{slip.address || 'No address on file'}</Text>
                 {slip.items?.length ? (
-                  <Text style={styles.slipItems} numberOfLines={3}>
+                  <Text style={[styles.slipItems, isDark && { color: '#94A3B8' }]} numberOfLines={3}>
                     {slip.items.join(' · ')}
                   </Text>
                 ) : null}
@@ -195,10 +197,10 @@ export default function DeliveryTokenModal({
                 </Text>
               </View>
 
-              <Text style={styles.meta}>Valid until delivery is confirmed</Text>
+              <Text style={[styles.meta, isDark && { color: '#94A3B8' }]}>Valid until delivery is confirmed</Text>
 
               {bundle?.confirmUrl ? (
-                <Text style={styles.link} numberOfLines={3} selectable>
+                <Text style={[styles.link, isDark && { color: '#34D399', backgroundColor: '#1C2422' }]} numberOfLines={3} selectable>
                   {bundle.confirmUrl}
                 </Text>
               ) : null}
@@ -216,7 +218,7 @@ export default function DeliveryTokenModal({
             ) : null}
             {bundle?.confirmUrl ? (
               <TouchableOpacity style={styles.ghostBtn} onPress={handleCopy} activeOpacity={0.9}>
-                <BootstrapIcon name="clipboard" size={14} color="#0C6258" />
+                <BootstrapIcon name="clipboard" size={14} color="#1D4533" />
                 <Text style={styles.ghostBtnText}>Copy link</Text>
               </TouchableOpacity>
             ) : null}
@@ -227,10 +229,10 @@ export default function DeliveryTokenModal({
               activeOpacity={0.85}
             >
               {busy ? (
-                <ActivityIndicator color="#0C6258" />
+                <ActivityIndicator color="#1D4533" />
               ) : (
                 <>
-                  <BootstrapIcon name="arrow-repeat" size={14} color="#0C6258" />
+                  <BootstrapIcon name="arrow-repeat" size={14} color="#1D4533" />
                   <Text style={styles.secondaryBtnText}>
                     {bundle ? 'Regenerate QR' : 'Generate QR'}
                   </Text>
@@ -318,7 +320,7 @@ const styles = StyleSheet.create({
   slipKicker: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#084A43',
+    color: '#143325',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     marginBottom: 4,
@@ -326,7 +328,7 @@ const styles = StyleSheet.create({
   slipName: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
   slipLine: { fontSize: 13, fontWeight: '700', color: '#334155', marginTop: 2 },
   slipAddr: { fontSize: 13, color: '#475569', lineHeight: 18, marginTop: 4 },
-  slipItems: { fontSize: 12, color: '#084A43', marginTop: 8, lineHeight: 17 },
+  slipItems: { fontSize: 12, color: '#143325', marginTop: 8, lineHeight: 17 },
   slipPay: { fontSize: 12, fontWeight: '700', color: '#92400E', marginTop: 8 },
   meta: { fontSize: 12, color: '#047857', fontWeight: '700', textAlign: 'center', marginBottom: 8 },
   link: {
@@ -340,7 +342,7 @@ const styles = StyleSheet.create({
   },
   actions: { gap: 8 },
   primaryBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 12,
     height: 46,
     alignItems: 'center',
@@ -360,7 +362,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  ghostBtnText: { color: '#0C6258', fontWeight: '700', fontSize: 13 },
+  ghostBtnText: { color: '#1D4533', fontWeight: '700', fontSize: 13 },
   secondaryBtn: {
     borderRadius: 12,
     height: 44,
@@ -372,5 +374,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  secondaryBtnText: { color: '#0C6258', fontWeight: '700', fontSize: 13 },
+  secondaryBtnText: { color: '#1D4533', fontWeight: '700', fontSize: 13 },
 });

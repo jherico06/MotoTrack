@@ -17,9 +17,10 @@ module.exports = {
         },
       },
       fontFamily: {
-        sans: ['Manrope', 'sans-serif'],
-        manrope: ['Manrope', 'sans-serif'],
-        inter: ['Manrope', 'sans-serif'],
+        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+        plusJakarta: ['"Plus Jakarta Sans"', 'sans-serif'],
+        manrope: ['"Plus Jakarta Sans"', 'sans-serif'],
+        inter: ['"Plus Jakarta Sans"', 'sans-serif'],
       },
     },
   },

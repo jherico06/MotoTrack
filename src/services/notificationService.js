@@ -12,6 +12,21 @@ export function stripEmojis(text) {
     .trim();
 }
 
+export function isDateTodayOrSoon(dateStr) {
+  if (!dateStr) return false;
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(dateStr);
+    if (isNaN(target.getTime())) return false;
+    target.setHours(0, 0, 0, 0);
+    const diffDays = Math.round((target - today) / (1000 * 60 * 60 * 24));
+    return diffDays >= 0 && diffDays <= 1;
+  } catch (_e) {
+    return false;
+  }
+}
+
 /**
  * 15 Dedicated Admin Notification Categories:
  * 1. order_placed: New customer order placed
@@ -344,6 +359,10 @@ class NotificationService {
     }
     this.initialized = true;
     this.notify();
+
+    // Attach real-time system event listeners & auto-sync from database
+    this.setupSystemEventListeners();
+    this.syncFromDatabase().catch((e) => console.warn('[NotificationService] initial sync note:', e));
   }
 
   async persist() {
@@ -416,6 +435,461 @@ class NotificationService {
 
   async markAllAdminAsRead() {
     this.adminNotifications = this.adminNotifications.map((n) => ({ ...n, status: 'read' }));
+    await this.persist();
+    this.notify();
+    return this.adminNotifications;
+  }
+
+  setupSystemEventListeners() {
+    if (this._eventsSetup) return;
+    this._eventsSetup = true;
+
+    let debounceTimer = null;
+    const triggerDebouncedSync = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        this.syncFromDatabase().catch((e) => console.warn('[NotificationService] Realtime sync error:', e));
+      }, 2500);
+    };
+
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+      window.addEventListener('mototrack_orders_updated', triggerDebouncedSync);
+      window.addEventListener('mototrack_bookings_updated', triggerDebouncedSync);
+      window.addEventListener('mototrack_products_updated', triggerDebouncedSync);
+      window.addEventListener('mototrack_users_updated', triggerDebouncedSync);
+      window.addEventListener('storage', (e) => {
+        if (
+          e.key &&
+          (e.key.includes('order') ||
+            e.key.includes('garage') ||
+            e.key.includes('product') ||
+            e.key.includes('user'))
+        ) {
+          triggerDebouncedSync();
+        }
+      });
+    }
+
+    try {
+      const client = supabaseManager.getClient();
+      if (client && !this._realtimeSubscribed) {
+        this._realtimeSubscribed = true;
+        client
+          .channel('public:system_alerts_realtime')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () =>
+            triggerDebouncedSync()
+          )
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'bookings' }, () =>
+            triggerDebouncedSync()
+          )
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, () =>
+            triggerDebouncedSync()
+          )
+          .subscribe();
+      }
+    } catch (_e) {}
+  }
+
+  /**
+   * Synchronize Admin Notifications with Live Database Data (Supabase & Local DB)
+   * Fetches real records across Orders, Pit Bay Bookings, Products Stock, and Users.
+   */
+  async syncFromDatabase({ force = false } = {}) {
+    try {
+      const generatedAlerts = [];
+
+      // 1. Fetch live orders (use TTL cache — avoid full re-download on every alert sync)
+      let orders = [];
+      try {
+        const ordMod = await import('./orderService.js');
+        if (ordMod?.orderService?.getAllOrders) {
+          orders = (await ordMod.orderService.getAllOrders({ force: Boolean(force) })) || [];
+        }
+      } catch (_e) {}
+      if (!orders.length) {
+        try {
+          const raw = await storageAdapter.getItem('mototrack_orders_db');
+          if (raw) orders = JSON.parse(raw);
+        } catch (_e) {}
+      }
+
+      if (Array.isArray(orders)) {
+        for (const o of orders) {
+          if (!o) continue;
+          const orderId = o.order_id || o.id || 'N/A';
+          const customerName = o.customer_name || 'Customer';
+          const totalAmount = Number(o.total_amount || o.grand_total || 0);
+          const itemCount = Array.isArray(o.order_items) ? o.order_items.length : (o.itemsCount || 1);
+          const paymentMethod = o.payment_method || 'COD';
+          const status = String(o.status || 'Processing').trim();
+          const createdAt = o.created_at || new Date().toISOString();
+
+          // Order Placed / Processing Alert
+          generatedAlerts.push({
+            id: `db-order-placed-${orderId}`,
+            dbRecordId: orderId,
+            isDatabaseLive: true,
+            target: 'admin',
+            category: 'order_placed',
+            type: 'order',
+            priority: 'high',
+            title: 'New Customer Order Placed',
+            message: `Customer ${customerName} placed Order #${orderId} (₱${totalAmount.toLocaleString()} - ${itemCount} item${itemCount > 1 ? 's' : ''}) via ${paymentMethod}. Current Status: ${status}.`,
+            meta: { orderId, customerName, totalAmount, itemCount, paymentMethod, status },
+            status: 'unread',
+            created_at: createdAt,
+            link: 'orders',
+            icon: 'bag-check-fill',
+          });
+
+          // Payment Confirmed Alert (if paid / confirmed / gcash)
+          const isPaid =
+            String(o.payment_status || '').toLowerCase() === 'paid' ||
+            status.toLowerCase().includes('paid') ||
+            paymentMethod.toLowerCase().includes('gcash');
+          if (isPaid) {
+            generatedAlerts.push({
+              id: `db-payment-${orderId}`,
+              dbRecordId: orderId,
+              isDatabaseLive: true,
+              target: 'admin',
+              category: 'payment_confirmed',
+              type: 'payment',
+              priority: 'medium',
+              title: 'Order Payment Confirmed',
+              message: `Payment of ₱${totalAmount.toLocaleString()} for Order #${orderId} was verified via ${paymentMethod}. Ready for dispatch.`,
+              meta: { orderId, customerName, totalAmount, paymentMethod },
+              status: 'unread',
+              created_at: createdAt,
+              link: 'orders',
+              icon: 'credit-card-2-front-fill',
+            });
+          }
+
+          // Order status alerts
+          const sLower = status.toLowerCase();
+          if (sLower === 'out for delivery' || sLower.includes('out for')) {
+            generatedAlerts.push({
+              id: `db-order-out-${orderId}`,
+              dbRecordId: orderId,
+              isDatabaseLive: true,
+              target: 'admin',
+              category: 'order_status',
+              type: 'order',
+              priority: 'medium',
+              title: 'Order Out for Delivery',
+              message: `Order #${orderId} is currently out for delivery to ${customerName} (${o.customer_address || 'Customer Address'}).`,
+              meta: { orderId, customerName, status },
+              status: 'unread',
+              created_at: o.updated_at || createdAt,
+              link: 'orders',
+              icon: 'truck',
+            });
+          } else if (sLower === 'delivered') {
+            generatedAlerts.push({
+              id: `db-order-delivered-${orderId}`,
+              dbRecordId: orderId,
+              isDatabaseLive: true,
+              target: 'admin',
+              category: 'order_status',
+              type: 'order',
+              priority: 'low',
+              title: 'Order Delivered Successfully',
+              message: `Order #${orderId} was finalized and delivered to ${customerName}.`,
+              meta: { orderId, customerName, status },
+              status: 'read',
+              created_at: o.delivered_at || o.updated_at || createdAt,
+              link: 'orders',
+              icon: 'check2-all',
+            });
+          } else if (sLower.includes('cancel') || sLower.includes('issue') || sLower.includes('return')) {
+            generatedAlerts.push({
+              id: `db-order-issue-${orderId}-${sLower.slice(0, 8)}`,
+              dbRecordId: orderId,
+              isDatabaseLive: true,
+              target: 'admin',
+              category: 'order_status',
+              type: 'order',
+              priority: 'urgent',
+              title: `Order Alert: ${status}`,
+              message: `Order #${orderId} for ${customerName} was updated to "${status}". Attention required.`,
+              meta: { orderId, customerName, status },
+              status: 'unread',
+              created_at: o.updated_at || createdAt,
+              link: 'orders',
+              icon: 'exclamation-octagon-fill',
+            });
+          }
+        }
+      }
+
+      // 2. Fetch live garage bookings
+      let bookings = [];
+      try {
+        const garMod = await import('./garageService.js');
+        if (garMod?.garageService?.getAllBookings) {
+          bookings = (await garMod.garageService.getAllBookings()) || [];
+        }
+      } catch (_e) {}
+      if (!bookings.length) {
+        try {
+          const raw = await storageAdapter.getItem('mototrack_garage_bookings');
+          if (raw) bookings = JSON.parse(raw);
+        } catch (_e) {}
+      }
+
+      if (Array.isArray(bookings)) {
+        for (const b of bookings) {
+          if (!b) continue;
+          const bookingId = b.id || b.booking_id || 'N/A';
+          const customerName = b.customer_name || 'Customer';
+          const vehicle = b.vehicle_model || b.motorcycle_model || b.motorcycle || 'Motorcycle';
+          const plate = b.plate_number || b.plate || '';
+          const serviceTitle = b.service_name || b.service_title || b.category || 'Pitstop Service';
+          const status = String(b.status || '').toLowerCase().trim();
+          const date = b.appointment_date || b.date || 'Upcoming';
+          const timeSlot = b.appointment_time || b.time_slot || b.time || 'Schedule';
+          const mechanic = b.assigned_mechanic || 'Technician';
+          const bay = b.bay_name || b.pit_bay || 'Pit Bay';
+          const createdAt = b.created_at || new Date().toISOString();
+
+          if (status === 'cancelled' || status.includes('cancel')) {
+            generatedAlerts.push({
+              id: `db-booking-cancelled-${bookingId}`,
+              dbRecordId: bookingId,
+              isDatabaseLive: true,
+              target: 'admin',
+              category: 'booking_cancelled',
+              type: 'booking',
+              priority: 'medium',
+              title: 'Customer Cancelled Booking',
+              message: `Booking #${bookingId} for ${vehicle} (${customerName}) was cancelled${b.cancellation_reason ? `: ${b.cancellation_reason}` : ''}. Pit bay slot released back to queue.`,
+              meta: { bookingId, customerName, vehicle, bay, reason: b.cancellation_reason },
+              status: 'unread',
+              created_at: b.cancelled_at || b.updated_at || createdAt,
+              link: 'garage',
+              icon: 'calendar-x-fill',
+            });
+          } else if (status === 'completed' || status.includes('done')) {
+            generatedAlerts.push({
+              id: `db-booking-completed-${bookingId}`,
+              dbRecordId: bookingId,
+              isDatabaseLive: true,
+              target: 'admin',
+              category: 'service_completed',
+              type: 'booking',
+              priority: 'medium',
+              title: 'Pitstop Service Completed',
+              message: `${mechanic} finished ${serviceTitle} on ${vehicle}${plate ? ` (${plate})` : ''} for ${customerName}. Ready for inspection & billing.`,
+              meta: { bookingId, customerName, mechanic, vehicle, serviceTitle },
+              status: 'read',
+              created_at: b.completed_at || b.updated_at || createdAt,
+              link: 'garage',
+              icon: 'check-circle-fill',
+            });
+          } else {
+            // New booking alert
+            generatedAlerts.push({
+              id: `db-booking-new-${bookingId}`,
+              dbRecordId: bookingId,
+              isDatabaseLive: true,
+              target: 'admin',
+              category: 'booking_new',
+              type: 'booking',
+              priority: 'high',
+              title: 'New Pitstop Booking Received',
+              message: `${customerName} booked ${serviceTitle} for ${vehicle}${plate ? ` (Plate: ${plate})` : ''} on ${date} at ${timeSlot}. Bay: ${bay}.`,
+              meta: { bookingId, customerName, vehicle, serviceTitle, date, timeSlot },
+              status: 'unread',
+              created_at: createdAt,
+              link: 'garage',
+              icon: 'calendar-plus-fill',
+            });
+
+            // If appointment is today or tomorrow
+            if (isDateTodayOrSoon(date)) {
+              generatedAlerts.push({
+                id: `db-booking-approaching-${bookingId}`,
+                dbRecordId: bookingId,
+                isDatabaseLive: true,
+                target: 'admin',
+                category: 'service_approaching',
+                type: 'booking',
+                priority: 'high',
+                title: 'Scheduled Pitstop Service Approaching',
+                message: `Upcoming appointment for ${vehicle} (${customerName} - ${mechanic}) is scheduled for ${date} at ${timeSlot} in ${bay}.`,
+                meta: { bookingId, customerName, vehicle, mechanic, bay, date, timeSlot },
+                status: 'unread',
+                created_at: createdAt,
+                link: 'garage',
+                icon: 'clock-history',
+              });
+            }
+          }
+        }
+      }
+
+      // 3. Fetch live products & inventory stock levels
+      let products = [];
+      try {
+        const prdMod = await import('./productService.js');
+        if (prdMod?.productService?.getProducts) {
+          products = (await prdMod.productService.getProducts()) || [];
+        }
+      } catch (_e) {}
+      if (!products.length) {
+        try {
+          const raw = await storageAdapter.getItem('mototrack_products_db');
+          if (raw) products = JSON.parse(raw);
+        } catch (_e) {}
+      }
+
+      if (Array.isArray(products)) {
+        for (const p of products) {
+          if (!p) continue;
+          const stock = Number(p.stock ?? 0);
+          const pId = p.id || p.product_id;
+          const pName = p.name || 'Motorcycle Part';
+
+          if (stock <= 0) {
+            generatedAlerts.push({
+              id: `db-stock-out-${pId}`,
+              dbRecordId: pId,
+              isDatabaseLive: true,
+              target: 'admin',
+              category: 'out_of_stock',
+              type: 'inventory',
+              priority: 'urgent',
+              title: 'Product Out of Stock Alert',
+              message: `"${pName}" has reached 0 units in warehouse storage. Reorder required immediately.`,
+              meta: { productName: pName, productId: pId, currentStock: 0 },
+              status: 'unread',
+              created_at: new Date().toISOString(),
+              link: 'inventory',
+              icon: 'x-octagon-fill',
+            });
+          } else if (stock <= 5) {
+            generatedAlerts.push({
+              id: `db-stock-low-${pId}`,
+              dbRecordId: pId,
+              isDatabaseLive: true,
+              target: 'admin',
+              category: 'low_stock',
+              type: 'inventory',
+              priority: 'high',
+              title: 'Low Stock Threshold Warning',
+              message: `"${pName}" has reached low stock: only ${stock} unit${stock === 1 ? '' : 's'} remaining in warehouse (Threshold: 5).`,
+              meta: { productName: pName, productId: pId, currentStock: stock, minThreshold: 5 },
+              status: 'unread',
+              created_at: new Date().toISOString(),
+              link: 'inventory',
+              icon: 'exclamation-triangle-fill',
+            });
+          }
+        }
+      }
+
+      // 4. Fetch live registered users
+      let users = [];
+      try {
+        const usrMod = await import('./userService.js');
+        if (usrMod?.userService?.getAllUsers) {
+          users = (await usrMod.userService.getAllUsers()) || [];
+        }
+      } catch (_e) {}
+      if (!users.length) {
+        try {
+          const raw = await storageAdapter.getItem('mototrack_users_db');
+          if (raw) users = JSON.parse(raw);
+        } catch (_e) {}
+      }
+
+      if (Array.isArray(users)) {
+        for (const u of users) {
+          if (!u || u.role === 'admin') continue;
+          const uId = u.id || u.user_id;
+          const uName = u.name || u.username || 'New Rider';
+          const uEmail = u.email || '';
+          generatedAlerts.push({
+            id: `db-user-${uId}`,
+            dbRecordId: uId,
+            isDatabaseLive: true,
+            target: 'admin',
+            category: 'customer_registered',
+            type: 'user',
+            priority: 'low',
+            title: 'New Customer Registered',
+            message: `Rider account registered: "${uName}" (${uEmail || 'No email provided'}). Added to customer directory.`,
+            meta: { customerName: uName, email: uEmail, userId: uId },
+            status: 'read',
+            created_at: u.created_at || new Date().toISOString(),
+            link: 'users',
+            icon: 'person-plus-fill',
+          });
+        }
+      }
+
+      // Reconcile and Merge:
+      // Preserve existing read/unread status
+      const existingStatusMap = new Map();
+      this.adminNotifications.forEach((n) => {
+        if (n && n.id) {
+          existingStatusMap.set(n.id, {
+            status: n.status,
+            created_at: n.created_at,
+          });
+        }
+      });
+
+      const mergedLiveAlerts = generatedAlerts.map((gen) => {
+        if (existingStatusMap.has(gen.id)) {
+          const existing = existingStatusMap.get(gen.id);
+          return {
+            ...gen,
+            status: existing.status,
+            created_at: existing.created_at || gen.created_at,
+          };
+        }
+        return gen;
+      });
+
+      // Keep non-DB notifications that haven't been deleted
+      const nonDbAlerts = this.adminNotifications.filter(
+        (n) => !n.isDatabaseLive && !String(n.id).startsWith('db-')
+      );
+
+      // Real database alerts placed at the top, sorted by date descending
+      const combined = [...mergedLiveAlerts, ...nonDbAlerts];
+      combined.sort((a, b) => {
+        const timeA = new Date(a.created_at || 0).getTime();
+        const timeB = new Date(b.created_at || 0).getTime();
+        return timeB - timeA;
+      });
+
+      this.adminNotifications = combined.map((n) => this.sanitize(n));
+      await this.persist();
+      this.notify();
+      return {
+        success: true,
+        count: this.adminNotifications.length,
+        liveDbCount: mergedLiveAlerts.length,
+      };
+    } catch (err) {
+      console.warn('[NotificationService] syncFromDatabase error:', err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  getDatabaseAlertsCount() {
+    return this.adminNotifications.filter(
+      (n) => n.isDatabaseLive || (n.id && String(n.id).startsWith('db-'))
+    ).length;
+  }
+
+  async clearSampleNotifications() {
+    this.adminNotifications = this.adminNotifications.filter(
+      (n) => n.isDatabaseLive || (n.id && String(n.id).startsWith('db-'))
+    );
     await this.persist();
     this.notify();
     return this.adminNotifications;

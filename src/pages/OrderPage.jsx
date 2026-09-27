@@ -12,12 +12,8 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { BootstrapIcon, BottomNavBar } from '../components/common';
 import { ANDROID_TOP_INSET } from '../utils/safeArea';
-import {
-  LiveOrderTrackingMapModal,
-  RateDeliveredOrderModal,
-} from '../components/modals';
+import { LiveOrderTrackingMapModal, RateDeliveredOrderModal } from '../components/modals';
 import { orderService } from '../services/orderService';
-import { deliveryService } from '../services/deliveryService';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
@@ -59,7 +55,7 @@ const ORDER_CATEGORIES = [
     id: 'All',
     name: 'All Orders',
     icon: 'grid-fill',
-    color: '#0C6258',
+    color: '#1D4533',
     bgColor: '#ECFDF5',
     borderColor: '#A7F3D0',
     description: 'All past and active purchases',
@@ -189,10 +185,11 @@ export default function OrderPage({
       }
     } catch (_e) {}
 
-    // Poll so admin → customer status changes appear even across accounts/devices
+    // Poll occasionally; realtime/events cover most updates (was 5s — huge egress)
     const pollId = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       fetchOrders();
-    }, 5000);
+    }, 45000);
 
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       window.addEventListener('mototrack_orders_updated', onOrdersUpdated);
@@ -297,7 +294,10 @@ export default function OrderPage({
   const handleBottomNavChange = (tab) => {
     if (tab === 'Home' || tab === 'Search' || tab === 'Cart') onNavigateToStore?.();
     else if (tab === 'Garage') onNavigateToGarage?.();
+    else if (tab === 'More') onNavigateToProfile?.('menu');
     else if (tab === 'Dashboard') onNavigateToProfile?.('overview');
+    else if (tab === 'Bookings') onNavigateToProfile?.('bookings');
+    else if (tab === 'Notifications') onNavigateToProfile?.('notifications');
     else if (tab === 'Profile') onNavigateToProfile?.('profile');
     else if (tab === 'Customize') {
       if (onNavigateToCustomizer) onNavigateToCustomizer();
@@ -307,12 +307,16 @@ export default function OrderPage({
       onNavigateToWishlist?.();
     } else if (tab === 'Orders') {
       // already on orders page
+    } else if (tab === 'Admin') {
+      onNavigateToAdmin?.();
+    } else if (tab === 'Login') {
+      onNavigateToLogin?.();
     }
   };
 
   return (
     <SafeAreaView style={tailwind.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
 
       {/* ─── TOP HEADER BAR (CLEAN, EASY TO NAVIGATE) ─── */}
       <View style={tailwind.topBar}>
@@ -323,12 +327,12 @@ export default function OrderPage({
             activeOpacity={0.75}
             accessibilityLabel="Back to Shop"
           >
-            <BootstrapIcon name="arrow-left" size={16} color="#0C6258" />
+            <BootstrapIcon name="arrow-left" size={16} color="#1D4533" />
             <Text style={tailwind.backBtnText}>Shop</Text>
           </TouchableOpacity>
 
           <View style={tailwind.headerTitleWrap}>
-            <BootstrapIcon name="box-seam-fill" size={18} color="#0C6258" />
+            <BootstrapIcon name="box-seam-fill" size={18} color="#1D4533" />
             <Text style={tailwind.headerTitle}>My Orders</Text>
           </View>
 
@@ -349,10 +353,7 @@ export default function OrderPage({
           {/* ─── CATEGORY DROPDOWN (TAILWIND STYLED) ─── */}
           <View style={tailwind.dropdownContainer}>
             <TouchableOpacity
-              style={[
-                tailwind.dropdownTrigger,
-                isDropdownOpen && tailwind.dropdownTriggerOpen,
-              ]}
+              style={[tailwind.dropdownTrigger, isDropdownOpen && tailwind.dropdownTriggerOpen]}
               onPress={() => setIsDropdownOpen((prev) => !prev)}
               activeOpacity={0.85}
               accessibilityRole="button"
@@ -365,11 +366,7 @@ export default function OrderPage({
                     { backgroundColor: activeCategory.bgColor, borderColor: activeCategory.borderColor },
                   ]}
                 >
-                  <BootstrapIcon
-                    name={activeCategory.icon}
-                    size={15}
-                    color={activeCategory.color}
-                  />
+                  <BootstrapIcon name={activeCategory.icon} size={15} color={activeCategory.color} />
                 </View>
                 <View style={tailwind.dropdownTextCol}>
                   <Text style={tailwind.dropdownSubLabel}>FILTER CATEGORY</Text>
@@ -386,16 +383,11 @@ export default function OrderPage({
                     {(categoryCounts[activeCategory.id] ?? 0) === 1 ? 'Order' : 'Orders'}
                   </Text>
                 </View>
-                <View
-                  style={[
-                    tailwind.chevronBox,
-                    isDropdownOpen && tailwind.chevronBoxOpen,
-                  ]}
-                >
+                <View style={[tailwind.chevronBox, isDropdownOpen && tailwind.chevronBoxOpen]}>
                   <BootstrapIcon
                     name={isDropdownOpen ? 'chevron-up' : 'chevron-down'}
                     size={12}
-                    color={isDropdownOpen ? '#0C6258' : '#64748B'}
+                    color={isDropdownOpen ? '#1D4533' : '#64748B'}
                   />
                 </View>
               </View>
@@ -420,10 +412,7 @@ export default function OrderPage({
                   return (
                     <TouchableOpacity
                       key={cat.id}
-                      style={[
-                        tailwind.dropdownMenuItem,
-                        isSelected && tailwind.dropdownMenuItemSelected,
-                      ]}
+                      style={[tailwind.dropdownMenuItem, isSelected && tailwind.dropdownMenuItemSelected]}
                       onPress={() => {
                         setOrderFilter(cat.id);
                         setIsDropdownOpen(false);
@@ -440,12 +429,7 @@ export default function OrderPage({
                           <BootstrapIcon name={cat.icon} size={15} color={cat.color} />
                         </View>
                         <View style={tailwind.itemInfoCol}>
-                          <Text
-                            style={[
-                              tailwind.itemTitle,
-                              isSelected && tailwind.itemTitleSelected,
-                            ]}
-                          >
+                          <Text style={[tailwind.itemTitle, isSelected && tailwind.itemTitleSelected]}>
                             {cat.name}
                           </Text>
                           <Text style={tailwind.itemDesc} numberOfLines={1}>
@@ -456,23 +440,17 @@ export default function OrderPage({
 
                       <View style={tailwind.dropdownMenuItemRight}>
                         <View
-                          style={[
-                            tailwind.itemCountBadge,
-                            isSelected && tailwind.itemCountBadgeSelected,
-                          ]}
+                          style={[tailwind.itemCountBadge, isSelected && tailwind.itemCountBadgeSelected]}
                         >
                           <Text
-                            style={[
-                              tailwind.itemCountText,
-                              isSelected && tailwind.itemCountTextSelected,
-                            ]}
+                            style={[tailwind.itemCountText, isSelected && tailwind.itemCountTextSelected]}
                           >
                             {count}
                           </Text>
                         </View>
                         {isSelected && (
                           <View style={tailwind.checkWrap}>
-                            <BootstrapIcon name="check-circle-fill" size={16} color="#0C6258" />
+                            <BootstrapIcon name="check-circle-fill" size={16} color="#1D4533" />
                           </View>
                         )}
                       </View>
@@ -497,11 +475,7 @@ export default function OrderPage({
                   ? "You haven't placed any orders yet. Discover our premium motorcycle parts, exhaust systems, and accessories!"
                   : `You have no orders matching "${activeCategory.name}". Browse our curated catalog of motorparts!`}
               </Text>
-              <TouchableOpacity
-                style={tailwind.emptyCtaBtn}
-                onPress={onNavigateToStore}
-                activeOpacity={0.85}
-              >
+              <TouchableOpacity style={tailwind.emptyCtaBtn} onPress={onNavigateToStore} activeOpacity={0.85}>
                 <BootstrapIcon name="cart-fill" size={14} color="#FFFFFF" />
                 <Text style={tailwind.emptyCtaBtnText}>Explore Motorparts</Text>
               </TouchableOpacity>
@@ -544,9 +518,7 @@ export default function OrderPage({
                         { backgroundColor: badge.bg, borderColor: badge.border, borderWidth: 1 },
                       ]}
                     >
-                      <Text style={[tailwind.statusPillText, { color: badge.text }]}>
-                        {statusLabel}
-                      </Text>
+                      <Text style={[tailwind.statusPillText, { color: badge.text }]}>{statusLabel}</Text>
                     </View>
                   </View>
 
@@ -558,76 +530,26 @@ export default function OrderPage({
                   {isOutForDelivery && (
                     <View style={tailwind.deliveryMetaBlock}>
                       {order.rider_name ? (
-                        <Text style={tailwind.deliveryMetaText}>
-                          Rider: {order.rider_name}
-                        </Text>
+                        <Text style={tailwind.deliveryMetaText}>Rider: {order.rider_name}</Text>
                       ) : null}
                       {order.estimated_delivery ? (
-                        <Text style={tailwind.deliveryMetaText}>
-                          Expected: {order.estimated_delivery}
-                        </Text>
+                        <Text style={tailwind.deliveryMetaText}>Expected: {order.estimated_delivery}</Text>
                       ) : null}
                       <Text style={tailwind.deliveryMetaText}>
-                        Optional: Confirm Received after you get the package. The store finalizes delivery.
+                        Your order is out for delivery. The store admin will confirm final delivery upon arrival.
                       </Text>
-                      {!order.customer_delivery_confirmed ? (
-                        <TouchableOpacity
-                          style={{
-                            marginTop: 8,
-                            backgroundColor: '#0C6258',
-                            borderRadius: 10,
-                            paddingVertical: 8,
-                            paddingHorizontal: 12,
-                            alignSelf: 'flex-start',
-                          }}
-                          onPress={async (e) => {
-                            e?.stopPropagation?.();
-                            const oid = order.order_id || order.id;
-                            const res = await deliveryService.customerConfirmReceived({
-                              orderId: oid,
-                              customerUser: currentUser,
-                            });
-                            if (res.success) {
-                              showToast?.('Thanks — store notified you received the order');
-                              setOrdersList((prev) =>
-                                (prev || []).map((o) =>
-                                  o.order_id === oid || o.id === oid
-                                    ? {
-                                        ...o,
-                                        customer_delivery_confirmed: true,
-                                        customer_delivery_confirmed_at: new Date().toISOString(),
-                                      }
-                                    : o
-                                )
-                              );
-                            } else {
-                              showToast?.(res.error || 'Could not confirm receipt');
-                            }
-                          }}
-                        >
-                          <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>
-                            Confirm Received
-                          </Text>
-                        </TouchableOpacity>
-                      ) : (
-                        <Text style={[tailwind.deliveryMetaText, { color: '#047857', marginTop: 6 }]}>
-                          You confirmed receipt
-                        </Text>
-                      )}
                     </View>
                   )}
 
                   {isDelivered && (
-                      <View style={tailwind.confirmedBanner}>
-                        <BootstrapIcon name="check-circle-fill" size={13} color="#15803D" />
-                        <Text style={tailwind.confirmedBannerText}>
-                          Delivered by the store
-                          {confirmedAt
-                            ? ` · ${new Date(confirmedAt).toLocaleString()}`
-                            : ''}
-                        </Text>
-                      </View>
-                    )}
+                    <View style={tailwind.confirmedBanner}>
+                      <BootstrapIcon name="check-circle-fill" size={13} color="#15803D" />
+                      <Text style={tailwind.confirmedBannerText}>
+                        Delivered by the store
+                        {confirmedAt ? ` · ${new Date(confirmedAt).toLocaleString()}` : ''}
+                      </Text>
+                    </View>
+                  )}
 
                   {/* Card Footer: Total Amount & Action Buttons */}
                   <View style={tailwind.orderCardFooter}>
@@ -643,20 +565,14 @@ export default function OrderPage({
                           onPress={() => handleOpenRating(order)}
                           activeOpacity={0.85}
                           accessibilityRole="button"
-                          accessibilityLabel={isOrderRated ? "View or edit rating" : "Rate delivered items"}
+                          accessibilityLabel={isOrderRated ? 'View or edit rating' : 'Rate delivered items'}
                         >
                           <BootstrapIcon
                             name="star-fill"
                             size={12}
                             color={isOrderRated ? '#D97706' : '#FFFFFF'}
                           />
-                          <Text
-                            style={
-                              isOrderRated
-                                ? tailwind.orderRatedBtnText
-                                : tailwind.orderRateBtnText
-                            }
-                          >
+                          <Text style={isOrderRated ? tailwind.orderRatedBtnText : tailwind.orderRateBtnText}>
                             {isOrderRated ? `Rated ${ratedScore.toFixed(1)} ★` : 'Rate Items'}
                           </Text>
                         </TouchableOpacity>
@@ -723,13 +639,13 @@ const tailwind = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 12,
-    paddingBottom: 100,
+    paddingBottom: 115,
   },
   maxContainer: {
     width: '100%',
     maxWidth: 720,
     alignSelf: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
   },
 
   // Top Bar
@@ -767,7 +683,7 @@ const tailwind = StyleSheet.create({
   backBtnText: {
     fontSize: 12.5,
     fontWeight: '700',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   headerTitleWrap: {
     flexDirection: 'row',
@@ -816,7 +732,7 @@ const tailwind = StyleSheet.create({
     elevation: 2,
   },
   dropdownTriggerOpen: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#F9FCFB',
     borderBottomLeftRadius: 8,
     borderBottomRightRadius: 8,
@@ -879,7 +795,7 @@ const tailwind = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   chevronBoxOpen: {
-    backgroundColor: '#E7F5F3',
+    backgroundColor: '#E8F0EC',
     borderColor: '#CCFBF1',
   },
   dropdownMenuCard: {
@@ -950,7 +866,7 @@ const tailwind = StyleSheet.create({
     color: '#1E293B',
   },
   itemTitleSelected: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
   itemDesc: {
@@ -1053,7 +969,7 @@ const tailwind = StyleSheet.create({
   orderTotalPrice: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
     marginTop: 1,
   },
   orderTrackBtn: {
@@ -1124,7 +1040,7 @@ const tailwind = StyleSheet.create({
   deliveryMetaText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#084A43',
+    color: '#143325',
     marginBottom: 2,
   },
   confirmedBanner: {
@@ -1185,11 +1101,11 @@ const tailwind = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 20,
     paddingVertical: 11,
     borderRadius: 12,
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,

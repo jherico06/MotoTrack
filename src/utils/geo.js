@@ -3,6 +3,15 @@
  * Photon is used because it allows browser CORS (Nominatim often does not).
  */
 
+export const STORE_LOCATION = {
+  name: "D'Blockchain Motorparts and Accessories",
+  address: 'Natalio B. Bacalso S National Hwy, South Poblacion, Naga, 6037 Cebu',
+  plusCode: '6Q44+MPQ, Naga, 6037 Cebu',
+  lat: 10.20663,
+  lng: 123.75675,
+  googleMapsUrl: 'https://www.google.com/maps/search/?api=1&query=10.20663,123.75675',
+};
+
 export function areaFromAddress(address) {
   const parts = String(address || '')
     .split(',')

@@ -52,7 +52,7 @@ export const wishlistStyles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   logoAccent: {
-    color: '#0C6258',
+    color: '#1D4533',
   },
   navActionsRight: {
     flexDirection: 'row',
@@ -74,7 +74,7 @@ export const wishlistStyles = StyleSheet.create({
     color: '#334155',
   },
   navBtnPrimary: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   navBtnPrimaryText: {
     color: '#FFFFFF',
@@ -100,7 +100,7 @@ export const wishlistStyles = StyleSheet.create({
     fontWeight: '600',
   },
   breadcrumbActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
   titleRow: {
@@ -122,13 +122,13 @@ export const wishlistStyles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#D1ECE6',
+    borderColor: '#C8DDD3',
     marginLeft: 8,
   },
   itemCountBadgeText: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   headerControls: {
     flexDirection: 'row',
@@ -332,7 +332,7 @@ export const wishlistStyles = StyleSheet.create({
   brandText: {
     fontSize: 11.5,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -406,7 +406,7 @@ export const wishlistStyles = StyleSheet.create({
   },
   addToCartBtn: {
     flex: 1,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingVertical: 10,
     borderRadius: 12,
     flexDirection: 'row',
@@ -469,7 +469,7 @@ export const wishlistStyles = StyleSheet.create({
     marginBottom: 24,
   },
   emptyShopBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 14,
@@ -515,7 +515,7 @@ export const wishlistStyles = StyleSheet.create({
     color: '#0F172A',
   },
   mobileAddAllBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 12,

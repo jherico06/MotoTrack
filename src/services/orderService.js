@@ -5,10 +5,17 @@ import { emailService } from './emailService';
 import { productService } from './productService';
 import { notificationService } from './notificationService';
 import { auditLogService } from './auditLogService';
+import { getSizePrice } from '../utils/productSizes';
 
 const STORAGE_KEY_ORDERS = 'mototrack_orders_db';
 const STORAGE_KEY_OFFLINE_QUEUE = 'mototrack_orders_offline_queue';
 const MAX_OFFLINE_RETRIES = 5;
+
+/** In-memory short TTL to stop 5s UI polls from re-downloading the full orders join. */
+const ordersFetchCache = new Map();
+const ORDERS_FETCH_TTL_MS = 20000;
+let ordersFetchInFlight = null;
+let ordersFetchInFlightKey = null;
 
 function makeEntityId(prefix) {
   const rand = Math.floor(100000 + Math.random() * 900000);
@@ -665,6 +672,9 @@ class OrderService {
   }
 
   notifyListeners(orders) {
+    ordersFetchCache.clear();
+    ordersFetchInFlight = null;
+    ordersFetchInFlightKey = null;
     this.listeners.forEach((fn) => {
       try {
         fn(orders);
@@ -802,8 +812,42 @@ class OrderService {
    * Fetch orders from Supabase and merge with local/offline cache.
    * Admin (no userId/customerId) always receives the merged full list.
    * Pass `currentUser` as 4th arg (or object as 1st) for reliable ownership matching.
+   * options.force=true bypasses the short in-memory TTL (used after mutations).
    */
-  async getUserOrders(userId, customerId, customerName, currentUser = null) {
+  async getUserOrders(userId, customerId, customerName, currentUser = null, options = {}) {
+    const force = Boolean(options?.force);
+    const cacheKey = [
+      userId || currentUser?.id || currentUser?.user_id || '',
+      customerId || currentUser?.customer_id || '',
+      'u',
+    ].join('|');
+
+    if (!force) {
+      const cached = ordersFetchCache.get(cacheKey);
+      if (cached && Date.now() - cached.at < ORDERS_FETCH_TTL_MS) {
+        return cached.data;
+      }
+      if (ordersFetchInFlight && ordersFetchInFlightKey === cacheKey) {
+        return ordersFetchInFlight;
+      }
+    }
+
+    const run = this._getUserOrdersUncached(userId, customerId, customerName, currentUser);
+    ordersFetchInFlight = run;
+    ordersFetchInFlightKey = cacheKey;
+    try {
+      const data = await run;
+      ordersFetchCache.set(cacheKey, { at: Date.now(), data: Array.isArray(data) ? data : [] });
+      return data;
+    } finally {
+      if (ordersFetchInFlightKey === cacheKey) {
+        ordersFetchInFlight = null;
+        ordersFetchInFlightKey = null;
+      }
+    }
+  }
+
+  async _getUserOrdersUncached(userId, customerId, customerName, currentUser = null) {
     // Never sync create_order before fetch — that re-inserts rows deleted in Supabase.
     try {
       await this.syncPendingOrders({ skipCreates: true });
@@ -830,7 +874,9 @@ class OrderService {
       try {
         let query = client
           .from('orders')
-          .select('*, order_items(*, products(*, categories(name))), order_deliveries(*, riders(*))')
+          .select(
+            'order_id,customer_id,customer_name,customer_phone,customer_address,delivery_notes,payment_method,total_amount,discount_amount,shipping_fee,grand_total,items_summary,items_count,status,channel,created_at,updated_at,estimated_delivery,tracking_number,courier,cancel_reason,return_status,return_reason,return_notes,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,customers(user_id,name,email,contact_number),order_items(order_item_id,product_id,quantity,cost,size,unit_cost,products(product_id,id,name,brand,price,categories(name))),order_deliveries(delivery_id,order_id,rider_id,rider_name,rider_contact,vehicle_info,delivery_status,delivery_notes,expected_delivery_at,shipping_fee,rider_earning,rider_earning_credited,rider_earning_credited_at,rider_reported_delivered,rider_reported_at,rider_reported_by,rider_report_notes,admin_confirmed,admin_confirmed_at,confirmed_by_admin,admin_confirmed_reason,delivered_at,token_verified,confirmation_token_used_at,proof_uploaded_by,proof_uploaded_at,updated_at,created_at,customer_confirmed,customer_confirmed_at,riders(id,name,phone,vehicle_info,plate_number,status))'
+          )
           .order('created_at', { ascending: false })
           .limit(150);
 
@@ -847,12 +893,16 @@ class OrderService {
                   product_id: oi.product_id,
                   name: oi.products?.name || 'Motorcycle Part',
                   brand: oi.products?.brand || 'MotoTrack',
-                  category: oi.products?.categories?.name || oi.products?.category || 'Gear',
+                  category: oi.products?.categories?.name || 'Gear',
                   quantity: oi.quantity || 1,
                   price: Number(oi.cost || oi.products?.price || 0),
+                  size: oi.size || null,
+                  unit_cost:
+                    oi.unit_cost != null && oi.unit_cost !== ''
+                      ? Number(oi.unit_cost)
+                      : null,
                   image:
-                    oi.products?.image ||
-                    'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
+                    'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=60',
                 }))
               : [];
 
@@ -898,13 +948,17 @@ class OrderService {
               courier: o.courier || 'MotoTrack Express SuperAir',
               cancel_reason: o.cancel_reason,
               return_status: o.return_status,
-              user_id: o.user_id || null,
+              user_id: o.customers?.user_id || o.user_id || null,
               items: items.length > 0 ? items : this.parseItemsSummary(o.items_summary),
               // Joined from order_deliveries → riders (not stored on orders)
-              rider_id: deliveryRow?.rider_id || riderRow?.id || null,
-              rider_name: riderRow?.name || null,
-              rider_contact: riderRow?.phone || null,
-              rider_vehicle: riderRow?.vehicle_info || null,
+              rider_id: deliveryRow?.rider_id || riderRow?.id || o.delivered_by_rider_id || null,
+              expected_delivery_at: deliveryRow?.expected_delivery_at || null,
+              delivered_at: o.delivered_at || deliveryRow?.delivered_at || null,
+              delivery_lat: o.delivery_lat ?? deliveryRow?.delivery_lat ?? null,
+              delivery_lng: o.delivery_lng ?? deliveryRow?.delivery_lng ?? null,
+              rider_name: riderRow?.name || deliveryRow?.rider_name || null,
+              rider_contact: riderRow?.phone || deliveryRow?.rider_contact || null,
+              rider_vehicle: riderRow?.vehicle_info || deliveryRow?.vehicle_info || null,
               rider_plate: riderRow?.plate_number || null,
               rider_avatar: riderRow?.avatar || null,
               customer_delivery_confirmed: Boolean(deliveryRow?.customer_confirmed),
@@ -986,8 +1040,8 @@ class OrderService {
     return reconciled.filter((o) => orderBelongsToUser(o, ownershipUser));
   }
 
-  async getAllOrders() {
-    return this.getUserOrders(null, null, null, null);
+  async getAllOrders(options = {}) {
+    return this.getUserOrders(null, null, null, null, options);
   }
 
   /** Public helper for UI filters / live subscriptions */
@@ -1132,18 +1186,42 @@ class OrderService {
       customerPhone
     );
 
-    const normalizedItems = (items || []).map((i) => ({
-      product_id: i.product?.id || i.product?.product_id || i.product_id || i.id,
-      name: i.product?.name || i.name || 'Pro Motorcycle Component',
-      brand: i.product?.brand || i.brand || 'MotoTrack',
-      category: i.product?.category || i.category || 'Accessories',
-      quantity: Number(i.quantity || 1),
-      price: Number(i.product?.price ?? i.price ?? 0),
-      image:
-        i.product?.image ||
-        i.image ||
-        'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
-    }));
+    const normalizedItems = (items || []).map((i) => {
+      const size = String(
+        i.size || i.product?.selectedSize || i.selectedSize || ''
+      ).trim();
+      const color = String(
+        i.color || i.product?.selectedColor || i.selectedColor || ''
+      ).trim();
+      const baseName = i.product?.name || i.name || 'Pro Motorcycle Component';
+      const variantBits = [size && `Size ${size}`, color && `Color ${color}`].filter(Boolean);
+      // Prefer cart/POS locked price; otherwise resolve from size price table
+      let unitPrice = Number(i.product?.price ?? i.price ?? 0);
+      if (size && i.product && !(i.product.selectedSize && Number(i.product.price) > 0)) {
+        const sized = getSizePrice(i.product, size);
+        if (Number.isFinite(sized) && sized > 0) unitPrice = sized;
+      } else if (size && !i.product && Number(i.price) > 0) {
+        unitPrice = Number(i.price);
+      }
+      return {
+        product_id: i.product?.id || i.product?.product_id || i.product_id || i.id,
+        name: variantBits.length ? `${baseName} [${variantBits.join(' · ')}]` : baseName,
+        brand: i.product?.brand || i.brand || 'MotoTrack',
+        category: i.product?.category || i.category || 'Accessories',
+        quantity: Number(i.quantity || 1),
+        price: unitPrice,
+        size: size || null,
+        color: color || null,
+        // Historical COGS snapshot at sale time (separate from legacy sell-price `cost` column)
+        unit_cost: Number(
+          i.product?.unit_cost ?? i.product?.unitCost ?? i.unit_cost ?? i.unitCost ?? 0
+        ),
+        image:
+          i.product?.image ||
+          i.image ||
+          'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
+      };
+    });
 
     if (normalizedItems.every((it) => !it.product_id)) {
       return { success: false, error: 'Order items are missing product IDs', supabaseSynced: false };
@@ -1311,7 +1389,9 @@ class OrderService {
       order_id: orderId,
       product_id: it.product_id,
       quantity: it.quantity,
-      cost: it.price,
+      cost: it.price, // legacy: stores selling unit price
+      unit_cost: it.unit_cost, // true purchase cost snapshot for P&L
+      size: it.size || null,
       subtotal: it.price * it.quantity,
     }));
 
@@ -1352,13 +1432,36 @@ class OrderService {
           if (orderItemsPayload.length > 0) {
             const { error: itemsErr } = await client.from('order_items').insert(orderItemsPayload);
             if (itemsErr) {
-              // Drop invalid product_id FKs and retry bare rows
-              const bareItems = orderItemsPayload.map(({ product_id, ...rest }) => ({
-                ...rest,
-                product_id: null,
-              }));
-              const itemsRetry = await client.from('order_items').insert(bareItems);
-              if (itemsRetry.error) console.warn('[OrderService] Order items insert failed:', itemsRetry.error);
+              const msg = String(itemsErr.message || '');
+              // Drop optional columns if not yet migrated, then drop invalid product_id FKs
+              let retryPayload = orderItemsPayload;
+              if (/unit_cost/i.test(msg)) {
+                retryPayload = retryPayload.map(({ unit_cost, ...rest }) => rest);
+              }
+              if (/size/i.test(msg) || /unit_cost/i.test(msg)) {
+                // also strip size if that column is missing
+                if (/size/i.test(msg)) {
+                  retryPayload = retryPayload.map(({ size, ...rest }) => rest);
+                }
+                const retry = await client.from('order_items').insert(retryPayload);
+                if (!retry.error) {
+                  // ok
+                } else {
+                  const bareItems = retryPayload.map(({ product_id, ...rest }) => ({
+                    ...rest,
+                    product_id: null,
+                  }));
+                  const itemsRetry = await client.from('order_items').insert(bareItems);
+                  if (itemsRetry.error) console.warn('[OrderService] Order items insert failed:', itemsRetry.error);
+                }
+              } else {
+                const bareItems = orderItemsPayload.map(({ product_id, ...rest }) => ({
+                  ...rest,
+                  product_id: null,
+                }));
+                const itemsRetry = await client.from('order_items').insert(bareItems);
+                if (itemsRetry.error) console.warn('[OrderService] Order items insert failed:', itemsRetry.error);
+              }
             }
           }
         } else {
@@ -1440,6 +1543,69 @@ class OrderService {
     }
 
     return { success: true, order: targetOrder, address: cleanAddress };
+  }
+
+  /**
+   * Admin Update Order Details (Editable fields: customer_name, customer_phone, customer_address, delivery_notes, cod_change_for, status, rider_name, rider_contact)
+   */
+  async updateOrderDetails(orderId, updates = {}) {
+    if (!orderId) return { success: false, error: 'Order ID is required' };
+    const orders = this.getLocalOrders();
+    const existing = orders.find((o) => o.order_id === orderId || o.id === orderId);
+    if (!existing) return { success: false, error: 'Order not found' };
+
+    const nowIso = new Date().toISOString();
+    let targetOrder = null;
+    const updated = orders.map((o) => {
+      if (o.order_id === orderId || o.id === orderId) {
+        targetOrder = {
+          ...o,
+          ...updates,
+          updated_at: nowIso,
+        };
+        return targetOrder;
+      }
+      return o;
+    });
+    this.saveLocalOrders(updated);
+
+    const client = supabaseManager.getClient();
+    let synced = false;
+    if (client) {
+      try {
+        const payload = {};
+        if (updates.customer_name !== undefined) payload.customer_name = updates.customer_name;
+        if (updates.customer_phone !== undefined) payload.customer_phone = updates.customer_phone;
+        if (updates.customer_address !== undefined) payload.customer_address = updates.customer_address;
+        if (updates.delivery_notes !== undefined) payload.delivery_notes = updates.delivery_notes;
+        if (updates.cod_change_for !== undefined) {
+          payload.cod_change_for = updates.cod_change_for ? Number(updates.cod_change_for) : null;
+        }
+        if (updates.status !== undefined) payload.status = updates.status;
+        if (updates.rider_name !== undefined) payload.rider_name = updates.rider_name;
+        if (updates.rider_contact !== undefined) payload.rider_contact = updates.rider_contact;
+        payload.updated_at = nowIso;
+
+        const { error } = await client
+          .from('orders')
+          .update(payload)
+          .eq('order_id', orderId);
+        if (!error) synced = true;
+        else console.warn('Supabase updateOrderDetails warning:', error);
+      } catch (e) {
+        console.warn('Supabase updateOrderDetails exception:', e);
+      }
+    }
+
+    if (!synced) {
+      this.enqueueOfflineAction({
+        type: 'update_order_details',
+        orderId,
+        updates,
+      });
+    }
+
+    return { success: true, order: targetOrder };
   }
 
   /**

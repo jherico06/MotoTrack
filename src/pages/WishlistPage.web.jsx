@@ -9,8 +9,16 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { BootstrapIcon, ToastNotification, BottomNavBar, UserProfileDropdown, UserProfileButton, BrandLogo, NotificationDropdown } from '../components/common';
-import { LiveOrderTrackingMapModal, ProductSpecsModal } from '../components/modals';
+import {
+  BootstrapIcon,
+  ToastNotification,
+  BottomNavBar,
+  UserProfileDropdown,
+  UserProfileButton,
+  BrandLogo,
+  NotificationDropdown,
+} from '../components/common';
+import { LiveOrderTrackingMapModal, ProductSpecsModal, CartModal, CheckoutModal } from '../components/modals';
 import { wishlistWebStyles as wStyles } from '../styles/web/wishlistPage.web.styles';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -19,6 +27,7 @@ import { notificationService } from '../services/notificationService';
 import { MOTOR_PARTS } from '../data/motorParts';
 import { productService } from '../services/productService';
 import { orderService } from '../services/orderService';
+import { productHasCustomerRatings } from '../utils/productCatalog';
 
 export default function WishlistPageWeb({
   onNavigateToStore,
@@ -38,7 +47,12 @@ export default function WishlistPageWeb({
   const { addToCart, showToast, toastMessage, cartItemCount } = useCart();
   const { wishlist, toggleWishlist, clearWishlist, wishlistCount } = useWishlist();
 
-  const [unreadNotifCount, setUnreadNotifCount] = useState(() => notificationService.getUnreadCount(currentUser?.id));
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+
+  const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
+    notificationService.getUnreadCount(currentUser?.id)
+  );
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
 
   useEffect(() => {
@@ -99,58 +113,60 @@ export default function WishlistPageWeb({
       <StatusBar style="dark" />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── DESKTOP TOP STICKY NAVBAR ─── */}
+      {/* ─── RESPONSIVE TOP STICKY NAVBAR ─── */}
       <View style={wStyles.headerWrapper}>
-        <View style={wStyles.headerInner}>
+        <View style={[wStyles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
           <TouchableOpacity
             style={wStyles.logoWrap}
             onPress={() => onNavigateToStore?.()}
             activeOpacity={0.8}
           >
-            <BrandLogo size={40} textColor="#FFFFFF" />
+            <BrandLogo size={windowWidth < 768 ? 32 : 40} textColor="#FFFFFF" />
           </TouchableOpacity>
 
-          {/* Center Navigation: Store & Repair */}
-          <View style={wStyles.headerCenterNav}>
-            {/* Store Button */}
-            <TouchableOpacity
-              style={wStyles.headerCenterBtn}
-              onPress={() => onNavigateToStore?.()}
-              activeOpacity={0.85}
-              title="Store"
-            >
-              <BootstrapIcon name="shop" size={16} color="#FFFFFF" />
-              <Text style={wStyles.headerCenterBtnText}>Store</Text>
-            </TouchableOpacity>
+          {/* Center Navigation: Store & Repair (Desktop / Tablet only) */}
+          {windowWidth >= 768 && (
+            <View style={wStyles.headerCenterNav}>
+              {/* Store Button */}
+              <TouchableOpacity
+                style={wStyles.headerCenterBtn}
+                onPress={() => onNavigateToStore?.()}
+                activeOpacity={0.85}
+                title="Store"
+              >
+                <BootstrapIcon name="shop" size={16} color="#FFFFFF" />
+                <Text style={wStyles.headerCenterBtnText}>Store</Text>
+              </TouchableOpacity>
 
-            {/* Repair Button */}
-            <TouchableOpacity
-              style={wStyles.headerCenterBtn}
-              onPress={() => onNavigateToGarage?.()}
-              activeOpacity={0.8}
-              title="Book a Service"
-            >
-              <BootstrapIcon name="tools" size={16} color="#FFFFFF" />
-              <Text style={wStyles.headerCenterBtnText}>Book a Service</Text>
-            </TouchableOpacity>
+              {/* Repair Button */}
+              <TouchableOpacity
+                style={wStyles.headerCenterBtn}
+                onPress={() => onNavigateToGarage?.()}
+                activeOpacity={0.8}
+                title="Book a Service"
+              >
+                <BootstrapIcon name="tools" size={16} color="#FFFFFF" />
+                <Text style={wStyles.headerCenterBtnText}>Book a Service</Text>
+              </TouchableOpacity>
 
-            {/* Customize Button */}
-            <TouchableOpacity
-              style={wStyles.headerCenterBtn}
-              onPress={() => {
-                if (onNavigateToCustomizer) onNavigateToCustomizer();
-                else if (onNavigateToCustomize) onNavigateToCustomize();
-              }}
-              activeOpacity={0.8}
-              title="Customize"
-            >
-              <BootstrapIcon name="magic" size={16} color="#FFFFFF" />
-              <Text style={wStyles.headerCenterBtnText}>Customize</Text>
-            </TouchableOpacity>
-          </View>
+              {/* Customize Button */}
+              <TouchableOpacity
+                style={wStyles.headerCenterBtn}
+                onPress={() => {
+                  if (onNavigateToCustomizer) onNavigateToCustomizer();
+                  else if (onNavigateToCustomize) onNavigateToCustomize();
+                }}
+                activeOpacity={0.8}
+                title="Customize"
+              >
+                <BootstrapIcon name="magic" size={16} color="#FFFFFF" />
+                <Text style={wStyles.headerCenterBtnText}>Customize</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Right Header Actions */}
-          <View style={wStyles.headerActions}>
+          <View style={[wStyles.headerActions, windowWidth < 768 && { gap: 8 }]}>
             {/* Favorites Button */}
             <TouchableOpacity
               style={wStyles.navActionIconBtn}
@@ -199,7 +215,7 @@ export default function WishlistPageWeb({
             {/* Cart Button */}
             <TouchableOpacity
               style={wStyles.navActionIconBtn}
-              onPress={() => onNavigateToStore?.()}
+              onPress={() => setIsCartOpen(true)}
               activeOpacity={0.85}
               title="Shopping Cart"
             >
@@ -221,9 +237,9 @@ export default function WishlistPageWeb({
                   width: 42,
                   height: 42,
                   borderRadius: 21,
-                  backgroundColor: 'rgba(12, 98, 88, 0.4)',
+                  backgroundColor: 'rgba(29, 69, 51, 0.4)',
                   borderWidth: 1,
-                  borderColor: '#0C6258',
+                  borderColor: '#1D4533',
                 }}
                 onPress={() => onNavigateToAdmin?.()}
                 activeOpacity={0.8}
@@ -350,8 +366,16 @@ export default function WishlistPageWeb({
                   activeOpacity={0.92}
                 >
                   {/* 1:1 Square Product Image */}
-                  <View style={wStyles.productImgWrap} className="w-full aspect-square bg-slate-100 relative overflow-hidden">
-                    <Image source={{ uri: product.image }} style={wStyles.productImg} resizeMode="cover" className="w-full h-full object-cover" />
+                  <View
+                    style={wStyles.productImgWrap}
+                    className="w-full aspect-square bg-slate-100 relative overflow-hidden"
+                  >
+                    <Image
+                      source={{ uri: product.image }}
+                      style={wStyles.productImg}
+                      resizeMode="cover"
+                      className="w-full h-full object-cover"
+                    />
 
                     {/* Wishlist Remove Button */}
                     <TouchableOpacity
@@ -368,38 +392,86 @@ export default function WishlistPageWeb({
                   </View>
 
                   {/* Details - Compact Square Layout */}
-                  <View style={wStyles.productDetails} className="p-2.5 bg-white flex flex-col justify-between">
+                  <View
+                    style={wStyles.productDetails}
+                    className="p-2.5 bg-white flex flex-col justify-between"
+                  >
                     {/* Product Name (2 Lines Max) */}
-                    <Text style={wStyles.productName} numberOfLines={2} className="text-[12.5px] font-semibold text-slate-800 leading-[17px] mb-1 h-[34px]">
+                    <Text
+                      style={wStyles.productName}
+                      numberOfLines={2}
+                      className="text-[12.5px] font-semibold text-slate-800 leading-[17px] mb-1 h-[34px]"
+                    >
                       {product.name}
                     </Text>
 
                     {/* Price Row: Bold Teal Brand Color (matching app) */}
                     <View style={wStyles.priceRow} className="flex flex-row items-baseline gap-1.5 mb-1.5">
-                      <Text style={wStyles.priceMainText} className="text-[15px] font-extrabold text-[#0C6258]">₱{product.price?.toFixed(2)}</Text>
+                      <Text
+                        style={wStyles.priceMainText}
+                        className="text-[15px] font-extrabold text-[#1D4533]"
+                      >
+                        ₱{product.price?.toFixed(2)}
+                      </Text>
                     </View>
 
                     {/* Tags Row: COD, Actual Stock & Rating */}
-                    <View style={wStyles.tagsRow} className="flex flex-row items-center gap-1.5 mb-1.5 flex-wrap">
+                    <View
+                      style={wStyles.tagsRow}
+                      className="flex flex-row items-center gap-1.5 mb-1.5 flex-wrap"
+                    >
                       <View style={wStyles.codTag} className="bg-amber-100 px-1.5 py-0.5 rounded">
-                        <Text style={wStyles.codTagText} className="text-[10px] font-extrabold text-amber-700">COD</Text>
+                        <Text
+                          style={wStyles.codTagText}
+                          className="text-[10px] font-extrabold text-amber-700"
+                        >
+                          COD
+                        </Text>
                       </View>
                       <View style={wStyles.stockTag} className="bg-emerald-50 px-1.5 py-0.5 rounded">
                         <Text style={wStyles.stockTagText} className="text-[10px] font-bold text-emerald-700">
                           {product.stock <= 5 ? `Only ${product.stock} left` : `${product.stock} in stock`}
                         </Text>
                       </View>
-                      <View style={[wStyles.ratingLeft, { marginLeft: 'auto' }]} className="flex flex-row items-center gap-1 ml-auto">
-                        <BootstrapIcon name="star-fill" size={10} color="#F59E0B" />
-                        <Text style={wStyles.ratingValText} className="text-[11.5px] font-bold text-amber-500">{product.rating?.toFixed(1) || '5.0'}</Text>
-                        <Text style={wStyles.reviewCountText} className="text-[10.5px] text-slate-500 font-medium">({product.reviews || 0})</Text>
-                      </View>
+                      {productHasCustomerRatings(product) ? (
+                        <View
+                          style={[wStyles.ratingLeft, { marginLeft: 'auto' }]}
+                          className="flex flex-row items-center gap-1 ml-auto"
+                        >
+                          <BootstrapIcon name="star-fill" size={10} color="#F59E0B" />
+                          <Text
+                            style={wStyles.ratingValText}
+                            className="text-[11.5px] font-bold text-amber-500"
+                          >
+                            {Number(product.rating).toFixed(1)}
+                          </Text>
+                          <Text
+                            style={wStyles.reviewCountText}
+                            className="text-[10.5px] text-slate-500 font-medium"
+                          >
+                            ({product.reviews})
+                          </Text>
+                        </View>
+                      ) : (
+                        <View
+                          style={[wStyles.ratingLeft, { marginLeft: 'auto' }]}
+                          className="flex flex-row items-center gap-1 ml-auto"
+                        >
+                          <BootstrapIcon name="star" size={10} color="#94A3B8" />
+                          <Text
+                            style={wStyles.reviewCountText}
+                            className="text-[10.5px] text-slate-500 font-medium"
+                          >
+                            No ratings yet
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
                     {/* Add to Cart Button with matching App Solid Teal style */}
                     <TouchableOpacity
                       style={wStyles.addToCartBtn}
-                      className="bg-[#0C6258] hover:bg-[#094e46] rounded-lg py-2 flex flex-row items-center justify-center gap-1.5 mt-1.5 transition-colors cursor-pointer"
+                      className="bg-[#1D4533] hover:bg-[#094e46] rounded-lg py-2 flex flex-row items-center justify-center gap-1.5 mt-1.5 transition-colors cursor-pointer"
                       onPress={(e) => {
                         e?.stopPropagation?.();
                         handleAddToCartSingle(product);
@@ -407,7 +479,9 @@ export default function WishlistPageWeb({
                       activeOpacity={0.8}
                     >
                       <BootstrapIcon name="cart3" size={13} color="#FFFFFF" />
-                      <Text style={wStyles.addToCartBtnText} className="text-xs font-bold text-white">Add to Cart</Text>
+                      <Text style={wStyles.addToCartBtnText} className="text-xs font-bold text-white">
+                        Add to Cart
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
@@ -425,6 +499,35 @@ export default function WishlistPageWeb({
         onAddToCart={(prod) => handleAddToCartSingle(prod)}
       />
 
+      <CartModal
+        visible={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        onProceedToCheckout={() => {
+          if (!currentUser) {
+            setIsCartOpen(false);
+            setRedirectReason('Please sign in to complete your checkout.');
+            onNavigateToLogin?.();
+            return;
+          }
+          setIsCartOpen(false);
+          setIsCheckoutOpen(true);
+        }}
+      />
+
+      <CheckoutModal
+        visible={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        onCompleteOrder={() => {
+          setIsCheckoutOpen(false);
+          showToast('Order placed successfully!');
+          onNavigateToOrders?.();
+        }}
+        onOpenProfile={() => {
+          setIsCheckoutOpen(false);
+          onNavigateToProfile?.('profile');
+        }}
+      />
+
       {/* Persistent Mobile Bottom Navigation Bar on smaller screens */}
       {windowWidth < 768 && (
         <BottomNavBar
@@ -440,8 +543,31 @@ export default function WishlistPageWeb({
               onNavigateToGarage?.();
             } else if (tab === 'Orders') {
               onNavigateToOrders?.();
-            } else if (tab === 'Favorites') {
+            } else if (tab === 'Wishlist' || tab === 'Favorites') {
               // already on wishlist
+            } else if (tab === 'More') {
+              if (!currentUser) {
+                setRedirectReason('');
+                onNavigateToLogin?.();
+              } else {
+                onNavigateToProfile?.('menu');
+              }
+            } else if (tab === 'Dashboard') {
+              if (!currentUser) {
+                setRedirectReason('');
+                onNavigateToLogin?.();
+              } else {
+                onNavigateToProfile?.('overview');
+              }
+            } else if (tab === 'Bookings') {
+              if (!currentUser) {
+                setRedirectReason('');
+                onNavigateToLogin?.();
+              } else {
+                onNavigateToProfile?.('bookings');
+              }
+            } else if (tab === 'Notifications') {
+              onNavigateToProfile?.('notifications');
             } else if (tab === 'Admin') {
               if (currentUser?.role === 'admin') {
                 onNavigateToAdmin?.();
@@ -451,7 +577,7 @@ export default function WishlistPageWeb({
                 setRedirectReason('');
                 onNavigateToLogin?.();
               } else {
-                onNavigateToProfile?.();
+                onNavigateToProfile?.('profile');
               }
             }
           }}

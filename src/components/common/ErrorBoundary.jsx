@@ -117,7 +117,7 @@ export default class ErrorBoundary extends React.Component {
 
             <TouchableOpacity
               style={{
-                backgroundColor: '#0C6258',
+                backgroundColor: '#1D4533',
                 paddingVertical: 14,
                 paddingHorizontal: 28,
                 borderRadius: 14,

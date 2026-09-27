@@ -192,7 +192,9 @@ class MotorcycleService {
 
       let query = client
         .from('customer_motorcycles')
-        .select('*')
+        .select(
+          'motorcycle_id,user_id,customer_id,customer_email,brand,model,year,plate_number,engine_cc,color,odometer,vin_number,nickname,is_primary,notes,created_at,updated_at,photo_url'
+        )
         .order('is_primary', { ascending: false })
         .order('created_at', { ascending: false });
 
@@ -261,6 +263,18 @@ class MotorcycleService {
       photoUrl = matched
         ? matched.url
         : 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80';
+    } else if (String(photoUrl).startsWith('data:')) {
+      try {
+        const { resolveImageForDatabase } = await import('../utils/productImageUpload');
+        const resolved = await resolveImageForDatabase(photoUrl, {
+          folder: 'motorcycles',
+          orderId: newId,
+          fileName: `motorcycles/${newId}-${Date.now()}.jpg`,
+        });
+        if (resolved.url) photoUrl = resolved.url;
+      } catch (_e) {
+        // keep original if upload fails
+      }
     }
 
     const newRecord = {
@@ -332,6 +346,19 @@ class MotorcycleService {
     const existing = this.motorcycles[existingIndex];
     const isNowPrimary = updateData.is_primary !== undefined ? Boolean(updateData.is_primary) : existing.is_primary;
 
+    let nextPhoto = updateData.photo_url !== undefined ? updateData.photo_url : existing.photo_url;
+    if (nextPhoto && String(nextPhoto).startsWith('data:')) {
+      try {
+        const { resolveImageForDatabase } = await import('../utils/productImageUpload');
+        const resolved = await resolveImageForDatabase(nextPhoto, {
+          folder: 'motorcycles',
+          orderId: motorcycleId,
+          fileName: `motorcycles/${motorcycleId}-${Date.now()}.jpg`,
+        });
+        if (resolved.url) nextPhoto = resolved.url;
+      } catch (_e) {}
+    }
+
     const updatedRecord = {
       ...existing,
       ...updateData,
@@ -343,6 +370,7 @@ class MotorcycleService {
         : existing.plate_number,
       year: updateData.year ? parseInt(updateData.year, 10) : existing.year,
       engine_cc: updateData.engine_cc ? parseInt(updateData.engine_cc, 10) : existing.engine_cc,
+      photo_url: nextPhoto,
       is_primary: isNowPrimary,
       updated_at: new Date().toISOString(),
     };

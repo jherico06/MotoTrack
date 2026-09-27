@@ -4,7 +4,7 @@ import { ANDROID_TOP_INSET } from '../utils/safeArea';
 export const profileMobileStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingTop: ANDROID_TOP_INSET,
   },
   container: {
@@ -25,7 +25,7 @@ export const profileMobileStyles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 14,
     paddingHorizontal: 16,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   headerLeftGroup: {
     flexDirection: 'row',
@@ -88,13 +88,13 @@ export const profileMobileStyles = StyleSheet.create({
 
   // ─── RIDER PROFILE HERO BANNER ───
   riderHeroCard: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 18,
     paddingBottom: 22,
     paddingTop: 6,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
     shadowRadius: 12,
@@ -115,7 +115,7 @@ export const profileMobileStyles = StyleSheet.create({
     borderRadius: 30,
     borderWidth: 2.5,
     borderColor: '#FFFFFF',
-    backgroundColor: '#084A43',
+    backgroundColor: '#143325',
   },
   avatarEditBadge: {
     position: 'absolute',
@@ -128,7 +128,7 @@ export const profileMobileStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
   },
   riderInfo: {
     flex: 1,
@@ -210,9 +210,9 @@ export const profileMobileStyles = StyleSheet.create({
     elevation: 1,
   },
   tabBtnActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
-    shadowColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
+    shadowColor: '#1D4533',
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 3,
@@ -297,9 +297,9 @@ export const profileMobileStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   statCardTealAccent: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     borderTopWidth: 3.5,
-    borderTopColor: '#0C6258',
+    borderTopColor: '#1D4533',
   },
   statCardWarningAccent: {
     borderColor: '#F59E0B',
@@ -320,7 +320,7 @@ export const profileMobileStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 12,
-    backgroundColor: '#E7F5F3',
+    backgroundColor: '#E8F0EC',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
@@ -538,7 +538,7 @@ export const profileMobileStyles = StyleSheet.create({
   orderTotalPrice: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   statusPill: {
     paddingHorizontal: 8,
@@ -589,7 +589,7 @@ export const profileMobileStyles = StyleSheet.create({
   bookingId: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   bookingServiceTitle: {
     fontSize: 15.5,
@@ -717,11 +717,11 @@ export const profileMobileStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingVertical: 12,
     borderRadius: 14,
     marginBottom: 16,
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -774,12 +774,12 @@ export const profileMobileStyles = StyleSheet.create({
     color: '#475569',
   },
   saveBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 8,
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
@@ -838,7 +838,7 @@ export const profileMobileStyles = StyleSheet.create({
     marginBottom: 16,
   },
   emptyCtaBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 18,
     paddingVertical: 9,
     borderRadius: 10,
@@ -877,7 +877,7 @@ export const profileMobileStyles = StyleSheet.create({
     zIndex: 10,
   },
   menuDrawerHeader: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingTop: 48,
     paddingBottom: 20,
     paddingHorizontal: 18,
@@ -949,8 +949,8 @@ export const profileMobileStyles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   menuItemBtnActive: {
-    backgroundColor: '#0C6258',
-    shadowColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
@@ -966,7 +966,7 @@ export const profileMobileStyles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#E7F5F3',
+    backgroundColor: '#E8F0EC',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1026,5 +1026,106 @@ export const profileMobileStyles = StyleSheet.create({
     fontSize: 13.5,
     fontWeight: '700',
     color: '#DC2626',
+  },
+
+  // ─── FACEBOOK-STYLE MENU REFERENCE SCREEN STYLES (CLEAN APP THEME) ───
+  menuScrollContent: {
+    paddingBottom: 110,
+  },
+  menuContentWrapper: {
+    paddingTop: 8,
+    paddingBottom: 24,
+  },
+  menuRefCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    marginBottom: 14,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  menuRefProfileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  menuRefAvatar: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: '#1D4533',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuRefUserName: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  menuRefUserSub: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 2,
+  },
+  menuRefHairline: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+  },
+  menuRefRowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: '#FFFFFF',
+  },
+  menuRefRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    flex: 1,
+  },
+  menuRefIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#E6F4F1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  menuRefRowText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  menuRefCountBadge: {
+    backgroundColor: '#1D4533',
+    borderRadius: 10,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+  },
+  menuRefCountBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  menuRefSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.3,
+    textTransform: 'uppercase',
+    marginBottom: 8,
+    marginTop: 6,
+    paddingHorizontal: 4,
   },
 });

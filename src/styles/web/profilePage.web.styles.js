@@ -18,15 +18,15 @@ export const profileWebStyles = StyleSheet.create({
 
   // ─── TOP STICKY NAVBAR ───
   headerWrapper: {
-    backgroundColor: 'rgba(10, 15, 28, 0.85)',
+    backgroundColor: '#1D4533',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.10)',
     position: 'sticky',
     top: 0,
     zIndex: 100,
-    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.25)',
+    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
   },
   headerInner: {
     flexDirection: 'row',
@@ -44,7 +44,7 @@ export const profileWebStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -122,9 +122,9 @@ export const profileWebStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(12, 98, 88, 0.25)',
+    backgroundColor: 'rgba(29, 69, 51, 0.25)',
     borderWidth: 1,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
@@ -465,7 +465,7 @@ export const profileWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   brandChipActive: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   brandChipText: {
     fontSize: 12,
@@ -479,7 +479,7 @@ export const profileWebStyles = StyleSheet.create({
 
   // Primary Action Button
   primaryBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingVertical: 13,
     paddingHorizontal: 22,
     borderRadius: 12,
@@ -697,7 +697,7 @@ export const profileWebStyles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderColor: '#CBD5E1',
     borderLeftWidth: 4,
-    borderLeftColor: '#0C6258',
+    borderLeftColor: '#1D4533',
   },
   notifIconBox: {
     width: 36,
@@ -765,7 +765,7 @@ export const profileWebStyles = StyleSheet.create({
     backgroundColor: '#E2E8F0',
   },
   lifecycleStepPillActive: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   lifecycleStepPillDone: {
     backgroundColor: '#DCFCE7',
@@ -883,7 +883,7 @@ export const profileWebStyles = StyleSheet.create({
     color: '#15803D',
   },
   payBillBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 10,
@@ -910,7 +910,7 @@ export const profileWebStyles = StyleSheet.create({
   nextPmsCard: {
     backgroundColor: '#F3F7F6',
     borderWidth: 1.5,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     borderRadius: 12,
     padding: 12,
     marginTop: 10,
@@ -922,7 +922,7 @@ export const profileWebStyles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -933,7 +933,7 @@ export const profileWebStyles = StyleSheet.create({
   },
   nextPmsDetail: {
     fontSize: 11.5,
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '700',
     marginTop: 2,
   },

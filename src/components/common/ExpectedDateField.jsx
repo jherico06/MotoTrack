@@ -23,7 +23,7 @@ export default function ExpectedDateField({
     <View>
       {label ? <Text style={styles.label}>{label} *</Text> : null}
       <View style={styles.inputWrap}>
-        <BootstrapIcon name="calendar3" size={16} color="#0C6258" />
+        <BootstrapIcon name="calendar3" size={16} color="#1D4533" />
         {Platform.OS === 'web' ? (
           <input
             type="date"
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     borderWidth: 1.5,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: Platform.OS === 'web' ? 8 : 10,
@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  chipOn: { backgroundColor: '#0C6258', borderColor: '#0C6258' },
+  chipOn: { backgroundColor: '#1D4533', borderColor: '#1D4533' },
   chipText: { fontSize: 11, fontWeight: '700', color: '#334155' },
   chipTextOn: { color: '#FFFFFF' },
   hint: { fontSize: 11, color: '#64748B', marginTop: 6, lineHeight: 15 },

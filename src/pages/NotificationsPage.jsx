@@ -9,6 +9,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { BootstrapIcon } from '../components/common';
+import { StatusBar } from 'expo-status-bar';
 import { notificationService, stripEmojis } from '../services/notificationService';
 import { useAuth } from '../context/AuthContext';
 import { ANDROID_TOP_INSET } from '../utils/safeArea';
@@ -16,7 +17,7 @@ import { ANDROID_TOP_INSET } from '../utils/safeArea';
 function getNotificationIcon(type) {
   switch (type) {
     case 'booking':
-      return { icon: 'tools', color: '#0C6258', bg: '#DCFCE7' };
+      return { icon: 'tools', color: '#1D4533', bg: '#DCFCE7' };
     case 'order':
       return { icon: 'box-seam', color: '#2563EB', bg: '#DBEAFE' };
     case 'promo':
@@ -25,7 +26,7 @@ function getNotificationIcon(type) {
     case 'system':
       return { icon: 'shield-lock', color: '#7C3AED', bg: '#EDE9FE' };
     default:
-      return { icon: 'bell', color: '#0C6258', bg: '#E7F5F3' };
+      return { icon: 'bell', color: '#1D4533', bg: '#E8F0EC' };
   }
 }
 export default function NotificationsPage({
@@ -55,6 +56,12 @@ export default function NotificationsPage({
     });
     return () => unsub?.();
   }, [isAdmin, currentUser?.id]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      notificationService.syncFromDatabase().catch(() => {});
+    }
+  }, [isAdmin]);
 
   const handleMarkAllRead = async () => {
     if (isAdmin) {
@@ -91,6 +98,7 @@ export default function NotificationsPage({
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
       <View style={styles.header}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {onNavigateBack && (
@@ -154,7 +162,7 @@ const styles = StyleSheet.create({
   backBtn: { padding: 6 },
   title: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
   readAllBtn: { padding: 6 },
-  readAllText: { fontSize: 13, fontWeight: '600', color: '#0C6258' },
+  readAllText: { fontSize: 13, fontWeight: '600', color: '#1D4533' },
   content: { padding: 16 },
   card: {
     backgroundColor: '#FFFFFF',

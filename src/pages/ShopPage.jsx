@@ -1,22 +1,21 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, SafeAreaView, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, SafeAreaView, RefreshControl, useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 // ─── STYLES & DATA ──────────────────────────────────────────────────────────
 import { shopStyles as styles } from '../styles/shop.styles';
-import { MOTOR_PARTS } from '../data/motorParts';
 import { productService } from '../services/productService';
-import { databaseService } from '../services/databaseService';
 import { orderService } from '../services/orderService';
 
 // ─── CONTEXTS ───────────────────────────────────────────────────────────────
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { productNeedsSizes, withSelectedSize, isSizeSoldOut } from '../utils/productSizes';
+import { getRatedScore } from '../utils/productCatalog';
 
 // ─── COMPONENTS & MODALS ───────────────────────────────────────────────────
 import {
-  BootstrapIcon,
   BottomNavBar,
   ToastNotification,
   MobileHeader,
@@ -31,6 +30,7 @@ import {
   AccessDeniedModal,
   LiveOrderTrackingMapModal,
   GCashPaymentModal,
+  CompanyInfoModal,
 } from '../components';
 
 export default function ShopPage({ onNavigateToScreen }) {
@@ -40,16 +40,26 @@ export default function ShopPage({ onNavigateToScreen }) {
     cart,
     addToCart,
     clearCart,
-    cartSubtotal,
+    removeSelectedFromCart,
+    selectedCartItems,
+    selectedCartItemCount,
+    selectedCartSubtotal,
+    selectedDiscountAmount,
+    selectedShippingFee,
+    selectedCartTotal,
     cartItemCount,
+    cartTotal,
+    cartSubtotal,
     discountAmount,
     shippingFee,
-    cartTotal,
     appliedPromoId,
     toastMessage,
     showToast,
   } = useCart();
   const { wishlistCount } = useWishlist();
+
+  const { width } = useWindowDimensions();
+  const isSmallMobile = width < 380;
 
   // Local state
   const [productsList, setProductsList] = useState([]);
@@ -69,6 +79,13 @@ export default function ShopPage({ onNavigateToScreen }) {
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAccessDeniedModalOpen, setIsAccessDeniedModalOpen] = useState(false);
+  const [isCompanyInfoOpen, setIsCompanyInfoOpen] = useState(false);
+  const [companyInfoTab, setCompanyInfoTab] = useState('about');
+
+  const handleOpenCompanyInfo = (tab = 'about') => {
+    setCompanyInfoTab(tab);
+    setIsCompanyInfoOpen(true);
+  };
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
   const [isGcashModalOpen, setIsGcashModalOpen] = useState(false);
@@ -76,18 +93,18 @@ export default function ShopPage({ onNavigateToScreen }) {
   const [buyNowItems, setBuyNowItems] = useState(null); // null = use cart; array = buy-now checkout
 
   const isBuyNowCheckout = Array.isArray(buyNowItems) && buyNowItems.length > 0;
-  const checkoutItems = isBuyNowCheckout ? buyNowItems : cart;
-  const checkoutSubtotal = useMemo(
-    () => checkoutItems.reduce((sum, item) => sum + Number(item.product?.price || 0) * Number(item.quantity || 0), 0),
-    [checkoutItems]
-  );
-  const checkoutShipping = isBuyNowCheckout ? 150 : shippingFee;
-  const checkoutDiscount = isBuyNowCheckout ? 0 : discountAmount;
-  const checkoutTotal = Math.max(0, checkoutSubtotal - checkoutDiscount) + Number(checkoutShipping || 0);
-  const checkoutItemCount = useMemo(
-    () => checkoutItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
-    [checkoutItems]
-  );
+  const checkoutItems = isBuyNowCheckout ? buyNowItems : selectedCartItems;
+  const checkoutSubtotal = isBuyNowCheckout
+    ? buyNowItems.reduce((sum, item) => sum + Number(item.product?.price || 0) * Number(item.quantity || 0), 0)
+    : selectedCartSubtotal;
+  const checkoutShipping = isBuyNowCheckout ? 150 : selectedShippingFee;
+  const checkoutDiscount = isBuyNowCheckout ? 0 : selectedDiscountAmount;
+  const checkoutTotal = isBuyNowCheckout
+    ? Math.max(0, checkoutSubtotal - checkoutDiscount) + Number(checkoutShipping || 0)
+    : selectedCartTotal;
+  const checkoutItemCount = isBuyNowCheckout
+    ? buyNowItems.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+    : selectedCartItemCount;
 
   // Load products from DB or fallback
   const refreshProducts = useCallback(async () => {
@@ -105,14 +122,18 @@ export default function ShopPage({ onNavigateToScreen }) {
   };
 
   useEffect(() => {
-    refreshProducts();
+    productService.getProducts().then((data) => {
+      if (Array.isArray(data)) {
+        setProductsList(data);
+      }
+    });
     const unsubscribe = productService.subscribe((updated) => {
       if (Array.isArray(updated)) {
         setProductsList(updated);
       }
     });
     return () => unsubscribe();
-  }, [refreshProducts]);
+  }, []);
 
   // Filtered & Sorted products list
   const filteredProducts = useMemo(() => {
@@ -127,9 +148,9 @@ export default function ShopPage({ onNavigateToScreen }) {
         item.brand.toLowerCase().includes(query) ||
         item.category.toLowerCase().includes(query);
 
-      // Rating filter
+      // Rating filter — unrated products are 0, not a fake 5.0
       let matchRating = true;
-      const itemRating = Number(item.rating || 5);
+      const itemRating = getRatedScore(item);
       if (ratingFilter === '5') matchRating = itemRating >= 5.0;
       else if (ratingFilter === '4.5') matchRating = itemRating >= 4.5;
       else if (ratingFilter === '4') matchRating = itemRating >= 4.0;
@@ -150,27 +171,69 @@ export default function ShopPage({ onNavigateToScreen }) {
     } else if (priceFilter === 'price-high' || filterSort === 'price-high') {
       list = [...list].sort((a, b) => b.price - a.price);
     } else if (ratingFilter === 'sort-rating' || filterSort === 'rating') {
-      list = [...list].sort((a, b) => (b.rating || 5) - (a.rating || 5));
+      list = [...list].sort((a, b) => getRatedScore(b) - getRatedScore(a));
     }
 
     return list;
   }, [productsList, selectedCategory, searchQuery, filterSort, ratingFilter, priceFilter]);
 
   // Add to cart with auth check
-  const handleAddToCartAttempt = (product, qty = 1) => {
+  const handleAddToCartAttempt = (product, qty = 1, options = {}) => {
     if (!currentUser) {
       setRedirectReason('Please sign in or create an account to add items to your cart.');
       onNavigateToScreen?.('login');
       return;
     }
-    addToCart(product, qty);
+    const size = options.size || product?.selectedSize || '';
+    if (productNeedsSizes(product) && !size) {
+      if (onNavigateToScreen) {
+        onNavigateToScreen('product-details', { product });
+      } else {
+        setSelectedProduct(product);
+        setIsSpecsOpen(true);
+      }
+      showToast('Select a size for this product');
+      return;
+    }
+    if (size && isSizeSoldOut(product, size)) {
+      if (onNavigateToScreen) {
+        onNavigateToScreen('product-details', { product });
+      } else {
+        setSelectedProduct(product);
+        setIsSpecsOpen(true);
+      }
+      showToast(`Size ${size} is sold out`);
+      return;
+    }
+    addToCart(product, qty, { size });
   };
 
   // Buy Now — skip cart, go straight to checkout (login required)
-  const handleBuyNowAttempt = (product, qty = 1) => {
+  const handleBuyNowAttempt = (product, qty = 1, options = {}) => {
     if (!currentUser) {
       setRedirectReason('Please sign in or create an account to buy this item.');
       onNavigateToScreen?.('login');
+      return;
+    }
+    const size = options.size || product?.selectedSize || '';
+    if (productNeedsSizes(product) && !size) {
+      if (onNavigateToScreen) {
+        onNavigateToScreen('product-details', { product });
+      } else {
+        setSelectedProduct(product);
+        setIsSpecsOpen(true);
+      }
+      showToast('Select a size for this product');
+      return;
+    }
+    if (size && isSizeSoldOut(product, size)) {
+      if (onNavigateToScreen) {
+        onNavigateToScreen('product-details', { product });
+      } else {
+        setSelectedProduct(product);
+        setIsSpecsOpen(true);
+      }
+      showToast(`Size ${size} is sold out`);
       return;
     }
     const stock = Number(product?.stock);
@@ -179,7 +242,8 @@ export default function ShopPage({ onNavigateToScreen }) {
       return;
     }
     const quantity = Math.min(Math.max(1, qty), Number.isFinite(stock) ? stock : qty);
-    setBuyNowItems([{ product, quantity }]);
+    const sizedProduct = size ? withSelectedSize(product, size) : product;
+    setBuyNowItems([{ product: sizedProduct, quantity, size }]);
     setIsCartOpen(false);
     setIsSpecsOpen(false);
     setIsCheckoutOpen(true);
@@ -191,6 +255,10 @@ export default function ShopPage({ onNavigateToScreen }) {
       setIsCartOpen(false);
       setRedirectReason('Please sign in with your customer account to complete your checkout and delivery.');
       onNavigateToScreen?.('login');
+      return;
+    }
+    if (selectedCartItems.length === 0) {
+      showToast('Please select at least one item to checkout');
       return;
     }
     setBuyNowItems(null);
@@ -284,7 +352,7 @@ export default function ShopPage({ onNavigateToScreen }) {
       if (isBuyNowCheckout) {
         setBuyNowItems(null);
       } else {
-        clearCart();
+        removeSelectedFromCart();
       }
       setIsCheckoutOpen(false);
       setIsGcashModalOpen(false);
@@ -297,7 +365,8 @@ export default function ShopPage({ onNavigateToScreen }) {
             ? '🎉 COD Order placed! Awaiting Store Admin verification.'
             : paymentMethod === 'PayPal'
               ? '🎉 PayPal payment confirmed! Live order tracking active.'
-              : paymentMethod === 'Credit / Debit Card' || (paymentMethod || '').toLowerCase().includes('card')
+              : paymentMethod === 'Credit / Debit Card' ||
+                  (paymentMethod || '').toLowerCase().includes('card')
                 ? '🎉 Card payment confirmed! Live order tracking active.'
                 : '🎉 GCash Payment Confirmed! Live order tracking active.'
       );
@@ -313,7 +382,7 @@ export default function ShopPage({ onNavigateToScreen }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
 
       {/* Toast Notification */}
       <ToastNotification message={toastMessage} />
@@ -325,12 +394,12 @@ export default function ShopPage({ onNavigateToScreen }) {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handlePullRefresh}
-            colors={['#0C6258']}
-            tintColor="#0C6258"
+            colors={['#1D4533']}
+            tintColor="#1D4533"
           />
         }
       >
-        <View style={styles.maxContainer}>
+        <View style={[styles.maxContainer, { paddingHorizontal: isSmallMobile ? 12 : 14 }]}>
           {/* Mobile Top Header */}
           <MobileHeader
             searchQuery={searchQuery}
@@ -403,13 +472,39 @@ export default function ShopPage({ onNavigateToScreen }) {
                 key={product.id ? `prod-${product.id}` : `prod-${pIdx}`}
                 product={product}
                 onPress={(prod) => {
-                  setSelectedProduct(prod);
-                  setIsSpecsOpen(true);
+                  if (onNavigateToScreen) {
+                    onNavigateToScreen('product-details', { product: prod });
+                  } else {
+                    setSelectedProduct(prod);
+                    setIsSpecsOpen(true);
+                  }
                 }}
-                onAddToCart={handleAddToCartAttempt}
-                onBuyNow={handleBuyNowAttempt}
               />
             ))}
+          </View>
+
+          {/* Mobile Footer with Company Links & Copyright */}
+          <View style={{ alignItems: 'center', paddingVertical: 24, paddingHorizontal: 16 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+              <TouchableOpacity onPress={() => handleOpenCompanyInfo('about')} style={{ paddingVertical: 4, paddingHorizontal: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>About Us</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 11, color: '#CBD5E1' }}>•</Text>
+              <TouchableOpacity onPress={() => handleOpenCompanyInfo('contact')} style={{ paddingVertical: 4, paddingHorizontal: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>Contact</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 11, color: '#CBD5E1' }}>•</Text>
+              <TouchableOpacity onPress={() => handleOpenCompanyInfo('terms')} style={{ paddingVertical: 4, paddingHorizontal: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>Terms of Service</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 11, color: '#CBD5E1' }}>•</Text>
+              <TouchableOpacity onPress={() => handleOpenCompanyInfo('privacy')} style={{ paddingVertical: 4, paddingHorizontal: 6 }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#475569' }}>Privacy Policy</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={{ fontSize: 11, color: '#94A3B8', textAlign: 'center' }}>
+              © 2026 MotoTrack Motorparts & Accessories. Official Performance Network.
+            </Text>
           </View>
         </View>
       </ScrollView>
@@ -433,6 +528,13 @@ export default function ShopPage({ onNavigateToScreen }) {
             }
           } else if (tab === 'Wishlist' || tab === 'Favorites') {
             onNavigateToScreen?.('wishlist');
+          } else if (tab === 'More') {
+            if (!currentUser) {
+              setRedirectReason?.('Please sign in to access your Customer Dashboard.');
+              onNavigateToScreen?.('login');
+            } else {
+              onNavigateToScreen?.('profile', { tab: 'menu' });
+            }
           } else if (tab === 'Dashboard') {
             if (!currentUser) {
               setRedirectReason?.('Please sign in to access your Customer Dashboard.');
@@ -440,6 +542,15 @@ export default function ShopPage({ onNavigateToScreen }) {
             } else {
               onNavigateToScreen?.('profile', { tab: 'overview' });
             }
+          } else if (tab === 'Bookings') {
+            if (!currentUser) {
+              setRedirectReason?.('Please sign in to view your pit bookings.');
+              onNavigateToScreen?.('login');
+            } else {
+              onNavigateToScreen?.('profile', { tab: 'bookings' });
+            }
+          } else if (tab === 'Notifications') {
+            onNavigateToScreen?.('notifications');
           } else if (tab === 'Profile') {
             if (!currentUser) {
               setRedirectReason?.('Please sign in to access your Customer Profile.');
@@ -472,7 +583,6 @@ export default function ShopPage({ onNavigateToScreen }) {
         onClose={() => setIsSpecsOpen(false)}
         onAddToCart={handleAddToCartAttempt}
         onBuyNow={handleBuyNowAttempt}
-        onCustomizeWithPart={(prod) => onNavigateToScreen?.('customizer', { product: prod })}
       />
 
       <CartModal
@@ -566,6 +676,13 @@ export default function ShopPage({ onNavigateToScreen }) {
         orderData={pendingGcashOrderData}
         onClose={() => setIsGcashModalOpen(false)}
         onPaymentSuccess={handleGcashPaymentSuccess}
+        showToast={showToast}
+      />
+
+      <CompanyInfoModal
+        visible={isCompanyInfoOpen}
+        initialTab={companyInfoTab}
+        onClose={() => setIsCompanyInfoOpen(false)}
         showToast={showToast}
       />
     </SafeAreaView>

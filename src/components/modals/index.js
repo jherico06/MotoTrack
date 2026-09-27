@@ -1,4 +1,6 @@
 export { default as ProductSpecsModal } from './ProductSpecsModal';
+export { default as PlaceOrderModal } from './PlaceOrderModal';
+export { default as ProductVariantPickerModal } from './ProductVariantPickerModal';
 export { default as CartModal } from './CartModal';
 export { default as CheckoutModal } from './CheckoutModal';
 export { default as ProfileModal } from './ProfileModal';
@@ -15,3 +17,5 @@ export { default as DeliveryTokenModal } from './DeliveryTokenModal';
 export { default as RiderAccessModal } from './RiderAccessModal';
 export { default as RiderQrScanSheet } from './RiderQrScanSheet';
 export { default as RiderConfirmDeliverySheet } from './RiderConfirmDeliverySheet';
+export { default as CompanyInfoModal } from './CompanyInfoModal';
+export { default as EditCustomerSettingsModal } from './EditCustomerSettingsModal';

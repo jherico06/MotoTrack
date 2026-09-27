@@ -7,4 +7,5 @@ export * from './orderPage.styles';
 export * from './signUpPage.styles';
 export * from './wishlistPage.styles';
 export * from './customizer.styles';
+export * from './productDetailsPage.styles';
 export * as webStyles from './web';

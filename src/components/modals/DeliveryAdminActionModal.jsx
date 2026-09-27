@@ -88,31 +88,33 @@ export default function DeliveryAdminActionModal({
 
   if (!visible) return null;
 
+  const isDark = typeof document !== 'undefined' && document.documentElement?.classList.contains('dark');
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, isDark && { backgroundColor: '#141A18', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>
+            <Text style={[styles.title, isDark && { color: '#F8FAFC' }]}>
               {isMarkDelivered
                 ? 'Confirm Delivery'
                 : isIssue
                   ? 'Delivery Issue'
                   : 'Mark Delivery Reported'}
             </Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} disabled={busy}>
-              <BootstrapIcon name="x-lg" size={14} color="#64748b" />
+            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDark && { backgroundColor: '#1C2422' }]} disabled={busy}>
+              <BootstrapIcon name="x-lg" size={14} color={isDark ? '#CBD5E1' : '#64748b'} />
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.body}>
+          <Text style={[styles.body, isDark && { color: '#F8FAFC' }]}>
             {isMarkDelivered
               ? `Confirm delivery for order #${orderId}. This changes Delivery Reported → Delivered.`
               : isIssue
                 ? `Flag a problem with order #${orderId}. The confirmation QR will be invalidated.`
                 : `Record that ${riderName} confirmed drop-off for order #${orderId} (moves to Delivery Reported).`}
           </Text>
-          <Text style={styles.sub}>
+          <Text style={[styles.sub, isDark && { color: '#94A3B8' }]}>
             {isMarkDelivered
               ? 'Review the rider report and optional photo first. A reason is required for the audit trail.'
               : isIssue
@@ -120,11 +122,11 @@ export default function DeliveryAdminActionModal({
                 : 'Use this if the rider called instead of scanning the QR. The order becomes Delivery Reported until you Confirm Delivery.'}
           </Text>
 
-          <Text style={styles.label}>
+          <Text style={[styles.label, isDark && { color: '#94A3B8' }]}>
             {isMarkDelivered || isIssue ? 'Notes (required)' : 'Notes (optional)'}
           </Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)', color: '#F8FAFC' }]}
             value={notes}
             onChangeText={setNotes}
             placeholder={
@@ -161,8 +163,8 @@ export default function DeliveryAdminActionModal({
               </Text>
             )}
           </TouchableOpacity>
-          <TouchableOpacity style={styles.secondaryBtn} onPress={onClose} disabled={busy} activeOpacity={0.85}>
-            <Text style={styles.secondaryBtnText}>Cancel</Text>
+          <TouchableOpacity style={[styles.secondaryBtn, isDark && { borderColor: 'rgba(255,255,255,0.1)' }]} onPress={onClose} disabled={busy} activeOpacity={0.85}>
+            <Text style={[styles.secondaryBtnText, isDark && { color: '#94A3B8' }]}>Cancel</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -220,7 +222,7 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   primaryBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 12,
     height: 46,
     alignItems: 'center',

@@ -24,17 +24,11 @@ import {
 import { orderWebStyles as oStyles } from '../styles/web/orderPage.web.styles';
 import { useAuth } from '../context/AuthContext';
 import { orderService } from '../services/orderService';
-import { deliveryService } from '../services/deliveryService';
 import { useWishlist } from '../context/WishlistContext';
 
 const isOutForDeliveryStatus = (status = '') => {
   const st = (status || '').toLowerCase();
-  return (
-    st === 'out for delivery' ||
-    st === 'shipped' ||
-    st === 'in transit' ||
-    st.includes('transit')
-  );
+  return st === 'out for delivery' || st === 'shipped' || st === 'in transit' || st.includes('transit');
 };
 
 const isReportedStatus = (status = '') => {
@@ -112,9 +106,7 @@ export default function OrderPageWeb({
       setSelectedOrder((curr) => {
         if (!curr) return userOrders[0] || null;
         return (
-          userOrders.find((o) => o.order_id === curr.order_id || o.id === curr.id) ||
-          userOrders[0] ||
-          null
+          userOrders.find((o) => o.order_id === curr.order_id || o.id === curr.id) || userOrders[0] || null
         );
       });
     };
@@ -174,8 +166,9 @@ export default function OrderPageWeb({
     } catch (_e) {}
 
     const pollId = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
       refreshFromShared();
-    }, 5000);
+    }, 45000);
 
     if (typeof window !== 'undefined') {
       window.addEventListener('mototrack_orders_updated', onOrdersUpdated);
@@ -233,10 +226,7 @@ export default function OrderPageWeb({
     if (filterStatus === 'active' && (st.includes('delivered') || st.includes('completed'))) {
       setFilterStatus('delivered');
     }
-    if (
-      (filterStatus === 'pending' || filterStatus === 'active') &&
-      st.includes('cancel')
-    ) {
+    if ((filterStatus === 'pending' || filterStatus === 'active') && st.includes('cancel')) {
       setFilterStatus('cancelled');
     }
   }, [selectedOrder?.status, filterStatus, selectedOrder]);
@@ -266,9 +256,7 @@ export default function OrderPageWeb({
     setSelectedOrder((curr) => {
       if (!curr) return userOrders[0] || null;
       return (
-        userOrders.find((o) => o.order_id === curr.order_id || o.id === curr.id) ||
-        userOrders[0] ||
-        null
+        userOrders.find((o) => o.order_id === curr.order_id || o.id === curr.id) || userOrders[0] || null
       );
     });
   }, [currentUser]);
@@ -315,7 +303,7 @@ export default function OrderPageWeb({
                   {
                     backgroundColor: '#F3F7F6',
                     borderWidth: 1,
-                    borderColor: '#D1ECE6',
+                    borderColor: '#C8DDD3',
                     paddingHorizontal: 12,
                     borderRadius: 10,
                   },
@@ -323,8 +311,8 @@ export default function OrderPageWeb({
                 onPress={() => onNavigateToAdmin?.()}
                 activeOpacity={0.8}
               >
-                <BootstrapIcon name="shield-lock-fill" size={13} color="#0C6258" />
-                <Text style={[oStyles.navLinkBtnText, { color: '#0C6258', fontWeight: '800' }]}>Admin</Text>
+                <BootstrapIcon name="shield-lock-fill" size={13} color="#1D4533" />
+                <Text style={[oStyles.navLinkBtnText, { color: '#1D4533', fontWeight: '800' }]}>Admin</Text>
               </TouchableOpacity>
             )}
 
@@ -375,7 +363,7 @@ export default function OrderPageWeb({
           <View style={oStyles.metricsRow}>
             <View style={oStyles.metricCard}>
               <View style={oStyles.metricIconWrap}>
-                <BootstrapIcon name="bag-check-fill" size={18} color="#0C6258" />
+                <BootstrapIcon name="bag-check-fill" size={18} color="#1D4533" />
               </View>
               <View>
                 <Text style={oStyles.metricNum}>{orders.length}</Text>
@@ -395,7 +383,7 @@ export default function OrderPageWeb({
 
             <View style={oStyles.metricCard}>
               <View style={[oStyles.metricIconWrap, { backgroundColor: '#F3F7F6' }]}>
-                <BootstrapIcon name="truck" size={18} color="#0C6258" />
+                <BootstrapIcon name="truck" size={18} color="#1D4533" />
               </View>
               <View>
                 <Text style={oStyles.metricNum}>{activeDispatchCount}</Text>
@@ -469,7 +457,7 @@ export default function OrderPageWeb({
                     paddingHorizontal: 12,
                     paddingVertical: 5,
                     borderRadius: 20,
-                    backgroundColor: filterDateRange === dr.id ? '#0C6258' : '#F1F5F9',
+                    backgroundColor: filterDateRange === dr.id ? '#1D4533' : '#F1F5F9',
                   }}
                   onPress={() => setFilterDateRange(dr.id)}
                   activeOpacity={0.8}
@@ -573,45 +561,43 @@ export default function OrderPageWeb({
                           }}
                         >
                           {order.rider_name ? (
-                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#084A43' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#143325' }}>
                               Rider: {order.rider_name}
                             </Text>
                           ) : null}
                           {order.estimated_delivery ? (
-                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#084A43' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#143325' }}>
                               Expected: {order.estimated_delivery}
                             </Text>
                           ) : null}
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#084A43' }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#143325' }}>
                             The store will mark this delivered after drop-off.
                           </Text>
                         </View>
                       )}
 
                       {isDelivered && (
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              gap: 6,
-                              backgroundColor: '#DCFCE7',
-                              borderRadius: 8,
-                              borderWidth: 1,
-                              borderColor: '#BBF7D0',
-                              paddingHorizontal: 10,
-                              paddingVertical: 7,
-                              marginBottom: 10,
-                            }}
-                          >
-                            <BootstrapIcon name="check-circle-fill" size={12} color="#15803D" />
-                            <Text style={{ flex: 1, fontSize: 11.5, fontWeight: '700', color: '#15803D' }}>
-                              Delivered by the store
-                              {confirmedAt
-                                ? ` · ${new Date(confirmedAt).toLocaleString()}`
-                                : ''}
-                            </Text>
-                          </View>
-                        )}
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                            backgroundColor: '#DCFCE7',
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: '#BBF7D0',
+                            paddingHorizontal: 10,
+                            paddingVertical: 7,
+                            marginBottom: 10,
+                          }}
+                        >
+                          <BootstrapIcon name="check-circle-fill" size={12} color="#15803D" />
+                          <Text style={{ flex: 1, fontSize: 11.5, fontWeight: '700', color: '#15803D' }}>
+                            Delivered by the store
+                            {confirmedAt ? ` · ${new Date(confirmedAt).toLocaleString()}` : ''}
+                          </Text>
+                        </View>
+                      )}
 
                       <View style={oStyles.orderCardBottom}>
                         <Text style={oStyles.orderTotalText}>
@@ -666,7 +652,7 @@ export default function OrderPageWeb({
                             }}
                             activeOpacity={0.8}
                           >
-                            <BootstrapIcon name="geo-alt-fill" size={12} color="#0C6258" />
+                            <BootstrapIcon name="geo-alt-fill" size={12} color="#1D4533" />
                             <Text style={oStyles.trackBtnText}>Live GPS Route</Text>
                           </TouchableOpacity>
                         </View>
@@ -713,7 +699,7 @@ export default function OrderPageWeb({
                                   step.current &&
                                     !step.isCancelled && {
                                       borderWidth: 2,
-                                      borderColor: '#0C6258',
+                                      borderColor: '#1D4533',
                                       backgroundColor: '#FFFFFF',
                                     },
                                 ]}
@@ -783,99 +769,58 @@ export default function OrderPageWeb({
                         }}
                       >
                         <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>
-                          {isReportedStatus(selectedOrder.status)
-                            ? 'Delivery Reported'
-                            : 'Out for Delivery'}
+                          {isReportedStatus(selectedOrder.status) ? 'Delivery Reported' : 'Out for Delivery'}
                         </Text>
                         {selectedOrder.rider_name ? (
-                          <Text style={{ fontSize: 12.5, color: '#084A43', marginBottom: 4, fontWeight: '600' }}>
+                          <Text
+                            style={{ fontSize: 12.5, color: '#143325', marginBottom: 4, fontWeight: '600' }}
+                          >
                             Rider: {selectedOrder.rider_name}
                           </Text>
                         ) : null}
                         {selectedOrder.estimated_delivery ? (
-                          <Text style={{ fontSize: 12.5, color: '#084A43', marginBottom: 4, fontWeight: '600' }}>
+                          <Text
+                            style={{ fontSize: 12.5, color: '#143325', marginBottom: 4, fontWeight: '600' }}
+                          >
                             Expected: {selectedOrder.estimated_delivery}
                           </Text>
                         ) : null}
-                        <Text style={{ fontSize: 12.5, color: '#084A43', fontWeight: '600', marginBottom: 10 }}>
+                        <Text
+                          style={{ fontSize: 12.5, color: '#143325', fontWeight: '600' }}
+                        >
                           {isReportedStatus(selectedOrder.status)
-                            ? 'The rider reported drop-off. The store will confirm delivery shortly.'
-                            : 'Optional: tap below if you already received your package. Final delivery is confirmed by the store.'}
+                            ? 'The rider reported drop-off. The store admin will confirm delivery shortly.'
+                            : 'Your order is on the way. Delivery will be confirmed by the store admin upon arrival.'}
                         </Text>
-                        {!selectedOrder.customer_delivery_confirmed && (
-                          <TouchableOpacity
-                            style={{
-                              backgroundColor: '#0C6258',
-                              borderRadius: 10,
-                              paddingVertical: 10,
-                              paddingHorizontal: 14,
-                              alignSelf: 'flex-start',
-                            }}
-                            onPress={async () => {
-                              const oid = selectedOrder.order_id || selectedOrder.id;
-                              const res = await deliveryService.customerConfirmReceived({
-                                orderId: oid,
-                                customerUser: currentUser,
-                              });
-                              if (res.success) {
-                                showToast('Thanks — we notified the store you received your order');
-                                setSelectedOrder((prev) =>
-                                  prev
-                                    ? {
-                                        ...prev,
-                                        customer_delivery_confirmed: true,
-                                        customer_delivery_confirmed_at: new Date().toISOString(),
-                                      }
-                                    : prev
-                                );
-                              } else {
-                                showToast(res.error || 'Could not confirm receipt');
-                              }
-                            }}
-                            activeOpacity={0.85}
-                          >
-                            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 13 }}>
-                              Confirm Received
-                            </Text>
-                          </TouchableOpacity>
-                        )}
-                        {selectedOrder.customer_delivery_confirmed ? (
-                          <Text style={{ fontSize: 12, color: '#047857', fontWeight: '700' }}>
-                            You confirmed receipt
-                            {selectedOrder.customer_delivery_confirmed_at
-                              ? ` · ${new Date(selectedOrder.customer_delivery_confirmed_at).toLocaleString()}`
-                              : ''}
-                          </Text>
-                        ) : null}
                       </View>
                     )}
 
                     {((selectedOrder.status || '').toLowerCase().includes('delivered') ||
                       (selectedOrder.status || '').toLowerCase().includes('completed')) && (
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 8,
-                            backgroundColor: '#DCFCE7',
-                            padding: 12,
-                            borderRadius: 12,
-                            borderWidth: 1,
-                            borderColor: '#BBF7D0',
-                            marginBottom: 14,
-                          }}
-                        >
-                          <BootstrapIcon name="check-circle-fill" size={14} color="#15803D" />
-                          <Text style={{ flex: 1, fontSize: 12.5, fontWeight: '700', color: '#15803D' }}>
-                            Delivered by the store
-                            {selectedOrder.admin_confirmed_at || selectedOrder.updated_at
-                              ? ` · ${new Date(
-                                  selectedOrder.admin_confirmed_at || selectedOrder.updated_at
-                                ).toLocaleString()}`
-                              : ''}
-                          </Text>
-                        </View>
-                      )}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                          backgroundColor: '#DCFCE7',
+                          padding: 12,
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: '#BBF7D0',
+                          marginBottom: 14,
+                        }}
+                      >
+                        <BootstrapIcon name="check-circle-fill" size={14} color="#15803D" />
+                        <Text style={{ flex: 1, fontSize: 12.5, fontWeight: '700', color: '#15803D' }}>
+                          Delivered by the store
+                          {selectedOrder.admin_confirmed_at || selectedOrder.updated_at
+                            ? ` · ${new Date(
+                                selectedOrder.admin_confirmed_at || selectedOrder.updated_at
+                              ).toLocaleString()}`
+                            : ''}
+                        </Text>
+                      </View>
+                    )}
 
                     {selectedOrder.return_status && selectedOrder.return_status !== 'none' ? (
                       <View
@@ -1021,8 +966,31 @@ export default function OrderPageWeb({
               onNavigateToGarage?.();
             } else if (tab === 'Orders') {
               // already on orders
-            } else if (tab === 'Favorites') {
+            } else if (tab === 'Wishlist' || tab === 'Favorites') {
               onNavigateToWishlist?.();
+            } else if (tab === 'More') {
+              if (!currentUser) {
+                setRedirectReason('Please sign in to view your Customer Dashboard.');
+                onNavigateToLogin?.();
+              } else {
+                onNavigateToProfile?.('menu');
+              }
+            } else if (tab === 'Dashboard') {
+              if (!currentUser) {
+                setRedirectReason('Please sign in to view your Customer Dashboard.');
+                onNavigateToLogin?.();
+              } else {
+                onNavigateToProfile?.('overview');
+              }
+            } else if (tab === 'Bookings') {
+              if (!currentUser) {
+                setRedirectReason('Please sign in to view your bookings.');
+                onNavigateToLogin?.();
+              } else {
+                onNavigateToProfile?.('bookings');
+              }
+            } else if (tab === 'Notifications') {
+              onNavigateToProfile?.('notifications');
             } else if (tab === 'Admin') {
               if (currentUser?.role === 'admin') {
                 onNavigateToAdmin?.();

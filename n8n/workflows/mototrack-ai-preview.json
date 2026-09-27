@@ -1,0 +1,169 @@
+{
+  "name": "MotoTrack — AI Customization Preview",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "mototrack-preview",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-preview",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.headers['x-mototrack-secret'] || $json.headers['X-MotoTrack-Secret']}}",
+              "value2": "={{$env.MOTOTRACK_WEBHOOK_SECRET}}"
+            }
+          ]
+        }
+      },
+      "id": "validate-secret",
+      "name": "Validate Secret",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: 'Unauthorized' } }}"
+      },
+      "id": "reject",
+      "name": "Reject",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [440, 180]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nif (!body.customizationId || !body.motorcycle?.brand || !Array.isArray(body.productIds) || !body.productIds.length) {\n  return [{ json: { valid: false, error: 'Invalid customization payload' } }];\n}\nconst prompt = body.prompt || [\n  `Generate a realistic commercial motorcycle visualization of a ${[body.motorcycle.year, body.motorcycle.brand, body.motorcycle.model].filter(Boolean).join(' ')}.`,\n  'Keep the motorcycle model recognizable. Do not change it into another model. Do not generate a car.',\n  'Visually represent ONLY these selected motorcycle parts:',\n  (body.items || []).map(i => `- ${i.product_name || i.name}`).join('\\n'),\n  'Photorealistic studio lighting, 4K commercial product photo. Do not invent prices or stock.'\n].join('\\n');\nreturn [{ json: { ...body, valid: true, prompt } }];"
+      },
+      "id": "validate-build",
+      "name": "Validate Customization",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, -40]
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/functions/v1/customization-compatibility",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ customerId: $json.customerId, motorcycleId: $json.motorcycle?.motorcycleId, motorcycle: $json.motorcycle, productIds: $json.productIds }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "verify-compat",
+      "name": "Verify Compatibility",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [660, -40]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [{ "value1": "={{$json.compatible}}", "value2": true }]
+        }
+      },
+      "id": "compat-ok",
+      "name": "Compatibility OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [880, -40]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { error: 'Incompatible products — preview blocked', compatibility: $json } }}"
+      },
+      "id": "block-incompat",
+      "name": "Block Incompatible",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1100, 140]
+    },
+    {
+      "parameters": {
+        "jsCode": "const validated = $('Validate Customization').first().json;\nconst prompt = validated.prompt;\nconst encoded = encodeURIComponent(prompt.replace(/[^\\w\\s,.\\-/]/gi,' ').replace(/\\s+/g,' ').trim().slice(0,450));\nconst seed = Math.floor(100000 + Math.random()*900000);\nconst imageUrl = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=768&nologo=true&seed=${seed}&model=flux`;\nreturn [{ json: { customizationId: validated.customizationId, promptUsed: prompt, imageUrl, previewImageUrl: imageUrl } }];"
+      },
+      "id": "build-prompt-generate",
+      "name": "Build Prompt + Generate Image",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, -80],
+      "notes": "Replace this node with your preferred image API (OpenAI Images, Stability, Gemini, etc.). Never let the model set prices/stock/compatibility."
+    },
+    {
+      "parameters": {
+        "url": "={{$env.SUPABASE_URL}}/rest/v1/customizations?customization_id=eq.{{$json.customizationId}}",
+        "method": "PATCH",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ preview_image_url: $json.previewImageUrl, preview_prompt: $json.promptUsed, status: 'previewed' }) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "{{$env.SUPABASE_SERVICE_ROLE_KEY}}" },
+            { "name": "Authorization", "value": "Bearer {{$env.SUPABASE_SERVICE_ROLE_KEY}}" },
+            { "name": "Content-Type", "value": "application/json" },
+            { "name": "Prefer", "value": "return=minimal" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "save-preview",
+      "name": "Save Preview URL",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1320, -80]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { success: true, previewImageUrl: $('Build Prompt + Generate Image').item.json.previewImageUrl, promptUsed: $('Build Prompt + Generate Image').item.json.promptUsed, customizationId: $('Build Prompt + Generate Image').item.json.customizationId } }}"
+      },
+      "id": "respond-preview",
+      "name": "Return Preview Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1540, -80]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Validate Secret", "type": "main", "index": 0 }]] },
+    "Validate Secret": {
+      "main": [
+        [{ "node": "Validate Customization", "type": "main", "index": 0 }],
+        [{ "node": "Reject", "type": "main", "index": 0 }]
+      ]
+    },
+    "Validate Customization": { "main": [[{ "node": "Verify Compatibility", "type": "main", "index": 0 }]] },
+    "Verify Compatibility": { "main": [[{ "node": "Compatibility OK?", "type": "main", "index": 0 }]] },
+    "Compatibility OK?": {
+      "main": [
+        [{ "node": "Build Prompt + Generate Image", "type": "main", "index": 0 }],
+        [{ "node": "Block Incompatible", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Prompt + Generate Image": { "main": [[{ "node": "Save Preview URL", "type": "main", "index": 0 }]] },
+    "Save Preview URL": { "main": [[{ "node": "Return Preview Result", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "description": "AI preview workflow. Validates secret + customization, verifies DB compatibility via edge function, builds prompt, generates image, saves preview_image_url. AI does not set price/stock/compatibility."
+  }
+}

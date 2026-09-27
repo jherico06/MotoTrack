@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon';
 import { shopStyles as styles } from '../../styles/shop.styles';
 import { useAuth } from '../../context/AuthContext';
@@ -22,6 +22,8 @@ export default function MobileHeader({
   showSearch = true,
   searchPlaceholder = 'Search parts, gear, accessories...',
 }) {
+  const { width } = useWindowDimensions();
+  const isSmallMobile = width < 380;
   const { currentUser } = useAuth();
   const { cartItemCount } = useCart();
   const { wishlistCount } = useWishlist();
@@ -39,7 +41,7 @@ export default function MobileHeader({
   return (
     <>
       <View style={styles.headerWrapper}>
-        <View style={styles.headerRow}>
+        <View style={[styles.headerRow, isSmallMobile && { gap: 6 }]}>
           {/* Left: User Avatar & Greeting or Sign In */}
           {currentUser ? (
             <TouchableOpacity style={styles.headerLeft} onPress={onOpenProfile} activeOpacity={0.75}>
@@ -92,14 +94,14 @@ export default function MobileHeader({
           )}
 
           {/* Right: Notifications, Wishlist & Cart Bag (Minimalist Line Icons with Brand Colors) */}
-          <View style={styles.headerRight}>
+          <View style={[styles.headerRight, isSmallMobile && { gap: 6 }]}>
             <TouchableOpacity
               style={styles.headerIconBtn}
               onPress={onNavigateToNotifications}
               title="Notifications"
               activeOpacity={0.75}
             >
-              <BootstrapIcon name="bell" size={17} color="#0C6258" />
+              <BootstrapIcon name="bell" size={17} color="#1D4533" />
               {unreadNotifCount > 0 && (
                 <View style={[styles.cartBadgeDot, { backgroundColor: '#EF4444' }]}>
                   <Text style={styles.cartBadgeDotText}>
@@ -129,9 +131,9 @@ export default function MobileHeader({
               title="Shopping Cart"
               activeOpacity={0.75}
             >
-              <BootstrapIcon name="cart3" size={18} color="#0C6258" />
+              <BootstrapIcon name="cart3" size={18} color="#1D4533" />
               {cartItemCount > 0 && (
-                <View style={[styles.cartBadgeDot, { backgroundColor: '#0C6258' }]}>
+                <View style={[styles.cartBadgeDot, { backgroundColor: '#1D4533' }]}>
                   <Text style={styles.cartBadgeDotText}>{cartItemCount}</Text>
                 </View>
               )}

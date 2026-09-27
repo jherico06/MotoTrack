@@ -35,6 +35,9 @@ import {
   CheckoutModal,
   CartModal,
 } from '../components/modals';
+import CustomizationWorkspace from '../components/customizer/CustomizationWorkspace';
+import AiMotorcycleInstallStudio from '../components/customizer/AiMotorcycleInstallStudio';
+import { useCustomizationBuilder } from '../hooks/useCustomizationBuilder';
 import { pickImageFromFile } from '../utils/imagePickerHelper';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -59,6 +62,12 @@ export default function CustomizerPageWeb({
   const { currentUser, logout, setRedirectReason } = useAuth();
   const { addToCart, showToast, toastMessage, cartItemCount } = useCart();
   const { wishlistCount, addToWishlist } = useWishlist();
+
+  const [studioMode, setStudioMode] = useState('builder');
+  const customizationBuilder = useCustomizationBuilder({
+    currentUser,
+    initialProduct: initialSelectedProduct,
+  });
 
   // ─── NOTIFICATION STATE ───
   const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
@@ -97,7 +106,8 @@ export default function CustomizerPageWeb({
   useEffect(() => {
     const unsub = motorcycleService.subscribe(() => {
       const userBikes = motorcycleService.getMotorcycles(currentUser?.id);
-      const bikes = Array.isArray(userBikes) && userBikes.length > 0 ? userBikes : motorcycleService.getMotorcycles();
+      const bikes =
+        Array.isArray(userBikes) && userBikes.length > 0 ? userBikes : motorcycleService.getMotorcycles();
       setRegisteredBikes(bikes);
       if (!selectedRegisteredBike && bikes.length > 0) {
         setSelectedRegisteredBike(bikes.find((b) => b.is_primary) || bikes[0]);
@@ -135,7 +145,14 @@ export default function CustomizerPageWeb({
       photo_url: customPhotoUri,
       color: 'Custom Finish',
     };
-  }, [bikeSourceMode, selectedRegisteredBike, selectedPreset, customBikeBrand, customBikeName, customPhotoUri]);
+  }, [
+    bikeSourceMode,
+    selectedRegisteredBike,
+    selectedPreset,
+    customBikeBrand,
+    customBikeName,
+    customPhotoUri,
+  ]);
 
   const currentBasePhoto = useMemo(() => {
     if (bikeSourceMode === 'registered' && selectedRegisteredBike?.photo_url) {
@@ -528,12 +545,7 @@ export default function CustomizerPageWeb({
               <Text style={styles.headerCenterBtnText}>Book a Service</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.headerCenterBtn} activeOpacity={0.8}>
-              <BootstrapIcon name="magic" size={16} color="#10B981" />
-              <Text style={[styles.headerCenterBtnText, { color: '#10B981', fontWeight: '800' }]}>
-                Customize
-              </Text>
-            </TouchableOpacity>
+
           </View>
 
           <View style={styles.headerActions}>
@@ -643,6 +655,69 @@ export default function CustomizerPageWeb({
         showsVerticalScrollIndicator={true}
       >
         <View style={styles.maxContainer}>
+          <View
+            style={{
+              flexDirection: 'row',
+              gap: 8,
+              marginBottom: 14,
+              backgroundColor: '#F1F5F9',
+              borderRadius: 12,
+              padding: 4,
+              maxWidth: 520,
+            }}
+          >
+            {[
+              { id: 'builder', label: 'Parts Builder' },
+              { id: 'install', label: 'AI Install' },
+              { id: 'studio', label: 'AI Studio' },
+            ].map((tab) => (
+              <TouchableOpacity
+                key={tab.id}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: studioMode === tab.id ? '#1D4533' : 'transparent',
+                  alignItems: 'center',
+                }}
+                onPress={() => setStudioMode(tab.id)}
+              >
+                <Text
+                  style={{
+                    fontWeight: '700',
+                    fontSize: 12,
+                    color: studioMode === tab.id ? '#FFFFFF' : '#64748B',
+                  }}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {studioMode === 'builder' && (
+            <CustomizationWorkspace
+              builder={customizationBuilder}
+              addToCart={addToCart}
+              onRequireLogin={() => {
+                setRedirectReason?.('save-customization');
+                onNavigateToLogin?.();
+              }}
+            />
+          )}
+
+          {studioMode === 'install' && (
+            <AiMotorcycleInstallStudio
+              currentUser={currentUser}
+              onRequireLogin={() => {
+                setRedirectReason?.('ai-install');
+                onNavigateToLogin?.();
+              }}
+            />
+          )}
+
+          {studioMode === 'studio' && (
+            <>
           {/* ─── MINIMALIST STEPPER ─── */}
           <View style={styles.workflowStepperCard}>
             <View style={styles.stepperTrack}>
@@ -699,10 +774,7 @@ export default function CustomizerPageWeb({
                     <BootstrapIcon name="check" size={14} color="#FFFFFF" />
                   ) : (
                     <Text
-                      style={[
-                        styles.stepBadgeText,
-                        workflowStep === 'parts' && styles.stepBadgeTextActive,
-                      ]}
+                      style={[styles.stepBadgeText, workflowStep === 'parts' && styles.stepBadgeTextActive]}
                     >
                       2
                     </Text>
@@ -742,10 +814,7 @@ export default function CustomizerPageWeb({
                     <BootstrapIcon name="check" size={14} color="#FFFFFF" />
                   ) : (
                     <Text
-                      style={[
-                        styles.stepBadgeText,
-                        workflowStep === 'review' && styles.stepBadgeTextActive,
-                      ]}
+                      style={[styles.stepBadgeText, workflowStep === 'review' && styles.stepBadgeTextActive]}
                     >
                       3
                     </Text>
@@ -759,12 +828,7 @@ export default function CustomizerPageWeb({
                 </View>
               </TouchableOpacity>
 
-              <View
-                style={[
-                  styles.stepConnector,
-                  workflowStep === 'total' && styles.stepConnectorActive,
-                ]}
-              />
+              <View style={[styles.stepConnector, workflowStep === 'total' && styles.stepConnectorActive]} />
 
               {/* Step 4 */}
               <TouchableOpacity
@@ -772,17 +836,9 @@ export default function CustomizerPageWeb({
                 onPress={() => setWorkflowStep('total')}
                 activeOpacity={0.85}
               >
-                <View
-                  style={[
-                    styles.stepBadge,
-                    workflowStep === 'total' && styles.stepBadgeActive,
-                  ]}
-                >
+                <View style={[styles.stepBadge, workflowStep === 'total' && styles.stepBadgeActive]}>
                   <Text
-                    style={[
-                      styles.stepBadgeText,
-                      workflowStep === 'total' && styles.stepBadgeTextActive,
-                    ]}
+                    style={[styles.stepBadgeText, workflowStep === 'total' && styles.stepBadgeTextActive]}
                   >
                     4
                   </Text>
@@ -811,7 +867,7 @@ export default function CustomizerPageWeb({
                     </Text>
                   </View>
                   <TouchableOpacity
-                    style={[styles.emptyRegBikesBtn, { backgroundColor: '#0C6258' }]}
+                    style={[styles.emptyRegBikesBtn, { backgroundColor: '#1D4533' }]}
                     onPress={() => setIsRegisterBikeModalOpen(true)}
                     activeOpacity={0.85}
                   >
@@ -823,17 +879,14 @@ export default function CustomizerPageWeb({
                 {/* Filter Tabs: All Options | Registered Garage | Presets | Custom Photo */}
                 <View style={styles.bikeSourceTabs}>
                   <TouchableOpacity
-                    style={[
-                      styles.bikeSourceTab,
-                      bikeSourceMode === 'all' && styles.bikeSourceTabActive,
-                    ]}
+                    style={[styles.bikeSourceTab, bikeSourceMode === 'all' && styles.bikeSourceTabActive]}
                     onPress={() => setBikeSourceMode('all')}
                     activeOpacity={0.85}
                   >
                     <BootstrapIcon
                       name="collection-fill"
                       size={14}
-                      color={bikeSourceMode === 'all' ? '#FFFFFF' : '#0C6258'}
+                      color={bikeSourceMode === 'all' ? '#FFFFFF' : '#1D4533'}
                     />
                     <Text
                       style={[
@@ -856,7 +909,7 @@ export default function CustomizerPageWeb({
                     <BootstrapIcon
                       name="bicycle"
                       size={14}
-                      color={bikeSourceMode === 'registered' ? '#FFFFFF' : '#0C6258'}
+                      color={bikeSourceMode === 'registered' ? '#FFFFFF' : '#1D4533'}
                     />
                     <Text
                       style={[
@@ -869,17 +922,14 @@ export default function CustomizerPageWeb({
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[
-                      styles.bikeSourceTab,
-                      bikeSourceMode === 'presets' && styles.bikeSourceTabActive,
-                    ]}
+                    style={[styles.bikeSourceTab, bikeSourceMode === 'presets' && styles.bikeSourceTabActive]}
                     onPress={() => setBikeSourceMode('presets')}
                     activeOpacity={0.85}
                   >
                     <BootstrapIcon
                       name="grid-fill"
                       size={14}
-                      color={bikeSourceMode === 'presets' ? '#FFFFFF' : '#0C6258'}
+                      color={bikeSourceMode === 'presets' ? '#FFFFFF' : '#1D4533'}
                     />
                     <Text
                       style={[
@@ -892,17 +942,14 @@ export default function CustomizerPageWeb({
                   </TouchableOpacity>
 
                   <TouchableOpacity
-                    style={[
-                      styles.bikeSourceTab,
-                      bikeSourceMode === 'upload' && styles.bikeSourceTabActive,
-                    ]}
+                    style={[styles.bikeSourceTab, bikeSourceMode === 'upload' && styles.bikeSourceTabActive]}
                     onPress={() => setBikeSourceMode('upload')}
                     activeOpacity={0.85}
                   >
                     <BootstrapIcon
                       name="camera-fill"
                       size={14}
-                      color={bikeSourceMode === 'upload' ? '#FFFFFF' : '#0C6258'}
+                      color={bikeSourceMode === 'upload' ? '#FFFFFF' : '#1D4533'}
                     />
                     <Text
                       style={[
@@ -929,7 +976,7 @@ export default function CustomizerPageWeb({
                       }}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <BootstrapIcon name="bicycle" size={16} color="#0C6258" />
+                        <BootstrapIcon name="bicycle" size={16} color="#1D4533" />
                         <Text
                           style={[
                             styles.formLabel,
@@ -947,13 +994,13 @@ export default function CustomizerPageWeb({
                         </Text>
                         <View
                           style={{
-                            backgroundColor: '#D1ECE6',
+                            backgroundColor: '#C8DDD3',
                             paddingHorizontal: 8,
                             paddingVertical: 2,
                             borderRadius: 12,
                           }}
                         >
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#0C6258' }}>
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533' }}>
                             {registeredBikes.length} in Garage
                           </Text>
                         </View>
@@ -964,8 +1011,8 @@ export default function CustomizerPageWeb({
                         onPress={() => setIsRegisterBikeModalOpen(true)}
                         activeOpacity={0.8}
                       >
-                        <BootstrapIcon name="plus-circle-fill" size={13} color="#0C6258" />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#0C6258' }}>
+                        <BootstrapIcon name="plus-circle-fill" size={13} color="#1D4533" />
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4533' }}>
                           + Register New Motorcycle
                         </Text>
                       </TouchableOpacity>
@@ -993,7 +1040,8 @@ export default function CustomizerPageWeb({
                               />
                               <View style={styles.regBikeHeader}>
                                 <Text style={styles.regBikeTitle} numberOfLines={1}>
-                                  {bike.year ? `${bike.year} ` : ''}{bike.brand} {bike.model}
+                                  {bike.year ? `${bike.year} ` : ''}
+                                  {bike.brand} {bike.model}
                                 </Text>
                                 <View
                                   style={[
@@ -1015,9 +1063,7 @@ export default function CustomizerPageWeb({
                               <View style={styles.regBikeMetaRow}>
                                 {bike.plate_number && (
                                   <View style={styles.regBikePlateBadge}>
-                                    <Text style={styles.regBikePlateText}>
-                                      Plate: {bike.plate_number}
-                                    </Text>
+                                    <Text style={styles.regBikePlateText}>Plate: {bike.plate_number}</Text>
                                   </View>
                                 )}
                                 {bike.color && (
@@ -1058,19 +1104,19 @@ export default function CustomizerPageWeb({
                               width: 44,
                               height: 44,
                               borderRadius: 22,
-                              backgroundColor: '#D1ECE6',
+                              backgroundColor: '#C8DDD3',
                               justifyContent: 'center',
                               alignItems: 'center',
                               marginBottom: 8,
                             }}
                           >
-                            <BootstrapIcon name="plus-lg" size={20} color="#0C6258" />
+                            <BootstrapIcon name="plus-lg" size={20} color="#1D4533" />
                           </View>
                           <Text
                             style={{
                               fontSize: 12.5,
                               fontWeight: '700',
-                              color: '#0C6258',
+                              color: '#1D4533',
                               textAlign: 'center',
                               paddingHorizontal: 8,
                             }}
@@ -1081,9 +1127,10 @@ export default function CustomizerPageWeb({
                       </ScrollView>
                     ) : (
                       <View style={styles.emptyRegBikesBox}>
-                        <BootstrapIcon name="info-circle" size={24} color="#0C6258" />
+                        <BootstrapIcon name="info-circle" size={24} color="#1D4533" />
                         <Text style={styles.emptyRegBikesText}>
-                          No motorcycles registered yet in your garage fleet. Register your ride below to customize parts with 100% precision fitment!
+                          No motorcycles registered yet in your garage fleet. Register your ride below to
+                          customize parts with 100% precision fitment!
                         </Text>
                         <TouchableOpacity
                           style={styles.emptyRegBikesBtn}
@@ -1102,7 +1149,7 @@ export default function CustomizerPageWeb({
                 {(bikeSourceMode === 'all' || bikeSourceMode === 'presets') && (
                   <View style={{ marginBottom: 20 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                      <BootstrapIcon name="grid-fill" size={15} color="#0C6258" />
+                      <BootstrapIcon name="grid-fill" size={15} color="#1D4533" />
                       <Text
                         style={[
                           styles.formLabel,
@@ -1184,7 +1231,7 @@ export default function CustomizerPageWeb({
                         <BootstrapIcon
                           name={customPhotoUri ? 'check-circle-fill' : 'camera-fill'}
                           size={24}
-                          color={customPhotoUri ? '#0C6258' : '#94A3B8'}
+                          color={customPhotoUri ? '#1D4533' : '#94A3B8'}
                         />
                       </View>
                       <Text style={styles.uploadTitle}>
@@ -1205,7 +1252,7 @@ export default function CustomizerPageWeb({
                     padding: 16,
                     marginTop: 10,
                     borderWidth: 1.5,
-                    borderColor: '#0C6258',
+                    borderColor: '#1D4533',
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'space-between',
@@ -1232,7 +1279,7 @@ export default function CustomizerPageWeb({
                           style={{
                             fontSize: 11,
                             fontWeight: '800',
-                            color: '#0C6258',
+                            color: '#1D4533',
                             letterSpacing: 0.5,
                           }}
                         >
@@ -1241,7 +1288,7 @@ export default function CustomizerPageWeb({
                         {selectedRegisteredBike ? (
                           <View
                             style={{
-                              backgroundColor: '#0C6258',
+                              backgroundColor: '#1D4533',
                               paddingHorizontal: 7,
                               paddingVertical: 2,
                               borderRadius: 4,
@@ -1287,8 +1334,8 @@ export default function CustomizerPageWeb({
                         {selectedRegisteredBike
                           ? `Plate: ${selectedRegisteredBike.plate_number || 'N/A'} • Color: ${selectedRegisteredBike.color || 'Standard'} • Engine: ${selectedRegisteredBike.engine_cc || 155}cc`
                           : selectedPreset
-                          ? `Category: ${selectedPreset.category} • Color: ${selectedPreset.color} • ${selectedPreset.baseHp} HP`
-                          : 'Custom project photo loaded from device'}
+                            ? `Category: ${selectedPreset.category} • Color: ${selectedPreset.color} • ${selectedPreset.baseHp} HP`
+                            : 'Custom project photo loaded from device'}
                       </Text>
                     </View>
                   </View>
@@ -1298,9 +1345,7 @@ export default function CustomizerPageWeb({
                     onPress={() => setWorkflowStep('parts')}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.reviewActionPrimaryText}>
-                      Confirm Motorcycle & Choose Parts ➔
-                    </Text>
+                    <Text style={styles.reviewActionPrimaryText}>Confirm Motorcycle & Choose Parts ➔</Text>
                     <BootstrapIcon name="arrow-right" size={15} color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
@@ -1324,7 +1369,7 @@ export default function CustomizerPageWeb({
                     />
                     <View style={styles.canvasOverlayHeader}>
                       <View style={styles.bikeTagBadge}>
-                        <BootstrapIcon name="bicycle" size={14} color="#0C6258" />
+                        <BootstrapIcon name="bicycle" size={14} color="#1D4533" />
                         <Text style={styles.bikeTagText} numberOfLines={1}>
                           {currentBikeTitle}
                         </Text>
@@ -1342,8 +1387,8 @@ export default function CustomizerPageWeb({
                     <View style={styles.diagHeader}>
                       <Text style={styles.diagTitle}>Performance Tuning Metrics</Text>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                        <BootstrapIcon name="speedometer2" size={14} color="#0C6258" />
-                        <Text style={{ fontSize: 11.5, color: '#0C6258', fontWeight: '800' }}>
+                        <BootstrapIcon name="speedometer2" size={14} color="#1D4533" />
+                        <Text style={{ fontSize: 11.5, color: '#1D4533', fontWeight: '800' }}>
                           {liveDiagnostics.powerToWeightRatio}
                         </Text>
                       </View>
@@ -1354,7 +1399,9 @@ export default function CustomizerPageWeb({
                         <Text style={styles.diagItemLabel}>Peak Horsepower</Text>
                         <Text style={styles.diagItemVal}>
                           {liveDiagnostics.estimatedFinalHp} HP{' '}
-                          <Text style={{ fontSize: 11, color: '#10B981' }}>(+{liveDiagnostics.hpGain} HP)</Text>
+                          <Text style={{ fontSize: 11, color: '#10B981' }}>
+                            (+{liveDiagnostics.hpGain} HP)
+                          </Text>
                         </Text>
                         <Text style={styles.diagItemSub}>Stock: {liveDiagnostics.baseHp} HP</Text>
                       </View>
@@ -1398,7 +1445,8 @@ export default function CustomizerPageWeb({
                       </View>
                       <View>
                         <Text style={styles.addMorePromptTitle}>
-                          {selectedParts.length} Custom {selectedParts.length === 1 ? 'Part' : 'Parts'} Installed
+                          {selectedParts.length} Custom {selectedParts.length === 1 ? 'Part' : 'Parts'}{' '}
+                          Installed
                         </Text>
                         <Text style={styles.addMorePromptSub}>
                           Add more customizations (Wheels, Exhaust, Accessories)?
@@ -1458,10 +1506,7 @@ export default function CustomizerPageWeb({
                           activeOpacity={0.8}
                         >
                           <Text
-                            style={[
-                              styles.partsCategoryText,
-                              isCatActive && styles.partsCategoryTextActive,
-                            ]}
+                            style={[styles.partsCategoryText, isCatActive && styles.partsCategoryTextActive]}
                           >
                             {cat}
                           </Text>
@@ -1500,7 +1545,11 @@ export default function CustomizerPageWeb({
                           onPress={() => handleOpenPartDetails(product)}
                           activeOpacity={0.85}
                         >
-                          <Image source={{ uri: product.image }} style={styles.partThumb} resizeMode="cover" />
+                          <Image
+                            source={{ uri: product.image }}
+                            style={styles.partThumb}
+                            resizeMode="cover"
+                          />
 
                           <View style={styles.partInfo}>
                             <Text style={styles.partName} numberOfLines={1}>
@@ -1510,9 +1559,11 @@ export default function CustomizerPageWeb({
                               {product.brand} • {product.category}
                             </Text>
                             {isSelected && (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
-                                <BootstrapIcon name="check2-circle" size={12} color="#0C6258" />
-                                <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#0C6258' }}>
+                              <View
+                                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}
+                              >
+                                <BootstrapIcon name="check2-circle" size={12} color="#1D4533" />
+                                <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#1D4533' }}>
                                   Installed on {activeMotorcycle?.model || 'Motorcycle'}
                                 </Text>
                               </View>
@@ -1568,9 +1619,7 @@ export default function CustomizerPageWeb({
                         disabled={selectedParts.length === 0}
                         activeOpacity={0.85}
                       >
-                        <Text style={styles.reviewActionPrimaryText}>
-                          Review Customization ➔
-                        </Text>
+                        <Text style={styles.reviewActionPrimaryText}>Review Customization ➔</Text>
                         <BootstrapIcon name="arrow-right" size={14} color="#FFFFFF" />
                       </TouchableOpacity>
                     </View>
@@ -1595,11 +1644,10 @@ export default function CustomizerPageWeb({
                       resizeMode="cover"
                     />
                     <View>
-                      <Text style={styles.reviewBikeTitle}>
-                        {currentBikeTitle}
-                      </Text>
+                      <Text style={styles.reviewBikeTitle}>{currentBikeTitle}</Text>
                       <Text style={styles.reviewBikeSub}>
-                        {activeMotorcycle?.brand} • {activeMotorcycle?.color || 'Custom Paint'} • Plate: {activeMotorcycle?.plate_number || 'Registered'}
+                        {activeMotorcycle?.brand} • {activeMotorcycle?.color || 'Custom Paint'} • Plate:{' '}
+                        {activeMotorcycle?.plate_number || 'Registered'}
                       </Text>
                     </View>
                   </View>
@@ -1623,7 +1671,11 @@ export default function CustomizerPageWeb({
                   {selectedParts.map((part) => (
                     <View key={part.id || part.product_id} style={styles.reviewPartRow}>
                       <View style={styles.reviewPartLeft}>
-                        <Image source={{ uri: part.image }} style={styles.reviewPartThumb} resizeMode="cover" />
+                        <Image
+                          source={{ uri: part.image }}
+                          style={styles.reviewPartThumb}
+                          resizeMode="cover"
+                        />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.reviewPartName} numberOfLines={1}>
                             {part.name}
@@ -1658,10 +1710,17 @@ export default function CustomizerPageWeb({
                     padding: 20,
                     marginVertical: 18,
                     borderWidth: 1.5,
-                    borderColor: '#D1ECE6',
+                    borderColor: '#C8DDD3',
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginBottom: 8,
+                    }}
+                  >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <View style={[styles.modeIconWrap, { width: 34, height: 34 }]}>
                         <BootstrapIcon name="magic" size={16} color="#FFFFFF" />
@@ -1684,12 +1743,12 @@ export default function CustomizerPageWeb({
                   {/* Formed Prompt Box */}
                   <View style={styles.formedPromptTextBox}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#0C6258' }}>
+                      <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#1D4533' }}>
                         AUTO-SYNTHESIZED PROMPT SENTENCE:
                       </Text>
                       <View style={{ flexDirection: 'row', gap: 6 }}>
                         <TouchableOpacity onPress={handleCopyPrompt} title="Copy prompt">
-                          <BootstrapIcon name="clipboard-check" size={13} color="#0C6258" />
+                          <BootstrapIcon name="clipboard-check" size={13} color="#1D4533" />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={handleResetPrompt} title="Reset prompt">
                           <BootstrapIcon name="arrow-clockwise" size={13} color="#64748B" />
@@ -1724,8 +1783,8 @@ export default function CustomizerPageWeb({
                       {isGenerating
                         ? 'Generating 4K AI Photo...'
                         : generationResult
-                        ? '⚡ Re-Generate AI Custom Motorcycle Photo'
-                        : '⚡ Generate Photorealistic AI Photo Preview'}
+                          ? '⚡ Re-Generate AI Custom Motorcycle Photo'
+                          : '⚡ Generate Photorealistic AI Photo Preview'}
                     </Text>
                   </TouchableOpacity>
 
@@ -1741,7 +1800,12 @@ export default function CustomizerPageWeb({
                         <TouchableOpacity
                           style={[
                             styles.toggleViewBtn,
-                            { position: 'absolute', top: 14, right: 14, backgroundColor: 'rgba(15,23,42,0.85)' },
+                            {
+                              position: 'absolute',
+                              top: 14,
+                              right: 14,
+                              backgroundColor: 'rgba(15,23,42,0.85)',
+                            },
                           ]}
                           onPress={() =>
                             setActiveViewMode((prev) => (prev === 'generated' ? 'original' : 'generated'))
@@ -1798,9 +1862,7 @@ export default function CustomizerPageWeb({
                     onPress={() => setWorkflowStep('total')}
                     activeOpacity={0.85}
                   >
-                    <Text style={styles.reviewActionPrimaryText}>
-                      View Estimated Total & Action ➔
-                    </Text>
+                    <Text style={styles.reviewActionPrimaryText}>View Estimated Total & Action ➔</Text>
                     <BootstrapIcon name="arrow-right" size={15} color="#FFFFFF" />
                   </TouchableOpacity>
                 </View>
@@ -1835,9 +1897,7 @@ export default function CustomizerPageWeb({
                       <Text style={styles.totalRowLabel} numberOfLines={1}>
                         {part.name} ({part.brand})
                       </Text>
-                      <Text style={styles.totalRowValue}>
-                        ₱{usdToPhp(part.price || 0).toLocaleString()}
-                      </Text>
+                      <Text style={styles.totalRowValue}>₱{usdToPhp(part.price || 0).toLocaleString()}</Text>
                     </View>
                   ))}
 
@@ -1864,7 +1924,7 @@ export default function CustomizerPageWeb({
                   <View style={styles.totalGrandBox}>
                     <View>
                       <Text style={styles.totalGrandLabel}>Total Estimated Investment</Text>
-                      <Text style={{ fontSize: 11, color: '#0C6258' }}>
+                      <Text style={{ fontSize: 11, color: '#1D4533' }}>
                         Includes all equipped parts + garage installation
                       </Text>
                     </View>
@@ -1888,7 +1948,7 @@ export default function CustomizerPageWeb({
                     <BootstrapIcon name="cart-check-fill" size={18} color="#FFFFFF" />
                     <View>
                       <Text style={styles.buyPartsCheckoutText}>Buy Parts (Checkout)</Text>
-                      <Text style={{ fontSize: 11, color: '#D1ECE6' }}>
+                      <Text style={{ fontSize: 11, color: '#C8DDD3' }}>
                         Order parts online with COD or GCash
                       </Text>
                     </View>
@@ -1922,6 +1982,8 @@ export default function CustomizerPageWeb({
               </View>
             </View>
           )}
+            </>
+          )}
         </View>
       </ScrollView>
 
@@ -1932,7 +1994,7 @@ export default function CustomizerPageWeb({
             <View style={styles.partModalSheet}>
               <View style={styles.partModalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <BootstrapIcon name="info-circle-fill" size={18} color="#0C6258" />
+                  <BootstrapIcon name="info-circle-fill" size={18} color="#1D4533" />
                   <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>
                     Part Details & Fitment
                   </Text>
@@ -1971,7 +2033,7 @@ export default function CustomizerPageWeb({
 
               <View style={styles.partModalSpecsRow}>
                 <View style={styles.partModalSpecChip}>
-                  <BootstrapIcon name="check-circle" size={12} color="#0C6258" />
+                  <BootstrapIcon name="check-circle" size={12} color="#1D4533" />
                   <Text style={styles.partModalSpecText}>
                     Compatible with {activeMotorcycle?.brand} {activeMotorcycle?.model}
                   </Text>
@@ -2036,7 +2098,7 @@ export default function CustomizerPageWeb({
           <View style={styles.modalSheet}>
             <View style={styles.modalHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <BootstrapIcon name="calendar-check-fill" size={18} color="#0C6258" />
+                <BootstrapIcon name="calendar-check-fill" size={18} color="#1D4533" />
                 <Text style={styles.modalTitle}>Book Installation Pitstop</Text>
               </View>
               <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsBookingModalOpen(false)}>
@@ -2054,9 +2116,7 @@ export default function CustomizerPageWeb({
                   marginBottom: 12,
                 }}
               >
-                <Text style={{ fontWeight: '700', color: '#0F172A', fontSize: 13 }}>
-                  {currentBikeTitle}
-                </Text>
+                <Text style={{ fontWeight: '700', color: '#0F172A', fontSize: 13 }}>{currentBikeTitle}</Text>
                 <Text style={{ fontSize: 11, color: '#64748B' }}>
                   {selectedParts.length} Custom Parts to be Installed
                 </Text>
@@ -2146,13 +2206,36 @@ export default function CustomizerPageWeb({
             if (tab === 'Home') onNavigateToStore?.();
             else if (tab === 'Garage') onNavigateToGarage?.();
             else if (tab === 'Orders') onNavigateToOrders?.();
-            else if (tab === 'Favorites') onNavigateToWishlist?.();
-            else if (tab === 'Profile') {
+            else if (tab === 'Wishlist' || tab === 'Favorites') onNavigateToWishlist?.();
+            else if (tab === 'More') {
               if (!currentUser) {
                 setRedirectReason('');
                 onNavigateToLogin?.();
               } else {
-                onNavigateToProfile?.();
+                onNavigateToProfile?.('menu');
+              }
+            } else if (tab === 'Dashboard') {
+              if (!currentUser) {
+                setRedirectReason('');
+                onNavigateToLogin?.();
+              } else {
+                onNavigateToProfile?.('overview');
+              }
+            } else if (tab === 'Bookings') {
+              if (!currentUser) {
+                setRedirectReason('');
+                onNavigateToLogin?.();
+              } else {
+                onNavigateToProfile?.('bookings');
+              }
+            } else if (tab === 'Notifications') {
+              onNavigateToProfile?.('notifications');
+            } else if (tab === 'Profile') {
+              if (!currentUser) {
+                setRedirectReason('');
+                onNavigateToLogin?.();
+              } else {
+                onNavigateToProfile?.('profile');
               }
             }
           }}

@@ -6,7 +6,7 @@ export const wishlistWebStyles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
   },
   headerWrapper: {
-    backgroundColor: 'rgba(10, 15, 28, 0.85)',
+    backgroundColor: '#1D4533',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
     position: 'sticky',
@@ -14,7 +14,7 @@ export const wishlistWebStyles = StyleSheet.create({
     zIndex: 1000,
     boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.10)',
   },
   headerInner: {
     maxWidth: 1360,
@@ -35,7 +35,7 @@ export const wishlistWebStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -123,7 +123,9 @@ export const wishlistWebStyles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 20,
-    backgroundColor: '#1E293B',
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
   },
   signInHeaderBtnText: {
     fontSize: 13,
@@ -182,7 +184,7 @@ export const wishlistWebStyles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 9,
     borderRadius: 14,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
   },
   moveAllBtnText: {
     fontSize: 13,
@@ -216,7 +218,7 @@ export const wishlistWebStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 20,
     paddingVertical: 11,
     borderRadius: 14,
@@ -288,7 +290,7 @@ export const wishlistWebStyles = StyleSheet.create({
   priceMainText: {
     fontSize: 15.5,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   tagsRow: {
     flexDirection: 'row',
@@ -351,7 +353,7 @@ export const wishlistWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   addToCartBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 8,
     paddingVertical: 7.5,
     flexDirection: 'row',

@@ -9,11 +9,14 @@ import {
   SafeAreaView,
   Modal,
   RefreshControl,
+  Image,
 } from 'react-native';
 import BootstrapIcon from '../components/common/BootstrapIcon';
+import { StatusBar } from 'expo-status-bar';
 import ExternalLink from '../components/common/ExternalLink';
 import RiderQrScanSheet from '../components/modals/RiderQrScanSheet';
 import RiderConfirmDeliverySheet from '../components/modals/RiderConfirmDeliverySheet';
+import { pickImageFromFile } from '../utils/imagePickerHelper';
 import { useAuth } from '../context/AuthContext';
 import { deliveryService } from '../services/deliveryService';
 import { riderService } from '../services/riderService';
@@ -97,6 +100,8 @@ export default function RiderDashboard({ onLogout }) {
   const [notice, setNotice] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [tab, setTab] = useState('active'); // 'active' | 'history'
+  const [podPhoto, setPodPhoto] = useState(null);   // staged photo for current detail
+  const [podBusy, setPodBusy] = useState(false);    // uploading indicator
 
   const resolveRiderId = useCallback(async () => {
     if (currentUser?.rider_id) return currentUser.rider_id;
@@ -151,7 +156,9 @@ export default function RiderDashboard({ onLogout }) {
   }, [resolveRiderId]);
 
   useEffect(() => {
-    load();
+    (async () => {
+      await load();
+    })();
   }, [load]);
 
   useEffect(() => {
@@ -253,8 +260,39 @@ export default function RiderDashboard({ onLogout }) {
     setNotice('Delivery reported. The store can see the update.');
     setVerified(null);
     setSelected(null);
+    setPodPhoto(null);
     closeConfirmPopup();
     await load();
+  };
+
+  const handlePickPodPhoto = async () => {
+    const res = await pickImageFromFile();
+    if (res.success) setPodPhoto(res.uri);
+    else if (res.error && res.error !== 'No file selected' && res.error !== 'Selection cancelled')
+      setNotice(res.error);
+  };
+
+  const handleSavePodPhoto = async () => {
+    if (!podPhoto || !detail) return;
+    setPodBusy(true);
+    try {
+      const res = await deliveryService.riderUploadProofPhoto({
+        riderId,
+        orderId: detail.orderId,
+        photoUri: podPhoto,
+      });
+      if (res.success) {
+        setNotice('Proof photo saved successfully.');
+        // Patch the selected delivery card with the photo so the preview persists
+        setSelected((prev) => prev ? { ...prev, deliveryPhoto: podPhoto } : prev);
+        setPodPhoto(null);
+        await load();
+      } else {
+        setNotice(res.error || 'Could not save photo.');
+      }
+    } finally {
+      setPodBusy(false);
+    }
   };
 
   const detail = selected;
@@ -273,6 +311,7 @@ export default function RiderDashboard({ onLogout }) {
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.safe}>
+        <StatusBar style="dark" translucent backgroundColor="transparent" />
         <ScrollView
           contentContainerStyle={styles.body}
           showsVerticalScrollIndicator={false}
@@ -604,6 +643,99 @@ export default function RiderDashboard({ onLogout }) {
                 </TouchableOpacity>
               ) : null}
 
+              {/* ── PROOF OF DELIVERY PHOTO ── */}
+              {detail.deliveryStatus !== 'Delivered' ? (
+                <View style={styles.podSection}>
+                  <Text style={styles.section}>Proof of Delivery Photo</Text>
+
+                  {/* Existing saved photo */}
+                  {detail.deliveryPhoto && !podPhoto ? (
+                    <View style={styles.podPhotoWrap}>
+                      <Image
+                        source={{ uri: detail.deliveryPhoto }}
+                        style={styles.podPhotoPreview}
+                        resizeMode="cover"
+                      />
+                      <Text style={styles.podPhotoLabel}>Photo on file</Text>
+                      <TouchableOpacity
+                        style={styles.podChangeBtn}
+                        onPress={handlePickPodPhoto}
+                        activeOpacity={0.85}
+                      >
+                        <BootstrapIcon name="camera" size={12} color={colors.brand} />
+                        <Text style={styles.podChangeBtnText}>Change photo</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+
+                  {/* New staged photo preview */}
+                  {podPhoto ? (
+                    <View style={styles.podPhotoWrap}>
+                      <Image
+                        source={{ uri: podPhoto }}
+                        style={styles.podPhotoPreview}
+                        resizeMode="cover"
+                      />
+                      <Text style={styles.podPhotoLabel}>New photo selected — not saved yet</Text>
+                    </View>
+                  ) : null}
+
+                  {/* Pick photo button (shown when no staged photo) */}
+                  {!podPhoto ? (
+                    <TouchableOpacity
+                      style={styles.podPickBtn}
+                      onPress={handlePickPodPhoto}
+                      activeOpacity={0.85}
+                    >
+                      <BootstrapIcon name="camera" size={14} color={colors.info} />
+                      <Text style={styles.podPickBtnText}>
+                        {detail.deliveryPhoto ? 'Replace Photo' : 'Add Proof Photo'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {/* Save / Cancel row */}
+                  {podPhoto ? (
+                    <View style={styles.podActions}>
+                      <TouchableOpacity
+                        style={[styles.podSaveBtn, podBusy && { opacity: 0.6 }]}
+                        onPress={handleSavePodPhoto}
+                        disabled={podBusy}
+                        activeOpacity={0.85}
+                      >
+                        {podBusy ? (
+                          <ActivityIndicator size="small" color={colors.white} />
+                        ) : (
+                          <>
+                            <BootstrapIcon name="cloud-upload" size={14} color={colors.white} />
+                            <Text style={styles.podSaveBtnText}>Save Photo</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.podCancelBtn}
+                        onPress={() => setPodPhoto(null)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.podCancelBtnText}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {/* Delivered — show saved photo read-only */}
+              {detail.deliveryStatus === 'Delivered' && detail.deliveryPhoto ? (
+                <View style={styles.podSection}>
+                  <Text style={styles.section}>Proof of Delivery</Text>
+                  <Image
+                    source={{ uri: detail.deliveryPhoto }}
+                    style={styles.podPhotoPreview}
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : null}
+
               {verified?.orderId === detail.orderId && confirmToken ? (
                 <TouchableOpacity style={styles.primaryBtn} onPress={() => setConfirmOpen(true)}>
                   <Text style={styles.primaryBtnText}>Open Confirm Delivery</Text>
@@ -880,4 +1012,75 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  // ── Proof of Delivery photo styles ──
+  podSection: {
+    marginTop: 18,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  podPhotoWrap: {
+    marginTop: 10,
+    marginBottom: 4,
+    gap: 6,
+  },
+  podPhotoPreview: {
+    width: '100%',
+    height: 190,
+    borderRadius: 14,
+    backgroundColor: colors.bgSubtle,
+  },
+  podPhotoLabel: {
+    fontSize: 11,
+    color: colors.textMuted,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  podPickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+    borderWidth: 1.5,
+    borderColor: colors.info,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+    backgroundColor: colors.infoSoft,
+  },
+  podPickBtnText: { color: colors.info, fontWeight: '800', fontSize: 13 },
+  podChangeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-end',
+  },
+  podChangeBtnText: { color: colors.brand, fontWeight: '700', fontSize: 12 },
+  podActions: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  podSaveBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: colors.brand,
+    borderRadius: 12,
+    paddingVertical: 12,
+  },
+  podSaveBtnText: { color: colors.white, fontWeight: '800', fontSize: 13 },
+  podCancelBtn: {
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+  },
+  podCancelBtnText: { color: colors.textSecondary, fontWeight: '700', fontSize: 13 },
 });

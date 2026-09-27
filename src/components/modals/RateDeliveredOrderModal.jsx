@@ -145,8 +145,19 @@ export default function RateDeliveredOrderModal({
           ? Number((itemScores.reduce((a, b) => a + b, 0) / itemScores.length).toFixed(1))
           : 5.0;
 
-      // 2. Submit reviews for each product to update catalog rating and review count
+      // 2. Submit reviews for each REAL product item to update the catalog rating
+      //    and review count. Skip fabricated fallback rows (e.g. summary-only
+      //    orders with no real product_id, like the throwaway `prod-order`
+      //    placeholder) — those would otherwise pollute the product catalog
+      //    with phony reviews that reference a non-existent product.
       for (const item of deliveredItems) {
+        const isFabricated =
+          item.product_id === 'prod-order' ||
+          item.product_id === 'prod-order' ||
+          (item.id && item.id.startsWith('item-summary')) ||
+          (item.id && item.id.startsWith('prod-order'));
+        if (isFabricated) continue;
+
         const itemReview = itemsRatings[item.id] || { rating: 5, comment: '', tags: [] };
         const combinedComment = [
           itemReview.comment.trim(),
@@ -314,7 +325,7 @@ export default function RateDeliveredOrderModal({
                 <View style={styles.courierSectionCard}>
                   <View style={styles.courierHeader}>
                     <View style={styles.courierIconWrap}>
-                      <BootstrapIcon name="truck" size={16} color="#0C6258" />
+                      <BootstrapIcon name="truck" size={16} color="#1D4533" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.courierTitle}>Delivery & Courier Experience</Text>
@@ -523,7 +534,7 @@ const styles = StyleSheet.create({
   productBrand: {
     fontSize: 10.5,
     fontWeight: '700',
-    color: '#0C6258',
+    color: '#1D4533',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
@@ -624,7 +635,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#E7F5F3',
+    backgroundColor: '#E8F0EC',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -681,8 +692,8 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: '#0C6258',
-    shadowColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,

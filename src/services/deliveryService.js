@@ -19,6 +19,7 @@ import {
 import { dateInputToIso, expectedDeliveryStatusText } from '../utils/deliveryDate';
 import { riderAccessService, extractConfirmToken } from './riderAccessService';
 import { geocodeAddress } from '../utils/geo';
+import { resolveImageForDatabase } from '../utils/productImageUpload';
 
 const STORAGE_KEY_DELIVERIES = 'mototrack_order_deliveries';
 const STORAGE_KEY_HISTORY = 'mototrack_delivery_history';
@@ -44,7 +45,7 @@ function scheduleDeliveryRealtimeNotify() {
   deliveryRealtimeTimer = setTimeout(() => {
     deliveryRealtimeTimer = null;
     notifyDeliveryListeners({ source: 'realtime', at: Date.now() });
-  }, 250);
+  }, 1200);
 }
 
 function setupDeliveryRealtime() {
@@ -372,6 +373,161 @@ function findOrder(orderId) {
   return orders.find((o) => o.order_id === orderId || o.id === orderId) || null;
 }
 
+function mapOrderItemsForPreview(order) {
+  const items = Array.isArray(order?.items) ? order.items : [];
+  if (items.length) {
+    return items.map((it) => ({
+      name: it.name || 'Motorcycle Part',
+      brand: it.brand || '',
+      quantity: Number(it.quantity || 1),
+      price: Number(it.price || it.cost || 0),
+      size: it.size || null,
+      image: it.image || null,
+    }));
+  }
+  const summary = String(order?.items_summary || '').trim();
+  if (!summary) return [];
+  return summary.split(',').map((part) => {
+    const raw = part.trim();
+    const m = raw.match(/^(.*)\s*\(x(\d+)\)\s*$/i);
+    return {
+      name: m ? m[1].trim() : raw,
+      brand: '',
+      quantity: m ? Number(m[2]) : 1,
+      price: 0,
+      size: null,
+      image: null,
+    };
+  });
+}
+
+function buildOrderDetailsFromOrder(order) {
+  if (!order) return {};
+  const items = mapOrderItemsForPreview(order);
+  return {
+    customerName: order.customer_name || null,
+    customerPhone: order.customer_phone || null,
+    customerAddress: order.customer_address || null,
+    paymentMethod: order.payment_method || null,
+    totalAmount: Number(order.grand_total ?? order.total_amount ?? order.total ?? 0),
+    shippingFee: Number(order.shipping_fee || 0),
+    discountAmount: Number(order.discount_amount || 0),
+    itemsSummary: order.items_summary || items.map((i) => `${i.name} (x${i.quantity})`).join(', '),
+    items,
+    itemCount: order.items_count || items.reduce((s, i) => s + Number(i.quantity || 0), 0) || items.length,
+  };
+}
+
+function normalizePreviewItems(raw) {
+  if (!raw) return [];
+  let list = raw;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list);
+    } catch (_e) {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list.map((it) => ({
+    name: it?.name || 'Motorcycle Part',
+    brand: it?.brand || '',
+    quantity: Number(it?.quantity || 1),
+    price: Number(it?.price || it?.cost || 0),
+    size: it?.size || null,
+    image: it?.image || null,
+  }));
+}
+
+function mapRpcPreviewRow(row) {
+  if (!row) return null;
+  const items = normalizePreviewItems(row.items);
+  return {
+    orderId: row.order_id,
+    deliveryId: row.delivery_id,
+    deliveryStatus: row.delivery_status,
+    orderStatus: row.order_status,
+    riderName: row.rider_name,
+    riderContact: row.rider_contact,
+    itemCount: row.item_count ?? items.reduce((s, i) => s + Number(i.quantity || 0), 0) ?? 0,
+    destinationHint: row.destination_hint,
+    expectedDeliveryAt: row.expected_delivery_at,
+    expiresAt: row.token_expires_at,
+    tokenUsed: row.token_used,
+    tokenInvalidated: row.token_invalidated,
+    tokenExpired: row.token_expired,
+    isValid: row.is_valid,
+    customerName: row.customer_name || null,
+    customerPhone: row.customer_phone || null,
+    customerAddress: row.customer_address || null,
+    paymentMethod: row.payment_method || null,
+    totalAmount: row.total_amount != null ? Number(row.total_amount) : null,
+    shippingFee: row.shipping_fee != null ? Number(row.shipping_fee) : null,
+    discountAmount: row.discount_amount != null ? Number(row.discount_amount) : null,
+    itemsSummary: row.items_summary || null,
+    items,
+  };
+}
+
+async function enrichPreviewWithLocalOrder(preview) {
+  if (!preview?.orderId) return preview;
+  const hasItems = Array.isArray(preview.items) && preview.items.length > 0;
+  const hasAddress = Boolean(preview.customerAddress);
+  if (hasItems && hasAddress && preview.customerName) return preview;
+
+  const order = findOrder(preview.orderId);
+  if (!order) {
+    // Remote fallback when rider device has no local order cache
+    const client = supabaseManager.getClient();
+    if (!client) return preview;
+    try {
+      const { data, error } = await client
+        .from('orders')
+        .select(
+          'order_id, customer_name, customer_phone, customer_address, payment_method, total_amount, grand_total, shipping_fee, discount_amount, items_summary, items_count, order_items(quantity, cost, size, products(name, brand, image, price))'
+        )
+        .eq('order_id', preview.orderId)
+        .limit(1);
+      if (error || !data?.[0]) return preview;
+      const o = data[0];
+      const items = Array.isArray(o.order_items)
+        ? o.order_items.map((oi) => ({
+            name: oi.products?.name || 'Motorcycle Part',
+            brand: oi.products?.brand || '',
+            quantity: Number(oi.quantity || 1),
+            price: Number(oi.cost ?? oi.products?.price ?? 0),
+            size: oi.size || null,
+            image: oi.products?.image || null,
+          }))
+        : [];
+      const details = buildOrderDetailsFromOrder({
+        ...o,
+        items,
+        items_count: o.items_count || items.length,
+      });
+      return { ...preview, ...details, itemCount: details.itemCount || preview.itemCount };
+    } catch (e) {
+      console.warn('[DeliveryService] enrichPreviewWithLocalOrder remote:', e);
+      return preview;
+    }
+  }
+
+  const details = buildOrderDetailsFromOrder(order);
+  return {
+    ...preview,
+    customerName: preview.customerName || details.customerName,
+    customerPhone: preview.customerPhone || details.customerPhone,
+    customerAddress: preview.customerAddress || details.customerAddress,
+    paymentMethod: preview.paymentMethod || details.paymentMethod,
+    totalAmount: preview.totalAmount ?? details.totalAmount,
+    shippingFee: preview.shippingFee ?? details.shippingFee,
+    discountAmount: preview.discountAmount ?? details.discountAmount,
+    itemsSummary: preview.itemsSummary || details.itemsSummary,
+    items: hasItems ? preview.items : details.items,
+    itemCount: preview.itemCount || details.itemCount,
+  };
+}
+
 export const deliveryService = {
   DELIVERY_STATUSES,
 
@@ -434,9 +590,10 @@ export const deliveryService = {
       try {
         const { data, error } = await client
           .from('delivery_history')
-          .select('*')
+          .select('id,order_id,action,previous_status,new_status,performed_by,notes,created_at')
           .eq('order_id', orderId)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: false })
+          .limit(40);
         if (!error && Array.isArray(data) && data.length) {
           rows = data;
           const others = getLocalHistory().filter((h) => h.order_id !== orderId);
@@ -959,11 +1116,21 @@ export const deliveryService = {
       return { success: false, error: 'Assign delivery before uploading proof.' };
     }
 
+    const resolved = await resolveImageForDatabase(imageUri, {
+      folder: 'delivery-proofs',
+      orderId,
+      fileName: `delivery-proofs/${orderId}-${Date.now()}.jpg`,
+    });
+    if (!resolved.url) {
+      return { success: false, error: resolved.error || 'Could not upload proof photo.' };
+    }
+
     const nowIso = new Date().toISOString();
     const adminLabel = adminUser?.name || adminUser?.email || 'Admin';
     const updated = {
       ...delivery,
-      proof_of_delivery: imageUri,
+      proof_of_delivery: resolved.url,
+      delivery_photo: resolved.url,
       proof_uploaded_by: adminLabel,
       proof_uploaded_at: nowIso,
       updated_at: nowIso,
@@ -1296,7 +1463,7 @@ export const deliveryService = {
   },
 
   /**
-   * Public (no auth): validate token and return safe preview for rider confirmation page.
+   * Public (no auth): validate token and return order details for rider confirmation page.
    */
   async getPublicDeliveryPreview(plainToken) {
     const token = String(plainToken || '').trim();
@@ -1314,25 +1481,11 @@ export const deliveryService = {
         if (!error && data) {
           const row = Array.isArray(data) ? data[0] : data;
           if (row) {
+            const preview = await enrichPreviewWithLocalOrder(mapRpcPreviewRow(row));
             return {
               success: Boolean(row.is_valid),
               error: row.is_valid ? null : row.invalid_reason || 'Token is not valid',
-              preview: {
-                orderId: row.order_id,
-                deliveryId: row.delivery_id,
-                deliveryStatus: row.delivery_status,
-                orderStatus: row.order_status,
-                riderName: row.rider_name,
-                riderContact: row.rider_contact,
-                itemCount: row.item_count,
-                destinationHint: row.destination_hint,
-                expectedDeliveryAt: row.expected_delivery_at,
-                expiresAt: row.token_expires_at,
-                tokenUsed: row.token_used,
-                tokenInvalidated: row.token_invalidated,
-                tokenExpired: row.token_expired,
-                isValid: row.is_valid,
-              },
+              preview,
             };
           }
         }
@@ -1372,26 +1525,30 @@ export const deliveryService = {
     const addr = String(order?.customer_address || '');
     const parts = addr.split(',').map((p) => p.trim()).filter(Boolean);
     const destinationHint = parts.length ? parts[parts.length - 1] : 'Delivery address on file';
+    const orderDetails = buildOrderDetailsFromOrder(order);
+
+    const preview = await enrichPreviewWithLocalOrder({
+      orderId: delivery.order_id,
+      deliveryId: delivery.delivery_id,
+      deliveryStatus: delivery.delivery_status,
+      orderStatus: order?.status || null,
+      riderName: delivery.rider_name,
+      riderContact: delivery.rider_contact,
+      itemCount: orderDetails.itemCount || order?.items_count || (order?.items || []).length || 0,
+      destinationHint,
+      expectedDeliveryAt: delivery.expected_delivery_at,
+      expiresAt: delivery.confirmation_token_expires_at,
+      tokenUsed: used,
+      tokenInvalidated: invalidated,
+      tokenExpired: expired,
+      isValid: ok,
+      ...orderDetails,
+    });
 
     return {
       success: ok,
       error: ok ? null : reason,
-      preview: {
-        orderId: delivery.order_id,
-        deliveryId: delivery.delivery_id,
-        deliveryStatus: delivery.delivery_status,
-        orderStatus: order?.status || null,
-        riderName: delivery.rider_name,
-        riderContact: delivery.rider_contact,
-        itemCount: order?.items_count || (order?.items || []).length || 0,
-        destinationHint,
-        expectedDeliveryAt: delivery.expected_delivery_at,
-        expiresAt: delivery.confirmation_token_expires_at,
-        tokenUsed: used,
-        tokenInvalidated: invalidated,
-        tokenExpired: expired,
-        isValid: ok,
-      },
+      preview,
     };
   },
 
@@ -1405,7 +1562,19 @@ export const deliveryService = {
     }
     const tokenHash = hashDeliveryToken(plain);
     const noteText = String(notes || '').trim();
-    const photoUri = photo || null;
+
+    let photoUri = photo || null;
+    if (photoUri && String(photoUri).startsWith('data:')) {
+      const previewForName = await this.getPublicDeliveryPreview(plain);
+      const orderHint = previewForName?.preview?.orderId || 'token';
+      const resolved = await resolveImageForDatabase(photoUri, {
+        folder: 'delivery-proofs',
+        orderId: orderHint,
+        fileName: `delivery-proofs/${orderHint}-${Date.now()}.jpg`,
+      });
+      if (resolved.url) photoUri = resolved.url;
+      else photoUri = null;
+    }
 
     const client = supabaseManager.getClient();
     if (client) {
@@ -1889,14 +2058,26 @@ export const deliveryService = {
     const client = supabaseManager.getClient();
     if (client) {
       try {
-        const { data: drows } = await client.from('order_deliveries').select('*').eq('rider_id', riderId);
+        const { data: drows } = await client
+          .from('order_deliveries')
+          .select(
+            'delivery_id,order_id,rider_id,rider_name,rider_contact,vehicle_info,delivery_status,delivery_notes,expected_delivery_at,shipping_fee,rider_earning,rider_earning_credited,rider_reported_delivered,rider_reported_at,rider_report_notes,admin_confirmed,delivered_at,assigned_at,updated_at,delivery_lat,delivery_lng'
+          )
+          .eq('rider_id', riderId)
+          .limit(80);
         if (Array.isArray(drows)) {
           deliveries = drows;
           drows.forEach((row) => upsertLocalDelivery(row));
         }
         const ids = [...new Set(deliveries.map((d) => d.order_id).filter(Boolean))];
         if (ids.length) {
-          const { data: orows } = await client.from('orders').select('*').in('order_id', ids);
+          const { data: orows } = await client
+            .from('orders')
+            .select(
+              'order_id,customer_name,customer_phone,customer_address,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,created_at,updated_at'
+            )
+            .in('order_id', ids)
+            .limit(80);
           if (Array.isArray(orows) && orows.length) {
             const byId = new Map(orows.map((o) => [o.order_id, o]));
             orders = orders.map((o) => byId.get(o.order_id) || o);
@@ -1905,7 +2086,13 @@ export const deliveryService = {
             });
           }
         }
-        const { data: assignedOrders } = await client.from('orders').select('*').eq('rider_id', riderId);
+        const { data: assignedOrders } = await client
+          .from('orders')
+          .select(
+            'order_id,customer_name,customer_phone,customer_address,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,created_at,updated_at'
+          )
+          .eq('delivered_by_rider_id', riderId)
+          .limit(80);
         if (Array.isArray(assignedOrders)) {
           assignedOrders.forEach((o) => {
             if (!orders.some((x) => x.order_id === o.order_id)) orders.push(o);
@@ -2195,6 +2382,65 @@ export const deliveryService = {
       success: true,
       delivery: this.buildRiderDeliveryCard(updatedDelivery, { ...order, status: DELIVERY_STATUSES.DELIVERED, delivered_at: nowIso }),
     };
+  },
+
+  /**
+   * Rider uploads a proof-of-delivery photo from the dashboard.
+   * Does NOT change the order status — just attaches the photo to the delivery record.
+   * The admin's "Confirm Delivery" remains the final step.
+   */
+  async riderUploadProofPhoto({ riderId, orderId, photoUri }) {
+    if (!riderId || !orderId) return { success: false, error: 'Missing rider or order.' };
+    if (!photoUri) return { success: false, error: 'No photo provided.' };
+
+    let delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery) return { success: false, error: 'Delivery assignment not found for this order.' };
+
+    const resolved = await resolveImageForDatabase(photoUri, {
+      folder: 'delivery-proofs',
+      orderId,
+      fileName: `delivery-proofs/${orderId}-rider-${Date.now()}.jpg`,
+    });
+    if (!resolved.url) {
+      return { success: false, error: resolved.error || 'Could not upload proof photo.' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const riderLabel = delivery.rider_name || 'Rider';
+
+    const updated = {
+      ...delivery,
+      delivery_photo: resolved.url,
+      proof_of_delivery: resolved.url,
+      proof_uploaded_by: riderLabel,
+      proof_uploaded_at: nowIso,
+      updated_at: nowIso,
+    };
+    upsertLocalDelivery(updated);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client
+          .from('order_deliveries')
+          .upsert([toDeliveryDbRow(updated)], { onConflict: 'order_id' });
+      } catch (e) {
+        console.warn('[DeliveryService] riderUploadProofPhoto supabase:', e);
+      }
+    }
+
+    await appendHistory({
+      orderId,
+      action: 'PROOF_PHOTO_UPLOADED',
+      previousStatus: delivery.delivery_status,
+      newStatus: delivery.delivery_status,
+      performedBy: riderLabel,
+      notes: 'Rider uploaded proof-of-delivery photo.',
+      metadata: { has_photo: true, rider_id: riderId },
+    });
+
+    this.notifyChanged({ source: 'rider_proof_photo', orderId });
+    return { success: true, delivery: stripOtpSecrets(updated) };
   },
 };
 

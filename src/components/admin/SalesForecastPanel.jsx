@@ -8,8 +8,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  Image,
 } from 'react-native';
-import { BootstrapIcon } from '../common';
+import { BootstrapIcon, AdminStatCard } from '../common';
 import ForecastChart from './ForecastChart';
 import {
   getForecastStyles,
@@ -115,6 +116,7 @@ export default function SalesForecastPanel({
   const [selectedProductId, setSelectedProductId] = useState(null);
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [horizonPickerOpen, setHorizonPickerOpen] = useState(false);
+  const [lookbackPickerOpen, setLookbackPickerOpen] = useState(false);
   const [safetyConfig, setSafetyConfig] = useState(() => forecastService.loadSafetyPrefs());
   const [safetyInput, setSafetyInput] = useState(String(forecastService.loadSafetyPrefs().value));
   const [history, setHistory] = useState([]);
@@ -124,17 +126,47 @@ export default function SalesForecastPanel({
 
   const salesRows = useMemo(() => getHistoricalSales(orders), [orders]);
 
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const [productCategoryFilter, setProductCategoryFilter] = useState('All');
+
   const productOptions = useMemo(() => {
     const list = (products || []).map((p) => ({
       id: p.id || p.product_id,
       name: p.name,
+      brand: p.brand || '',
       category: p.category || '—',
       stock: Number(p.stock) || 0,
+      image: p.image || p.imageUrl || p.photo || '',
+      rating: Number(p.rating) || 5.0,
+      reviews: Number(p.reviews) || 0,
       product: p,
     }));
     list.sort((a, b) => String(a.name).localeCompare(String(b.name)));
     return list;
   }, [products]);
+
+  const pickerCategories = useMemo(() => {
+    const cats = new Set();
+    productOptions.forEach((p) => {
+      if (p.category && p.category !== '—') cats.add(p.category);
+    });
+    return ['All', ...Array.from(cats)];
+  }, [productOptions]);
+
+  const filteredProductOptions = useMemo(() => {
+    return productOptions.filter((p) => {
+      const q = productSearchQuery.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        String(p.name || '').toLowerCase().includes(q) ||
+        String(p.brand || '').toLowerCase().includes(q) ||
+        String(p.category || '').toLowerCase().includes(q);
+      const matchesCat =
+        productCategoryFilter === 'All' ||
+        String(p.category || '').toLowerCase() === productCategoryFilter.toLowerCase();
+      return matchesSearch && matchesCat;
+    });
+  }, [productOptions, productSearchQuery, productCategoryFilter]);
 
   useEffect(() => {
     if (!selectedProductId && productOptions.length > 0) {
@@ -249,7 +281,6 @@ export default function SalesForecastPanel({
   const activePeriodType = forecast?.periodType || periodType;
   const periodNoun =
     activePeriodType === 'day' ? 'days' : activePeriodType === 'month' ? 'months' : 'weeks';
-  const accentBorders = [tokens.primary, tokens.sky, tokens.violet, tokens.amber];
 
   const renderPickerModal = (visible, onClose, title, children) => (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -276,18 +307,424 @@ export default function SalesForecastPanel({
     </Modal>
   );
 
+  const renderProductPickerModal = () => (
+    <Modal
+      visible={productPickerOpen}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setProductPickerOpen(false)}
+    >
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: isDesktop ? 24 : 12,
+        }}
+      >
+        <TouchableOpacity
+          style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0 }}
+          activeOpacity={1}
+          onPress={() => setProductPickerOpen(false)}
+        />
+
+        <View
+          style={{
+            width: '100%',
+            maxWidth: 960,
+            maxHeight: '88%',
+            backgroundColor: tokens.card,
+            borderRadius: 20,
+            borderWidth: 1.5,
+            borderColor: tokens.border,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 10 },
+            shadowOpacity: 0.25,
+            shadowRadius: 25,
+            elevation: 10,
+            overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
+          {/* Modal Header */}
+          <View
+            style={{
+              paddingHorizontal: 20,
+              paddingTop: 18,
+              paddingBottom: 14,
+              borderBottomWidth: 1,
+              borderBottomColor: tokens.border,
+              backgroundColor: isDarkMode ? '#171922' : '#FAFCFF',
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 12,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#E6F4F1',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BootstrapIcon name="box-seam" size={18} color={tokens.primary} />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.foreground }}>
+                    Select motorcycle part
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: tokens.mutedForeground, marginTop: 1 }}>
+                    Choose a part to analyze demand regression and calculate replenishment
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setProductPickerOpen(false)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                  backgroundColor: isDarkMode ? '#222530' : '#F1F5F9',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <BootstrapIcon name="x-lg" size={14} color={tokens.mutedForeground} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Search Input & Category Pills */}
+            <View style={{ gap: 10 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isDarkMode ? '#1E2028' : '#FFFFFF',
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: tokens.border,
+                  paddingHorizontal: 12,
+                  height: 40,
+                  gap: 8,
+                }}
+              >
+                <BootstrapIcon name="search" size={14} color={tokens.mutedForeground} />
+                <TextInput
+                  placeholder="Search motorcycle part by name, brand, or category..."
+                  placeholderTextColor={tokens.mutedForeground}
+                  value={productSearchQuery}
+                  onChangeText={setProductSearchQuery}
+                  style={{
+                    flex: 1,
+                    fontSize: 13,
+                    color: tokens.foreground,
+                    outlineStyle: 'none',
+                  }}
+                />
+                {productSearchQuery ? (
+                  <TouchableOpacity onPress={() => setProductSearchQuery('')}>
+                    <BootstrapIcon name="x-circle-fill" size={14} color={tokens.mutedForeground} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
+              {/* Category Pills */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 6 }}
+              >
+                {pickerCategories.map((cat) => {
+                  const active = productCategoryFilter === cat;
+                  return (
+                    <TouchableOpacity
+                      key={cat}
+                      onPress={() => setProductCategoryFilter(cat)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 5,
+                        borderRadius: 20,
+                        backgroundColor: active
+                          ? tokens.primary
+                          : isDarkMode
+                          ? '#1E2028'
+                          : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: active ? tokens.primary : tokens.border,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: active ? '700' : '600',
+                          color: active ? '#FFFFFF' : tokens.mutedForeground,
+                        }}
+                      >
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          </View>
+
+          {/* Modal Body: Product Card Grid */}
+          <ScrollView
+            style={{ flex: 1, padding: 16 }}
+            contentContainerStyle={{ paddingBottom: 24 }}
+          >
+            {filteredProductOptions.length === 0 ? (
+              <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 48 }}>
+                <BootstrapIcon name="search" size={32} color={tokens.mutedForeground} />
+                <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.foreground, marginTop: 12 }}>
+                  No parts found
+                </Text>
+                <Text style={{ fontSize: 12, color: tokens.mutedForeground, marginTop: 4 }}>
+                  Try adjusting your search query or category filter
+                </Text>
+              </View>
+            ) : (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  flexWrap: 'wrap',
+                  gap: 12,
+                  justifyContent: 'flex-start',
+                }}
+              >
+                {filteredProductOptions.map((p) => {
+                  const isSelected = String(p.id) === String(selectedProductId);
+                  const isOutOfStock = p.stock <= 0;
+                  const isLowStock = p.stock > 0 && p.stock <= 5;
+
+                  return (
+                    <TouchableOpacity
+                      key={p.id}
+                      activeOpacity={0.88}
+                      onPress={() => {
+                        setSelectedProductId(p.id);
+                        setProductPickerOpen(false);
+                      }}
+                      style={{
+                        width: isDesktop ? '23.5%' : '48%',
+                        minWidth: isDesktop ? 180 : 150,
+                        backgroundColor: isSelected
+                          ? isDarkMode
+                            ? 'rgba(29, 69, 51, 0.15)'
+                            : '#F0FDF4'
+                          : isDarkMode
+                          ? '#1E2028'
+                          : '#FFFFFF',
+                        borderRadius: 14,
+                        borderWidth: isSelected ? 2 : 1,
+                        borderColor: isSelected ? tokens.primary : tokens.border,
+                        overflow: 'hidden',
+                        shadowColor: '#0F172A',
+                        shadowOffset: { width: 0, height: 2 },
+                        shadowOpacity: 0.04,
+                        shadowRadius: 6,
+                        elevation: 1,
+                        marginBottom: 4,
+                      }}
+                    >
+                      {/* Product Image Container */}
+                      <View
+                        style={{
+                          width: '100%',
+                          aspectRatio: 1.15,
+                          backgroundColor: isDarkMode ? '#14161C' : '#F1F5F9',
+                          overflow: 'hidden',
+                          position: 'relative',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {p.image ? (
+                          <Image
+                            source={{ uri: p.image }}
+                            style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
+                          />
+                        ) : (
+                          <BootstrapIcon name="box-seam" size={36} color={tokens.mutedForeground} />
+                        )}
+
+                        {/* Category badge top-left */}
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: 8,
+                            left: 8,
+                            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+                            paddingHorizontal: 6,
+                            paddingVertical: 2.5,
+                            borderRadius: 6,
+                          }}
+                        >
+                          <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFFFFF' }}>
+                            {p.category}
+                          </Text>
+                        </View>
+
+                        {/* Selected Indicator Checkmark top-right */}
+                        {isSelected && (
+                          <View
+                            style={{
+                              position: 'absolute',
+                              top: 8,
+                              right: 8,
+                              backgroundColor: tokens.primary,
+                              width: 24,
+                              height: 24,
+                              borderRadius: 12,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              shadowColor: '#000',
+                              shadowOffset: { width: 0, height: 1 },
+                              shadowOpacity: 0.2,
+                              shadowRadius: 2,
+                            }}
+                          >
+                            <BootstrapIcon name="check-lg" size={13} color="#FFFFFF" />
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Product Card Details (Matching ProductCard layout, strictly NO PRICE) */}
+                      <View style={{ padding: 10, flex: 1, justifyContent: 'space-between' }}>
+                        <View>
+                          {/* Brand subtle uppercase tag */}
+                          {p.brand ? (
+                            <Text
+                              numberOfLines={1}
+                              style={{
+                                fontSize: 9.5,
+                                fontWeight: '700',
+                                color: tokens.mutedForeground,
+                                letterSpacing: 0.5,
+                                marginBottom: 2,
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              {p.brand}
+                            </Text>
+                          ) : null}
+
+                          {/* Product Title (2 Lines Max) */}
+                          <Text
+                            numberOfLines={2}
+                            style={{
+                              fontSize: 12.5,
+                              fontWeight: '700',
+                              color: tokens.foreground,
+                              lineHeight: 16,
+                              minHeight: 32,
+                              marginBottom: 6,
+                            }}
+                          >
+                            {p.name}
+                          </Text>
+
+                          {/* Minimal Meta Row: Rating & Stock */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              flexWrap: 'wrap',
+                              gap: 4,
+                              marginBottom: 8,
+                            }}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                              <BootstrapIcon name="star-fill" size={9.5} color="#F59E0B" />
+                              <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.foreground }}>
+                                {Number(p.rating || 5.0).toFixed(1)}
+                              </Text>
+                              <Text style={{ fontSize: 9.5, color: tokens.mutedForeground }}>
+                                ({p.reviews || 0})
+                              </Text>
+                            </View>
+                            <Text style={{ color: tokens.mutedForeground, fontSize: 10 }}>•</Text>
+                            <Text
+                              style={{
+                                fontSize: 10.5,
+                                fontWeight: '700',
+                                color: isOutOfStock
+                                  ? '#EF4444'
+                                  : isLowStock
+                                  ? '#F59E0B'
+                                  : '#10B981',
+                              }}
+                            >
+                              {isOutOfStock
+                                ? 'Out of stock'
+                                : isLowStock
+                                ? `Only ${p.stock} left`
+                                : `${p.stock} in stock`}
+                            </Text>
+                          </View>
+                        </View>
+
+                        {/* Action CTA Button */}
+                        <View
+                          style={{
+                            paddingVertical: 6,
+                            paddingHorizontal: 8,
+                            borderRadius: 7,
+                            backgroundColor: isSelected
+                              ? tokens.primary
+                              : isDarkMode
+                              ? '#272930'
+                              : '#F1F5F9',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexDirection: 'row',
+                            gap: 5,
+                          }}
+                        >
+                          <BootstrapIcon
+                            name={isSelected ? 'check-circle-fill' : 'hand-index-thumb'}
+                            size={11}
+                            color={isSelected ? '#FFFFFF' : tokens.mutedForeground}
+                          />
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: '700',
+                              color: isSelected ? '#FFFFFF' : tokens.foreground,
+                            }}
+                          >
+                            {isSelected ? 'Active Selection' : 'Select Part'}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+
   return (
     <View style={styles.root}>
-      {/* Page header — matches Figma */}
-      <View style={styles.pageHeader}>
-        <View style={{ flex: 1, minWidth: 220 }}>
-          <Text style={styles.pageTitle}>Sales Forecast & Stock Optimization</Text>
-          <Text style={styles.pageSubtitle}>
-            Analyze sales trends and forecast future motorcycle-parts demand using historical sales
-            data.
-          </Text>
-        </View>
-
+      {/* Controls header */}
+      <View style={[styles.pageHeader, { justifyContent: 'flex-end', marginBottom: 8 }]}>
         <View style={styles.controlsRow}>
           <TouchableOpacity style={styles.controlBtn} onPress={() => setProductPickerOpen(true)}>
             <BootstrapIcon name="box-seam" size={13} color={tokens.mutedForeground} />
@@ -303,11 +740,112 @@ export default function SalesForecastPanel({
             <BootstrapIcon name="chevron-down" size={12} color={tokens.mutedForeground} />
           </TouchableOpacity>
 
-          <View style={styles.controlBtn}>
-            <BootstrapIcon name="calendar-range" size={13} color={tokens.mutedForeground} />
-            <Text style={styles.controlBtnText} numberOfLines={1}>
-              {formatDateRange(forecast?.historical)}
-            </Text>
+          <View style={{ position: 'relative' }}>
+            <TouchableOpacity
+              style={styles.controlBtn}
+              onPress={() => setLookbackPickerOpen((v) => !v)}
+            >
+              <BootstrapIcon name="calendar-range" size={13} color={tokens.mutedForeground} />
+              <Text style={styles.controlBtnText} numberOfLines={1}>
+                {formatDateRange(forecast?.historical)}
+              </Text>
+              <BootstrapIcon
+                name={lookbackPickerOpen ? 'chevron-up' : 'chevron-down'}
+                size={12}
+                color={tokens.mutedForeground}
+              />
+            </TouchableOpacity>
+
+            {lookbackPickerOpen && (
+              <>
+                {/* Transparent backdrop to close on outside click */}
+                <TouchableOpacity
+                  style={{
+                    position: 'fixed',
+                    top: 0, left: 0, right: 0, bottom: 0,
+                    zIndex: 999,
+                  }}
+                  onPress={() => setLookbackPickerOpen(false)}
+                  activeOpacity={1}
+                />
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: 0,
+                    marginTop: 6,
+                    minWidth: 260,
+                    backgroundColor: tokens.card,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: tokens.border,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 8 },
+                    shadowOpacity: 0.12,
+                    shadowRadius: 16,
+                    zIndex: 1000,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Dropdown header */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderBottomWidth: 1,
+                      borderBottomColor: tokens.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: tokens.mutedForeground, letterSpacing: 0.5 }}>
+                      HISTORY DATE RANGE
+                    </Text>
+                    <TouchableOpacity onPress={() => setLookbackPickerOpen(false)}>
+                      <BootstrapIcon name="x-lg" size={13} color={tokens.mutedForeground} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Options */}
+                  {chartLookback.map((opt, idx) => {
+                    const active = lookbackPeriods === opt.key;
+                    return (
+                      <TouchableOpacity
+                        key={opt.key}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          paddingHorizontal: 14,
+                          paddingVertical: 11,
+                          backgroundColor: active ? (isDarkMode ? 'rgba(29, 69, 51,0.2)' : '#E8F0EC') : 'transparent',
+                          borderBottomWidth: idx < chartLookback.length - 1 ? 1 : 0,
+                          borderBottomColor: tokens.border,
+                        }}
+                        onPress={() => {
+                          setLookbackPeriods(opt.key);
+                          setLookbackPickerOpen(false);
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <View>
+                          <Text style={{ fontWeight: '700', fontSize: 13.5, color: active ? '#1D4533' : tokens.foreground }}>
+                            Lookback {opt.label}
+                          </Text>
+                          <Text style={{ fontSize: 11.5, color: tokens.mutedForeground, marginTop: 2 }}>
+                            Changes the history window used for the forecast chart
+                          </Text>
+                        </View>
+                        {active && (
+                          <BootstrapIcon name="check-lg" size={15} color="#1D4533" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </>
+            )}
           </View>
 
           <TouchableOpacity style={styles.generateBtn} onPress={handleRefresh} disabled={loading}>
@@ -321,53 +859,70 @@ export default function SalesForecastPanel({
         </View>
       </View>
 
-      {/* Summary cards */}
+      {/* Summary cards (using unified AdminStatCard design system) */}
       <View style={[styles.statsGrid, !isDesktop && { flexDirection: 'column' }]}>
         {[
           {
+            accent: 'teal',
             label: 'Forecasted Demand',
-            value: forecast?.insufficient || forecast?.forecastedDemand == null ? '—' : String(forecast.forecastedDemand),
-            unit: forecast?.insufficient ? '' : ' units',
-            sub: forecast?.forecastPeriodLabel ? `Next period · ${forecast.forecastPeriodLabel}` : 'Next period',
-            border: accentBorders[0],
+            value:
+              forecast?.insufficient || forecast?.forecastedDemand == null ? (
+                '—'
+              ) : (
+                <>
+                  {forecast.forecastedDemand}
+                  <Text style={styles.statUnit}> units</Text>
+                </>
+              ),
+            sub: forecast?.forecastPeriodLabel
+              ? `Next period · ${forecast.forecastPeriodLabel}`
+              : 'Next period',
           },
           {
+            accent: 'blue',
             label: 'Current Stock',
-            value: String(forecast?.currentStock ?? selectedProduct?.stock ?? 0),
-            unit: ' units',
+            value: (
+              <>
+                {String(forecast?.currentStock ?? selectedProduct?.stock ?? 0)}
+                <Text style={styles.statUnit}> units</Text>
+              </>
+            ),
             sub: 'Available inventory',
-            border: accentBorders[1],
           },
           {
+            accent: 'purple',
             label: 'Recommended Restock',
-            value: forecast?.insufficient ? '—' : String(forecast?.recommendedRestock ?? 0),
-            unit: forecast?.insufficient ? '' : ' units',
+            value: forecast?.insufficient ? (
+              '—'
+            ) : (
+              <>
+                {String(forecast?.recommendedRestock ?? 0)}
+                <Text style={styles.statUnit}> units</Text>
+              </>
+            ),
+            valueColor:
+              !forecast?.insufficient && (forecast?.recommendedRestock ?? 0) > 0
+                ? tokens.primary
+                : undefined,
             sub: 'Suggested order quantity',
-            border: accentBorders[2],
           },
           {
+            accent: 'amber',
             label: 'Sales Trend',
             value: forecast?.insufficient ? '—' : forecast?.trendLabel || '—',
-            unit: '',
             sub: 'Based on historical sales',
-            border: accentBorders[3],
           },
         ].map((card) => (
-          <View
+          <AdminStatCard
             key={card.label}
-            style={[
-              styles.statCard,
-              !isDesktop && styles.statCardMobile,
-              { borderLeftColor: card.border },
-            ]}
-          >
-            <Text style={styles.statLabel}>{card.label}</Text>
-            <Text style={styles.statValue}>
-              {card.value}
-              {card.unit ? <Text style={styles.statUnit}>{card.unit}</Text> : null}
-            </Text>
-            <Text style={styles.statSub}>{card.sub}</Text>
-          </View>
+            styles={styles}
+            accent={card.accent}
+            label={card.label}
+            value={card.value}
+            valueColor={card.valueColor}
+            sub={card.sub}
+            style={!isDesktop && styles.statCardMobile}
+          />
         ))}
       </View>
 
@@ -809,27 +1364,7 @@ export default function SalesForecastPanel({
         )}
       </View>
 
-      {renderPickerModal(productPickerOpen, () => setProductPickerOpen(false), 'Select motorcycle part',
-        productOptions.map((p) => (
-          <TouchableOpacity
-            key={p.id}
-            style={{
-              paddingVertical: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: tokens.border,
-            }}
-            onPress={() => {
-              setSelectedProductId(p.id);
-              setProductPickerOpen(false);
-            }}
-          >
-            <Text style={{ fontWeight: '700', color: tokens.foreground }}>{p.name}</Text>
-            <Text style={{ fontSize: 12, color: tokens.mutedForeground, marginTop: 2 }}>
-              {p.category} · Stock {p.stock}
-            </Text>
-          </TouchableOpacity>
-        ))
-      )}
+      {renderProductPickerModal()}
 
       {renderPickerModal(horizonPickerOpen, () => setHorizonPickerOpen(false), 'Forecast period',
         HORIZON_OPTIONS.map((opt) => (
@@ -856,6 +1391,8 @@ export default function SalesForecastPanel({
           </TouchableOpacity>
         ))
       )}
+
+
     </View>
   );
 }

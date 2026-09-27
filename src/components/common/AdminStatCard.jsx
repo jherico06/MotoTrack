@@ -12,17 +12,18 @@ const ACCENT_KEY = {
 };
 
 export default function AdminStatCard({
-  styles,
+  styles = {},
   label,
   value,
   sub,
   accent = 'teal',
   valueColor,
+  style,
 }) {
   const accentStyle = styles[ACCENT_KEY[accent] || ACCENT_KEY.teal];
 
   return (
-    <View style={[styles.statCard, accentStyle]}>
+    <View style={[styles.statCard, accentStyle, style]}>
       <Text style={styles.statLabel}>{label}</Text>
       <Text style={[styles.statValue, valueColor ? { color: valueColor } : null]}>{value}</Text>
       {sub ? <Text style={styles.statSub}>{sub}</Text> : null}

@@ -2,10 +2,10 @@ import React from 'react';
 import { View, Text, Image, StyleSheet } from 'react-native';
 
 export default function BrandLogo({
-  size = 40,
+  size = 48,
   showText = true,
   textColor,
-  accentColor = '#DC2626',
+  accentColor = '#16A34A',
   variant = 'horizontal',
   style,
 }) {
@@ -37,8 +37,8 @@ export default function BrandLogo({
         <Image
           source={require('../../../assets/emblem.png')}
           style={{
-            width: Math.round(size * 0.86),
-            height: Math.round(size * 0.62),
+            width: Math.round(size * 0.92),
+            height: Math.round(size * 0.92),
             resizeMode: 'contain',
           }}
         />
@@ -50,17 +50,17 @@ export default function BrandLogo({
               style={[
                 styles.brandTitle,
                 textColor ? { color: textColor } : null,
-                { fontSize: Math.max(14, Math.round(size * 0.44)) },
+                { fontSize: Math.max(10, Math.round(size * 0.28)) },
               ]}
             >
-              MOTO<Text style={{ color: accentColor || '#DC2626' }}>TRACK</Text>
+              MOTO<Text style={{ color: isDark ? '#6EE7B7' : (accentColor || '#16A34A') }}>TRACK</Text>
             </Text>
           </View>
           <Text
             style={[
               styles.brandSubtitle,
-              accentColor ? { color: accentColor } : null,
-              { fontSize: Math.max(7.5, Math.round(size * 0.2)) },
+              { color: isDark ? 'rgba(255,255,255,0.65)' : (accentColor || '#16A34A') },
+              { fontSize: Math.max(5.5, Math.round(size * 0.135)) },
             ]}
           >
             MOTORPARTS & ACCESSORIES
@@ -78,17 +78,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   logoBadge: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1.5 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
     padding: 2,
   },
   textColumn: {
@@ -99,16 +91,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   brandTitle: {
-    fontFamily: 'Manrope',
+    fontFamily: 'Plus Jakarta Sans',
     fontWeight: '900',
     letterSpacing: -0.3,
     color: '#0F172A',
   },
   brandSubtitle: {
-    fontFamily: 'Manrope',
+    fontFamily: 'Plus Jakarta Sans',
     fontWeight: '800',
     letterSpacing: 0.6,
-    color: '#DC2626',
+    color: '#16A34A',
     marginTop: -1,
   },
 });

@@ -169,14 +169,16 @@ export default function AssignDeliveryModal({
 
   if (!visible) return null;
 
+  const isDark = typeof document !== 'undefined' && document.documentElement?.classList.contains('dark');
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, isDark && { backgroundColor: '#141A18', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }]}>
           <View style={styles.header}>
-            <Text style={styles.title}>Assign Delivery</Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeBtn} disabled={busy}>
-              <BootstrapIcon name="x-lg" size={14} color="#64748b" />
+            <Text style={[styles.title, isDark && { color: '#F8FAFC' }]}>Assign Delivery</Text>
+            <TouchableOpacity onPress={onClose} style={[styles.closeBtn, isDark && { backgroundColor: '#1C2422' }]} disabled={busy}>
+              <BootstrapIcon name="x-lg" size={14} color={isDark ? '#CBD5E1' : '#64748b'} />
             </TouchableOpacity>
           </View>
 
@@ -184,11 +186,11 @@ export default function AssignDeliveryModal({
             <Text style={styles.meta}>
               Order #{orderId} · {order?.customer_name || 'Customer'}
             </Text>
-            <Text style={styles.address} numberOfLines={3}>
+            <Text style={[styles.address, isDark && { color: '#94A3B8' }]} numberOfLines={3}>
               {order?.customer_address || 'No address on file'}
             </Text>
 
-            <Text style={styles.label}>Select Registered Rider *</Text>
+            <Text style={[styles.label, isDark && { color: '#E2E8F0' }]}>Select Registered Rider *</Text>
             <TouchableOpacity
               style={styles.checkRow}
               onPress={() => {
@@ -200,20 +202,20 @@ export default function AssignDeliveryModal({
               <View style={[styles.checkbox, manualMode && styles.checkboxOn]}>
                 {manualMode ? <BootstrapIcon name="check" size={12} color="#fff" /> : null}
               </View>
-              <Text style={styles.checkText}>Record rider name & contact only (no roster entry)</Text>
+              <Text style={[styles.checkText, isDark && { color: '#CBD5E1' }]}>Record rider name & contact only (no roster entry)</Text>
             </TouchableOpacity>
 
             {manualMode ? (
               <View style={{ gap: 8, marginBottom: 8 }}>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)', color: '#F8FAFC' }]}
                   value={manualName}
                   onChangeText={setManualName}
                   placeholder="Rider full name *"
                   placeholderTextColor="#94A3B8"
                 />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)', color: '#F8FAFC' }]}
                   value={manualContact}
                   onChangeText={setManualContact}
                   placeholder="Rider phone / contact *"
@@ -222,7 +224,7 @@ export default function AssignDeliveryModal({
                 />
               </View>
             ) : loadingRiders ? (
-              <ActivityIndicator color="#0C6258" style={{ marginVertical: 12 }} />
+              <ActivityIndicator color="#1D4533" style={{ marginVertical: 12 }} />
             ) : riders.length === 0 ? (
               <Text style={styles.emptyHint}>
                 No riders on roster. Toggle “Record rider name & contact” above, or add staff under
@@ -235,21 +237,25 @@ export default function AssignDeliveryModal({
                   return (
                     <TouchableOpacity
                       key={r.id}
-                      style={[styles.riderCard, active && styles.riderCardActive]}
+                      style={[
+                        styles.riderCard,
+                        isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' },
+                        active && (isDark ? { backgroundColor: 'rgba(16, 185, 129, 0.18)', borderColor: '#10B981' } : styles.riderCardActive),
+                      ]}
                       onPress={() => setSelectedRiderId(r.id)}
                       activeOpacity={0.85}
                     >
                       <Image source={{ uri: r.avatar }} style={styles.riderAvatar} />
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.riderName}>{r.name}</Text>
-                        <Text style={styles.riderSub}>
+                        <Text style={[styles.riderName, isDark && { color: '#F8FAFC' }]}>{r.name}</Text>
+                        <Text style={[styles.riderSub, isDark && { color: '#94A3B8' }]}>
                           {r.phone}
                           {r.vehicleInfo ? ` · ${r.vehicleInfo}` : ''}
                           {r.plateNumber ? ` · ${r.plateNumber}` : ''}
                         </Text>
-                        <Text style={styles.riderStatus}>{r.status || 'Available'}</Text>
+                        <Text style={[styles.riderStatus, isDark && { color: '#34D399' }]}>{r.status || 'Available'}</Text>
                       </View>
-                      {active ? <BootstrapIcon name="check-circle-fill" size={18} color="#0C6258" /> : null}
+                      {active ? <BootstrapIcon name="check-circle-fill" size={18} color="#10B981" /> : null}
                     </TouchableOpacity>
                   );
                 })}
@@ -257,12 +263,12 @@ export default function AssignDeliveryModal({
             )}
 
             {!manualMode && selectedRider ? (
-              <View style={styles.summaryBox}>
-                <Text style={styles.summaryTitle}>Assigned rider summary</Text>
-                <Text style={styles.summaryLine}>{selectedRider.name}</Text>
-                <Text style={styles.summaryLine}>{selectedRider.phone}</Text>
+              <View style={[styles.summaryBox, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
+                <Text style={[styles.summaryTitle, isDark && { color: '#F8FAFC' }]}>Assigned rider summary</Text>
+                <Text style={[styles.summaryLine, isDark && { color: '#CBD5E1' }]}>{selectedRider.name}</Text>
+                <Text style={[styles.summaryLine, isDark && { color: '#94A3B8' }]}>{selectedRider.phone}</Text>
                 {selectedRider.vehicleInfo ? (
-                  <Text style={styles.summaryLine}>
+                  <Text style={[styles.summaryLine, isDark && { color: '#94A3B8' }]}>
                     {selectedRider.vehicleInfo}
                     {selectedRider.plateNumber ? ` · Plate ${selectedRider.plateNumber}` : ''}
                   </Text>
@@ -277,9 +283,9 @@ export default function AssignDeliveryModal({
               hint="This date is shown to the customer on order tracking."
             />
 
-            <Text style={styles.label}>Delivery Notes</Text>
+            <Text style={[styles.label, isDark && { color: '#E2E8F0' }]}>Delivery Notes</Text>
             <TextInput
-              style={[styles.input, { minHeight: 72, textAlignVertical: 'top' }]}
+              style={[styles.input, { minHeight: 72, textAlignVertical: 'top' }, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)', color: '#F8FAFC' }]}
               value={notes}
               onChangeText={setNotes}
               placeholder="Gate codes, landmarks, special instructions…"
@@ -295,10 +301,10 @@ export default function AssignDeliveryModal({
               <View style={[styles.checkbox, alsoDispatch && styles.checkboxOn]}>
                 {alsoDispatch ? <BootstrapIcon name="check" size={12} color="#fff" /> : null}
               </View>
-              <Text style={styles.checkText}>Also mark Out for Delivery now</Text>
+              <Text style={[styles.checkText, isDark && { color: '#CBD5E1' }]}>Also mark Out for Delivery now</Text>
             </TouchableOpacity>
 
-            <Text style={styles.hint}>
+            <Text style={[styles.hint, isDark && { color: '#94A3B8' }]}>
               Dispatching generates a packing QR plus a temporary rider dashboard link. No rider account
               required. The dashboard shows every stop assigned to this rider.
             </Text>
@@ -383,7 +389,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  meta: { fontSize: 13, fontWeight: '700', color: '#0C6258', marginBottom: 4 },
+  meta: { fontSize: 13, fontWeight: '700', color: '#1D4533', marginBottom: 4 },
   address: { fontSize: 12, color: '#64748B', marginBottom: 12 },
   label: { fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 6, marginTop: 8 },
   input: {
@@ -416,13 +422,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   riderCardActive: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#ECFDF5',
   },
   riderAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E2E8F0' },
   riderName: { fontSize: 13.5, fontWeight: '800', color: '#0F172A' },
   riderSub: { fontSize: 11.5, color: '#64748B', marginTop: 2 },
-  riderStatus: { fontSize: 10.5, fontWeight: '700', color: '#0C6258', marginTop: 2 },
+  riderStatus: { fontSize: 10.5, fontWeight: '700', color: '#1D4533', marginTop: 2 },
   summaryBox: {
     backgroundColor: '#F1F5F9',
     borderRadius: 10,
@@ -442,12 +448,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxOn: { backgroundColor: '#0C6258', borderColor: '#0C6258' },
+  checkboxOn: { backgroundColor: '#1D4533', borderColor: '#1D4533' },
   checkText: { flex: 1, fontSize: 12.5, color: '#334155', fontWeight: '600' },
   hint: { fontSize: 11, color: '#94A3B8', marginTop: 12, lineHeight: 16 },
   primaryBtn: {
     marginTop: 14,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 12,
     height: 46,
     alignItems: 'center',

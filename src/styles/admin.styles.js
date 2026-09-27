@@ -94,7 +94,7 @@ export const createAdminStyles = (isDark = false) => {
     color: t.textMuted,
   },
   bottomNavLabelActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
   bottomNavBadge: {
@@ -147,7 +147,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   mobileMoreCardActive: {
     backgroundColor: t.accentBg,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
   },
   sidebarCompact: {
     width: 68,
@@ -167,7 +167,7 @@ export const createAdminStyles = (isDark = false) => {
     letterSpacing: -0.5,
   },
   sidebarLogoAccent: {
-    color: '#0C6258',
+    color: '#1D4533',
   },
   adminTagBadge: {
     backgroundColor: t.accentBg,
@@ -178,7 +178,7 @@ export const createAdminStyles = (isDark = false) => {
     borderColor: t.accentBorder,
   },
   adminTagBadgeText: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontSize: 10.5,
     fontWeight: '800',
   },
@@ -197,7 +197,7 @@ export const createAdminStyles = (isDark = false) => {
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
@@ -230,13 +230,14 @@ export const createAdminStyles = (isDark = false) => {
   },
   navHeading: {
     fontSize: 11,
-    fontWeight: '800',
-    color: t.textSubtle,
+    fontWeight: '700',
+    color: isDark ? '#94A3B8' : '#64748B',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginTop: 14,
+    letterSpacing: 1.1,
+    marginTop: 18,
     marginBottom: 6,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
+    fontFamily: Platform.select({ web: "'Plus Jakarta Sans', -apple-system, sans-serif", default: 'PlusJakartaSans-Bold' }),
   },
   sidebarNavList: {
     gap: 4,
@@ -244,32 +245,46 @@ export const createAdminStyles = (isDark = false) => {
   sidebarNavItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 9,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    borderRadius: 10,
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 14,
     backgroundColor: 'transparent',
   },
   sidebarNavItemActive: {
-    backgroundColor: isDark ? '#1E293B' : '#0F172A',
+    backgroundColor: isDark ? '#1C2422' : '#0F172A',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 5,
+    elevation: 2,
   },
   sidebarNavLabel: {
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
     color: t.textSecondary,
+    fontFamily: Platform.select({ web: "'Plus Jakarta Sans', -apple-system, sans-serif", default: 'PlusJakartaSans-Medium' }),
+    ...(Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : {}),
   },
   sidebarNavLabelActive: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '700',
+    fontFamily: Platform.select({ web: "'Plus Jakarta Sans', -apple-system, sans-serif", default: 'PlusJakartaSans-Bold' }),
+    ...(Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : {}),
+  },
+  sidebarActiveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+    marginLeft: 6,
+    flexShrink: 0,
   },
   sidebarCountBadge: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
+    borderWidth: 1,
+    borderColor: t.border,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
@@ -314,11 +329,13 @@ export const createAdminStyles = (isDark = false) => {
     paddingVertical: 9,
     paddingHorizontal: 12,
     borderRadius: 10,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(239, 68, 68, 0.35)' : '#FECACA',
     alignItems: 'center',
   },
   logoutSidebarText: {
-    color: '#DC2626',
+    color: isDark ? '#F87171' : '#DC2626',
     fontSize: 12.5,
     fontWeight: '700',
   },
@@ -352,7 +369,7 @@ export const createAdminStyles = (isDark = false) => {
     gap: 10,
   },
   addBtnPrimary: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 12,
@@ -377,7 +394,7 @@ export const createAdminStyles = (isDark = false) => {
     gap: 6,
   },
   quickStoreBtnText: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontSize: 12.5,
     fontWeight: '700',
   },
@@ -401,7 +418,7 @@ export const createAdminStyles = (isDark = false) => {
     paddingVertical: 20,
     paddingHorizontal: 22,
     borderWidth: 1.5,
-    borderColor: t.border,
+    borderColor: isDark ? '#334155' : '#CBD5E1',
     shadowColor: t.cardShadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -411,25 +428,25 @@ export const createAdminStyles = (isDark = false) => {
     minHeight: 148,
   },
   statCardTealAccent: {
-    borderColor: '#0C6258',
+    borderColor: isDark ? '#14B8A6' : '#0C6258',
   },
   statCardBlueAccent: {
-    borderColor: '#3B82F6',
+    borderColor: isDark ? '#60A5FA' : '#3B82F6',
   },
   statCardCyanAccent: {
-    borderColor: '#14B8A6',
+    borderColor: isDark ? '#2DD4BF' : '#14B8A6',
   },
   statCardWarningAccent: {
-    borderColor: '#F59E0B',
+    borderColor: isDark ? '#FBBF24' : '#F59E0B',
   },
   statCardDangerAccent: {
-    borderColor: '#EF4444',
+    borderColor: isDark ? '#F87171' : '#EF4444',
   },
   statCardSuccessAccent: {
-    borderColor: '#10B981',
+    borderColor: isDark ? '#34D399' : '#10B981',
   },
   statCardPurpleAccent: {
-    borderColor: '#8B5CF6',
+    borderColor: isDark ? '#A78BFA' : '#8B5CF6',
   },
   statIconWrap: {
     width: 38,
@@ -536,7 +553,9 @@ export const createAdminStyles = (isDark = false) => {
     height: 42,
     borderRadius: 10,
     marginRight: 12,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
+    borderWidth: 1,
+    borderColor: t.border,
     flexShrink: 0,
   },
   tableTitle: {
@@ -594,11 +613,11 @@ export const createAdminStyles = (isDark = false) => {
     borderWidth: 1,
   },
   promoStatusActive: {
-    backgroundColor: '#DCFCE7',
-    borderColor: '#86EFAC',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.16)' : '#DCFCE7',
+    borderColor: isDark ? 'rgba(16, 185, 129, 0.35)' : '#86EFAC',
   },
   promoStatusInactive: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
     borderColor: t.borderInput,
   },
   promoToggleDot: {
@@ -671,8 +690,8 @@ export const createAdminStyles = (isDark = false) => {
     gap: 6,
   },
   filterPillActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
   },
   filterPillText: {
     fontSize: 12,
@@ -694,26 +713,26 @@ export const createAdminStyles = (isDark = false) => {
     alignSelf: 'center',
   },
   stockInStock: {
-    backgroundColor: '#D1FAE5',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.16)' : '#D1FAE5',
   },
   stockInStockText: {
-    color: '#065F46',
+    color: isDark ? '#34D399' : '#065F46',
     fontSize: 11,
     fontWeight: '800',
   },
   stockLow: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7',
   },
   stockLowText: {
-    color: '#92400E',
+    color: isDark ? '#FBBF24' : '#92400E',
     fontSize: 11,
     fontWeight: '800',
   },
   stockOut: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.18)' : '#FEE2E2',
   },
   stockOutText: {
-    color: '#991B1B',
+    color: isDark ? '#F87171' : '#991B1B',
     fontSize: 11,
     fontWeight: '800',
   },
@@ -726,7 +745,7 @@ export const createAdminStyles = (isDark = false) => {
     width: 28,
     height: 28,
     borderRadius: 6,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -806,7 +825,7 @@ export const createAdminStyles = (isDark = false) => {
   posProductImgContainer: {
     width: '100%',
     height: 135,
-    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+    backgroundColor: isDark ? '#1C2422' : '#F8FAFC',
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -844,10 +863,10 @@ export const createAdminStyles = (isDark = false) => {
   posProductPrice: {
     fontSize: 14.5,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   posAddBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 8,
     paddingVertical: 7,
     paddingHorizontal: 8,
@@ -944,7 +963,7 @@ export const createAdminStyles = (isDark = false) => {
     width: 24,
     height: 24,
     borderRadius: 6,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
@@ -988,7 +1007,7 @@ export const createAdminStyles = (isDark = false) => {
   posGrandTotalVal: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   posPayMethodRow: {
     flexDirection: 'row',
@@ -1010,7 +1029,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   posPayMethodBtnActive: {
     backgroundColor: t.accentBg,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     borderWidth: 1.5,
   },
   posPayMethodText: {
@@ -1019,7 +1038,7 @@ export const createAdminStyles = (isDark = false) => {
     color: t.textMuted,
   },
   posPayMethodTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
   posTenderBox: {
@@ -1050,11 +1069,11 @@ export const createAdminStyles = (isDark = false) => {
     color: t.textSecondary,
   },
   posChangeBanner: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -1063,7 +1082,7 @@ export const createAdminStyles = (isDark = false) => {
   posChangeBannerText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#065F46',
+    color: isDark ? '#34D399' : '#065F46',
   },
   posChangeBannerAmount: {
     fontSize: 15,
@@ -1071,7 +1090,7 @@ export const createAdminStyles = (isDark = false) => {
     color: '#047857',
   },
   posCheckoutBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
@@ -1079,7 +1098,7 @@ export const createAdminStyles = (isDark = false) => {
     flexDirection: 'row',
     gap: 8,
     marginTop: 8,
-    shadowColor: '#0C6258',
+    shadowColor: '#1D4533',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1128,7 +1147,7 @@ export const createAdminStyles = (isDark = false) => {
   analyticsPeriodTabs: {
     flexDirection: 'row',
     gap: 6,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
     padding: 3,
     borderRadius: 10,
   },
@@ -1151,7 +1170,7 @@ export const createAdminStyles = (isDark = false) => {
     color: t.textMuted,
   },
   analyticsPeriodTabTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
   chartBarContainer: {
@@ -1174,7 +1193,7 @@ export const createAdminStyles = (isDark = false) => {
   chartBarPill: {
     width: '100%',
     maxWidth: 36,
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderTopLeftRadius: 6,
     borderTopRightRadius: 6,
     minHeight: 8,
@@ -1191,7 +1210,7 @@ export const createAdminStyles = (isDark = false) => {
   chartBarVal: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#0C6258',
+    color: '#1D4533',
     marginBottom: 4,
   },
   leaderboardRow: {
@@ -1213,18 +1232,18 @@ export const createAdminStyles = (isDark = false) => {
   leaderboardRankText: {
     fontSize: 11,
     fontWeight: '900',
-    color: '#0C6258',
+    color: '#1D4533',
   },
   progressBarTrack: {
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
     overflow: 'hidden',
     marginTop: 6,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     borderRadius: 4,
   },
 
@@ -1280,14 +1299,15 @@ export const createAdminStyles = (isDark = false) => {
     letterSpacing: 0.4,
   },
   formInput: {
-    backgroundColor: t.bgSub,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: t.borderInput,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: t.borderInput || '#CBD5E1',
     paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13.5,
-    color: t.textPrimary,
+    paddingVertical: 11,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0F172A',
     marginBottom: 4,
     ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
   },
@@ -1295,7 +1315,7 @@ export const createAdminStyles = (isDark = false) => {
     backgroundColor: t.bgSub,
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     borderStyle: 'dashed',
     padding: 16,
     alignItems: 'center',
@@ -1309,7 +1329,9 @@ export const createAdminStyles = (isDark = false) => {
     borderRadius: 10,
     overflow: 'hidden',
     marginBottom: 10,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
+    borderWidth: 1,
+    borderColor: t.border,
     position: 'relative',
   },
   imageUploadPreview: {
@@ -1325,7 +1347,7 @@ export const createAdminStyles = (isDark = false) => {
     marginTop: 6,
   },
   uploadActionBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
@@ -1334,7 +1356,7 @@ export const createAdminStyles = (isDark = false) => {
     gap: 6,
   },
   uploadActionBtnSecondary: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
     borderWidth: 1,
     borderColor: t.borderInput,
   },
@@ -1359,7 +1381,7 @@ export const createAdminStyles = (isDark = false) => {
     borderColor: t.border,
   },
   presetThumbBtnActive: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     borderWidth: 2.5,
   },
   presetThumbImg: {
@@ -1427,7 +1449,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   receiptBarcode: {
     height: 44,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
     borderRadius: 6,
     marginVertical: 14,
     justifyContent: 'center',
@@ -1452,7 +1474,7 @@ export const createAdminStyles = (isDark = false) => {
     maxHeight: 180,
   },
   sqlCodeText: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 11.5,
     lineHeight: 18,
@@ -1487,7 +1509,7 @@ export const createAdminStyles = (isDark = false) => {
     elevation: 2,
   },
   paymentDropdownTriggerActive: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: t.accentBg,
   },
   paymentDropdownTriggerText: {
@@ -1531,7 +1553,7 @@ export const createAdminStyles = (isDark = false) => {
     fontWeight: '600',
   },
   paymentDropdownItemTextActive: {
-    color: '#0C6258',
+    color: '#1D4533',
     fontWeight: '800',
   },
   orderFilterBar: {
@@ -1550,8 +1572,8 @@ export const createAdminStyles = (isDark = false) => {
     borderColor: t.border,
   },
   orderFilterTabActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
   },
   orderFilterTabText: {
     fontSize: 12,
@@ -1562,9 +1584,9 @@ export const createAdminStyles = (isDark = false) => {
     color: '#FFFFFF',
   },
   codAlertBanner: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: isDark ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A',
     borderRadius: 14,
     padding: 14,
     marginBottom: 16,
@@ -1577,15 +1599,15 @@ export const createAdminStyles = (isDark = false) => {
   codAlertBannerText: {
     fontSize: 13,
     fontWeight: '800',
-    color: '#92400E',
+    color: isDark ? '#FBBF24' : '#92400E',
   },
   codAlertBannerSub: {
     fontSize: 11.5,
-    color: '#B45309',
+    color: isDark ? '#FCD34D' : '#B45309',
     marginTop: 2,
   },
   approveAllCodBtn: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
@@ -1605,7 +1627,7 @@ export const createAdminStyles = (isDark = false) => {
     flexShrink: 0,
   },
   btnApproveCod: {
-    backgroundColor: '#0C6258',
+    backgroundColor: '#1D4533',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1621,9 +1643,9 @@ export const createAdminStyles = (isDark = false) => {
     fontWeight: '700',
   },
   btnAdvanceOrder: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: isDark ? 'rgba(59, 130, 246, 0.16)' : '#EFF6FF',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: isDark ? 'rgba(59, 130, 246, 0.35)' : '#BFDBFE',
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1633,7 +1655,7 @@ export const createAdminStyles = (isDark = false) => {
     flexShrink: 0,
   },
   btnAdvanceOrderText: {
-    color: '#1D4ED8',
+    color: isDark ? '#60A5FA' : '#1D4ED8',
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '700',
@@ -1656,10 +1678,49 @@ export const createAdminStyles = (isDark = false) => {
     lineHeight: 14,
     fontWeight: '700',
   },
-  btnCancelOrder: {
-    backgroundColor: '#FEE2E2',
+  btnEditOrder: {
+    backgroundColor: isDark ? 'rgba(29, 69, 51, 0.35)' : '#E8F5E9',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: isDark ? '#2E7D32' : '#A5D6A7',
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexShrink: 0,
+  },
+  btnEditOrderText: {
+    color: isDark ? '#81C784' : '#1D4533',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '800',
+  },
+  orderFormField: {
+    marginBottom: 10,
+  },
+  orderFormLabel: {
+    fontSize: 11.5,
+    fontWeight: '700',
+    color: t.textSecondary,
+    marginBottom: 5,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  orderFormInput: {
+    backgroundColor: isDark ? '#141A18' : '#FFFFFF',
+    borderWidth: 1,
+    borderColor: t.borderInput,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 13,
+    color: t.textPrimary,
+  },
+  btnCancelOrder: {
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2',
+    borderWidth: 1,
+    borderColor: isDark ? 'rgba(239, 68, 68, 0.35)' : '#FECACA',
     paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 8,
@@ -1669,7 +1730,7 @@ export const createAdminStyles = (isDark = false) => {
     flexShrink: 0,
   },
   btnCancelOrderText: {
-    color: '#DC2626',
+    color: isDark ? '#F87171' : '#DC2626',
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '700',
@@ -1698,8 +1759,8 @@ export const createAdminStyles = (isDark = false) => {
     borderColor: t.border,
   },
   garageSubNavBtnActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
   },
   garageSubNavText: {
     fontSize: 13,
@@ -1742,45 +1803,45 @@ export const createAdminStyles = (isDark = false) => {
     flexShrink: 0,
   },
   statusConfirmed: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: isDark ? 'rgba(59, 130, 246, 0.16)' : '#EFF6FF',
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: isDark ? 'rgba(59, 130, 246, 0.35)' : '#BFDBFE',
   },
   statusConfirmedText: {
-    color: '#1D4ED8',
+    color: isDark ? '#60A5FA' : '#1D4ED8',
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '700',
   },
   statusInProgress: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: isDark ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A',
   },
   statusInProgressText: {
-    color: '#B45309',
+    color: isDark ? '#FBBF24' : '#B45309',
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '700',
   },
   statusCompleted: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
   },
   statusCompletedText: {
-    color: '#059669',
+    color: isDark ? '#34D399' : '#059669',
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '700',
   },
   statusCancelled: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: isDark ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2',
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: isDark ? 'rgba(239, 68, 68, 0.35)' : '#FECACA',
   },
   statusCancelledText: {
-    color: '#DC2626',
+    color: isDark ? '#F87171' : '#DC2626',
     fontSize: 11,
     lineHeight: 14,
     fontWeight: '700',
@@ -1794,7 +1855,7 @@ export const createAdminStyles = (isDark = false) => {
     flexWrap: 'wrap',
   },
   bikePlatePill: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -1822,7 +1883,7 @@ export const createAdminStyles = (isDark = false) => {
   techPillText: {
     fontSize: 10.5,
     fontWeight: '700',
-    color: '#0C6258',
+    color: '#1D4533',
   },
 
   // ─── MECHANICS & TECHNICIANS ROSTER STYLES ───
@@ -1857,7 +1918,7 @@ export const createAdminStyles = (isDark = false) => {
     height: 56,
     borderRadius: 28,
     borderWidth: 2,
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     backgroundColor: '#E2E8F0',
   },
   mechanicHeaderInfo: {
@@ -1885,24 +1946,24 @@ export const createAdminStyles = (isDark = false) => {
     alignSelf: 'flex-start',
   },
   mechanicStatusAvailable: {
-    backgroundColor: '#ECFDF5',
+    backgroundColor: isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
     borderWidth: 1,
-    borderColor: '#A7F3D0',
+    borderColor: isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
   },
   mechanicStatusAvailableText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#059669',
+    color: isDark ? '#34D399' : '#059669',
   },
   mechanicStatusBusy: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: isDark ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
     borderWidth: 1,
-    borderColor: '#FDE68A',
+    borderColor: isDark ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A',
   },
   mechanicStatusBusyText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#B45309',
+    color: isDark ? '#FBBF24' : '#B45309',
   },
   mechanicInfoRow: {
     flexDirection: 'row',
@@ -1916,7 +1977,7 @@ export const createAdminStyles = (isDark = false) => {
     flex: 1,
   },
   mechanicBayBadge: {
-    backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+    backgroundColor: isDark ? '#1C2422' : '#F1F5F9',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
@@ -1969,7 +2030,7 @@ export const createAdminStyles = (isDark = false) => {
     borderColor: 'transparent',
   },
   avatarPresetThumbSelected: {
-    borderColor: '#0C6258',
+    borderColor: '#1D4533',
     transform: [{ scale: 1.08 }],
   },
   quickChipRow: {
@@ -1982,13 +2043,13 @@ export const createAdminStyles = (isDark = false) => {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
-    backgroundColor: isDark ? '#1E293B' : '#F8FAFC',
+    backgroundColor: isDark ? '#1C2422' : '#F8FAFC',
     borderWidth: 1,
     borderColor: t.borderInput,
   },
   quickChipActive: {
-    backgroundColor: '#0C6258',
-    borderColor: '#0C6258',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
   },
   quickChipText: {
     fontSize: 11.5,
