@@ -1,5 +1,6 @@
 import { storageAdapter } from './storageAdapter.js';
 import { supabaseManager } from './supabaseClient.js';
+import { resolveReorderLevel } from '../utils/inventoryHelpers.js';
 
 const CUSTOMER_STORAGE_KEY = '@mototrack_user_notifications';
 const ADMIN_STORAGE_KEY = '@mototrack_admin_notifications';
@@ -46,220 +47,22 @@ export function isDateTodayOrSoon(dateStr) {
  * 15. security_activity: Important system or security activities
  */
 
-const INITIAL_ADMIN_NOTIFICATIONS = [
-  {
-    id: 'admin-notif-1',
-    target: 'admin',
-    category: 'order_placed',
-    type: 'order',
-    priority: 'high',
-    title: 'New Customer Order Placed',
-    message: 'Customer John Dela Cruz placed Order #MT-ORD-9412 (₱14,500 - 3 items). Awaiting processing & fulfillment dispatch.',
-    meta: { orderId: 'MT-ORD-9412', customer: 'John Dela Cruz', amount: 14500, itemsCount: 3 },
-    status: 'unread',
-    created_at: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    link: 'orders',
-    icon: 'bag-check-fill',
-  },
-  {
-    id: 'admin-notif-2',
-    target: 'admin',
-    category: 'payment_confirmed',
-    type: 'payment',
-    priority: 'medium',
-    title: 'Order Payment Confirmed',
-    message: 'Payment of ₱18,250 for Order #MT-ORD-9304 was successfully verified via GCash. Order queued for courier handover.',
-    meta: { orderId: 'MT-ORD-9304', amount: 18250, method: 'GCash' },
-    status: 'unread',
-    created_at: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-    link: 'orders',
-    icon: 'credit-card-2-front-fill',
-  },
-  {
-    id: 'admin-notif-3',
-    target: 'admin',
-    category: 'order_status',
-    type: 'order',
-    priority: 'low',
-    title: 'Order Status Updated',
-    message: 'Order #MT-ORD-8821 was updated to "Out for Delivery" by Express Logistics Partner.',
-    meta: { orderId: 'MT-ORD-8821', status: 'Out for Delivery' },
-    status: 'read',
-    created_at: new Date(Date.now() - 1000 * 60 * 95).toISOString(),
-    link: 'orders',
-    icon: 'truck',
-  },
-  {
-    id: 'admin-notif-4',
-    target: 'admin',
-    category: 'low_stock',
-    type: 'inventory',
-    priority: 'high',
-    title: 'Low Stock Threshold Reached',
-    message: 'Brembo RCS 19 Corsa Corta Brake Master Cylinder is down to 2 units remaining (Minimum threshold: 5).',
-    meta: { productName: 'Brembo RCS 19 Corsa Corta', currentStock: 2, minThreshold: 5 },
-    status: 'unread',
-    created_at: new Date(Date.now() - 1000 * 60 * 110).toISOString(),
-    link: 'inventory',
-    icon: 'exclamation-triangle-fill',
-  },
-  {
-    id: 'admin-notif-5',
-    target: 'admin',
-    category: 'out_of_stock',
-    type: 'inventory',
-    priority: 'urgent',
-    title: 'Product Out of Stock Alert',
-    message: 'Akrapovič Carbon Slip-On Exhaust (Kawasaki ZX-6R) has reached 0 units in warehouse storage. Reorder required immediately.',
-    meta: { productName: 'Akrapovič Carbon Slip-On Exhaust', currentStock: 0 },
-    status: 'unread',
-    created_at: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
-    link: 'inventory',
-    icon: 'x-octagon-fill',
-  },
-  {
-    id: 'admin-notif-6',
-    target: 'admin',
-    category: 'booking_new',
-    type: 'booking',
-    priority: 'high',
-    title: 'New Pitstop Booking Submitted',
-    message: 'Maria Santos submitted a booking for Pro Performance 20-Point PMS (Yamaha NMAX 155, Plate: NMX-482).',
-    meta: { customer: 'Maria Santos', vehicle: 'Yamaha NMAX 155', service: 'Pro Performance Full PMS' },
-    status: 'unread',
-    created_at: new Date(Date.now() - 1000 * 60 * 45).toISOString(),
-    link: 'garage',
-    icon: 'calendar-plus-fill',
-  },
-  {
-    id: 'admin-notif-7',
-    target: 'admin',
-    category: 'booking_cancelled',
-    type: 'booking',
-    priority: 'medium',
-    title: 'Customer Cancelled Booking',
-    message: 'Booking #BK-REP-4190 scheduled for Bay 2 was cancelled by customer Mark Reyes. Pit bay slot released back to queue.',
-    meta: { bookingId: 'BK-REP-4190', customer: 'Mark Reyes', bay: 'Bay 2' },
-    status: 'read',
-    created_at: new Date(Date.now() - 1000 * 60 * 220).toISOString(),
-    link: 'garage',
-    icon: 'calendar-x-fill',
-  },
-  {
-    id: 'admin-notif-8',
-    target: 'admin',
-    category: 'service_approaching',
-    type: 'booking',
-    priority: 'high',
-    title: 'Scheduled Pitstop Service Approaching',
-    message: 'Appointment for Honda CBR650R (Master Tech Jayson - Pit Bay 1) starts in 30 minutes at 10:30 AM.',
-    meta: { vehicle: 'Honda CBR650R', mechanic: 'Master Tech Jayson', bay: 'Pit Bay 1', startsIn: '30 mins' },
-    status: 'unread',
-    created_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-    link: 'garage',
-    icon: 'clock-history',
-  },
-  {
-    id: 'admin-notif-9',
-    target: 'admin',
-    category: 'service_completed',
-    type: 'booking',
-    priority: 'medium',
-    title: 'Repair / PMS Service Completed',
-    message: 'Mechanic Carlos successfully completed Full Brake Caliper Rebuild & Bleed on Ducati Monster. Vehicle ready for inspection.',
-    meta: { mechanic: 'Carlos', vehicle: 'Ducati Monster', service: 'Full Brake Caliper Rebuild' },
-    status: 'read',
-    created_at: new Date(Date.now() - 1000 * 60 * 310).toISOString(),
-    link: 'garage',
-    icon: 'check-circle-fill',
-  },
-  {
-    id: 'admin-notif-10',
-    target: 'admin',
-    category: 'customer_registered',
-    type: 'user',
-    priority: 'low',
-    title: 'New Customer Registered',
-    message: 'New verified rider account registered: Alex Tan (alex.tan@gmail.com). Customer added to customer directory.',
-    meta: { customer: 'Alex Tan', email: 'alex.tan@gmail.com' },
-    status: 'read',
-    created_at: new Date(Date.now() - 1000 * 60 * 360).toISOString(),
-    link: 'users',
-    icon: 'person-plus-fill',
-  },
-  {
-    id: 'admin-notif-11',
-    target: 'admin',
-    category: 'review_submitted',
-    type: 'review',
-    priority: 'medium',
-    title: 'New Customer Review Submitted',
-    message: 'Dave P. submitted a 5-star rating for Motul 300V Factory Line 10W-40: "Amazing oil, shifting is butter-smooth on track!"',
-    meta: { rating: 5, customer: 'Dave P.', product: 'Motul 300V Factory Line 10W-40' },
-    status: 'unread',
-    created_at: new Date(Date.now() - 1000 * 60 * 140).toISOString(),
-    link: 'inventory',
-    icon: 'star-fill',
-  },
-  {
-    id: 'admin-notif-12',
-    target: 'admin',
-    category: 'restock_attention',
-    type: 'procurement',
-    priority: 'high',
-    title: 'Purchase Order Needs Attention',
-    message: 'Restocking Request #PO-2026-089 (Öhlins Suspensions Batch - ₱245,000) is awaiting admin approval and PO sign-off.',
-    meta: { poNumber: 'PO-2026-089', supplier: 'Öhlins Official PH', amount: 245000 },
-    status: 'unread',
-    created_at: new Date(Date.now() - 1000 * 60 * 75).toISOString(),
-    link: 'suppliers',
-    icon: 'file-earmark-text-fill',
-  },
-  {
-    id: 'admin-notif-13',
-    target: 'admin',
-    category: 'restock_recommendation',
-    type: 'inventory',
-    priority: 'medium',
-    title: 'AI Restock Recommendation',
-    message: 'High sales velocity detected: NGK Iridium Spark Plugs sold 42 units in 5 days. Recommended reorder quantity: 60 units.',
-    meta: { product: 'NGK Iridium Spark Plugs', velocity: '8.4 units/day', recommendedQty: 60 },
-    status: 'read',
-    created_at: new Date(Date.now() - 1000 * 60 * 480).toISOString(),
-    link: 'inventory',
-    icon: 'graph-up-arrow',
-  },
-  {
-    id: 'admin-notif-14',
-    target: 'admin',
-    category: 'sales_update',
-    type: 'sales',
-    priority: 'medium',
-    title: 'Important Sales & Revenue Milestone',
-    message: 'Store gross revenue surpassed daily milestone: ₱148,200 recorded across in-store POS and e-commerce checkouts today.',
-    meta: { dailyTotal: 148200, onlineOrders: 14, posOrders: 28 },
-    status: 'read',
-    created_at: new Date(Date.now() - 1000 * 60 * 540).toISOString(),
-    link: 'overview',
-    icon: 'cash-coin',
-  },
-  {
-    id: 'admin-notif-15',
-    target: 'admin',
-    category: 'security_activity',
-    type: 'system',
-    priority: 'urgent',
-    title: 'Important Security Activity Detected',
-    message: 'Admin Master PIN was verified and security configuration backup was generated from IP 192.168.1.104.',
-    meta: { action: 'Security Backup & PIN Verification', ip: '192.168.1.104' },
-    status: 'unread',
-    created_at: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-    link: 'settings',
-    icon: 'shield-lock-fill',
-  },
-];
+const INITIAL_ADMIN_NOTIFICATIONS = [];
 
 const INITIAL_CUSTOMER_NOTIFICATIONS = [
+  {
+    id: 'cust-notif-welcome',
+    target: 'customer',
+    user_id: 'guest',
+    title: 'Welcome to MotoTrack!',
+    message: 'Explore performance parts, customize your motorcycle, or book PMS bay appointments anytime.',
+    type: 'promo',
+    category: 'welcome',
+    status: 'unread',
+    created_at: new Date(Date.now() - 1000 * 60 * 10).toISOString(),
+    link: 'shop',
+    icon: 'lightning-charge-fill',
+  },
   {
     id: 'cust-notif-1',
     target: 'customer',
@@ -267,6 +70,7 @@ const INITIAL_CUSTOMER_NOTIFICATIONS = [
     title: 'Pit Bay Appointment Confirmed',
     message: 'Your Repair appointment (Ticket #BK-REP-4921) at Quezon City Hub is confirmed for tomorrow at 10:30 AM.',
     type: 'booking',
+    category: 'booking',
     status: 'unread',
     created_at: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
     link: 'bookings',
@@ -279,6 +83,7 @@ const INITIAL_CUSTOMER_NOTIFICATIONS = [
     title: 'Order Out for Delivery',
     message: 'Order #MT-ORD-8821 with Akrapovič Carbon Slip-On is now out with courier rider Jherico. Track location live!',
     type: 'order',
+    category: 'order',
     status: 'unread',
     created_at: new Date(Date.now() - 1000 * 60 * 120).toISOString(),
     link: 'orders',
@@ -291,6 +96,7 @@ const INITIAL_CUSTOMER_NOTIFICATIONS = [
     title: 'Weekend PMS Special',
     message: 'Get a free Motul 300V brake fluid flush with any 20-Point PMS booking this weekend. Limited bay slots!',
     type: 'promo',
+    category: 'promo',
     status: 'read',
     created_at: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
     link: 'garage',
@@ -303,6 +109,7 @@ const INITIAL_CUSTOMER_NOTIFICATIONS = [
     title: 'Security Verification Alert',
     message: 'New login detected from Chrome on Windows (124.106.128.45). If this was you, no action is needed.',
     type: 'security',
+    category: 'security',
     status: 'read',
     created_at: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
     link: 'settings',
@@ -334,28 +141,35 @@ class NotificationService {
       const storedCust = await storageAdapter.getItem(CUSTOMER_STORAGE_KEY);
       if (storedCust) {
         const parsed = JSON.parse(storedCust);
-        this.customerNotifications = Array.isArray(parsed) && parsed.length > 0
-          ? parsed.map((n) => this.sanitize(n))
-          : [...INITIAL_CUSTOMER_NOTIFICATIONS];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Merge with any missing initial broadcast notifications
+          const parsedIds = new Set(parsed.map((p) => p.id));
+          const missingBroadcast = INITIAL_CUSTOMER_NOTIFICATIONS.filter((i) => !parsedIds.has(i.id));
+          this.customerNotifications = [...parsed.map((n) => this.sanitize(n)), ...missingBroadcast];
+        } else {
+          this.customerNotifications = [...INITIAL_CUSTOMER_NOTIFICATIONS];
+        }
       } else {
         this.customerNotifications = [...INITIAL_CUSTOMER_NOTIFICATIONS];
       }
 
-      // Load Admin Notifications
+      // Load Admin Notifications (only live database/system alerts)
       const storedAdmin = await storageAdapter.getItem(ADMIN_STORAGE_KEY);
       if (storedAdmin) {
         const parsedAdmin = JSON.parse(storedAdmin);
-        this.adminNotifications = Array.isArray(parsedAdmin) && parsedAdmin.length > 0
-          ? parsedAdmin.map((n) => this.sanitize(n))
-          : [...INITIAL_ADMIN_NOTIFICATIONS];
+        this.adminNotifications = Array.isArray(parsedAdmin)
+          ? parsedAdmin
+              .filter((n) => n.isDatabaseLive || (n.id && String(n.id).startsWith('db-')))
+              .map((n) => this.sanitize(n))
+          : [];
       } else {
-        this.adminNotifications = [...INITIAL_ADMIN_NOTIFICATIONS];
+        this.adminNotifications = [];
       }
 
       await this.persist();
     } catch (_e) {
       this.customerNotifications = [...INITIAL_CUSTOMER_NOTIFICATIONS];
-      this.adminNotifications = [...INITIAL_ADMIN_NOTIFICATIONS];
+      this.adminNotifications = [];
     }
     this.initialized = true;
     this.notify();
@@ -497,6 +311,7 @@ class NotificationService {
   async syncFromDatabase({ force = false } = {}) {
     try {
       const generatedAlerts = [];
+      const generatedCustomerAlerts = [];
 
       // 1. Fetch live orders (use TTL cache — avoid full re-download on every alert sync)
       let orders = [];
@@ -523,8 +338,9 @@ class NotificationService {
           const paymentMethod = o.payment_method || 'COD';
           const status = String(o.status || 'Processing').trim();
           const createdAt = o.created_at || new Date().toISOString();
+          const sLower = status.toLowerCase();
 
-          // Order Placed / Processing Alert
+          // Order Placed / Processing Alert for Admin
           generatedAlerts.push({
             id: `db-order-placed-${orderId}`,
             dbRecordId: orderId,
@@ -540,6 +356,46 @@ class NotificationService {
             created_at: createdAt,
             link: 'orders',
             icon: 'bag-check-fill',
+          });
+
+          // Customer Order Alert
+          const orderCustomerUserId = o.user_id || o.userId || o.customer_id || o.customerId || 'guest';
+          let custTitle = 'Order Placed';
+          let custMsg = `Your Order #${orderId} (${itemCount} item${itemCount > 1 ? 's' : ''} - ₱${totalAmount.toLocaleString()}) via ${paymentMethod} is being prepared.`;
+          let custIcon = 'bag-check-fill';
+          let custStatus = 'unread';
+
+          if (sLower === 'delivered') {
+            custTitle = 'Order Delivered';
+            custMsg = `Your Order #${orderId} has been successfully delivered. Thank you for choosing MotoTrack!`;
+            custIcon = 'check-circle-fill';
+            custStatus = 'read';
+          } else if (sLower === 'out for delivery' || sLower.includes('out for')) {
+            custTitle = 'Order Out for Delivery';
+            custMsg = `Your Order #${orderId} is out for delivery. Courier rider is en route to your address.`;
+            custIcon = 'truck';
+          } else if (sLower.includes('cancel')) {
+            custTitle = 'Order Cancelled';
+            custMsg = `Your Order #${orderId} has been cancelled.`;
+            custIcon = 'x-circle-fill';
+          }
+
+          generatedCustomerAlerts.push({
+            id: `db-cust-order-${orderId}`,
+            dbRecordId: orderId,
+            isDatabaseLive: true,
+            target: 'customer',
+            user_id: orderCustomerUserId,
+            category: 'order_status',
+            type: 'order',
+            priority: 'high',
+            title: custTitle,
+            message: custMsg,
+            meta: { orderId, totalAmount, itemCount, paymentMethod, status, userId: orderCustomerUserId },
+            status: custStatus,
+            created_at: o.updated_at || createdAt,
+            link: 'orders',
+            icon: custIcon,
           });
 
           // Payment Confirmed Alert (if paid / confirmed / gcash)
@@ -566,8 +422,7 @@ class NotificationService {
             });
           }
 
-          // Order status alerts
-          const sLower = status.toLowerCase();
+          // Order status alerts for Admin
           if (sLower === 'out for delivery' || sLower.includes('out for')) {
             generatedAlerts.push({
               id: `db-order-out-${orderId}`,
@@ -653,6 +508,47 @@ class NotificationService {
           const bay = b.bay_name || b.pit_bay || 'Pit Bay';
           const createdAt = b.created_at || new Date().toISOString();
 
+          // Customer Booking Alert
+          const bookingCustomerUserId = b.user_id || b.userId || b.customer_id || 'guest';
+          let bookTitle = 'Pit Bay Appointment Confirmed';
+          let bookMsg = `Your appointment for ${serviceTitle} (${vehicle}) at ${bay} is scheduled for ${date} at ${timeSlot}.`;
+          let bookIcon = 'tools';
+          let bookStatus = 'unread';
+
+          if (status === 'completed' || status.includes('done')) {
+            bookTitle = 'Pitstop Service Completed';
+            bookMsg = `Your ${serviceTitle} on ${vehicle} is completed. Ready for pickup at ${bay}!`;
+            bookIcon = 'check-circle-fill';
+            bookStatus = 'read';
+          } else if (status === 'cancelled' || status.includes('cancel')) {
+            bookTitle = 'Pitstop Booking Cancelled';
+            bookMsg = `Your booking #${bookingId} for ${vehicle} was cancelled${b.cancellation_reason ? `: ${b.cancellation_reason}` : ''}.`;
+            bookIcon = 'calendar-x-fill';
+          } else if (status === 'in_service' || status.includes('progress')) {
+            bookTitle = 'Motorcycle in Service Bay';
+            bookMsg = `Technician ${mechanic} is now servicing your ${vehicle} in ${bay}.`;
+            bookIcon = 'gear-wide-connected';
+          }
+
+          generatedCustomerAlerts.push({
+            id: `db-cust-booking-${bookingId}`,
+            dbRecordId: bookingId,
+            isDatabaseLive: true,
+            target: 'customer',
+            user_id: bookingCustomerUserId,
+            category: 'booking_status',
+            type: 'booking',
+            priority: 'high',
+            title: bookTitle,
+            message: bookMsg,
+            meta: { bookingId, customerName, vehicle, serviceTitle, date, timeSlot, mechanic, bay, userId: bookingCustomerUserId },
+            status: bookStatus,
+            created_at: b.updated_at || createdAt,
+            link: 'bookings',
+            icon: bookIcon,
+          });
+
+          // Admin Booking Alerts
           if (status === 'cancelled' || status.includes('cancel')) {
             generatedAlerts.push({
               id: `db-booking-cancelled-${bookingId}`,
@@ -768,7 +664,8 @@ class NotificationService {
               link: 'inventory',
               icon: 'x-octagon-fill',
             });
-          } else if (stock <= 5) {
+          } else if (stock <= resolveReorderLevel(p, 5)) {
+            const threshold = resolveReorderLevel(p, 5);
             generatedAlerts.push({
               id: `db-stock-low-${pId}`,
               dbRecordId: pId,
@@ -778,8 +675,8 @@ class NotificationService {
               type: 'inventory',
               priority: 'high',
               title: 'Low Stock Threshold Warning',
-              message: `"${pName}" has reached low stock: only ${stock} unit${stock === 1 ? '' : 's'} remaining in warehouse (Threshold: 5).`,
-              meta: { productName: pName, productId: pId, currentStock: stock, minThreshold: 5 },
+              message: `"${pName}" has reached low stock: only ${stock} unit${stock === 1 ? '' : 's'} remaining in warehouse (Threshold: ${threshold}).`,
+              meta: { productName: pName, productId: pId, currentStock: stock, minThreshold: threshold },
               status: 'unread',
               created_at: new Date().toISOString(),
               link: 'inventory',
@@ -829,8 +726,7 @@ class NotificationService {
         }
       }
 
-      // Reconcile and Merge:
-      // Preserve existing read/unread status
+      // Reconcile and Merge Admin Alerts:
       const existingStatusMap = new Map();
       this.adminNotifications.forEach((n) => {
         if (n && n.id) {
@@ -853,12 +749,10 @@ class NotificationService {
         return gen;
       });
 
-      // Keep non-DB notifications that haven't been deleted
       const nonDbAlerts = this.adminNotifications.filter(
         (n) => !n.isDatabaseLive && !String(n.id).startsWith('db-')
       );
 
-      // Real database alerts placed at the top, sorted by date descending
       const combined = [...mergedLiveAlerts, ...nonDbAlerts];
       combined.sort((a, b) => {
         const timeA = new Date(a.created_at || 0).getTime();
@@ -867,12 +761,59 @@ class NotificationService {
       });
 
       this.adminNotifications = combined.map((n) => this.sanitize(n));
+
+      // Reconcile and Merge Customer Alerts:
+      const existingCustStatusMap = new Map();
+      this.customerNotifications.forEach((n) => {
+        if (n && n.id) {
+          existingCustStatusMap.set(n.id, {
+            status: n.status,
+            created_at: n.created_at,
+          });
+        }
+      });
+
+      const mergedCustomerLiveAlerts = generatedCustomerAlerts.map((gen) => {
+        if (existingCustStatusMap.has(gen.id)) {
+          const existing = existingCustStatusMap.get(gen.id);
+          return {
+            ...gen,
+            status: existing.status,
+            created_at: existing.created_at || gen.created_at,
+          };
+        }
+        return gen;
+      });
+
+      const nonDbCustomerAlerts = this.customerNotifications.filter(
+        (n) => !n.isDatabaseLive && !String(n.id).startsWith('db-cust-')
+      );
+
+      const baseCustomer = nonDbCustomerAlerts.length > 0 ? nonDbCustomerAlerts : [...INITIAL_CUSTOMER_NOTIFICATIONS];
+      const combinedCustomer = [...mergedCustomerLiveAlerts, ...baseCustomer];
+      const seenCustIds = new Set();
+      const dedupedCustomer = [];
+      for (const item of combinedCustomer) {
+        if (!seenCustIds.has(item.id)) {
+          seenCustIds.add(item.id);
+          dedupedCustomer.push(this.sanitize(item));
+        }
+      }
+      dedupedCustomer.sort((a, b) => {
+        const timeA = new Date(a.created_at || 0).getTime();
+        const timeB = new Date(b.created_at || 0).getTime();
+        return timeB - timeA;
+      });
+
+      this.customerNotifications = dedupedCustomer;
+
       await this.persist();
       this.notify();
       return {
         success: true,
         count: this.adminNotifications.length,
         liveDbCount: mergedLiveAlerts.length,
+        customerCount: this.customerNotifications.length,
       };
     } catch (err) {
       console.warn('[NotificationService] syncFromDatabase error:', err);
@@ -905,22 +846,27 @@ class NotificationService {
   // ─── CUSTOMER NOTIFICATIONS ACCESSORS ───
 
   getCustomerNotifications(userId = null) {
-    if (!userId) return []; // If not logged in, no notifications are shown
-
-    const list = this.customerNotifications.map((n) => this.sanitize(n));
-    if (userId === 'guest') {
-      return list.filter((n) => !n.user_id || n.user_id === 'guest');
+    if (!userId || userId === 'guest') {
+      return [];
     }
-    return list.filter((n) => n.user_id === userId);
+    const list = this.customerNotifications.map((n) => this.sanitize(n));
+    return list.filter((n) => {
+      const isForUser = n.user_id === userId || n.meta?.userId === userId || n.meta?.customerId === userId;
+      const isBroadcast = !n.user_id || n.user_id === 'guest' || n.target === 'all' || n.target === 'customer';
+      return isForUser || isBroadcast;
+    });
   }
 
   getCustomerUnreadCount(userId = null) {
+    if (!userId || userId === 'guest') {
+      return 0;
+    }
     return this.getCustomerNotifications(userId).filter((n) => n.status === 'unread').length;
   }
 
   async markCustomerAsRead(id) {
     this.customerNotifications = this.customerNotifications.map((n) =>
-      n.id === id ? { ...n, status: 'read' } : n
+      String(n.id) === String(id) ? { ...n, status: 'read', read: true } : n
     );
     await this.persist();
     this.notify();
@@ -929,7 +875,7 @@ class NotificationService {
 
   async markCustomerAsUnread(id) {
     this.customerNotifications = this.customerNotifications.map((n) =>
-      n.id === id ? { ...n, status: 'unread' } : n
+      String(n.id) === String(id) ? { ...n, status: 'unread', read: false } : n
     );
     await this.persist();
     this.notify();
@@ -937,7 +883,7 @@ class NotificationService {
   }
 
   async deleteCustomerNotification(id) {
-    this.customerNotifications = this.customerNotifications.filter((n) => n.id !== id);
+    this.customerNotifications = this.customerNotifications.filter((n) => String(n.id) !== String(id));
     await this.persist();
     this.notify();
     return this.customerNotifications;
@@ -946,10 +892,12 @@ class NotificationService {
   async markAllCustomerAsRead(userId = null) {
     this.customerNotifications = this.customerNotifications.map((n) => {
       const isGuest = !userId || userId === 'guest';
-      const matchesUser = isGuest ? (!n.user_id || n.user_id === 'guest') : (n.user_id === userId);
+      const matchesUser = isGuest
+        ? (!n.user_id || n.user_id === 'guest' || n.target === 'customer' || n.target === 'all')
+        : (n.user_id === userId || n.meta?.userId === userId || n.meta?.customerId === userId || !n.user_id || n.user_id === 'guest' || n.target === 'customer' || n.target === 'all');
       
       if (matchesUser) {
-        return { ...n, status: 'read' };
+        return { ...n, status: 'read', read: true };
       }
       return n;
     });
@@ -1022,6 +970,7 @@ class NotificationService {
   async addNotification({
     target = 'customer',
     userId,
+    user_id,
     title,
     message,
     type = 'order',
@@ -1031,10 +980,11 @@ class NotificationService {
     icon = 'bell-fill',
     meta = {},
   }) {
+    const resolvedUserId = userId || user_id || meta?.userId || meta?.customerId || 'guest';
     const notifItem = {
       id: `notif-${Date.now()}-${Math.floor(Math.random() * 10000)}`,
       target,
-      user_id: userId || 'guest',
+      user_id: resolvedUserId,
       title: stripEmojis(title) || 'MotoTrack Alert',
       message: stripEmojis(message) || '',
       type,
@@ -1044,7 +994,7 @@ class NotificationService {
       created_at: new Date().toISOString(),
       link,
       icon,
-      meta,
+      meta: { ...meta, userId: resolvedUserId },
     };
 
     if (target === 'admin') {
@@ -1059,6 +1009,60 @@ class NotificationService {
     await this.persist();
     this.notify();
     return notifItem;
+  }
+
+  // ─── DEDICATED CUSTOMER NOTIFICATION EMITTER METHODS ───
+
+  async notifyCustomerOrderPlaced({ userId, orderId, itemCount = 1, totalAmount, paymentMethod }) {
+    return this.addNotification({
+      target: 'customer',
+      userId,
+      title: 'Order Placed Successfully',
+      message: `Your Order #${orderId} (${itemCount} item${itemCount > 1 ? 's' : ''} - ₱${Number(totalAmount || 0).toLocaleString()}) via ${paymentMethod || 'COD'} is being prepared.`,
+      type: 'order',
+      category: 'order_placed',
+      priority: 'high',
+      link: 'orders',
+      icon: 'bag-check-fill',
+      meta: { orderId, totalAmount, itemCount, paymentMethod },
+    });
+  }
+
+  async notifyCustomerOrderStatus({ userId, orderId, status, message }) {
+    const statusIcons = {
+      'Processing': 'gear-wide-connected',
+      'Ready for Delivery': 'box-seam',
+      'Out for Delivery': 'truck',
+      'Delivered': 'check-circle-fill',
+      'Cancelled': 'x-circle-fill',
+    };
+    return this.addNotification({
+      target: 'customer',
+      userId,
+      title: `Order #${orderId} — ${status}`,
+      message: message || `Your order status has been updated to "${status}".`,
+      type: 'order',
+      category: 'order_status',
+      priority: status === 'Out for Delivery' || status === 'Delivered' ? 'high' : 'normal',
+      link: 'orders',
+      icon: statusIcons[status] || 'box-seam',
+      meta: { orderId, status },
+    });
+  }
+
+  async notifyCustomerBookingStatus({ userId, bookingId, serviceTitle, status, message }) {
+    return this.addNotification({
+      target: 'customer',
+      userId,
+      title: `Booking #${bookingId} — ${status}`,
+      message: message || `Your pit appointment for ${serviceTitle || 'service'} has been updated to "${status}".`,
+      type: 'booking',
+      category: 'booking_status',
+      priority: 'normal',
+      link: 'bookings',
+      icon: 'tools',
+      meta: { bookingId, status, serviceTitle },
+    });
   }
 
   // ──────────────────────────────────────────────────────────────────────────

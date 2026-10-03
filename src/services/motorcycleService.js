@@ -149,16 +149,13 @@ class MotorcycleService {
       const raw = appStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Ensure seed bikes exist if user list is small
-          const missing = DEFAULT_SEED_MOTORCYCLES.filter(
-            (s) => !parsed.some((p) => p.motorcycle_id === s.motorcycle_id || (p.brand === s.brand && p.model === s.model))
-          );
-          return [...parsed, ...missing];
+        if (Array.isArray(parsed)) {
+          // Exclude any synthetic seed motorcycles so only real user-registered bikes exist
+          return parsed.filter((p) => !String(p.motorcycle_id || '').startsWith('moto-seed-'));
         }
       }
     } catch (_e) {}
-    return [...DEFAULT_SEED_MOTORCYCLES];
+    return [];
   }
 
   _saveLocal(list) {
@@ -254,16 +251,9 @@ class MotorcycleService {
     const model = (bikeData.model || '').trim();
     const plate = (bikeData.plate_number || bikeData.plate || '').trim().toUpperCase();
 
-    // Default image if none provided
-    let photoUrl = bikeData.photo_url || '';
-    if (!photoUrl) {
-      const matched = MOTORCYCLE_PHOTO_PRESETS.find(
-        (p) => p.brand.toLowerCase() === brand.toLowerCase()
-      );
-      photoUrl = matched
-        ? matched.url
-        : 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80';
-    } else if (String(photoUrl).startsWith('data:')) {
+    // Photo URL: only use user-provided photo; do NOT auto-assign preset or AI photo
+    let photoUrl = (bikeData.photo_url || '').trim() || null;
+    if (photoUrl && String(photoUrl).startsWith('data:')) {
       try {
         const { resolveImageForDatabase } = await import('../utils/productImageUpload');
         const resolved = await resolveImageForDatabase(photoUrl, {
@@ -284,13 +274,13 @@ class MotorcycleService {
       customer_email: (bikeData.customer_email || bikeData.email || '').trim().toLowerCase(),
       brand,
       model,
-      year: bikeData.year ? parseInt(bikeData.year, 10) : new Date().getFullYear(),
+      year: bikeData.year ? parseInt(bikeData.year, 10) : null,
       plate_number: plate,
-      engine_cc: bikeData.engine_cc ? parseInt(bikeData.engine_cc, 10) : 150,
-      color: (bikeData.color || 'Standard Metallic').trim(),
-      odometer: (bikeData.odometer || '0 km').trim(),
+      engine_cc: bikeData.engine_cc ? parseInt(bikeData.engine_cc, 10) : null,
+      color: (bikeData.color || '').trim(),
+      odometer: (bikeData.odometer || '').trim(),
       vin_number: (bikeData.vin_number || '').trim(),
-      nickname: (bikeData.nickname || `${brand} ${model}`).trim(),
+      nickname: (bikeData.nickname || '').trim(),
       photo_url: photoUrl,
       is_primary: isFirstBike || Boolean(bikeData.is_primary),
       notes: (bikeData.notes || '').trim(),

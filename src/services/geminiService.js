@@ -1,44 +1,62 @@
 // ─── GOOGLE GEMINI AI SERVICE FOR MOTOTRACK CUSTOMIZER ───────────────────────
-import { storageAdapter } from './storageAdapter.js';
+// Production path: call MotoTrack Express proxy (server owns GEMINI_API_KEY).
+// Client must NOT ship EXPO_PUBLIC_GEMINI_API_KEY or store keys in localStorage.
 import { APP_CONFIG } from '../config/index.js';
+import { getCustomizeApiBaseUrl } from './aiCustomizeApi.js';
 
-const GEMINI_API_KEY_STORAGE = 'mototrack_gemini_api_key';
-const FALLBACK_ENV_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY || APP_CONFIG.gemini?.apiKey || '';
 const DEFAULT_GEMINI_MODEL = process.env.EXPO_PUBLIC_GEMINI_MODEL || APP_CONFIG.gemini?.model || 'gemini-1.5-flash';
 const DEFAULT_IMAGE_MODEL =
   process.env.EXPO_PUBLIC_GEMINI_IMAGE_MODEL || APP_CONFIG.gemini?.imageModel || 'gemini-2.5-flash-image';
 
-export const geminiService = {
-  getApiKey() {
-    try {
-      const stored = storageAdapter.getItem(GEMINI_API_KEY_STORAGE);
-      if (stored && typeof stored === 'string' && stored.trim().length > 0) {
-        return stored.trim();
-      }
-    } catch (e) {}
-    // Default to configured environment API key
-    if (FALLBACK_ENV_KEY && typeof FALLBACK_ENV_KEY === 'string' && FALLBACK_ENV_KEY.trim().length > 0) {
-      return FALLBACK_ENV_KEY.trim();
+async function callServerProxy(path, body, timeoutMs = 20000) {
+  const base = getCustomizeApiBaseUrl();
+  const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const response = await fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: controller ? controller.signal : undefined,
+    });
+    if (timer) clearTimeout(timer);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { success: false, error: data?.error || `Proxy ${response.status}` };
     }
+    return { success: true, ...data };
+  } catch (err) {
+    if (timer) clearTimeout(timer);
+    return {
+      success: false,
+      error:
+        err?.name === 'AbortError'
+          ? 'AI proxy timed out.'
+          : err?.message || 'AI proxy unavailable. Start the MotoTrack server.',
+    };
+  }
+}
+
+export const geminiService = {
+  /** @deprecated Keys must live on the server — always false for client storage. */
+  getApiKey() {
     return '';
   },
 
-  setApiKey(apiKey) {
-    try {
-      if (!apiKey || apiKey.trim().length === 0) {
-        storageAdapter.removeItem(GEMINI_API_KEY_STORAGE);
-      } else {
-        storageAdapter.setItem(GEMINI_API_KEY_STORAGE, apiKey.trim());
-      }
-      return true;
-    } catch (e) {
-      return false;
-    }
+  /** @deprecated No-op — do not store Gemini keys on the device. */
+  setApiKey(_apiKey) {
+    return false;
   },
 
-  hasApiKey() {
-    const key = this.getApiKey();
-    return Boolean(key && key.length > 10);
+  async hasApiKey() {
+    try {
+      const base = getCustomizeApiBaseUrl();
+      const res = await fetch(`${base}/health`);
+      const data = await res.json().catch(() => ({}));
+      return Boolean(data?.hasGeminiKey);
+    } catch {
+      return false;
+    }
   },
 
   getModel() {
@@ -133,14 +151,6 @@ export const geminiService = {
     requireReferencePhoto = true,
     timeoutMs = 90000,
   } = {}) {
-    const apiKey = this.getApiKey();
-    if (!apiKey) {
-      return {
-        success: false,
-        error: 'Gemini API key is not configured. Add EXPO_PUBLIC_GEMINI_API_KEY in .env.',
-      };
-    }
-
     const imagePart = await this._resolveInlineImagePart(referencePhotoUri);
     if (requireReferencePhoto && !imagePart) {
       return {
@@ -187,153 +197,77 @@ export const geminiService = {
           'Keep the motorcycle model exact. Do not generate a car.',
         ].join('\n');
 
-    const parts = [];
-    if (imagePart) parts.push(imagePart);
-    parts.push({ text: promptText });
+    const imageBase64 = imagePart?.inline_data?.data || null;
+    const imageMime = imagePart?.inline_data?.mime_type || 'image/jpeg';
 
-    const candidateModels = [
-      this.getImageModel(),
-      'gemini-2.5-flash-image',
-      'gemini-3.1-flash-image',
-      'gemini-2.0-flash-preview-image-generation',
-    ].filter((m, i, arr) => m && arr.indexOf(m) === i);
+    const proxied = await callServerProxy(
+      '/gemini/image',
+      {
+        promptText,
+        model: this.getImageModel(),
+        imageBase64,
+        imageMime,
+      },
+      timeoutMs
+    );
 
-    let lastError = 'Gemini image generation failed.';
-
-    for (const model of candidateModels) {
-      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
-
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ role: 'user', parts }],
-            generationConfig: {
-              responseModalities: ['TEXT', 'IMAGE'],
-              temperature: 0.2,
-            },
-          }),
-          signal: controller ? controller.signal : undefined,
-        });
-
-        if (timer) clearTimeout(timer);
-
-        const resData = await response.json().catch(() => ({}));
-        if (!response.ok) {
-          lastError =
-            resData?.error?.message ||
-            `Gemini ${model} returned ${response.status}.`;
-          continue;
-        }
-
-        const extracted = this._extractGeneratedImage(resData);
-        if (extracted.dataUrl) {
-          return {
-            success: true,
-            previewImageUrl: extracted.dataUrl,
-            model,
-            usedReferencePhoto: Boolean(imagePart),
-            poweredBy: `Google Gemini (${model})`,
-          };
-        }
-
-        lastError =
-          extracted.blockReason
-            ? `Gemini blocked the image request (${extracted.blockReason}).`
-            : extracted.text
-              ? 'Gemini returned text but no image. Try again or check model access.'
-              : `Gemini ${model} returned no image data.`;
-      } catch (err) {
-        if (timer) clearTimeout(timer);
-        lastError = err?.name === 'AbortError'
-          ? 'Gemini image generation timed out.'
-          : err?.message || String(err);
-      }
+    if (proxied.success && proxied.previewImageUrl) {
+      return {
+        success: true,
+        previewImageUrl: proxied.previewImageUrl,
+        model: proxied.model || this.getImageModel(),
+        usedReferencePhoto: Boolean(imagePart),
+        poweredBy: proxied.poweredBy || 'MotoTrack AI proxy',
+      };
     }
 
-    return { success: false, error: lastError };
+    return {
+      success: false,
+      error:
+        proxied.error ||
+        'AI image generation failed. Ensure the MotoTrack server is running with GEMINI_API_KEY.',
+    };
   },
 
   /**
-   * Helper to perform Gemini API call with timeout and fallback models
+   * Helper — text/JSON generation via MotoTrack server proxy (no client API key).
    */
   async _callGeminiApi({ promptText, base64ImageUri, timeoutMs = 16000 }) {
-    const apiKey = this.getApiKey();
-    if (!apiKey) return null;
-
-    const candidateModels = [DEFAULT_GEMINI_MODEL, 'gemini-flash-latest', 'gemini-3.8-flash'];
-
-    const contents = [];
-    const parts = [];
-
-    // Attach image if present
+    let imageBase64 = null;
+    let imageMime = 'image/jpeg';
     if (base64ImageUri && base64ImageUri.startsWith('data:image')) {
       try {
-        const mimeType = base64ImageUri.split(';')[0].split(':')[1] || 'image/jpeg';
-        const base64Data = base64ImageUri.split(',')[1];
-        if (base64Data) {
-          parts.push({
-            inline_data: {
-              mime_type: mimeType,
-              data: base64Data,
-            },
-          });
-        }
-      } catch (imgErr) {
-        console.warn('Image encoding note:', imgErr);
-      }
+        imageMime = base64ImageUri.split(';')[0].split(':')[1] || 'image/jpeg';
+        imageBase64 = base64ImageUri.split(',')[1] || null;
+      } catch (_e) {}
     }
 
-    parts.push({ text: promptText });
-    contents.push({ role: 'user', parts });
+    const proxied = await callServerProxy(
+      '/gemini/generate',
+      {
+        promptText,
+        model: DEFAULT_GEMINI_MODEL,
+        imageBase64,
+        imageMime,
+        temperature: 0.35,
+      },
+      timeoutMs
+    );
 
-    for (const model of candidateModels) {
-      const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-      const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    if (!proxied.success || !proxied.text) return null;
 
-      try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents,
-            generationConfig: {
-              temperature: 0.35,
-              topK: 32,
-              topP: 0.9,
-              response_mime_type: 'application/json',
-            },
-          }),
-          signal: controller ? controller.signal : undefined,
-        });
-
-        if (timer) clearTimeout(timer);
-
-        if (response.ok) {
-          const resData = await response.json();
-          const textOutput = resData?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-          if (textOutput) {
-            const cleanJson = textOutput
-              .replace(/```json/gi, '')
-              .replace(/```/g, '')
-              .trim();
-            return {
-              data: JSON.parse(cleanJson),
-              model,
-            };
-          }
-        }
-      } catch (err) {
-        if (timer) clearTimeout(timer);
-        console.warn(`Gemini API call on model ${model} note:`, err?.message || err);
-      }
+    try {
+      const cleanJson = String(proxied.text)
+        .replace(/```json/gi, '')
+        .replace(/```/g, '')
+        .trim();
+      return {
+        data: JSON.parse(cleanJson),
+        model: proxied.model || DEFAULT_GEMINI_MODEL,
+      };
+    } catch (_e) {
+      return { data: { raw: proxied.text }, model: proxied.model || DEFAULT_GEMINI_MODEL };
     }
-
-    return null;
   },
 
   /**

@@ -970,9 +970,12 @@ export default function ProfileModal({
                   <Text style={{ fontSize: 12.5, color: '#475569', lineHeight: 17 }}>
                     {currentUser.address || 'No address set in profile yet.'}
                   </Text>
-                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 4 }}>
-                    📞 {currentUser.phone || 'No phone number set'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 4 }}>
+                    <BootstrapIcon name="telephone" size={12} color="#64748B" />
+                    <Text style={{ fontSize: 12, color: '#64748B' }}>
+                      {currentUser.phone || 'No phone number set'}
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Direct Link to My Orders */}

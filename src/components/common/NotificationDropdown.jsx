@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -32,44 +32,55 @@ function getRelativeTime(dateString) {
   });
 }
 
-function getCategoryTheme(type) {
-  switch (type) {
-    case 'booking':
-      return {
-        icon: 'tools',
-        bg: '#DCFCE7',
-        color: '#1D4533',
-        badgeBg: '#1D4533',
-      };
-    case 'order':
-      return {
-        icon: 'bag-check-fill',
-        bg: '#DBEAFE',
-        color: '#1D4ED8',
-        badgeBg: '#1D4ED8',
-      };
-    case 'promo':
-      return {
-        icon: 'lightning-charge-fill',
-        bg: '#FEF9C3',
-        color: '#B45309',
-        badgeBg: '#B45309',
-      };
-    case 'security':
-      return {
-        icon: 'shield-lock-fill',
-        bg: '#FEE2E2',
-        color: '#DC2626',
-        badgeBg: '#DC2626',
-      };
-    default:
-      return {
-        icon: 'bell-fill',
-        bg: '#F1F5F9',
-        color: '#1D4533',
-        badgeBg: '#1D4533',
-      };
+function getCategoryInfo(item) {
+  const cat = String(item.category || item.type || '').toLowerCase();
+  
+  if (cat.includes('booking') || cat.includes('service') || cat.includes('garage')) {
+    return {
+      label: 'BOOKING',
+      icon: 'calendar-check',
+      bg: '#FEF3C7',
+      color: '#D97706',
+    };
   }
+  if (cat.includes('order') || cat.includes('dispatch') || cat.includes('ship')) {
+    return {
+      label: 'ORDER',
+      icon: 'bag-check-fill',
+      bg: '#E0F2FE',
+      color: '#0284C7',
+    };
+  }
+  if (cat.includes('payment') || cat.includes('sales') || cat.includes('spend')) {
+    return {
+      label: 'PAYMENT',
+      icon: 'wallet2',
+      bg: '#DCFCE7',
+      color: '#16A34A',
+    };
+  }
+  if (cat.includes('stock') || cat.includes('inventory') || cat.includes('restock')) {
+    return {
+      label: 'IMPORTANT',
+      icon: 'exclamation-triangle-fill',
+      bg: '#FEE2E2',
+      color: '#DC2626',
+    };
+  }
+  if (cat.includes('promo') || cat.includes('discount')) {
+    return {
+      label: 'PROMOTION',
+      icon: 'tag-fill',
+      bg: '#F3E8FF',
+      color: '#9333EA',
+    };
+  }
+  return {
+    label: item.categoryLabel || item.type?.toUpperCase() || 'STUDIO NOTICE',
+    icon: 'bell-fill',
+    bg: '#F5F4F0',
+    color: '#856839',
+  };
 }
 
 export default function NotificationDropdown({
@@ -77,21 +88,31 @@ export default function NotificationDropdown({
   onClose,
   onNavigateToScreen,
   currentUser,
+  isAdmin: propIsAdmin = false,
 }) {
+  const containerRef = useRef(null);
   const { width: windowWidth } = useWindowDimensions();
+  const isAdmin = propIsAdmin || currentUser?.role === 'admin';
+
   const [notifications, setNotifications] = useState(() =>
-    notificationService.getNotifications(currentUser?.id)
+    isAdmin
+      ? notificationService.getAdminNotifications()
+      : notificationService.getCustomerNotifications(currentUser?.id)
   );
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'unread'
-  const [activeMenuNotifId, setActiveMenuNotifId] = useState(null);
 
   useEffect(() => {
-    const unsub = notificationService.subscribe((fresh) => {
-      const userList = notificationService.getNotifications(currentUser?.id);
-      setNotifications(userList || []);
+    const unsub = notificationService.subscribe((data) => {
+      if (isAdmin) {
+        setNotifications(data?.admin || notificationService.getAdminNotifications());
+      } else {
+        setNotifications(
+          data?.customer || notificationService.getCustomerNotifications(currentUser?.id)
+        );
+      }
     });
     return () => unsub?.();
-  }, [currentUser?.id]);
+  }, [isAdmin, currentUser?.id]);
 
   const unreadCount = useMemo(() => {
     return notifications.filter((n) => n.status === 'unread').length;
@@ -104,130 +125,176 @@ export default function NotificationDropdown({
     return notifications;
   }, [notifications, activeFilter]);
 
+  // Click outside to close
+  useEffect(() => {
+    if (!isOpen) return;
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+
+    const handlePointerDown = (event) => {
+      const target = event.target;
+      if (!target) return;
+
+      if (typeof target.closest === 'function' && target.closest('[data-notification-button]')) {
+        return;
+      }
+
+      if (containerRef.current) {
+        let node = containerRef.current;
+        if (node && typeof node.contains !== 'function') {
+          if (typeof node.getScrollableNode === 'function') {
+            node = node.getScrollableNode();
+          } else if (typeof node.getNode === 'function') {
+            node = node.getNode();
+          }
+        }
+        if (node && typeof node.contains === 'function' && !node.contains(target)) {
+          onClose?.();
+        }
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        onClose?.();
+      }
+    };
+
+    const timer = setTimeout(() => {
+      document.addEventListener('pointerdown', handlePointerDown, true);
+      document.addEventListener('keydown', handleKeyDown, true);
+    }, 40);
+
+    return () => {
+      clearTimeout(timer);
+      document.removeEventListener('pointerdown', handlePointerDown, true);
+      document.removeEventListener('keydown', handleKeyDown, true);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const handleMarkAllRead = async () => {
-    await notificationService.markAllAsRead(currentUser?.id);
-    setActiveMenuNotifId(null);
-  };
-
-  const handleToggleReadStatus = async (item) => {
-    if (item.status === 'unread') {
-      await notificationService.markAsRead(item.id);
+    if (isAdmin) {
+      await notificationService.markAllAdminAsRead();
+      setNotifications(notificationService.getAdminNotifications());
     } else {
-      await notificationService.markAsUnread(item.id);
+      await notificationService.markAllCustomerAsRead(currentUser?.id);
+      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
     }
-    setActiveMenuNotifId(null);
   };
 
-  const handleDeleteNotification = async (id) => {
-    await notificationService.deleteNotification(id);
-    setActiveMenuNotifId(null);
+  const handleClearRead = async () => {
+    const unreadOnly = notifications.filter((n) => n.status === 'unread');
+    if (isAdmin) {
+      notificationService.adminNotifications = unreadOnly;
+      await notificationService.persist();
+      notificationService.notify();
+      setNotifications(unreadOnly);
+    } else {
+      notificationService.customerNotifications = unreadOnly;
+      await notificationService.persist();
+      notificationService.notify();
+      setNotifications(unreadOnly);
+    }
+  };
+
+  const handleDeleteNotification = async (id, e) => {
+    e?.stopPropagation?.();
+    if (isAdmin) {
+      await notificationService.deleteAdminNotification(id);
+      setNotifications(notificationService.getAdminNotifications());
+    } else {
+      await notificationService.deleteCustomerNotification(id);
+      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+    }
   };
 
   const handleNotificationPress = async (item) => {
-    setActiveMenuNotifId(null);
     if (item.status === 'unread') {
-      await notificationService.markAsRead(item.id);
+      if (isAdmin) {
+        await notificationService.markAdminAsRead(item.id);
+        setNotifications(notificationService.getAdminNotifications());
+      } else {
+        await notificationService.markCustomerAsRead(item.id);
+        setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+      }
     }
     onClose?.();
-    if (item.link) {
-      if (item.link === 'bookings' || item.link === 'garage') {
-        onNavigateToScreen?.('garage');
-      } else if (item.link === 'orders') {
-        onNavigateToScreen?.('profile', { tab: 'orders' });
-      } else if (item.link === 'settings') {
-        onNavigateToScreen?.('profile', { tab: 'settings' });
-      } else {
-        onNavigateToScreen?.(item.link);
-      }
+    if (onNavigateToScreen) {
+      onNavigateToScreen('notifications');
     }
   };
 
-  const dropdownWidth = Math.min(390, windowWidth - 24);
+  const dropdownWidth = Math.min(410, windowWidth - 24);
 
   return (
     <>
-      {/* Invisible full backdrop to dismiss dropdown on outside click */}
-      <TouchableWithoutFeedback
-        onPress={() => {
-          setActiveMenuNotifId(null);
-          onClose?.();
-        }}
-      >
+      {/* Invisible backdrop */}
+      <TouchableWithoutFeedback onPress={() => onClose?.()}>
         <View style={styles.backdrop} />
       </TouchableWithoutFeedback>
 
-      {/* Floating Dropdown Card (Facebook Style) */}
-      <View style={[styles.dropdownContainer, { width: dropdownWidth }]}>
-        {/* Header: Title & Mark All Read */}
+      {/* Floating Notification Panel */}
+      <View ref={containerRef} style={[styles.dropdownContainer, { width: dropdownWidth }]}>
+        {/* Header */}
         <View style={styles.headerRow}>
-          <View style={styles.titleGroup}>
-            <Text style={styles.headerTitle}>Notifications</Text>
-            {unreadCount > 0 && (
-              <View style={styles.headerBadge}>
-                <Text style={styles.headerBadgeText}>{unreadCount}</Text>
-              </View>
-            )}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={styles.headerIconWrap}>
+              <BootstrapIcon name="bell-fill" size={16} color="#856839" />
+            </View>
+            <View>
+              <Text style={styles.headerTitle}>Notifications</Text>
+              <Text style={styles.headerSubtitle}>
+                {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'All caught up'}
+              </Text>
+            </View>
           </View>
 
-          {unreadCount > 0 && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
             <TouchableOpacity
-              style={styles.markAllBtn}
-              onPress={handleMarkAllRead}
+              style={styles.headerActionBtn}
+              onPress={handleClearRead}
               activeOpacity={0.7}
+              title="Clear notifications"
             >
-              <BootstrapIcon name="check2-all" size={13} color="#1D4533" />
-              <Text style={styles.markAllBtnText}>Mark all read</Text>
+              <BootstrapIcon name="trash3" size={15} color="#8E8B85" />
             </TouchableOpacity>
-          )}
+
+            <TouchableOpacity
+              style={styles.headerActionBtn}
+              onPress={onClose}
+              activeOpacity={0.7}
+              title="Close panel"
+            >
+              <BootstrapIcon name="x-lg" size={14} color="#8E8B85" />
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Filter Pills: All / Unread */}
-        <View style={styles.filterPillsRow}>
+        {/* Tabs: All (Count) / Unread (Count) */}
+        <View style={styles.tabsRow}>
           <TouchableOpacity
-            style={[styles.filterPill, activeFilter === 'all' && styles.filterPillActive]}
-            onPress={() => {
-              setActiveFilter('all');
-              setActiveMenuNotifId(null);
-            }}
+            style={[styles.tabPill, activeFilter === 'all' && styles.tabPillActive]}
+            onPress={() => setActiveFilter('all')}
             activeOpacity={0.8}
           >
-            <Text
-              style={[
-                styles.filterPillText,
-                activeFilter === 'all' && styles.filterPillTextActive,
-              ]}
-            >
-              All
+            <Text style={[styles.tabPillText, activeFilter === 'all' && styles.tabPillTextActive]}>
+              All ({notifications.length})
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.filterPill,
-              activeFilter === 'unread' && styles.filterPillActive,
-            ]}
-            onPress={() => {
-              setActiveFilter('unread');
-              setActiveMenuNotifId(null);
-            }}
+            style={[styles.tabPill, activeFilter === 'unread' && styles.tabPillActive]}
+            onPress={() => setActiveFilter('unread')}
             activeOpacity={0.8}
           >
-            <Text
-              style={[
-                styles.filterPillText,
-                activeFilter === 'unread' && styles.filterPillTextActive,
-              ]}
-            >
-              Unread {unreadCount > 0 ? `(${unreadCount})` : ''}
+            <Text style={[styles.tabPillText, activeFilter === 'unread' && styles.tabPillTextActive]}>
+              Unread ({unreadCount})
             </Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.headerDivider} />
-
-        {/* Notifications Scroll List */}
+        {/* List of Notifications */}
         <ScrollView
           style={styles.scrollList}
           contentContainerStyle={styles.scrollContent}
@@ -235,169 +302,72 @@ export default function NotificationDropdown({
         >
           {displayedNotifications.length === 0 ? (
             <View style={styles.emptyState}>
-              <View style={styles.emptyIconCircle}>
-                <BootstrapIcon
-                  name={activeFilter === 'unread' ? 'check2-circle' : 'bell-slash'}
-                  size={26}
-                  color="#94A3B8"
-                />
+              <View style={styles.emptyIconWrap}>
+                <BootstrapIcon name="bell" size={24} color="#A19E95" />
               </View>
               <Text style={styles.emptyTitle}>
-                {activeFilter === 'unread' ? "You're all caught up!" : 'No notifications'}
+                {activeFilter === 'unread' ? 'No unread notifications' : 'No notifications'}
               </Text>
-              <Text style={styles.emptySubtitle}>
-                {activeFilter === 'unread'
-                  ? 'No unread notifications right now.'
-                  : "We'll notify you about orders, pit bay bookings, and specials."}
-              </Text>
+              <Text style={styles.emptySub}>You're all caught up.</Text>
             </View>
           ) : (
             displayedNotifications.map((item) => {
-              const theme = getCategoryTheme(item.type);
+              const catInfo = getCategoryInfo(item);
               const isUnread = item.status === 'unread';
-              const isMenuOpen = activeMenuNotifId === item.id;
 
               return (
-                <View
+                <TouchableOpacity
                   key={item.id}
-                  style={[styles.itemWrapper, isMenuOpen && { zIndex: 120 }]}
+                  style={[styles.itemRow, isUnread && styles.itemRowUnread]}
+                  onPress={() => handleNotificationPress(item)}
+                  activeOpacity={0.8}
                 >
-                  <TouchableOpacity
-                    style={[styles.itemRow, isUnread && styles.itemRowUnread]}
-                    onPress={() => handleNotificationPress(item)}
-                    activeOpacity={0.7}
-                  >
-                    {/* Left Category Avatar Badge */}
-                    <View style={[styles.avatarBadge, { backgroundColor: theme.bg }]}>
-                      <BootstrapIcon name={theme.icon} size={18} color={theme.color} />
-                    </View>
+                  <View style={[styles.itemIconBadge, { backgroundColor: catInfo.bg }]}>
+                    <BootstrapIcon name={catInfo.icon} size={15} color={catInfo.color} />
+                  </View>
 
-                    {/* Center Content */}
-                    <View style={styles.itemContent}>
-                      <Text
-                        style={[styles.itemTitle, isUnread && styles.itemTitleUnread]}
-                        numberOfLines={1}
-                      >
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 2 }}>
+                      <Text style={[styles.itemTitle, isUnread && styles.itemTitleUnread]} numberOfLines={1}>
                         {stripEmojis(item.title)}
                       </Text>
-                      <Text style={styles.itemMessage} numberOfLines={2}>
-                        {stripEmojis(item.message)}
-                      </Text>
-                      <Text
-                        style={[styles.itemTime, isUnread && styles.itemTimeUnread]}
-                      >
-                        {getRelativeTime(item.created_at)}
-                      </Text>
+                      <Text style={styles.itemTime}>{getRelativeTime(item.created_at)}</Text>
                     </View>
 
-                    {/* Right Unread Indicator Dot */}
-                    {isUnread && <View style={styles.unreadDot} />}
-                  </TouchableOpacity>
+                    <Text style={styles.itemMessage} numberOfLines={2}>
+                      {stripEmojis(item.message)}
+                    </Text>
 
-                  {/* 3-Dot Context Menu Button (Facebook style) */}
-                  <TouchableOpacity
-                    style={[
-                      styles.dotsBtn,
-                      isMenuOpen && styles.dotsBtnActive,
-                    ]}
-                    onPress={(e) => {
-                      e?.stopPropagation?.();
-                      setActiveMenuNotifId(isMenuOpen ? null : item.id);
-                    }}
-                    activeOpacity={0.7}
-                    title="Notification options"
-                  >
-                    <BootstrapIcon
-                      name="three-dots"
-                      size={14}
-                      color={isMenuOpen ? '#1D4533' : '#64748B'}
-                    />
-                  </TouchableOpacity>
-
-                  {/* 3-Dot Action Popover Menu */}
-                  {isMenuOpen && (
-                    <>
-                      {/* Sub-backdrop for closing 3-dot popover */}
-                      <TouchableWithoutFeedback
-                        onPress={(e) => {
-                          e?.stopPropagation?.();
-                          setActiveMenuNotifId(null);
-                        }}
-                      >
-                        <View style={styles.menuBackdrop} />
-                      </TouchableWithoutFeedback>
-
-                      <View style={styles.actionPopover}>
-                        {/* Option 1: Mark as Read / Unread */}
-                        <TouchableOpacity
-                          style={styles.popoverItem}
-                          onPress={() => handleToggleReadStatus(item)}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.popoverIconWrap}>
-                            <BootstrapIcon
-                              name={isUnread ? 'check-circle' : 'circle-fill'}
-                              size={13}
-                              color="#1D4533"
-                            />
-                          </View>
-                          <Text style={styles.popoverItemText}>
-                            {isUnread ? 'Mark as read' : 'Mark as unread'}
-                          </Text>
-                        </TouchableOpacity>
-
-                        <View style={styles.popoverDivider} />
-
-                        {/* Option 2: Delete Notification */}
-                        <TouchableOpacity
-                          style={styles.popoverItem}
-                          onPress={() => handleDeleteNotification(item.id)}
-                          activeOpacity={0.7}
-                        >
-                          <View
-                            style={[
-                              styles.popoverIconWrap,
-                              { backgroundColor: '#FEE2E2' },
-                            ]}
-                          >
-                            <BootstrapIcon
-                              name="trash3"
-                              size={13}
-                              color="#EF4444"
-                            />
-                          </View>
-                          <Text
-                            style={[
-                              styles.popoverItemText,
-                              { color: '#EF4444', fontWeight: '700' },
-                            ]}
-                          >
-                            Delete
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </>
-                  )}
-                </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 6 }}>
+                      <Text style={[styles.categoryTag, { color: catInfo.color }]}>
+                        {catInfo.label}
+                      </Text>
+                      {isUnread && <View style={styles.unreadDot} />}
+                    </View>
+                  </View>
+                </TouchableOpacity>
               );
             })
           )}
         </ScrollView>
 
-        {/* Footer: View Full Notifications in Profile */}
+        {/* Footer */}
         <View style={styles.footerRow}>
           <TouchableOpacity
-            style={styles.footerBtn}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
             onPress={() => {
-              setActiveMenuNotifId(null);
               onClose?.();
-              onNavigateToScreen?.('notifications');
+              if (onNavigateToScreen) {
+                onNavigateToScreen('notifications');
+              }
             }}
-            activeOpacity={0.8}
+            activeOpacity={0.7}
           >
-            <Text style={styles.footerBtnText}>See all notifications</Text>
-            <BootstrapIcon name="chevron-right" size={11} color="#1D4533" />
+            <Text style={styles.viewAllBtnText}>View all notifications</Text>
+            <BootstrapIcon name="arrow-right" size={13} color="#856839" />
           </TouchableOpacity>
+
+          <Text style={styles.hoverNoticeText}>Hover notice to read</Text>
         </View>
       </View>
     </>
@@ -411,281 +381,180 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1050,
-    cursor: 'default',
-  },
-  menuBackdrop: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 125,
-    cursor: 'default',
+    zIndex: 9998,
+    backgroundColor: 'transparent',
   },
   dropdownContainer: {
     position: 'absolute',
-    top: 48,
+    top: '100%',
     right: 0,
+    marginTop: 8,
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    borderRadius: 18,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    zIndex: 1100,
-    overflow: 'visible',
-    ...Platform.select({
-      web: {
-        boxShadow: '0 20px 45px -10px rgba(15, 23, 42, 0.2), 0 4px 12px rgba(0,0,0,0.05)',
-      },
-      default: {
-        elevation: 12,
-      },
-    }),
+    borderColor: '#EAE8E3',
+    boxShadow: '0 12px 32px -4px rgba(0, 0, 0, 0.14)',
+    zIndex: 9999,
+    overflow: 'hidden',
   },
   headerRow: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 12,
   },
-  titleGroup: {
-    flexDirection: 'row',
+  headerIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#F5F2EB',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '900',
-    color: '#0F172A',
-    letterSpacing: -0.4,
-  },
-  headerBadge: {
-    backgroundColor: '#1D4533',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  headerBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  markAllBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#F3F7F6',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-  },
-  markAllBtnText: {
-    fontSize: 11.5,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#1D4533',
+    color: '#1E293B',
   },
-  filterPillsRow: {
+  headerSubtitle: {
+    fontSize: 11.5,
+    color: '#8E8B85',
+    marginTop: 1,
+  },
+  headerActionBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
     paddingHorizontal: 16,
-    paddingBottom: 10,
+    paddingBottom: 12,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
   },
-  filterPill: {
+  tabPill: {
     paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 16,
+    paddingVertical: 6,
+    borderRadius: 8,
     backgroundColor: '#F1F5F9',
   },
-  filterPillActive: {
-    backgroundColor: '#1D4533',
+  tabPillActive: {
+    backgroundColor: '#0F172A',
   },
-  filterPillText: {
+  tabPillText: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '600',
     color: '#64748B',
   },
-  filterPillTextActive: {
+  tabPillTextActive: {
     color: '#FFFFFF',
-  },
-  headerDivider: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
+    fontWeight: '700',
   },
   scrollList: {
-    maxHeight: 400,
+    maxHeight: 380,
   },
   scrollContent: {
-    paddingVertical: 6,
-    paddingHorizontal: 8,
+    paddingVertical: 0,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
+  },
+  itemRowUnread: {
+    backgroundColor: '#FAF9F6',
+  },
+  itemIconBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  itemTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+    flex: 1,
+  },
+  itemTitleUnread: {
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  itemTime: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  itemMessage: {
+    fontSize: 12,
+    color: '#64748B',
+    lineHeight: 17,
+  },
+  categoryTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  unreadDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#1D4533',
   },
   emptyState: {
-    paddingVertical: 36,
-    paddingHorizontal: 20,
+    padding: 32,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  emptyIconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#F1F5F9',
+  emptyIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#F5F4F0',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
   },
   emptyTitle: {
-    fontSize: 14.5,
-    fontWeight: '800',
-    color: '#0F172A',
-    marginBottom: 4,
-  },
-  emptySubtitle: {
-    fontSize: 12,
-    color: '#94A3B8',
-    textAlign: 'center',
-    maxWidth: 240,
-    lineHeight: 17,
-  },
-  itemWrapper: {
-    position: 'relative',
-    marginVertical: 2,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    paddingRight: 42,
-    borderRadius: 14,
-    gap: 12,
-    backgroundColor: '#FFFFFF',
-  },
-  itemRowUnread: {
-    backgroundColor: '#F3F7F6',
-  },
-  avatarBadge: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  itemContent: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1E293B',
-    marginBottom: 2,
   },
-  itemTitleUnread: {
-    color: '#0F172A',
-    fontWeight: '800',
-  },
-  itemMessage: {
+  emptySub: {
     fontSize: 12,
-    color: '#64748B',
-    lineHeight: 16,
-    marginBottom: 3,
-  },
-  itemTime: {
-    fontSize: 11,
-    fontWeight: '600',
     color: '#94A3B8',
-  },
-  itemTimeUnread: {
-    color: '#1D4533',
-    fontWeight: '700',
-  },
-  unreadDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: '#1D4533',
-    marginLeft: 4,
-  },
-  dotsBtn: {
-    position: 'absolute',
-    right: 8,
-    top: 14,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-  },
-  dotsBtnActive: {
-    backgroundColor: '#E6F0EE',
-    borderColor: '#1D4533',
-  },
-  actionPopover: {
-    position: 'absolute',
-    right: 38,
-    top: 10,
-    width: 164,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    zIndex: 130,
-    paddingVertical: 5,
-    ...Platform.select({
-      web: {
-        boxShadow: '0 12px 28px -4px rgba(15, 23, 42, 0.18)',
-      },
-      default: {
-        elevation: 8,
-      },
-    }),
-  },
-  popoverItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 9,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  popoverIconWrap: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  popoverItemText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#334155',
-  },
-  popoverDivider: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
-    marginVertical: 3,
+    marginTop: 2,
   },
   footerRow: {
-    borderTopWidth: 1,
-    borderColor: '#F1F5F9',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-  },
-  footerBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 6,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
-  footerBtnText: {
+  viewAllBtnText: {
     fontSize: 12.5,
-    fontWeight: '800',
-    color: '#1D4533',
+    fontWeight: '700',
+    color: '#856839',
+  },
+  hoverNoticeText: {
+    fontSize: 11.5,
+    color: '#A19E95',
   },
 });

@@ -101,7 +101,11 @@ export function CartProvider({ children }) {
       return { success: false, capped: true };
     }
     const sizeLabel = size ? ` (${size})` : '';
-    showToast(`Added "${String(product.name || 'Item').slice(0, 18)}${sizeLabel}..." to bag!`);
+    if (options.compatWarning) {
+      showToast(options.compatWarning);
+    } else {
+      showToast(`Added "${String(product.name || 'Item').slice(0, 18)}${sizeLabel}..." to bag!`);
+    }
     return { success: true };
   };
 

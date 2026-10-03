@@ -38,6 +38,12 @@ import CheckoutModal from '../components/modals/CheckoutModal';
 import GCashPaymentModal from '../components/modals/GCashPaymentModal';
 import ProductVariantPickerModal from '../components/modals/ProductVariantPickerModal';
 import ToastNotification from '../components/common/ToastNotification';
+import CompatibilityBadge from '../components/shop/CompatibilityBadge';
+import { MyMotorcyclePanel } from '../components/common';
+import {
+  compatibilityService,
+  COMPAT_STATUS,
+} from '../services/compatibilityService';
 import { getProductDetailImageUrl } from '../utils/imageUrl';
 import { promoService } from '../services/promoService';
 import { sanitizeCompareAtPrice, productHasCustomerRatings } from '../utils/productCatalog';
@@ -126,6 +132,35 @@ export default function ProductDetailsPage({
   const [isVariantModalOpen, setIsVariantModalOpen] = useState(false);
   const [variantModalMode, setVariantModalMode] = useState('buy'); // 'buy' | 'cart'
   const [activePromo, setActivePromo] = useState(null);
+  const [activeBike, setActiveBike] = useState(null);
+  const [compatModels, setCompatModels] = useState([]);
+  const [compatStatus, setCompatStatus] = useState(COMPAT_STATUS.NO_BIKE);
+  const [compatMessage, setCompatMessage] = useState('');
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const productId = product?.id || product?.product_id;
+      const [rows, map] = await Promise.all([
+        productId
+          ? compatibilityService.getCompatibilityForProduct(productId)
+          : Promise.resolve([]),
+        compatibilityService.getCompatibilityMap(),
+      ]);
+      if (!alive) return;
+      setCompatModels(rows || []);
+      const userId = currentUser?.id || currentUser?.customer_id;
+      const bike = userId ? await compatibilityService.getActiveMotorcycle(userId) : null;
+      if (!alive) return;
+      setActiveBike(bike);
+      const status = compatibilityService.getCompatStatus(productId, bike, map);
+      setCompatStatus(status);
+      setCompatMessage(compatibilityService.formatCompatMessage(status, bike));
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [product?.id, product?.product_id, currentUser?.id, currentUser?.customer_id]);
 
   useEffect(() => {
     let active = true;
@@ -327,11 +362,18 @@ export default function ProductDetailsPage({
     if (chosenQty) setQuantity(chosenQty);
 
     if (mode === 'cart') {
+      const warn =
+        compatStatus === COMPAT_STATUS.INCOMPATIBLE && activeBike
+          ? `⚠ This part is not marked as compatible with your ${compatibilityService.bikeLabel(activeBike)}.`
+          : null;
       addToCart(configuredProduct, chosenQty, {
         size: size || '',
         color: color || '',
+        compatWarning: warn,
       });
-      showToast(`Added ${chosenQty}x "${product.name?.slice(0, 22)}..." to cart!`);
+      if (!warn) {
+        showToast(`Added ${chosenQty}x "${product.name?.slice(0, 22)}..." to cart!`);
+      }
     } else {
       // mode === 'buy': launch CheckoutModal directly
       setBuyNowItems([
@@ -488,7 +530,16 @@ export default function ProductDetailsPage({
       >
         {/* ─── HERO GALLERY SHOWCASE ─── */}
         <View style={styles.heroContainer}>
-          <Image source={{ uri: activeImage }} style={styles.heroImage} resizeMode="contain" />
+          {activeImage ? (
+            <Image source={{ uri: activeImage }} style={styles.heroImage} resizeMode="contain" />
+          ) : (
+            <View style={[styles.heroImage, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }]}>
+              <BootstrapIcon name="box-seam" size={64} color="#CBD5E1" />
+              <Text style={{ fontSize: 13, color: '#94A3B8', marginTop: 8, fontWeight: '600' }}>
+                No image available
+              </Text>
+            </View>
+          )}
 
           {/* Top Tag Pill */}
           <View style={styles.topTagPill}>
@@ -870,9 +921,52 @@ export default function ProductDetailsPage({
           <View style={styles.specRow}>
             <Text style={styles.specLabel}>Fitment / Compatibility</Text>
             <Text style={styles.specValue}>
-              {product.compatibility || 'Universal / Standard Motorcycle Specs'}
+              {compatMessage ||
+                product.compatibility ||
+                'Compatibility information unavailable'}
             </Text>
           </View>
+
+          {compatMessage ? (
+            <CompatibilityBadge status={compatStatus} message={compatMessage} style={{ marginBottom: 10 }} />
+          ) : null}
+
+          <View style={{ marginTop: 8, marginBottom: 8 }}>
+            <Text style={[styles.sectionBoxTitle, { fontSize: 13, marginBottom: 8 }]}>
+              Compatible Motorcycles
+            </Text>
+            {compatModels.length > 0 ? (
+              compatModels.map((row) => (
+                <Text
+                  key={row.compatibility_id || `${row.brand}-${row.model}`}
+                  style={{ fontSize: 13, fontWeight: '600', color: '#047857', marginBottom: 4 }}
+                >
+                  ✓ {row.brand} {row.model}
+                </Text>
+              ))
+            ) : (
+              <Text style={{ fontSize: 12, color: '#64748B' }}>
+                Compatibility information unavailable
+              </Text>
+            )}
+          </View>
+
+          {!activeBike && currentUser ? (
+            <MyMotorcyclePanel
+              currentUser={currentUser}
+              onToast={showToast}
+              onActiveChange={async (bike) => {
+                setActiveBike(bike);
+                const productId = product?.id || product?.product_id;
+                const map = await compatibilityService.getCompatibilityMap();
+                const status = compatibilityService.getCompatStatus(productId, bike, map);
+                setCompatStatus(status);
+                setCompatMessage(compatibilityService.formatCompatMessage(status, bike));
+              }}
+              compact
+              style={{ marginTop: 8 }}
+            />
+          ) : null}
 
           <View style={styles.specRow}>
             <Text style={styles.specLabel}>Condition</Text>

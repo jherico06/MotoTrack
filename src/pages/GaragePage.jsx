@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import { garageStyles as styles } from '../styles/garagePage.styles';
 import {
   garageService,
+  generateBookingId,
   GARAGE_BRANCHES,
   TIME_SLOTS,
   REPAIR_COMMON_ISSUES,
@@ -22,7 +23,7 @@ import {
   normalizeServicePackage,
 } from '../services/garageService';
 import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../services/motorcycleService';
-import { isFlexibleBooking, normalizeBookingStatus } from '../utils/serviceQuotation';
+import { isFlexibleBooking, normalizeBookingStatus, getServiceEstimateDefaults } from '../utils/serviceQuotation';
 import { BootstrapIcon, BottomNavBar, BrandLogo, BookingSelect, BookingCalendar, SegmentedToggle, CustomerServiceBookingCard } from '../components/common';
 import { ConfirmModal, RegisterMotorcycleModal } from '../components/modals';
 import { pickImageFromFile, pickVideoFromFile } from '../utils/imagePickerHelper';
@@ -32,10 +33,75 @@ import { useCart } from '../context/CartContext';
 import { authService } from '../services/authService';
 import { CUSTOMER_USER } from '../services/userService';
 
-const SERVICE_TYPE_LABELS = {
-  PMS: 'PMS Service',
-  Repair: 'Repair Service',
-};
+const SERVICE_TYPE_OPTIONS = [
+  {
+    id: 'PMS',
+    label: 'Preventive Maintenance Service',
+    shortLabel: 'PMS',
+    icon: 'wrench-adjustable',
+    color: '#1D4533',
+    bg: '#E6F8F5',
+    description: 'Routine multi-point inspection, fluids, and safety checks.',
+  },
+  {
+    id: 'Oil Change',
+    label: 'Oil Change',
+    shortLabel: 'Oil',
+    icon: 'droplet-fill',
+    color: '#0369A1',
+    bg: '#E0F2FE',
+    description: 'Engine oil and filter replacement.',
+  },
+  {
+    id: 'Brake Service',
+    label: 'Brake Service',
+    shortLabel: 'Brakes',
+    icon: 'shield-shaded',
+    color: '#B45309',
+    bg: '#FEF3C7',
+    description: 'Pads, fluid bleed, and brake system check.',
+  },
+  {
+    id: 'Tire Service',
+    label: 'Tire Service',
+    shortLabel: 'Tires',
+    icon: 'circle',
+    color: '#475569',
+    bg: '#F1F5F9',
+    description: 'Tire swap, puncture repair, and pressure setup.',
+  },
+  {
+    id: 'Engine Service',
+    label: 'Engine Service',
+    shortLabel: 'Engine',
+    icon: 'gear-wide-connected',
+    color: '#7C3AED',
+    bg: '#EDE9FE',
+    description: 'Engine diagnostics, tune-up, and related repairs.',
+  },
+  {
+    id: 'Repair',
+    label: 'Repair',
+    shortLabel: 'Repair',
+    icon: 'wrench',
+    color: '#DC2626',
+    bg: '#FEE2E2',
+    description: 'Mechanical or electrical troubleshooting and repair.',
+  },
+  {
+    id: 'Other',
+    label: 'Other',
+    shortLabel: 'Other',
+    icon: 'three-dots',
+    color: '#64748B',
+    bg: '#F8FAFC',
+    description: 'Describe your service need in the next step.',
+  },
+];
+
+const SERVICE_TYPE_LABELS = Object.fromEntries(
+  SERVICE_TYPE_OPTIONS.map((o) => [o.id, o.label])
+);
 
 
 export default function GaragePage({
@@ -68,7 +134,6 @@ export default function GaragePage({
   const [userBookings, setUserBookings] = useState([]);
   const [bookingsPage, setBookingsPage] = useState(1);
   const BOOKINGS_PAGE_SIZE = 5;
-  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
   const handleBottomNavChange = (tab) => {
     if (tab === 'Home') {
@@ -404,6 +469,7 @@ export default function GaragePage({
     { id: 3, label: 'Describe Problem', shortLabel: 'Problem', icon: 'chat-left-text-fill' },
     { id: 4, label: 'Upload Photos', shortLabel: 'Photos', icon: 'camera-fill' },
     { id: 5, label: 'Preferred Date & Time', shortLabel: 'Schedule', icon: 'calendar-check-fill' },
+    { id: 6, label: 'Booking Summary', shortLabel: 'Summary', icon: 'clipboard-check' },
   ];
 
   const getStepValidation = (step) => {
@@ -416,7 +482,7 @@ export default function GaragePage({
       return { valid: true };
     }
     if (step === 2) {
-      if (!bookingType) return { valid: false, message: 'Please select a service type (PMS or Repair).' };
+      if (!bookingType) return { valid: false, message: 'Please select a service type.' };
       return { valid: true };
     }
     if (step === 3) {
@@ -432,6 +498,19 @@ export default function GaragePage({
     if (step === 5) {
       if (!bookingDate) return { valid: false, message: 'Please select your preferred date.' };
       if (!selectedTimeSlot) return { valid: false, message: 'Please select your preferred time.' };
+      const availability = garageService.getDaySlotAvailability(bookingDate);
+      if (availability?.isFullyBooked) {
+        return { valid: false, message: 'That date is fully booked. Please choose another slot.' };
+      }
+      const slotTaken = (availability?.slots || []).some(
+        (s) => s.isBooked && String(s.timeSlot) === String(selectedTimeSlot)
+      );
+      if (slotTaken) {
+        return { valid: false, message: 'That time slot is already booked. Please pick another.' };
+      }
+      return { valid: true };
+    }
+    if (step === 6) {
       return { valid: true };
     }
     return { valid: true };
@@ -443,7 +522,7 @@ export default function GaragePage({
       if (showToast) showToast(`⚠️ ${validation.message}`);
       return;
     }
-    if (bookingStep < 5) {
+    if (bookingStep < 6) {
       setBookingStep((prev) => prev + 1);
     } else {
       handleConfirmBooking();
@@ -564,12 +643,13 @@ export default function GaragePage({
 
   // Switch booking type directly
   const handleSwitchBookingType = (newType) => {
-    const target = newType === 'Repair' ? 'Repair' : 'PMS';
+    const target = SERVICE_TYPE_OPTIONS.some((o) => o.id === newType) ? newType : 'PMS';
     setBookingType(target);
-    setSelectedServiceForBooking(resolveBookingPackage(target));
+    const pkgKey = target === 'Repair' ? 'Repair' : 'PMS';
+    setSelectedServiceForBooking(resolveBookingPackage(pkgKey));
   };
 
-  // Submit flexible service request — no package, no price, no downpayment (quotation comes later)
+  // Submit flexible service request — admin reviews, then downpayment, then schedule
   const handleConfirmBooking = async () => {
     if (!selectedMotorcycleId) {
       showToast('⚠️ Please select a registered motorcycle to continue.');
@@ -588,74 +668,86 @@ export default function GaragePage({
     }
 
     const isRepair = bookingType === 'Repair';
-    const serviceLabel = isRepair ? SERVICE_TYPE_LABELS.Repair : SERVICE_TYPE_LABELS.PMS;
+    const serviceLabel = SERVICE_TYPE_LABELS[bookingType] || bookingType || 'Service';
     const selectedBike = garageMotorcycles.find(
       (m) => String(m.motorcycle_id) === String(selectedMotorcycleId)
     );
+    const typeCode = String(bookingType || 'SVC')
+      .replace(/[^A-Za-z]/g, '')
+      .slice(0, 3)
+      .toUpperCase() || 'SVC';
 
     const problemDescription = isRepair && selectedRepairIssue
       ? `[Fault: ${selectedRepairIssue}] ${serviceNotes.trim()}`
       : serviceNotes.trim();
 
-    const bookingId = `BK-${isRepair ? 'REP' : 'PMS'}-` + Math.floor(10000 + Math.random() * 90000);
+    try {
+      const bookingId = generateBookingId(bookingType, userBookings || []);
+      const estimateDefaults = getServiceEstimateDefaults(bookingType);
 
-    const bookingDraft = {
-      id: bookingId,
-      booking_id: bookingId,
-      booking_mode: 'flexible',
-      flexible: true,
-      skip_downpayment: true,
-      service_id: null,
-      package_id: null,
-      package_name: serviceLabel,
-      package_price: 0,
-      included_services: [],
-      service_title: serviceLabel,
-      service_price: 0,
-      pricePhp: 0,
-      category: bookingType,
-      service_type: bookingType,
-      repair_type: isRepair ? selectedRepairIssue : undefined,
-      problem_description: problemDescription,
-      downpayment_required: false,
-      downpayment_percent: 0,
-      downpayment_amount: 0,
-      remaining_balance: 0,
-      is_non_refundable: false,
-      motorcycle_id: selectedMotorcycleId,
-      bike_brand: selectedBike?.brand || bikeBrand,
-      bike_model: selectedBike?.model || bikeModel,
-      bike_year: selectedBike?.year ? String(selectedBike.year) : bikeYear,
-      year: selectedBike?.year ? String(selectedBike.year) : bikeYear,
-      plate_number: selectedBike?.plate_number || bikePlate.trim() || 'Pending Registration',
-      odometer: selectedBike?.odometer || bikeOdo.trim() || 'New Unit',
-      appointment_date: bookingDate,
-      preferred_date: bookingDate,
-      time_slot: selectedTimeSlot,
-      preferred_time: selectedTimeSlot,
-      branch: flagshipBranch.name,
-      branch_address: flagshipBranch.address,
-      photos: motorcyclePhotos,
-      media_urls: motorcyclePhotos,
-      customer_name: ownerName || currentUser?.name || 'Customer',
-      customer_phone: ownerPhone,
-      customer_id: currentUser?.customer_id || currentUser?.id || currentUser?.user_id,
-      notes: additionalNotes.trim() ? additionalNotes.trim() : problemDescription,
-      additional_notes: additionalNotes.trim(),
-      status: 'PENDING_REVIEW',
-      customerPhone: ownerPhone,
-    };
+      const bookingDraft = {
+        id: bookingId,
+        booking_id: bookingId,
+        booking_mode: 'flexible',
+        flexible: true,
+        skip_downpayment: true,
+        service_id: null,
+        package_id: null,
+        package_name: serviceLabel,
+        package_price: 0,
+        included_services: [],
+        service_title: serviceLabel,
+        service_price: 0,
+        pricePhp: 0,
+        category: isRepair ? 'Repair' : bookingType === 'PMS' ? 'PMS' : 'Other',
+        service_type: bookingType,
+        repair_type: isRepair ? selectedRepairIssue : undefined,
+        problem_description: problemDescription,
+        downpayment_required: false,
+        downpayment_percent: estimateDefaults.downpaymentPercent,
+        downpayment_amount: 0,
+        remaining_balance: 0,
+        estimated_service_total: 0,
+        is_non_refundable: false,
+        motorcycle_id: selectedMotorcycleId,
+        bike_brand: selectedBike?.brand || bikeBrand,
+        bike_model: selectedBike?.model || bikeModel,
+        bike_year: selectedBike?.year ? String(selectedBike.year) : bikeYear,
+        year: selectedBike?.year ? String(selectedBike.year) : bikeYear,
+        plate_number: selectedBike?.plate_number || bikePlate.trim() || 'Pending Registration',
+        odometer: selectedBike?.odometer || bikeOdo.trim() || 'New Unit',
+        color: selectedBike?.color || selectedBike?.bike_color || '',
+        appointment_date: bookingDate,
+        preferred_date: bookingDate,
+        time_slot: selectedTimeSlot,
+        preferred_time: selectedTimeSlot,
+        branch: flagshipBranch.name,
+        branch_address: flagshipBranch.address,
+        photos: motorcyclePhotos,
+        media_urls: motorcyclePhotos,
+        customer_name: ownerName || currentUser?.name || 'Customer',
+        customer_phone: ownerPhone,
+        customer_id: currentUser?.customer_id || currentUser?.id || currentUser?.user_id,
+        notes: additionalNotes.trim() ? additionalNotes.trim() : problemDescription,
+        additional_notes: additionalNotes.trim(),
+        status: 'PENDING_REVIEW',
+        customerPhone: ownerPhone,
+      };
 
-    const newBooking = await garageService.createBooking(bookingDraft);
-    refreshUserBookings();
-    setIsBookingModalOpen(false);
-    setMotorcyclePhotos([]);
-    setServiceNotes('');
-    setAdditionalNotes('');
-    setActiveFilter('MyBookings');
-    showToast(
-      `Your service request (#${newBooking?.booking_id || bookingId}) has been submitted. Our admin will review your request and provide a quotation.`
-    );
+      const newBooking = await garageService.createBooking(bookingDraft);
+      refreshUserBookings();
+      setIsBookingModalOpen(false);
+      setMotorcyclePhotos([]);
+      setServiceNotes('');
+      setAdditionalNotes('');
+      setActiveFilter('MyBookings');
+      showToast(
+        `Booking Submitted Successfully. #${newBooking?.booking_id || bookingId} is waiting for admin review.`
+      );
+    } catch (err) {
+      console.error('Booking confirmation failed:', err);
+      showToast('⚠️ Could not submit booking request. Please try again.');
+    }
   };
 
   // Cancel Booking Prompter
@@ -852,7 +944,6 @@ export default function GaragePage({
                 onPress={() => setIsRosterModalOpen(true)}
                 activeOpacity={0.75}
               >
-                <BootstrapIcon name="people-fill" size={14} color="#1D4533" />
                 <Text style={styles.liveStatVal}>
                   {mechanicsData.availableCount}/{mechanicsData.totalCount}
                 </Text>
@@ -861,11 +952,6 @@ export default function GaragePage({
 
               {/* Stat 2: Slots */}
               <View style={styles.liveStatChip}>
-                <BootstrapIcon
-                  name={todaySlotsData.isFullyBooked ? 'calendar-x-fill' : 'calendar-check'}
-                  size={14}
-                  color={todaySlotsData.isFullyBooked ? '#DC2626' : '#D97706'}
-                />
                 <Text style={[styles.liveStatVal, todaySlotsData.isFullyBooked && { color: '#DC2626' }]}>
                   {todaySlotsData.isFullyBooked ? 'Full' : todaySlotsData.availableSlotsCount}
                 </Text>
@@ -874,14 +960,12 @@ export default function GaragePage({
 
               {/* Stat 3: Next Opening */}
               <View style={styles.liveStatChip}>
-                <BootstrapIcon name="clock-history" size={14} color="#4F46E5" />
                 <Text style={styles.liveStatVal}>{todaySlotsData.isFullyBooked ? 'Tmrw' : 'Today'}</Text>
                 <Text style={styles.liveStatLbl}>Next Opening</Text>
               </View>
 
               {/* Stat 4: Pit Bays */}
               <View style={styles.liveStatChip}>
-                <BootstrapIcon name="speedometer2" size={14} color="#2563EB" />
                 <Text style={styles.liveStatVal}>6 Bays</Text>
                 <Text style={styles.liveStatLbl}>Dyno Cell</Text>
               </View>
@@ -1500,7 +1584,7 @@ export default function GaragePage({
                       ]}
                       numberOfLines={1}
                     >
-                      Step {bookingStep} of 5: {BOOKING_STEPS[bookingStep - 1]?.label}
+                      Step {bookingStep} of 6: {BOOKING_STEPS[bookingStep - 1]?.label}
                     </Text>
                   </View>
                 </View>
@@ -1588,12 +1672,7 @@ export default function GaragePage({
                       <View style={styles.motorcycleCardGrid}>
                         {garageMotorcycles.map((m) => {
                           const isPicked = String(m.motorcycle_id) === String(selectedMotorcycleId);
-                          const bikePhoto =
-                            m.photo_url ||
-                            MOTORCYCLE_PHOTO_PRESETS?.find(
-                              (p) => p.brand?.toLowerCase() === m.brand?.toLowerCase()
-                            )?.url ||
-                            'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80';
+                          const bikePhoto = m.photo_url || null;
 
                           return (
                             <TouchableOpacity
@@ -1619,11 +1698,20 @@ export default function GaragePage({
                                   padding: 6,
                                 }}
                               >
-                                <Image
-                                  source={{ uri: bikePhoto }}
-                                  style={{ width: '100%', height: '100%' }}
-                                  resizeMode="contain"
-                                />
+                                {bikePhoto ? (
+                                  <Image
+                                    source={{ uri: bikePhoto }}
+                                    style={{ width: '100%', height: '100%' }}
+                                    resizeMode="contain"
+                                  />
+                                ) : (
+                                  <View style={{ alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                    <BootstrapIcon name="bicycle" size={42} color="#94A3B8" />
+                                    <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>
+                                      No photo uploaded
+                                    </Text>
+                                  </View>
+                                )}
 
                                 {/* Brand Badge (Top-Left) */}
                                 <View
@@ -1845,99 +1933,81 @@ export default function GaragePage({
                   <View style={styles.stepSectionHeader}>
                     <Text style={styles.stepSectionTitle}>Select Service Type</Text>
                     <Text style={styles.stepSectionSubtitle}>
-                      Choose maintenance or mechanical repair.
+                      Choose the service that best matches what you need.
                     </Text>
                   </View>
 
-                  {/* Service Cards Grid */}
                   <View style={styles.serviceCardGrid}>
-                    {/* Card 1: PMS */}
-                    <TouchableOpacity
-                      style={[
-                        styles.serviceCard,
-                        bookingType === 'PMS' && styles.serviceCardActivePMS,
-                      ]}
-                      onPress={() => {
-                        setBookingType('PMS');
-                        setSelectedServiceForBooking(resolveBookingPackage('PMS'));
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                        <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#E6F8F5', alignItems: 'center', justifyContent: 'center' }}>
-                          <BootstrapIcon name="wrench-adjustable" size={20} color="#1D4533" />
-                        </View>
-                        <View style={{ backgroundColor: bookingType === 'PMS' ? '#1D4533' : '#F1F5F9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: bookingType === 'PMS' ? '#FFFFFF' : '#64748B' }}>
-                            {bookingType === 'PMS' ? 'Selected ✓' : 'Select'}
+                    {SERVICE_TYPE_OPTIONS.map((opt) => {
+                      const selected = bookingType === opt.id;
+                      return (
+                        <TouchableOpacity
+                          key={opt.id}
+                          style={[
+                            styles.serviceCard,
+                            selected &&
+                              (opt.id === 'Repair'
+                                ? styles.serviceCardActiveRepair
+                                : styles.serviceCardActivePMS),
+                          ]}
+                          onPress={() => handleSwitchBookingType(opt.id)}
+                          activeOpacity={0.85}
+                        >
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              marginBottom: 10,
+                            }}
+                          >
+                            <View
+                              style={{
+                                width: 40,
+                                height: 40,
+                                borderRadius: 12,
+                                backgroundColor: opt.bg,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <BootstrapIcon name={opt.icon} size={18} color={opt.color} />
+                            </View>
+                            <View
+                              style={{
+                                backgroundColor: selected ? opt.color : '#F1F5F9',
+                                paddingHorizontal: 10,
+                                paddingVertical: 4,
+                                borderRadius: 12,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: '800',
+                                  color: selected ? '#FFFFFF' : '#64748B',
+                                }}
+                              >
+                                {selected ? 'Selected ✓' : 'Select'}
+                              </Text>
+                            </View>
+                          </View>
+                          <Text
+                            style={{
+                              fontSize: 15,
+                              fontWeight: '900',
+                              color: '#0F172A',
+                              marginBottom: 4,
+                            }}
+                          >
+                            {opt.label}
                           </Text>
-                        </View>
-                      </View>
-                      <Text style={{ fontSize: 16, fontWeight: '900', color: '#0F172A', marginBottom: 6 }}>
-                        Preventive Maintenance (PMS)
-                      </Text>
-                      <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17, marginBottom: 12 }}>
-                        Routine maintenance, fresh engine oil, filter changes, and complete safety inspection.
-                      </Text>
-                      <View style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 10, gap: 6 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="check2" size={14} color="#059669" />
-                          <Text style={{ fontSize: 11.5, color: '#334155', fontWeight: '600' }}>Multi-Point Safety Inspection</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="check2" size={14} color="#059669" />
-                          <Text style={{ fontSize: 11.5, color: '#334155', fontWeight: '600' }}>Engine Oil & Filter Replacement</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="check2" size={14} color="#059669" />
-                          <Text style={{ fontSize: 11.5, color: '#334155', fontWeight: '600' }}>Brake System & Chain Care</Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Card 2: Repair */}
-                    <TouchableOpacity
-                      style={[
-                        styles.serviceCard,
-                        bookingType === 'Repair' && styles.serviceCardActiveRepair,
-                      ]}
-                      onPress={() => {
-                        setBookingType('Repair');
-                        setSelectedServiceForBooking(resolveBookingPackage('Repair'));
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                        <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}>
-                          <BootstrapIcon name="wrench" size={20} color="#DC2626" />
-                        </View>
-                        <View style={{ backgroundColor: bookingType === 'Repair' ? '#DC2626' : '#F1F5F9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: bookingType === 'Repair' ? '#FFFFFF' : '#64748B' }}>
-                            {bookingType === 'Repair' ? 'Selected ✓' : 'Select'}
+                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17 }}>
+                            {opt.description}
                           </Text>
-                        </View>
-                      </View>
-                      <Text style={{ fontSize: 16, fontWeight: '900', color: '#0F172A', marginBottom: 6 }}>
-                        Mechanical & Electrical Repair
-                      </Text>
-                      <Text style={{ fontSize: 12, color: '#475569', lineHeight: 17, marginBottom: 12 }}>
-                        Diagnostics, engine repair, electrical troubleshooting, brake overhauls, and fixes.
-                      </Text>
-                      <View style={{ borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 10, gap: 6 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="check2" size={14} color="#DC2626" />
-                          <Text style={{ fontSize: 11.5, color: '#334155', fontWeight: '600' }}>Computer Diagnostic Scanning</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="check2" size={14} color="#DC2626" />
-                          <Text style={{ fontSize: 11.5, color: '#334155', fontWeight: '600' }}>Engine & Transmission Troubleshooting</Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="check2" size={14} color="#DC2626" />
-                          <Text style={{ fontSize: 11.5, color: '#334155', fontWeight: '600' }}>Brakes, Battery & Electrical Wiring</Text>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
               )}
@@ -2276,68 +2346,115 @@ export default function GaragePage({
                     />
                   </View>
 
-                  {/* Summary Card */}
-                  {(() => {
-                    const serviceLabel = bookingType === 'Repair' ? SERVICE_TYPE_LABELS.Repair : SERVICE_TYPE_LABELS.PMS;
+                  {/* Compact schedule confirmation (full summary is Step 6) */}
+                  {bookingDate && selectedTimeSlot ? (
+                    <View
+                      style={{
+                        backgroundColor: '#F0FDFA',
+                        borderRadius: 12,
+                        padding: 12,
+                        borderWidth: 1.5,
+                        borderColor: '#99F6E4',
+                        marginTop: 12,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 10,
+                      }}
+                    >
+                      <BootstrapIcon name="calendar-check" size={17} color="#1D4533" />
+                      <Text style={{ fontSize: 12, color: '#134E4A', flex: 1, fontWeight: '600', lineHeight: 17 }}>
+                        {bookingDate} • {selectedTimeSlot}. Continue to review your booking summary.
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              )}
 
+              {/* STEP 6: BOOKING SUMMARY */}
+              {bookingStep === 6 && (
+                <View>
+                  <View style={styles.stepSectionHeader}>
+                    <Text style={styles.stepSectionTitle}>Booking Summary</Text>
+                    <Text style={styles.stepSectionSubtitle}>
+                      Review your request before submitting.
+                    </Text>
+                  </View>
+
+                  {(() => {
+                    const serviceLabel = SERVICE_TYPE_LABELS[bookingType] || bookingType;
                     return (
-                      <View style={{ backgroundColor: '#F8FAFC', borderRadius: 16, borderWidth: 1.5, borderColor: '#E2E8F0', padding: 14 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                          Request Summary
-                        </Text>
-                        <View style={{ gap: 8, marginBottom: 12 }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 12, color: '#64748B' }}>📅 Date & Time:</Text>
-                            <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A' }}>
-                              {bookingDate} • {selectedTimeSlot || 'Morning'}
-                            </Text>
+                      <View
+                        style={{
+                          backgroundColor: '#F8FAFC',
+                          borderRadius: 16,
+                          borderWidth: 1.5,
+                          borderColor: '#E2E8F0',
+                          padding: 16,
+                          gap: 12,
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                          <Text style={{ fontSize: 12, color: '#64748B' }}>Motorcycle</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', flex: 1, textAlign: 'right' }}>
+                            {bikeBrand} {bikeModel} {bikeYear ? `(${bikeYear})` : ''}
+                            {bikePlate ? ` · ${bikePlate}` : ''}
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                          <Text style={{ fontSize: 12, color: '#64748B' }}>Service type</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#1D4533', flex: 1, textAlign: 'right' }}>
+                            {serviceLabel}
+                          </Text>
+                        </View>
+                        <View style={{ gap: 4 }}>
+                          <Text style={{ fontSize: 12, color: '#64748B' }}>Problem description</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A', lineHeight: 18 }}>
+                            {serviceNotes.trim() || '—'}
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 12, color: '#64748B' }}>Photos</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
+                            {motorcyclePhotos.length > 0
+                              ? `${motorcyclePhotos.length} attached`
+                              : 'None (optional)'}
+                          </Text>
+                        </View>
+                        {motorcyclePhotos.length > 0 ? (
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                            {motorcyclePhotos.slice(0, 4).map((uri, idx) => (
+                              <Image
+                                key={`${uri}-${idx}`}
+                                source={{ uri }}
+                                style={{ width: 56, height: 56, borderRadius: 8, backgroundColor: '#E2E8F0' }}
+                              />
+                            ))}
                           </View>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 12, color: '#64748B' }}>🔧 Service:</Text>
-                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#1D4533' }}>
-                              {serviceLabel}
-                            </Text>
-                          </View>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                            <Text style={{ fontSize: 12, color: '#64748B' }}>🛵 Motorcycle:</Text>
-                            <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#0F172A' }}>
-                              {bikeBrand} {bikeModel} {bikeYear ? `(${bikeYear})` : ''}
-                            </Text>
-                          </View>
-                          {serviceNotes.trim() ? (
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-                              <Text style={{ fontSize: 12, color: '#64748B' }}>📝 Details:</Text>
-                              <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A', flex: 1, textAlign: 'right' }} numberOfLines={2}>
-                                {serviceNotes.trim()}
-                              </Text>
-                            </View>
-                          ) : null}
-                          {motorcyclePhotos.length > 0 && (
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                              <Text style={{ fontSize: 12, color: '#64748B' }}>📎 Photos:</Text>
-                              <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4533' }}>
-                                {motorcyclePhotos.length} file{motorcyclePhotos.length === 1 ? '' : 's'} attached
-                              </Text>
-                            </View>
-                          )}
+                        ) : null}
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 12, color: '#64748B' }}>Preferred date</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>{bookingDate}</Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                          <Text style={{ fontSize: 12, color: '#64748B' }}>Preferred time</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
+                            {selectedTimeSlot}
+                          </Text>
                         </View>
 
-                        {/* Concise, reassuring notice */}
                         <View
                           style={{
-                            backgroundColor: '#F0FDFA',
+                            backgroundColor: '#FEF3C7',
                             borderRadius: 12,
                             padding: 12,
-                            borderWidth: 1.5,
-                            borderColor: '#99F6E4',
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 10,
+                            borderWidth: 1,
+                            borderColor: '#FDE68A',
+                            marginTop: 4,
                           }}
                         >
-                          <BootstrapIcon name="shield-check" size={17} color="#1D4533" />
-                          <Text style={{ fontSize: 12, color: '#134E4A', flex: 1, fontWeight: '600', lineHeight: 17 }}>
-                            No payment needed now. You'll receive an itemized quotation to review and approve before any work starts.
+                          <Text style={{ fontSize: 12, color: '#92400E', fontWeight: '600', lineHeight: 17 }}>
+                            After you submit, your booking status will be Pending Review. An admin will
+                            approve it and request a downpayment before scheduling.
                           </Text>
                         </View>
                       </View>
@@ -2349,7 +2466,7 @@ export default function GaragePage({
 
             {/* Stepper Footer Controls */}
             {(() => {
-              const serviceLabel = bookingType === 'Repair' ? SERVICE_TYPE_LABELS.Repair : SERVICE_TYPE_LABELS.PMS;
+              const serviceLabel = SERVICE_TYPE_LABELS[bookingType] || bookingType || 'Service';
 
               return (
                 <View style={styles.stepperFooter}>
@@ -2366,7 +2483,7 @@ export default function GaragePage({
 
                   <View style={{ flex: 1, alignItems: 'center' }}>
                     <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B' }} numberOfLines={1}>
-                      Step {bookingStep}/5 • {bookingStep === 5 ? 'Review & Submit' : serviceLabel}
+                      Step {bookingStep}/6 • {bookingStep === 6 ? 'Review & Submit' : serviceLabel}
                     </Text>
                   </View>
 
@@ -2387,7 +2504,9 @@ export default function GaragePage({
                             ? 'Next: Photos →'
                             : bookingStep === 4
                               ? 'Next: Date & Time →'
-                              : 'Submit Request →'}
+                              : bookingStep === 5
+                                ? 'Next: Summary →'
+                                : 'Submit Booking →'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -2461,34 +2580,42 @@ export default function GaragePage({
             </View>
 
             <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={true}>
-              {mechanicsData.mechanics.map((mech) => (
-                <View key={mech.id} style={styles.rosterItemCard}>
-                  <Image source={{ uri: mech.avatar }} style={styles.rosterItemAvatar} />
-                  <View style={styles.rosterItemBody}>
-                    <Text style={styles.rosterItemName}>{mech.shortName || mech.name}</Text>
-                    <Text style={styles.rosterItemSpec}>⚡ {mech.specialization}</Text>
-                    <Text style={styles.rosterItemBay}>📍 {mech.bay}</Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.rosterStatusPill,
-                      {
-                        backgroundColor: mech.isAvailable
-                          ? 'rgba(16, 185, 129, 0.15)'
-                          : 'rgba(239, 68, 68, 0.15)',
-                        borderWidth: 1,
-                        borderColor: mech.isAvailable ? '#10B981' : '#EF4444',
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[styles.rosterStatusText, { color: mech.isAvailable ? '#10B981' : '#EF4444' }]}
-                    >
-                      {mech.status}
-                    </Text>
-                  </View>
+              {mechanicsData.mechanics.length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center' }}>
+                    No certified mechanics currently registered.
+                  </Text>
                 </View>
-              ))}
+              ) : (
+                mechanicsData.mechanics.map((mech) => (
+                  <View key={mech.id} style={styles.rosterItemCard}>
+                    <Image source={{ uri: mech.avatar }} style={styles.rosterItemAvatar} />
+                    <View style={styles.rosterItemBody}>
+                      <Text style={styles.rosterItemName}>{mech.shortName || mech.name}</Text>
+                      <Text style={styles.rosterItemSpec}>⚡ {mech.specialization}</Text>
+                      <Text style={styles.rosterItemBay}>📍 {mech.bay}</Text>
+                    </View>
+                    <View
+                      style={[
+                        styles.rosterStatusPill,
+                        {
+                          backgroundColor: mech.isAvailable
+                            ? 'rgba(16, 185, 129, 0.15)'
+                            : 'rgba(239, 68, 68, 0.15)',
+                          borderWidth: 1,
+                          borderColor: mech.isAvailable ? '#10B981' : '#EF4444',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[styles.rosterStatusText, { color: mech.isAvailable ? '#10B981' : '#EF4444' }]}
+                      >
+                        {mech.status}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
             </ScrollView>
 
             <View

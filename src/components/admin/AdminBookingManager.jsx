@@ -23,7 +23,7 @@ import {
   formatPhp,
 } from '../../utils/serviceQuotation';
 
-/** Workflow stages for admin (grouped, actionable) */
+/** Workflow stages for admin (grouped, actionable) — payment after approve */
 export const BOOKING_PIPELINE = [
   {
     id: 'review',
@@ -31,8 +31,26 @@ export const BOOKING_PIPELINE = [
     icon: 'inbox',
     color: '#D97706',
     bg: '#FEF3C7',
-    statuses: [FLEX_BOOKING_STATUS.PENDING_REVIEW, 'Pending'],
-    nextHint: 'Approve or reject',
+    statuses: [FLEX_BOOKING_STATUS.PENDING_REVIEW, FLEX_BOOKING_STATUS.NEEDS_INFORMATION, 'Pending'],
+    nextHint: 'Approve, reject, or request info',
+  },
+  {
+    id: 'payment',
+    label: 'Payment Required',
+    icon: 'cash-coin',
+    color: '#EA580C',
+    bg: '#FFEDD5',
+    statuses: [FLEX_BOOKING_STATUS.APPROVED, FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT],
+    nextHint: 'Record downpayment',
+  },
+  {
+    id: 'schedule',
+    label: 'Schedule & Assign',
+    icon: 'person-plus',
+    color: '#0284C7',
+    bg: '#E0F2FE',
+    statuses: [FLEX_BOOKING_STATUS.CONFIRMED],
+    nextHint: 'Assign mechanic & bay',
   },
   {
     id: 'inspect',
@@ -41,13 +59,13 @@ export const BOOKING_PIPELINE = [
     color: '#7C3AED',
     bg: '#EDE9FE',
     statuses: [
-      FLEX_BOOKING_STATUS.APPROVED,
       FLEX_BOOKING_STATUS.SCHEDULED,
       FLEX_BOOKING_STATUS.UNDER_INSPECTION,
+      FLEX_BOOKING_STATUS.ESTIMATE_SUBMITTED,
       'Confirmed',
       'Inspection',
     ],
-    nextHint: 'Inspect → build quotation',
+    nextHint: 'Mechanic inspects → quotation',
   },
   {
     id: 'waiting_customer',
@@ -58,11 +76,10 @@ export const BOOKING_PIPELINE = [
     statuses: [
       FLEX_BOOKING_STATUS.QUOTATION_SENT,
       FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL,
-      FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT,
       FLEX_BOOKING_STATUS.ADDITIONAL_APPROVAL_REQUIRED,
       'Estimate Pending',
     ],
-    nextHint: 'Customer action pending',
+    nextHint: 'Customer quotation / extra work decision',
   },
   {
     id: 'service',
@@ -70,27 +87,25 @@ export const BOOKING_PIPELINE = [
     icon: 'tools',
     color: '#1D4533',
     bg: '#C8DDD3',
-    statuses: [
-      FLEX_BOOKING_STATUS.CONFIRMED,
-      FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS,
-      'In Progress',
-    ],
+    statuses: [FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS, 'In Progress'],
     nextHint: 'Track work / actual hours',
   },
   {
     id: 'billing',
     label: 'Billing & Pickup',
-    icon: 'cash-coin',
+    icon: 'cash-stack',
     color: '#059669',
     bg: '#D1FAE5',
     statuses: [
       FLEX_BOOKING_STATUS.SERVICE_COMPLETED,
+      FLEX_BOOKING_STATUS.FOR_FINAL_BILLING,
       FLEX_BOOKING_STATUS.AWAITING_FINAL_PAYMENT,
+      FLEX_BOOKING_STATUS.FULLY_PAID,
       FLEX_BOOKING_STATUS.READY_FOR_PICKUP,
       'Service Done',
       'Paid',
     ],
-    nextHint: 'Finalize / verify pickup',
+    nextHint: 'Record balance / verify pickup',
   },
   {
     id: 'done',
@@ -103,6 +118,7 @@ export const BOOKING_PIPELINE = [
       FLEX_BOOKING_STATUS.REJECTED,
       FLEX_BOOKING_STATUS.CANCELLED,
       FLEX_BOOKING_STATUS.CUSTOMER_DECLINED,
+      FLEX_BOOKING_STATUS.BOOKING_EXPIRED,
       'Closed',
       'Completed',
       'Cancelled',
@@ -134,43 +150,49 @@ function statusLabel(status) {
 function primaryAction(booking) {
   const s = normalizeBookingStatus(booking?.status);
   const raw = String(booking?.status || '');
-  if (s === FLEX_BOOKING_STATUS.PENDING_REVIEW || raw === 'Pending') {
-    return { id: 'approve', label: 'Review & Approve', icon: 'check2-circle' };
+  if (s === FLEX_BOOKING_STATUS.PENDING_REVIEW || raw === 'Pending' || s === FLEX_BOOKING_STATUS.NEEDS_INFORMATION) {
+    return { id: 'approve', label: 'Review Booking', icon: 'check2-circle' };
   }
-  if (s === FLEX_BOOKING_STATUS.APPROVED) {
+  if (s === FLEX_BOOKING_STATUS.APPROVED || s === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT) {
+    return { id: 'finalize', label: 'Record Downpayment', icon: 'cash-coin' };
+  }
+  if (s === FLEX_BOOKING_STATUS.CONFIRMED) {
     return { id: 'assign', label: 'Assign Mechanic', icon: 'person-plus' };
   }
   if (s === FLEX_BOOKING_STATUS.SCHEDULED) {
-    return { id: 'inspect', label: 'Start Inspection', icon: 'search' };
+    return { id: 'open', label: 'Awaiting Inspection', icon: 'wrench' };
   }
   if (s === FLEX_BOOKING_STATUS.UNDER_INSPECTION || raw === 'Inspection') {
-    return { id: 'quote', label: 'Build Quotation', icon: 'receipt' };
+    return { id: 'open', label: 'Mechanic Inspecting', icon: 'search' };
+  }
+  if (s === FLEX_BOOKING_STATUS.ESTIMATE_SUBMITTED) {
+    return { id: 'quote', label: 'Review Quotation', icon: 'receipt' };
   }
   if (
     s === FLEX_BOOKING_STATUS.QUOTATION_SENT ||
-    s === FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL ||
-    s === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT
+    s === FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL
   ) {
     return { id: 'open', label: 'Waiting Customer', icon: 'hourglass-split' };
   }
-  if (s === FLEX_BOOKING_STATUS.CONFIRMED || raw === 'Confirmed') {
-    return { id: 'start', label: 'Start Service', icon: 'play-fill' };
-  }
   if (s === FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS || raw === 'In Progress') {
-    return { id: 'complete', label: 'Complete Service', icon: 'flag' };
+    return { id: 'open', label: 'In Service', icon: 'tools' };
   }
   if (s === FLEX_BOOKING_STATUS.ADDITIONAL_APPROVAL_REQUIRED) {
     return { id: 'open', label: 'Waiting Extra Approval', icon: 'exclamation-triangle' };
   }
   if (
     s === FLEX_BOOKING_STATUS.SERVICE_COMPLETED ||
+    s === FLEX_BOOKING_STATUS.FOR_FINAL_BILLING ||
     s === FLEX_BOOKING_STATUS.AWAITING_FINAL_PAYMENT ||
     raw === 'Service Done'
   ) {
     return { id: 'finalize', label: 'Finalize Billing', icon: 'cash-stack' };
   }
+  if (s === FLEX_BOOKING_STATUS.FULLY_PAID) {
+    return { id: 'pickup', label: 'Release for Pickup', icon: 'box-arrow-up' };
+  }
   if (s === FLEX_BOOKING_STATUS.READY_FOR_PICKUP || raw === 'Paid') {
-    return { id: 'pickup', label: 'Verify Pickup QR', icon: 'qr-code' };
+    return { id: 'pickup', label: 'Scan Pickup QR', icon: 'qr-code' };
   }
   return { id: 'open', label: 'Open Details', icon: 'eye-fill' };
 }
@@ -202,7 +224,12 @@ export default function AdminBookingManager({
     return map;
   }, [bookings]);
 
-  const attentionCount = (counts.review || 0) + (counts.inspect || 0) + (counts.billing || 0);
+  const attentionCount =
+    (counts.review || 0) +
+    (counts.payment || 0) +
+    (counts.schedule || 0) +
+    (counts.inspect || 0) +
+    (counts.billing || 0);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

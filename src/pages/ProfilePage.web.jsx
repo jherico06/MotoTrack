@@ -10,18 +10,31 @@ import {
   Platform,
   SafeAreaView,
   useWindowDimensions,
+  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { getAdminStyles, getAdminThemeTokens } from '../styles/web/admin.web.styles';
+import { getProfileWebTokens, createProfileWebStyles } from '../styles/web/profilePage.web.styles';
 import { appStorage } from '../services/storageAdapter';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { garageService } from '../services/garageService';
 import { orderService } from '../services/orderService';
-import { notificationService } from '../services/notificationService';
-import { BootstrapIcon, BrandLogo } from '../components/common';
-import { LiveOrderTrackingMapModal, ConfirmModal, RegisterMotorcycleModal, EditCustomerSettingsModal } from '../components/modals';
+import { notificationService, stripEmojis } from '../services/notificationService';
+import {
+  BootstrapIcon,
+  BrandLogo,
+  NotificationDropdown,
+  UserProfileButton,
+  UserProfileDropdown,
+} from '../components/common';
+import {
+  LiveOrderTrackingMapModal,
+  ConfirmModal,
+  RegisterMotorcycleModal,
+  EditCustomerSettingsModal,
+  CartModal,
+} from '../components/modals';
 import { motorcycleService } from '../services/motorcycleService';
 import { pickImageFromFile } from '../utils/imagePickerHelper';
 
@@ -33,7 +46,155 @@ const ADDRESS_PRESETS = [
   { label: 'BGC Central, Taguig', address: '7th Ave & 28th St, Bonifacio Global City, Taguig' },
 ];
 
+const getOrderGrandTotal = (order) => {
+  if (!order) return 0;
+  const val = Number(
+    order.grand_total ??
+    order.grandTotal ??
+    order.total_amount ??
+    order.total ??
+    order.totalAmount ??
+    0
+  );
+  if (!isNaN(val) && val > 0) return val;
+
+  if (Array.isArray(order.items) && order.items.length > 0) {
+    const calc = order.items.reduce((sum, i) => {
+      const price = Number(i?.price ?? i?.cost ?? i?.unit_cost ?? 0);
+      const qty = Number(i?.quantity) || 1;
+      return sum + (price * qty);
+    }, 0);
+    if (calc > 0) return calc;
+  }
+  return !isNaN(val) ? val : 0;
+};
+
+const isOrderDeliveredOrDone = (status) => {
+  const s = String(status || '').toLowerCase().trim();
+  if (s.includes('out') || s.includes('transit') || s.includes('shipped') || s.includes('ready') || s.includes('report')) {
+    return false;
+  }
+  return s === 'delivered' || s.includes('complete') || s.includes('cancel') || s.includes('refund');
+};
+
+const isOrderPendingApproval = (status) => {
+  const s = String(status || '').toLowerCase();
+  return s.includes('pending') || s.includes('approval');
+};
+
+const getOrderStatusRank = (status) => {
+  const s = String(status || '').toLowerCase().trim();
+  if (s.includes('pending') || s.includes('approval') || s === 'processing') return 1;
+  if (s.includes('out') || s.includes('transit') || s.includes('shipped') || s.includes('ready') || s.includes('report')) return 2;
+  if (s === 'delivered' || s.includes('complete')) return 3;
+  if (s.includes('cancel') || s.includes('refund')) return 4;
+  return 2;
+};
+
+const sortOrdersByPriority = (orderList) => {
+  if (!Array.isArray(orderList)) return [];
+  return [...orderList].sort((a, b) => {
+    const rankA = getOrderStatusRank(a.status);
+    const rankB = getOrderStatusRank(b.status);
+
+    if (rankA !== rankB) {
+      return rankA - rankB;
+    }
+
+    const dateA = new Date(a.created_at || a.date || a.orderDate || a.createdAt || 0).getTime();
+    const dateB = new Date(b.created_at || b.date || b.orderDate || b.createdAt || 0).getTime();
+    return dateB - dateA;
+  });
+};
+
 const MOTORCYCLE_BRANDS = ['Yamaha', 'Honda', 'Kawasaki', 'Suzuki', 'Ducati', 'BMW', 'KTM', 'Triumph'];
+
+const MAIN_NAV_ITEMS = [
+  { id: 'shop', label: 'Shop' },
+  { id: 'overview', label: 'Overview' },
+  { id: 'garage', label: 'My Garage' },
+  { id: 'orders', label: 'My Orders' },
+  { id: 'bookings', label: 'Booked Services' },
+];
+
+function formatNotifTime(isoString) {
+  if (!isoString) return 'Just now';
+  try {
+    const d = new Date(isoString);
+    const diffMs = Date.now() - d.getTime();
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch (_e) {
+    return 'Recent';
+  }
+}
+
+function getNotifTheme(type = '', category = '') {
+  const t = (type || '').toLowerCase();
+  const c = (category || '').toLowerCase();
+
+  if (t === 'order' || c === 'order' || c.includes('delivery')) {
+    return {
+      icon: 'bag-check-fill',
+      color: '#2563EB',
+      bg: '#EFF6FF',
+      badgeBg: '#DBEAFE',
+      label: 'Order',
+    };
+  }
+  if (t === 'booking' || c === 'booking' || c.includes('service') || c.includes('repair')) {
+    return {
+      icon: 'tools',
+      color: '#D97706',
+      bg: '#FEF3C7',
+      badgeBg: '#FDE68A',
+      label: 'Pit Bay',
+    };
+  }
+  if (t === 'promo' || c === 'promo' || c === 'welcome') {
+    return {
+      icon: 'ticket-perforated-fill',
+      color: '#EA580C',
+      bg: '#FFF7ED',
+      badgeBg: '#FFEDD5',
+      label: 'Promotion',
+    };
+  }
+  if (t === 'security' || t === 'system' || c === 'security') {
+    return {
+      icon: 'shield-lock-fill',
+      color: '#DC2626',
+      bg: '#FEE2E2',
+      badgeBg: '#FECACA',
+      label: 'Security',
+    };
+  }
+  return {
+    icon: 'bell-fill',
+    color: '#1D4533',
+    bg: '#E8F0EC',
+    badgeBg: '#C8DDD3',
+    label: 'Notification',
+  };
+}
+
+function getNotifActionLabel(notif) {
+  const t = (notif?.type || '').toLowerCase();
+  const c = (notif?.category || '').toLowerCase();
+  if (t === 'booking' || c === 'booking') return 'View Booking →';
+  if (t === 'order' || c === 'order') return 'Track Order →';
+  if (t === 'promo' || c === 'promo' || c === 'welcome') return 'View Deals →';
+  if (t === 'security') return 'Security Settings →';
+  return 'View Details →';
+}
 
 export default function ProfilePage({
   initialTab = 'overview',
@@ -53,8 +214,14 @@ export default function ProfilePage({
   const isSmallMobile = windowWidth < 480;
 
   const { currentUser, updateProfile, changePassword, changeEmail, getAccountLogs, logout } = useAuth();
-  const { showToast: cartShowToast, addToCart } = useCart();
-  const { wishlistCount } = useWishlist();
+  const { cartItemCount = 0, showToast: cartShowToast, addToCart } = useCart();
+  const { wishlistCount = 0 } = useWishlist();
+
+  // ─── TOP NAVBAR & MODALS STATE ───
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   // ─── DARK MODE STATE (Matching Admin Console) ───
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -69,8 +236,8 @@ export default function ProfilePage({
     });
   };
 
-  const tokens = useMemo(() => getAdminThemeTokens(isDarkMode), [isDarkMode]);
-  const styles = useMemo(() => getAdminStyles(isDarkMode), [isDarkMode]);
+  const tokens = useMemo(() => getProfileWebTokens(isDarkMode), [isDarkMode]);
+  const styles = useMemo(() => createProfileWebStyles(isDarkMode), [isDarkMode]);
 
   // ─── ACTIVE NAVIGATION TAB ───
   // ─── ACTIVE NAVIGATION TAB ───
@@ -122,10 +289,14 @@ export default function ProfilePage({
   const [currentPwd, setCurrentPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
   const [isSavingPwd, setIsSavingPwd] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [emailPwd, setEmailPwd] = useState('');
   const [isSavingEmail, setIsSavingEmail] = useState(false);
+  const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
 
   // Motorcycle Fleet State ("My Garage")
   const [motorcycles, setMotorcycles] = useState(() =>
@@ -154,8 +325,18 @@ export default function ProfilePage({
   const [bookingFilter, setBookingFilter] = useState('All'); // 'All' | 'Active' | 'Completed' | 'Cancelled'
   const [orderFilter, setOrderFilter] = useState('All'); // 'All' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled'
   const [isOrderFilterDropdownOpen, setIsOrderFilterDropdownOpen] = useState(false);
-  const [notifFilter, setNotifFilter] = useState('All'); // 'All' | 'order' | 'booking' | 'security'
+  const [notifFilter, setNotifFilter] = useState('All'); // 'All' | 'order' | 'booking' | 'promo' | 'security' | 'unread'
+  const [notifSearchQuery, setNotifSearchQuery] = useState('');
+  const [expandedNotifIds, setExpandedNotifIds] = useState(new Set());
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
+
+  // Real-time notification subscription
+  useEffect(() => {
+    const unsub = notificationService.subscribe(() => {
+      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+    });
+    return () => unsub?.();
+  }, [currentUser?.id]);
 
   // Live Tracking Modal State
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
@@ -342,17 +523,27 @@ export default function ProfilePage({
     );
   }, [orders]);
 
+  const activePendingOrders = useMemo(() => {
+    return (Array.isArray(orders) ? orders : []).filter(
+      (o) => !isOrderDeliveredOrDone(o.status)
+    );
+  }, [orders]);
+
   const totalSpent = useMemo(() => {
     return (Array.isArray(orders) ? orders : [])
       .filter((o) => o.status !== 'Cancelled')
-      .reduce((sum, o) => sum + (Number(o.grandTotal || o.total) || 0), 0);
+      .reduce((sum, o) => sum + getOrderGrandTotal(o), 0);
   }, [orders]);
 
   const unreadNotifCount = useMemo(() => {
     return (Array.isArray(notifications) ? notifications : []).filter(
-      (n) => n.status === 'unread' || !n.read
+      (n) => n.status === 'unread'
     ).length;
   }, [notifications]);
+
+  const sortedOrders = useMemo(() => {
+    return sortOrdersByPriority(orders);
+  }, [orders]);
 
   // Filtered Orders
   const filteredOrders = useMemo(() => {
@@ -368,7 +559,7 @@ export default function ProfilePage({
           (o.items || []).some((item) => String(item.name || '').toLowerCase().includes(q))
       );
     }
-    return list;
+    return sortOrdersByPriority(list);
   }, [orders, orderFilter, orderSearchQuery]);
 
   // Filtered Bookings
@@ -381,12 +572,195 @@ export default function ProfilePage({
     return list;
   }, [bookings, bookingFilter]);
 
+  const orderNotifsCount = useMemo(() => {
+    return (Array.isArray(notifications) ? notifications : []).filter(
+      (n) => (n.type || '').toLowerCase() === 'order' || (n.category || '').toLowerCase() === 'order'
+    ).length;
+  }, [notifications]);
+
+  const bookingNotifsCount = useMemo(() => {
+    return (Array.isArray(notifications) ? notifications : []).filter(
+      (n) => (n.type || '').toLowerCase() === 'booking' || (n.category || '').toLowerCase() === 'booking'
+    ).length;
+  }, [notifications]);
+
+  const promoNotifsCount = useMemo(() => {
+    return (Array.isArray(notifications) ? notifications : []).filter(
+      (n) => (n.type || '').toLowerCase() === 'promo' || (n.category || '').toLowerCase() === 'promo' || (n.category || '').toLowerCase() === 'welcome'
+    ).length;
+  }, [notifications]);
+
+  const securityNotifsCount = useMemo(() => {
+    return (Array.isArray(notifications) ? notifications : []).filter(
+      (n) => (n.type || '').toLowerCase() === 'security' || (n.type || '').toLowerCase() === 'system' || (n.category || '').toLowerCase() === 'security'
+    ).length;
+  }, [notifications]);
+
   // Filtered Notifications
   const filteredNotifications = useMemo(() => {
-    const list = Array.isArray(notifications) ? notifications : [];
-    if (notifFilter === 'All') return list;
-    return list.filter((n) => (n.type || '').toLowerCase() === notifFilter.toLowerCase());
-  }, [notifications, notifFilter]);
+    let list = Array.isArray(notifications) ? notifications : [];
+    if (notifFilter === 'order') {
+      list = list.filter((n) => (n.type || '').toLowerCase() === 'order' || (n.category || '').toLowerCase() === 'order');
+    } else if (notifFilter === 'booking') {
+      list = list.filter((n) => (n.type || '').toLowerCase() === 'booking' || (n.category || '').toLowerCase() === 'booking');
+    } else if (notifFilter === 'promo') {
+      list = list.filter((n) => (n.type || '').toLowerCase() === 'promo' || (n.category || '').toLowerCase() === 'promo' || (n.category || '').toLowerCase() === 'welcome');
+    } else if (notifFilter === 'security') {
+      list = list.filter((n) => (n.type || '').toLowerCase() === 'security' || (n.type || '').toLowerCase() === 'system' || (n.category || '').toLowerCase() === 'security');
+    } else if (notifFilter === 'unread') {
+      list = list.filter((n) => n.status === 'unread');
+    }
+
+    if (notifSearchQuery.trim()) {
+      const q = notifSearchQuery.toLowerCase();
+      list = list.filter((n) => {
+        const t = (n.title || '').toLowerCase();
+        const m = (n.message || '').toLowerCase();
+        const c = (n.category || '').toLowerCase();
+        const oId = String(n.meta?.orderId || '').toLowerCase();
+        const bId = String(n.meta?.bookingId || '').toLowerCase();
+        return t.includes(q) || m.includes(q) || c.includes(q) || oId.includes(q) || bId.includes(q);
+      });
+    }
+
+    return list;
+  }, [notifications, notifFilter, notifSearchQuery]);
+
+  // Group notifications chronologically (New, Today, Yesterday, Earlier)
+  const groupedNotifications = useMemo(() => {
+    const now = new Date();
+    const todayMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const yesterdayMidnight = todayMidnight - 24 * 60 * 60 * 1000;
+
+    const buckets = {
+      new: [],
+      today: [],
+      yesterday: [],
+      earlier: [],
+    };
+
+    filteredNotifications.forEach((n) => {
+      const isUnread = n.status === 'unread';
+      const timeVal = n.created_at || n.timestamp || n.date;
+      const itemDate = timeVal ? new Date(timeVal).getTime() : now.getTime();
+
+      if (isUnread && itemDate >= yesterdayMidnight) {
+        buckets.new.push(n);
+      } else if (itemDate >= todayMidnight) {
+        buckets.today.push(n);
+      } else if (itemDate >= yesterdayMidnight) {
+        buckets.yesterday.push(n);
+      } else {
+        buckets.earlier.push(n);
+      }
+    });
+
+    const sections = [];
+    if (buckets.new.length > 0) {
+      sections.push({
+        key: 'new',
+        title: 'New',
+        badge: `${buckets.new.length} unread`,
+        items: buckets.new,
+      });
+    }
+    if (buckets.today.length > 0) {
+      sections.push({
+        key: 'today',
+        title: 'Today',
+        badge: null,
+        items: buckets.today,
+      });
+    }
+    if (buckets.yesterday.length > 0) {
+      sections.push({
+        key: 'yesterday',
+        title: 'Yesterday',
+        badge: null,
+        items: buckets.yesterday,
+      });
+    }
+    if (buckets.earlier.length > 0) {
+      sections.push({
+        key: 'earlier',
+        title: 'Earlier',
+        badge: null,
+        items: buckets.earlier,
+      });
+    }
+
+    if (sections.length === 0 && filteredNotifications.length > 0) {
+      sections.push({
+        key: 'all',
+        title: 'All Notifications',
+        badge: null,
+        items: filteredNotifications,
+      });
+    }
+
+    return sections;
+  }, [filteredNotifications]);
+
+  const handleMarkAllNotifsRead = async () => {
+    await notificationService.markAllCustomerAsRead(currentUser?.id);
+    setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+    showToast('✓ All notifications marked as read');
+  };
+
+  const handleClearReadNotifs = async () => {
+    const unreadOnly = (Array.isArray(notifications) ? notifications : []).filter(
+      (n) => n.status === 'unread'
+    );
+    notificationService.customerNotifications = unreadOnly;
+    await notificationService.persist();
+    notificationService.notify();
+    setNotifications(unreadOnly);
+    showToast('✓ Cleared read notifications');
+  };
+
+  const handleMarkSingleNotifRead = async (id) => {
+    await notificationService.markCustomerAsRead(id);
+    setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+  };
+
+  const handleMarkSingleNotifUnread = async (id) => {
+    await notificationService.markCustomerAsUnread(id);
+    setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+  };
+
+  const handleDeleteNotif = async (id) => {
+    await notificationService.deleteCustomerNotification(id);
+    setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+    showToast('Notification removed');
+  };
+
+  const handleNotifAction = (notif) => {
+    handleMarkSingleNotifRead(notif.id);
+    const link = (notif.link || '').toLowerCase();
+    const type = (notif.type || '').toLowerCase();
+    if (type === 'booking' || link === 'bookings' || link === 'garage') {
+      setActiveTab('bookings');
+    } else if (type === 'order' || link === 'orders') {
+      setActiveTab('orders');
+      if (notif.meta?.orderId) {
+        const found = orders.find((o) => String(o.id) === String(notif.meta.orderId));
+        if (found) {
+          if (isOrderDeliveredOrDone(found.status)) {
+            showToast('✓ Order has already been delivered and confirmed.');
+          } else {
+            setSelectedOrderForTracking(found);
+            setIsLiveTrackingOpen(true);
+          }
+        }
+      }
+    } else if (type === 'promo' || link === 'shop' || link === 'store') {
+      onNavigateToStore?.();
+    } else if (type === 'security' || link === 'settings') {
+      setActiveTab('settings');
+    } else {
+      setActiveTab('overview');
+    }
+  };
 
   // Handlers
   const handleSaveProfile = async () => {
@@ -608,26 +982,6 @@ export default function ProfilePage({
     }
   };
 
-  const navTitles = {
-    overview: 'Rider Dashboard',
-    garage: 'My Garage & Fleet',
-    orders: 'My Orders & Deliveries',
-    bookings: 'Booked Services',
-    profile: 'Account Profile',
-    notifications: 'Notifications & Alerts',
-    settings: 'Customer Account Settings',
-  };
-
-  const navIcons = {
-    overview: 'speedometer2',
-    garage: 'wrench-adjustable',
-    orders: 'receipt',
-    bookings: 'calendar-check-fill',
-    profile: 'person-fill',
-    notifications: 'bell-fill',
-    settings: 'gear-fill',
-  };
-
   const userDisplayName = currentUser?.name || currentUser?.fullName || 'Rider';
   const userInitials = (userDisplayName.charAt(0) || 'R').toUpperCase();
 
@@ -658,436 +1012,213 @@ export default function ProfilePage({
         </View>
       ) : null}
 
-      <View style={styles.adminLayout}>
-        {/* ───────────────────────────────────────────────────────────── */}
-        {/* 1. LEFT SIDEBAR (DESKTOP)                                     */}
-        {/* ───────────────────────────────────────────────────────────── */}
-        {isDesktop && (
-          <View style={styles.sidebar}>
-            {/* Brand Logo Header */}
-            <View style={styles.sidebarBrandRow}>
+      {/* ─── 1. SINGLE TOP GREEN NAVBAR (ONLY NAVBAR) ─── */}
+      <View style={styles.headerWrapper}>
+        <View style={[styles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
+          {/* LEFT: MotoTrack Logo + Mobile Menu Toggle */}
+          <View style={styles.headerLeft}>
+            {windowWidth < 1024 && (
               <TouchableOpacity
-                onPress={onNavigateToStore}
-                style={{ flexDirection: 'row', alignItems: 'center' }}
-                activeOpacity={0.8}
+                style={styles.mobileNavToggleBtn}
+                onPress={() => setIsMobileNavOpen((prev) => !prev)}
+                activeOpacity={0.7}
+                title="Navigation Menu"
+                accessibilityLabel="Navigation Menu"
               >
-                <BrandLogo
-                  size={36}
-                  textColor={tokens.textPrimary}
-                  accentColor="#DC2626"
-                />
+                <BootstrapIcon name={isMobileNavOpen ? 'x-lg' : 'list'} size={18} color="#FFFFFF" />
               </TouchableOpacity>
-            </View>
+            )}
 
-            {/* Scrollable Navigation Items */}
-            <ScrollView
-              style={styles.sidebarNavScroll}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: 16 }}
+            <TouchableOpacity
+              style={styles.logoWrap}
+              onPress={onNavigateToStore}
+              activeOpacity={0.8}
             >
-              {/* Customer Profile Box */}
-              <View style={styles.adminProfileBox}>
-                <View
-                  style={[
-                    styles.adminAvatarCircle,
-                    {
-                      backgroundColor: isUploadedAvatar ? '#1D4533' : '#DDE2E8',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: isUploadedAvatar ? 0 : 1.5,
-                      borderColor: '#CBD5E1',
-                    },
-                  ]}
-                >
-                  {isUploadedAvatar ? (
-                    <Image
-                      source={{ uri: currentUser.avatar || currentUser.photoUri }}
-                      style={{ width: 42, height: 42, borderRadius: 21 }}
-                    />
-                  ) : (
-                    <BootstrapIcon name="person-fill" size={24} color="#64748B" />
-                  )}
-                  <View style={styles.onlineIndicator} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.profileNameText} numberOfLines={1}>
-                    {userDisplayName}
-                  </Text>
-                  <Text style={styles.profileRoleText} numberOfLines={1}>
-                    {currentUser?.email || 'Rider Account'}
-                  </Text>
-                </View>
-              </View>
-
-              {/* SECTION: Rider Navigation */}
-              <Text style={styles.navHeading}>My Account</Text>
-              <View style={styles.sidebarNavList}>
-                {/* 1. Overview */}
-                <TouchableOpacity
-                  style={[styles.sidebarNavItem, activeTab === 'overview' && styles.sidebarNavItemActive]}
-                  onPress={() => setActiveTab('overview')}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ width: 22, alignItems: 'center' }}>
-                    <BootstrapIcon
-                      name="grid-1x2-fill"
-                      size={16}
-                      color={activeTab === 'overview' ? '#FFFFFF' : '#64748B'}
-                    />
-                  </View>
-                  <Text style={[styles.sidebarNavLabel, activeTab === 'overview' && styles.sidebarNavLabelActive]}>
-                    Overview
-                  </Text>
-                </TouchableOpacity>
-
-                {/* 2. My Garage (Fleet) */}
-                <TouchableOpacity
-                  style={[styles.sidebarNavItem, activeTab === 'garage' && styles.sidebarNavItemActive]}
-                  onPress={() => setActiveTab('garage')}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ width: 22, alignItems: 'center' }}>
-                    <BootstrapIcon
-                      name="wrench-adjustable"
-                      size={16}
-                      color={activeTab === 'garage' ? '#FFFFFF' : '#64748B'}
-                    />
-                  </View>
-                  <Text style={[styles.sidebarNavLabel, activeTab === 'garage' && styles.sidebarNavLabelActive]}>
-                    My Garage
-                  </Text>
-                  {motorcycles.length > 0 && (
-                    <View
-                      style={[
-                        styles.sidebarCountBadge,
-                        { backgroundColor: '#1D4533' },
-                        activeTab === 'garage' && styles.sidebarCountBadgeActive,
-                      ]}
-                    >
-                      <Text style={{ color: '#FFFFFF', fontSize: 10.5, fontWeight: '800' }}>
-                        {motorcycles.length}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {/* 3. My Orders */}
-                <TouchableOpacity
-                  style={[styles.sidebarNavItem, activeTab === 'orders' && styles.sidebarNavItemActive]}
-                  onPress={() => setActiveTab('orders')}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ width: 22, alignItems: 'center' }}>
-                    <BootstrapIcon
-                      name="receipt"
-                      size={16}
-                      color={activeTab === 'orders' ? '#FFFFFF' : '#64748B'}
-                    />
-                  </View>
-                  <Text style={[styles.sidebarNavLabel, activeTab === 'orders' && styles.sidebarNavLabelActive]}>
-                    My Orders
-                  </Text>
-                  {orders.length > 0 && (
-                    <View
-                      style={[
-                        styles.sidebarCountBadge,
-                        activeTab === 'orders' && styles.sidebarCountBadgeActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.sidebarCountText,
-                          activeTab === 'orders' && styles.sidebarCountTextActive,
-                        ]}
-                      >
-                        {orders.length}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {/* 3. Garage Bookings */}
-                <TouchableOpacity
-                  style={[styles.sidebarNavItem, activeTab === 'bookings' && styles.sidebarNavItemActive]}
-                  onPress={() => setActiveTab('bookings')}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ width: 22, alignItems: 'center' }}>
-                    <BootstrapIcon
-                      name="calendar-check-fill"
-                      size={16}
-                      color={activeTab === 'bookings' ? '#FFFFFF' : '#64748B'}
-                    />
-                  </View>
-                  <Text style={[styles.sidebarNavLabel, activeTab === 'bookings' && styles.sidebarNavLabelActive]}>
-                    Booked Services
-                  </Text>
-                  {activeBookings.length > 0 && (
-                    <View
-                      style={[
-                        styles.sidebarCountBadge,
-                        { backgroundColor: '#1D4533' },
-                        activeTab === 'bookings' && styles.sidebarCountBadgeActive,
-                      ]}
-                    >
-                      <Text style={{ color: '#FFFFFF', fontSize: 10.5, fontWeight: '800' }}>
-                        {activeBookings.length} Active
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {/* 4. Account Profile */}
-                <TouchableOpacity
-                  style={[styles.sidebarNavItem, activeTab === 'profile' && styles.sidebarNavItemActive]}
-                  onPress={() => setActiveTab('profile')}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ width: 22, alignItems: 'center' }}>
-                    <BootstrapIcon
-                      name="person-circle"
-                      size={16}
-                      color={activeTab === 'profile' ? '#FFFFFF' : '#64748B'}
-                    />
-                  </View>
-                  <Text style={[styles.sidebarNavLabel, activeTab === 'profile' && styles.sidebarNavLabelActive]}>
-                    Account
-                  </Text>
-                  {activeTab === 'profile' && <View style={styles.sidebarActiveDot} />}
-                </TouchableOpacity>
-              </View>
-
-              {/* SECTION: Preferences & Security */}
-              <Text style={styles.navHeading}>Preferences</Text>
-              <View style={styles.sidebarNavList}>
-                {/* 5. Notifications */}
-                <TouchableOpacity
-                  style={[styles.sidebarNavItem, activeTab === 'notifications' && styles.sidebarNavItemActive]}
-                  onPress={() => setActiveTab('notifications')}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ width: 22, alignItems: 'center' }}>
-                    <BootstrapIcon
-                      name="bell-fill"
-                      size={16}
-                      color={activeTab === 'notifications' ? '#FFFFFF' : '#64748B'}
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.sidebarNavLabel,
-                      activeTab === 'notifications' && styles.sidebarNavLabelActive,
-                    ]}
-                  >
-                    Alerts & Updates
-                  </Text>
-                  {unreadNotifCount > 0 && (
-                    <View
-                      style={{
-                        backgroundColor: '#DC2626',
-                        paddingHorizontal: 6,
-                        paddingVertical: 1,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '900' }}>
-                        {unreadNotifCount}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {/* 6. Account Settings */}
-                <TouchableOpacity
-                  style={[styles.sidebarNavItem, activeTab === 'settings' && styles.sidebarNavItemActive]}
-                  onPress={() => setActiveTab('settings')}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ width: 22, alignItems: 'center' }}>
-                    <BootstrapIcon
-                      name="gear-fill"
-                      size={16}
-                      color={activeTab === 'settings' ? '#FFFFFF' : '#64748B'}
-                    />
-                  </View>
-                  <Text style={[styles.sidebarNavLabel, activeTab === 'settings' && styles.sidebarNavLabelActive]}>
-                    Account Settings
-                  </Text>
-                  {activeTab === 'settings' && <View style={styles.sidebarActiveDot} />}
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-
-            {/* Sidebar Bottom Footer */}
-            <View style={styles.sidebarFooter}>
-              <TouchableOpacity
-                style={styles.quickStoreBtn}
-                onPress={onNavigateToStore}
-                activeOpacity={0.8}
-              >
-                <BootstrapIcon name="arrow-left" size={13} color="#1D4533" />
-                <Text style={styles.quickStoreBtnText}>Return to Store</Text>
-              </TouchableOpacity>
-
-              <View style={styles.sidebarStatusRow}>
-                <View style={styles.statusDotGreen} />
-                <Text style={styles.sidebarStatusText}>Rider Account Synced</Text>
-              </View>
-
-              <TouchableOpacity
-                style={[
-                  styles.logoutSidebarBtn,
-                  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-                ]}
-                onPress={handleUserLogout}
-                activeOpacity={0.8}
-              >
-                <BootstrapIcon name="box-arrow-right" size={14} color="#DC2626" />
-                <Text style={styles.logoutSidebarText}>Log Out</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
-
-        {/* ───────────────────────────────────────────────────────────── */}
-        {/* 2. MAIN CONTENT AREA                                          */}
-        {/* ───────────────────────────────────────────────────────────── */}
-        <View style={[styles.mainContentArea, { backgroundColor: '#F8FAFC' }]}>
-          {/* Top Content Header Bar */}
-          <View
-            style={[
-              styles.topContentBar,
-              { backgroundColor: '#FFFFFF', borderBottomColor: '#E2E8F0' },
-              !isDesktop && { paddingHorizontal: isSmallMobile ? 12 : 16, paddingVertical: 12 },
-            ]}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  backgroundColor: '#E8F0EC',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <BootstrapIcon
-                  name={navIcons[activeTab] || 'speedometer2'}
-                  size={16}
-                  color="#1D4533"
-                />
-              </View>
-              <Text style={[styles.pageBreadcrumbTitle, !isDesktop && { fontSize: isSmallMobile ? 15 : 17 }]}>
-                {navTitles[activeTab] || 'Customer Console'}
-              </Text>
-            </View>
-
-            <View style={[styles.topActionsRow, { gap: 8 }]}>
-              {activeTab === 'garage' && (
-                <TouchableOpacity
-                  style={[styles.addBtnPrimary, { paddingVertical: 8, paddingHorizontal: 12 }]}
-                  onPress={handleOpenAddMotorcycle}
-                  activeOpacity={0.85}
-                >
-                  <BootstrapIcon name="plus-circle-fill" size={13} color="#FFFFFF" />
-                  <Text style={[styles.addBtnPrimaryText, { fontSize: 12.5 }]}>
-                    {isSmallMobile ? 'Register' : 'Register Motorcycle'}
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              {!isDesktop && (
-                <TouchableOpacity
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    backgroundColor: '#E8F0EC',
-                    paddingHorizontal: isSmallMobile ? 10 : 12,
-                    paddingVertical: 7,
-                    borderRadius: 10,
-                    borderWidth: 1,
-                    borderColor: '#BBF7D0',
-                  }}
-                  onPress={onNavigateToStore}
-                  activeOpacity={0.8}
-                >
-                  <BootstrapIcon name="arrow-left" size={12} color="#1D4533" />
-                  <BootstrapIcon name="shop" size={13} color="#1D4533" />
-                  {!isSmallMobile && (
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4533' }}>Store</Text>
-                  )}
-                </TouchableOpacity>
-              )}
-            </View>
+              <BrandLogo size={windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
+            </TouchableOpacity>
           </View>
 
-          {/* Mobile Tab Selector for screens < 1024px */}
-          {!isDesktop && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={{
-                backgroundColor: '#FFFFFF',
-                borderBottomWidth: 1,
-                borderBottomColor: '#E2E8F0',
-                paddingVertical: 8,
-              }}
-              contentContainerStyle={{ paddingHorizontal: 14, gap: 8 }}
-            >
-              {[
-                { id: 'overview', label: 'Overview', icon: 'speedometer2' },
-                { id: 'garage', label: `My Garage (${motorcycles.length})`, icon: 'wrench-adjustable' },
-                { id: 'orders', label: 'Orders', icon: 'receipt' },
-                { id: 'bookings', label: 'Booked Services', icon: 'calendar-check-fill' },
-                { id: 'profile', label: 'Profile', icon: 'person-vcard-fill' },
-                { id: 'notifications', label: 'Alerts', icon: 'bell-fill' },
-                { id: 'settings', label: 'Settings', icon: 'gear-fill' },
-              ].map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <TouchableOpacity
-                    key={tab.id}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 20,
-                      backgroundColor: isActive ? '#1D4533' : '#F8FAFC',
-                      borderWidth: 1,
-                      borderColor: isActive ? '#1D4533' : '#E2E8F0',
-                    }}
-                    onPress={() => setActiveTab(tab.id)}
-                    activeOpacity={0.8}
-                  >
-                    <BootstrapIcon
-                      name={tab.icon}
-                      size={13}
-                      color={isActive ? '#FFFFFF' : '#64748B'}
-                    />
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontWeight: isActive ? '800' : '600',
-                        color: isActive ? '#FFFFFF' : '#334155',
+          {/* MAIN NAVIGATION (CENTERED): Overview | My Garage | My Orders | Booked Services */}
+          {windowWidth >= 1024 && (
+            <View style={styles.headerCenterNav}>
+              <View style={styles.mainNavList}>
+                {MAIN_NAV_ITEMS.map((item) => {
+                  const isActive = activeTab === item.id;
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.mainNavItem, isActive && styles.mainNavItemActive]}
+                      onPress={() => {
+                        if (item.id === 'shop') {
+                          onNavigateToStore?.();
+                        } else {
+                          setActiveTab(item.id);
+                        }
                       }}
+                      activeOpacity={0.8}
                     >
-                      {tab.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </ScrollView>
+                      <Text style={[styles.mainNavItemText, isActive && styles.mainNavItemTextActive]}>
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
           )}
 
+          {/* RIGHT: [Heart] | [Bell] | [Cart] | [⚙] | [Profile] */}
+          <View style={[styles.headerActions, windowWidth < 768 && { gap: 6 }]}>
+            {/* Wishlist / Heart Icon [Heart] */}
+            <TouchableOpacity
+              style={styles.navActionIconBtn}
+              onPress={onNavigateToWishlist}
+              activeOpacity={0.8}
+              title="Favorites"
+            >
+              <BootstrapIcon name="heart" size={16} color="#FFFFFF" />
+              {wishlistCount > 0 && (
+                <View style={styles.navBadgeCircle}>
+                  <Text style={styles.navBadgeText}>{wishlistCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Existing Notification / Bell Icon [Bell] */}
+            <View style={{ position: 'relative' }}>
+              <TouchableOpacity
+                style={styles.navActionIconBtn}
+                onPress={() => {
+                  setIsProfileDropdownOpen(false);
+                  setIsNotifDropdownOpen((prev) => !prev);
+                }}
+                activeOpacity={0.8}
+                title="Notifications"
+                dataSet={{ notificationButton: true }}
+                {...(Platform.OS === 'web' ? { 'data-notification-button': 'true' } : {})}
+              >
+                <BootstrapIcon name="bell" size={16} color="#FFFFFF" />
+                {unreadNotifCount > 0 && (
+                  <View style={styles.navBadgeCircle}>
+                    <Text style={styles.navBadgeText}>
+                      {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+
+              <NotificationDropdown
+                isOpen={isNotifDropdownOpen}
+                onClose={() => setIsNotifDropdownOpen(false)}
+                onNavigateToScreen={(screen, params) => {
+                  if (screen === 'store' || screen === 'shop') onNavigateToStore?.();
+                  else if (screen === 'garage') onNavigateToGarage?.();
+                  else if (screen === 'customizer') onNavigateToCustomizer?.();
+                  else if (screen === 'orders') setActiveTab('orders');
+                  else if (screen === 'profile') setActiveTab(params?.tab || 'overview');
+                  else if (screen === 'notifications') setActiveTab('notifications');
+                  else if (screen === 'admin') onNavigateToAdmin?.();
+                }}
+                currentUser={currentUser}
+              />
+            </View>
+
+            {/* Cart Icon [Cart] */}
+            <TouchableOpacity
+              style={styles.navActionIconBtn}
+              onPress={() => setIsCartOpen(true)}
+              activeOpacity={0.85}
+              title="Shopping Cart"
+            >
+              <BootstrapIcon name="cart3" size={17} color="#FFFFFF" />
+              {cartItemCount > 0 && (
+                <View style={styles.navBadgeCircle}>
+                  <Text style={styles.navBadgeText}>{cartItemCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* User Profile Avatar [Profile] or Sign In */}
+            {currentUser ? (
+              <View style={{ position: 'relative' }}>
+                <UserProfileButton
+                  currentUser={currentUser}
+                  onPress={() => {
+                    setIsNotifDropdownOpen(false);
+                    setIsProfileDropdownOpen(!isProfileDropdownOpen);
+                  }}
+                  size={40}
+                />
+
+                <UserProfileDropdown
+                  currentUser={currentUser}
+                  isOpen={isProfileDropdownOpen}
+                  onClose={() => setIsProfileDropdownOpen(false)}
+                  onNavigateToDashboard={(tab = 'overview') => setActiveTab(tab)}
+                  onNavigateToOrders={() => setActiveTab('orders')}
+                  onNavigateToProfile={() => setActiveTab('profile')}
+                  onNavigateToSettings={() => setActiveTab('settings')}
+                  onNavigateToNotifications={() => setActiveTab('notifications')}
+                  onNavigateToAdmin={() => {
+                    if (currentUser?.role === 'admin') {
+                      onNavigateToAdmin?.();
+                    } else {
+                      showToast('Admin access required');
+                    }
+                  }}
+                  onLogout={handleUserLogout}
+                />
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.btnPrimary}
+                onPress={onNavigateToLogin}
+              >
+                <Text style={styles.btnPrimaryText}>Sign In</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Mobile Navigation Drawer for Screens < 1024px */}
+        {windowWidth < 1024 && isMobileNavOpen && (
+          <View style={styles.mobileNavDrawer}>
+            {MAIN_NAV_ITEMS.map((item) => {
+              const isActive = activeTab === item.id;
+              return (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.mobileNavItem, isActive && styles.mobileNavItemActive]}
+                  onPress={() => {
+                    if (item.id === 'shop') {
+                      onNavigateToStore?.();
+                    } else {
+                      setActiveTab(item.id);
+                    }
+                    setIsMobileNavOpen(false);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.mobileNavItemText, isActive && styles.mobileNavItemTextActive]}>
+                    {item.label}
+                  </Text>
+                  {isActive && (
+                    <BootstrapIcon name="check2" size={16} color="#34D399" />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+      </View>
+
+      <View style={styles.adminLayout}>
+        <View style={styles.mainContentArea}>
           {/* Main Scrollable Canvas */}
           <ScrollView
             contentContainerStyle={[
               styles.mainScroll,
-              { maxWidth: 1200, width: '100%', alignSelf: 'center' },
+              { maxWidth: 1360, width: '100%', alignSelf: 'center' },
               isDesktop && { padding: 28, paddingBottom: 120 },
               isTablet && { padding: 20, paddingBottom: 120 },
               isMobile && { padding: 14, paddingBottom: 110 },
@@ -1099,17 +1230,14 @@ export default function ProfilePage({
             {/* ───────────────────────────────────────────────────────── */}
             {activeTab === 'overview' && (
               <View>
-                {/* 4 KPI Stats Grid (Matching Admin Stat Cards) */}
+                {/* 4 KPI Stats Grid */}
                 <View style={styles.statsGrid}>
                   {/* Card 1: Total Orders */}
                   <TouchableOpacity
                     style={[styles.statCard, styles.statCardTealAccent]}
                     onPress={() => setActiveTab('orders')}
-                    activeOpacity={0.85}
+                    activeOpacity={0.88}
                   >
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="receipt" size={18} color="#1D4533" />
-                    </View>
                     <Text style={styles.statLabel}>Orders Placed</Text>
                     <Text style={styles.statValue}>{orders.length}</Text>
                     <Text style={styles.statSub}>
@@ -1121,15 +1249,12 @@ export default function ProfilePage({
                   <TouchableOpacity
                     style={[styles.statCard, styles.statCardWarningAccent]}
                     onPress={() => setActiveTab('bookings')}
-                    activeOpacity={0.85}
+                    activeOpacity={0.88}
                   >
-                    <View style={[styles.statIconWrap, { backgroundColor: isDarkMode ? 'rgba(217, 119, 6, 0.15)' : '#FEF3C7' }]}>
-                      <BootstrapIcon name="calendar-check" size={18} color="#D97706" />
-                    </View>
                     <Text style={styles.statLabel}>Garage Bookings</Text>
                     <Text style={styles.statValue}>{activeBookings.length}</Text>
                     <Text style={styles.statSub}>
-                      {bookings.length} total scheduled PMS/repairs
+                      {bookings.length > 0 ? `${bookings.length} scheduled PMS/repairs` : 'No scheduled pit services'}
                     </Text>
                   </TouchableOpacity>
 
@@ -1137,11 +1262,8 @@ export default function ProfilePage({
                   <TouchableOpacity
                     style={[styles.statCard, styles.statCardDangerAccent]}
                     onPress={onNavigateToWishlist}
-                    activeOpacity={0.85}
+                    activeOpacity={0.88}
                   >
-                    <View style={[styles.statIconWrap, { backgroundColor: isDarkMode ? 'rgba(220, 38, 38, 0.15)' : '#FEE2E2' }]}>
-                      <BootstrapIcon name="heart-fill" size={18} color="#DC2626" />
-                    </View>
                     <Text style={styles.statLabel}>Saved Wishlist</Text>
                     <Text style={styles.statValue}>{wishlistCount || 0}</Text>
                     <Text style={styles.statSub}>Components ready for bag</Text>
@@ -1149,50 +1271,36 @@ export default function ProfilePage({
 
                   {/* Card 4: Total Spent */}
                   <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                    <View style={[styles.statIconWrap, { backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.15)' : '#EFF6FF' }]}>
-                      <BootstrapIcon name="wallet2" size={18} color="#2563EB" />
-                    </View>
                     <Text style={styles.statLabel}>Total Spend</Text>
                     <Text style={styles.statValue}>₱{Number(totalSpent).toLocaleString()}</Text>
                     <Text style={styles.statSub}>Verified purchases & tuning</Text>
                   </View>
                 </View>
 
-                {/* Customer Account Settings & Profile Quick Center */}
-                <View
-                  style={[
-                    styles.sectionCard,
-                    {
-                      marginBottom: 20,
-                      backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-                      borderWidth: 1,
-                      borderColor: tokens.border,
-                      borderRadius: 16,
-                      padding: 20,
-                    },
-                  ]}
-                >
+                {/* Customer Profile Summary */}
+                <View style={[styles.sectionCard, { marginBottom: 20 }]}>
                   <View
                     style={{
                       flexDirection: isSmallMobile ? 'column' : 'row',
                       alignItems: isSmallMobile ? 'flex-start' : 'center',
                       justifyContent: 'space-between',
-                      gap: 14,
+                      gap: 16,
                       marginBottom: 16,
                     }}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    {/* Left: Avatar + Identity */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1, minWidth: 240 }}>
                       <View
                         style={{
-                          width: 44,
-                          height: 44,
-                          borderRadius: 22,
+                          width: 52,
+                          height: 52,
+                          borderRadius: 26,
                           backgroundColor: '#1D4533',
                           alignItems: 'center',
                           justifyContent: 'center',
                           overflow: 'hidden',
                           borderWidth: 2,
-                          borderColor: '#C8DDD3',
+                          borderColor: tokens.brandBorder,
                         }}
                       >
                         {currentUser?.avatar || currentUser?.photoUri ? (
@@ -1202,102 +1310,123 @@ export default function ProfilePage({
                             resizeMode="cover"
                           />
                         ) : (
-                          <BootstrapIcon name="person-fill" size={22} color="#FFFFFF" />
+                          <BootstrapIcon name="person-fill" size={26} color="#FFFFFF" />
                         )}
                       </View>
-                      <View>
+                      <View style={{ flex: 1 }}>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                          <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary }}>
+                          <Text style={{ fontSize: 16.5, fontWeight: '800', color: tokens.textPrimary, letterSpacing: -0.2 }}>
                             {userDisplayName}
                           </Text>
                           <View
                             style={{
-                              backgroundColor: '#DCFCE7',
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 4,
+                              backgroundColor: tokens.statusSuccessBg,
                               paddingHorizontal: 8,
                               paddingVertical: 2,
                               borderRadius: 6,
                               borderWidth: 1,
-                              borderColor: '#86EFAC',
+                              borderColor: tokens.statusSuccessBorder,
                             }}
                           >
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#166534' }}>
+                            <BootstrapIcon name="patch-check-fill" size={11} color={tokens.statusSuccessText} />
+                            <Text style={{ fontSize: 10.5, fontWeight: '800', color: tokens.statusSuccessText }}>
                               Verified Customer
                             </Text>
                           </View>
                         </View>
-                        <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 2 }}>
-                          {currentUser?.email || 'Customer Account'} · {currentUser?.phone || 'No phone set'}
-                        </Text>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                            <BootstrapIcon name="envelope-fill" size={11} color={tokens.textMuted} />
+                            <Text style={{ fontSize: 12, color: tokens.textMuted }}>
+                              {currentUser?.email || 'Customer Account'}
+                            </Text>
+                          </View>
+                          <Text style={{ color: tokens.border, fontSize: 12 }}>•</Text>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                            <BootstrapIcon name="telephone-fill" size={11} color={tokens.textMuted} />
+                            <Text style={{ fontSize: 12, color: tokens.textMuted }}>
+                              {currentUser?.phone || phone || 'No phone set'}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     </View>
 
+                    {/* Right: Actions */}
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <TouchableOpacity
-                        style={[
-                          styles.addBtnPrimary,
-                          {
-                            paddingVertical: 8,
-                            paddingHorizontal: 14,
-                            backgroundColor: '#1D4533',
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                          },
-                        ]}
+                        style={styles.btnPrimary}
                         onPress={() => setIsEditSettingsModalOpen(true)}
                         activeOpacity={0.85}
                       >
                         <BootstrapIcon name="pencil-square" size={13} color="#FFFFFF" />
-                        <Text style={[styles.addBtnPrimaryText, { fontSize: 12.5 }]}>
-                          Edit Information
-                        </Text>
+                        <Text style={styles.btnPrimaryText}>Edit Information</Text>
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={[
-                          styles.quickStoreBtn,
-                          {
-                            paddingVertical: 8,
-                            paddingHorizontal: 12,
-                            backgroundColor: tokens.bgSub,
-                            borderColor: tokens.border,
-                          },
-                        ]}
+                        style={styles.btnSecondary}
                         onPress={() => setActiveTab('settings')}
                         activeOpacity={0.8}
                       >
-                        <BootstrapIcon name="gear-fill" size={13} color={tokens.textSecondary} />
-                        <Text style={[styles.quickStoreBtnText, { color: tokens.textSecondary, fontSize: 12 }]}>
-                          Settings →
-                        </Text>
+                        <BootstrapIcon name="gear" size={13} color={tokens.textSecondary} />
+                        <Text style={styles.btnSecondaryText}>Settings →</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
 
-                  {/* Quick Info Grid */}
+                  {/* Delivery Details 2-box row */}
                   <View
                     style={{
                       flexDirection: isDesktop ? 'row' : 'column',
-                      gap: 14,
-                      paddingTop: 14,
+                      gap: 12,
+                      paddingTop: 16,
                       borderTopWidth: 1,
                       borderTopColor: tokens.border,
                     }}
                   >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        Primary Delivery Address
-                      </Text>
-                      <Text style={{ fontSize: 12.5, fontWeight: '600', color: tokens.textPrimary, marginTop: 3 }}>
-                        📍 {currentUser?.address ? `${currentUser.address}, ${currentUser.city || 'City of Naga'}` : 'No address set — tap Edit to configure delivery location'}
+                    <View
+                      style={{
+                        flex: 1,
+                        backgroundColor: tokens.bgSub,
+                        borderRadius: 12,
+                        padding: 14,
+                        borderWidth: 1,
+                        borderColor: tokens.border,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <BootstrapIcon name="geo-alt-fill" size={12} color={tokens.brandPrimary} />
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                          Delivery Address
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: tokens.textPrimary, lineHeight: 18 }}>
+                        {currentUser?.address ? `${currentUser.address}, ${currentUser.city || 'City of Naga'}, Philippines` : 'No delivery address saved — click Edit Information to configure'}
                       </Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                        Delivery Instructions
-                      </Text>
-                      <Text style={{ fontSize: 12.5, fontWeight: '500', color: tokens.textSecondary, marginTop: 3 }}>
-                        💬 {currentUser?.deliveryNotes || 'Leave at front gate / contact on delivery'}
+
+                    <View
+                      style={{
+                        flex: 1,
+                        backgroundColor: tokens.bgSub,
+                        borderRadius: 12,
+                        padding: 14,
+                        borderWidth: 1,
+                        borderColor: tokens.border,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <BootstrapIcon name="truck" size={12} color={tokens.brandPrimary} />
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                          Delivery Instructions
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 13, fontWeight: '500', color: tokens.textSecondary, lineHeight: 18 }}>
+                        {currentUser?.deliveryNotes || 'Leave at front gate / contact on delivery'}
                       </Text>
                     </View>
                   </View>
@@ -1309,8 +1438,21 @@ export default function ProfilePage({
                   <View style={[styles.sectionCard, { flex: 1, marginBottom: 0 }]}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <BootstrapIcon name="box-seam-fill" size={18} color="#1D4533" />
-                        <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary }}>
+                        <View
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 8,
+                            backgroundColor: tokens.brandLight,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: tokens.brandBorder,
+                          }}
+                        >
+                          <BootstrapIcon name="box-seam-fill" size={14} color="#1D4533" />
+                        </View>
+                        <Text style={{ fontSize: 15.5, fontWeight: '800', color: tokens.textPrimary }}>
                           Recent Orders
                         </Text>
                       </View>
@@ -1329,80 +1471,156 @@ export default function ProfilePage({
                           Explore genuine racing parts & components.
                         </Text>
                         <TouchableOpacity
-                          style={[styles.addBtnPrimary, { marginTop: 14 }]}
+                          style={[styles.btnPrimary, { marginTop: 14 }]}
                           onPress={onNavigateToStore}
                           activeOpacity={0.85}
                         >
-                          <Text style={styles.addBtnPrimaryText}>Browse Catalog</Text>
+                          <Text style={styles.btnPrimaryText}>Browse Catalog</Text>
                         </TouchableOpacity>
                       </View>
                     ) : (
-                      <View style={{ gap: 12 }}>
-                        {orders.slice(0, 3).map((ord) => (
-                          <View
-                            key={ord.id}
-                            style={{
-                              backgroundColor: tokens.bgSub,
-                              borderWidth: 1,
-                              borderColor: tokens.border,
-                              borderRadius: 14,
-                              padding: 14,
-                            }}
-                          >
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: tokens.textPrimary, flex: 1, marginRight: 8 }} numberOfLines={1}>
-                                {ord.itemsSummary || (Array.isArray(ord.items) && ord.items.length > 0 ? ord.items.map((i) => typeof i === 'string' ? i : (i?.name || i?.product_name || 'Item')).join(', ') : 'Motorcycle Performance Equipment')}
-                              </Text>
-                              <View
-                                style={{
-                                  backgroundColor: ord.status === 'Delivered' ? '#D1FAE5' : ord.status === 'Cancelled' ? '#FEE2E2' : '#FEF3C7',
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 3,
-                                  borderRadius: 8,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: '800',
-                                    color: ord.status === 'Delivered' ? '#065F46' : ord.status === 'Cancelled' ? '#991B1B' : '#92400E',
-                                  }}
-                                >
-                                  {ord.status || 'Processing'}
-                                </Text>
-                              </View>
-                            </View>
+                      <View style={{ gap: 10 }}>
+                        {sortedOrders.slice(0, 5).map((ord) => {
+                          const statusLower = String(ord.status || '').toLowerCase();
+                          let statusBg = tokens.statusWarningBg;
+                          let statusText = tokens.statusWarningText;
+                          let statusBorder = tokens.statusWarningBorder;
+                          let statusLabel = ord.status || 'Processing';
 
-                            <Text style={{ fontSize: 12, color: tokens.textMuted, marginBottom: 8 }}>
-                              {ord.items?.length || 1} items • Total: ₱{Number(ord.grandTotal || ord.total || 0).toLocaleString()} • {ord.paymentMethod || 'COD'}
-                            </Text>
+                          if (statusLower.includes('out') || statusLower.includes('transit') || statusLower.includes('shipped') || statusLower.includes('ready')) {
+                            statusBg = tokens.statusInfoBg;
+                            statusText = tokens.statusInfoText;
+                            statusBorder = tokens.statusInfoBorder;
+                            statusLabel = ord.status || 'Out for Delivery';
+                          } else if (statusLower === 'delivered' || statusLower.includes('complete')) {
+                            statusBg = tokens.statusSuccessBg;
+                            statusText = tokens.statusSuccessText;
+                            statusBorder = tokens.statusSuccessBorder;
+                            statusLabel = 'Delivered';
+                          } else if (statusLower.includes('cancel')) {
+                            statusBg = tokens.statusDangerBg;
+                            statusText = tokens.statusDangerText;
+                            statusBorder = tokens.statusDangerBorder;
+                            statusLabel = 'Cancelled';
+                          }
 
-                            <TouchableOpacity
+                          const isDone = isOrderDeliveredOrDone(ord.status);
+                          const isPending = isOrderPendingApproval(ord.status);
+
+                          return (
+                            <View
+                              key={ord.id}
                               style={{
-                                backgroundColor: isDarkMode ? '#1C2422' : '#FFFFFF',
+                                backgroundColor: tokens.bgSub,
                                 borderWidth: 1,
                                 borderColor: tokens.border,
-                                paddingVertical: 6,
-                                paddingHorizontal: 12,
-                                borderRadius: 8,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 6,
+                                borderRadius: 12,
+                                padding: 13,
+                                flexDirection: isSmallMobile ? 'column' : 'row',
+                                justifyContent: 'space-between',
+                                alignItems: isSmallMobile ? 'flex-start' : 'center',
+                                gap: 12,
                               }}
-                              onPress={() => {
-                                setSelectedOrderForTracking(ord);
-                                setIsLiveTrackingOpen(true);
-                              }}
-                              activeOpacity={0.8}
                             >
-                              <BootstrapIcon name="geo-alt-fill" size={12} color="#1D4533" />
-                              <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4533' }}>
-                                Track Order Live
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        ))}
+                              <View style={{ flex: 1, minWidth: 0 }}>
+                                <Text style={{ fontSize: 13.5, fontWeight: '700', color: tokens.textPrimary }} numberOfLines={1}>
+                                  {ord.itemsSummary || (Array.isArray(ord.items) && ord.items.length > 0 ? ord.items.map((i) => typeof i === 'string' ? i : (i?.name || i?.product_name || 'Part')).join(', ') : 'Motorcycle Performance Equipment')}
+                                </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                                  <Text style={{ fontSize: 11.5, color: tokens.textMuted }}>
+                                    {ord.created_at ? new Date(ord.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent Order'}
+                                  </Text>
+                                  <Text style={{ color: tokens.border }}>•</Text>
+                                  <Text style={{ fontSize: 11.5, color: tokens.textMuted }}>
+                                    {ord.items?.length || 1} {ord.items?.length === 1 ? 'item' : 'items'}
+                                  </Text>
+                                  <Text style={{ color: tokens.border }}>•</Text>
+                                  <Text style={{ fontSize: 11.5, color: tokens.textMuted }}>
+                                    {ord.paymentMethod || 'COD'}
+                                  </Text>
+                                  <Text style={{ color: tokens.border }}>•</Text>
+                                  <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>
+                                    ₱{getOrderGrandTotal(ord).toLocaleString()}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              <View style={{ flexDirection: isSmallMobile ? 'row' : 'column', alignItems: isSmallMobile ? 'center' : 'flex-end', gap: 8, width: isSmallMobile ? '100%' : 'auto', justifyContent: 'space-between' }}>
+                                <View
+                                  style={{
+                                    backgroundColor: statusBg,
+                                    borderWidth: 1,
+                                    borderColor: statusBorder,
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 2.5,
+                                    borderRadius: 6,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 11, fontWeight: '800', color: statusText }}>
+                                    {statusLabel}
+                                  </Text>
+                                </View>
+
+                                {isDone ? (
+                                  <View
+                                    style={[
+                                      styles.btnSecondary,
+                                      {
+                                        paddingVertical: 6,
+                                        paddingHorizontal: 10,
+                                        backgroundColor: tokens.bgSub,
+                                        borderColor: tokens.border,
+                                        opacity: 0.75,
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 4,
+                                      },
+                                    ]}
+                                  >
+                                    <BootstrapIcon name="check-circle-fill" size={11} color="#059669" />
+                                    <Text style={[styles.btnSecondaryText, { fontSize: 11.5, color: tokens.textMuted }]}>
+                                      Delivered
+                                    </Text>
+                                  </View>
+                                ) : isPending ? (
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.btnSecondary,
+                                      {
+                                        paddingVertical: 6,
+                                        paddingHorizontal: 10,
+                                        backgroundColor: tokens.statusWarningBg || '#FEF3C7',
+                                        borderColor: tokens.statusWarningBorder || '#FDE68A',
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 5,
+                                      },
+                                    ]}
+                                    onPress={() => showToast('⏳ Order is pending admin approval. Live tracking will unlock once approved.')}
+                                    activeOpacity={0.8}
+                                  >
+                                    <BootstrapIcon name="hourglass-split" size={11} color={tokens.statusWarningText || '#92400E'} />
+                                    <Text style={[styles.btnSecondaryText, { fontSize: 11.5, color: tokens.statusWarningText || '#92400E' }]}>
+                                      Awaiting Approval
+                                    </Text>
+                                  </TouchableOpacity>
+                                ) : (
+                                  <TouchableOpacity
+                                    style={[styles.btnSecondary, { paddingVertical: 6, paddingHorizontal: 10 }]}
+                                    onPress={() => {
+                                      setSelectedOrderForTracking(ord);
+                                      setIsLiveTrackingOpen(true);
+                                    }}
+                                    activeOpacity={0.8}
+                                  >
+                                    <BootstrapIcon name="geo-alt-fill" size={11} color={tokens.brandPrimary} />
+                                    <Text style={[styles.btnSecondaryText, { fontSize: 11.5 }]}>Track Order</Text>
+                                  </TouchableOpacity>
+                                )}
+                              </View>
+                            </View>
+                          );
+                        })}
                       </View>
                     )}
                   </View>
@@ -1411,8 +1629,21 @@ export default function ProfilePage({
                   <View style={[styles.sectionCard, { flex: 1, marginBottom: 0 }]}>
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <BootstrapIcon name="tools" size={17} color="#1D4533" />
-                        <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary }}>
+                        <View
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 8,
+                            backgroundColor: tokens.brandLight,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: tokens.brandBorder,
+                          }}
+                        >
+                          <BootstrapIcon name="tools" size={14} color="#1D4533" />
+                        </View>
+                        <Text style={{ fontSize: 15.5, fontWeight: '800', color: tokens.textPrimary }}>
                           Garage Pit Bay Slots
                         </Text>
                       </View>
@@ -1431,15 +1662,15 @@ export default function ProfilePage({
                           Need PMS tune-up, dyno test, or tire fitting?
                         </Text>
                         <TouchableOpacity
-                          style={[styles.addBtnPrimary, { marginTop: 14 }]}
+                          style={[styles.btnPrimary, { marginTop: 14 }]}
                           onPress={onNavigateToGarage}
                           activeOpacity={0.85}
                         >
-                          <Text style={styles.addBtnPrimaryText}>Book a Service Slot</Text>
+                          <Text style={styles.btnPrimaryText}>Book a Service Slot</Text>
                         </TouchableOpacity>
                       </View>
                     ) : (
-                      <View style={{ gap: 12 }}>
+                      <View style={{ gap: 10 }}>
                         {activeBookings.slice(0, 2).map((bk) => (
                           <View
                             key={bk.id}
@@ -1447,62 +1678,75 @@ export default function ProfilePage({
                               backgroundColor: tokens.bgSub,
                               borderWidth: 1,
                               borderColor: tokens.border,
-                              borderRadius: 14,
-                              padding: 16,
+                              borderRadius: 12,
+                              padding: 14,
+                              gap: 8,
                             }}
                           >
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                              <Text style={{ fontSize: 13.5, fontWeight: '800', color: tokens.textPrimary }}>
-                                {bk.service_title || bk.serviceName || 'Motorcycle Maintenance'}
-                              </Text>
-                              <View style={{ backgroundColor: '#C8DDD3', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                                <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#1D4533' }}>
-                                  {bk.category || 'PMS'}
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
+                                  Service Type
+                                </Text>
+                                <Text style={{ fontSize: 14, fontWeight: '800', color: tokens.textPrimary, marginTop: 2 }}>
+                                  {bk.service_title || bk.serviceName || 'PMS Service'}
+                                </Text>
+                              </View>
+                              <View
+                                style={{
+                                  backgroundColor: tokens.brandLight,
+                                  borderWidth: 1,
+                                  borderColor: tokens.brandBorder,
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 2.5,
+                                  borderRadius: 6,
+                                }}
+                              >
+                                <Text style={{ fontSize: 10.5, fontWeight: '800', color: tokens.brandPrimary }}>
+                                  {bk.category || 'PMS'} / Scheduled
                                 </Text>
                               </View>
                             </View>
 
-                            <Text style={{ fontSize: 12, color: tokens.textMuted, marginBottom: 4 }}>
-                              📅 {bk.appointment_date} • ⏰ {bk.time_slot}
-                            </Text>
-                            <Text style={{ fontSize: 12, color: tokens.textMuted, marginBottom: 10 }}>
-                              📍 {bk.branch || 'MotoTrack Flagship Central Hub'}
-                            </Text>
-
-                            <View style={{ flexDirection: 'row', gap: 8 }}>
-                              <TouchableOpacity
-                                style={{
-                                  flex: 1,
-                                  backgroundColor: isDarkMode ? '#1C2422' : '#FFFFFF',
-                                  borderWidth: 1,
-                                  borderColor: tokens.border,
-                                  paddingVertical: 7,
-                                  borderRadius: 8,
-                                  alignItems: 'center',
-                                }}
-                                onPress={() => setActiveTab('bookings')}
-                              >
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>
-                                  View Details
+                            <View style={{ gap: 4, paddingVertical: 2 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <BootstrapIcon name="calendar3" size={12} color={tokens.brandPrimary} />
+                                <Text style={{ fontSize: 12, color: tokens.textSecondary, fontWeight: '500' }}>
+                                  {bk.appointment_date || 'Date scheduled'}
                                 </Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <BootstrapIcon name="clock" size={12} color={tokens.brandPrimary} />
+                                <Text style={{ fontSize: 12, color: tokens.textSecondary, fontWeight: '500' }}>
+                                  {bk.time_slot || '10:30 AM – 12:00 PM'}
+                                </Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <BootstrapIcon name="geo-alt-fill" size={12} color={tokens.brandPrimary} />
+                                <Text style={{ fontSize: 12, color: tokens.textSecondary, fontWeight: '500' }} numberOfLines={1}>
+                                  {bk.branch || 'MotoTrack Flagship Central Hub'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', gap: 8, paddingTop: 6, borderTopWidth: 1, borderTopColor: tokens.border }}>
+                              <TouchableOpacity
+                                style={[styles.btnSecondary, { flex: 1, paddingVertical: 6 }]}
+                                onPress={() => setActiveTab('bookings')}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={[styles.btnSecondaryText, { fontSize: 12 }]}>View Details</Text>
                               </TouchableOpacity>
 
                               <TouchableOpacity
-                                style={{
-                                  backgroundColor: '#FEE2E2',
-                                  paddingHorizontal: 12,
-                                  paddingVertical: 7,
-                                  borderRadius: 8,
-                                  alignItems: 'center',
-                                }}
+                                style={[styles.btnDangerSubtle, { paddingVertical: 6 }]}
                                 onPress={() => {
                                   setBookingToCancel(bk);
                                   setIsCancelModalOpen(true);
                                 }}
+                                activeOpacity={0.8}
                               >
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: '#DC2626' }}>
-                                  Cancel
-                                </Text>
+                                <Text style={[styles.btnDangerSubtleText, { fontSize: 12 }]}>Cancel</Text>
                               </TouchableOpacity>
                             </View>
                           </View>
@@ -1760,9 +2004,6 @@ export default function ProfilePage({
                 <View style={[styles.statsGrid, { marginBottom: 20 }]}>
                   {/* Stat 1: Total Fleet */}
                   <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="tools" size={18} color="#1D4533" />
-                    </View>
                     <Text style={styles.statLabel}>Garage Fleet</Text>
                     <Text style={styles.statValue}>{motorcycles.length}</Text>
                     <Text style={styles.statSub}>Registered vehicles</Text>
@@ -1770,9 +2011,6 @@ export default function ProfilePage({
 
                   {/* Stat 2: Primary Ride */}
                   <View style={[styles.statCard, styles.statCardWarningAccent]}>
-                    <View style={[styles.statIconWrap, { backgroundColor: isDarkMode ? 'rgba(217, 119, 6, 0.15)' : '#FEF3C7' }]}>
-                      <BootstrapIcon name="star-fill" size={18} color="#D97706" />
-                    </View>
                     <Text style={styles.statLabel}>Primary Ride</Text>
                     <Text style={[styles.statValue, { fontSize: 16 }]} numberOfLines={1}>
                       {primaryMotorcycle ? `${primaryMotorcycle.brand} ${primaryMotorcycle.model}` : 'None'}
@@ -1788,9 +2026,6 @@ export default function ProfilePage({
                     onPress={() => setActiveTab('bookings')}
                     activeOpacity={0.85}
                   >
-                    <View style={[styles.statIconWrap, { backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.15)' : '#C8DDD3' }]}>
-                      <BootstrapIcon name="calendar-check" size={18} color="#1D4533" />
-                    </View>
                     <Text style={styles.statLabel}>Pit Bay Bookings</Text>
                     <Text style={styles.statValue}>{activeBookings.length}</Text>
                     <Text style={styles.statSub}>Scheduled PMS & repairs</Text>
@@ -1798,9 +2033,6 @@ export default function ProfilePage({
 
                   {/* Stat 4: Service Readiness */}
                   <View style={[styles.statCard, styles.statCardDangerAccent]}>
-                    <View style={[styles.statIconWrap, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' }]}>
-                      <BootstrapIcon name="shield-check" size={18} color="#10B981" />
-                    </View>
                     <Text style={styles.statLabel}>Status</Text>
                     <Text style={[styles.statValue, { color: '#059669', fontSize: 17 }]}>
                       Track & Road Ready
@@ -1852,21 +2084,50 @@ export default function ProfilePage({
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <View
-                    style={{
-                      flexDirection: isDesktop ? 'row' : 'column',
-                      flexWrap: 'wrap',
-                      gap: 20,
-                    }}
-                  >
+                  <View>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        marginBottom: 16,
+                      }}
+                    >
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary }}>
+                        My Fleet ({motorcycles.length})
+                      </Text>
+                      <TouchableOpacity
+                        style={styles.addBtnPrimary}
+                        onPress={handleOpenAddMotorcycle}
+                        activeOpacity={0.85}
+                      >
+                        <BootstrapIcon name="plus-circle-fill" size={13} color="#FFFFFF" />
+                        <Text style={styles.addBtnPrimaryText}>
+                          {isSmallMobile ? 'Register' : 'Register Motorcycle'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                    <View
+                      style={{
+                        width: '100%',
+                        ...(Platform.OS === 'web'
+                          ? {
+                              display: 'grid',
+                              gridTemplateColumns: windowWidth >= 768 ? 'repeat(2, minmax(0, 1fr))' : '1fr',
+                              gap: 14,
+                            }
+                          : {
+                              flexDirection: isDesktop ? 'row' : 'column',
+                              gap: 14,
+                            }),
+                      }}
+                    >
                     {motorcycles.map((bike) => {
                       return (
                         <View
                           key={bike.motorcycle_id}
                           style={{
-                            flex: isDesktop ? 1 : undefined,
-                            minWidth: isDesktop ? 360 : '100%',
-                            maxWidth: isDesktop ? 540 : '100%',
+                            width: '100%',
                             backgroundColor: tokens.bgCard,
                             borderRadius: 18,
                             borderWidth: 1.5,
@@ -1877,6 +2138,8 @@ export default function ProfilePage({
                             shadowOpacity: isDarkMode ? 0.35 : 0.06,
                             shadowRadius: 12,
                             elevation: 4,
+                            display: 'flex',
+                            flexDirection: 'column',
                           }}
                         >
                           {/* Image Banner Header */}
@@ -1988,8 +2251,9 @@ export default function ProfilePage({
                           </View>
 
                           {/* Card Content Body */}
-                          <View style={{ padding: 18 }}>
-                            {/* Brand & Model Title */}
+                          <View style={{ padding: 18, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                            <View style={{ flex: 1 }}>
+                              {/* Brand & Model Title */}
                             <Text
                               style={{
                                 fontSize: 11.5,
@@ -2130,8 +2394,9 @@ export default function ProfilePage({
                                 </Text>
                               </View>
                             ) : null}
+                          </View>
 
-                            {/* Card Footer Actions */}
+                          {/* Card Footer Actions */}
                             <View
                               style={{
                                 flexDirection: 'row',
@@ -2234,6 +2499,7 @@ export default function ProfilePage({
                       );
                     })}
                   </View>
+                  </View>
                 )}
               </View>
             )}
@@ -2247,9 +2513,6 @@ export default function ProfilePage({
                 <View style={[styles.statsGrid, { marginBottom: 20 }]}>
                   {/* Metric 1: Total Orders Placed */}
                   <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={styles.statIconWrap}>
-                      <BootstrapIcon name="bag-check-fill" size={18} color="#1D4533" />
-                    </View>
                     <Text style={styles.statLabel}>Total Orders Placed</Text>
                     <Text style={styles.statValue}>{orders.length}</Text>
                     <Text style={styles.statSub}>Full order telemetry history</Text>
@@ -2257,9 +2520,6 @@ export default function ProfilePage({
 
                   {/* Metric 2: Awaiting COD Approval */}
                   <View style={[styles.statCard, styles.statCardWarningAccent]}>
-                    <View style={[styles.statIconWrap, { backgroundColor: isDarkMode ? 'rgba(217, 119, 6, 0.15)' : '#FEF3C7' }]}>
-                      <BootstrapIcon name="shield-lock-fill" size={18} color="#D97706" />
-                    </View>
                     <Text style={styles.statLabel}>Awaiting COD Approval</Text>
                     <Text style={[styles.statValue, { color: '#D97706' }]}>
                       {orders.filter((o) => (o.status || '').toLowerCase().includes('pending') || (o.status || '').toLowerCase().includes('approval')).length}
@@ -2269,9 +2529,6 @@ export default function ProfilePage({
 
                   {/* Metric 3: Active Dispatches */}
                   <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <View style={[styles.statIconWrap, { backgroundColor: isDarkMode ? 'rgba(59, 130, 246, 0.15)' : '#EFF6FF' }]}>
-                      <BootstrapIcon name="truck" size={18} color="#2563EB" />
-                    </View>
                     <Text style={styles.statLabel}>Active Dispatches</Text>
                     <Text style={[styles.statValue, { color: '#2563EB' }]}>
                       {orders.filter((o) => ['processing', 'shipped', 'in transit'].includes((o.status || '').toLowerCase())).length}
@@ -2281,12 +2538,9 @@ export default function ProfilePage({
 
                   {/* Metric 4: Total Order Value */}
                   <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                    <View style={[styles.statIconWrap, { backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5' }]}>
-                      <BootstrapIcon name="cash-stack" size={18} color="#16A34A" />
-                    </View>
                     <Text style={styles.statLabel}>Total Order Value</Text>
                     <Text style={[styles.statValue, { color: '#16A34A' }]}>
-                      ₱{orders.reduce((acc, o) => acc + Number(o.grandTotal || o.total || 0), 0).toLocaleString()}
+                      ₱{orders.reduce((acc, o) => acc + getOrderGrandTotal(o), 0).toLocaleString()}
                     </Text>
                     <Text style={styles.statSub}>Combined checkout expenditure</Text>
                   </View>
@@ -2544,19 +2798,46 @@ export default function ProfilePage({
                               </Text>
                             </View>
 
-                            <TouchableOpacity
-                              style={[styles.addBtnPrimary, { paddingVertical: 7, paddingHorizontal: 12 }]}
-                              onPress={() => {
-                                setSelectedOrderForTracking(o);
-                                setIsLiveTrackingOpen(true);
-                              }}
-                              activeOpacity={0.8}
-                            >
-                              <BootstrapIcon name="geo-alt-fill" size={12} color="#FFFFFF" />
-                              <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>
-                                Track Live
-                              </Text>
-                            </TouchableOpacity>
+                            {!isOrderDeliveredOrDone(o.status) && (
+                              isOrderPendingApproval(o.status) ? (
+                                <TouchableOpacity
+                                  style={[
+                                    styles.addBtnPrimary,
+                                    {
+                                      paddingVertical: 7,
+                                      paddingHorizontal: 12,
+                                      backgroundColor: '#FEF3C7',
+                                      borderColor: '#FDE68A',
+                                      borderWidth: 1,
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 6,
+                                    },
+                                  ]}
+                                  onPress={() => showToast('⏳ Order is pending admin approval. Live tracking will unlock once approved.')}
+                                  activeOpacity={0.8}
+                                >
+                                  <BootstrapIcon name="hourglass-split" size={12} color="#92400E" />
+                                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#92400E' }}>
+                                    Awaiting Approval
+                                  </Text>
+                                </TouchableOpacity>
+                              ) : (
+                                <TouchableOpacity
+                                  style={[styles.addBtnPrimary, { paddingVertical: 7, paddingHorizontal: 12 }]}
+                                  onPress={() => {
+                                    setSelectedOrderForTracking(o);
+                                    setIsLiveTrackingOpen(true);
+                                  }}
+                                  activeOpacity={0.8}
+                                >
+                                  <BootstrapIcon name="geo-alt-fill" size={12} color="#FFFFFF" />
+                                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>
+                                    Track Live
+                                  </Text>
+                                </TouchableOpacity>
+                              )
+                            )}
                           </View>
                         </View>
 
@@ -2600,7 +2881,7 @@ export default function ProfilePage({
 
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                           <Text style={{ fontSize: 12, color: tokens.textMuted }}>
-                            Payment: <Text style={{ fontWeight: '700', color: tokens.textPrimary }}>{o.paymentMethod || 'COD'}</Text> • Total: <Text style={{ fontWeight: '900', color: '#1D4533', fontSize: 14 }}>₱{Number(o.grandTotal || o.total || 0).toLocaleString()}</Text>
+                            Payment: <Text style={{ fontWeight: '700', color: tokens.textPrimary }}>{o.paymentMethod || 'COD'}</Text> • Total: <Text style={{ fontWeight: '900', color: '#1D4533', fontSize: 14 }}>₱{getOrderGrandTotal(o).toLocaleString()}</Text>
                           </Text>
 
                           {typeof addToCart === 'function' && o.items && o.items.length > 0 && (
@@ -2778,96 +3059,53 @@ export default function ProfilePage({
             {/* ───────────────────────────────────────────────────────── */}
             {/* TAB 4: RIDER & BIKE PROFILE (Inspiration UI Design)           */}
             {/* ───────────────────────────────────────────────────────── */}
+            {/* ───────────────────────────────────────────────────────── */}
+            {/* TAB 4: RIDER & BIKE PROFILE                               */}
+            {/* ───────────────────────────────────────────────────────── */}
             {activeTab === 'profile' && (
-              <View style={{ display: 'flex', flexDirection: 'column', gap: isSmallMobile ? 18 : 24, maxWidth: 960, marginHorizontal: 'auto', width: '100%' }}>
-                {/* Page Heading */}
-                <View style={{ marginBottom: 4 }}>
-                  <Text
-                    style={{
-                      fontSize: isSmallMobile ? 22 : 26,
-                      fontWeight: '800',
-                      color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                      letterSpacing: -0.4,
-                    }}
-                  >
-                    My Profile
-                  </Text>
-                </View>
-
-                {/* 1. Avatar Header Card (Matching Inspiration UI Card 1) */}
+              <View style={{ display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 960, marginHorizontal: 'auto', width: '100%' }}>
+                {/* 1. Balanced Profile Header Card (Replacing heavy dark banner) */}
                 <View
                   style={{
-                    backgroundColor: '#1D4533',
-                    borderColor: '#163527',
+                    backgroundColor: isDarkMode ? tokens.cardBg : '#FFFFFF',
+                    borderColor: tokens.border,
                     borderWidth: 1,
                     borderRadius: 16,
-                    paddingVertical: isSmallMobile ? 26 : 34,
-                    paddingHorizontal: isSmallMobile ? 18 : 24,
+                    paddingVertical: isSmallMobile ? 24 : 30,
+                    paddingHorizontal: isSmallMobile ? 18 : 28,
                     alignItems: 'center',
                     justifyContent: 'center',
                     position: 'relative',
                     overflow: 'hidden',
-                    shadowColor: '#1D4533',
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.22,
-                    shadowRadius: 12,
-                    elevation: 4,
+                    borderTopWidth: 4,
+                    borderTopColor: '#1D4533',
+                    boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
                   }}
                 >
-                  {/* Subtle Background Decorative Accents */}
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: -40,
-                      right: -30,
-                      width: 180,
-                      height: 180,
-                      borderRadius: 90,
-                      backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                    }}
-                    pointerEvents="none"
-                  />
-                  <View
-                    style={{
-                      position: 'absolute',
-                      bottom: -50,
-                      left: -30,
-                      width: 160,
-                      height: 160,
-                      borderRadius: 80,
-                      backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                    }}
-                    pointerEvents="none"
-                  />
-
                   {/* Avatar Container with Camera Action Badge */}
-                  <View style={{ position: 'relative', width: 110, height: 110, marginBottom: 16 }}>
+                  <View style={{ position: 'relative', width: 92, height: 92, marginBottom: 14 }}>
                     <View
                       style={{
-                        width: 110,
-                        height: 110,
-                        borderRadius: 55,
-                        backgroundColor: '#163527',
+                        width: 92,
+                        height: 92,
+                        borderRadius: 46,
+                        backgroundColor: '#1D4533',
                         overflow: 'hidden',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderWidth: 3.5,
+                        borderWidth: 3,
                         borderColor: '#FFFFFF',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 3 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 8,
-                        elevation: 4,
+                        boxShadow: '0 2px 8px rgba(15, 23, 42, 0.1)',
                       }}
                     >
                       {currentUser?.avatar || currentUser?.photoUri ? (
                         <Image
                           source={{ uri: currentUser?.avatar || currentUser?.photoUri }}
-                          style={{ width: 110, height: 110, borderRadius: 55 }}
+                          style={{ width: 92, height: 92, borderRadius: 46 }}
                           resizeMode="cover"
                         />
                       ) : (
-                        <BootstrapIcon name="person-fill" size={56} color="#FFFFFF" />
+                        <BootstrapIcon name="person-fill" size={46} color="#FFFFFF" />
                       )}
                     </View>
 
@@ -2877,38 +3115,34 @@ export default function ProfilePage({
                         position: 'absolute',
                         bottom: 0,
                         right: 0,
-                        width: 36,
-                        height: 36,
-                        borderRadius: 18,
+                        width: 30,
+                        height: 30,
+                        borderRadius: 15,
                         backgroundColor: '#FFFFFF',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        borderWidth: 2,
+                        borderWidth: 1.5,
                         borderColor: '#1D4533',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 2 },
-                        shadowOpacity: 0.25,
-                        shadowRadius: 4,
-                        elevation: 4,
+                        boxShadow: '0 2px 5px rgba(0, 0, 0, 0.15)',
                         cursor: 'pointer',
                       }}
                       onPress={handleUploadAvatar}
-                      title="Upload new photo"
+                      accessibilityLabel="Upload new photo"
                       activeOpacity={0.85}
                     >
-                      <BootstrapIcon name="camera-fill" size={15} color="#1D4533" />
+                      <BootstrapIcon name="camera-fill" size={13} color="#1D4533" />
                     </TouchableOpacity>
                   </View>
 
-                  {/* Customer Full Name: e.g. "Ada, Ojude" / "LastName, FirstName" */}
+                  {/* Customer Full Name: e.g. "Maurin, Jherico" */}
                   <Text
                     style={{
                       fontSize: isSmallMobile ? 20 : 22,
                       fontWeight: '800',
-                      color: '#FFFFFF',
+                      color: tokens.textPrimary,
                       textAlign: 'center',
-                      marginBottom: 4,
-                      letterSpacing: -0.2,
+                      marginBottom: 3,
+                      letterSpacing: -0.3,
                     }}
                   >
                     {lastName && firstName
@@ -2916,72 +3150,70 @@ export default function ProfilePage({
                       : (name || currentUser?.name || currentUser?.fullName || 'Motorcycle Customer')}
                   </Text>
 
-                  {/* Customer Subtitle / Profession */}
+                  {/* Customer Headline / Bio */}
                   <Text
                     style={{
                       fontSize: 14,
                       fontWeight: '500',
-                      color: 'rgba(255, 255, 255, 0.9)',
+                      color: tokens.textSecondary,
                       textAlign: 'center',
-                      marginBottom: 4,
+                      marginBottom: 5,
                     }}
                   >
                     {bio || currentUser?.bio || 'Motorcycle Enthusiast & Customer'}
                   </Text>
 
                   {/* Customer Location */}
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: '500',
-                      color: 'rgba(255, 255, 255, 0.72)',
-                      textAlign: 'center',
-                    }}
-                  >
-                    {city ? `${city}, ${country || 'Philippines'}` : (country || 'Philippines')}
-                  </Text>
-
-                  {/* Quick Photo Actions (if uploaded) */}
-                  {isUploadedAvatar && (
-                    <TouchableOpacity
-                      onPress={handleRemoveAvatar}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 14 }}>
+                    <BootstrapIcon name="geo-alt-fill" size={12} color={tokens.brandPrimary} />
+                    <Text
                       style={{
-                        marginTop: 12,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 5,
-                        paddingHorizontal: 12,
-                        paddingVertical: 5,
-                        borderRadius: 20,
-                        backgroundColor: 'rgba(239, 68, 68, 0.2)',
-                        borderWidth: 1,
-                        borderColor: 'rgba(239, 68, 68, 0.4)',
+                        fontSize: 13,
+                        fontWeight: '500',
+                        color: tokens.textMuted,
+                        textAlign: 'center',
                       }}
                     >
-                      <BootstrapIcon name="trash" size={11} color="#FCA5A5" />
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#FEE2E2' }}>
-                        Remove Photo
+                      {city ? `${city}, ${country || 'Philippines'}` : (country || 'City of Naga, Philippines')}
+                    </Text>
+                  </View>
+
+                  {/* Profile Header Actions */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <TouchableOpacity
+                      style={styles.btnPrimary}
+                      onPress={() => setIsEditingPersonalInfo(!isEditingPersonalInfo)}
+                      activeOpacity={0.85}
+                    >
+                      <BootstrapIcon
+                        name={isEditingPersonalInfo ? 'x-lg' : 'pencil-square'}
+                        size={13}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.btnPrimaryText}>
+                        {isEditingPersonalInfo ? 'Cancel Editing' : 'Edit Profile'}
                       </Text>
                     </TouchableOpacity>
-                  )}
+
+                    {/* Subtle Destructive Remove Photo */}
+                    {isUploadedAvatar && (
+                      <TouchableOpacity
+                        onPress={handleRemoveAvatar}
+                        style={styles.btnGhost}
+                        activeOpacity={0.7}
+                      >
+                        <BootstrapIcon name="trash" size={12} color="#DC2626" />
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#DC2626' }}>
+                          Remove Photo
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 </View>
 
-                {/* 2. Personal Information Card (Matching Inspiration UI Card 2) */}
-                <View
-                  style={{
-                    backgroundColor: isDarkMode ? tokens.cardBg : '#FFFFFF',
-                    borderColor: isDarkMode ? tokens.border : '#E2E8F0',
-                    borderWidth: 1,
-                    borderRadius: 14,
-                    padding: isSmallMobile ? 18 : 24,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.04,
-                    shadowRadius: 3,
-                    elevation: 1,
-                  }}
-                >
-                  {/* Card Header with Section Title and [ ✎ Edit ] Button */}
+                {/* 2. Personal Information Card (2-Column Responsive Grid) */}
+                <View style={styles.sectionCard}>
+                  {/* Card Header with Section Title and [Edit Information] Button */}
                   <View
                     style={{
                       flexDirection: 'row',
@@ -2990,125 +3222,123 @@ export default function ProfilePage({
                       marginBottom: 20,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: isSmallMobile ? 16 : 17,
-                        fontWeight: '700',
-                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                      }}
-                    >
-                      Personal Information
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          backgroundColor: tokens.brandLight,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 1,
+                          borderColor: tokens.brandBorder,
+                        }}
+                      >
+                        <BootstrapIcon name="person-vcard" size={14} color="#1D4533" />
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '800',
+                          color: tokens.textPrimary,
+                          letterSpacing: -0.2,
+                        }}
+                      >
+                        Personal Information
+                      </Text>
+                    </View>
 
                     <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
-                        paddingHorizontal: 12,
-                        paddingVertical: 6,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: '#CBD5E1',
-                        backgroundColor: isEditingPersonalInfo ? '#F1F5F9' : '#FFFFFF',
-                      }}
+                      style={styles.btnSecondary}
                       onPress={() => setIsEditingPersonalInfo(!isEditingPersonalInfo)}
-                      activeOpacity={0.7}
+                      activeOpacity={0.8}
                     >
                       <BootstrapIcon
-                        name={isEditingPersonalInfo ? 'x-lg' : 'pencil'}
+                        name={isEditingPersonalInfo ? 'x-lg' : 'pencil-square'}
                         size={12}
-                        color="#334155"
+                        color={tokens.brandPrimary}
                       />
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>
-                        {isEditingPersonalInfo ? 'Cancel' : 'Edit'}
+                      <Text style={styles.btnSecondaryText}>
+                        {isEditingPersonalInfo ? 'Cancel' : 'Edit Information'}
                       </Text>
                     </TouchableOpacity>
                   </View>
 
                   {!isEditingPersonalInfo ? (
-                    /* Read-Only Grid (Matching Image: Row 1 = First Name, Last Name, City; Row 2 = Email, Phone, Country, Bio) */
-                    <View style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-                      {/* Row 1 */}
-                      <View
-                        style={{
-                          flexDirection: isSmallMobile ? 'column' : 'row',
-                          flexWrap: 'wrap',
-                          gap: 16,
-                        }}
-                      >
-                        <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 160 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                    /* Read-Only 2-Column Responsive Grid */
+                    <View style={{ gap: 16 }}>
+                      {/* Row 1: First Name & Last Name */}
+                      <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 16 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                             First Name
                           </Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                          <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
                             {firstName || (name ? name.split(' ')[0] : '—')}
                           </Text>
                         </View>
 
-                        <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 160 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                             Last Name
                           </Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                          <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
                             {lastName || (name && name.split(' ').length > 1 ? name.split(' ').slice(1).join(' ') : '—')}
-                          </Text>
-                        </View>
-
-                        <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 160 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
-                            City
-                          </Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                            {city || 'City of Naga'}
                           </Text>
                         </View>
                       </View>
 
-                      {/* Row 2 */}
-                      <View
-                        style={{
-                          flexDirection: isSmallMobile ? 'column' : 'row',
-                          flexWrap: 'wrap',
-                          gap: 16,
-                          paddingTop: 4,
-                        }}
-                      >
-                        <View style={{ flex: 1.2, minWidth: isSmallMobile ? '100%' : 180 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
-                            Email Address
+                      {/* Row 2: City & Email Address */}
+                      <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 16 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+                            City
                           </Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                            {currentUser?.email || '—'}
+                          <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
+                            {city || 'City of Naga'}
                           </Text>
                         </View>
 
-                        <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 140 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+                            Email Address
+                          </Text>
+                          <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
+                            {currentUser?.email || '—'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Row 3: Phone & Country */}
+                      <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 16 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                             Phone
                           </Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                          <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
                             {phone || currentUser?.phone || '—'}
                           </Text>
                         </View>
 
-                        <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 140 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                             Country
                           </Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                          <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
                             {country || 'Philippines'}
                           </Text>
                         </View>
+                      </View>
 
-                        <View style={{ flex: 1.2, minWidth: isSmallMobile ? '100%' : 160 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
-                            Bio
-                          </Text>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                            {bio || 'Educator'}
-                          </Text>
-                        </View>
+                      {/* Row 4: Bio */}
+                      <View>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+                          Bio
+                        </Text>
+                        <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
+                          {bio || 'Motorcycle Enthusiast & Customer'}
+                        </Text>
                       </View>
                     </View>
                   ) : (
@@ -3116,136 +3346,82 @@ export default function ProfilePage({
                     <View style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                       <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 14 }}>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             First Name
                           </Text>
                           <TextInput
                             value={firstName}
                             onChangeText={setFirstName}
                             placeholder="First Name"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
 
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             Last Name
                           </Text>
                           <TextInput
                             value={lastName}
                             onChangeText={setLastName}
                             placeholder="Last Name"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
 
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             City
                           </Text>
                           <TextInput
                             value={city}
                             onChangeText={setCity}
                             placeholder="e.g. City of Naga"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
                       </View>
 
                       <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 14 }}>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             Phone Number
                           </Text>
                           <TextInput
                             value={phone}
                             onChangeText={setPhone}
                             placeholder="+63 912 345 6789"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
 
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             Country
                           </Text>
                           <TextInput
                             value={country}
                             onChangeText={setCountry}
                             placeholder="Philippines"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
 
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
-                            Bio / Profession
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
+                            Bio / Headline
                           </Text>
                           <TextInput
                             value={bio}
                             onChangeText={setBio}
-                            placeholder="e.g. Educator, Rider"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholder="e.g. Rider, Enthusiast"
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
                       </View>
@@ -3253,29 +3429,14 @@ export default function ProfilePage({
                       {/* Edit Actions */}
                       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
                         <TouchableOpacity
-                          style={{
-                            paddingHorizontal: 16,
-                            paddingVertical: 8,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: '#CBD5E1',
-                            backgroundColor: '#FFFFFF',
-                          }}
+                          style={styles.btnSecondary}
                           onPress={() => setIsEditingPersonalInfo(false)}
                         >
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>Cancel</Text>
+                          <Text style={styles.btnSecondaryText}>Cancel</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                            paddingHorizontal: 18,
-                            paddingVertical: 8,
-                            borderRadius: 8,
-                            backgroundColor: '#1D4533',
-                          }}
+                          style={styles.btnPrimary}
                           onPress={handleSaveProfile}
                           disabled={isSaving}
                         >
@@ -3284,7 +3445,7 @@ export default function ProfilePage({
                           ) : (
                             <>
                               <BootstrapIcon name="check2" size={14} color="#FFFFFF" />
-                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>Save Changes</Text>
+                              <Text style={styles.btnPrimaryText}>Save Changes</Text>
                             </>
                           )}
                         </TouchableOpacity>
@@ -3293,22 +3454,9 @@ export default function ProfilePage({
                   )}
                 </View>
 
-                {/* 3. Garage & Delivery Information Card (Matching "Education Information" layout from image) */}
-                <View
-                  style={{
-                    backgroundColor: isDarkMode ? tokens.cardBg : '#FFFFFF',
-                    borderColor: isDarkMode ? tokens.border : '#E2E8F0',
-                    borderWidth: 1,
-                    borderRadius: 14,
-                    padding: isSmallMobile ? 18 : 24,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.04,
-                    shadowRadius: 3,
-                    elevation: 1,
-                  }}
-                >
-                  {/* Card Header with Section Title and [ ✎ Edit ] Button */}
+                {/* 3. Garage & Delivery Information Card */}
+                <View style={styles.sectionCard}>
+                  {/* Card Header with Section Title and [Edit] Button */}
                   <View
                     style={{
                       flexDirection: 'row',
@@ -3317,51 +3465,58 @@ export default function ProfilePage({
                       marginBottom: 20,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: isSmallMobile ? 16 : 17,
-                        fontWeight: '700',
-                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                      }}
-                    >
-                      Garage & Delivery Information
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          backgroundColor: tokens.brandLight,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 1,
+                          borderColor: tokens.brandBorder,
+                        }}
+                      >
+                        <BootstrapIcon name="wrench-adjustable" size={14} color="#1D4533" />
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '800',
+                          color: tokens.textPrimary,
+                          letterSpacing: -0.2,
+                        }}
+                      >
+                        Garage & Delivery Information
+                      </Text>
+                    </View>
 
                     <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
-                        paddingHorizontal: 12,
-                        paddingVertical: 6,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: '#CBD5E1',
-                        backgroundColor: isEditingGarageInfo ? '#F1F5F9' : '#FFFFFF',
-                      }}
+                      style={styles.btnSecondary}
                       onPress={() => setIsEditingGarageInfo(!isEditingGarageInfo)}
                       activeOpacity={0.7}
                     >
                       <BootstrapIcon
-                        name={isEditingGarageInfo ? 'x-lg' : 'pencil'}
+                        name={isEditingGarageInfo ? 'x-lg' : 'pencil-square'}
                         size={12}
-                        color="#334155"
+                        color={tokens.brandPrimary}
                       />
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>
-                        {isEditingGarageInfo ? 'Cancel' : 'Edit'}
+                      <Text style={styles.btnSecondaryText}>
+                        {isEditingGarageInfo ? 'Cancel' : 'Edit Information'}
                       </Text>
                     </TouchableOpacity>
                   </View>
 
                   {!isEditingGarageInfo ? (
-                    <View style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
-                      {/* Section 1 (like "Institution 2" in inspiration image) */}
+                    <View style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                      {/* Section 1: Primary Motorcycle */}
                       <View>
                         <Text
                           style={{
                             fontSize: 13,
                             fontWeight: '700',
-                            color: isDarkMode ? tokens.textPrimary : '#1E293B',
+                            color: tokens.textPrimary,
                             marginBottom: 10,
                           }}
                         >
@@ -3375,53 +3530,53 @@ export default function ProfilePage({
                           }}
                         >
                           <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 150 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
-                              School / Brand
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+                              Motorcycle Brand
                             </Text>
-                            <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                            <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
                               {bikeBrand || 'Yamaha'}
                             </Text>
                           </View>
 
                           <View style={{ flex: 1.2, minWidth: isSmallMobile ? '100%' : 170 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                               Model & Displacement
                             </Text>
-                            <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                            <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
                               {bikeModel || 'NMAX 155'}
                             </Text>
                           </View>
 
                           <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 140 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
-                              Plate / MV File No.
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+                              Plate / Registration
                             </Text>
-                            <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                            <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
                               {bikePlate || 'NM-4892'}
                             </Text>
                           </View>
 
                           <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 140 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                               Odometer Reading
                             </Text>
-                            <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                            <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
                               {bikeOdo || '12,400 km'}
                             </Text>
                           </View>
                         </View>
                       </View>
 
-                      {/* Divider */}
-                      <View style={{ height: 1, backgroundColor: isDarkMode ? tokens.border : '#F1F5F9' }} />
+                      {/* Subtle Divider */}
+                      <View style={{ height: 1, backgroundColor: tokens.border }} />
 
-                      {/* Section 2 (like "Institution 1" in inspiration image) */}
+                      {/* Section 2: Default Delivery Destination */}
                       <View>
                         <Text
                           style={{
                             fontSize: 13,
                             fontWeight: '700',
-                            color: isDarkMode ? tokens.textPrimary : '#1E293B',
+                            color: tokens.textPrimary,
                             marginBottom: 10,
                           }}
                         >
@@ -3435,37 +3590,37 @@ export default function ProfilePage({
                           }}
                         >
                           <View style={{ flex: 1.5, minWidth: isSmallMobile ? '100%' : 200 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                               Street Address
                             </Text>
-                            <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: tokens.textPrimary, lineHeight: 19 }}>
                               {address || "D'Blockchain Motorparts, South Poblacion"}
                             </Text>
                           </View>
 
                           <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 140 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
-                              City / Barangay
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
+                              City / Region
                             </Text>
-                            <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: tokens.textPrimary, lineHeight: 19 }}>
                               {city || 'City of Naga'}
                             </Text>
                           </View>
 
                           <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 140 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                               Contact Phone
                             </Text>
-                            <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                            <Text style={{ fontSize: 14, fontWeight: '600', color: tokens.textPrimary, lineHeight: 19 }}>
                               {phone || '+63 912 345 6789'}
                             </Text>
                           </View>
 
                           <View style={{ flex: 1.5, minWidth: isSmallMobile ? '100%' : 180 }}>
-                            <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                               Delivery Instructions
                             </Text>
-                            <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                            <Text style={{ fontSize: 14, fontWeight: '500', color: tokens.textSecondary, lineHeight: 19 }}>
                               {deliveryNotes || 'Leave at front gate / contact on delivery'}
                             </Text>
                           </View>
@@ -3476,7 +3631,7 @@ export default function ProfilePage({
                     /* Edit Garage & Delivery Mode */
                     <View style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
                       {/* Motorcycle Specs */}
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B' }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary }}>
                         Primary Motorcycle Details
                       </Text>
                       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 4 }}>
@@ -3489,15 +3644,15 @@ export default function ProfilePage({
                               paddingVertical: 4,
                               borderRadius: 6,
                               borderWidth: 1,
-                              borderColor: bikeBrand === b ? '#1D4533' : '#CBD5E1',
-                              backgroundColor: bikeBrand === b ? '#E8F0EC' : '#F8FAFC',
+                              borderColor: bikeBrand === b ? '#1D4533' : tokens.border,
+                              backgroundColor: bikeBrand === b ? tokens.brandLight : tokens.bgSub,
                             }}
                           >
                             <Text
                               style={{
                                 fontSize: 12,
                                 fontWeight: bikeBrand === b ? '700' : '500',
-                                color: bikeBrand === b ? '#1D4533' : '#475569',
+                                color: bikeBrand === b ? '#1D4533' : tokens.textSecondary,
                               }}
                             >
                               {b}
@@ -3508,136 +3663,82 @@ export default function ProfilePage({
 
                       <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 12 }}>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
-                            Brand / Make
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
+                            Motorcycle Brand
                           </Text>
                           <TextInput
                             value={bikeBrand}
                             onChangeText={setBikeBrand}
                             placeholder="e.g. Yamaha"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             Model & Spec
                           </Text>
                           <TextInput
                             value={bikeModel}
                             onChangeText={setBikeModel}
                             placeholder="e.g. NMAX 155 ABS"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
-                            Plate / MV File No.
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
+                            Plate / Registration
                           </Text>
                           <TextInput
                             value={bikePlate}
                             onChangeText={setBikePlate}
                             placeholder="e.g. NM-4892"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             Odometer Reading
                           </Text>
                           <TextInput
                             value={bikeOdo}
                             onChangeText={setBikeOdo}
                             placeholder="e.g. 12,400 km"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
                       </View>
 
                       {/* Delivery Address */}
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginTop: 8 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary, marginTop: 8 }}>
                         Delivery Destination & Notes
                       </Text>
                       <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 12 }}>
                         <View style={{ flex: 2 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             Delivery Street Address
                           </Text>
                           <TextInput
                             value={address}
                             onChangeText={setAddress}
                             placeholder="Street, Barangay, Landmark"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
                         <View style={{ flex: 1.5 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             Delivery Instructions
                           </Text>
                           <TextInput
                             value={deliveryNotes}
                             onChangeText={setDeliveryNotes}
                             placeholder="e.g. Call before arrival"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
+                            placeholderTextColor={tokens.textMuted}
+                            style={[styles.inputBox, { backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
                           />
                         </View>
                       </View>
@@ -3645,29 +3746,14 @@ export default function ProfilePage({
                       {/* Action buttons */}
                       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
                         <TouchableOpacity
-                          style={{
-                            paddingHorizontal: 16,
-                            paddingVertical: 8,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: '#CBD5E1',
-                            backgroundColor: '#FFFFFF',
-                          }}
+                          style={styles.btnSecondary}
                           onPress={() => setIsEditingGarageInfo(false)}
                         >
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>Cancel</Text>
+                          <Text style={styles.btnSecondaryText}>Cancel</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                            paddingHorizontal: 18,
-                            paddingVertical: 8,
-                            borderRadius: 8,
-                            backgroundColor: '#1D4533',
-                          }}
+                          style={styles.btnPrimary}
                           onPress={handleSaveProfile}
                           disabled={isSaving}
                         >
@@ -3676,7 +3762,7 @@ export default function ProfilePage({
                           ) : (
                             <>
                               <BootstrapIcon name="check2" size={14} color="#FFFFFF" />
-                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>Save Details</Text>
+                              <Text style={styles.btnPrimaryText}>Save Details</Text>
                             </>
                           )}
                         </TouchableOpacity>
@@ -3686,20 +3772,7 @@ export default function ProfilePage({
                 </View>
 
                 {/* 4. Account Security & Credentials Card */}
-                <View
-                  style={{
-                    backgroundColor: isDarkMode ? tokens.cardBg : '#FFFFFF',
-                    borderColor: isDarkMode ? tokens.border : '#E2E8F0',
-                    borderWidth: 1,
-                    borderRadius: 14,
-                    padding: isSmallMobile ? 18 : 24,
-                    shadowColor: '#000',
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.04,
-                    shadowRadius: 3,
-                    elevation: 1,
-                  }}
-                >
+                <View style={styles.sectionCard}>
                   <View
                     style={{
                       flexDirection: 'row',
@@ -3708,38 +3781,45 @@ export default function ProfilePage({
                       marginBottom: 20,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: isSmallMobile ? 16 : 17,
-                        fontWeight: '700',
-                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                      }}
-                    >
-                      Account Security & Credentials
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <View
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          backgroundColor: tokens.brandLight,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 1,
+                          borderColor: tokens.brandBorder,
+                        }}
+                      >
+                        <BootstrapIcon name="shield-lock-fill" size={14} color="#1D4533" />
+                      </View>
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '800',
+                          color: tokens.textPrimary,
+                          letterSpacing: -0.2,
+                        }}
+                      >
+                        Account Security & Credentials
+                      </Text>
+                    </View>
 
                     <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
-                        paddingHorizontal: 12,
-                        paddingVertical: 6,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: '#CBD5E1',
-                        backgroundColor: isEditingSecurity ? '#F1F5F9' : '#FFFFFF',
-                      }}
+                      style={styles.btnSecondary}
                       onPress={() => setIsEditingSecurity(!isEditingSecurity)}
                       activeOpacity={0.7}
                     >
                       <BootstrapIcon
-                        name={isEditingSecurity ? 'x-lg' : 'pencil'}
+                        name={isEditingSecurity ? 'x-lg' : 'key'}
                         size={12}
-                        color="#334155"
+                        color={tokens.brandPrimary}
                       />
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>
-                        {isEditingSecurity ? 'Cancel' : 'Edit'}
+                      <Text style={styles.btnSecondaryText}>
+                        {isEditingSecurity ? 'Cancel' : 'Change Password'}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -3753,37 +3833,37 @@ export default function ProfilePage({
                       }}
                     >
                       <View style={{ flex: 1.2, minWidth: isSmallMobile ? '100%' : 180 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                           Login Email
                         </Text>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
                           {currentUser?.email || 'customer@mototrack.com'}
                         </Text>
                       </View>
 
                       <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 150 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                           Password Status
                         </Text>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary }}>
                           •••••••••••• (Encrypted)
                         </Text>
                       </View>
 
                       <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 150 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                           Security Protection
                         </Text>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#16A34A' }}>
+                        <Text style={{ fontSize: 14.5, fontWeight: '700', color: '#16A34A' }}>
                           ✓ Protected (Active)
                         </Text>
                       </View>
 
                       <View style={{ flex: 1, minWidth: isSmallMobile ? '100%' : 140 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '500', color: '#94A3B8', marginBottom: 4 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 4 }}>
                           Account Tier
                         </Text>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#1D4533' }}>
+                        <Text style={{ fontSize: 14.5, fontWeight: '700', color: '#1D4533' }}>
                           Verified Customer
                         </Text>
                       </View>
@@ -3793,86 +3873,76 @@ export default function ProfilePage({
                     <View style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                       <View style={{ flexDirection: isSmallMobile ? 'column' : 'row', gap: 12 }}>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             Current Password
                           </Text>
-                          <TextInput
-                            value={currentPwd}
-                            onChangeText={setCurrentPwd}
-                            secureTextEntry
-                            placeholder="Enter current password"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
-                          />
+                          <View style={{ position: 'relative', justifyContent: 'center' }}>
+                            <TextInput
+                              value={currentPwd}
+                              onChangeText={setCurrentPwd}
+                              secureTextEntry={!showCurrentPwd}
+                              placeholder="Enter current password"
+                              placeholderTextColor={tokens.textMuted}
+                              style={[styles.inputBox, { paddingRight: 40, backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
+                            />
+                            <TouchableOpacity
+                              style={{ position: 'absolute', right: 12, padding: 4 }}
+                              onPress={() => setShowCurrentPwd(!showCurrentPwd)}
+                            >
+                              <BootstrapIcon name={showCurrentPwd ? 'eye-slash' : 'eye'} size={15} color={tokens.textMuted} />
+                            </TouchableOpacity>
+                          </View>
                         </View>
 
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             New Password
                           </Text>
-                          <TextInput
-                            value={newPwd}
-                            onChangeText={setNewPwd}
-                            secureTextEntry
-                            placeholder="Min 8 characters"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
-                          />
+                          <View style={{ position: 'relative', justifyContent: 'center' }}>
+                            <TextInput
+                              value={newPwd}
+                              onChangeText={setNewPwd}
+                              secureTextEntry={!showNewPwd}
+                              placeholder="Min 8 characters"
+                              placeholderTextColor={tokens.textMuted}
+                              style={[styles.inputBox, { paddingRight: 40, backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
+                            />
+                            <TouchableOpacity
+                              style={{ position: 'absolute', right: 12, padding: 4 }}
+                              onPress={() => setShowNewPwd(!showNewPwd)}
+                            >
+                              <BootstrapIcon name={showNewPwd ? 'eye-slash' : 'eye'} size={15} color={tokens.textMuted} />
+                            </TouchableOpacity>
+                          </View>
                         </View>
 
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textSecondary, marginBottom: 6 }}>
                             Confirm New Password
                           </Text>
-                          <TextInput
-                            value={confirmPwd}
-                            onChangeText={setConfirmPwd}
-                            secureTextEntry
-                            placeholder="Confirm new password"
-                            placeholderTextColor="#94A3B8"
-                            style={{
-                              borderWidth: 1,
-                              borderColor: '#CBD5E1',
-                              borderRadius: 8,
-                              paddingHorizontal: 12,
-                              paddingVertical: 9,
-                              fontSize: 14,
-                              color: '#0F172A',
-                              backgroundColor: '#FFFFFF',
-                            }}
-                          />
+                          <View style={{ position: 'relative', justifyContent: 'center' }}>
+                            <TextInput
+                              value={confirmPwd}
+                              onChangeText={setConfirmPwd}
+                              secureTextEntry={!showConfirmPwd}
+                              placeholder="Confirm new password"
+                              placeholderTextColor={tokens.textMuted}
+                              style={[styles.inputBox, { paddingRight: 40, backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF' }]}
+                            />
+                            <TouchableOpacity
+                              style={{ position: 'absolute', right: 12, padding: 4 }}
+                              onPress={() => setShowConfirmPwd(!showConfirmPwd)}
+                            >
+                              <BootstrapIcon name={showConfirmPwd ? 'eye-slash' : 'eye'} size={15} color={tokens.textMuted} />
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       </View>
 
                       {/* Password Action Buttons */}
                       <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
                         <TouchableOpacity
-                          style={{
-                            paddingHorizontal: 16,
-                            paddingVertical: 8,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: '#CBD5E1',
-                            backgroundColor: '#FFFFFF',
-                          }}
+                          style={styles.btnSecondary}
                           onPress={() => {
                             setIsEditingSecurity(false);
                             setCurrentPwd('');
@@ -3880,19 +3950,11 @@ export default function ProfilePage({
                             setConfirmPwd('');
                           }}
                         >
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#475569' }}>Cancel</Text>
+                          <Text style={styles.btnSecondaryText}>Cancel</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                            paddingHorizontal: 18,
-                            paddingVertical: 8,
-                            borderRadius: 8,
-                            backgroundColor: '#1D4533',
-                          }}
+                          style={styles.btnPrimary}
                           onPress={async () => {
                             await handleChangePassword();
                             setIsEditingSecurity(false);
@@ -3904,9 +3966,7 @@ export default function ProfilePage({
                           ) : (
                             <>
                               <BootstrapIcon name="shield-lock" size={14} color="#FFFFFF" />
-                              <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
-                                Update Password
-                              </Text>
+                              <Text style={styles.btnPrimaryText}>Update Password</Text>
                             </>
                           )}
                         </TouchableOpacity>
@@ -3917,100 +3977,459 @@ export default function ProfilePage({
               </View>
             )}
 
-            {/* TAB 5: NOTIFICATIONS                                      */}
+            {/* ───────────────────────────────────────────────────────── */}
+            {/* TAB 5: NOTIFICATIONS & ALERTS                             */}
             {/* ───────────────────────────────────────────────────────── */}
             {activeTab === 'notifications' && (
               <View>
-                <View style={styles.sectionCard}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-                    <Text style={{ fontSize: 18, fontWeight: '900', color: tokens.textPrimary }}>
-                      Alerts & Messages ({notifications.length})
-                    </Text>
-
-                    <View style={{ flexDirection: 'row', gap: 6 }}>
-                      {['All', 'order', 'booking', 'security'].map((f) => (
-                        <TouchableOpacity
-                          key={f}
+                <View
+                  style={{
+                    backgroundColor: tokens.bgCard,
+                    borderRadius: 16,
+                    borderWidth: 1.5,
+                    borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.10)' : '#A7F3D0',
+                    shadowColor: '#000000',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.04,
+                    shadowRadius: 10,
+                    elevation: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: Platform.OS === 'web' ? 'calc(100vh - 160px)' : 640,
+                    maxHeight: 880,
+                    minHeight: 520,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* ─── 1. FIXED TOP CONTROLS (HEADER, SEARCH, FILTERS) ─── */}
+                  <View
+                    style={{
+                      paddingHorizontal: isSmallMobile ? 14 : 20,
+                      paddingTop: 18,
+                      paddingBottom: 14,
+                      borderBottomWidth: 1,
+                      borderBottomColor: tokens.border,
+                      backgroundColor: tokens.bgCard,
+                      zIndex: 10,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 2 },
+                      shadowOpacity: 0.03,
+                      shadowRadius: 4,
+                      elevation: 2,
+                    }}
+                  >
+                    {/* Header Row */}
+                    <View
+                      style={{
+                        flexDirection: isSmallMobile ? 'column' : 'row',
+                        alignItems: isSmallMobile ? 'flex-start' : 'center',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        marginBottom: 14,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View
                           style={{
-                            backgroundColor: notifFilter === f ? '#1D4533' : tokens.bgSub,
-                            paddingHorizontal: 12,
-                            paddingVertical: 5,
-                            borderRadius: 16,
+                            width: 40,
+                            height: 40,
+                            borderRadius: 12,
+                            backgroundColor: tokens.brandLight,
+                            alignItems: 'center',
+                            justifyContent: 'center',
                             borderWidth: 1,
-                            borderColor: notifFilter === f ? '#1D4533' : tokens.border,
+                            borderColor: tokens.brandBorder,
                           }}
-                          onPress={() => setNotifFilter(f)}
                         >
-                          <Text
-                            style={{
-                              fontSize: 11.5,
-                              fontWeight: notifFilter === f ? '800' : '600',
-                              color: notifFilter === f ? '#FFFFFF' : tokens.textSecondary,
-                              textTransform: 'capitalize',
-                            }}
-                          >
-                            {f}
+                          <BootstrapIcon name="bell-fill" size={18} color="#1D4533" />
+                        </View>
+                        <View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Text style={{ fontSize: 18, fontWeight: '900', color: tokens.textPrimary, letterSpacing: -0.3 }}>
+                              Notifications & Alerts
+                            </Text>
+                            {unreadNotifCount > 0 && (
+                              <View
+                                style={{
+                                  backgroundColor: '#E11D48',
+                                  paddingHorizontal: 7,
+                                  paddingVertical: 2,
+                                  borderRadius: 10,
+                                }}
+                              >
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF' }}>
+                                  {unreadNotifCount} NEW
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                          <Text style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 2 }}>
+                            Updates on your orders, pit bay bookings, deliveries, and promotions
                           </Text>
+                        </View>
+                      </View>
+
+                      {/* Top Action Button: Mark all read */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        {unreadNotifCount > 0 && (
+                          <TouchableOpacity
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                              paddingHorizontal: 12,
+                              paddingVertical: 7,
+                              borderRadius: 8,
+                              backgroundColor: tokens.bgSub,
+                              borderWidth: 1,
+                              borderColor: tokens.border,
+                              cursor: 'pointer',
+                            }}
+                            onPress={handleMarkAllNotifsRead}
+                            activeOpacity={0.8}
+                          >
+                            <BootstrapIcon name="check2-all" size={13} color="#1D4533" />
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>
+                              Mark all read
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Search Input Bar */}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: tokens.bgSub,
+                        borderRadius: 10,
+                        borderWidth: 1,
+                        borderColor: tokens.border,
+                        paddingHorizontal: 12,
+                        paddingVertical: Platform.OS === 'web' ? 8 : 4,
+                        marginBottom: 12,
+                        gap: 8,
+                      }}
+                    >
+                      <BootstrapIcon name="search" size={14} color={tokens.textMuted} />
+                      <TextInput
+                        style={{
+                          flex: 1,
+                          fontSize: 13,
+                          color: tokens.textPrimary,
+                          padding: 0,
+                          outlineStyle: 'none',
+                        }}
+                        placeholder="Search notifications by keyword, order #, item, ticket..."
+                        placeholderTextColor={tokens.textMuted}
+                        value={notifSearchQuery}
+                        onChangeText={setNotifSearchQuery}
+                      />
+                      {Boolean(notifSearchQuery) && (
+                        <TouchableOpacity onPress={() => setNotifSearchQuery('')} activeOpacity={0.7} style={{ cursor: 'pointer' }}>
+                          <BootstrapIcon name="x-circle-fill" size={14} color={tokens.textMuted} />
                         </TouchableOpacity>
-                      ))}
+                      )}
+                    </View>
+
+                    {/* Filter Pills */}
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {[
+                        { id: 'All', label: `All (${notifications.length})` },
+                        { id: 'order', label: `Orders (${orderNotifsCount})` },
+                        { id: 'booking', label: `Pit Bay (${bookingNotifsCount})` },
+                        { id: 'promo', label: `Promotions (${promoNotifsCount})` },
+                        { id: 'security', label: `Security (${securityNotifsCount})` },
+                        { id: 'unread', label: `Unread (${unreadNotifCount})` },
+                      ].map((f) => {
+                        const isSelected = notifFilter === f.id;
+                        return (
+                          <TouchableOpacity
+                            key={f.id}
+                            style={{
+                              backgroundColor: isSelected ? '#1D4533' : tokens.bgSub,
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 16,
+                              borderWidth: 1,
+                              borderColor: isSelected ? '#1D4533' : tokens.border,
+                              cursor: 'pointer',
+                            }}
+                            onPress={() => setNotifFilter(f.id)}
+                            activeOpacity={0.75}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: isSelected ? '800' : '600',
+                                color: isSelected ? '#FFFFFF' : tokens.textSecondary,
+                              }}
+                            >
+                              {f.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
                   </View>
 
-                  {filteredNotifications.length === 0 ? (
-                    <View style={{ paddingVertical: 32, alignItems: 'center' }}>
-                      <BootstrapIcon name="bell-slash" size={36} color={tokens.textMuted} />
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: tokens.textPrimary, marginTop: 10 }}>
-                        No notifications
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={{ gap: 10 }}>
-                      {filteredNotifications.map((n) => (
+                  {/* ─── 2. DEDICATED SCROLLABLE NOTIFICATION FEED ─── */}
+                  <ScrollView
+                    style={{ flex: 1, paddingHorizontal: isSmallMobile ? 14 : 20 }}
+                    contentContainerStyle={{ paddingVertical: 16, gap: 18 }}
+                    showsVerticalScrollIndicator={true}
+                  >
+                    {groupedNotifications.length === 0 ? (
+                      <View style={{ paddingVertical: 48, alignItems: 'center' }}>
                         <View
-                          key={n.id}
                           style={{
+                            width: 56,
+                            height: 56,
+                            borderRadius: 28,
                             backgroundColor: tokens.bgSub,
-                            borderWidth: 1,
-                            borderColor: tokens.border,
-                            borderRadius: 12,
-                            padding: 14,
-                            flexDirection: 'row',
-                            gap: 12,
-                            alignItems: 'flex-start',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 12,
                           }}
                         >
+                          <BootstrapIcon name="bell-slash" size={26} color={tokens.textMuted} />
+                        </View>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary }}>
+                          {notifSearchQuery ? 'No matching notifications' : 'No notifications yet'}
+                        </Text>
+                        <Text style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 4 }}>
+                          {notifSearchQuery
+                            ? 'Try searching with different keywords.'
+                            : "We'll notify you about orders, pit bay bookings, and specials."}
+                        </Text>
+                      </View>
+                    ) : (
+                      groupedNotifications.map((group) => (
+                        <View key={group.key} style={{ gap: 8 }}>
+                          {/* Date Section Heading (New, Today, Yesterday, Earlier) */}
                           <View
                             style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: 18,
-                              backgroundColor: n.type === 'order' ? '#EFF6FF' : n.type === 'booking' ? '#FEF3C7' : '#FEE2E2',
-                              justifyContent: 'center',
+                              flexDirection: 'row',
                               alignItems: 'center',
+                              justifyContent: 'space-between',
+                              paddingVertical: 4,
+                              paddingHorizontal: 2,
                             }}
                           >
-                            <BootstrapIcon
-                              name={n.type === 'order' ? 'bag-check-fill' : n.type === 'booking' ? 'tools' : 'shield-exclamation'}
-                              size={16}
-                              color={n.type === 'order' ? '#2563EB' : n.type === 'booking' ? '#D97706' : '#DC2626'}
-                            />
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <Text
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: '800',
+                                  color: tokens.textPrimary,
+                                  letterSpacing: 0.3,
+                                  textTransform: 'uppercase',
+                                }}
+                              >
+                                {group.title}
+                              </Text>
+                              {group.badge && (
+                                <View
+                                  style={{
+                                    backgroundColor: 'rgba(29, 69, 51, 0.12)',
+                                    paddingHorizontal: 7,
+                                    paddingVertical: 2,
+                                    borderRadius: 8,
+                                  }}
+                                >
+                                  <Text style={{ fontSize: 10, fontWeight: '800', color: '#1D4533' }}>
+                                    {group.badge}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
                           </View>
 
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 13.5, fontWeight: '800', color: tokens.textPrimary }}>
-                              {n.title}
-                            </Text>
-                            <Text style={{ fontSize: 12, color: tokens.textSecondary, marginTop: 3, lineHeight: 18 }}>
-                              {n.message}
-                            </Text>
-                            <Text style={{ fontSize: 11, color: tokens.textMuted, marginTop: 4 }}>
-                              {n.timestamp || n.created_at || 'Just now'}
-                            </Text>
+                          {/* Group Items Feed */}
+                          <View style={{ gap: 10 }}>
+                            {group.items.map((n) => {
+                              const isUnread = n.status === 'unread';
+                              const isExpanded = expandedNotifIds.has(n.id);
+                              const metaTheme = getNotifTheme(n.type, n.category);
+                              const actionLabel = getNotifActionLabel(n);
+
+                              return (
+                                <View
+                                  key={n.id}
+                                  style={{
+                                    backgroundColor: isUnread
+                                      ? (isDarkMode ? 'rgba(29, 69, 51, 0.14)' : '#FAF9F6')
+                                      : (isDarkMode ? '#141A18' : '#FFFFFF'),
+                                    borderWidth: 1,
+                                    borderColor: isUnread ? '#D4D4D8' : tokens.border,
+                                    borderRadius: 16,
+                                    shadowColor: '#000000',
+                                    shadowOffset: { width: 0, height: 2 },
+                                    shadowOpacity: 0.03,
+                                    shadowRadius: 6,
+                                    elevation: 1,
+                                    overflow: 'hidden',
+                                  }}
+                                >
+                                  {/* Top Clickable Summary Row */}
+                                  <TouchableOpacity
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'flex-start',
+                                      justifyContent: 'space-between',
+                                      padding: 16,
+                                      gap: 14,
+                                      cursor: 'pointer',
+                                    }}
+                                    onPress={() => {
+                                      if (isUnread) handleMarkSingleNotifRead(n.id);
+                                      setExpandedNotifIds((prev) => {
+                                        const next = new Set(prev);
+                                        if (next.has(n.id)) next.delete(n.id);
+                                        else next.add(n.id);
+                                        return next;
+                                      });
+                                    }}
+                                    activeOpacity={0.8}
+                                  >
+                                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14, flex: 1, minWidth: 0 }}>
+                                      {/* Soft Icon Circle */}
+                                      <View
+                                        style={{
+                                          width: 38,
+                                          height: 38,
+                                          borderRadius: 19,
+                                          backgroundColor: metaTheme.bg,
+                                          justifyContent: 'center',
+                                          alignItems: 'center',
+                                          flexShrink: 0,
+                                          marginTop: 2,
+                                        }}
+                                      >
+                                        <BootstrapIcon
+                                          name={metaTheme.icon}
+                                          size={16}
+                                          color={metaTheme.color}
+                                        />
+                                      </View>
+
+                                      <View style={{ flex: 1, minWidth: 0 }}>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                          <Text
+                                            style={{
+                                              fontSize: 14,
+                                              fontWeight: isUnread ? '700' : '600',
+                                              color: tokens.textPrimary,
+                                              lineHeight: 20,
+                                            }}
+                                          >
+                                            {stripEmojis(n.title)}
+                                          </Text>
+                                          {isUnread && (
+                                            <View
+                                              style={{
+                                                width: 6,
+                                                height: 6,
+                                                borderRadius: 3,
+                                                backgroundColor: '#1D4533',
+                                              }}
+                                            />
+                                          )}
+                                        </View>
+
+                                        {!isExpanded && (
+                                          <Text
+                                            style={{
+                                              fontSize: 13,
+                                              color: tokens.textMuted,
+                                              marginTop: 3,
+                                              lineHeight: 18,
+                                            }}
+                                            numberOfLines={1}
+                                          >
+                                            {stripEmojis(n.message)}
+                                          </Text>
+                                        )}
+                                      </View>
+                                    </View>
+
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 0, marginTop: 4 }}>
+                                      <Text style={{ fontSize: 12, color: tokens.textMuted }}>
+                                        {formatNotifTime(n.created_at || n.timestamp)}
+                                      </Text>
+                                      <BootstrapIcon
+                                        name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                                        size={14}
+                                        color="#8E8E93"
+                                      />
+                                    </View>
+                                  </TouchableOpacity>
+
+                                  {/* Expanded Body */}
+                                  {isExpanded && (
+                                    <View style={{ paddingHorizontal: 16, paddingBottom: 16, paddingTop: 0 }}>
+                                      <Text
+                                        style={{
+                                          fontSize: 13.5,
+                                          color: tokens.textSecondary,
+                                          lineHeight: 21,
+                                          paddingLeft: 52,
+                                          marginTop: 2,
+                                        }}
+                                      >
+                                        {stripEmojis(n.message)}
+                                      </Text>
+
+                                      {/* Divider */}
+                                      <View
+                                        style={{
+                                          height: 1,
+                                          backgroundColor: tokens.border,
+                                          marginVertical: 12,
+                                          marginLeft: 52,
+                                        }}
+                                      />
+
+                                      {/* Footer */}
+                                      <View
+                                        style={{
+                                          flexDirection: 'row',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          paddingLeft: 52,
+                                        }}
+                                      >
+                                        <TouchableOpacity
+                                          onPress={() => handleNotifAction(n)}
+                                          activeOpacity={0.7}
+                                          style={{ cursor: 'pointer' }}
+                                        >
+                                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4533' }}>
+                                            {actionLabel} · {metaTheme.label}
+                                          </Text>
+                                        </TouchableOpacity>
+
+                                        <TouchableOpacity
+                                          onPress={() => handleDeleteNotif(n.id)}
+                                          activeOpacity={0.7}
+                                          title="Dismiss notification"
+                                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                                        >
+                                          <BootstrapIcon name="trash3" size={13} color="#71717A" />
+                                          <Text style={{ fontSize: 12, color: '#71717A', fontWeight: '500' }}>Dismiss</Text>
+                                        </TouchableOpacity>
+                                      </View>
+                                    </View>
+                                  )}
+                                </View>
+                              );
+                            })}
                           </View>
                         </View>
-                      ))}
-                    </View>
-                  )}
+                      ))
+                    )}
+                  </ScrollView>
                 </View>
               </View>
             )}
@@ -4020,7 +4439,7 @@ export default function ProfilePage({
             {/* ───────────────────────────────────────────────────────── */}
             {activeTab === 'settings' && (
               <View>
-                {/* 1. Customer Profile Information Card (Read-Only with Modal Edit Button) */}
+                {/* 1. Customer Information & Settings Card */}
                 <View style={[styles.sectionCard, { marginBottom: 20 }]}>
                   <View
                     style={{
@@ -4028,8 +4447,8 @@ export default function ProfilePage({
                       alignItems: isSmallMobile ? 'flex-start' : 'center',
                       justifyContent: 'space-between',
                       gap: 12,
-                      marginBottom: 20,
-                      paddingBottom: 16,
+                      marginBottom: 16,
+                      paddingBottom: 14,
                       borderBottomWidth: 1,
                       borderBottomColor: tokens.border,
                     }}
@@ -4037,68 +4456,56 @@ export default function ProfilePage({
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                       <View
                         style={{
-                          width: 40,
-                          height: 40,
+                          width: 36,
+                          height: 36,
                           borderRadius: 10,
-                          backgroundColor: '#E8F0EC',
+                          backgroundColor: tokens.brandLight,
                           alignItems: 'center',
                           justifyContent: 'center',
                           borderWidth: 1,
-                          borderColor: '#C8DDD3',
+                          borderColor: tokens.brandBorder,
                         }}
                       >
-                        <BootstrapIcon name="person-vcard-fill" size={20} color="#1D4533" />
+                        <BootstrapIcon name="person-vcard-fill" size={17} color="#1D4533" />
                       </View>
                       <View>
-                        <Text style={{ fontSize: 17, fontWeight: '800', color: tokens.textPrimary, letterSpacing: -0.2 }}>
+                        <Text style={{ fontSize: 16.5, fontWeight: '800', color: tokens.textPrimary, letterSpacing: -0.2 }}>
                           Customer Information & Settings
                         </Text>
                         <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>
-                          Review your registered rider information, phone number, and delivery destination
+                          Review your registered rider information, contact details, and destination
                         </Text>
                       </View>
                     </View>
 
                     <TouchableOpacity
-                      style={[
-                        styles.addBtnPrimary,
-                        {
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          paddingHorizontal: 16,
-                          paddingVertical: 9,
-                          backgroundColor: '#1D4533',
-                        },
-                      ]}
+                      style={styles.btnPrimary}
                       onPress={() => setIsEditSettingsModalOpen(true)}
                       activeOpacity={0.85}
                     >
-                      <BootstrapIcon name="pencil-square" size={14} color="#FFFFFF" />
-                      <Text style={[styles.addBtnPrimaryText, { fontSize: 13 }]}>
-                        Edit Information
-                      </Text>
+                      <BootstrapIcon name="pencil-square" size={13} color="#FFFFFF" />
+                      <Text style={styles.btnPrimaryText}>Edit Information</Text>
                     </TouchableOpacity>
                   </View>
 
-                  {/* Readable Details Grid */}
-                  <View style={{ gap: 16 }}>
+                  {/* 2-Column Responsive Information Grid */}
+                  <View style={{ gap: 12 }}>
                     {/* Row 1: Name and Email */}
-                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16 }}>
+                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
                       <View
                         style={{
                           flex: 1,
                           backgroundColor: tokens.bgSub,
-                          padding: 14,
+                          padding: 13,
                           borderRadius: 12,
                           borderWidth: 1,
                           borderColor: tokens.border,
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                           Full Customer Name
                         </Text>
-                        <Text style={{ fontSize: 14.5, fontWeight: '800', color: tokens.textPrimary, marginTop: 4 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: tokens.textPrimary, marginTop: 3 }}>
                           {userDisplayName}
                         </Text>
                       </View>
@@ -4107,89 +4514,91 @@ export default function ProfilePage({
                         style={{
                           flex: 1,
                           backgroundColor: tokens.bgSub,
-                          padding: 14,
+                          padding: 13,
                           borderRadius: 12,
                           borderWidth: 1,
                           borderColor: tokens.border,
                         }}
                       >
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                             Account Email Address
                           </Text>
                           <View
                             style={{
-                              backgroundColor: '#DCFCE7',
+                              backgroundColor: tokens.statusSuccessBg,
                               paddingHorizontal: 7,
-                              paddingVertical: 2,
-                              borderRadius: 6,
+                              paddingVertical: 1.5,
+                              borderRadius: 5,
+                              borderWidth: 1,
+                              borderColor: tokens.statusSuccessBorder,
                             }}
                           >
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#166534' }}>Verified</Text>
+                            <Text style={{ fontSize: 10, fontWeight: '800', color: tokens.statusSuccessText }}>Verified</Text>
                           </View>
                         </View>
-                        <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary, marginTop: 4 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary, marginTop: 3 }}>
                           {currentUser?.email || 'N/A'}
                         </Text>
                       </View>
                     </View>
 
-                    {/* Row 2: Phone and Delivery Address */}
-                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16 }}>
+                    {/* Row 2: Phone and Delivery Destination */}
+                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
                       <View
                         style={{
                           flex: 1,
                           backgroundColor: tokens.bgSub,
-                          padding: 14,
+                          padding: 13,
                           borderRadius: 12,
                           borderWidth: 1,
                           borderColor: tokens.border,
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                           Contact Phone Number
                         </Text>
-                        <Text style={{ fontSize: 14.5, fontWeight: '700', color: tokens.textPrimary, marginTop: 4 }}>
-                          📞 {currentUser?.phone || phone || 'Not provided'}
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary, marginTop: 3 }}>
+                          {currentUser?.phone || phone || 'Not provided'}
                         </Text>
                       </View>
 
                       <View
                         style={{
-                          flex: 1.5,
+                          flex: 1,
                           backgroundColor: tokens.bgSub,
-                          padding: 14,
+                          padding: 13,
                           borderRadius: 12,
                           borderWidth: 1,
                           borderColor: tokens.border,
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                           Primary Delivery Destination
                         </Text>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary, marginTop: 4 }}>
-                          📍 {currentUser?.address || address ? `${currentUser?.address || address}, ${currentUser?.city || city || 'City of Naga'}, ${currentUser?.country || country || 'Philippines'}` : 'No street address saved'}
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary, marginTop: 3 }} numberOfLines={1}>
+                          {currentUser?.address || address ? `${currentUser?.address || address}, ${currentUser?.city || city || 'City of Naga'}, ${currentUser?.country || country || 'Philippines'}` : 'No street address saved'}
                         </Text>
                       </View>
                     </View>
 
                     {/* Row 3: Bio and Delivery Notes */}
-                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16 }}>
+                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
                       <View
                         style={{
                           flex: 1,
                           backgroundColor: tokens.bgSub,
-                          padding: 14,
+                          padding: 13,
                           borderRadius: 12,
                           borderWidth: 1,
                           borderColor: tokens.border,
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                           Rider Bio / Headline
                         </Text>
-                        <Text style={{ fontSize: 13.5, fontWeight: '600', color: tokens.textSecondary, marginTop: 4 }}>
-                          💬 {currentUser?.bio || bio || 'Motorcycle Enthusiast & Customer'}
+                        <Text style={{ fontSize: 13.5, fontWeight: '600', color: tokens.textSecondary, marginTop: 3 }}>
+                          {currentUser?.bio || bio || 'Motorcycle Enthusiast & Customer'}
                         </Text>
                       </View>
 
@@ -4197,17 +4606,17 @@ export default function ProfilePage({
                         style={{
                           flex: 1,
                           backgroundColor: tokens.bgSub,
-                          padding: 14,
+                          padding: 13,
                           borderRadius: 12,
                           borderWidth: 1,
                           borderColor: tokens.border,
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                           Courier Delivery Instructions
                         </Text>
-                        <Text style={{ fontSize: 13.5, fontWeight: '600', color: tokens.textSecondary, marginTop: 4 }}>
-                          📦 {currentUser?.deliveryNotes || deliveryNotes || 'Leave at front gate / contact on delivery'}
+                        <Text style={{ fontSize: 13.5, fontWeight: '600', color: tokens.textSecondary, marginTop: 3 }}>
+                          {currentUser?.deliveryNotes || deliveryNotes || 'Leave at front gate / contact on delivery'}
                         </Text>
                       </View>
                     </View>
@@ -4218,25 +4627,25 @@ export default function ProfilePage({
                         flexDirection: 'row',
                         flexWrap: 'wrap',
                         alignItems: 'center',
-                        gap: 10,
-                        paddingTop: 8,
+                        gap: 8,
+                        paddingTop: 4,
                       }}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tokens.bgSub, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: tokens.border }}>
-                        <BootstrapIcon name="shield-check" size={13} color="#059669" />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>
-                          Status: Active Customer
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: tokens.bgSub, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: tokens.border }}>
+                        <BootstrapIcon name="shield-check" size={12} color="#059669" />
+                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: tokens.textPrimary }}>
+                          Active Customer
                         </Text>
                       </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tokens.bgSub, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: tokens.border }}>
-                        <BootstrapIcon name="geo-alt-fill" size={13} color="#1D4533" />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>
-                          Hub: {currentUser?.city || city || 'City of Naga, Cebu'}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: tokens.bgSub, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: tokens.border }}>
+                        <BootstrapIcon name="geo-alt-fill" size={12} color="#1D4533" />
+                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: tokens.textPrimary }}>
+                          Hub: {currentUser?.city || city || 'City of Naga'}
                         </Text>
                       </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: tokens.bgSub, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: tokens.border }}>
-                        <BootstrapIcon name="calendar2-check" size={13} color="#2563EB" />
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: tokens.bgSub, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: tokens.border }}>
+                        <BootstrapIcon name="patch-check-fill" size={12} color="#2563EB" />
+                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: tokens.textPrimary }}>
                           Verified Account
                         </Text>
                       </View>
@@ -4244,118 +4653,240 @@ export default function ProfilePage({
                   </View>
                 </View>
 
-                {/* Change Password Card */}
+                {/* 2. Compact Change Password Card */}
+                {(() => {
+                  const hasLength = newPwd.length >= 8;
+                  const hasUpper = /[A-Z]/.test(newPwd);
+                  const hasNumber = /[0-9]/.test(newPwd);
+                  const hasSpecial = /[^A-Za-z0-9]/.test(newPwd);
+                  const score = (hasLength ? 1 : 0) + (hasUpper ? 1 : 0) + (hasNumber ? 1 : 0) + (hasSpecial ? 1 : 0);
+
+                  let strengthLabel = 'Weak';
+                  let strengthColor = '#DC2626';
+                  let strengthPercent = '25%';
+                  if (score === 2) {
+                    strengthLabel = 'Fair';
+                    strengthColor = '#F59E0B';
+                    strengthPercent = '50%';
+                  } else if (score === 3) {
+                    strengthLabel = 'Good';
+                    strengthColor = '#2563EB';
+                    strengthPercent = '75%';
+                  } else if (score === 4) {
+                    strengthLabel = 'Strong';
+                    strengthColor = '#10B981';
+                    strengthPercent = '100%';
+                  }
+
+                  return (
+                    <View style={styles.sectionCard}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                        <View
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            backgroundColor: tokens.brandLight,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: tokens.brandBorder,
+                          }}
+                        >
+                          <BootstrapIcon name="key-fill" size={15} color="#1D4533" />
+                        </View>
+                        <View>
+                          <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary }}>
+                            Change Password
+                          </Text>
+                          <Text style={{ fontSize: 12, color: tokens.textMuted }}>
+                            Keep your rider account secured with strong authentication
+                          </Text>
+                        </View>
+                      </View>
+
+                      <View style={{ gap: 14 }}>
+                        {/* Current Password */}
+                        <View>
+                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                            Current Password
+                          </Text>
+                          <View style={{ position: 'relative', justifyContent: 'center' }}>
+                            <TextInput
+                              style={[styles.inputBox, { paddingRight: 42 }]}
+                              value={currentPwd}
+                              onChangeText={setCurrentPwd}
+                              secureTextEntry={!showCurrentPwd}
+                              placeholder="••••••••"
+                              placeholderTextColor={tokens.textMuted}
+                            />
+                            <TouchableOpacity
+                              style={{ position: 'absolute', right: 12, padding: 6 }}
+                              onPress={() => setShowCurrentPwd(!showCurrentPwd)}
+                              accessibilityLabel={showCurrentPwd ? 'Hide current password' : 'Show current password'}
+                            >
+                              <BootstrapIcon name={showCurrentPwd ? 'eye-slash' : 'eye'} size={15} color={tokens.textMuted} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        {/* New Password & Confirm New Password in 2 Columns */}
+                        <View style={{ flexDirection: windowWidth >= 640 ? 'row' : 'column', gap: 14 }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                              New Password
+                            </Text>
+                            <View style={{ position: 'relative', justifyContent: 'center' }}>
+                              <TextInput
+                                style={[styles.inputBox, { paddingRight: 42 }]}
+                                value={newPwd}
+                                onChangeText={setNewPwd}
+                                secureTextEntry={!showNewPwd}
+                                placeholder="Min 8 characters"
+                                placeholderTextColor={tokens.textMuted}
+                              />
+                              <TouchableOpacity
+                                style={{ position: 'absolute', right: 12, padding: 6 }}
+                                onPress={() => setShowNewPwd(!showNewPwd)}
+                                accessibilityLabel={showNewPwd ? 'Hide new password' : 'Show new password'}
+                              >
+                                <BootstrapIcon name={showNewPwd ? 'eye-slash' : 'eye'} size={15} color={tokens.textMuted} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                              Confirm New Password
+                            </Text>
+                            <View style={{ position: 'relative', justifyContent: 'center' }}>
+                              <TextInput
+                                style={[styles.inputBox, { paddingRight: 42 }]}
+                                value={confirmPwd}
+                                onChangeText={setConfirmPwd}
+                                secureTextEntry={!showConfirmPwd}
+                                placeholder="Re-enter password"
+                                placeholderTextColor={tokens.textMuted}
+                              />
+                              <TouchableOpacity
+                                style={{ position: 'absolute', right: 12, padding: 6 }}
+                                onPress={() => setShowConfirmPwd(!showConfirmPwd)}
+                                accessibilityLabel={showConfirmPwd ? 'Hide confirm password' : 'Show confirm password'}
+                              >
+                                <BootstrapIcon name={showConfirmPwd ? 'eye-slash' : 'eye'} size={15} color={tokens.textMuted} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        </View>
+
+                        {/* Real-time Password Strength & Requirements Checklist */}
+                        {newPwd.length > 0 && (
+                          <View style={{ backgroundColor: tokens.bgSub, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: tokens.border, gap: 10 }}>
+                            <View>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                                <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                  Password Strength
+                                </Text>
+                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: strengthColor }}>
+                                  {strengthLabel}
+                                </Text>
+                              </View>
+                              <View style={{ height: 5, borderRadius: 3, backgroundColor: tokens.bgCard, borderWidth: 1, borderColor: tokens.border, overflow: 'hidden' }}>
+                                <View style={{ width: strengthPercent, height: '100%', backgroundColor: strengthColor, borderRadius: 2 }} />
+                              </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingTop: 4 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 150 }}>
+                                <BootstrapIcon
+                                  name={hasLength ? 'check-circle-fill' : 'circle'}
+                                  size={12}
+                                  color={hasLength ? '#10B981' : tokens.textMuted}
+                                />
+                                <Text style={{ fontSize: 11.5, color: hasLength ? tokens.textPrimary : tokens.textMuted, fontWeight: hasLength ? '600' : '400' }}>
+                                  At least 8 characters
+                                </Text>
+                              </View>
+
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 150 }}>
+                                <BootstrapIcon
+                                  name={hasUpper ? 'check-circle-fill' : 'circle'}
+                                  size={12}
+                                  color={hasUpper ? '#10B981' : tokens.textMuted}
+                                />
+                                <Text style={{ fontSize: 11.5, color: hasUpper ? tokens.textPrimary : tokens.textMuted, fontWeight: hasUpper ? '600' : '400' }}>
+                                  Contains uppercase letter
+                                </Text>
+                              </View>
+
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 150 }}>
+                                <BootstrapIcon
+                                  name={hasNumber ? 'check-circle-fill' : 'circle'}
+                                  size={12}
+                                  color={hasNumber ? '#10B981' : tokens.textMuted}
+                                />
+                                <Text style={{ fontSize: 11.5, color: hasNumber ? tokens.textPrimary : tokens.textMuted, fontWeight: hasNumber ? '600' : '400' }}>
+                                  Contains number
+                                </Text>
+                              </View>
+
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, minWidth: 150 }}>
+                                <BootstrapIcon
+                                  name={hasSpecial ? 'check-circle-fill' : 'circle'}
+                                  size={12}
+                                  color={hasSpecial ? '#10B981' : tokens.textMuted}
+                                />
+                                <Text style={{ fontSize: 11.5, color: hasSpecial ? tokens.textPrimary : tokens.textMuted, fontWeight: hasSpecial ? '600' : '400' }}>
+                                  Contains special character
+                                </Text>
+                              </View>
+                            </View>
+                          </View>
+                        )}
+
+                        <TouchableOpacity
+                          style={[
+                            styles.btnPrimary,
+                            {
+                              marginTop: 4,
+                              alignSelf: isSmallMobile ? 'stretch' : 'flex-start',
+                            },
+                          ]}
+                          onPress={handleChangePassword}
+                          disabled={isSavingPwd}
+                          activeOpacity={0.85}
+                        >
+                          {isSavingPwd ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <>
+                              <BootstrapIcon name="shield-lock-fill" size={13} color="#FFFFFF" />
+                              <Text style={styles.btnPrimaryText}>Update Password</Text>
+                            </>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })()}
+
+                {/* 3. Change Email Card */}
                 <View style={styles.sectionCard}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                    <BootstrapIcon name="key-fill" size={18} color="#1D4533" />
-                    <View>
-                      <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary }}>
-                        Change Password
-                      </Text>
-                      <Text style={{ fontSize: 12, color: tokens.textMuted }}>
-                        Keep your rider account secured with strong authentication
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={{ gap: 12 }}>
-                    <View>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textSecondary, marginBottom: 6 }}>
-                        Current Password
-                      </Text>
-                      <TextInput
-                        style={{
-                          backgroundColor: tokens.bgSub,
-                          borderWidth: 1,
-                          borderColor: tokens.border,
-                          borderRadius: 10,
-                          paddingHorizontal: 14,
-                          paddingVertical: 10,
-                          color: tokens.textPrimary,
-                          fontSize: 13,
-                        }}
-                        value={currentPwd}
-                        onChangeText={setCurrentPwd}
-                        secureTextEntry
-                        placeholder="••••••••"
-                        placeholderTextColor={tokens.textMuted}
-                      />
-                    </View>
-
-                    <View style={{ flexDirection: windowWidth >= 640 ? 'row' : 'column', gap: 12 }}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textSecondary, marginBottom: 6 }}>
-                          New Password
-                        </Text>
-                        <TextInput
-                          style={{
-                            backgroundColor: tokens.bgSub,
-                            borderWidth: 1,
-                            borderColor: tokens.border,
-                            borderRadius: 10,
-                            paddingHorizontal: 14,
-                            paddingVertical: 10,
-                            color: tokens.textPrimary,
-                            fontSize: 13,
-                          }}
-                          value={newPwd}
-                          onChangeText={setNewPwd}
-                          secureTextEntry
-                          placeholder="Min 8 characters"
-                          placeholderTextColor={tokens.textMuted}
-                        />
-                      </View>
-
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textSecondary, marginBottom: 6 }}>
-                          Confirm New Password
-                        </Text>
-                        <TextInput
-                          style={{
-                            backgroundColor: tokens.bgSub,
-                            borderWidth: 1,
-                            borderColor: tokens.border,
-                            borderRadius: 10,
-                            paddingHorizontal: 14,
-                            paddingVertical: 10,
-                            color: tokens.textPrimary,
-                            fontSize: 13,
-                          }}
-                          value={confirmPwd}
-                          onChangeText={setConfirmPwd}
-                          secureTextEntry
-                          placeholder="Re-enter password"
-                          placeholderTextColor={tokens.textMuted}
-                        />
-                      </View>
-                    </View>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.addBtnPrimary,
-                        {
-                          marginTop: 6,
-                          alignSelf: isSmallMobile ? 'stretch' : 'flex-start',
-                          justifyContent: 'center',
-                        },
-                      ]}
-                      onPress={handleChangePassword}
-                      disabled={isSavingPwd}
-                      activeOpacity={0.85}
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
+                        backgroundColor: tokens.brandLight,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: tokens.brandBorder,
+                      }}
                     >
-                      {isSavingPwd ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Text style={styles.addBtnPrimaryText}>Update Password</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Change Email Card */}
-                <View style={styles.sectionCard}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                    <BootstrapIcon name="envelope-check-fill" size={18} color="#1D4533" />
+                      <BootstrapIcon name="envelope-check-fill" size={15} color="#1D4533" />
+                    </View>
                     <View>
                       <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary }}>
                         Account Email Address
@@ -4366,23 +4897,14 @@ export default function ProfilePage({
                     </View>
                   </View>
 
-                  <View style={{ gap: 12 }}>
-                    <View style={{ flexDirection: windowWidth >= 640 ? 'row' : 'column', gap: 12 }}>
+                  <View style={{ gap: 14 }}>
+                    <View style={{ flexDirection: windowWidth >= 640 ? 'row' : 'column', gap: 14 }}>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textSecondary, marginBottom: 6 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
                           New Email Address
                         </Text>
                         <TextInput
-                          style={{
-                            backgroundColor: tokens.bgSub,
-                            borderWidth: 1,
-                            borderColor: tokens.border,
-                            borderRadius: 10,
-                            paddingHorizontal: 14,
-                            paddingVertical: 10,
-                            color: tokens.textPrimary,
-                            fontSize: 13,
-                          }}
+                          style={styles.inputBox}
                           value={newEmail}
                           onChangeText={setNewEmail}
                           placeholder="rider@newemail.com"
@@ -4393,20 +4915,11 @@ export default function ProfilePage({
                       </View>
 
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textSecondary, marginBottom: 6 }}>
+                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
                           Confirm with Current Password
                         </Text>
                         <TextInput
-                          style={{
-                            backgroundColor: tokens.bgSub,
-                            borderWidth: 1,
-                            borderColor: tokens.border,
-                            borderRadius: 10,
-                            paddingHorizontal: 14,
-                            paddingVertical: 10,
-                            color: tokens.textPrimary,
-                            fontSize: 13,
-                          }}
+                          style={styles.inputBox}
                           value={emailPwd}
                           onChangeText={setEmailPwd}
                           secureTextEntry
@@ -4418,11 +4931,10 @@ export default function ProfilePage({
 
                     <TouchableOpacity
                       style={[
-                        styles.addBtnPrimary,
+                        styles.btnPrimary,
                         {
-                          marginTop: 6,
+                          marginTop: 4,
                           alignSelf: isSmallMobile ? 'stretch' : 'flex-start',
-                          justifyContent: 'center',
                         },
                       ]}
                       onPress={handleChangeEmail}
@@ -4432,7 +4944,10 @@ export default function ProfilePage({
                       {isSavingEmail ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
-                        <Text style={styles.addBtnPrimaryText}>Save Email Address</Text>
+                        <>
+                          <BootstrapIcon name="check2" size={14} color="#FFFFFF" />
+                          <Text style={styles.btnPrimaryText}>Save Email Address</Text>
+                        </>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -4558,6 +5073,15 @@ export default function ProfilePage({
         onConfirm={handleConfirmLogout}
         onCancel={() => setIsLogoutModalOpen(false)}
       />
-    </SafeAreaView>
+          {/* Shopping Cart Modal */}
+      <CartModal
+        visible={isCartOpen}
+        onClose={() => setIsCartOpen(false)}
+        onProceedToCheckout={() => {
+          setIsCartOpen(false);
+          onNavigateToStore?.();
+        }}
+      />
+</SafeAreaView>
   );
 }

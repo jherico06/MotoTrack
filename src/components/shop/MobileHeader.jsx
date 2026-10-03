@@ -14,7 +14,6 @@ export default function MobileHeader({
   onCycleFilterSort,
   onOpenCart,
   onOpenProfile,
-  isProfileDropdownOpen = false,
   onNavigateToLogin,
   onNavigateToNotifications,
   onNavigateToWishlist,
@@ -28,12 +27,14 @@ export default function MobileHeader({
   const { cartItemCount } = useCart();
   const { wishlistCount } = useWishlist();
   const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
-    notificationService.getUnreadCount(currentUser?.id)
+    currentUser?.id ? notificationService.getUnreadCount(currentUser?.id) : 0
   );
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
-      setUnreadNotifCount(notificationService.getUnreadCount(currentUser?.id));
+      setUnreadNotifCount(
+        currentUser?.id ? notificationService.getUnreadCount(currentUser?.id) : 0
+      );
     });
     return () => unsub?.();
   }, [currentUser?.id]);
@@ -45,7 +46,7 @@ export default function MobileHeader({
           {/* Left: User Avatar & Greeting or Sign In */}
           {currentUser ? (
             <TouchableOpacity style={styles.headerLeft} onPress={onOpenProfile} activeOpacity={0.75}>
-              <View style={[styles.avatarWrap, isProfileDropdownOpen && { borderColor: '#0F172A' }]}>
+              <View style={styles.avatarWrap}>
                 <Image
                   source={{
                     uri:
@@ -61,12 +62,6 @@ export default function MobileHeader({
                 </Text>
                 <View style={styles.greetingNameRow}>
                   <Text style={styles.userName}>{currentUser.name || currentUser.fullName}</Text>
-                  <BootstrapIcon
-                    name={isProfileDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                    size={10}
-                    color="#64748B"
-                    style={{ marginLeft: 3 }}
-                  />
                 </View>
               </View>
             </TouchableOpacity>

@@ -22,6 +22,32 @@ function makeEntityId(prefix) {
   return `${prefix}-${Date.now()}-${rand}`;
 }
 
+export function generateOrderId(channel = 'Online Store', existingOrders = []) {
+  const currentYear = new Date().getFullYear();
+  const chanStr = String(channel || '').toLowerCase();
+  const prefix = (chanStr.includes('pos') || chanStr.includes('in-store') || chanStr.includes('counter') || chanStr.includes('walk-in'))
+    ? 'POS'
+    : (chanStr.includes('phone') || chanStr.includes('call') || chanStr.includes('tel'))
+    ? 'TEL'
+    : 'ON';
+
+  let maxSeq = 0;
+  const list = Array.isArray(existingOrders) ? existingOrders : [];
+  list.forEach((o) => {
+    const oId = String((o && (o.order_id || o.id)) || '');
+    const match = oId.match(/-(\d{5})$/) || oId.match(/-(\d+)$/);
+    if (match) {
+      const seq = parseInt(match[1], 10);
+      if (!isNaN(seq) && seq < 100000 && seq > maxSeq) {
+        maxSeq = seq;
+      }
+    }
+  });
+
+  const nextSeq = String(maxSeq + 1).padStart(5, '0');
+  return `ORD-${prefix}-${currentYear}-${nextSeq}`;
+}
+
 /** Cross-tab shared cache — sessionStorage alone cannot be seen by an admin tab. */
 function readSharedOrdersJson() {
   try {
@@ -245,15 +271,11 @@ function normalizePhoneDigits(phone) {
   return String(phone || '').replace(/\D/g, '');
 }
 
-/** Match an order to the signed-in customer (ids, phone, or email). */
+/** Match an order to the signed-in customer (ids, phone, email, or name). */
 function orderBelongsToUser(order, user) {
   if (!order || !user) return false;
   const userId = user.id || user.user_id || null;
   const customerId = user.customer_id || null;
-  const orderId = String(order.order_id || order.id || '');
-
-  // Never treat seeded demo orders as the signed-in customer's history
-  if (/^ord-(9104|9052|8975|8921|8710)$/.test(orderId)) return false;
 
   if (userId && (order.user_id === userId || order.userId === userId || order.customer_id === userId)) {
     return true;
@@ -274,13 +296,19 @@ function orderBelongsToUser(order, user) {
     if (String(order.customer_email || '').toLowerCase().trim() === email) return true;
   }
 
+  const userName = String(user.name || user.fullName || '').toLowerCase().trim();
+  const orderCustName = String(order.customer_name || '').toLowerCase().trim();
+  if (userName && orderCustName && (userName.includes(orderCustName) || orderCustName.includes(userName))) {
+    return true;
+  }
+
   return false;
 }
 
 const INITIAL_DEMO_ORDERS = [
   {
-    order_id: 'ord-9104',
-    id: 'ord-9104',
+    order_id: 'ORD-ON-2026-00001',
+    id: 'ORD-ON-2026-00001',
     customer_id: 'cust-02',
     customer_name: 'Carlos Mendoza',
     customer_phone: '+63 (918) 723-9014',
@@ -313,8 +341,8 @@ const INITIAL_DEMO_ORDERS = [
     ],
   },
   {
-    order_id: 'ord-9052',
-    id: 'ord-9052',
+    order_id: 'ORD-ON-2026-00002',
+    id: 'ORD-ON-2026-00002',
     customer_id: 'cust-03',
     customer_name: 'Dave Bautista',
     customer_phone: '+63 (927) 419-8821',
@@ -356,8 +384,8 @@ const INITIAL_DEMO_ORDERS = [
     ],
   },
   {
-    order_id: 'ord-8975',
-    id: 'ord-8975',
+    order_id: 'ORD-ON-2026-00003',
+    id: 'ORD-ON-2026-00003',
     customer_id: 'cust-04',
     customer_name: 'Samantha Cruz',
     customer_phone: '+63 (917) 832-1145',
@@ -390,8 +418,8 @@ const INITIAL_DEMO_ORDERS = [
     ],
   },
   {
-    order_id: 'ord-8921',
-    id: 'ord-8921',
+    order_id: 'ORD-ON-2026-00004',
+    id: 'ORD-ON-2026-00004',
     customer_id: 'cust-01',
     customer_name: 'Alex Rider',
     customer_phone: '+63 (917) 582-9410',
@@ -422,8 +450,8 @@ const INITIAL_DEMO_ORDERS = [
     ],
   },
   {
-    order_id: 'ord-8710',
-    id: 'ord-8710',
+    order_id: 'ORD-ON-2026-00005',
+    id: 'ORD-ON-2026-00005',
     customer_id: 'cust-05',
     customer_name: 'Miguel Tan',
     customer_phone: '+63 (905) 124-7789',
@@ -915,6 +943,9 @@ class OrderService {
                 : deliveryRow.riders
               : null;
 
+            const itemsCalcTotal = items.reduce((sum, item) => sum + (Number(item.price || 0) * (Number(item.quantity) || 1)), 0);
+            const calcGrandTotal = Number(o.grand_total || o.total_amount || 0) || itemsCalcTotal;
+
             return {
               order_id: o.order_id || o.id,
               id: o.order_id || o.id,
@@ -924,10 +955,13 @@ class OrderService {
               customer_address: o.customer_address,
               delivery_notes: o.delivery_notes,
               payment_method: o.payment_method || 'Cash on Delivery (COD)',
-              total_amount: Number(o.total_amount || o.grand_total || 0),
+              total_amount: calcGrandTotal,
               discount_amount: Number(o.discount_amount || 0),
               shipping_fee: Number(o.shipping_fee || 0),
-              grand_total: Number(o.grand_total || o.total_amount || 0),
+              grand_total: calcGrandTotal,
+              grandTotal: calcGrandTotal,
+              total: calcGrandTotal,
+              totalAmount: calcGrandTotal,
               items_summary: o.items_summary || items.map((i) => `${i.name} (x${i.quantity})`).join(', '),
               items_count: o.items_count || items.length,
               status: o.status || 'Pending Approval',
@@ -1162,7 +1196,8 @@ class OrderService {
       return { success: false, error: 'Cannot place an order with an empty cart', supabaseSynced: false };
     }
 
-    const orderId = makeEntityId('ord');
+    const existingOrders = this.getLocalOrders();
+    const orderId = generateOrderId(channel, existingOrders);
     const isCOD =
       (paymentMethod || '').toLowerCase().includes('cash') || (paymentMethod || '').includes('COD');
     const orderStatus = overrideStatus || (isCOD ? 'Pending Approval' : 'Processing');
@@ -1227,7 +1262,10 @@ class OrderService {
       return { success: false, error: 'Order items are missing product IDs', supabaseSynced: false };
     }
 
-    const stockResult = await productService.deductStock(normalizedItems);
+    const stockResult = await productService.deductStock(normalizedItems, {
+      orderId,
+      referenceType: 'order',
+    });
     if (!stockResult.success) {
       return {
         success: false,
@@ -1291,6 +1329,14 @@ class OrderService {
         paymentMethod: newOrder.payment_method,
       });
 
+      notificationService.notifyCustomerOrderPlaced({
+        userId: newOrder.user_id || newOrder.customer_id,
+        orderId: newOrder.order_id,
+        itemCount: newOrder.items_count,
+        totalAmount: newOrder.grand_total,
+        paymentMethod: newOrder.payment_method,
+      });
+
       if (
         paymentMethod === 'GCash' ||
         paymentMethod === 'Online Transfer' ||
@@ -1305,7 +1351,7 @@ class OrderService {
         });
       }
     } catch (_notifErr) {
-      console.warn('[OrderService] Admin notification failed:', _notifErr);
+      console.warn('[OrderService] Order notification failed:', _notifErr);
     }
 
     for (const it of normalizedItems) {
@@ -1314,17 +1360,18 @@ class OrderService {
           (p) => p.id === it.product_id || p.product_id === it.product_id
         );
         const newStock = match ? Number(match.stock || 0) : null;
+        const threshold = Number(match?.reorder_level ?? match?.reorderLevel ?? 5);
         if (newStock === 0) {
           notificationService.notifyAdminOutOfStock({
             productName: it.name,
             productId: it.product_id,
           });
-        } else if (newStock !== null && newStock <= 5) {
+        } else if (newStock !== null && newStock <= threshold) {
           notificationService.notifyAdminLowStock({
             productName: it.name,
             productId: it.product_id,
             currentStock: newStock,
-            minThreshold: 5,
+            minThreshold: threshold,
           });
         }
       } catch (e) {
@@ -1876,6 +1923,11 @@ class OrderService {
           status: canonicalNew,
           customerName: targetOrder.customer_name,
         });
+        notificationService.notifyCustomerOrderStatus({
+          userId: targetOrder.user_id || targetOrder.customer_id,
+          orderId,
+          status: canonicalNew,
+        });
         auditLogService.logOrderAction({
           action: 'ORDER_STATUS_CHANGED',
           target: `Order #${orderId}`,
@@ -2006,6 +2058,12 @@ class OrderService {
         orderId,
         status: `Cancelled (${cleanReason})`,
         customerName: targetOrder.customer_name,
+      });
+      notificationService.notifyCustomerOrderStatus({
+        userId: targetOrder.user_id || targetOrder.customer_id,
+        orderId,
+        status: 'Cancelled',
+        message: `Your Order #${orderId} was cancelled. Reason: ${cleanReason}`,
       });
       auditLogService.logOrderAction({
         action: 'ORDER_CANCELLED',
@@ -2454,7 +2512,10 @@ class OrderService {
 
     const posItems = newOrder.items || [];
     if (posItems.length > 0) {
-      const stockRes = await productService.deductStock(posItems);
+      const stockRes = await productService.deductStock(posItems, {
+        orderId: newOrder.order_id || newOrder.id,
+        referenceType: 'pos_order',
+      });
       if (!stockRes?.success) {
         return { success: false, error: stockRes?.error || 'Insufficient stock for POS sale.' };
       }

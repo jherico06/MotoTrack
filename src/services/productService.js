@@ -3,9 +3,14 @@ import { MOTOR_PARTS } from '../data/motorParts';
 import { appStorage } from './storageAdapter';
 import { notificationService } from './notificationService';
 import { serializeProductSizes, normalizeProductSizes } from '../utils/productSizes';
-import { serializeProductColors } from '../utils/productColors';
+import { serializeProductColors, normalizeProductColors } from '../utils/productColors';
 import { resolveColorImagesForSave, resolveImageForDatabase } from '../utils/productImageUpload';
 import { sanitizeCompareAtPrice } from '../utils/productCatalog';
+import {
+  applyColorRestockDeltas,
+  applySizeRestockDeltas,
+  buildRestockDeltaMap,
+} from '../utils/inventoryHelpers';
 import { dataCache } from './cache/dataCache.js';
 import { CACHE_TTL, CacheKeys, productInvalidationKeys } from './cache/cacheKeys.js';
 
@@ -62,46 +67,129 @@ function categoryIdFromName(name) {
   return 'cat-03';
 }
 
-async function upsertInventoryStock(client, productId, stockQuantity) {
-  if (!client || !productId) return;
-  const qty = Math.max(0, Number(stockQuantity) || 0);
-  const { error } = await client.from('inventory').upsert(
-    [
-      {
-        inventory_id: `inv-${productId}`,
-        product_id: productId,
-        stock_quantity: qty,
-        reorder_level: 5,
-        last_updated: new Date().toISOString(),
-      },
-    ],
-    { onConflict: 'product_id' }
-  );
-  if (error) {
-    // Fallback if upsert conflict target differs
-    const { data } = await client
-      .from('inventory')
-      .select('inventory_id')
-      .eq('product_id', productId)
-      .limit(1);
-    if (data?.[0]?.inventory_id) {
-      await client
-        .from('inventory')
-        .update({ stock_quantity: qty, last_updated: new Date().toISOString() })
-        .eq('product_id', productId);
-    } else {
-      await client.from('inventory').insert([
-        {
-          inventory_id: `inv-${productId}`,
-          product_id: productId,
-          stock_quantity: qty,
-          reorder_level: 5,
-          last_updated: new Date().toISOString(),
-        },
-      ]);
-    }
+/**
+ * Atomic stock delta via Postgres SECURITY DEFINER RPC + ledger.
+ * Never clamps negatives client-side — DB rejects insufficient stock.
+ */
+async function adjustStockRpc(
+  client,
+  {
+    productId,
+    delta,
+    reason,
+    referenceType = null,
+    referenceId = null,
+    actorId = null,
   }
+) {
+  if (!client || !productId) {
+    return { success: false, error: 'Missing client or productId' };
+  }
+  const qtyDelta = Number(delta);
+  if (!Number.isFinite(qtyDelta) || qtyDelta === 0) {
+    return { success: false, error: 'Stock delta must be a non-zero number' };
+  }
+  const { data, error } = await client.rpc('fn_adjust_stock', {
+    p_product_id: productId,
+    p_delta: Math.trunc(qtyDelta),
+    p_reason: reason,
+    p_ref_type: referenceType,
+    p_ref_id: referenceId,
+    p_actor_id: actorId,
+  });
+  if (error) {
+    return {
+      success: false,
+      error: error.message || 'Stock adjustment failed',
+      code: error.code,
+    };
+  }
+  return { success: true, stock: Number(data) };
 }
+
+/** Absolute stock set via RPC (admin count / edit). */
+async function setStockRpc(
+  client,
+  {
+    productId,
+    newQty,
+    reason = 'adjustment',
+    referenceType = 'inventory_adjustment',
+    referenceId = null,
+    actorId = null,
+  }
+) {
+  if (!client || !productId) {
+    return { success: false, error: 'Missing client or productId' };
+  }
+  const qty = Number(newQty);
+  if (!Number.isFinite(qty) || qty < 0) {
+    return { success: false, error: 'Stock quantity cannot be negative' };
+  }
+  const { data, error } = await client.rpc('fn_set_stock', {
+    p_product_id: productId,
+    p_new_qty: Math.trunc(qty),
+    p_reason: reason,
+    p_ref_type: referenceType,
+    p_ref_id: referenceId,
+    p_actor_id: actorId,
+  });
+  if (error) {
+    return {
+      success: false,
+      error: error.message || 'Stock set failed',
+      code: error.code,
+    };
+  }
+  return { success: true, stock: Number(data) };
+}
+
+/** Update inventory metadata only (no quantity write). */
+async function updateInventoryMeta(client, productId, meta = {}) {
+  if (!client || !productId) return { success: false };
+  const patch = { last_updated: new Date().toISOString() };
+  if (meta.reorder_level != null) patch.reorder_level = Math.max(0, Number(meta.reorder_level) || 0);
+  if (meta.reorder_point != null) patch.reorder_point = Math.max(0, Number(meta.reorder_point) || 0);
+  if (meta.order_quantity != null) patch.order_quantity = Math.max(0, Number(meta.order_quantity) || 0);
+  if (meta.lead_time_days != null) patch.lead_time_days = Math.max(0, Number(meta.lead_time_days) || 0);
+  if (meta.supplier_id !== undefined) patch.supplier_id = meta.supplier_id || null;
+  const { error } = await client.from('inventory').update(patch).eq('product_id', productId);
+  if (error) return { success: false, error: error.message };
+  return { success: true };
+}
+
+/** @deprecated Prefer adjustStockRpc / setStockRpc — kept name for internal call sites during migration */
+async function upsertInventoryStock(client, productId, stockQuantity, meta = {}) {
+  const setRes = await setStockRpc(client, {
+    productId,
+    newQty: stockQuantity,
+    reason: meta.reason || 'adjustment',
+    referenceType: meta.referenceType || 'inventory_adjustment',
+    referenceId: meta.referenceId || null,
+    actorId: meta.actorId || null,
+  });
+  if (!setRes.success) {
+    console.warn('fn_set_stock failed:', setRes.error);
+    return setRes;
+  }
+  if (
+    meta.reorder_level != null ||
+    meta.reorder_point != null ||
+    meta.lead_time_days != null ||
+    meta.order_quantity != null ||
+    meta.supplier_id !== undefined
+  ) {
+    await updateInventoryMeta(client, productId, meta);
+  }
+  return setRes;
+}
+
+/** Default reorder threshold only when DB value is missing */
+export {
+  resolveReorderLevel,
+  isLowStock,
+  isOutOfStock,
+} from '../utils/inventoryHelpers.js';
 
 function notifyListeners(products) {
   productFetchCache = null;
@@ -176,7 +264,7 @@ export const productService = {
         const { data, error } = await client
           .from('products')
           .select(
-            'product_id,id,category_id,name,description,price,image,brand,old_price,rating,reviews,compatibility,sku,badge,type,is_new,discount,material,weight,features,unit_cost,sizes,colors,status,created_at,categories(name),inventory(stock_quantity)'
+            'product_id,id,category_id,name,description,price,image,brand,old_price,rating,reviews,compatibility,sku,badge,type,is_new,discount,material,weight,features,unit_cost,sizes,colors,status,created_at,categories(name),inventory(stock_quantity,reorder_level,reorder_point,order_quantity,lead_time_days,supplier_id)'
           )
           .order('created_at', { ascending: false })
           .limit(Number(options?.limit) > 0 ? Number(options.limit) : 120);
@@ -203,6 +291,14 @@ export const productService = {
               compatibility: item.compatibility || 'Universal Fitment',
               sku: item.sku || 'SKU-' + (item.product_id || item.id),
               stock: Number(inv?.stock_quantity ?? item.stock ?? 0),
+              reorder_level: Number(inv?.reorder_level ?? 5),
+              reorderLevel: Number(inv?.reorder_level ?? 5),
+              reorder_point: inv?.reorder_point != null ? Number(inv.reorder_point) : null,
+              reorderPoint: inv?.reorder_point != null ? Number(inv.reorder_point) : null,
+              order_quantity: Number(inv?.order_quantity ?? 1),
+              lead_time_days: Number(inv?.lead_time_days ?? 3),
+              leadTimeDays: Number(inv?.lead_time_days ?? 3),
+              supplier_id: inv?.supplier_id || null,
               badge: item.badge || (item.is_new ? 'New' : undefined),
               type: item.type || 'newArrival',
               isNew: Boolean(item.is_new),
@@ -252,18 +348,21 @@ export const productService = {
     const sizes = serializeProductSizes(newProduct.sizes, Number(newProduct.price) || 0);
     const resolvedColors = await resolveColorImagesForSave(newProduct.colors || []);
     const colors = serializeProductColors(resolvedColors.colors);
-    const resolvedMainImage = await resolveImageForDatabase(
-      newProduct.image ||
-        'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
-      { folder: 'products', orderId: prodId, fileName: `products/${prodId}-${Date.now()}.jpg` }
-    );
+    const resolvedMainImage = newProduct.image
+      ? await resolveImageForDatabase(newProduct.image, {
+          folder: 'products',
+          orderId: prodId,
+          fileName: `products/${prodId}-${Date.now()}.jpg`,
+        })
+      : { url: '' };
+
     const product = {
       id: prodId,
       product_id: prodId,
       name: newProduct.name.trim(),
-      category: newProduct.category || 'Accessories',
-      brand: newProduct.brand?.trim() || 'MotoTrack',
-      price: Number(newProduct.price),
+      category: newProduct.category || '',
+      brand: newProduct.brand?.trim() || '',
+      price: Number(newProduct.price) || 0,
       unit_cost: Number(newProduct.unit_cost ?? newProduct.unitCost ?? 0),
       unitCost: Number(newProduct.unit_cost ?? newProduct.unitCost ?? 0),
       sizes,
@@ -271,22 +370,18 @@ export const productService = {
       oldPrice: sanitizeCompareAtPrice(newProduct.oldPrice, newProduct.price),
       rating: 0,
       reviews: 0,
-      compatibility: newProduct.compatibility || 'Universal Motorcycle Fitment',
-      sku: newProduct.sku || 'TRACK-' + Math.floor(1000 + Math.random() * 9000),
-      stock: Number(newProduct.stock || 10),
-      badge: newProduct.badge || 'New',
-      type: newProduct.type || 'newArrival',
+      compatibility: newProduct.compatibility || '',
+      sku: newProduct.sku || '',
+      stock: Number(newProduct.stock ?? 0),
+      badge: newProduct.badge || '',
+      type: newProduct.type || '',
       isNew: Boolean(newProduct.isNew ?? true),
       discount: newProduct.discount || '',
-      image:
-        resolvedMainImage.url ||
-        'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
-      material: newProduct.material || 'CNC Aluminum / Titanium',
-      weight: newProduct.weight || '1.2 kg',
-      description: newProduct.description || 'High quality motorcycle upgrade part.',
-      features: Array.isArray(newProduct.features)
-        ? newProduct.features
-        : ['Direct OEM Fitment', 'Track Tested'],
+      image: resolvedMainImage.url || newProduct.image || '',
+      material: newProduct.material || '',
+      weight: newProduct.weight || '',
+      description: newProduct.description || '',
+      features: Array.isArray(newProduct.features) ? newProduct.features : [],
     };
 
     let dbError = null;
@@ -326,7 +421,13 @@ export const productService = {
           dbError = error;
           console.warn('Supabase product insert failed:', error);
         } else {
-          await upsertInventoryStock(client, product.product_id, product.stock);
+          await upsertInventoryStock(client, product.product_id, product.stock, {
+            reason: 'restock',
+            referenceType: 'product_create',
+            referenceId: product.product_id,
+            reorder_level: Number(newProduct.reorder_level ?? newProduct.reorderLevel ?? 5),
+            lead_time_days: Number(newProduct.lead_time_days ?? newProduct.leadTimeDays ?? 3),
+          });
         }
       }
     } catch (e) {
@@ -442,7 +543,36 @@ export const productService = {
           }
         }
         if (nextUpdates.stock !== undefined) {
-          await upsertInventoryStock(client, id, nextUpdates.stock);
+          const stockRes = await upsertInventoryStock(client, id, nextUpdates.stock, {
+            reason: nextUpdates.stockReason || 'adjustment',
+            referenceType: nextUpdates.stockRefType || 'inventory_adjustment',
+            referenceId: nextUpdates.stockRefId || id,
+            reorder_level: nextUpdates.reorder_level ?? nextUpdates.reorderLevel,
+            reorder_point: nextUpdates.reorder_point ?? nextUpdates.reorderPoint,
+            lead_time_days: nextUpdates.lead_time_days ?? nextUpdates.leadTimeDays,
+            order_quantity: nextUpdates.order_quantity,
+            supplier_id: nextUpdates.supplier_id,
+          });
+          if (!stockRes.success) {
+            dbError = { message: stockRes.error || 'Stock update failed' };
+            console.warn('Stock update failed:', stockRes.error);
+          }
+        } else if (
+          nextUpdates.reorder_level != null ||
+          nextUpdates.reorderLevel != null ||
+          nextUpdates.lead_time_days != null ||
+          nextUpdates.leadTimeDays != null ||
+          nextUpdates.reorder_point != null ||
+          nextUpdates.order_quantity != null ||
+          nextUpdates.supplier_id !== undefined
+        ) {
+          await updateInventoryMeta(client, id, {
+            reorder_level: nextUpdates.reorder_level ?? nextUpdates.reorderLevel,
+            reorder_point: nextUpdates.reorder_point ?? nextUpdates.reorderPoint,
+            lead_time_days: nextUpdates.lead_time_days ?? nextUpdates.leadTimeDays,
+            order_quantity: nextUpdates.order_quantity,
+            supplier_id: nextUpdates.supplier_id,
+          });
         }
       }
     } catch (e) {
@@ -530,15 +660,46 @@ export const productService = {
   },
 
   /**
-   * Quick adjust stock (+/- delta) in Supabase
+   * Quick adjust stock (+/- delta) via atomic RPC.
    */
-  async quickAdjustStock(id, delta) {
+  async quickAdjustStock(id, delta, meta = {}) {
     const current = await this.getProducts();
     const target = current.find((p) => p.id === id || p.product_id === id);
     if (!target) return { success: false, error: 'Product not found' };
 
-    const newStock = Math.max(0, (target.stock || 0) + delta);
-    return await this.updateProduct(id, { stock: newStock });
+    const d = Number(delta);
+    if (!Number.isFinite(d) || d === 0) {
+      return { success: false, error: 'Delta must be a non-zero number' };
+    }
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      const reason = d > 0 ? meta.reason || 'restock' : meta.reason || 'adjustment';
+      const res = await adjustStockRpc(client, {
+        productId: target.product_id || target.id || id,
+        delta: Math.trunc(d),
+        reason,
+        referenceType: meta.referenceType || 'inventory_adjustment',
+        referenceId: meta.referenceId || id,
+        actorId: meta.actorId || null,
+      });
+      if (!res.success) {
+        return { success: false, error: res.error || 'Stock adjustment failed' };
+      }
+      const updated = current.map((p) =>
+        p.id === id || p.product_id === id ? { ...p, stock: res.stock } : p
+      );
+      try {
+        appStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      } catch (_e) {}
+      notifyListeners(updated);
+      return { success: true, products: updated, stock: res.stock };
+    }
+
+    // Offline/local fallback
+    const newStock = (target.stock || 0) + d;
+    if (newStock < 0) return { success: false, error: 'Insufficient stock' };
+    return await this.updateProduct(id, { stock: newStock, stockReason: d > 0 ? 'restock' : 'adjustment' });
   },
 
   /**
@@ -556,6 +717,7 @@ export const productService = {
     supplierId = null,
     supplierName = '',
     sizeDeltas = null,
+    colorDeltas = null,
   }) {
     const cost = Number(unitCost);
     const price = sellPrice != null && sellPrice !== '' ? Number(sellPrice) : null;
@@ -569,62 +731,47 @@ export const productService = {
     const target = current.find((p) => p.id === productId || p.product_id === productId);
     if (!target) return { success: false, error: 'Product not found' };
 
+    const prevPrice = Number(target.price || 0);
+    const nextPrice = price != null && Number.isFinite(price) && price >= 0 ? price : prevPrice;
+    const prevStock = Number(target.stock || 0);
+
     const existingSizes = normalizeProductSizes(target);
-    const deltaMap = new Map();
-    if (Array.isArray(sizeDeltas)) {
-      sizeDeltas.forEach((row) => {
-        const label = String(row?.label || '').trim();
-        const add = Number(row?.quantity ?? row?.addQty ?? 0);
-        if (!label || !Number.isFinite(add) || add <= 0) return;
-        deltaMap.set(label, (deltaMap.get(label) || 0) + add);
-      });
-    }
+    const deltaMap = buildRestockDeltaMap(sizeDeltas);
+    const sizeResult = applySizeRestockDeltas(existingSizes, deltaMap, nextPrice || prevPrice);
+    const nextSizes = sizeResult.nextSizes;
+
+    const existingColors = normalizeProductColors(target);
+    const colorDeltaMap = buildRestockDeltaMap(colorDeltas);
+    const colorResult = applyColorRestockDeltas(existingColors, colorDeltaMap);
+    const nextColors = colorResult.nextColors;
 
     let qty = Number(quantity);
-    let nextSizes = undefined;
-    if (deltaMap.size > 0 && existingSizes.length > 0) {
-      nextSizes = existingSizes.map((s) => {
-        const add = deltaMap.get(s.label) || 0;
-        const prev =
-          s.stock === null || s.stock === undefined
-            ? Number(target.stock || 0)
-            : Number(s.stock || 0);
-        return {
-          label: s.label,
-          price: Number(s.price) || Number(target.price) || 0,
-          stock: Math.max(0, prev + add),
-        };
-      });
-      deltaMap.forEach((add, label) => {
-        if (!nextSizes.some((s) => s.label === label)) {
-          nextSizes.push({
-            label,
-            price: Number(target.price) || 0,
-            stock: Math.max(0, add),
-          });
-        }
-      });
-      qty = Array.from(deltaMap.values()).reduce((a, b) => a + b, 0);
+    if (deltaMap.size > 0) {
+      qty = sizeResult.qtyFromSizes;
+    } else if (colorDeltaMap.size > 0) {
+      qty = colorResult.qtyFromColors;
     }
 
     if (!Number.isFinite(qty) || qty <= 0) {
       return { success: false, error: 'Enter a valid purchase quantity' };
     }
 
-    const prevStock = Number(target.stock || 0);
-    const newStock =
-      nextSizes && nextSizes.length
-        ? nextSizes.reduce((sum, s) => sum + (Number(s.stock) || 0), 0)
-        : prevStock + qty;
-    const prevPrice = Number(target.price || 0);
-    const nextPrice = price != null && Number.isFinite(price) && price >= 0 ? price : prevPrice;
+    // Product stock always increases by purchased qty (never sum of inherited size stocks).
+    const expectedStock = prevStock + qty;
     const expense = cost * qty;
     const profitPerUnit = nextPrice - cost;
     const expectedProfit = profitPerUnit * qty;
     const margin = nextPrice > 0 ? (profitPerUnit / nextPrice) * 100 : 0;
 
+    const poId = `po-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const piId = `pi-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const expId = `exp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    const today = new Date().toISOString().slice(0, 10);
+    const resolvedProductId = target.product_id || target.id || productId;
+
+    // Metadata only when online — stock is applied via atomic +qty RPC below.
+    const client = supabaseManager.getClient();
     const updates = {
-      stock: newStock,
       unit_cost: cost,
       unitCost: cost,
       price: nextPrice,
@@ -632,19 +779,54 @@ export const productService = {
     if (nextSizes) {
       updates.sizes = serializeProductSizes(nextSizes, nextPrice);
     }
+    if (nextColors) {
+      updates.colors = serializeProductColors(nextColors);
+    }
+    if (!client) {
+      updates.stock = expectedStock;
+      updates.stockReason = 'restock';
+      updates.stockRefType = 'purchase_order';
+      updates.stockRefId = poId;
+    }
 
     const updateRes = await this.updateProduct(productId, updates);
     if (!updateRes?.success) {
       return { success: false, error: updateRes?.error || 'Failed to update product' };
     }
 
-    const poId = `po-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-    const piId = `pi-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-    const expId = `exp-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
-    const today = new Date().toISOString().slice(0, 10);
+    let finalStock = expectedStock;
+    if (client) {
+      const stockRes = await adjustStockRpc(client, {
+        productId: resolvedProductId,
+        delta: Math.trunc(qty),
+        reason: 'restock',
+        referenceType: 'purchase_order',
+        referenceId: poId,
+        actorId: null,
+      });
+      if (!stockRes.success) {
+        return {
+          success: false,
+          error: stockRes.error || 'Failed to restock inventory',
+        };
+      }
+      finalStock = Number.isFinite(stockRes.stock) ? stockRes.stock : expectedStock;
+      try {
+        const cached = await this.getProducts();
+        const synced = cached.map((p) =>
+          p.id === productId ||
+          p.product_id === productId ||
+          p.id === resolvedProductId ||
+          p.product_id === resolvedProductId
+            ? { ...p, stock: finalStock }
+            : p
+        );
+        appStorage.setItem(STORAGE_KEY, JSON.stringify(synced));
+        notifyListeners(synced);
+      } catch (_e) {}
+    }
 
     try {
-      const client = supabaseManager.getClient();
       if (client) {
         const poPayload = {
           po_id: poId,
@@ -666,7 +848,7 @@ export const productService = {
           {
             purchase_item_id: piId,
             po_id: poId,
-            product_id: target.product_id || target.id,
+            product_id: resolvedProductId,
             quantity: qty,
             cost,
             subtotal: expense,
@@ -701,7 +883,7 @@ export const productService = {
       const list = raw ? JSON.parse(raw) : [];
       const entry = {
         id: poId,
-        product_id: target.product_id || target.id,
+        product_id: resolvedProductId,
         product_name: target.name,
         supplier_id: supplierId,
         supplier_name: supplierName || 'Supplier',
@@ -715,21 +897,31 @@ export const productService = {
         size_deltas: deltaMap.size
           ? Array.from(deltaMap.entries()).map(([label, quantity]) => ({ label, quantity }))
           : null,
+        color_deltas: colorDeltaMap.size
+          ? Array.from(colorDeltaMap.entries()).map(([label, quantity]) => ({ label, quantity }))
+          : null,
         created_at: new Date().toISOString(),
       };
       const next = [entry, ...(Array.isArray(list) ? list : [])].slice(0, 100);
       appStorage.setItem(key, JSON.stringify(next));
     } catch (_e) {}
 
+    const serializedSizes = nextSizes
+      ? serializeProductSizes(nextSizes, nextPrice)
+      : undefined;
+    const serializedColors = nextColors ? serializeProductColors(nextColors) : undefined;
+
     return {
       success: true,
       product: {
         ...target,
-        stock: newStock,
+        ...(updateRes.product || {}),
+        stock: finalStock,
         unit_cost: cost,
         unitCost: cost,
         price: nextPrice,
-        ...(nextSizes ? { sizes: serializeProductSizes(nextSizes, nextPrice) } : {}),
+        ...(serializedSizes ? { sizes: serializedSizes } : {}),
+        ...(serializedColors ? { colors: serializedColors } : {}),
       },
       purchase: {
         poId,
@@ -825,10 +1017,12 @@ export const productService = {
   },
 
   /**
-   * Deduct stock for completed order / POS checkout.
-   * Aborts without mutating local inventory if any line lacks stock or a remote write fails.
+   * Deduct stock for completed order / POS checkout via atomic RPC.
+   * Each line is an independent ledger entry (reason=sale).
+   * Mid-failure lines already committed stay committed; caller should surface the error.
+   * Compensating restores use restoreStock (reason=return) only when explicitly requested.
    */
-  async deductStock(items) {
+  async deductStock(items, meta = {}) {
     if (!Array.isArray(items) || items.length === 0) return { success: true };
 
     const validation = await this.validateStock(items);
@@ -838,83 +1032,66 @@ export const productService = {
 
     const catalog = await this.getProducts();
     const updated = [...catalog];
-    const appliedRemote = [];
+    const applied = [];
     const client = supabaseManager.getClient();
-
-    const rollbackRemote = async () => {
-      if (!client) return;
-      for (const done of appliedRemote) {
-        try {
-          await upsertInventoryStock(client, done.productId, done.previousStock);
-        } catch (e) {
-          console.warn('Supabase stock rollback error:', e);
-        }
-      }
-    };
+    const orderRef = meta.orderId || meta.referenceId || null;
 
     for (const step of validation.plan) {
       const index = updated.findIndex((p) => p.id === step.productId || p.product_id === step.productId);
-      if (index === -1 || Number(updated[index].stock || 0) < step.quantity) {
-        await rollbackRemote();
-        return { success: false, error: `Insufficient stock for "${step.name}"` };
+      if (index === -1) {
+        return {
+          success: false,
+          error: `Product not found for "${step.name}"`,
+          deductions: applied,
+        };
       }
 
-      updated[index] = { ...updated[index], stock: step.newStock };
-
       if (client) {
-        try {
-          const { data: invRows, error } = await client
-            .from('inventory')
-            .select('product_id, stock_quantity')
-            .eq('product_id', step.productId)
-            .limit(1);
-
-          if (error) {
-            console.warn('Supabase stock deduction error:', error);
-            await rollbackRemote();
-            return { success: false, error: `Failed to update inventory for "${step.name}"` };
-          } else if (invRows && invRows.length > 0) {
-            const remoteStock = Number(invRows[0].stock_quantity || 0);
-            if (remoteStock < step.quantity) {
-              await rollbackRemote();
-              return {
-                success: false,
-                error: `Insufficient stock for "${step.name}" (only ${remoteStock} left)`,
-              };
-            }
-            const newQty = remoteStock - step.quantity;
-            await upsertInventoryStock(client, step.productId, newQty);
-            appliedRemote.push({
-              ...step,
-              previousStock: remoteStock,
-              newStock: newQty,
-            });
-          } else {
-            await upsertInventoryStock(client, step.productId, step.newStock);
-            appliedRemote.push(step);
-          }
-        } catch (e) {
-          console.warn('Supabase stock deduction error:', e);
+        const res = await adjustStockRpc(client, {
+          productId: step.productId,
+          delta: -Math.abs(step.quantity),
+          reason: 'sale',
+          referenceType: meta.referenceType || 'order',
+          referenceId: orderRef,
+          actorId: meta.actorId || null,
+        });
+        if (!res.success) {
+          return {
+            success: false,
+            error: res.error || `Insufficient stock for "${step.name}"`,
+            deductions: applied,
+            code: res.code,
+          };
         }
+        updated[index] = { ...updated[index], stock: res.stock };
+        applied.push({ ...step, newStock: res.stock });
+      } else {
+        const next = Number(updated[index].stock || 0) - step.quantity;
+        if (next < 0) {
+          return { success: false, error: `Insufficient stock for "${step.name}"`, deductions: applied };
+        }
+        updated[index] = { ...updated[index], stock: next };
+        applied.push({ ...step, newStock: next });
       }
     }
 
     try {
       appStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch (e) {}
+    } catch (_e) {}
     notifyListeners(updated);
-    return { success: true, products: updated, deductions: validation.plan };
+    return { success: true, products: updated, deductions: applied };
   },
 
   /**
-   * Restore previously deducted stock (cancel / failed checkout rollback).
+   * Restore previously deducted stock (cancel / return) via atomic RPC.
    */
-  async restoreStock(items) {
+  async restoreStock(items, meta = {}) {
     if (!Array.isArray(items) || items.length === 0) return { success: true };
 
     const catalog = await this.getProducts();
     const updated = [...catalog];
     const client = supabaseManager.getClient();
+    const orderRef = meta.orderId || meta.referenceId || null;
 
     for (const item of items) {
       const rawId = item.product_id || item.id || item.product?.id || item.product?.product_id;
@@ -926,23 +1103,56 @@ export const productService = {
       const index = updated.findIndex((p) => p.id === prodId || p.product_id === prodId);
       if (index === -1) continue;
 
-      const newStock = Number(updated[index].stock || 0) + qty;
-      updated[index] = { ...updated[index], stock: newStock };
-
       if (client) {
-        try {
-          await upsertInventoryStock(client, prodId, newStock);
-        } catch (e) {
-          console.warn('Supabase stock restore error:', e);
+        const res = await adjustStockRpc(client, {
+          productId: prodId,
+          delta: Math.abs(qty),
+          reason: meta.reason || 'return',
+          referenceType: meta.referenceType || 'order',
+          referenceId: orderRef,
+          actorId: meta.actorId || null,
+        });
+        if (!res.success) {
+          console.warn('restoreStock RPC failed:', res.error);
+          return { success: false, error: res.error || 'Failed to restore stock', products: updated };
         }
+        updated[index] = { ...updated[index], stock: res.stock };
+      } else {
+        const newStock = Number(updated[index].stock || 0) + qty;
+        updated[index] = { ...updated[index], stock: newStock };
       }
     }
 
     try {
       appStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-    } catch (e) {}
+    } catch (_e) {}
     notifyListeners(updated);
     return { success: true, products: updated };
+  },
+
+  /**
+   * Fetch inventory ledger rows for a product (or all recent).
+   */
+  async getInventoryTransactions({ productId = null, limit = 50 } = {}) {
+    const client = supabaseManager.getClient();
+    if (!client) return [];
+    try {
+      let q = client
+        .from('inventory_transactions')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+      if (productId) q = q.eq('product_id', productId);
+      const { data, error } = await q;
+      if (error) {
+        console.warn('getInventoryTransactions:', error.message);
+        return [];
+      }
+      return data || [];
+    } catch (e) {
+      console.warn('getInventoryTransactions:', e);
+      return [];
+    }
   },
 
   /**

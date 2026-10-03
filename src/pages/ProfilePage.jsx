@@ -11,6 +11,7 @@ import {
   Modal,
   Animated,
   Platform,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { profileMobileStyles as styles } from '../styles/profilePage.styles';
@@ -21,7 +22,7 @@ import { orderService } from '../services/orderService';
 import { notificationService } from '../services/notificationService';
 import { motorcycleService } from '../services/motorcycleService';
 import { BootstrapIcon, BottomNavBar, ToastNotification } from '../components/common';
-import { LiveOrderTrackingMapModal, ConfirmModal, RegisterMotorcycleModal, EditCustomerSettingsModal } from '../components/modals';
+import { LiveOrderTrackingMapModal, ConfirmModal, RegisterMotorcycleModal, EditCustomerSettingsModal, CompanyInfoModal } from '../components/modals';
 import { pickImageFromFile } from '../utils/imagePickerHelper';
 
 const ADDRESS_PRESETS = [
@@ -56,6 +57,107 @@ function formatOrderItemsSummary(order, fallback = 'Motorcycle Performance Equip
       .join(', ');
   }
   return fallback;
+}
+
+const getOrderGrandTotal = (order) => {
+  if (!order) return 0;
+  const val = Number(
+    order.grand_total ??
+    order.grandTotal ??
+    order.total_amount ??
+    order.total ??
+    order.totalAmount ??
+    0
+  );
+  if (!isNaN(val) && val > 0) return val;
+
+  if (Array.isArray(order.items) && order.items.length > 0) {
+    const calc = order.items.reduce((sum, i) => {
+      const price = Number(i?.price ?? i?.cost ?? i?.unit_cost ?? 0);
+      const qty = Number(i?.quantity) || 1;
+      return sum + (price * qty);
+    }, 0);
+    if (calc > 0) return calc;
+  }
+  return !isNaN(val) ? val : 0;
+};
+
+const isOrderDeliveredOrDone = (status) => {
+  const s = String(status || '').toLowerCase().trim();
+  if (s.includes('out') || s.includes('transit') || s.includes('shipped') || s.includes('ready') || s.includes('report')) {
+    return false;
+  }
+  return s === 'delivered' || s.includes('complete') || s.includes('cancel') || s.includes('refund');
+};
+
+const isOrderPendingApproval = (status) => {
+  const s = String(status || '').toLowerCase();
+  return s.includes('pending') || s.includes('approval');
+};
+
+const getOrderStatusRank = (status) => {
+  const s = String(status || '').toLowerCase().trim();
+  if (s.includes('pending') || s.includes('approval') || s === 'processing') return 1;
+  if (s.includes('out') || s.includes('transit') || s.includes('shipped') || s.includes('ready') || s.includes('report')) return 2;
+  if (s === 'delivered' || s.includes('complete')) return 3;
+  if (s.includes('cancel') || s.includes('refund')) return 4;
+  return 2;
+};
+
+const sortOrdersByPriority = (orderList) => {
+  if (!Array.isArray(orderList)) return [];
+  return [...orderList].sort((a, b) => {
+    const rankA = getOrderStatusRank(a.status);
+    const rankB = getOrderStatusRank(b.status);
+
+    if (rankA !== rankB) {
+      return rankA - rankB;
+    }
+
+    const dateA = new Date(a.created_at || a.date || a.orderDate || a.createdAt || 0).getTime();
+    const dateB = new Date(b.created_at || b.date || b.orderDate || b.createdAt || 0).getTime();
+    return dateB - dateA;
+  });
+};
+
+function formatNotifTime(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return '';
+    const now = new Date();
+    const diffMs = now - d;
+    if (diffMs < 0) return 'Just now';
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString();
+  } catch (_e) {
+    return '';
+  }
+}
+
+function getNotifVisuals(type) {
+  switch (type) {
+    case 'order':
+      return { icon: 'bag-check-fill', bg: '#DCFCE7', color: '#16A34A', label: 'Order' };
+    case 'booking':
+      return { icon: 'tools', bg: '#FEF3C7', color: '#D97706', label: 'Pitstop' };
+    case 'promo':
+    case 'welcome':
+      return { icon: 'lightning-charge-fill', bg: '#F3E8FF', color: '#9333EA', label: 'Special' };
+    case 'security':
+    case 'system':
+      return { icon: 'shield-lock-fill', bg: '#FEE2E2', color: '#DC2626', label: 'Security' };
+    default:
+      return { icon: 'bell-fill', bg: '#E2E8F0', color: '#1D4533', label: 'Alert' };
+  }
 }
 
 export default function ProfilePage({
@@ -130,6 +232,19 @@ export default function ProfilePage({
   // Orders Filter
   const [orderFilter, setOrderFilter] = useState('All');
 
+  // More / Menu Tab Sub-view and Modals
+  const [menuSubView, setMenuSubView] = useState('main'); // 'main' | 'settings_privacy'
+  const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
+  const [isPrivacyCenterOpen, setIsPrivacyCenterOpen] = useState(false);
+  const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
+  const [selectedLanguage, setSelectedLanguage] = useState('English (US)');
+  const [isPrivacyCheckupOpen, setIsPrivacyCheckupOpen] = useState(false);
+  const [isContentPrefOpen, setIsContentPrefOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [reportText, setReportText] = useState('');
+  const [reportSubmitted, setReportSubmitted] = useState(false);
+  const [isDisplayModalOpen, setIsDisplayModalOpen] = useState(false);
+
   // Live Tracking Modal State
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
@@ -162,6 +277,44 @@ export default function ProfilePage({
   const [notifications, setNotifications] = useState(() =>
     notificationService.getNotifications(currentUser?.id)
   );
+  const [notifFilter, setNotifFilter] = useState('all');
+
+  const filteredTabNotifications = useMemo(() => {
+    const list = Array.isArray(notifications) ? notifications : [];
+    return list.filter((n) => {
+      if (notifFilter === 'unread') return n.status === 'unread';
+      if (notifFilter === 'order') return n.type === 'order';
+      if (notifFilter === 'booking') return n.type === 'booking';
+      if (notifFilter === 'promo') return n.type === 'promo' || n.type === 'welcome';
+      return true;
+    });
+  }, [notifications, notifFilter]);
+
+  const handleMarkAllCustomerNotificationsRead = async () => {
+    await notificationService.markAllCustomerAsRead(currentUser?.id);
+    setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+  };
+
+  const handleCustomerNotificationPress = async (n) => {
+    if (n.status === 'unread') {
+      await notificationService.markCustomerAsRead(n.id);
+      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+    }
+    if (n.link === 'orders' || n.type === 'order') {
+      setActiveTab('orders');
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    } else if (n.link === 'garage' || n.link === 'bookings' || n.type === 'booking') {
+      setActiveTab('bookings');
+      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+    } else if (n.link === 'shop' || n.type === 'promo') {
+      onNavigateToStore?.();
+    }
+  };
+
+  const handleDeleteCustomerNotification = async (id) => {
+    await notificationService.deleteCustomerNotification(id);
+    setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+  };
 
   // Cancel Booking Modal
   const [bookingToCancel, setBookingToCancel] = useState(null);
@@ -308,10 +461,16 @@ export default function ProfilePage({
     );
   }, [bookings]);
 
+  const activePendingOrders = useMemo(() => {
+    return (Array.isArray(orders) ? orders : []).filter(
+      (o) => !isOrderDeliveredOrDone(o.status)
+    );
+  }, [orders]);
+
   const totalSpent = useMemo(() => {
     return (Array.isArray(orders) ? orders : [])
       .filter((o) => o.status !== 'Cancelled')
-      .reduce((sum, o) => sum + (Number(o.grandTotal || o.total) || 0), 0);
+      .reduce((sum, o) => sum + getOrderGrandTotal(o), 0);
   }, [orders]);
 
   const activeBookingsCount = useMemo(
@@ -327,17 +486,25 @@ export default function ProfilePage({
   const activeOngoingOrder = useMemo(() => {
     const list = Array.isArray(orders) ? orders : [];
     return (
-      list.find((o) => ['Processing', 'Shipped', 'Out for Delivery', 'On the Way'].includes(o.status)) ||
-      list[0] ||
-      null
+      list.find((o) => {
+        const s = String(o?.status || '').toLowerCase();
+        return !s.includes('deliver') && !s.includes('complete') && !s.includes('cancel') && !s.includes('refund');
+      }) || null
     );
+  }, [orders]);
+
+  const sortedOrders = useMemo(() => {
+    return sortOrdersByPriority(orders);
   }, [orders]);
 
   // Filtered Orders
   const filteredOrders = useMemo(() => {
     const list = Array.isArray(orders) ? orders : [];
-    if (orderFilter === 'All') return list;
-    return list.filter((o) => (o.status || '').toLowerCase() === orderFilter.toLowerCase());
+    let filtered = list;
+    if (orderFilter !== 'All') {
+      filtered = filtered.filter((o) => (o.status || '').toLowerCase() === orderFilter.toLowerCase());
+    }
+    return sortOrdersByPriority(filtered);
   }, [orders, orderFilter]);
 
   // Next Upcoming Booking
@@ -585,8 +752,28 @@ export default function ProfilePage({
   };
 
   const handleTrackOrder = (order) => {
+    const s = String(order?.status || '').toLowerCase();
+    if (s.includes('pending') || s.includes('approval')) {
+      showToast('⏳ Order is pending admin approval. Live map tracking will unlock once approved.');
+      return;
+    }
+    if (s.includes('deliver') || s.includes('complete') || s.includes('cancel') || s.includes('refund')) {
+      showToast('✓ This order has already been delivered and confirmed!');
+      return;
+    }
     setSelectedOrderForTracking(order);
     setIsLiveTrackingOpen(true);
+  };
+
+  const handleSubmitReport = () => {
+    if (!reportText.trim()) return;
+    setReportSubmitted(true);
+    setTimeout(() => {
+      setReportSubmitted(false);
+      setReportText('');
+      setIsReportModalOpen(false);
+      showToast('Thank you for reporting this issue! Our team has been notified.');
+    }, 1800);
   };
 
   const handleBottomNavChange = (tab) => {
@@ -691,222 +878,395 @@ export default function ProfilePage({
              ═══════════════════════════════════════════════════════ */}
           {activeTab === 'menu' && (
             <View style={styles.menuContentWrapper}>
-              {/* Card 1: User Profile & Settings */}
-              <View style={styles.menuRefCard}>
-                <View style={styles.menuRefProfileRow}>
-                  <View style={[styles.menuRefAvatar, { overflow: 'hidden' }]}>
-                    {currentUser?.avatar ? (
-                      <Image source={{ uri: currentUser.avatar }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
-                    ) : (
-                      <BootstrapIcon name="person-fill" size={24} color="#FFFFFF" />
-                    )}
+              {menuSubView === 'settings_privacy' ? (
+                /* ═══════════════════════════════════════════════════════
+                   SETTINGS & PRIVACY SUB-VIEW (MOBILE APP)
+                   ═══════════════════════════════════════════════════════ */
+                <View style={styles.menuRefCard}>
+                  {/* Top Header with Back Arrow and Title */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 14, gap: 12, borderBottomWidth: 1, borderBottomColor: '#E4E6EB' }}>
+                    <TouchableOpacity
+                      style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#E4E6EB', alignItems: 'center', justifyContent: 'center' }}
+                      onPress={() => setMenuSubView('main')}
+                      activeOpacity={0.7}
+                      accessibilityLabel="Back to More menu"
+                    >
+                      <BootstrapIcon name="arrow-left" size={18} color="#050505" />
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: '#050505', letterSpacing: -0.3 }}>Settings & privacy</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.menuRefUserName} numberOfLines={1}>
-                      {currentUser?.name || currentUser?.fullName || 'Jherico Maurin'}
-                    </Text>
-                    <Text style={styles.menuRefUserSub} numberOfLines={1}>
-                      Customer Profile • @{currentUser?.email ? currentUser.email.split('@')[0] : 'rider'}
-                    </Text>
-                  </View>
+
+                  {/* 1. Settings */}
+                  <TouchableOpacity
+                    style={styles.menuRefRowBtn}
+                    onPress={() => {
+                      setActiveTab('settings');
+                      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.menuRefRowLeft}>
+                      <View style={styles.menuRefIconWrap}>
+                        <BootstrapIcon name="gear-fill" size={17} color="#050505" />
+                      </View>
+                      <Text style={styles.menuRefRowText}>Settings</Text>
+                    </View>
+                    <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                  </TouchableOpacity>
+
+                  <View style={styles.menuRefHairline} />
+
+                  {/* 2. Language */}
+                  <TouchableOpacity
+                    style={styles.menuRefRowBtn}
+                    onPress={() => setIsLanguageModalOpen(true)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.menuRefRowLeft}>
+                      <View style={styles.menuRefIconWrap}>
+                        <BootstrapIcon name="globe" size={17} color="#050505" />
+                      </View>
+                      <Text style={styles.menuRefRowText}>Language</Text>
+                    </View>
+                    <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                  </TouchableOpacity>
+
+                  <View style={styles.menuRefHairline} />
+
+                  {/* 3. Privacy checkup */}
+                  <TouchableOpacity
+                    style={styles.menuRefRowBtn}
+                    onPress={() => setIsPrivacyCheckupOpen(true)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.menuRefRowLeft}>
+                      <View style={styles.menuRefIconWrap}>
+                        <BootstrapIcon name="shield-check" size={17} color="#050505" />
+                      </View>
+                      <Text style={styles.menuRefRowText}>Privacy checkup</Text>
+                    </View>
+                    <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                  </TouchableOpacity>
+
+                  <View style={styles.menuRefHairline} />
+
+                  {/* 4. Privacy Center */}
+                  <TouchableOpacity
+                    style={styles.menuRefRowBtn}
+                    onPress={() => setIsPrivacyCenterOpen(true)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.menuRefRowLeft}>
+                      <View style={styles.menuRefIconWrap}>
+                        <BootstrapIcon name="shield-lock-fill" size={17} color="#050505" />
+                      </View>
+                      <Text style={styles.menuRefRowText}>Privacy Center</Text>
+                    </View>
+                    <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                  </TouchableOpacity>
+
+                  <View style={styles.menuRefHairline} />
+
+                  {/* 5. Activity log */}
+                  <TouchableOpacity
+                    style={styles.menuRefRowBtn}
+                    onPress={() => {
+                      setActiveTab('orders');
+                      scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.menuRefRowLeft}>
+                      <View style={styles.menuRefIconWrap}>
+                        <BootstrapIcon name="list-task" size={17} color="#050505" />
+                      </View>
+                      <Text style={styles.menuRefRowText}>Activity log</Text>
+                    </View>
+                    <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                  </TouchableOpacity>
+
+                  <View style={styles.menuRefHairline} />
+
+                  {/* 6. Content preferences */}
+                  <TouchableOpacity
+                    style={styles.menuRefRowBtn}
+                    onPress={() => setIsContentPrefOpen(true)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.menuRefRowLeft}>
+                      <View style={styles.menuRefIconWrap}>
+                        <BootstrapIcon name="sliders" size={17} color="#050505" />
+                      </View>
+                      <Text style={styles.menuRefRowText}>Content preferences</Text>
+                    </View>
+                    <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                  </TouchableOpacity>
                 </View>
-
-                <View style={styles.menuRefHairline} />
-
-                <TouchableOpacity
-                  style={styles.menuRefRowBtn}
-                  onPress={() => {
-                    setActiveTab('profile');
-                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.menuRefRowLeft}>
-                    <View style={[styles.menuRefIconWrap, { backgroundColor: '#E8F0EC' }]}>
-                      <BootstrapIcon name="person-fill" size={17} color="#1D4533" />
-                    </View>
-                    <Text style={styles.menuRefRowText}>Profile</Text>
-                  </View>
-                  <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Card 2: DASHBOARD CHOICES (Grouped Card from Reference) */}
-              <View style={styles.menuRefCard}>
-                {/* 1. Overview Hub */}
-                <TouchableOpacity
-                  style={styles.menuRefRowBtn}
-                  onPress={() => {
-                    setActiveTab('overview');
-                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.menuRefRowLeft}>
-                    <View style={styles.menuRefIconWrap}>
-                      <BootstrapIcon name="speedometer2" size={17} color="#1D4533" />
-                    </View>
-                    <Text style={styles.menuRefRowText}>Overview Hub</Text>
-                  </View>
-                  <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
-                </TouchableOpacity>
-
-                <View style={styles.menuRefHairline} />
-
-                {/* 2. My Garage */}
-                <TouchableOpacity
-                  style={styles.menuRefRowBtn}
-                  onPress={() => {
-                    setActiveTab('garage');
-                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.menuRefRowLeft}>
-                    <View style={styles.menuRefIconWrap}>
-                      <BootstrapIcon name="tools" size={17} color="#1D4533" />
-                    </View>
-                    <Text style={styles.menuRefRowText}>My Garage</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    {motorcycles.length > 0 && (
-                      <View style={styles.menuRefCountBadge}>
-                        <Text style={styles.menuRefCountBadgeText}>{motorcycles.length}</Text>
-                      </View>
-                    )}
-                    <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
-                  </View>
-                </TouchableOpacity>
-
-                <View style={styles.menuRefHairline} />
-
-                {/* 3. Pit Bookings */}
-                <TouchableOpacity
-                  style={styles.menuRefRowBtn}
-                  onPress={() => {
-                    setActiveTab('bookings');
-                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.menuRefRowLeft}>
-                    <View style={styles.menuRefIconWrap}>
-                      <BootstrapIcon name="calendar-check" size={17} color="#1D4533" />
-                    </View>
-                    <Text style={styles.menuRefRowText}>Pit Bookings</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    {activeBookingsCount > 0 && (
-                      <View style={styles.menuRefCountBadge}>
-                        <Text style={styles.menuRefCountBadgeText}>{activeBookingsCount}</Text>
-                      </View>
-                    )}
-                    <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
-                  </View>
-                </TouchableOpacity>
-
-                <View style={styles.menuRefHairline} />
-
-                {/* 4. Alerts & Notifications */}
-                <TouchableOpacity
-                  style={styles.menuRefRowBtn}
-                  onPress={() => {
-                    setActiveTab('notifications');
-                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.menuRefRowLeft}>
-                    <View style={styles.menuRefIconWrap}>
-                      <BootstrapIcon name="bell" size={17} color="#1D4533" />
-                    </View>
-                    <Text style={styles.menuRefRowText}>Alerts & Notifications</Text>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    {unreadNotifCount > 0 && (
-                      <View style={[styles.menuRefCountBadge, { backgroundColor: '#EF4444' }]}>
-                        <Text style={styles.menuRefCountBadgeText}>{unreadNotifCount}</Text>
-                      </View>
-                    )}
-                    <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
-                  </View>
-                </TouchableOpacity>
-
-                <View style={styles.menuRefHairline} />
-
-                {/* 5. Account Settings */}
-                <TouchableOpacity
-                  style={styles.menuRefRowBtn}
-                  onPress={() => {
-                    setActiveTab('settings');
-                    scrollViewRef.current?.scrollTo({ y: 0, animated: false });
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.menuRefRowLeft}>
-                    <View style={styles.menuRefIconWrap}>
-                      <BootstrapIcon name="gear-fill" size={17} color="#1D4533" />
-                    </View>
-                    <Text style={styles.menuRefRowText}>Account Settings</Text>
-                  </View>
-                  <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
-                </TouchableOpacity>
-              </View>
-
-              {/* Card 3: Admin Console (If Admin) */}
-              {currentUser?.role === 'admin' && (
+              ) : (
+                /* ═══════════════════════════════════════════════════════
+                   ORGANIZED MAIN "MORE" SCREEN (MATCHING REFERENCE SCREENSHOT)
+                   ═══════════════════════════════════════════════════════ */
                 <>
-                  <Text style={styles.menuRefSectionTitle}>Also from Store Administration</Text>
+                  {/* CARD 1: PRIMARY PROFILE & SYSTEM CARD */}
                   <View style={styles.menuRefCard}>
+                    {/* User Profile Header */}
+                    <TouchableOpacity
+                      style={styles.menuRefProfileRow}
+                      onPress={() => {
+                        setActiveTab('profile');
+                        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                      }}
+                      activeOpacity={0.75}
+                    >
+                      <View style={[styles.menuRefAvatar, { overflow: 'hidden' }]}>
+                        {currentUser?.avatar ? (
+                          <Image source={{ uri: currentUser.avatar }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                        ) : (
+                          <BootstrapIcon name="person-fill" size={24} color="#65676B" />
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.menuRefUserName} numberOfLines={1}>
+                          {currentUser?.name || currentUser?.fullName || 'Rider Account'}
+                        </Text>
+                        <Text style={styles.menuRefUserSub} numberOfLines={1}>
+                          See your profile
+                        </Text>
+                      </View>
+                      <BootstrapIcon name="chevron-right" size={15} color="#8A8D91" />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuRefHairline} />
+
+                    {/* 1. Settings & privacy */}
                     <TouchableOpacity
                       style={styles.menuRefRowBtn}
-                      onPress={() => onNavigateToAdmin?.()}
+                      onPress={() => setMenuSubView('settings_privacy')}
                       activeOpacity={0.7}
                     >
                       <View style={styles.menuRefRowLeft}>
-                        <View style={[styles.menuRefIconWrap, { backgroundColor: '#FEF3C7' }]}>
-                          <BootstrapIcon name="shield-lock-fill" size={17} color="#D97706" />
+                        <View style={styles.menuRefIconWrap}>
+                          <BootstrapIcon name="gear-fill" size={17} color="#050505" />
                         </View>
-                        <Text style={styles.menuRefRowText}>Admin Console</Text>
+                        <Text style={styles.menuRefRowText}>Settings & privacy</Text>
                       </View>
-                      <BootstrapIcon name="chevron-right" size={14} color="#94A3B8" />
+                      <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
                     </TouchableOpacity>
+
+                    <View style={styles.menuRefHairline} />
+
+                    {/* 2. Help & support */}
+                    <TouchableOpacity
+                      style={styles.menuRefRowBtn}
+                      onPress={() => setIsHelpModalOpen(true)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.menuRefRowLeft}>
+                        <View style={styles.menuRefIconWrap}>
+                          <BootstrapIcon name="question-circle-fill" size={17} color="#050505" />
+                        </View>
+                        <Text style={styles.menuRefRowText}>Help & support</Text>
+                      </View>
+                      <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuRefHairline} />
+
+                    {/* 3. Report a problem */}
+                    <TouchableOpacity
+                      style={styles.menuRefRowBtn}
+                      onPress={() => setIsReportModalOpen(true)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.menuRefRowLeft}>
+                        <View style={styles.menuRefIconWrap}>
+                          <BootstrapIcon name="chat-square-dots-fill" size={17} color="#050505" />
+                        </View>
+                        <View>
+                          <Text style={styles.menuRefRowText}>Report a problem</Text>
+                          <Text style={{ fontSize: 11, color: '#65676B', marginTop: 1 }}>Feedback & bug reporting</Text>
+                        </View>
+                      </View>
+                      <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuRefHairline} />
+
+                    {/* 4. Display & accessibility */}
+                    <TouchableOpacity
+                      style={styles.menuRefRowBtn}
+                      onPress={() => setIsDisplayModalOpen(true)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.menuRefRowLeft}>
+                        <View style={styles.menuRefIconWrap}>
+                          <BootstrapIcon name="moon-fill" size={17} color="#050505" />
+                        </View>
+                        <Text style={styles.menuRefRowText}>Display & accessibility</Text>
+                      </View>
+                      <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* CARD 2: ACTIVITY & SERVICES */}
+                  <Text style={styles.menuRefSectionTitle}>Activity & Services</Text>
+                  <View style={styles.menuRefCard}>
+                    {/* 1. Overview Hub */}
+                    <TouchableOpacity
+                      style={styles.menuRefRowBtn}
+                      onPress={() => {
+                        setActiveTab('overview');
+                        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.menuRefRowLeft}>
+                        <View style={styles.menuRefIconWrap}>
+                          <BootstrapIcon name="speedometer2" size={17} color="#050505" />
+                        </View>
+                        <Text style={styles.menuRefRowText}>Overview Hub</Text>
+                      </View>
+                      <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                    </TouchableOpacity>
+
+                    <View style={styles.menuRefHairline} />
+
+                    {/* 2. My Garage */}
+                    <TouchableOpacity
+                      style={styles.menuRefRowBtn}
+                      onPress={() => {
+                        setActiveTab('garage');
+                        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.menuRefRowLeft}>
+                        <View style={styles.menuRefIconWrap}>
+                          <BootstrapIcon name="tools" size={17} color="#050505" />
+                        </View>
+                        <Text style={styles.menuRefRowText}>My Garage</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {motorcycles.length > 0 && (
+                          <View style={styles.menuRefCountBadge}>
+                            <Text style={styles.menuRefCountBadgeText}>{motorcycles.length}</Text>
+                          </View>
+                        )}
+                        <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                      </View>
+                    </TouchableOpacity>
+
+                    <View style={styles.menuRefHairline} />
+
+                    {/* 3. Pit Bookings */}
+                    <TouchableOpacity
+                      style={styles.menuRefRowBtn}
+                      onPress={() => {
+                        setActiveTab('bookings');
+                        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.menuRefRowLeft}>
+                        <View style={styles.menuRefIconWrap}>
+                          <BootstrapIcon name="calendar-check" size={17} color="#050505" />
+                        </View>
+                        <Text style={styles.menuRefRowText}>Pit Bookings</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {activeBookingsCount > 0 && (
+                          <View style={styles.menuRefCountBadge}>
+                            <Text style={styles.menuRefCountBadgeText}>{activeBookingsCount}</Text>
+                          </View>
+                        )}
+                        <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                      </View>
+                    </TouchableOpacity>
+
+                    <View style={styles.menuRefHairline} />
+
+                    {/* 4. Alerts & Notifications */}
+                    <TouchableOpacity
+                      style={styles.menuRefRowBtn}
+                      onPress={() => {
+                        setActiveTab('notifications');
+                        scrollViewRef.current?.scrollTo({ y: 0, animated: false });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.menuRefRowLeft}>
+                        <View style={styles.menuRefIconWrap}>
+                          <BootstrapIcon name="bell" size={17} color="#050505" />
+                        </View>
+                        <Text style={styles.menuRefRowText}>Alerts & Notifications</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        {unreadNotifCount > 0 && (
+                          <View style={[styles.menuRefCountBadge, { backgroundColor: '#EF4444' }]}>
+                            <Text style={styles.menuRefCountBadgeText}>{unreadNotifCount}</Text>
+                          </View>
+                        )}
+                        <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* CARD 3: STORE ADMINISTRATION (IF ADMIN) */}
+                  {currentUser?.role === 'admin' && (
+                    <>
+                      <Text style={styles.menuRefSectionTitle}>Store Administration</Text>
+                      <View style={styles.menuRefCard}>
+                        <TouchableOpacity
+                          style={styles.menuRefRowBtn}
+                          onPress={() => onNavigateToAdmin?.()}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.menuRefRowLeft}>
+                            <View style={[styles.menuRefIconWrap, { backgroundColor: '#E8F0EC' }]}>
+                              <BootstrapIcon name="shield-lock-fill" size={17} color="#1D4533" />
+                            </View>
+                            <Text style={[styles.menuRefRowText, { color: '#1D4533', fontWeight: '700' }]}>Admin Console</Text>
+                          </View>
+                          <BootstrapIcon name="chevron-right" size={14} color="#1D4533" />
+                        </TouchableOpacity>
+                      </View>
+                    </>
+                  )}
+
+                  {/* CARD 4: SESSION & ACCOUNT ACCESS (LOG OUT / SIGN IN AT THE VERY LAST) */}
+                  <View style={[styles.menuRefCard, { marginTop: 6, marginBottom: 36 }]}>
+                    {currentUser ? (
+                      <TouchableOpacity
+                        style={styles.menuRefRowBtn}
+                        onPress={() => setIsLogoutModalOpen(true)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.menuRefRowLeft}>
+                          <View style={[styles.menuRefIconWrap, { backgroundColor: '#FEE2E2' }]}>
+                            <BootstrapIcon name="box-arrow-right" size={17} color="#DC2626" />
+                          </View>
+                          <Text style={[styles.menuRefRowText, { color: '#DC2626', fontWeight: '700' }]}>Log out</Text>
+                        </View>
+                        <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                      </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.menuRefRowBtn}
+                        onPress={() => onNavigateToLogin?.()}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.menuRefRowLeft}>
+                          <View style={[styles.menuRefIconWrap, { backgroundColor: '#E8F0EC' }]}>
+                            <BootstrapIcon name="box-arrow-in-right" size={17} color="#1D4533" />
+                          </View>
+                          <Text style={[styles.menuRefRowText, { color: '#1D4533', fontWeight: '700' }]}>Sign In / Register</Text>
+                        </View>
+                        <BootstrapIcon name="chevron-right" size={14} color="#8A8D91" />
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </>
               )}
-
-              {/* Card 4: Sign Out (or Sign In) */}
-              <View style={[styles.menuRefCard, { marginTop: 8, marginBottom: 40 }]}>
-                {currentUser ? (
-                  <TouchableOpacity
-                    style={styles.menuRefRowBtn}
-                    onPress={() => setIsLogoutModalOpen(true)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.menuRefRowLeft}>
-                      <View style={[styles.menuRefIconWrap, { backgroundColor: '#FEE2E2' }]}>
-                        <BootstrapIcon name="box-arrow-right" size={17} color="#DC2626" />
-                      </View>
-                      <Text style={[styles.menuRefRowText, { color: '#DC2626' }]}>Sign Out</Text>
-                    </View>
-                    <BootstrapIcon name="chevron-right" size={14} color="#DC2626" />
-                  </TouchableOpacity>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.menuRefRowBtn}
-                    onPress={() => onNavigateToLogin?.()}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.menuRefRowLeft}>
-                      <View style={[styles.menuRefIconWrap, { backgroundColor: '#E6F4F1' }]}>
-                        <BootstrapIcon name="box-arrow-in-right" size={17} color="#1D4533" />
-                      </View>
-                      <Text style={[styles.menuRefRowText, { color: '#1D4533' }]}>Sign In / Register</Text>
-                    </View>
-                    <BootstrapIcon name="chevron-right" size={14} color="#1D4533" />
-                  </TouchableOpacity>
-                )}
-              </View>
             </View>
           )}
 
@@ -923,9 +1283,6 @@ export default function ProfilePage({
                   onPress={onNavigateToOrders}
                   activeOpacity={0.85}
                 >
-                  <View style={[styles.statIconWrap, { backgroundColor: '#E8F0EC' }]}>
-                    <BootstrapIcon name="receipt" size={17} color="#1D4533" />
-                  </View>
                   <Text style={styles.statLabel}>Orders Placed</Text>
                   <Text style={styles.statValue}>{orders.length}</Text>
                   <Text style={styles.statSub} numberOfLines={1}>
@@ -941,9 +1298,6 @@ export default function ProfilePage({
                   onPress={() => setActiveTab('bookings')}
                   activeOpacity={0.85}
                 >
-                  <View style={[styles.statIconWrap, { backgroundColor: '#FEF3C7' }]}>
-                    <BootstrapIcon name="calendar-check" size={17} color="#D97706" />
-                  </View>
                   <Text style={styles.statLabel}>Garage Bookings</Text>
                   <Text style={styles.statValue}>{activeBookings.length}</Text>
                   <Text style={styles.statSub} numberOfLines={1}>
@@ -957,9 +1311,6 @@ export default function ProfilePage({
                   onPress={onNavigateToWishlist}
                   activeOpacity={0.85}
                 >
-                  <View style={[styles.statIconWrap, { backgroundColor: '#FEE2E2' }]}>
-                    <BootstrapIcon name="heart-fill" size={17} color="#DC2626" />
-                  </View>
                   <Text style={styles.statLabel}>Saved Wishlist</Text>
                   <Text style={styles.statValue}>{wishlistCount || 0}</Text>
                   <Text style={styles.statSub} numberOfLines={1}>
@@ -969,9 +1320,6 @@ export default function ProfilePage({
 
                 {/* Card 4: Total Spent */}
                 <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                  <View style={[styles.statIconWrap, { backgroundColor: '#EFF6FF' }]}>
-                    <BootstrapIcon name="wallet2" size={17} color="#2563EB" />
-                  </View>
                   <Text style={styles.statLabel}>Total Spend</Text>
                   <Text style={styles.statValue}>₱{Number(totalSpent).toLocaleString()}</Text>
                   <Text style={styles.statSub} numberOfLines={1}>
@@ -1056,12 +1404,18 @@ export default function ProfilePage({
 
                 {/* Details snippet */}
                 <View style={{ paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9', gap: 6 }}>
-                  <Text style={{ fontSize: 12, color: '#334155' }} numberOfLines={2}>
-                    📍 <Text style={{ fontWeight: '700' }}>Address:</Text> {currentUser?.address ? `${currentUser.address}, ${currentUser.city || 'City of Naga'}` : 'Not set — tap Edit to configure'}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#334155' }} numberOfLines={1}>
-                    📞 <Text style={{ fontWeight: '700' }}>Phone:</Text> {currentUser?.phone || 'Not provided'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <BootstrapIcon name="geo-alt-fill" size={13} color="#64748B" />
+                    <Text style={{ fontSize: 12, color: '#334155', flex: 1 }} numberOfLines={2}>
+                      <Text style={{ fontWeight: '700' }}>Address:</Text> {currentUser?.address ? `${currentUser.address}, ${currentUser.city || 'City of Naga'}` : 'Not set — tap Edit to configure'}
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <BootstrapIcon name="telephone-fill" size={12} color="#64748B" />
+                    <Text style={{ fontSize: 12, color: '#334155', flex: 1 }} numberOfLines={1}>
+                      <Text style={{ fontWeight: '700' }}>Phone:</Text> {currentUser?.phone || 'Not provided'}
+                    </Text>
+                  </View>
                   <TouchableOpacity
                     onPress={() => {
                       setActiveTab('settings');
@@ -1217,48 +1571,85 @@ export default function ProfilePage({
                 </TouchableOpacity>
               </View>
 
-              {orders.slice(0, 3).map((order) => {
-                const badge = getStatusBadgeStyle(order.status);
-                return (
-                  <View key={order.id} style={styles.orderCard}>
-                    <View style={styles.orderCardHeader}>
-                      <Text style={[styles.orderIdText, { flex: 1, marginRight: 8 }]} numberOfLines={1}>
-                        {formatOrderItemsSummary(order)}
-                      </Text>
-                      <View style={[styles.statusPill, { backgroundColor: badge.bg }]}>
-                        <Text style={[styles.statusPillText, { color: badge.text }]}>
-                          {order.status || 'Processing'}
+              {orders.length === 0 ? (
+                <View style={[styles.orderCard, { alignItems: 'center', paddingVertical: 20 }]}>
+                  <BootstrapIcon name="cart3" size={28} color="#94A3B8" />
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1E293B', marginTop: 6 }}>
+                    No Orders Yet
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: '#64748B', marginTop: 2, textAlign: 'center' }}>
+                    Explore genuine racing parts & components.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.orderTrackBtn, { marginTop: 10, backgroundColor: '#1D4533', borderColor: '#163527' }]}
+                    onPress={onNavigateToStore}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.orderTrackBtnText, { color: '#FFFFFF' }]}>Browse Catalog</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                sortedOrders.slice(0, 5).map((order) => {
+                  const badge = getStatusBadgeStyle(order.status);
+                  const isDone = isOrderDeliveredOrDone(order.status);
+                  const isPending = isOrderPendingApproval(order.status);
+                  return (
+                    <View key={order.id} style={styles.orderCard}>
+                      <View style={styles.orderCardHeader}>
+                        <Text style={[styles.orderIdText, { flex: 1, marginRight: 8 }]} numberOfLines={1}>
+                          {formatOrderItemsSummary(order)}
                         </Text>
+                        <View style={[styles.statusPill, { backgroundColor: badge.bg }]}>
+                          <Text style={[styles.statusPillText, { color: badge.text }]}>
+                            {order.status || 'Processing'}
+                          </Text>
+                        </View>
+                      </View>
+                      {order.date || order.created_at ? (
+                        <Text style={[styles.orderDateText, { marginBottom: 10 }]}>
+                          Placed on{' '}
+                          {order.date ||
+                            (typeof order.created_at === 'string' ? order.created_at.slice(0, 10) : 'Recent')}
+                        </Text>
+                      ) : (
+                        <View style={{ marginBottom: 4 }} />
+                      )}
+                      <View style={styles.orderCardFooter}>
+                        <View>
+                          <Text style={styles.orderTotalLabel}>Total Amount</Text>
+                          <Text style={styles.orderTotalPrice}>
+                            ₱{getOrderGrandTotal(order).toLocaleString()}
+                          </Text>
+                        </View>
+                        {isDone ? (
+                          <View style={[styles.orderTrackBtn, { backgroundColor: '#F1F5F9', borderColor: '#E2E8F0' }]}>
+                            <BootstrapIcon name="check-circle-fill" size={11} color="#059669" />
+                            <Text style={[styles.orderTrackBtnText, { color: '#64748B' }]}>Delivered</Text>
+                          </View>
+                        ) : isPending ? (
+                          <TouchableOpacity
+                            style={[styles.orderTrackBtn, { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' }]}
+                            onPress={() => handleTrackOrder(order)}
+                            activeOpacity={0.8}
+                          >
+                            <BootstrapIcon name="hourglass-split" size={11} color="#92400E" />
+                            <Text style={[styles.orderTrackBtnText, { color: '#92400E' }]}>Awaiting Approval</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity
+                            style={styles.orderTrackBtn}
+                            onPress={() => handleTrackOrder(order)}
+                            activeOpacity={0.8}
+                          >
+                            <BootstrapIcon name="geo-alt-fill" size={11} color="#065F46" />
+                            <Text style={styles.orderTrackBtnText}>Track Order Live</Text>
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </View>
-                    {order.date || order.created_at ? (
-                      <Text style={[styles.orderDateText, { marginBottom: 10 }]}>
-                        Placed on{' '}
-                        {order.date ||
-                          (typeof order.created_at === 'string' ? order.created_at.slice(0, 10) : 'Recent')}
-                      </Text>
-                    ) : (
-                      <View style={{ marginBottom: 4 }} />
-                    )}
-                    <View style={styles.orderCardFooter}>
-                      <View>
-                        <Text style={styles.orderTotalLabel}>Total Amount</Text>
-                        <Text style={styles.orderTotalPrice}>
-                          ₱{Number(order.grandTotal || order.total || 0).toLocaleString()}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.orderTrackBtn}
-                        onPress={() => handleTrackOrder(order)}
-                        activeOpacity={0.8}
-                      >
-                        <BootstrapIcon name="geo-alt-fill" size={11} color="#065F46" />
-                        <Text style={styles.orderTrackBtnText}>Track Order Live</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                );
-              })}
+                  );
+                })
+              )}
             </View>
           )}
 
@@ -1553,35 +1944,210 @@ export default function ProfilePage({
               TAB 5: NOTIFICATIONS & ALERTS
              ═══════════════════════════════════════════════════════ */}
           {activeTab === 'notifications' && (
-            <View>
-              {notifications.length === 0 ? (
-                <View style={styles.emptyContainer}>
+            <View style={{ paddingHorizontal: 16, paddingBottom: 24, gap: 14 }}>
+              {/* Header with Title and "Mark All as Read" */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                <View>
+                  <Text style={{ fontSize: 20, fontWeight: '900', color: '#0F172A', letterSpacing: -0.3 }}>
+                    Alerts & Notifications
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500', marginTop: 2 }}>
+                    {unreadNotifCount > 0
+                      ? `${unreadNotifCount} unread message${unreadNotifCount > 1 ? 's' : ''}`
+                      : 'All caught up'}
+                  </Text>
+                </View>
+                {unreadNotifCount > 0 && (
+                  <TouchableOpacity
+                    onPress={handleMarkAllCustomerNotificationsRead}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                      borderRadius: 14,
+                      backgroundColor: '#EFF6FF',
+                      borderWidth: 1,
+                      borderColor: '#DBEAFE',
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#2563EB' }}>Mark all read</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Filter Chips */}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+                {[
+                  { id: 'all', label: `All (${(Array.isArray(notifications) ? notifications : []).length})` },
+                  { id: 'unread', label: `Unread (${unreadNotifCount})` },
+                  { id: 'order', label: 'Orders' },
+                  { id: 'booking', label: 'Pitstop' },
+                  { id: 'promo', label: 'Offers' },
+                ].map((f) => {
+                  const isActive = notifFilter === f.id;
+                  return (
+                    <TouchableOpacity
+                      key={f.id}
+                      style={{
+                        paddingHorizontal: 14,
+                        paddingVertical: 7,
+                        borderRadius: 20,
+                        backgroundColor: isActive ? '#1D4533' : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: isActive ? '#1D4533' : '#E2E8F0',
+                      }}
+                      onPress={() => setNotifFilter(f.id)}
+                      activeOpacity={0.75}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: isActive ? '800' : '600',
+                          color: isActive ? '#FFFFFF' : '#475569',
+                        }}
+                      >
+                        {f.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* List */}
+              {filteredTabNotifications.length === 0 ? (
+                <View style={[styles.emptyContainer, { marginHorizontal: 0, paddingVertical: 36 }]}>
                   <View style={styles.emptyIconCircle}>
                     <BootstrapIcon name="bell-slash" size={30} color="#94A3B8" />
                   </View>
-                  <Text style={styles.emptyTitle}>No Alerts</Text>
+                  <Text style={styles.emptyTitle}>No Notifications</Text>
                   <Text style={styles.emptySubtitle}>
-                    You're all caught up! Service and order updates will appear here.
+                    {notifFilter === 'unread'
+                      ? "You're all caught up! No unread messages."
+                      : notifFilter !== 'all'
+                      ? `No ${notifFilter} notifications available at this time.`
+                      : 'Live order updates, pitstop bookings, and promotions will appear here.'}
                   </Text>
+                  {onNavigateToStore && (
+                    <TouchableOpacity
+                      style={{
+                        marginTop: 14,
+                        backgroundColor: '#1D4533',
+                        paddingHorizontal: 18,
+                        paddingVertical: 9,
+                        borderRadius: 10,
+                      }}
+                      onPress={onNavigateToStore}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>Explore Store</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ) : (
-                notifications.map((n) => (
-                  <View key={n.id} style={styles.card}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <BootstrapIcon name="info-circle-fill" size={14} color="#1D4533" />
-                      <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0F172A', flex: 1 }}>
-                        {n.title}
-                      </Text>
-                      {n.status === 'unread' && (
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#2563EB' }} />
-                      )}
-                    </View>
-                    <Text style={{ fontSize: 12, color: '#475569', lineHeight: 18 }}>{n.message}</Text>
-                    {n.created_at ? (
-                      <Text style={{ fontSize: 10.5, color: '#94A3B8', marginTop: 6 }}>{n.created_at}</Text>
-                    ) : null}
-                  </View>
-                ))
+                filteredTabNotifications.map((n) => {
+                  const visual = getNotifVisuals(n.type);
+                  const isUnread = n.status === 'unread';
+                  return (
+                    <TouchableOpacity
+                      key={n.id}
+                      style={[
+                        styles.card,
+                        {
+                          marginHorizontal: 0,
+                          backgroundColor: isUnread ? '#F8FAFC' : '#FFFFFF',
+                          borderColor: isUnread ? '#CBD5E1' : '#E2E8F0',
+                          borderLeftWidth: isUnread ? 4 : 1,
+                          borderLeftColor: isUnread ? '#1D4533' : '#E2E8F0',
+                          padding: 14,
+                        },
+                      ]}
+                      onPress={() => handleCustomerNotificationPress(n)}
+                      activeOpacity={0.75}
+                    >
+                      <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                        {/* Type Icon Badge */}
+                        <View
+                          style={{
+                            width: 36,
+                            height: 36,
+                            borderRadius: 18,
+                            backgroundColor: visual.bg,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginTop: 1,
+                          }}
+                        >
+                          <BootstrapIcon name={visual.icon} size={16} color={visual.color} />
+                        </View>
+
+                        {/* Text Content */}
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                              <Text
+                                style={{
+                                  fontSize: 13.5,
+                                  fontWeight: isUnread ? '800' : '700',
+                                  color: '#0F172A',
+                                  flexShrink: 1,
+                                }}
+                                numberOfLines={1}
+                              >
+                                {n.title}
+                              </Text>
+                              {isUnread && (
+                                <View style={{ width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#2563EB' }} />
+                              )}
+                            </View>
+                            <TouchableOpacity
+                              onPress={(e) => {
+                                e?.stopPropagation?.();
+                                handleDeleteCustomerNotification(n.id);
+                              }}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                              activeOpacity={0.6}
+                            >
+                              <BootstrapIcon name="x" size={16} color="#94A3B8" />
+                            </TouchableOpacity>
+                          </View>
+
+                          <Text style={{ fontSize: 12, color: '#475569', lineHeight: 18, marginTop: 4 }}>
+                            {n.message}
+                          </Text>
+
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                              <View
+                                style={{
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 2,
+                                  borderRadius: 4,
+                                  backgroundColor: visual.bg,
+                                }}
+                              >
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: visual.color }}>
+                                  {visual.label}
+                                </Text>
+                              </View>
+                              <Text style={{ fontSize: 11, color: '#94A3B8' }}>
+                                {formatNotifTime(n.created_at)}
+                              </Text>
+                            </View>
+
+                            {(n.link || n.type === 'order' || n.type === 'booking') && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4533' }}>
+                                  {n.type === 'order' ? 'View Order' : n.type === 'booking' ? 'View Bay' : 'Open'}
+                                </Text>
+                                <BootstrapIcon name="chevron-right" size={10} color="#1D4533" />
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
               )}
             </View>
           )}
@@ -2298,7 +2864,7 @@ export default function ProfilePage({
                       Customer Name
                     </Text>
                     <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A', marginTop: 3 }}>
-                      {userDisplayName}
+                      {[firstName, lastName].filter(Boolean).join(' ') || currentUser?.name || currentUser?.fullName || name || 'Rider Account'}
                     </Text>
                   </View>
 
@@ -2320,18 +2886,24 @@ export default function ProfilePage({
                     <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
                       Phone Number
                     </Text>
-                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A', marginTop: 3 }}>
-                      📞 {currentUser?.phone || phone || 'Not provided'}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                      <BootstrapIcon name="telephone-fill" size={13} color="#0F172A" />
+                      <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>
+                        {currentUser?.phone || phone || 'Not provided'}
+                      </Text>
+                    </View>
                   </View>
 
                   <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#F1F5F9' }}>
                     <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
                       Primary Delivery Address
                     </Text>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A', marginTop: 3 }}>
-                      📍 {currentUser?.address || address ? `${currentUser?.address || address}, ${currentUser?.city || city || 'City of Naga'}, ${currentUser?.country || country || 'Philippines'}` : 'No street address saved'}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 }}>
+                      <BootstrapIcon name="geo-alt-fill" size={13} color="#0F172A" style={{ marginTop: 2 }} />
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A', flex: 1 }}>
+                        {currentUser?.address || address ? `${currentUser?.address || address}, ${currentUser?.city || city || 'City of Naga'}, ${currentUser?.country || country || 'Philippines'}` : 'No street address saved'}
+                      </Text>
+                    </View>
                   </View>
 
                   <View style={{ backgroundColor: '#F8FAFC', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#F1F5F9' }}>
@@ -2841,6 +3413,323 @@ export default function ProfilePage({
             </View>
           </View>
         </SafeAreaView>
+      </Modal>
+
+      {/* ─── HELP & SUPPORT MODAL ─── */}
+      <CompanyInfoModal
+        visible={isHelpModalOpen}
+        initialTab="contact"
+        onClose={() => setIsHelpModalOpen(false)}
+        showToast={showToast}
+      />
+
+      {/* ─── PRIVACY CENTER MODAL ─── */}
+      <CompanyInfoModal
+        visible={isPrivacyCenterOpen}
+        initialTab="privacy"
+        onClose={() => setIsPrivacyCenterOpen(false)}
+        showToast={showToast}
+      />
+
+      {/* ─── LANGUAGE PICKER MODAL ─── */}
+      <Modal
+        visible={isLanguageModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsLanguageModalOpen(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setIsLanguageModalOpen(false)}>
+          <View style={styles.dialogOverlay}>
+            <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
+              <View style={styles.dialogCard}>
+                <View style={styles.dialogHeader}>
+                  <View style={styles.menuRefIconWrap}>
+                    <BootstrapIcon name="globe" size={18} color="#050505" />
+                  </View>
+                  <Text style={styles.dialogTitle}>Select Language</Text>
+                </View>
+
+                <View style={{ gap: 8, marginVertical: 12 }}>
+                  {['English (US)', 'Filipino (Tagalog)', 'Bisaya (Cebuano)'].map((lang) => {
+                    const isSelected = selectedLanguage === lang;
+                    return (
+                      <TouchableOpacity
+                        key={lang}
+                        style={[
+                          styles.dialogSelectionRow,
+                          isSelected && styles.dialogSelectionRowActive,
+                        ]}
+                        onPress={() => setSelectedLanguage(lang)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[styles.dialogSelectionRowText, isSelected && { color: '#1D4533', fontWeight: '700' }]}>
+                          {lang}
+                        </Text>
+                        {isSelected && (
+                          <BootstrapIcon name="check-circle-fill" size={17} color="#1D4533" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.dialogSubmitBtn, { alignSelf: 'flex-end', marginTop: 8 }]}
+                  onPress={() => {
+                    setIsLanguageModalOpen(false);
+                    showToast(`Language set to ${selectedLanguage}`);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.dialogSubmitText}>Save Preference</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* ─── PRIVACY CHECKUP MODAL ─── */}
+      <Modal
+        visible={isPrivacyCheckupOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsPrivacyCheckupOpen(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setIsPrivacyCheckupOpen(false)}>
+          <View style={styles.dialogOverlay}>
+            <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
+              <View style={styles.dialogCard}>
+                <View style={styles.dialogHeader}>
+                  <View style={styles.menuRefIconWrap}>
+                    <BootstrapIcon name="shield-check" size={18} color="#050505" />
+                  </View>
+                  <Text style={styles.dialogTitle}>Privacy Checkup</Text>
+                </View>
+
+                <Text style={styles.dialogDesc}>
+                  Your data and rider privacy settings are protected and managed under MotoTrack standards.
+                </Text>
+
+                <View style={{ gap: 8, marginVertical: 10 }}>
+                  <View style={styles.dialogDisplayRow}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={styles.dialogDisplayRowTitle}>Profile & Contact Data</Text>
+                      <Text style={styles.dialogDisplayRowSub}>Shared only with assigned technician during active service</Text>
+                    </View>
+                    <View style={styles.dialogActiveTag}>
+                      <Text style={styles.dialogActiveTagText}>Encrypted</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.dialogDisplayRow}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={styles.dialogDisplayRowTitle}>Garage Fleet Details</Text>
+                      <Text style={styles.dialogDisplayRowSub}>Specs used solely for motorcycle parts compatibility</Text>
+                    </View>
+                    <View style={styles.dialogActiveTag}>
+                      <Text style={styles.dialogActiveTagText}>Private</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.dialogDisplayRow}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={styles.dialogDisplayRowTitle}>Order Tracking GPS</Text>
+                      <Text style={styles.dialogDisplayRowSub}>Live GPS tracking expires upon delivery completion</Text>
+                    </View>
+                    <View style={styles.dialogActiveTag}>
+                      <Text style={styles.dialogActiveTagText}>Secure</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.dialogSubmitBtn, { alignSelf: 'flex-end', marginTop: 8 }]}
+                  onPress={() => setIsPrivacyCheckupOpen(false)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.dialogSubmitText}>Looks Good</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* ─── CONTENT PREFERENCES MODAL ─── */}
+      <Modal
+        visible={isContentPrefOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsContentPrefOpen(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setIsContentPrefOpen(false)}>
+          <View style={styles.dialogOverlay}>
+            <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
+              <View style={styles.dialogCard}>
+                <View style={styles.dialogHeader}>
+                  <View style={styles.menuRefIconWrap}>
+                    <BootstrapIcon name="sliders" size={18} color="#050505" />
+                  </View>
+                  <Text style={styles.dialogTitle}>Content Preferences</Text>
+                </View>
+
+                <View style={{ gap: 8, marginVertical: 10 }}>
+                  <View style={styles.dialogDisplayRow}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={styles.dialogDisplayRowTitle}>Motorcycle Compatibility Feed</Text>
+                      <Text style={styles.dialogDisplayRowSub}>Prioritize parts compatible with your registered bike</Text>
+                    </View>
+                    <View style={styles.dialogActiveTag}>
+                      <Text style={styles.dialogActiveTagText}>On</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.dialogDisplayRow}>
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={styles.dialogDisplayRowTitle}>Restock & Price Drop Alerts</Text>
+                      <Text style={styles.dialogDisplayRowSub}>Push notifications for wishlist & restocked items</Text>
+                    </View>
+                    <View style={styles.dialogActiveTag}>
+                      <Text style={styles.dialogActiveTagText}>On</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.dialogSubmitBtn, { alignSelf: 'flex-end', marginTop: 8 }]}
+                  onPress={() => setIsContentPrefOpen(false)}
+                  activeOpacity={0.85}
+                >
+                  <Text style={styles.dialogSubmitText}>Done</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* ─── REPORT A PROBLEM MODAL ─── */}
+      <Modal
+        visible={isReportModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsReportModalOpen(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setIsReportModalOpen(false)}>
+          <View style={styles.dialogOverlay}>
+            <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
+              <View style={styles.dialogCard}>
+                <View style={styles.dialogHeader}>
+                  <View style={styles.menuRefIconWrap}>
+                    <BootstrapIcon name="chat-square-dots-fill" size={18} color="#050505" />
+                  </View>
+                  <Text style={styles.dialogTitle}>Report a Problem</Text>
+                </View>
+
+                {reportSubmitted ? (
+                  <View style={styles.dialogSuccessWrap}>
+                    <BootstrapIcon name="check-circle-fill" size={40} color="#10B981" />
+                    <Text style={styles.dialogSuccessTitle}>Thank you for your feedback!</Text>
+                    <Text style={styles.dialogSuccessSub}>
+                      Our technical team has been notified.
+                    </Text>
+                  </View>
+                ) : (
+                  <>
+                    <Text style={styles.dialogDesc}>
+                      Help us improve MotoTrack by describing the issue you encountered.
+                    </Text>
+
+                    <TextInput
+                      style={styles.dialogInput}
+                      placeholder="Briefly explain what happened or what's not working..."
+                      placeholderTextColor="#94A3B8"
+                      multiline
+                      numberOfLines={4}
+                      value={reportText}
+                      onChangeText={setReportText}
+                    />
+
+                    <View style={styles.dialogActions}>
+                      <TouchableOpacity
+                        style={styles.dialogCancelBtn}
+                        onPress={() => setIsReportModalOpen(false)}
+                        activeOpacity={0.8}
+                      >
+                        <Text style={styles.dialogCancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.dialogSubmitBtn,
+                          !reportText.trim() && { opacity: 0.5 },
+                        ]}
+                        onPress={handleSubmitReport}
+                        disabled={!reportText.trim()}
+                        activeOpacity={0.85}
+                      >
+                        <Text style={styles.dialogSubmitText}>Submit Report</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                )}
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* ─── DISPLAY & ACCESSIBILITY MODAL ─── */}
+      <Modal
+        visible={isDisplayModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsDisplayModalOpen(false)}
+      >
+        <TouchableWithoutFeedback onPress={() => setIsDisplayModalOpen(false)}>
+          <View style={styles.dialogOverlay}>
+            <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
+              <View style={styles.dialogCard}>
+                <View style={styles.dialogHeader}>
+                  <View style={styles.menuRefIconWrap}>
+                    <BootstrapIcon name="moon-fill" size={18} color="#050505" />
+                  </View>
+                  <Text style={styles.dialogTitle}>Display & Accessibility</Text>
+                </View>
+
+                <View style={{ gap: 12, marginVertical: 12 }}>
+                  <View style={styles.dialogDisplayRow}>
+                    <View>
+                      <Text style={styles.dialogDisplayRowTitle}>Light Theme</Text>
+                      <Text style={styles.dialogDisplayRowSub}>Clean white high-contrast interface</Text>
+                    </View>
+                    <View style={styles.dialogActiveTag}>
+                      <Text style={styles.dialogActiveTagText}>Active</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.dialogDisplayRow}>
+                    <View>
+                      <Text style={styles.dialogDisplayRowTitle}>High Legibility</Text>
+                      <Text style={styles.dialogDisplayRowSub}>Enhanced contrast circular icon badges</Text>
+                    </View>
+                    <View style={styles.dialogActiveTag}>
+                      <Text style={styles.dialogActiveTagText}>On</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.dialogCancelBtn, { marginTop: 8, alignSelf: 'flex-end', minWidth: 90, alignItems: 'center' }]}
+                  onPress={() => setIsDisplayModalOpen(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.dialogCancelText}>Close</Text>
+                </TouchableOpacity>
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
       </Modal>
 
       {/* ─── PERSISTENT MOBILE BOTTOM NAVIGATION (BOTTOM NAVBAR STAYS) ─── */}

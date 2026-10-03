@@ -201,7 +201,7 @@ export default function BookingCategoryPieChart({
         shortLabel: 'PMS',
         count: pmsCount,
         percentage: total > 0 ? Math.round((pmsCount / total) * 100) : 0,
-        color: '#1E75D8', // Blue
+        color: '#2563EB', // Blue
       },
       {
         id: 'repair',
@@ -209,15 +209,15 @@ export default function BookingCategoryPieChart({
         shortLabel: 'Repair',
         count: repairCount,
         percentage: total > 0 ? Math.round((repairCount / total) * 100) : 0,
-        color: '#FA5C4F', // Coral / Red
+        color: '#F43F5E', // Coral / Red
       },
       {
         id: 'custom',
         label: 'Customization & Tuning',
-        shortLabel: 'Customization',
+        shortLabel: 'Custom',
         count: customCount,
         percentage: total > 0 ? Math.round((customCount / total) * 100) : 0,
-        color: '#4CAF50', // Green
+        color: '#10B981', // Emerald Green
       },
     ];
 
@@ -280,16 +280,16 @@ export default function BookingCategoryPieChart({
       style={[
         {
           backgroundColor: colors.cardBg,
-          borderRadius: 20,
+          borderRadius: 16,
           borderWidth: 1,
           borderColor: colors.border,
-          padding: 20,
-          marginBottom: 20,
+          padding: 22,
+          marginBottom: 0,
           shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: isDark ? 0.2 : 0.04,
-          shadowRadius: 8,
-          elevation: 2,
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: isDark ? 0.2 : 0.03,
+          shadowRadius: 6,
+          elevation: 1,
         },
         style,
       ]}
@@ -301,18 +301,18 @@ export default function BookingCategoryPieChart({
           justifyContent: 'space-between',
           alignItems: 'center',
           flexWrap: 'wrap',
-          gap: 10,
-          marginBottom: 16,
+          gap: 12,
+          marginBottom: 18,
         }}
       >
         <View style={{ flex: 1, minWidth: 160 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <Text
               style={{
-                fontSize: 15.5,
+                fontSize: 16,
                 fontWeight: '800',
                 color: colors.textPrimary,
-                letterSpacing: -0.2,
+                letterSpacing: -0.3,
               }}
             >
               Service Bookings Share
@@ -323,28 +323,28 @@ export default function BookingCategoryPieChart({
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 4,
-                backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7',
-                paddingHorizontal: 7,
-                paddingVertical: 2,
+                gap: 5,
+                backgroundColor: isDark ? 'rgba(16, 185, 129, 0.14)' : '#ECFDF5',
+                paddingHorizontal: 8,
+                paddingVertical: 3,
                 borderRadius: 6,
                 borderWidth: 1,
-                borderColor: isDark ? 'rgba(16, 185, 129, 0.3)' : '#BBF7D0',
+                borderColor: isDark ? 'rgba(16, 185, 129, 0.28)' : '#A7F3D0',
               }}
             >
               <View
                 style={{
-                  width: 5,
-                  height: 5,
-                  borderRadius: 2.5,
+                  width: 6,
+                  height: 6,
+                  borderRadius: 3,
                   backgroundColor: '#10B981',
                 }}
               />
               <Text
                 style={{
-                  fontSize: 9.5,
+                  fontSize: 10.5,
                   fontWeight: '700',
-                  color: isDark ? '#34D399' : '#15803D',
+                  color: isDark ? '#34D399' : '#065F46',
                 }}
               >
                 Live ({liveBookings.length})
@@ -355,30 +355,40 @@ export default function BookingCategoryPieChart({
             <TouchableOpacity
               onPress={handleRefresh}
               disabled={syncing}
-              style={{ padding: 3, cursor: 'pointer' }}
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 6,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
+                borderWidth: 1,
+                borderColor: isDark ? '#334155' : '#E2E8F0',
+                cursor: 'pointer',
+              }}
               title="Sync with database"
             >
               {syncing ? (
-                <ActivityIndicator size="small" color="#1E75D8" />
+                <ActivityIndicator size="small" color="#2563EB" />
               ) : (
-                <BootstrapIcon name="arrow-repeat" size={12} color={colors.textMuted} />
+                <BootstrapIcon name="arrow-repeat" size={11} color={colors.textMuted} />
               )}
             </TouchableOpacity>
           </View>
-          <Text style={{ fontSize: 11.5, color: colors.textMuted, marginTop: 2 }}>
+          <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 3 }}>
             Appointment demand proportion by service category
           </Text>
         </View>
 
-        {/* Filter Tabs: All Time / Active Queue / Completed */}
+        {/* Filter Tabs: All / Active / Completed */}
         <View
           style={{
             flexDirection: 'row',
-            backgroundColor: colors.chipBg,
+            backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
             borderRadius: 8,
-            padding: 2.5,
+            padding: 3,
             borderWidth: 1,
-            borderColor: colors.chipBorder,
+            borderColor: isDark ? '#334155' : '#E2E8F0',
             gap: 2,
           }}
         >
@@ -392,18 +402,19 @@ export default function BookingCategoryPieChart({
               <TouchableOpacity
                 key={tab.key}
                 style={{
-                  paddingHorizontal: 9,
-                  paddingVertical: 4,
+                  paddingHorizontal: 11,
+                  paddingVertical: 4.5,
                   borderRadius: 6,
-                  backgroundColor: active ? (isDark ? '#1E293B' : '#0F172A') : 'transparent',
+                  backgroundColor: active ? (isDark ? '#0F172A' : '#0F172A') : 'transparent',
                   cursor: 'pointer',
+                  boxShadow: active ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
                 }}
                 onPress={() => setFilterMode(tab.key)}
                 activeOpacity={0.85}
               >
                 <Text
                   style={{
-                    fontSize: 10.5,
+                    fontSize: 11,
                     fontWeight: '700',
                     color: active ? '#FFFFFF' : colors.textMuted,
                   }}
@@ -422,17 +433,17 @@ export default function BookingCategoryPieChart({
           flexDirection: isDesktop ? 'row' : 'column',
           alignItems: 'center',
           justifyContent: isDesktop ? 'space-between' : 'center',
-          gap: isDesktop ? 20 : 20,
-          paddingVertical: 4,
+          gap: isDesktop ? 24 : 20,
+          paddingVertical: 6,
           flex: 1,
         }}
       >
-        {/* Left Side: SVG Donut with Center Telemetry matching reference */}
+        {/* Left Side: SVG Donut with Center Telemetry */}
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
           <View style={{ alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
             <svg
-              width="190"
-              height="190"
+              width="176"
+              height="176"
               viewBox="0 0 200 200"
               style={{ display: 'block', overflow: 'visible' }}
             >
@@ -501,14 +512,15 @@ export default function BookingCategoryPieChart({
             >
               <Text
                 style={{
-                  fontSize: 30,
-                  fontWeight: '900',
+                  fontSize: 28,
+                  fontWeight: '800',
                   color: colors.textPrimary,
-                  letterSpacing: -1,
-                  lineHeight: 34,
+                  letterSpacing: -0.8,
+                  lineHeight: 32,
+                  fontVariant: ['tabular-nums'],
                 }}
               >
-                {activeItem ? `${String(activeItem.percentage).padStart(2, '0')}%` : '00%'}
+                {activeItem ? `${activeItem.percentage}%` : '0%'}
               </Text>
               <Text
                 numberOfLines={1}
@@ -516,7 +528,7 @@ export default function BookingCategoryPieChart({
                   fontSize: 11.5,
                   fontWeight: '600',
                   color: colors.textMuted,
-                  marginTop: 2,
+                  marginTop: 3,
                   textAlign: 'center',
                   paddingHorizontal: 4,
                 }}
@@ -527,18 +539,18 @@ export default function BookingCategoryPieChart({
           </View>
         </View>
 
-        {/* Right Side: Clean Legend List exactly styled after the reference image */}
+        {/* Right Side: Clean Legend List */}
         <View
           style={{
             flex: 1,
             width: isDesktop ? 'auto' : '100%',
-            minWidth: isDesktop ? 190 : '100%',
+            minWidth: isDesktop ? 200 : '100%',
             gap: 4,
           }}
         >
           {stats.map((cat) => {
             const isHovered = hoveredCategory === cat.id;
-            const formattedPercent = `${String(cat.percentage).padStart(2, '0')}%`;
+            const formattedPercent = `${cat.percentage}%`;
 
             return (
               <TouchableOpacity
@@ -552,9 +564,9 @@ export default function BookingCategoryPieChart({
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  paddingVertical: 8,
+                  paddingVertical: 7,
                   paddingHorizontal: 10,
-                  borderRadius: 6,
+                  borderRadius: 8,
                   backgroundColor: isHovered ? colors.hoverBg : 'transparent',
                   borderWidth: 1,
                   borderColor: isHovered ? colors.hoverBorder : 'transparent',
@@ -565,9 +577,9 @@ export default function BookingCategoryPieChart({
                 {/* 1. Circle Dot */}
                 <View
                   style={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: 6,
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
                     backgroundColor: cat.color,
                     marginRight: 10,
                     flexShrink: 0,
@@ -593,7 +605,7 @@ export default function BookingCategoryPieChart({
                     fontSize: 13,
                     fontWeight: '800',
                     color: colors.textPrimary,
-                    width: 42,
+                    width: 44,
                     textAlign: 'right',
                     fontVariant: ['tabular-nums'],
                   }}
@@ -604,12 +616,12 @@ export default function BookingCategoryPieChart({
                 {/* 4. Count Value */}
                 <Text
                   style={{
-                    fontSize: 12.5,
-                    fontWeight: '500',
+                    fontSize: 12,
+                    fontWeight: '600',
                     color: colors.textMuted,
-                    width: 44,
+                    width: 36,
                     textAlign: 'right',
-                    marginLeft: 12,
+                    marginLeft: 10,
                     fontVariant: ['tabular-nums'],
                   }}
                 >

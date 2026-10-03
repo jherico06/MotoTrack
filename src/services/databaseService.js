@@ -131,23 +131,17 @@ export const databaseService = {
   },
 
   async updateStock(productId, stockQuantity) {
-    if (supabase) {
-      try {
-        await supabase
-          .from('products')
-          .update({ stock: stockQuantity })
-          .or(`product_id.eq.${productId},id.eq.${productId}`);
-        await supabase.from('inventory').upsert([
-          {
-            inventory_id: 'inv-' + productId,
-            product_id: productId,
-            stock_quantity: stockQuantity,
-            last_updated: new Date().toISOString(),
-          },
-        ]);
-      } catch (e) {}
+    try {
+      const { productService } = await import('./productService.js');
+      return await productService.updateProduct(productId, {
+        stock: stockQuantity,
+        stockReason: 'adjustment',
+        stockRefType: 'inventory_adjustment',
+      });
+    } catch (e) {
+      console.warn('databaseService.updateStock failed:', e);
+      return { success: false, error: e?.message || 'Stock update failed' };
     }
-    return { success: true };
   },
 
   // ─── 4. SERVICES & BOOKINGS ───

@@ -67,6 +67,8 @@ export function createForecastStyles(isDark = false) {
       justifyContent: 'space-between',
       gap: 16,
       marginBottom: 4,
+      position: 'relative',
+      zIndex: 50,
     },
     pageTitle: {
       fontSize: 22,
@@ -87,6 +89,8 @@ export function createForecastStyles(isDark = false) {
       flexWrap: 'wrap',
       alignItems: 'center',
       gap: 8,
+      position: 'relative',
+      zIndex: 50,
     },
     controlBtn: {
       flexDirection: 'row',
@@ -127,6 +131,8 @@ export function createForecastStyles(isDark = false) {
       flexWrap: 'wrap',
       gap: 16,
       marginBottom: 24,
+      position: 'relative',
+      zIndex: 1,
     },
     statCard: {
       flex: 1,

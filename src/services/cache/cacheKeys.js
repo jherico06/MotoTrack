@@ -7,6 +7,8 @@ export const CACHE_TTL = Object.freeze({
   PRODUCTS_MS: 30 * 60 * 1000, // 30 min
   CATEGORIES_MS: 45 * 60 * 1000,
   MOTORCYCLES_MS: 10 * 60 * 1000,
+  MOTORCYCLE_MODELS_MS: 30 * 60 * 1000, // admin catalog — relatively static
+  PRODUCT_COMPAT_MS: 30 * 60 * 1000, // fitment matrix — relatively static
   MECHANICS_MS: 10 * 60 * 1000,
   BOOKING_LIST_MS: 60 * 1000, // 1 min
   BOOKING_DETAIL_MS: 45 * 1000,
@@ -26,6 +28,10 @@ export const CacheKeys = {
   customer: (customerId) => `customer:${customerId}`,
   customerMotorcycles: (customerId) => `customer:${customerId}:motorcycles`,
   customerBookings: (customerId) => `customer:${customerId}:bookings`,
+
+  motorcycleModels: () => 'motorcycle:models:catalog',
+  productCompatibilityAll: () => 'products:compatibility:all',
+  productCompatibility: (productId) => `products:compatibility:${productId}`,
 
   booking: (bookingId) => `booking:${bookingId}`,
   bookingQuotation: (bookingId) => `booking:${bookingId}:quotation`,

@@ -22,8 +22,11 @@ import {
   getHistoricalSales,
   generateProductForecast,
   buildProductForecastTable,
+  generateCategoryForecast,
+  buildCategoryForecastTable,
 } from '../../services/forecastService';
 import { formatRegressionEquation } from '../../utils/linearRegression';
+import { resolveReorderLevel, isLowStock } from '../../services/productService';
 
 const CHART_LOOKBACK_WEEK = [
   { key: 4, label: '4W' },
@@ -54,6 +57,17 @@ const FORECAST_TABLE_COLUMNS = [
   { key: 'restockQty', label: 'Restock Qty', flex: 1.0, minWidth: 100 },
   { key: 'trend', label: 'Trend', flex: 1.1, minWidth: 110 },
   { key: 'status', label: 'Status', flex: 1.0, minWidth: 100 },
+];
+
+const CATEGORY_TABLE_COLUMNS = [
+  { key: 'category', label: 'Category', flex: 2.0, minWidth: 160 },
+  { key: 'productCount', label: 'Tracked Parts', flex: 1.1, minWidth: 110 },
+  { key: 'stock', label: 'Total Stock', flex: 1.0, minWidth: 90 },
+  { key: 'avgSales', label: 'Avg. Sales/Wk', flex: 1.1, minWidth: 110 },
+  { key: 'forecast', label: 'Forecast', flex: 1.0, minWidth: 90 },
+  { key: 'restockQty', label: 'Restock Qty', flex: 1.0, minWidth: 100 },
+  { key: 'trend', label: 'Trend', flex: 1.1, minWidth: 110 },
+  { key: 'status', label: 'Status', flex: 1.1, minWidth: 110 },
 ];
 
 function formatDateRange(historical = []) {
@@ -96,6 +110,20 @@ function TrendCell({ trend, tokens }) {
   );
 }
 
+function getCategoryIcon(category) {
+  const cat = String(category || '').toLowerCase();
+  if (cat === 'all') return 'grid-fill';
+  if (cat.includes('engine') || cat.includes('oil')) return 'gear-wide-connected';
+  if (cat.includes('brake')) return 'disc';
+  if (cat.includes('tire') || cat.includes('wheel')) return 'circle';
+  if (cat.includes('battery') || cat.includes('electric')) return 'lightning-charge';
+  if (cat.includes('trans') || cat.includes('clutch') || cat.includes('chain')) return 'link-45deg';
+  if (cat.includes('suspension') || cat.includes('fork') || cat.includes('shock')) return 'sliders';
+  if (cat.includes('exhaust')) return 'wind';
+  if (cat.includes('body') || cat.includes('fairing')) return 'shield';
+  return 'tag';
+}
+
 /**
  * Sales Forecast & Stock Optimization — styled to match Figma Make design.
  * https://www.figma.com/make/3Uhb9CKJJ6vcnxXwDFJhwc/Sales-Forecasting-Dashboard-Design
@@ -113,8 +141,14 @@ export default function SalesForecastPanel({
   const [lookbackPeriods, setLookbackPeriods] = useState(14);
   const [forecastAhead, setForecastAhead] = useState(1);
   const [horizonLabel, setHorizonLabel] = useState('Next Day');
+
+  // Forecasting Scope: 'product' (by motorcycle part) | 'category' (by category)
+  const [forecastScope, setForecastScope] = useState('product');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedProductId, setSelectedProductId] = useState(null);
+
   const [productPickerOpen, setProductPickerOpen] = useState(false);
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
   const [horizonPickerOpen, setHorizonPickerOpen] = useState(false);
   const [lookbackPickerOpen, setLookbackPickerOpen] = useState(false);
   const [safetyConfig, setSafetyConfig] = useState(() => forecastService.loadSafetyPrefs());
@@ -124,7 +158,7 @@ export default function SalesForecastPanel({
   const [refreshKey, setRefreshKey] = useState(0);
   const [saveAfterRefresh, setSaveAfterRefresh] = useState(false);
 
-  const salesRows = useMemo(() => getHistoricalSales(orders), [orders]);
+  const salesRows = useMemo(() => getHistoricalSales(orders, products), [orders, products]);
 
   const [productSearchQuery, setProductSearchQuery] = useState('');
   const [productCategoryFilter, setProductCategoryFilter] = useState('All');
@@ -180,6 +214,17 @@ export default function SalesForecastPanel({
   );
 
   const forecast = useMemo(() => {
+    if (forecastScope === 'category') {
+      return generateCategoryForecast({
+        salesRows,
+        products,
+        category: selectedCategory,
+        periodType,
+        lookbackPeriods,
+        forecastAhead,
+        safetyConfig,
+      });
+    }
     if (!selectedProduct) return null;
     return generateProductForecast({
       salesRows,
@@ -189,7 +234,18 @@ export default function SalesForecastPanel({
       forecastAhead,
       safetyConfig,
     });
-  }, [salesRows, selectedProduct, periodType, lookbackPeriods, forecastAhead, safetyConfig, refreshKey]);
+  }, [
+    forecastScope,
+    selectedCategory,
+    salesRows,
+    products,
+    selectedProduct,
+    periodType,
+    lookbackPeriods,
+    forecastAhead,
+    safetyConfig,
+    refreshKey,
+  ]);
 
   const tableRows = useMemo(
     () =>
@@ -205,6 +261,20 @@ export default function SalesForecastPanel({
     [products, salesRows, periodType, lookbackPeriods, forecastAhead, safetyConfig, refreshKey]
   );
 
+  const categoryTableRows = useMemo(
+    () =>
+      buildCategoryForecastTable({
+        categories: pickerCategories,
+        products,
+        salesRows,
+        periodType,
+        lookbackPeriods,
+        forecastAhead,
+        safetyConfig,
+      }),
+    [pickerCategories, products, salesRows, periodType, lookbackPeriods, forecastAhead, safetyConfig, refreshKey]
+  );
+
   const loadHistory = useCallback(async () => {
     const rows = await forecastService.getForecastHistory({ salesRows, limit: 30 });
     setHistory(rows);
@@ -218,21 +288,24 @@ export default function SalesForecastPanel({
     if (!forecast || forecast.insufficient) return;
     const primary = forecast.forecastPoints?.[forecast.forecastPoints.length - 1];
     await forecastService.saveForecastHistory({
-      product_id: forecast.productId,
-      product_name: forecast.productName,
+      product_id: forecastScope === 'category' ? null : forecast.productId,
+      product_name: forecastScope === 'category' ? `[Category] ${forecast.category}` : forecast.productName,
       forecast_date: new Date().toISOString().slice(0, 10),
-      forecast_period: periodType,
+      forecast_period: forecast.periodType || periodType,
       period_label: primary?.label || forecast.forecastPeriodLabel,
       period_key: primary?.key,
       predicted_quantity: forecast.forecastedDemand,
-      slope: forecast.regression.slope,
-      intercept: forecast.regression.intercept,
+      slope: null,
+      intercept: null,
       safety_stock: forecast.safetyStock,
       current_stock: forecast.currentStock,
       recommended_restock: forecast.recommendedRestock,
+      forecast_method: forecast.forecastMethod || 'croston_sba',
+      reorder_point: forecast.reorderPoint ?? null,
+      sufficient: forecast.sufficient !== false && !forecast.insufficient,
     });
     await loadHistory();
-  }, [forecast, periodType, loadHistory]);
+  }, [forecast, periodType, forecastScope, loadHistory]);
 
   const handleRefresh = async () => {
     setLoading(true);
@@ -257,25 +330,22 @@ export default function SalesForecastPanel({
   }, [saveAfterRefresh, forecast, persistForecast]);
 
   const selectedName =
-    productOptions.find((p) => String(p.id) === String(selectedProductId))?.name || 'Select product';
+    forecastScope === 'category'
+      ? (selectedCategory === 'All' ? 'All Categories' : selectedCategory)
+      : (productOptions.find((p) => String(p.id) === String(selectedProductId))?.name || 'Select product');
 
   const equation =
     forecast && !forecast.insufficient
-      ? formatRegressionEquation(forecast.regression.intercept, forecast.regression.slope)
-      : 'Y = a + bX';
+      ? `SBA ≈ ${(Number(forecast.sba?.forecast) || 0).toFixed(2)} / period`
+      : 'Insufficient historical data';
 
-  // Prefer "Y = bX + a" display order to match Figma mock
   const equationDisplay = useMemo(() => {
-    if (!forecast || forecast.insufficient) return 'Y = bX + a';
-    const b = Number(forecast.regression.slope);
-    const a = Number(forecast.regression.intercept);
-    if (!Number.isFinite(a) || !Number.isFinite(b)) return equation;
-    const absB = Math.abs(b).toFixed(Math.abs(b) >= 10 ? 1 : 2);
-    const aAbs = Math.abs(a).toFixed(Math.abs(a) >= 10 ? 0 : 1);
-    const aPart = a >= 0 ? `+ ${aAbs}` : `- ${aAbs}`;
-    if (b >= 0) return `Y = ${absB}X ${aPart}`;
-    return `Y = -${absB}X ${aPart}`;
-  }, [forecast, equation]);
+    if (!forecast || forecast.insufficient) return 'Insufficient historical data';
+    const method = forecast.forecastMethod || 'croston_sba';
+    const base = Number(forecast.sba?.forecast) || 0;
+    const nz = forecast.sba?.nonZeroObservations ?? 0;
+    return `${method === 'croston_sba' ? 'Croston/SBA' : method}: ${base.toFixed(2)} (${nz} demand events)`;
+  }, [forecast]);
 
   const chartLookback = (forecast?.periodType || periodType) === 'day' ? CHART_LOOKBACK_DAY : CHART_LOOKBACK_WEEK;
   const activePeriodType = forecast?.periodType || periodType;
@@ -385,7 +455,7 @@ export default function SalesForecastPanel({
                     Select motorcycle part
                   </Text>
                   <Text style={{ fontSize: 11.5, color: tokens.mutedForeground, marginTop: 1 }}>
-                    Choose a part to analyze demand regression and calculate replenishment
+                    Choose a part to analyze intermittent demand (SBA) and calculate replenishment
                   </Text>
                 </View>
               </View>
@@ -405,7 +475,7 @@ export default function SalesForecastPanel({
               </TouchableOpacity>
             </View>
 
-            {/* Search Input & Category Pills */}
+            {/* Search Input & Category Filter Pills */}
             <View style={{ gap: 10 }}>
               <View
                 style={{
@@ -481,7 +551,7 @@ export default function SalesForecastPanel({
             </View>
           </View>
 
-          {/* Modal Body: Product Card Grid */}
+          {/* Modal Body: Products Grid */}
           <ScrollView
             style={{ flex: 1, padding: 16 }}
             contentContainerStyle={{ paddingBottom: 24 }}
@@ -506,9 +576,10 @@ export default function SalesForecastPanel({
                 }}
               >
                 {filteredProductOptions.map((p) => {
-                  const isSelected = String(p.id) === String(selectedProductId);
+                  const isSelected =
+                    forecastScope === 'product' && String(p.id) === String(selectedProductId);
                   const isOutOfStock = p.stock <= 0;
-                  const isLowStock = p.stock > 0 && p.stock <= 5;
+                  const lowStock = isLowStock(p, 5);
 
                   return (
                     <TouchableOpacity
@@ -516,6 +587,7 @@ export default function SalesForecastPanel({
                       activeOpacity={0.88}
                       onPress={() => {
                         setSelectedProductId(p.id);
+                        setForecastScope('product');
                         setProductPickerOpen(false);
                       }}
                       style={{
@@ -602,10 +674,9 @@ export default function SalesForecastPanel({
                         )}
                       </View>
 
-                      {/* Product Card Details (Matching ProductCard layout, strictly NO PRICE) */}
+                      {/* Product Card Details */}
                       <View style={{ padding: 10, flex: 1, justifyContent: 'space-between' }}>
                         <View>
-                          {/* Brand subtle uppercase tag */}
                           {p.brand ? (
                             <Text
                               numberOfLines={1}
@@ -622,7 +693,6 @@ export default function SalesForecastPanel({
                             </Text>
                           ) : null}
 
-                          {/* Product Title (2 Lines Max) */}
                           <Text
                             numberOfLines={2}
                             style={{
@@ -637,7 +707,6 @@ export default function SalesForecastPanel({
                             {p.name}
                           </Text>
 
-                          {/* Minimal Meta Row: Rating & Stock */}
                           <View
                             style={{
                               flexDirection: 'row',
@@ -663,14 +732,14 @@ export default function SalesForecastPanel({
                                 fontWeight: '700',
                                 color: isOutOfStock
                                   ? '#EF4444'
-                                  : isLowStock
+                                  : lowStock
                                   ? '#F59E0B'
                                   : '#10B981',
                               }}
                             >
                               {isOutOfStock
                                 ? 'Out of stock'
-                                : isLowStock
+                                : lowStock
                                 ? `Only ${p.stock} left`
                                 : `${p.stock} in stock`}
                             </Text>
@@ -724,26 +793,220 @@ export default function SalesForecastPanel({
   return (
     <View style={styles.root}>
       {/* Controls header */}
-      <View style={[styles.pageHeader, { justifyContent: 'flex-end', marginBottom: 8 }]}>
-        <View style={styles.controlsRow}>
-          <TouchableOpacity style={styles.controlBtn} onPress={() => setProductPickerOpen(true)}>
+      <View
+        style={[
+          styles.pageHeader,
+          {
+            justifyContent: 'flex-end',
+            marginBottom: 8,
+            position: 'relative',
+            zIndex: categoryPickerOpen || lookbackPickerOpen ? 200 : 20,
+          },
+        ]}
+      >
+        <View
+          style={[
+            styles.controlsRow,
+            {
+              position: 'relative',
+              zIndex: categoryPickerOpen || lookbackPickerOpen ? 200 : 20,
+            },
+          ]}
+        >
+          {/* Motorcycle Part Picker Button */}
+          <TouchableOpacity
+            style={[
+              styles.controlBtn,
+              forecastScope === 'product' && {
+                borderColor: tokens.primary,
+              },
+            ]}
+            onPress={() => {
+              setCategoryPickerOpen(false);
+              setLookbackPickerOpen(false);
+              setProductPickerOpen(true);
+            }}
+          >
             <BootstrapIcon name="box-seam" size={13} color={tokens.mutedForeground} />
             <Text style={styles.controlBtnText} numberOfLines={1}>
-              {selectedName}
+              {selectedProduct?.name || 'Select part'}
             </Text>
             <BootstrapIcon name="chevron-down" size={12} color={tokens.mutedForeground} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.controlBtn} onPress={() => setHorizonPickerOpen(true)}>
+          {/* Product Category Dropdown */}
+          <View style={{ position: 'relative', zIndex: categoryPickerOpen ? 300 : 10 }}>
+            <TouchableOpacity
+              style={[
+                styles.controlBtn,
+                forecastScope === 'category' && {
+                  borderColor: tokens.primary,
+                  backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.2)' : '#E8F5EE',
+                },
+              ]}
+              onPress={() => {
+                setLookbackPickerOpen(false);
+                setCategoryPickerOpen((v) => !v);
+              }}
+            >
+              <BootstrapIcon
+                name="tags"
+                size={13}
+                color={forecastScope === 'category' ? tokens.primary : tokens.mutedForeground}
+              />
+              <Text
+                style={[
+                  styles.controlBtnText,
+                  forecastScope === 'category' && { color: tokens.primary, fontWeight: '700' },
+                ]}
+                numberOfLines={1}
+              >
+                {selectedCategory === 'All' ? 'All Categories' : selectedCategory}
+              </Text>
+              <BootstrapIcon
+                name={categoryPickerOpen ? 'chevron-up' : 'chevron-down'}
+                size={12}
+                color={forecastScope === 'category' ? tokens.primary : tokens.mutedForeground}
+              />
+            </TouchableOpacity>
+
+            {categoryPickerOpen && (
+              <>
+                <TouchableOpacity
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 999,
+                  }}
+                  onPress={() => setCategoryPickerOpen(false)}
+                  activeOpacity={1}
+                />
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    marginTop: 6,
+                    minWidth: 230,
+                    maxHeight: 350,
+                    backgroundColor: tokens.card,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: tokens.border,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 8 },
+                    shadowOpacity: 0.15,
+                    shadowRadius: 16,
+                    elevation: 25,
+                    zIndex: 1000,
+                    overflow: 'hidden',
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderBottomWidth: 1,
+                      borderBottomColor: tokens.border,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: '800',
+                        color: tokens.mutedForeground,
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      PRODUCT CATEGORY
+                    </Text>
+                    <TouchableOpacity onPress={() => setCategoryPickerOpen(false)}>
+                      <BootstrapIcon name="x-lg" size={12} color={tokens.mutedForeground} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView style={{ maxHeight: 280 }}>
+                    {pickerCategories.map((cat, idx) => {
+                      const active =
+                        forecastScope === 'category' &&
+                        selectedCategory.toLowerCase() === cat.toLowerCase();
+                      return (
+                        <TouchableOpacity
+                          key={cat}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingHorizontal: 14,
+                            paddingVertical: 11,
+                            backgroundColor: active
+                              ? isDarkMode
+                                ? 'rgba(29, 69, 51, 0.2)'
+                                : '#E8F0EC'
+                              : 'transparent',
+                            borderBottomWidth: idx < pickerCategories.length - 1 ? 1 : 0,
+                            borderBottomColor: tokens.border,
+                          }}
+                          onPress={() => {
+                            setSelectedCategory(cat);
+                            setForecastScope('category');
+                            setCategoryPickerOpen(false);
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                            <BootstrapIcon
+                              name={getCategoryIcon(cat)}
+                              size={13}
+                              color={active ? tokens.primary : tokens.mutedForeground}
+                            />
+                            <Text
+                              style={{
+                                fontWeight: active ? '700' : '600',
+                                fontSize: 13,
+                                color: active ? tokens.primary : tokens.foreground,
+                              }}
+                            >
+                              {cat === 'All' ? 'All Categories' : cat}
+                            </Text>
+                          </View>
+                          {active && (
+                            <BootstrapIcon name="check-lg" size={14} color={tokens.primary} />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              </>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={styles.controlBtn}
+            onPress={() => {
+              setCategoryPickerOpen(false);
+              setLookbackPickerOpen(false);
+              setHorizonPickerOpen(true);
+            }}
+          >
             <BootstrapIcon name="calendar3" size={13} color={tokens.mutedForeground} />
             <Text style={styles.controlBtnText}>{horizonLabel}</Text>
             <BootstrapIcon name="chevron-down" size={12} color={tokens.mutedForeground} />
           </TouchableOpacity>
 
-          <View style={{ position: 'relative' }}>
+          <View style={{ position: 'relative', zIndex: lookbackPickerOpen ? 300 : 10 }}>
             <TouchableOpacity
               style={styles.controlBtn}
-              onPress={() => setLookbackPickerOpen((v) => !v)}
+              onPress={() => {
+                setCategoryPickerOpen(false);
+                setLookbackPickerOpen((v) => !v);
+              }}
             >
               <BootstrapIcon name="calendar-range" size={13} color={tokens.mutedForeground} />
               <Text style={styles.controlBtnText} numberOfLines={1}>
@@ -781,8 +1044,9 @@ export default function SalesForecastPanel({
                     borderColor: tokens.border,
                     shadowColor: '#000',
                     shadowOffset: { width: 0, height: 8 },
-                    shadowOpacity: 0.12,
+                    shadowOpacity: 0.15,
                     shadowRadius: 16,
+                    elevation: 25,
                     zIndex: 1000,
                     overflow: 'hidden',
                   }}
@@ -932,7 +1196,7 @@ export default function SalesForecastPanel({
           <View style={{ flex: 1 }}>
             <Text style={styles.cardTitle}>Sales Forecast</Text>
             <Text style={styles.cardSubtitle}>
-              Historical sales compared with linear regression forecast
+              Historical sales compared with Croston/SBA forecast
             </Text>
           </View>
           <View style={styles.periodTabs}>
@@ -1000,9 +1264,9 @@ export default function SalesForecastPanel({
       {/* Regression + Stock Optimization */}
       <View style={[styles.splitRow, !isDesktop && { flexDirection: 'column' }]}>
         <View style={[styles.card, styles.splitMain]}>
-          <Text style={styles.cardTitle}>Linear Regression Model</Text>
+          <Text style={styles.cardTitle}>Demand Forecast Model</Text>
           <Text style={styles.cardSubtitle}>
-            Uses historical sales data to estimate future demand via a best-fit line (Y = bX + a).
+            Uses historical sales (including zero-demand periods) with Croston/SBA for intermittent motorcycle-parts demand.
           </Text>
 
           {forecast?.insufficient ? (
@@ -1010,33 +1274,45 @@ export default function SalesForecastPanel({
           ) : (
             <>
               <View style={styles.equationBox}>
-                <Text style={styles.equationLabel}>Regression Equation</Text>
+                <Text style={styles.equationLabel}>Forecast Model</Text>
                 <Text style={styles.equationText}>{equationDisplay}</Text>
-                <Text style={styles.equationHint}>General form: Y = bX + a</Text>
+                <Text style={styles.equationHint}>
+                  {forecast?.seasonalityEnabled
+                    ? 'Croston/SBA with seasonal adjustment'
+                    : 'Croston / Syntetos-Boylan Approximation (intermittent demand)'}
+                </Text>
               </View>
 
               <View style={styles.metaGrid}>
                 <View style={styles.metaItem}>
-                  <Text style={styles.metaLabel}>Slope (b)</Text>
+                  <Text style={styles.metaLabel}>Demand size (z)</Text>
                   <Text style={styles.metaValue}>
-                    {Number(forecast?.regression?.slope || 0).toFixed(2)}
+                    {Number(forecast?.sba?.z ?? 0).toFixed(2)}
                   </Text>
                 </View>
                 <View style={styles.metaItem}>
-                  <Text style={styles.metaLabel}>Intercept (a)</Text>
+                  <Text style={styles.metaLabel}>Interval (p)</Text>
                   <Text style={styles.metaValue}>
-                    {Number(forecast?.regression?.intercept || 0).toFixed(1)}
+                    {Number(forecast?.sba?.p ?? 0).toFixed(2)}
                   </Text>
                 </View>
                 <View style={styles.metaItem}>
                   <Text style={styles.metaLabel}>Historical Periods</Text>
                   <Text style={styles.metaValue}>
-                    {forecast?.regression?.n ?? 0} {periodNoun}
+                    {forecast?.distinctPeriods ?? forecast?.historical?.length ?? 0} {periodNoun}
                   </Text>
                 </View>
                 <View style={styles.metaItem}>
                   <Text style={styles.metaLabel}>Forecast Period</Text>
                   <Text style={styles.metaValue}>{horizonLabel}</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Reorder Point</Text>
+                  <Text style={styles.metaValue}>{forecast?.reorderPoint ?? '—'}</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Lead Time (days)</Text>
+                  <Text style={styles.metaValue}>{forecast?.leadTimeDays ?? '—'}</Text>
                 </View>
               </View>
 
@@ -1134,12 +1410,97 @@ export default function SalesForecastPanel({
         </View>
       </View>
 
-      {/* Product Forecast table */}
+      {/* Forecast Breakdown Table (Product vs Category) */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Product Forecast</Text>
-        <Text style={[styles.cardSubtitle, { marginBottom: 14 }]}>
-          Restock recommendations for all tracked motorcycle parts
-        </Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 10,
+            marginBottom: 14,
+          }}
+        >
+          <View>
+            <Text style={styles.cardTitle}>
+              {forecastScope === 'category' ? 'Category Forecast' : 'Product Forecast'}
+            </Text>
+            <Text style={styles.cardSubtitle}>
+              {forecastScope === 'category'
+                ? 'Demand projections and replenishment grouped by category'
+                : 'Restock recommendations for all tracked motorcycle parts'}
+            </Text>
+          </View>
+
+          {/* Table View Switcher */}
+          <View
+            style={{
+              flexDirection: 'row',
+              backgroundColor: isDarkMode ? '#1E2028' : '#F1F5F9',
+              borderRadius: 8,
+              padding: 3,
+              borderWidth: 1,
+              borderColor: tokens.border,
+            }}
+          >
+            <TouchableOpacity
+              onPress={() => setForecastScope('product')}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 6,
+                backgroundColor: forecastScope === 'product' ? tokens.primary : 'transparent',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <BootstrapIcon
+                name="box-seam"
+                size={11.5}
+                color={forecastScope === 'product' ? '#FFFFFF' : tokens.mutedForeground}
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '700',
+                  color: forecastScope === 'product' ? '#FFFFFF' : tokens.mutedForeground,
+                }}
+              >
+                Parts ({tableRows.length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setForecastScope('category')}
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 6,
+                backgroundColor: forecastScope === 'category' ? tokens.primary : 'transparent',
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 5,
+              }}
+            >
+              <BootstrapIcon
+                name="tags"
+                size={11.5}
+                color={forecastScope === 'category' ? '#FFFFFF' : tokens.mutedForeground}
+              />
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '700',
+                  color: forecastScope === 'category' ? '#FFFFFF' : tokens.mutedForeground,
+                }}
+              >
+                Categories ({categoryTableRows.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
 
         {isDesktop && Platform.OS === 'web' ? (
           <ScrollView
@@ -1148,184 +1509,402 @@ export default function SalesForecastPanel({
             style={{ width: '100%' }}
             contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
           >
-            <View style={{ width: '100%', minWidth: 960 }}>
-              <View style={[styles.tableHeader, { width: '100%', flexDirection: 'row' }]}>
-                {FORECAST_TABLE_COLUMNS.map((col) => (
-                  <Text
-                    key={col.key}
-                    style={[
-                      styles.tableHeaderText,
-                      { flex: col.flex, minWidth: col.minWidth },
-                    ]}
-                  >
-                    {col.label}
-                  </Text>
-                ))}
-              </View>
-              {tableRows.map((row) => {
-                const active = String(row.productId) === String(selectedProductId);
-                const stockColor =
-                  row.stockStatus === 'Critical Stock'
-                    ? tokens.danger
-                    : row.stockStatus === 'Low Stock'
-                      ? tokens.warning
-                      : tokens.foreground;
-                return (
-                  <TouchableOpacity
-                    key={row.productId}
-                    style={[
-                      styles.tableRow,
-                      { width: '100%', flexDirection: 'row' },
-                      active && styles.tableRowActive,
-                    ]}
-                    onPress={() => setSelectedProductId(row.productId)}
-                  >
+            {forecastScope === 'category' ? (
+              /* Category Forecast Desktop Table */
+              <View style={{ width: '100%', minWidth: 960 }}>
+                <View style={[styles.tableHeader, { width: '100%', flexDirection: 'row' }]}>
+                  {CATEGORY_TABLE_COLUMNS.map((col) => (
                     <Text
+                      key={col.key}
                       style={[
-                        styles.tableCellBold,
-                        {
-                          flex: FORECAST_TABLE_COLUMNS[0].flex,
-                          minWidth: FORECAST_TABLE_COLUMNS[0].minWidth,
-                          paddingRight: 8,
-                        },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {row.productName}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.tableCell,
-                        {
-                          flex: FORECAST_TABLE_COLUMNS[1].flex,
-                          minWidth: FORECAST_TABLE_COLUMNS[1].minWidth,
-                          paddingRight: 8,
-                        },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {row.category}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.tableCellBold,
-                        {
-                          flex: FORECAST_TABLE_COLUMNS[2].flex,
-                          minWidth: FORECAST_TABLE_COLUMNS[2].minWidth,
-                          color: stockColor,
-                        },
+                        styles.tableHeaderText,
+                        { flex: col.flex, minWidth: col.minWidth },
                       ]}
                     >
-                      {row.currentStock}
+                      {col.label}
                     </Text>
-                    <Text
+                  ))}
+                </View>
+                {categoryTableRows.map((row) => {
+                  const active =
+                    forecastScope === 'category' &&
+                    String(row.category).toLowerCase() === String(selectedCategory).toLowerCase();
+                  const stockColor =
+                    row.stockStatus === 'Critical Stock'
+                      ? tokens.danger
+                      : row.stockStatus === 'Low Stock'
+                        ? tokens.warning
+                        : tokens.foreground;
+                  const catIcon = getCategoryIcon(row.category);
+
+                  return (
+                    <TouchableOpacity
+                      key={row.category}
                       style={[
-                        styles.tableCell,
-                        {
-                          flex: FORECAST_TABLE_COLUMNS[3].flex,
-                          minWidth: FORECAST_TABLE_COLUMNS[3].minWidth,
-                        },
+                        styles.tableRow,
+                        { width: '100%', flexDirection: 'row' },
+                        active && styles.tableRowActive,
                       ]}
-                    >
-                      {row.averageSales}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.tableCellBold,
-                        {
-                          flex: FORECAST_TABLE_COLUMNS[4].flex,
-                          minWidth: FORECAST_TABLE_COLUMNS[4].minWidth,
-                        },
-                      ]}
-                    >
-                      {row.forecastedDemand == null ? '—' : row.forecastedDemand}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.tableCellBold,
-                        {
-                          flex: FORECAST_TABLE_COLUMNS[5].flex,
-                          minWidth: FORECAST_TABLE_COLUMNS[5].minWidth,
-                          color: tokens.primary,
-                        },
-                      ]}
-                    >
-                      {row.recommendedRestock == null
-                        ? '—'
-                        : row.recommendedRestock > 0
-                          ? `+${row.recommendedRestock}`
-                          : '—'}
-                    </Text>
-                    <View
-                      style={{
-                        flex: FORECAST_TABLE_COLUMNS[6].flex,
-                        minWidth: FORECAST_TABLE_COLUMNS[6].minWidth,
+                      onPress={() => {
+                        setSelectedCategory(row.category);
+                        setForecastScope('category');
                       }}
                     >
-                      <TrendCell trend={row.trend} tokens={tokens} />
-                    </View>
-                    <View
-                      style={{
-                        flex: FORECAST_TABLE_COLUMNS[7].flex,
-                        minWidth: FORECAST_TABLE_COLUMNS[7].minWidth,
-                      }}
-                    >
-                      <StatusBadge status={row.stockStatus} isDark={isDarkMode} />
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </ScrollView>
-        ) : (
-          <View>
-            {tableRows.map((row) => {
-              const active = String(row.productId) === String(selectedProductId);
-              return (
-                <TouchableOpacity
-                  key={row.productId}
-                  style={[styles.productCard, active && styles.productCardActive]}
-                  onPress={() => setSelectedProductId(row.productId)}
-                >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontWeight: '800', color: tokens.foreground, fontSize: 14 }}>
-                        {row.productName}
+                      <View
+                        style={{
+                          flex: CATEGORY_TABLE_COLUMNS[0].flex,
+                          minWidth: CATEGORY_TABLE_COLUMNS[0].minWidth,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                          paddingRight: 8,
+                        }}
+                      >
+                        <BootstrapIcon name={catIcon} size={13} color={tokens.primary} />
+                        <Text
+                          style={[styles.tableCellBold, { flex: 1 }]}
+                          numberOfLines={1}
+                        >
+                          {row.category}
+                        </Text>
+                      </View>
+
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          {
+                            flex: CATEGORY_TABLE_COLUMNS[1].flex,
+                            minWidth: CATEGORY_TABLE_COLUMNS[1].minWidth,
+                            paddingRight: 8,
+                          },
+                        ]}
+                      >
+                        {row.productCount} {row.productCount === 1 ? 'part' : 'parts'}
                       </Text>
-                      <Text style={{ color: tokens.mutedForeground, fontSize: 12, marginTop: 2 }}>
-                        {row.category}
-                      </Text>
-                    </View>
-                    <StatusBadge status={row.stockStatus} isDark={isDarkMode} />
-                  </View>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 }}>
-                    <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
-                      Stock{' '}
-                      <Text style={{ fontWeight: '800', color: tokens.foreground }}>
+
+                      <Text
+                        style={[
+                          styles.tableCellBold,
+                          {
+                            flex: CATEGORY_TABLE_COLUMNS[2].flex,
+                            minWidth: CATEGORY_TABLE_COLUMNS[2].minWidth,
+                            color: stockColor,
+                          },
+                        ]}
+                      >
                         {row.currentStock}
                       </Text>
-                    </Text>
-                    <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
-                      Forecast{' '}
-                      <Text style={{ fontWeight: '800', color: tokens.foreground }}>
+
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          {
+                            flex: CATEGORY_TABLE_COLUMNS[3].flex,
+                            minWidth: CATEGORY_TABLE_COLUMNS[3].minWidth,
+                          },
+                        ]}
+                      >
+                        {row.averageSales}
+                      </Text>
+
+                      <Text
+                        style={[
+                          styles.tableCellBold,
+                          {
+                            flex: CATEGORY_TABLE_COLUMNS[4].flex,
+                            minWidth: CATEGORY_TABLE_COLUMNS[4].minWidth,
+                          },
+                        ]}
+                      >
                         {row.forecastedDemand == null ? '—' : row.forecastedDemand}
                       </Text>
-                    </Text>
-                    <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
-                      Restock{' '}
-                      <Text style={{ fontWeight: '800', color: tokens.primary }}>
+
+                      <Text
+                        style={[
+                          styles.tableCellBold,
+                          {
+                            flex: CATEGORY_TABLE_COLUMNS[5].flex,
+                            minWidth: CATEGORY_TABLE_COLUMNS[5].minWidth,
+                            color: tokens.primary,
+                          },
+                        ]}
+                      >
                         {row.recommendedRestock == null
                           ? '—'
                           : row.recommendedRestock > 0
                             ? `+${row.recommendedRestock}`
                             : '—'}
                       </Text>
+
+                      <View
+                        style={{
+                          flex: CATEGORY_TABLE_COLUMNS[6].flex,
+                          minWidth: CATEGORY_TABLE_COLUMNS[6].minWidth,
+                        }}
+                      >
+                        <TrendCell trend={row.trend} tokens={tokens} />
+                      </View>
+
+                      <View
+                        style={{
+                          flex: CATEGORY_TABLE_COLUMNS[7].flex,
+                          minWidth: CATEGORY_TABLE_COLUMNS[7].minWidth,
+                        }}
+                      >
+                        <StatusBadge status={row.stockStatus} isDark={isDarkMode} />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ) : (
+              /* Product Forecast Desktop Table */
+              <View style={{ width: '100%', minWidth: 960 }}>
+                <View style={[styles.tableHeader, { width: '100%', flexDirection: 'row' }]}>
+                  {FORECAST_TABLE_COLUMNS.map((col) => (
+                    <Text
+                      key={col.key}
+                      style={[
+                        styles.tableHeaderText,
+                        { flex: col.flex, minWidth: col.minWidth },
+                      ]}
+                    >
+                      {col.label}
                     </Text>
-                    <TrendCell trend={row.trend} tokens={tokens} />
-                  </View>
-                </TouchableOpacity>
-              );
-            })}
+                  ))}
+                </View>
+                {tableRows.map((row) => {
+                  const active =
+                    forecastScope === 'product' && String(row.productId) === String(selectedProductId);
+                  const stockColor =
+                    row.stockStatus === 'Critical Stock'
+                      ? tokens.danger
+                      : row.stockStatus === 'Low Stock'
+                        ? tokens.warning
+                        : tokens.foreground;
+                  return (
+                    <TouchableOpacity
+                      key={row.productId}
+                      style={[
+                        styles.tableRow,
+                        { width: '100%', flexDirection: 'row' },
+                        active && styles.tableRowActive,
+                      ]}
+                      onPress={() => {
+                        setSelectedProductId(row.productId);
+                        setForecastScope('product');
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.tableCellBold,
+                          {
+                            flex: FORECAST_TABLE_COLUMNS[0].flex,
+                            minWidth: FORECAST_TABLE_COLUMNS[0].minWidth,
+                            paddingRight: 8,
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {row.productName}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          {
+                            flex: FORECAST_TABLE_COLUMNS[1].flex,
+                            minWidth: FORECAST_TABLE_COLUMNS[1].minWidth,
+                            paddingRight: 8,
+                          },
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {row.category}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCellBold,
+                          {
+                            flex: FORECAST_TABLE_COLUMNS[2].flex,
+                            minWidth: FORECAST_TABLE_COLUMNS[2].minWidth,
+                            color: stockColor,
+                          },
+                        ]}
+                      >
+                        {row.currentStock}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCell,
+                          {
+                            flex: FORECAST_TABLE_COLUMNS[3].flex,
+                            minWidth: FORECAST_TABLE_COLUMNS[3].minWidth,
+                          },
+                        ]}
+                      >
+                        {row.averageSales}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCellBold,
+                          {
+                            flex: FORECAST_TABLE_COLUMNS[4].flex,
+                            minWidth: FORECAST_TABLE_COLUMNS[4].minWidth,
+                          },
+                        ]}
+                      >
+                        {row.forecastedDemand == null ? '—' : row.forecastedDemand}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCellBold,
+                          {
+                            flex: FORECAST_TABLE_COLUMNS[5].flex,
+                            minWidth: FORECAST_TABLE_COLUMNS[5].minWidth,
+                            color: tokens.primary,
+                          },
+                        ]}
+                      >
+                        {row.recommendedRestock == null
+                          ? '—'
+                          : row.recommendedRestock > 0
+                            ? `+${row.recommendedRestock}`
+                            : '—'}
+                      </Text>
+                      <View
+                        style={{
+                          flex: FORECAST_TABLE_COLUMNS[6].flex,
+                          minWidth: FORECAST_TABLE_COLUMNS[6].minWidth,
+                        }}
+                      >
+                        <TrendCell trend={row.trend} tokens={tokens} />
+                      </View>
+                      <View
+                        style={{
+                          flex: FORECAST_TABLE_COLUMNS[7].flex,
+                          minWidth: FORECAST_TABLE_COLUMNS[7].minWidth,
+                        }}
+                      >
+                        <StatusBadge status={row.stockStatus} isDark={isDarkMode} />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
+        ) : (
+          /* Mobile View */
+          <View>
+            {forecastScope === 'category' ? (
+              categoryTableRows.map((row) => {
+                const active =
+                  forecastScope === 'category' &&
+                  String(row.category).toLowerCase() === String(selectedCategory).toLowerCase();
+                return (
+                  <TouchableOpacity
+                    key={row.category}
+                    style={[styles.productCard, active && styles.productCardActive]}
+                    onPress={() => {
+                      setSelectedCategory(row.category);
+                      setForecastScope('category');
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <BootstrapIcon name={getCategoryIcon(row.category)} size={16} color={tokens.primary} />
+                        <View>
+                          <Text style={{ fontWeight: '800', color: tokens.foreground, fontSize: 14 }}>
+                            {row.category}
+                          </Text>
+                          <Text style={{ color: tokens.mutedForeground, fontSize: 12, marginTop: 2 }}>
+                            {row.productCount} tracked parts
+                          </Text>
+                        </View>
+                      </View>
+                      <StatusBadge status={row.stockStatus} isDark={isDarkMode} />
+                    </View>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 }}>
+                      <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
+                        Stock{' '}
+                        <Text style={{ fontWeight: '800', color: tokens.foreground }}>
+                          {row.currentStock}
+                        </Text>
+                      </Text>
+                      <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
+                        Forecast{' '}
+                        <Text style={{ fontWeight: '800', color: tokens.foreground }}>
+                          {row.forecastedDemand == null ? '—' : row.forecastedDemand}
+                        </Text>
+                      </Text>
+                      <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
+                        Restock{' '}
+                        <Text style={{ fontWeight: '800', color: tokens.primary }}>
+                          {row.recommendedRestock == null
+                            ? '—'
+                            : row.recommendedRestock > 0
+                              ? `+${row.recommendedRestock}`
+                              : '—'}
+                        </Text>
+                      </Text>
+                      <TrendCell trend={row.trend} tokens={tokens} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            ) : (
+              tableRows.map((row) => {
+                const active =
+                  forecastScope === 'product' && String(row.productId) === String(selectedProductId);
+                return (
+                  <TouchableOpacity
+                    key={row.productId}
+                    style={[styles.productCard, active && styles.productCardActive]}
+                    onPress={() => {
+                      setSelectedProductId(row.productId);
+                      setForecastScope('product');
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontWeight: '800', color: tokens.foreground, fontSize: 14 }}>
+                          {row.productName}
+                        </Text>
+                        <Text style={{ color: tokens.mutedForeground, fontSize: 12, marginTop: 2 }}>
+                          {row.category}
+                        </Text>
+                      </View>
+                      <StatusBadge status={row.stockStatus} isDark={isDarkMode} />
+                    </View>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
+                        Stock{' '}
+                        <Text style={{ fontWeight: '800', color: tokens.foreground }}>
+                          {row.currentStock}
+                        </Text>
+                      </Text>
+                      <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
+                        Forecast{' '}
+                        <Text style={{ fontWeight: '800', color: tokens.foreground }}>
+                          {row.forecastedDemand == null ? '—' : row.forecastedDemand}
+                        </Text>
+                      </Text>
+                      <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
+                        Restock{' '}
+                        <Text style={{ fontWeight: '800', color: tokens.primary }}>
+                          {row.recommendedRestock == null
+                            ? '—'
+                            : row.recommendedRestock > 0
+                              ? `+${row.recommendedRestock}`
+                              : '—'}
+                        </Text>
+                      </Text>
+                      <TrendCell trend={row.trend} tokens={tokens} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })
+            )}
           </View>
         )}
       </View>

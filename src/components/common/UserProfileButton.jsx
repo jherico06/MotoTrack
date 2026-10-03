@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native';
 import BootstrapIcon from './BootstrapIcon';
 
 export default function UserProfileButton({ currentUser, onPress, size = 40 }) {
@@ -24,6 +24,8 @@ export default function UserProfileButton({ currentUser, onPress, size = 40 }) {
       activeOpacity={0.85}
       accessibilityRole="button"
       accessibilityLabel="User profile and navigation menu"
+      dataSet={{ profileButton: true }}
+      {...(Platform.OS === 'web' ? { 'data-profile-button': 'true' } : {})}
     >
       <View style={[styles.avatarWrap, { width: size, height: size, borderRadius: size / 2 }]}>
         {avatarUri ? (

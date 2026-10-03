@@ -78,7 +78,7 @@ export default function RevenueTrendChart({
 
     // Calculate dynamic dimensions
     const cWidth = isDesktop ? Math.max(760, len * 58) : Math.max(560, len * 48);
-    const cHeight = isDesktop ? 250 : 220;
+    const cHeight = isDesktop ? 320 : 280;
     const padding = { top: 24, right: 28, bottom: 38, left: 62 };
 
     const gW = cWidth - padding.left - padding.right;
@@ -228,7 +228,7 @@ export default function RevenueTrendChart({
         </View>
 
         {/* Period Tabs: 4W / 12W / 24W */}
-        {onPeriodChange && (
+        {onPeriodChange && data?.length > 0 && (
           <View
             style={{
               flexDirection: 'row',
@@ -270,6 +270,16 @@ export default function RevenueTrendChart({
         )}
       </View>
 
+      {(!Array.isArray(data) || data.length === 0 || data.every((d) => !(Number(d.revenue) > 0))) && (
+        <View style={{ paddingVertical: 48, alignItems: 'center' }}>
+          <Text style={{ fontSize: 14, color: colors.textMuted, fontStyle: 'italic' }}>
+            No historical revenue data available.
+          </Text>
+        </View>
+      )}
+
+      {Array.isArray(data) && data.some((d) => Number(d.revenue) > 0) && (
+      <>
       {/* Legend & Telemetry Bar */}
       <View
         style={{
@@ -651,6 +661,8 @@ export default function RevenueTrendChart({
           )}
         </ScrollView>
       </View>
+      </>
+      )}
     </View>
   );
 }

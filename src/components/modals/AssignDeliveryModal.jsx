@@ -281,6 +281,7 @@ export default function AssignDeliveryModal({
               onChange={setExpectedDate}
               label="Expected delivery date"
               hint="This date is shown to the customer on order tracking."
+              isDarkMode={isDark}
             />
 
             <Text style={[styles.label, isDark && { color: '#E2E8F0' }]}>Delivery Notes</Text>
@@ -362,6 +363,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+    zIndex: 999999,
   },
   sheet: {
     width: '100%',

@@ -659,10 +659,11 @@ export const deliveryService = {
     if (!order) return { success: false, error: 'Order not found.' };
 
     const prev = this.normalizeStatus(order.status);
-    if (!['processing', 'rescheduled', 'ready for delivery'].includes(prev.toLowerCase())) {
+    const blockedStatuses = ['cancelled', 'delivered', 'completed', 'return requested', 'returned'];
+    if (blockedStatuses.includes(prev.toLowerCase())) {
       return {
         success: false,
-        error: `Cannot assign delivery while order is "${order.status}". Process the order first.`,
+        error: `Cannot assign delivery while order is "${order.status}".`,
       };
     }
 

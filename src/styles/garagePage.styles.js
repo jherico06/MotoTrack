@@ -1945,12 +1945,12 @@ export const garageStyles = StyleSheet.create({
     flex: 1,
   },
   stepCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F0F6FA',
     borderWidth: 1.5,
-    borderColor: '#CBD5E1',
+    borderColor: '#D0DFEB',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1959,21 +1959,21 @@ export const garageStyles = StyleSheet.create({
     borderColor: '#1D4533',
   },
   stepCircleCompleted: {
-    backgroundColor: '#10B981',
-    borderColor: '#059669',
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
   },
   stepNumberText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
-    color: '#64748B',
+    color: '#3B7097',
   },
   stepNumberTextActive: {
     color: '#FFFFFF',
   },
   stepLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#5A738E',
     textAlign: 'center',
   },
   stepLabelActive: {
@@ -1981,17 +1981,18 @@ export const garageStyles = StyleSheet.create({
     fontWeight: '900',
   },
   stepLabelCompleted: {
-    color: '#059669',
+    color: '#1D4533',
+    fontWeight: '800',
   },
   stepConnectingLine: {
     height: 2,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: '#D0DFEB',
     flex: 0.8,
     marginHorizontal: -4,
-    marginBottom: 16,
+    marginTop: 15,
   },
   stepConnectingLineCompleted: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#1D4533',
   },
   stepSectionHeader: {
     marginBottom: 14,

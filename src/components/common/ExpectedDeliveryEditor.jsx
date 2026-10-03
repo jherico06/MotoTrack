@@ -10,6 +10,7 @@ export default function ExpectedDeliveryEditor({
   adminUser,
   onSaved,
   showToast,
+  isDarkMode = false,
 }) {
   const [date, setDate] = useState(() => toDateInputValue(currentIso) || addDaysDateInput(1));
   const [busy, setBusy] = useState(false);
@@ -43,6 +44,7 @@ export default function ExpectedDeliveryEditor({
         onChange={setDate}
         label="Expected delivery date"
         hint="Shown on the customer tracking page."
+        isDarkMode={isDarkMode}
       />
       <TouchableOpacity
         style={[styles.saveBtn, busy && { opacity: 0.7 }]}

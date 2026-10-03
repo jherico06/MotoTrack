@@ -4,7 +4,6 @@ import {
   ShopPage,
   LoginPage,
   SignUpPage,
-  OrderPage,
   GaragePage,
   WishlistPage,
   AdminDashboard,
@@ -14,6 +13,7 @@ import {
   DeliveryConfirmPage,
   RiderRunPage,
   RiderDashboard,
+  MechanicDashboard,
   ProductDetailsPage,
 } from '../pages';
 
@@ -189,7 +189,10 @@ function MainAppRouter() {
     try {
       const { screen: s } = parsePublicRoute();
       if (s === 'orders') {
-        return 'orders';
+        return 'profile';
+      }
+      if (s === 'notifications') {
+        return 'profile';
       }
       if (s === 'confirm-delivery') {
         return 'confirm-delivery';
@@ -204,7 +207,7 @@ function MainAppRouter() {
       if (s === 'rider-dashboard') {
         return 'rider-dashboard';
       }
-      if (['login', 'signup', 'admin', 'garage', 'wishlist', 'shop', 'customizer', 'profile', 'notifications', 'orders', 'confirm-delivery', 'rider-run', 'rider-dashboard'].includes(s)) {
+      if (['login', 'signup', 'admin', 'garage', 'wishlist', 'shop', 'customizer', 'profile', 'notifications', 'confirm-delivery', 'rider-run', 'rider-dashboard'].includes(s)) {
         return s;
       }
     } catch (_e) {}
@@ -221,6 +224,7 @@ function MainAppRouter() {
       if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
         const tab = new URLSearchParams(window.location.search).get('tab');
         if (s === 'orders' || tab === 'orders') return 'orders';
+        if (s === 'notifications' || tab === 'notifications') return 'notifications';
         if (tab) return tab;
       }
     } catch (_e) {}
@@ -232,6 +236,18 @@ function MainAppRouter() {
   const { wishlistCount } = useWishlist();
 
   const navigateScreen = (screen, params = null) => {
+    if (screen === 'orders') {
+      handleNavigateToProfile('orders');
+      return;
+    }
+    if (screen === 'notifications') {
+      handleNavigateToProfile('notifications');
+      return;
+    }
+    if (screen === 'profile') {
+      handleNavigateToProfile(params?.tab || 'overview');
+      return;
+    }
     if (params?.product) {
       if (screen === 'customizer') {
         setCustomizerProduct(params.product);
@@ -246,8 +262,12 @@ function MainAppRouter() {
         if (screen === 'shop') {
           url.searchParams.delete('screen');
           url.searchParams.delete('token');
+          url.searchParams.delete('tab');
         } else {
           url.searchParams.set('screen', screen);
+        }
+        if (screen !== 'profile') {
+          url.searchParams.delete('tab');
         }
         if (screen !== 'rider-run' && screen !== 'confirm-delivery') {
           url.searchParams.delete('token');
@@ -262,12 +282,27 @@ function MainAppRouter() {
       setRedirectReason(
         tab === 'orders'
           ? 'Please sign in to view your orders in your Customer Dashboard.'
-          : 'Please sign in to view your Customer Dashboard.'
+          : tab === 'notifications'
+            ? 'Please sign in to view your notifications in your Customer Dashboard.'
+            : 'Please sign in to view your Customer Dashboard.'
       );
       navigateScreen('login');
     } else {
       setProfileInitialTab(tab);
-      navigateScreen('profile');
+      setCurrentScreen('profile');
+      if (Platform.OS === 'web' && typeof window !== 'undefined' && window.history?.pushState) {
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set('screen', 'profile');
+          if (tab && tab !== 'overview') {
+            url.searchParams.set('tab', tab);
+          } else {
+            url.searchParams.delete('tab');
+          }
+          url.searchParams.delete('token');
+          window.history.pushState({}, '', url.pathname + (url.search ? url.search : ''));
+        } catch (_e) {}
+      }
     }
   };
 
@@ -318,6 +353,13 @@ function MainAppRouter() {
     }
   }, [currentUser, currentScreen]);
 
+  useEffect(() => {
+    if (currentUser?.role === 'mechanic' && currentScreen !== 'mechanic-dashboard') {
+      const t = setTimeout(() => navigateScreen('mechanic-dashboard'), 0);
+      return () => clearTimeout(t);
+    }
+  }, [currentUser, currentScreen]);
+
   // 2. If user is already authenticated and on login/signup, route appropriately
   useEffect(() => {
     if (currentUser && (currentScreen === 'login' || currentScreen === 'signup')) {
@@ -326,6 +368,8 @@ function MainAppRouter() {
           navigateScreen('admin');
         } else if (currentUser.role === 'rider') {
           navigateScreen('rider-dashboard');
+        } else if (currentUser.role === 'mechanic') {
+          navigateScreen('mechanic-dashboard');
         } else if (!redirectReason) {
           navigateScreen('shop');
         }
@@ -400,6 +444,19 @@ function MainAppRouter() {
           logout();
           navigateScreen('login');
           showToast('Rider logged out');
+        }}
+      />
+    );
+  }
+
+  // Authenticated mechanic dashboard
+  if (currentUser?.role === 'mechanic') {
+    return (
+      <MechanicDashboard
+        onLogout={() => {
+          logout();
+          navigateScreen('login');
+          showToast('Mechanic logged out');
         }}
       />
     );
@@ -584,9 +641,11 @@ function MainAppRouter() {
             if (screen === 'profile') {
               handleNavigateToProfile(params?.tab || 'overview');
             } else if (screen === 'orders') {
-              navigateScreen('orders');
+              handleNavigateToProfile('orders');
+            } else if (screen === 'notifications') {
+              handleNavigateToProfile('notifications');
             } else {
-              navigateScreen(screen);
+              navigateScreen(screen, params);
             }
           }}
         />
@@ -634,7 +693,7 @@ function MainAppRouter() {
       <WishlistPage
         onAddToCart={(product, qty) => addToCart(product, qty)}
         onNavigateToStore={() => navigateScreen('shop')}
-        onNavigateToOrders={() => navigateScreen('orders')}
+        onNavigateToOrders={() => handleNavigateToProfile('orders')}
         onNavigateToGarage={() => navigateScreen('garage')}
         onNavigateToLogin={() => navigateScreen('login')}
         onNavigateToProfile={(tab) => handleNavigateToProfile(tab)}
@@ -650,26 +709,21 @@ function MainAppRouter() {
 
   if (currentScreen === 'orders') {
     if (!currentUser) {
-      setRedirectReason('Please sign in to view your orders.');
+      setRedirectReason('Please sign in to view your orders in your Customer Dashboard.');
       navigateScreen('login');
       return null;
     }
     return (
-      <OrderPage
-        currentUser={currentUser}
+      <ProfilePage
+        initialTab="orders"
         onNavigateToStore={() => navigateScreen('shop')}
-        onNavigateToWishlist={() => navigateScreen('wishlist')}
         onNavigateToGarage={() => navigateScreen('garage')}
+        onNavigateToOrders={() => handleNavigateToProfile('orders')}
+        onNavigateToWishlist={() => navigateScreen('wishlist')}
         onNavigateToCustomizer={() => navigateScreen('customizer')}
-        onNavigateToCustomize={() => navigateScreen('customizer')}
-        onNavigateToLogin={() => navigateScreen('login')}
-        onNavigateToProfile={(tab) => handleNavigateToProfile(tab)}
         onNavigateToAdmin={() => navigateScreen('admin')}
-        onAddToCart={(product, qty) => addToCart(product, qty)}
-        onOpenCart={() => setIsCartOpen(true)}
-        cartItemCount={cartItemCount}
-        wishlistCount={wishlistCount}
-        showToast={showToast}
+        onNavigateToLogin={() => navigateScreen('login')}
+        onLogout={handleLogout}
       />
     );
   }
@@ -679,7 +733,7 @@ function MainAppRouter() {
       <GaragePage
         onNavigateToStore={() => navigateScreen('shop')}
         onNavigateToWishlist={() => navigateScreen('wishlist')}
-        onNavigateToOrders={() => navigateScreen('orders')}
+        onNavigateToOrders={() => handleNavigateToProfile('orders')}
         onNavigateToCustomizer={() => navigateScreen('customizer')}
         onNavigateToCustomize={() => navigateScreen('customizer')}
         onNavigateToLogin={() => {
@@ -701,7 +755,7 @@ function MainAppRouter() {
         onNavigateToStore={() => navigateScreen('shop')}
         onNavigateToGarage={() => navigateScreen('garage')}
         onNavigateToWishlist={() => navigateScreen('wishlist')}
-        onNavigateToOrders={() => navigateScreen('orders')}
+        onNavigateToOrders={() => handleNavigateToProfile('orders')}
         onNavigateToLogin={() => {
           setRedirectReason('Please sign in to book your customized build.');
           navigateScreen('login');
@@ -720,7 +774,7 @@ function MainAppRouter() {
         initialTab={profileInitialTab}
         onNavigateToStore={() => navigateScreen('shop')}
         onNavigateToGarage={() => navigateScreen('garage')}
-        onNavigateToOrders={() => navigateScreen('orders')}
+        onNavigateToOrders={() => handleNavigateToProfile('orders')}
         onNavigateToWishlist={() => navigateScreen('wishlist')}
         onNavigateToCustomizer={() => navigateScreen('customizer')}
         onNavigateToAdmin={() => navigateScreen('admin')}
@@ -731,10 +785,25 @@ function MainAppRouter() {
   }
 
   if (currentScreen === 'notifications') {
+    if (Platform.OS === 'web') {
+      return (
+        <ProfilePage
+          initialTab="notifications"
+          onNavigateToStore={() => navigateScreen('shop')}
+          onNavigateToGarage={() => navigateScreen('garage')}
+          onNavigateToOrders={() => handleNavigateToProfile('orders')}
+          onNavigateToWishlist={() => navigateScreen('wishlist')}
+          onNavigateToCustomizer={() => navigateScreen('customizer')}
+          onNavigateToAdmin={() => navigateScreen('admin')}
+          onNavigateToLogin={() => navigateScreen('login')}
+          onLogout={handleLogout}
+        />
+      );
+    }
     return (
       <NotificationsPage
         onNavigateBack={() => navigateScreen('shop')}
-        onNavigateToOrders={() => navigateScreen('orders')}
+        onNavigateToOrders={() => handleNavigateToProfile('orders')}
         onNavigateToGarage={() => navigateScreen('garage')}
         onNavigateToShop={() => navigateScreen('shop')}
         onNavigateToAdmin={() => navigateScreen('admin')}
@@ -749,7 +818,7 @@ function MainAppRouter() {
         onNavigateBack={() => navigateScreen('shop')}
         onNavigateToStore={() => navigateScreen('shop')}
         onNavigateToWishlist={() => navigateScreen('wishlist')}
-        onNavigateToOrders={() => navigateScreen('orders')}
+        onNavigateToOrders={() => handleNavigateToProfile('orders')}
         onNavigateToLogin={() => navigateScreen('login')}
       />
     );
@@ -769,7 +838,7 @@ function MainAppRouter() {
         if (screen === 'profile') {
           handleNavigateToProfile(params?.tab || 'overview');
         } else if (screen === 'orders') {
-          navigateScreen('orders');
+          handleNavigateToProfile('orders');
         } else {
           navigateScreen(screen, params);
         }

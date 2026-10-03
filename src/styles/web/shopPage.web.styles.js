@@ -15,6 +15,7 @@ export const shopWebStyles = StyleSheet.create({
     boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.10)',
+    minHeight: 67,
   },
   headerInner: {
     maxWidth: 1360,
@@ -22,6 +23,7 @@ export const shopWebStyles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: 24,
     paddingVertical: 12,
+    minHeight: 66,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',

@@ -8,12 +8,111 @@ import {
   SafeAreaView,
   useWindowDimensions,
   StyleSheet,
-  Platform,
   ActivityIndicator,
 } from 'react-native';
 import { BootstrapIcon } from '../components/common';
 import { notificationService, stripEmojis } from '../services/notificationService';
 import { useAuth } from '../context/AuthContext';
+import ProfilePage from './ProfilePage.web';
+
+function formatRelativeTime(isoString) {
+  if (!isoString) return 'Just now';
+  try {
+    const d = new Date(isoString);
+    const diffMs = Date.now() - d.getTime();
+    if (isNaN(diffMs)) return 'Recently';
+
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return 'Yesterday';
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  } catch (_e) {
+    return 'Recent';
+  }
+}
+
+function formatFullDate(isoString) {
+  if (!isoString) return 'Recent';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return String(isoString);
+    return d.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch (_e) {
+    return 'Recent';
+  }
+}
+
+function getCategoryConfig(notif) {
+  const cat = String(notif.category || notif.type || '').toLowerCase();
+
+  if (cat.includes('booking') || cat.includes('service') || cat.includes('garage') || cat.includes('pit')) {
+    return {
+      label: 'Booking',
+      icon: 'calendar-check',
+      bg: '#FDF4E7',
+      color: '#D97706',
+    };
+  }
+  if (cat.includes('order') || cat.includes('dispatch') || cat.includes('ship')) {
+    return {
+      label: 'Order',
+      icon: 'box-seam',
+      bg: '#EFF6FF',
+      color: '#2563EB',
+    };
+  }
+  if (cat.includes('payment') || cat.includes('paid') || cat.includes('spend')) {
+    return {
+      label: 'Payment',
+      icon: 'credit-card-2-front',
+      bg: '#ECFDF5',
+      color: '#059669',
+    };
+  }
+  if (cat.includes('stock') || cat.includes('inventory') || cat.includes('restock')) {
+    return {
+      label: 'Inventory',
+      icon: 'exclamation-diamond',
+      bg: '#FEF2F2',
+      color: '#DC2626',
+    };
+  }
+  if (cat.includes('security') || cat.includes('system') || cat.includes('alert')) {
+    return {
+      label: 'System',
+      icon: 'shield-exclamation',
+      bg: '#F3E8FF',
+      color: '#7C3AED',
+    };
+  }
+  if (cat.includes('promo') || cat.includes('discount')) {
+    return {
+      label: 'Promotion',
+      icon: 'ticket-perforated',
+      bg: '#FEF3C7',
+      color: '#D97706',
+    };
+  }
+  return {
+    label: notif.categoryLabel || 'Notice',
+    icon: 'bell',
+    bg: '#F4F3F0',
+    color: '#6B6862',
+  };
+}
 
 export default function NotificationsPage({
   isAdmin: propIsAdmin = false,
@@ -29,7 +128,7 @@ export default function NotificationsPage({
   onNavigateToSettings,
 }) {
   const { width } = useWindowDimensions();
-  const isDesktop = width >= 768;
+  const isMobile = width < 768;
   const { currentUser } = useAuth();
   const isAdmin = propIsAdmin || currentUser?.role === 'admin';
 
@@ -42,7 +141,7 @@ export default function NotificationsPage({
   const [activeFilter, setActiveFilter] = useState('all');
   const [toastMessage, setToastMessage] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
-  const [lastSyncedAt, setLastSyncedAt] = useState(null);
+  const [expandedCardIds, setExpandedCardIds] = useState(new Set());
   const [dbAlertCount, setDbAlertCount] = useState(() =>
     isAdmin ? notificationService.getDatabaseAlertsCount() : 0
   );
@@ -51,13 +150,12 @@ export default function NotificationsPage({
     if (isSyncing) return;
     setIsSyncing(true);
     try {
-      const res = await notificationService.syncFromDatabase({ force: true });
+      await notificationService.syncFromDatabase({ force: true });
       if (isAdmin) {
         const fresh = notificationService.getAdminNotifications();
         setNotifications(fresh);
         const count = notificationService.getDatabaseAlertsCount();
         setDbAlertCount(count);
-        setLastSyncedAt(new Date());
         if (isManual) {
           showToast(`✓ Database synchronized: ${count} live alerts active`);
         }
@@ -117,23 +215,6 @@ export default function NotificationsPage({
     showToast('✓ All notifications marked as read');
   };
 
-  const handleClearRead = async () => {
-    if (isAdmin) {
-      const unreadOnly = notifications.filter((n) => n.status === 'unread');
-      notificationService.adminNotifications = unreadOnly;
-      await notificationService.persist();
-      notificationService.notify();
-      setNotifications(unreadOnly);
-    } else {
-      const unreadOnly = notifications.filter((n) => n.status === 'unread');
-      notificationService.customerNotifications = unreadOnly;
-      await notificationService.persist();
-      notificationService.notify();
-      setNotifications(unreadOnly);
-    }
-    showToast('✓ Cleared read notifications');
-  };
-
   const handleMarkSingleRead = async (id) => {
     if (isAdmin) {
       await notificationService.markAdminAsRead(id);
@@ -144,17 +225,8 @@ export default function NotificationsPage({
     }
   };
 
-  const handleMarkSingleUnread = async (id) => {
-    if (isAdmin) {
-      await notificationService.markAdminAsUnread(id);
-      setNotifications(notificationService.getAdminNotifications());
-    } else {
-      await notificationService.markCustomerAsUnread(id);
-      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
-    }
-  };
-
-  const handleDeleteSingle = async (id) => {
+  const handleDeleteSingle = async (id, e) => {
+    e?.stopPropagation?.();
     if (isAdmin) {
       await notificationService.deleteAdminNotification(id);
       setNotifications(notificationService.getAdminNotifications());
@@ -162,142 +234,28 @@ export default function NotificationsPage({
       await notificationService.deleteCustomerNotification(id);
       setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
     }
-    showToast('Notification removed');
+    showToast('Notification dismissed');
   };
 
-  // ─── STATS & COUNTERS ───
-  const stats = useMemo(() => {
-    const total = notifications.length;
-    const unread = notifications.filter((n) => n.status === 'unread').length;
-
-    if (isAdmin) {
-      const orders = notifications.filter(
-        (n) =>
-          n.category === 'order_placed' ||
-          n.category === 'payment_confirmed' ||
-          n.category === 'order_status' ||
-          n.type === 'order' ||
-          n.type === 'payment'
-      ).length;
-
-      const inventory = notifications.filter(
-        (n) =>
-          n.category === 'low_stock' ||
-          n.category === 'out_of_stock' ||
-          n.category === 'restock_attention' ||
-          n.category === 'restock_recommendation' ||
-          n.type === 'inventory' ||
-          n.type === 'procurement'
-      ).length;
-
-      const bookings = notifications.filter(
-        (n) =>
-          n.category === 'booking_new' ||
-          n.category === 'booking_cancelled' ||
-          n.category === 'service_approaching' ||
-          n.category === 'service_completed' ||
-          n.type === 'booking'
-      ).length;
-
-      const customers = notifications.filter(
-        (n) =>
-          n.category === 'customer_registered' ||
-          n.category === 'review_submitted' ||
-          n.type === 'user' ||
-          n.type === 'review'
-      ).length;
-
-      const system = notifications.filter(
-        (n) =>
-          n.category === 'sales_update' ||
-          n.category === 'security_activity' ||
-          n.type === 'system' ||
-          n.type === 'sales'
-      ).length;
-
-      const liveDb = notifications.filter(
-        (n) => n.isDatabaseLive || (n.id && String(n.id).startsWith('db-'))
-      ).length;
-
-      return { total, unread, orders, inventory, bookings, customers, system, liveDb };
+  const toggleCardExpanded = (id, notif) => {
+    if (notif && notif.status === 'unread') {
+      handleMarkSingleRead(id);
     }
+    setExpandedCardIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
-    const bookings = notifications.filter((n) => n.type === 'booking').length;
-    const orders = notifications.filter((n) => n.type === 'order').length;
-    return { total, unread, bookings, orders };
-  }, [notifications, isAdmin]);
-
-  // ─── FILTERED NOTIFICATIONS FEED ───
+  // Filtered notifications
   const filteredNotifications = useMemo(() => {
     return notifications.filter((notif) => {
       if (activeFilter === 'unread' && notif.status !== 'unread') return false;
-
-      if (isAdmin) {
-        if (activeFilter === 'live_db') {
-          const isDb = notif.isDatabaseLive || (notif.id && String(notif.id).startsWith('db-'));
-          if (!isDb) return false;
-        }
-
-        if (activeFilter === 'orders') {
-          const match =
-            notif.category === 'order_placed' ||
-            notif.category === 'payment_confirmed' ||
-            notif.category === 'order_status' ||
-            notif.type === 'order' ||
-            notif.type === 'payment';
-          if (!match) return false;
-        }
-
-        if (activeFilter === 'inventory') {
-          const match =
-            notif.category === 'low_stock' ||
-            notif.category === 'out_of_stock' ||
-            notif.category === 'restock_attention' ||
-            notif.category === 'restock_recommendation' ||
-            notif.type === 'inventory' ||
-            notif.type === 'procurement';
-          if (!match) return false;
-        }
-
-        if (activeFilter === 'garage') {
-          const match =
-            notif.category === 'booking_new' ||
-            notif.category === 'booking_cancelled' ||
-            notif.category === 'service_approaching' ||
-            notif.category === 'service_completed' ||
-            notif.type === 'booking';
-          if (!match) return false;
-        }
-
-        if (activeFilter === 'customers') {
-          const match =
-            notif.category === 'customer_registered' ||
-            notif.category === 'review_submitted' ||
-            notif.type === 'user' ||
-            notif.type === 'review';
-          if (!match) return false;
-        }
-
-        if (activeFilter === 'system') {
-          const match =
-            notif.category === 'sales_update' ||
-            notif.category === 'security_activity' ||
-            notif.type === 'system' ||
-            notif.type === 'sales' ||
-            notif.type === 'security';
-          if (!match) return false;
-        }
-      } else {
-        if (activeFilter === 'booking' && notif.type !== 'booking') return false;
-        if (activeFilter === 'order' && notif.type !== 'order') return false;
-        if (activeFilter === 'promo' && notif.type !== 'promo') return false;
-        if (
-          activeFilter === 'system' &&
-          notif.type !== 'security' &&
-          notif.type !== 'system'
-        )
-          return false;
-      }
 
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -308,319 +266,79 @@ export default function NotificationsPage({
       }
       return true;
     });
-  }, [notifications, activeFilter, searchQuery, isAdmin]);
+  }, [notifications, activeFilter, searchQuery]);
 
-  const formatTimestamp = (isoString) => {
-    if (!isoString) return 'Recent';
-    try {
-      const d = new Date(isoString);
-      const diffMs = Date.now() - d.getTime();
-      const diffMins = Math.floor(diffMs / (1000 * 60));
-      const diffHours = Math.floor(diffMins / 60);
-      const diffDays = Math.floor(diffHours / 24);
+  // Chronologically grouped sections (e.g., THIS WEEK, THIS MONTH, EARLIER)
+  const groupedSections = useMemo(() => {
+    const now = Date.now();
+    const oneWeekMs = 7 * 24 * 60 * 60 * 1000;
+    const oneMonthMs = 30 * 24 * 60 * 60 * 1000;
 
-      if (diffMins < 1) return 'Just now';
-      if (diffMins < 60) return `${diffMins}m ago`;
-      if (diffHours < 24) return `${diffHours}h ago`;
-      if (diffDays === 1) return 'Yesterday';
-      if (diffDays < 7) return `${diffDays}d ago`;
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    } catch (_e) {
-      return 'Recent';
-    }
-  };
+    const buckets = {
+      thisWeek: [],
+      thisMonth: [],
+      earlier: [],
+    };
 
-  const getTypeMeta = (notif) => {
-    const cat = notif.category || '';
-    const type = notif.type || '';
+    filteredNotifications.forEach((n) => {
+      const timeVal = n.created_at || n.timestamp || n.date;
+      const itemTime = timeVal ? new Date(timeVal).getTime() : now;
+      const diff = now - itemTime;
 
-    switch (cat) {
-      case 'order_placed':
-        return {
-          icon: 'bag-check-fill',
-          color: '#2563EB',
-          bg: isDarkMode ? '#1C2422' : '#DBEAFE',
-          label: 'New Order',
-          priorityLabel: 'ORDER',
-          priorityColor: '#2563EB',
-        };
-      case 'payment_confirmed':
-        return {
-          icon: 'credit-card-2-front-fill',
-          color: '#059669',
-          bg: isDarkMode ? '#132A26' : '#D1FAE5',
-          label: 'Payment Verified',
-          priorityLabel: 'PAID',
-          priorityColor: '#059669',
-        };
-      case 'order_status':
-        return {
-          icon: 'truck',
-          color: '#2563EB',
-          bg: isDarkMode ? '#1C2422' : '#DBEAFE',
-          label: 'Order Update',
-          priorityLabel: 'STATUS',
-          priorityColor: '#2563EB',
-        };
-      case 'low_stock':
-        return {
-          icon: 'exclamation-diamond-fill',
-          color: '#D97706',
-          bg: isDarkMode ? '#2D2012' : '#FEF3C7',
-          label: 'Low Stock',
-          priorityLabel: 'REORDER',
-          priorityColor: '#D97706',
-        };
-      case 'out_of_stock':
-        return {
-          icon: 'x-octagon-fill',
-          color: '#DC2626',
-          bg: isDarkMode ? '#341515' : '#FEE2E2',
-          label: 'Out of Stock',
-          priorityLabel: 'CRITICAL',
-          priorityColor: '#DC2626',
-        };
-      case 'booking_new':
-        return {
-          icon: 'wrench-adjustable-circle-fill',
-          color: '#1D4533',
-          bg: isDarkMode ? '#132A26' : '#C8DDD3',
-          label: 'New Booking',
-          priorityLabel: 'PIT BAY',
-          priorityColor: '#1D4533',
-        };
-      case 'booking_cancelled':
-        return {
-          icon: 'calendar-x-fill',
-          color: '#DC2626',
-          bg: isDarkMode ? '#341515' : '#FEE2E2',
-          label: 'Booking Cancelled',
-          priorityLabel: 'CANCELLED',
-          priorityColor: '#DC2626',
-        };
-      case 'service_approaching':
-        return {
-          icon: 'clock-history',
-          color: '#1D4533',
-          bg: isDarkMode ? '#132A26' : '#C8DDD3',
-          label: 'Service Due',
-          priorityLabel: 'TODAY',
-          priorityColor: '#1D4533',
-        };
-      case 'service_completed':
-        return {
-          icon: 'check-circle-fill',
-          color: '#059669',
-          bg: isDarkMode ? '#132A26' : '#D1FAE5',
-          label: 'Service Complete',
-          priorityLabel: 'READY',
-          priorityColor: '#059669',
-        };
-      case 'customer_registered':
-        return {
-          icon: 'person-plus-fill',
-          color: '#4F46E5',
-          bg: isDarkMode ? '#1E1B4B' : '#EEF2FF',
-          label: 'New Customer',
-          priorityLabel: 'USER',
-          priorityColor: '#4F46E5',
-        };
-      case 'review_submitted':
-        return {
-          icon: 'star-fill',
-          color: '#D97706',
-          bg: isDarkMode ? '#2D2012' : '#FEF3C7',
-          label: 'Product Review',
-          priorityLabel: 'REVIEW',
-          priorityColor: '#D97706',
-        };
-      case 'restock_attention':
-        return {
-          icon: 'boxes',
-          color: '#DC2626',
-          bg: isDarkMode ? '#341515' : '#FEE2E2',
-          label: 'Restock Needed',
-          priorityLabel: 'ACTION',
-          priorityColor: '#DC2626',
-        };
-      case 'restock_recommendation':
-        return {
-          icon: 'cpu-fill',
-          color: '#7C3AED',
-          bg: isDarkMode ? '#281A42' : '#EDE9FE',
-          label: 'AI Suggestion',
-          priorityLabel: 'AI PLAN',
-          priorityColor: '#7C3AED',
-        };
-      case 'sales_update':
-        return {
-          icon: 'graph-up-arrow',
-          color: '#059669',
-          bg: isDarkMode ? '#132A26' : '#D1FAE5',
-          label: 'Sales Benchmark',
-          priorityLabel: 'SALES',
-          priorityColor: '#059669',
-        };
-      case 'security_activity':
-        return {
-          icon: 'shield-lock-fill',
-          color: '#DC2626',
-          bg: isDarkMode ? '#341515' : '#FEE2E2',
-          label: 'Security Alert',
-          priorityLabel: 'SECURITY',
-          priorityColor: '#DC2626',
-        };
-      default:
-        break;
-    }
-
-    switch (type) {
-      case 'booking':
-        return {
-          icon: 'tools',
-          color: '#1D4533',
-          bg: isDarkMode ? '#132A26' : '#C8DDD3',
-          label: 'Pit Bay',
-        };
-      case 'order':
-        return {
-          icon: 'box-seam-fill',
-          color: '#2563EB',
-          bg: isDarkMode ? '#1C2422' : '#DBEAFE',
-          label: 'Order',
-        };
-      case 'inventory':
-      case 'stock':
-        return {
-          icon: 'exclamation-triangle-fill',
-          color: '#DC2626',
-          bg: isDarkMode ? '#341515' : '#FEE2E2',
-          label: 'Stock Alert',
-        };
-      case 'security':
-      case 'system':
-        return {
-          icon: 'shield-lock-fill',
-          color: '#7C3AED',
-          bg: isDarkMode ? '#281A42' : '#EDE9FE',
-          label: 'Security',
-        };
-      case 'promo':
-        return {
-          icon: 'ticket-perforated-fill',
-          color: '#D97706',
-          bg: isDarkMode ? '#2D2012' : '#FEF3C7',
-          label: 'Promotion',
-        };
-      default:
-        return {
-          icon: 'bell-fill',
-          color: '#1D4533',
-          bg: isDarkMode ? '#132A26' : '#C8DDD3',
-          label: 'Notification',
-        };
-    }
-  };
-
-  const getActionButtonLabel = (notif) => {
-    if (!isAdmin) {
-      if (notif.type === 'booking') return 'View Booking →';
-      if (notif.type === 'order') return 'Track Order →';
-      if (notif.type === 'promo') return 'View Deals →';
-      return 'View Details →';
-    }
-
-    switch (notif.category) {
-      case 'order_placed':
-      case 'order_status':
-        return 'View Order →';
-      case 'payment_confirmed':
-        return 'Inspect Order →';
-      case 'low_stock':
-      case 'out_of_stock':
-      case 'restock_recommendation':
-        return 'Manage Stock →';
-      case 'booking_new':
-      case 'service_approaching':
-        return 'Pit Bay Queue →';
-      case 'booking_cancelled':
-      case 'service_completed':
-        return 'View Booking →';
-      case 'customer_registered':
-        return 'View Customer →';
-      case 'review_submitted':
-        return 'Moderate Reviews →';
-      case 'restock_attention':
-        return 'Review PO →';
-      case 'sales_update':
-        return 'View Sales →';
-      case 'security_activity':
-        return 'Security Settings →';
-      default:
-        return 'Open →';
-    }
-  };
-
-  const handleCardAction = (notif) => {
-    handleMarkSingleRead(notif.id);
-
-    if (isAdmin) {
-      if (
-        notif.link === 'orders' ||
-        notif.category === 'order_placed' ||
-        notif.category === 'payment_confirmed' ||
-        notif.category === 'order_status'
-      ) {
-        if (onNavigateToOrders) return onNavigateToOrders();
-      }
-      if (
-        notif.link === 'garage' ||
-        notif.category === 'booking_new' ||
-        notif.category === 'booking_cancelled' ||
-        notif.category === 'service_approaching' ||
-        notif.category === 'service_completed'
-      ) {
-        if (onNavigateToGarage) return onNavigateToGarage();
-      }
-      if (
-        notif.link === 'inventory' ||
-        notif.category === 'low_stock' ||
-        notif.category === 'out_of_stock' ||
-        notif.category === 'restock_recommendation'
-      ) {
-        if (onNavigateToInventory) return onNavigateToInventory();
-      }
-      if (notif.link === 'users' || notif.category === 'customer_registered') {
-        if (onNavigateToUsers) return onNavigateToUsers();
-      }
-      if (notif.link === 'suppliers' || notif.category === 'restock_attention') {
-        if (onNavigateToSuppliers) return onNavigateToSuppliers();
-      }
-      if (notif.link === 'settings' || notif.category === 'security_activity') {
-        if (onNavigateToSettings) return onNavigateToSettings();
-      }
-      if (notif.link === 'overview' || notif.category === 'sales_update') {
-        if (onNavigateToAdmin) return onNavigateToAdmin();
-      }
-      if (onNavigateToAdmin) return onNavigateToAdmin();
-    } else {
-      if (notif.link === 'bookings' || notif.link === 'garage') {
-        if (onNavigateToGarage) onNavigateToGarage();
-      } else if (notif.link === 'orders') {
-        if (onNavigateToOrders) onNavigateToOrders();
+      if (isNaN(diff) || diff <= oneWeekMs) {
+        buckets.thisWeek.push(n);
+      } else if (diff <= oneMonthMs) {
+        buckets.thisMonth.push(n);
       } else {
-        if (onNavigateToShop) onNavigateToShop();
+        buckets.earlier.push(n);
       }
+    });
+
+    const sections = [];
+    if (buckets.thisWeek.length > 0) {
+      sections.push({
+        key: 'thisWeek',
+        title: 'THIS WEEK',
+        count: buckets.thisWeek.length,
+        items: buckets.thisWeek,
+      });
     }
-  };
+    if (buckets.thisMonth.length > 0) {
+      sections.push({
+        key: 'thisMonth',
+        title: 'THIS MONTH',
+        count: buckets.thisMonth.length,
+        items: buckets.thisMonth,
+      });
+    }
+    if (buckets.earlier.length > 0) {
+      sections.push({
+        key: 'earlier',
+        title: 'EARLIER',
+        count: buckets.earlier.length,
+        items: buckets.earlier,
+      });
+    }
+
+    if (sections.length === 0 && filteredNotifications.length > 0) {
+      sections.push({
+        key: 'all',
+        title: 'ALL NOTIFICATIONS',
+        count: filteredNotifications.length,
+        items: filteredNotifications,
+      });
+    }
+
+    return sections;
+  }, [filteredNotifications]);
+
+  const totalUnread = useMemo(
+    () => notifications.filter((n) => n.status === 'unread').length,
+    [notifications]
+  );
 
   return (
-    <SafeAreaView
-      style={[
-        styles.safeArea,
-        { backgroundColor: isDarkMode ? '#0E1311' : '#F8FAFC' },
-      ]}
-    >
+    <SafeAreaView style={[styles.pageWrapper, { backgroundColor: isDarkMode ? '#0E1311' : '#F9F8F6' }]}>
       {/* Toast Alert */}
       {Boolean(toastMessage) && (
         <View style={styles.toast}>
@@ -628,861 +346,259 @@ export default function NotificationsPage({
         </View>
       )}
 
-      {/* ─── COMPACT TOP NAVBAR ─── */}
-      <View
-        style={[
-          styles.navbar,
-          {
-            backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-            borderBottomColor: isDarkMode ? 'rgba(255, 255, 255, 0.10)' : '#E2E8F0',
-          },
-        ]}
-      >
-        <View style={styles.navLeft}>
-          {onNavigateBack && !isAdmin && (
-            <TouchableOpacity
-              style={[
-                styles.backBtn,
-                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-              ]}
-              onPress={onNavigateBack}
-              activeOpacity={0.7}
-            >
-              <BootstrapIcon
-                name="chevron-left"
-                size={14}
-                color={isDarkMode ? '#F8FAFC' : '#0F172A'}
-              />
-              <Text
-                style={[
-                  styles.backBtnText,
-                  { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
-                ]}
-              >
-                Back
-              </Text>
-            </TouchableOpacity>
-          )}
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Top Action Header */}
+        <View style={styles.topHeader}>
+          <View style={styles.headerLeft}>
+            {onNavigateBack && (
+              <TouchableOpacity style={styles.backBtn} onPress={onNavigateBack} activeOpacity={0.7}>
+                <BootstrapIcon name="chevron-left" size={14} color="#52525B" />
+                <Text style={styles.backBtnText}>Back</Text>
+              </TouchableOpacity>
+            )}
 
-          <View style={styles.headerTitleWrap}>
-            <View
-              style={[
-                styles.bellIconCircle,
-                {
-                  backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
-                },
-              ]}
-            >
-              <BootstrapIcon name="bell-fill" size={16} color="#1D4533" />
-            </View>
-            <View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Text
-                  style={[
-                    styles.headerTitle,
-                    { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
-                  {isAdmin ? 'Alerts & Notifications' : 'Notifications'}
-                </Text>
-                {stats.unread > 0 && (
-                  <View
-                    style={{
-                      backgroundColor: '#E11D48',
-                      paddingHorizontal: 7,
-                      paddingVertical: 1.5,
-                      borderRadius: 12,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        fontWeight: '800',
-                        color: '#FFFFFF',
-                      }}
-                    >
-                      {stats.unread} NEW
-                    </Text>
-                  </View>
-                )}
-              </View>
-              <Text
-                style={[
-                  styles.headerSubtitle,
-                  { color: isDarkMode ? '#94A3B8' : '#64748B' },
-                ]}
-              >
-                {isAdmin
-                  ? 'Real-time alerts across orders, pit bays, stock levels, and security'
-                  : 'Updates on your orders, pit bay bookings, and promotions'}
+            <View style={styles.pageTitleGroup}>
+              <Text style={[styles.pageTitle, { color: isDarkMode ? '#F4F4F5' : '#18181B' }]}>
+                Notifications
               </Text>
+              {totalUnread > 0 && (
+                <View style={styles.unreadBadgePill}>
+                  <Text style={styles.unreadBadgePillText}>{totalUnread} UNREAD</Text>
+                </View>
+              )}
             </View>
           </View>
-        </View>
 
-        <View style={styles.navRight}>
-          {isAdmin && (
-            <View
-              style={[
-                styles.liveStatusBadge,
-                {
-                  backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
-                  borderColor: isDarkMode ? '#1F4D45' : '#C1E7E0',
-                },
-              ]}
-              title="Live database alert synchronization active"
-            >
-              <View style={styles.livePulseDot} />
-              <Text
-                style={[
-                  styles.liveStatusBadgeText,
-                  { color: isDarkMode ? '#34D399' : '#1D4533' },
-                ]}
-              >
-                Database Live ({stats.liveDb || dbAlertCount})
-              </Text>
-            </View>
-          )}
-
-          {isAdmin && (
+          <View style={styles.headerRight}>
             <TouchableOpacity
-              style={[
-                styles.actionBtnOutline,
-                {
-                  backgroundColor: isDarkMode ? '#132A26' : '#FFFFFF',
-                  borderColor: '#1D4533',
-                },
-              ]}
+              style={styles.pillActionBtn}
               onPress={() => handleSyncDatabase(true)}
               disabled={isSyncing}
               activeOpacity={0.7}
-              title="Fetch fresh data from database and update alerts"
             >
               {isSyncing ? (
-                <ActivityIndicator
-                  size="small"
-                  color="#1D4533"
-                  style={{ transform: [{ scale: 0.75 }] }}
-                />
+                <ActivityIndicator size="small" color="#18181B" />
               ) : (
-                <BootstrapIcon name="arrow-repeat" size={13} color="#1D4533" />
+                <BootstrapIcon name="arrow-repeat" size={13} color="#52525B" />
               )}
-              <Text style={[styles.actionBtnOutlineText, { color: '#1D4533' }]}>
-                {isSyncing ? 'Syncing...' : 'Sync Database'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {isAdmin && stats.total > (stats.liveDb || 0) && (
-            <TouchableOpacity
-              style={[
-                styles.actionBtnGhost,
-                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-              ]}
-              onPress={handleClearSampleAlerts}
-              activeOpacity={0.7}
-              title="Remove mock demo notifications and only keep live database items"
-            >
-              <BootstrapIcon name="funnel" size={12} color="#D97706" />
-              <Text
-                style={[
-                  styles.actionBtnGhostText,
-                  { color: isDarkMode ? '#FBBF24' : '#D97706' },
-                ]}
-              >
-                Clear Mock Data
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          <TouchableOpacity
-            style={[
-              styles.actionBtnOutline,
-              {
-                backgroundColor: isDarkMode ? '#132A26' : '#FFFFFF',
-                borderColor: '#1D4533',
-              },
-            ]}
-            onPress={handleMarkAllRead}
-            activeOpacity={0.7}
-          >
-            <BootstrapIcon name="check2-all" size={13} color="#1D4533" />
-            <Text style={[styles.actionBtnOutlineText, { color: '#1D4533' }]}>
-              Mark all read
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.actionBtnGhost,
-              { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-            ]}
-            onPress={handleClearRead}
-            activeOpacity={0.7}
-          >
-            <BootstrapIcon name="trash3" size={12} color="#64748B" />
-            <Text
-              style={[
-                styles.actionBtnGhostText,
-                { color: isDarkMode ? '#94A3B8' : '#64748B' },
-              ]}
-            >
-              Clear read
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* ─── STREAMLINED STATS BAR (EXECUTIVE DESIGN) ─── */}
-        {isAdmin && (
-          <View
-            style={[
-              styles.statsBar,
-              {
-                backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-                borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.10)' : '#E2E8F0',
-              },
-            ]}
-          >
-            {/* Total */}
-            <TouchableOpacity
-              style={[
-                styles.statTile,
-                activeFilter === 'all' && {
-                  backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.2)' : '#E8F0EC',
-                  borderRadius: 10,
-                },
-              ]}
-              onPress={() => setActiveFilter('all')}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.statIconBox,
-                  { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-                ]}
-              >
-                <BootstrapIcon name="layers-fill" size={14} color="#64748B" />
-              </View>
-              <View>
-                <Text
-                  style={[
-                    styles.statNumber,
-                    { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
-                  {stats.total}
-                </Text>
-                <Text style={styles.statLabel}>Total Alerts</Text>
-              </View>
+              <Text style={styles.pillActionBtnText}>{isSyncing ? 'Syncing...' : 'Sync Data'}</Text>
             </TouchableOpacity>
 
-            <View
-              style={[
-                styles.statDivider,
-                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-              ]}
-            />
+            {notifications.length > 0 && (
+              <TouchableOpacity style={styles.pillActionBtn} onPress={handleMarkAllRead} activeOpacity={0.7}>
+                <BootstrapIcon name="check2-all" size={14} color="#52525B" />
+                <Text style={styles.pillActionBtnText}>Mark all read</Text>
+              </TouchableOpacity>
+            )}
 
-            {/* Live DB Filter Tile */}
-            <TouchableOpacity
-              style={[
-                styles.statTile,
-                activeFilter === 'live_db' && {
-                  backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#C8DDD3',
-                  borderRadius: 10,
-                },
-              ]}
-              onPress={() => setActiveFilter('live_db')}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.statIconBox,
-                  { backgroundColor: isDarkMode ? '#132A26' : '#C8DDD3' },
-                ]}
-              >
-                <BootstrapIcon name="database-check" size={14} color="#1D4533" />
-              </View>
-              <View>
-                <Text
-                  style={[
-                    styles.statNumber,
-                    { color: isDarkMode ? '#34D399' : '#1D4533' },
-                  ]}
-                >
-                  {stats.liveDb || 0}
-                </Text>
-                <Text style={styles.statLabel}>Live DB</Text>
-              </View>
-            </TouchableOpacity>
-
-            <View
-              style={[
-                styles.statDivider,
-                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-              ]}
-            />
-
-            {/* Unread */}
-            <TouchableOpacity
-              style={[
-                styles.statTile,
-                activeFilter === 'unread' && {
-                  backgroundColor: isDarkMode ? 'rgba(225, 29, 72, 0.15)' : '#FFE4E6',
-                  borderRadius: 10,
-                },
-              ]}
-              onPress={() => setActiveFilter('unread')}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.statIconBox,
-                  { backgroundColor: stats.unread > 0 ? '#FFE4E6' : isDarkMode ? '#1C2422' : '#F1F5F9' },
-                ]}
-              >
-                <BootstrapIcon
-                  name="bell-fill"
-                  size={14}
-                  color={stats.unread > 0 ? '#E11D48' : '#64748B'}
-                />
-              </View>
-              <View>
-                <Text
-                  style={[
-                    styles.statNumber,
-                    { color: stats.unread > 0 ? '#E11D48' : isDarkMode ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
-                  {stats.unread}
-                </Text>
-                <Text style={styles.statLabel}>Action Required</Text>
-              </View>
-            </TouchableOpacity>
-
-            <View
-              style={[
-                styles.statDivider,
-                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-              ]}
-            />
-
-            {/* Orders */}
-            <TouchableOpacity
-              style={[
-                styles.statTile,
-                activeFilter === 'orders' && {
-                  backgroundColor: isDarkMode ? 'rgba(37, 99, 235, 0.15)' : '#DBEAFE',
-                  borderRadius: 10,
-                },
-              ]}
-              onPress={() => setActiveFilter('orders')}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.statIconBox,
-                  { backgroundColor: isDarkMode ? '#1C2422' : '#DBEAFE' },
-                ]}
-              >
-                <BootstrapIcon name="box-seam-fill" size={14} color="#2563EB" />
-              </View>
-              <View>
-                <Text
-                  style={[
-                    styles.statNumber,
-                    { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
-                  {stats.orders}
-                </Text>
-                <Text style={styles.statLabel}>Orders</Text>
-              </View>
-            </TouchableOpacity>
-
-            <View
-              style={[
-                styles.statDivider,
-                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-              ]}
-            />
-
-            {/* Inventory */}
-            <TouchableOpacity
-              style={[
-                styles.statTile,
-                activeFilter === 'inventory' && {
-                  backgroundColor: isDarkMode ? 'rgba(217, 119, 6, 0.15)' : '#FEF3C7',
-                  borderRadius: 10,
-                },
-              ]}
-              onPress={() => setActiveFilter('inventory')}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.statIconBox,
-                  { backgroundColor: isDarkMode ? '#2D2012' : '#FEF3C7' },
-                ]}
-              >
-                <BootstrapIcon name="boxes" size={14} color="#D97706" />
-              </View>
-              <View>
-                <Text
-                  style={[
-                    styles.statNumber,
-                    { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
-                  {stats.inventory}
-                </Text>
-                <Text style={styles.statLabel}>Stock Alerts</Text>
-              </View>
-            </TouchableOpacity>
-
-            <View
-              style={[
-                styles.statDivider,
-                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-              ]}
-            />
-
-            {/* Garage */}
-            <TouchableOpacity
-              style={[
-                styles.statTile,
-                activeFilter === 'garage' && {
-                  backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.2)' : '#C8DDD3',
-                  borderRadius: 10,
-                },
-              ]}
-              onPress={() => setActiveFilter('garage')}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.statIconBox,
-                  { backgroundColor: isDarkMode ? '#132A26' : '#C8DDD3' },
-                ]}
-              >
-                <BootstrapIcon name="wrench" size={14} color="#1D4533" />
-              </View>
-              <View>
-                <Text
-                  style={[
-                    styles.statNumber,
-                    { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
-                  {stats.bookings}
-                </Text>
-                <Text style={styles.statLabel}>Pit Bay</Text>
-              </View>
-            </TouchableOpacity>
-
-            <View
-              style={[
-                styles.statDivider,
-                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-              ]}
-            />
-
-            {/* Customers */}
-            <TouchableOpacity
-              style={[
-                styles.statTile,
-                activeFilter === 'customers' && {
-                  backgroundColor: isDarkMode ? 'rgba(79, 70, 229, 0.15)' : '#EEF2FF',
-                  borderRadius: 10,
-                },
-              ]}
-              onPress={() => setActiveFilter('customers')}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.statIconBox,
-                  { backgroundColor: isDarkMode ? '#1E1B4B' : '#EEF2FF' },
-                ]}
-              >
-                <BootstrapIcon name="people" size={14} color="#4F46E5" />
-              </View>
-              <View>
-                <Text
-                  style={[
-                    styles.statNumber,
-                    { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
-                  {stats.customers}
-                </Text>
-                <Text style={styles.statLabel}>Customers</Text>
-              </View>
-            </TouchableOpacity>
-
-            <View
-              style={[
-                styles.statDivider,
-                { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-              ]}
-            />
-
-            {/* System */}
-            <TouchableOpacity
-              style={[
-                styles.statTile,
-                activeFilter === 'system' && {
-                  backgroundColor: isDarkMode ? 'rgba(124, 58, 237, 0.15)' : '#EDE9FE',
-                  borderRadius: 10,
-                },
-              ]}
-              onPress={() => setActiveFilter('system')}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.statIconBox,
-                  { backgroundColor: isDarkMode ? '#281A42' : '#EDE9FE' },
-                ]}
-              >
-                <BootstrapIcon name="shield-check" size={14} color="#7C3AED" />
-              </View>
-              <View>
-                <Text
-                  style={[
-                    styles.statNumber,
-                    { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
-                  ]}
-                >
-                  {stats.system}
-                </Text>
-                <Text style={styles.statLabel}>Security</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* ─── SEARCH INPUT BAR ─── */}
-        <View style={styles.filterSection}>
-          <View
-            style={[
-              styles.searchBox,
-              {
-                backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-                borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.10)' : '#E2E8F0',
-              },
-            ]}
-          >
-            <BootstrapIcon name="search" size={14} color="#64748B" />
-            <TextInput
-              style={[
-                styles.searchInput,
-                { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
-              ]}
-              placeholder="Search notifications by keyword, order #, item, customer..."
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              placeholderTextColor="#94A3B8"
-            />
-            {Boolean(searchQuery) && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <BootstrapIcon name="x-circle-fill" size={14} color="#94A3B8" />
+            {statsHaveMock(notifications) && (
+              <TouchableOpacity style={styles.pillActionBtn} onPress={handleClearSampleAlerts} activeOpacity={0.7}>
+                <BootstrapIcon name="trash3" size={13} color="#D97706" />
+                <Text style={[styles.pillActionBtnText, { color: '#D97706' }]}>Clear Mock</Text>
               </TouchableOpacity>
             )}
           </View>
         </View>
 
-        {/* ─── NOTIFICATIONS FEED LIST ─── */}
-        <View
-          style={[
-            styles.feedCard,
-            {
-              backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.10)' : '#E2E8F0',
-            },
-          ]}
-        >
-          {filteredNotifications.length === 0 ? (
-            <View style={styles.emptyState}>
-              <View
-                style={[
-                  styles.emptyIconCircle,
-                  { backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9' },
-                ]}
-              >
-                <BootstrapIcon name="bell-slash" size={28} color="#94A3B8" />
-              </View>
-              <Text
-                style={[
-                  styles.emptyTitle,
-                  { color: isDarkMode ? '#F8FAFC' : '#1E293B' },
-                ]}
-              >
-                No Notifications
+        {/* Search & Filter Bar */}
+        <View style={styles.controlsBar}>
+          <View style={[styles.searchBox, { backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF' }]}>
+            <BootstrapIcon name="search" size={14} color="#A1A1AA" />
+            <TextInput
+              style={[styles.searchInput, { color: isDarkMode ? '#F4F4F5' : '#18181B' }]}
+              placeholder="Search notifications..."
+              placeholderTextColor="#A1A1AA"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {Boolean(searchQuery) && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <BootstrapIcon name="x-circle-fill" size={14} color="#A1A1AA" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.filterPills}>
+            <TouchableOpacity
+              style={[styles.filterPill, activeFilter === 'all' && styles.filterPillActive]}
+              onPress={() => setActiveFilter('all')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.filterPillText, activeFilter === 'all' && styles.filterPillTextActive]}>
+                All ({notifications.length})
               </Text>
-              <Text
-                style={[
-                  styles.emptySubtitle,
-                  { color: isDarkMode ? '#94A3B8' : '#64748B' },
-                ]}
-              >
-                {searchQuery
-                  ? 'No alerts match your keyword search.'
-                  : 'You are completely caught up in this section.'}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.filterPill, activeFilter === 'unread' && styles.filterPillActive]}
+              onPress={() => setActiveFilter('unread')}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.filterPillText, activeFilter === 'unread' && styles.filterPillTextActive]}>
+                Unread ({totalUnread})
               </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Grouped Notifications List */}
+        {groupedSections.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconCircle}>
+              <BootstrapIcon name="bell-slash" size={26} color="#A1A1AA" />
             </View>
-          ) : (
-            filteredNotifications.map((notif, index) => {
-              const isUnread = notif.status === 'unread';
-              const meta = getTypeMeta(notif);
+            <Text style={styles.emptyTitle}>No notifications</Text>
+            <Text style={styles.emptySubtitle}>You're all caught up.</Text>
+          </View>
+        ) : (
+          groupedSections.map((section) => (
+            <View key={section.key} style={styles.sectionContainer}>
+              {/* Group Section Header matching Reference Screenshot 1 */}
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>{section.title}</Text>
+                <View style={styles.sectionBadgeCircle}>
+                  <Text style={styles.sectionBadgeText}>{section.count}</Text>
+                </View>
+              </View>
 
-              return (
-                <View
-                  key={notif.id || index}
-                  style={[
-                    styles.notifItem,
-                    {
-                      borderBottomColor: isDarkMode ? '#1C2422' : '#F1F5F9',
-                      backgroundColor: isUnread
-                        ? isDarkMode
-                          ? 'rgba(29, 69, 51, 0.08)'
-                          : '#F7FBFA'
-                        : 'transparent',
-                    },
-                    isUnread && {
-                      borderLeftWidth: 3,
-                      borderLeftColor: '#1D4533',
-                    },
-                    index === filteredNotifications.length - 1 && {
-                      borderBottomWidth: 0,
-                    },
-                  ]}
-                >
-                  {/* Left Type Icon */}
-                  <View
-                    style={[
-                      styles.typeIconBox,
-                      { backgroundColor: meta.bg },
-                    ]}
-                  >
-                    <BootstrapIcon name={meta.icon} size={16} color={meta.color} />
-                  </View>
+              {/* List of Large Expandable Notification Cards */}
+              <View style={styles.cardsList}>
+                {section.items.map((notif) => {
+                  const isExpanded = expandedCardIds.has(notif.id);
+                  const isUnread = notif.status === 'unread';
+                  const config = getCategoryConfig(notif);
 
-                  {/* Body */}
-                  <View style={styles.notifBody}>
-                    <View style={styles.notifHeaderRow}>
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          flexWrap: 'wrap',
-                          flex: 1,
-                        }}
-                      >
-                        <Text
-                          style={[
-                            styles.notifCategoryBadge,
-                            {
-                              color: meta.color,
-                              backgroundColor: meta.bg,
-                            },
-                          ]}
-                        >
-                          {meta.label}
-                        </Text>
-                        {(notif.isDatabaseLive ||
-                          (notif.id && String(notif.id).startsWith('db-'))) && (
-                          <View
-                            style={[
-                              styles.liveDbTag,
-                              {
-                                backgroundColor: isDarkMode ? '#132A26' : '#C8DDD3',
-                                borderColor: isDarkMode ? '#1F4D45' : '#A7D9D0',
-                              },
-                            ]}
-                          >
-                            <View style={styles.liveDbDot} />
-                            <Text
-                              style={[
-                                styles.liveDbTagText,
-                                { color: isDarkMode ? '#34D399' : '#1D4533' },
-                              ]}
-                            >
-                              DATABASE LIVE
-                            </Text>
-                          </View>
-                        )}
-                        {isUnread && <View style={styles.unreadDot} />}
-                      </View>
-                      <Text style={styles.notifTimeText}>
-                        {formatTimestamp(notif.created_at)}
-                      </Text>
-                    </View>
-
-                    {/* Title */}
-                    <Text
+                  return (
+                    <View
+                      key={notif.id}
                       style={[
-                        styles.notifTitle,
-                        {
-                          color: isDarkMode ? '#F8FAFC' : '#0F172A',
-                          fontWeight: isUnread ? '700' : '600',
-                        },
+                        styles.cardContainer,
+                        isUnread && styles.cardUnread,
+                        { backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF' },
                       ]}
                     >
-                      {stripEmojis(notif.title)}
-                    </Text>
-
-                    {/* Message */}
-                    <Text
-                      style={[
-                        styles.notifMessage,
-                        { color: isDarkMode ? '#CBD5E1' : '#475569' },
-                      ]}
-                    >
-                      {stripEmojis(notif.message)}
-                    </Text>
-
-                    {/* Selected context chips (clean & uncluttered) */}
-                    {Boolean(notif.meta && Object.keys(notif.meta).length > 0) && (
-                      <View style={styles.metaRow}>
-                        {Object.entries(notif.meta)
-                          .filter(([k]) => ['order_id', 'booking_id', 'product_name', 'customer_name', 'plate', 'item', 'role'].includes(k.toLowerCase()) || !k.includes('_at'))
-                          .slice(0, 3)
-                          .map(([k, v]) => {
-                            if (v === null || v === undefined) return null;
-                            const label = k.replace(/_/g, ' ');
-                            return (
-                              <View
-                                key={k}
-                                style={[
-                                  styles.metaChip,
-                                  {
-                                    backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
-                                  },
-                                ]}
-                              >
-                                <Text style={styles.metaChipLabel}>{label}:</Text>
-                                <Text
-                                  style={[
-                                    styles.metaChipVal,
-                                    { color: isDarkMode ? '#E2E8F0' : '#0F172A' },
-                                  ]}
-                                >
-                                  {String(v)}
-                                </Text>
-                              </View>
-                            );
-                          })}
-                      </View>
-                    )}
-
-                    {/* Action Row */}
-                    <View style={styles.itemActionsRow}>
+                      {/* Top Clickable Header Row */}
                       <TouchableOpacity
-                        style={styles.primaryActionBtn}
-                        onPress={() => handleCardAction(notif)}
-                        activeOpacity={0.75}
+                        style={styles.cardHeaderRow}
+                        onPress={() => toggleCardExpanded(notif.id, notif)}
+                        activeOpacity={0.7}
                       >
-                        <Text style={styles.primaryActionText}>
-                          {getActionButtonLabel(notif)}
-                        </Text>
+                        <View style={styles.cardHeaderLeft}>
+                          {/* Soft circular icon container */}
+                          <View style={[styles.iconCircle, { backgroundColor: config.bg }]}>
+                            <BootstrapIcon name={config.icon} size={15} color={config.color} />
+                          </View>
+
+                          <View style={styles.cardTitleWrap}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                              <Text style={[styles.cardTitle, isUnread && styles.cardTitleUnread]}>
+                                {stripEmojis(notif.title)}
+                              </Text>
+                              {isUnread && <View style={styles.unreadDot} />}
+                            </View>
+
+                            {!isExpanded && (
+                              <Text style={styles.cardPreviewText} numberOfLines={1}>
+                                {stripEmojis(notif.message)}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+
+                        <View style={styles.cardHeaderRight}>
+                          <Text style={styles.relativeTimeText}>
+                            {formatRelativeTime(notif.created_at)}
+                          </Text>
+                          <View style={styles.chevronWrap}>
+                            <BootstrapIcon
+                              name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                              size={14}
+                              color="#8E8E93"
+                            />
+                          </View>
+                        </View>
                       </TouchableOpacity>
 
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 10,
-                        }}
-                      >
-                        <TouchableOpacity
-                          style={[
-                            styles.actionIconBtn,
-                            {
-                              backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
-                            },
-                          ]}
-                          onPress={() =>
-                            isUnread
-                              ? handleMarkSingleRead(notif.id)
-                              : handleMarkSingleUnread(notif.id)
-                          }
-                          title={isUnread ? 'Mark as read' : 'Mark as unread'}
-                        >
-                          <BootstrapIcon
-                            name={isUnread ? 'envelope-open' : 'envelope'}
-                            size={12}
-                            color={isDarkMode ? '#94A3B8' : '#64748B'}
-                          />
-                        </TouchableOpacity>
+                      {/* Expanded Card Body */}
+                      {isExpanded && (
+                        <View style={styles.cardExpandedBody}>
+                          <Text style={styles.cardFullMessage}>{stripEmojis(notif.message)}</Text>
 
-                        <TouchableOpacity
-                          style={[
-                            styles.actionIconBtn,
-                            {
-                              backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
-                            },
-                          ]}
-                          onPress={() => handleDeleteSingle(notif.id)}
-                          title="Delete notification"
-                        >
-                          <BootstrapIcon name="trash3" size={12} color="#DC2626" />
-                        </TouchableOpacity>
-                      </View>
+                          {/* Subtle Divider Line */}
+                          <View style={styles.cardDivider} />
+
+                          {/* Footer */}
+                          <View style={styles.cardFooterRow}>
+                            <Text style={styles.cardMetadataText}>
+                              {formatFullDate(notif.created_at)} · {config.label}
+                            </Text>
+
+                            <TouchableOpacity
+                              style={styles.dismissBtn}
+                              onPress={(e) => handleDeleteSingle(notif.id, e)}
+                              activeOpacity={0.7}
+                            >
+                              <BootstrapIcon name="trash3" size={13} color="#71717A" />
+                              <Text style={styles.dismissBtnText}>Dismiss</Text>
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
                     </View>
-                  </View>
-                </View>
-              );
-            })
-          )}
-        </View>
+                  );
+                })}
+              </View>
+            </View>
+          ))
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+function statsHaveMock(notifs) {
+  return notifs.some((n) => !n.isDatabaseLive && (!n.id || !String(n.id).startsWith('db-')));
+}
+
 const styles = StyleSheet.create({
-  safeArea: {
+  pageWrapper: {
     flex: 1,
   },
   toast: {
     position: 'absolute',
-    top: 16,
+    top: 20,
     alignSelf: 'center',
-    backgroundColor: '#1D4533',
+    backgroundColor: '#18181B',
     paddingHorizontal: 16,
-    paddingVertical: 9,
+    paddingVertical: 10,
     borderRadius: 20,
     zIndex: 9999,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 10,
-    elevation: 6,
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
   },
   toastText: {
     color: '#FFFFFF',
-    fontSize: 12.5,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
   },
-  navbar: {
-    borderBottomWidth: 1,
+  scrollContainer: {
+    paddingVertical: 32,
     paddingHorizontal: 20,
-    paddingVertical: 14,
+    maxWidth: 980,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  topHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginBottom: 24,
     flexWrap: 'wrap',
     gap: 12,
   },
-  navLeft: {
+  headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    flex: 1,
-    minWidth: 260,
   },
   backBtn: {
     flexDirection: 'row',
@@ -1491,287 +607,276 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
+    backgroundColor: '#F4F4F5',
   },
   backBtnText: {
-    fontSize: 12.5,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#52525B',
   },
-  headerTitleWrap: {
+  pageTitleGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
-  bellIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    letterSpacing: -0.4,
   },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    letterSpacing: -0.2,
+  unreadBadgePill: {
+    backgroundColor: '#18181B',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
-  headerSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
+  unreadBadgePillText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.4,
   },
-  navRight: {
+  headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  actionBtnOutline: {
+  pillActionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 8,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
+    borderColor: '#E4E4E7',
   },
-  actionBtnOutlineText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  actionBtnGhost: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 8,
-  },
-  actionBtnGhostText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  scrollContent: {
-    padding: 20,
-    maxWidth: 1100,
-    width: '100%',
-    alignSelf: 'center',
-  },
-  statsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 14,
-    borderWidth: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  statTile: {
-    flex: 1,
-    minWidth: 120,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 4,
-  },
-  statDivider: {
-    width: 1,
-    height: 32,
-  },
-  statIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  statNumber: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  filterSection: {
-    gap: 10,
-    marginBottom: 16,
-  },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 13,
-    outlineStyle: 'none',
-  },
-  feedCard: {
-    borderRadius: 14,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  emptyState: {
-    padding: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyIconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  emptySubtitle: {
+  pillActionBtnText: {
     fontSize: 12.5,
-    textAlign: 'center',
-    marginTop: 4,
-    maxWidth: 320,
+    fontWeight: '600',
+    color: '#3F3F46',
   },
-  notifItem: {
-    flexDirection: 'row',
-    padding: 16,
-    borderBottomWidth: 1,
-    gap: 14,
-    alignItems: 'flex-start',
-  },
-  typeIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  notifBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  notifHeaderRow: {
+  controlsBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 4,
+    marginBottom: 28,
+    gap: 12,
+    flexWrap: 'wrap',
   },
-  notifCategoryBadge: {
-    fontSize: 10,
+  searchBox: {
+    flex: 1,
+    minWidth: 260,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E4E4E7',
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13.5,
+    outlineStyle: 'none',
+  },
+  filterPills: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#E4E4E7',
+  },
+  filterPillActive: {
+    backgroundColor: '#18181B',
+  },
+  filterPillText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: '#52525B',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  sectionContainer: {
+    marginBottom: 32,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  sectionTitle: {
+    fontSize: 12,
     fontWeight: '800',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 5,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    color: '#71717A',
+    letterSpacing: 0.8,
+  },
+  sectionBadgeCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#E4E4E7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sectionBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#52525B',
+  },
+  cardsList: {
+    gap: 14,
+  },
+  cardContainer: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E4E4E7',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+    overflow: 'hidden',
+  },
+  cardUnread: {
+    borderColor: '#D4D4D8',
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    padding: 18,
+    gap: 14,
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 14,
+    flex: 1,
+    minWidth: 0,
+  },
+  iconCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    marginTop: 2,
+  },
+  cardTitleWrap: {
+    flex: 1,
+    minWidth: 0,
+  },
+  cardTitle: {
+    fontSize: 14.5,
+    fontWeight: '600',
+    color: '#27272A',
+    lineHeight: 20,
+  },
+  cardTitleUnread: {
+    fontWeight: '700',
+    color: '#09090B',
   },
   unreadDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#18181B',
   },
-  notifTimeText: {
-    fontSize: 11,
-    color: '#94A3B8',
-  },
-  notifTitle: {
-    fontSize: 13.5,
-    marginTop: 1,
-  },
-  notifMessage: {
-    fontSize: 12.5,
-    marginTop: 3,
+  cardPreviewText: {
+    fontSize: 13,
+    color: '#71717A',
+    marginTop: 4,
     lineHeight: 18,
   },
-  metaRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
-  },
-  metaChip: {
+  cardHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 2.5,
-    borderRadius: 6,
+    gap: 12,
+    flexShrink: 0,
+    marginTop: 4,
   },
-  metaChipLabel: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
+  relativeTimeText: {
+    fontSize: 12.5,
+    color: '#8E8E93',
   },
-  metaChipVal: {
-    fontSize: 10.5,
-    fontWeight: '600',
+  chevronWrap: {
+    padding: 2,
   },
-  itemActionsRow: {
+  cardExpandedBody: {
+    paddingHorizontal: 18,
+    paddingBottom: 18,
+    paddingTop: 0,
+  },
+  cardFullMessage: {
+    fontSize: 14,
+    color: '#3F3F46',
+    lineHeight: 22,
+    marginTop: 4,
+    paddingLeft: 52,
+  },
+  cardDivider: {
+    height: 1,
+    backgroundColor: '#F4F4F5',
+    marginVertical: 14,
+    marginLeft: 52,
+  },
+  cardFooterRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 10,
+    paddingLeft: 52,
   },
-  primaryActionBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 2,
-  },
-  primaryActionText: {
+  cardMetadataText: {
     fontSize: 12,
-    fontWeight: '700',
-    color: '#1D4533',
+    color: '#8E8E93',
   },
-  actionIconBtn: {
-    padding: 6,
+  dismissBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     borderRadius: 6,
   },
-  liveStatusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+  dismissBtnText: {
+    fontSize: 12,
+    color: '#71717A',
+    fontWeight: '500',
+  },
+  emptyCard: {
+    padding: 48,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
+    borderColor: '#E4E4E7',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  livePulseDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#10B981',
+  emptyIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#F4F4F5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
-  liveStatusBadgeText: {
-    fontSize: 11.5,
+  emptyTitle: {
+    fontSize: 16,
     fontWeight: '700',
-    letterSpacing: 0.2,
+    color: '#18181B',
   },
-  liveDbTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 5,
-    borderWidth: 1,
-  },
-  liveDbDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#1D4533',
-  },
-  liveDbTagText: {
-    fontSize: 9,
-    fontWeight: '800',
-    letterSpacing: 0.3,
+  emptySubtitle: {
+    fontSize: 13,
+    color: '#71717A',
+    marginTop: 4,
   },
 });

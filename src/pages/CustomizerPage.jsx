@@ -118,14 +118,14 @@ export default function CustomizerPage({
   ]);
 
   const currentBasePhoto = useMemo(() => {
-    if (selectedRegisteredBike?.photo_url) {
-      return selectedRegisteredBike.photo_url;
+    if (selectedRegisteredBike) {
+      return selectedRegisteredBike.photo_url || null;
     }
     if (selectedPreset?.image) {
       return selectedPreset.image;
     }
-    return customPhotoUri || registeredBikes[0]?.photo_url || BIKE_PRESETS[0]?.image;
-  }, [selectedRegisteredBike, selectedPreset, customPhotoUri, registeredBikes]);
+    return customPhotoUri || null;
+  }, [selectedRegisteredBike, selectedPreset, customPhotoUri]);
 
   const currentBikeTitle = useMemo(() => {
     if (selectedRegisteredBike) {
@@ -333,6 +333,10 @@ export default function CustomizerPage({
   const handleGenerateAI = async () => {
     if (selectedParts.length === 0) {
       showToast('⚠️ Please select at least 1 product to install on your motorcycle.');
+      return;
+    }
+    if (!currentBasePhoto) {
+      showToast('⚠️ Please upload or select a photo of your motorcycle to generate an AI customization.');
       return;
     }
 
@@ -844,11 +848,17 @@ export default function CustomizerPage({
                               onPress={() => handleSelectRegisteredBike(bike)}
                               activeOpacity={0.85}
                             >
-                              <Image
-                                source={{ uri: bike.photo_url || MOTORCYCLE_PHOTO_PRESETS[0]?.url }}
-                                style={styles.regBikeThumb}
-                                resizeMode="cover"
-                              />
+                              {bike.photo_url ? (
+                                <Image
+                                  source={{ uri: bike.photo_url }}
+                                  style={styles.regBikeThumb}
+                                  resizeMode="cover"
+                                />
+                              ) : (
+                                <View style={[styles.regBikeThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' }]}>
+                                  <BootstrapIcon name="bicycle" size={24} color="#94A3B8" />
+                                </View>
+                              )}
                               <View style={styles.regBikeHeader}>
                                 <Text style={styles.regBikeTitle} numberOfLines={1}>
                                   {bike.year ? `${bike.year} ` : ''}

@@ -6,6 +6,8 @@ import { useWishlist } from '../../context/WishlistContext';
 import { isProductSoldOut } from '../../utils/productSizes';
 import { productHasCustomerRatings } from '../../utils/productCatalog';
 import { getProductCardImageUrl } from '../../utils/imageUrl';
+import CompatibilityBadge from './CompatibilityBadge';
+import { resolveReorderLevel } from '../../utils/inventoryHelpers';
 
 export default function ProductCard({ product, onPress }) {
   const { width } = useWindowDimensions();
@@ -23,9 +25,13 @@ export default function ProductCard({ product, onPress }) {
   const { isWishlisted, toggleWishlist } = useWishlist();
   const isFav = isWishlisted(product.id);
   const soldOut = isProductSoldOut(product);
+  const lowStock =
+    !soldOut && Number(product.stock) > 0 && Number(product.stock) <= resolveReorderLevel(product, 5);
   const displayPrice = Number(product.price) || 0;
   const hasRatings = productHasCustomerRatings(product);
   const imageUri = getProductCardImageUrl(product.image);
+  const compatMessage = product.compatMessage;
+  const compatStatus = product.compatStatus;
 
   return (
     <TouchableOpacity
@@ -39,7 +45,13 @@ export default function ProductCard({ product, onPress }) {
       activeOpacity={0.92}
     >
       <View style={styles.productImageContainer}>
-        <Image source={{ uri: imageUri }} style={styles.productImg} />
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.productImg} />
+        ) : (
+          <View style={{ flex: 1, width: '100%', height: 160, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
+            <BootstrapIcon name="box-seam" size={36} color="#CBD5E1" />
+          </View>
+        )}
 
         {soldOut ? (
           <View
@@ -85,6 +97,10 @@ export default function ProductCard({ product, onPress }) {
           {product.name}
         </Text>
 
+        {compatMessage ? (
+          <CompatibilityBadge status={compatStatus} message={compatMessage} />
+        ) : null}
+
         <View style={styles.priceRow}>
           <Text style={styles.priceMainText}>₱{displayPrice.toFixed(2)}</Text>
         </View>
@@ -106,7 +122,7 @@ export default function ProductCard({ product, onPress }) {
           <Text style={styles.stockMinimalText}>
             {soldOut
               ? 'Sold out'
-              : product.stock <= 5
+              : lowStock
                 ? `Only ${product.stock} left`
                 : `${product.stock} in stock`}
           </Text>

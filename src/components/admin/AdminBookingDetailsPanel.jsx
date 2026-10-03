@@ -1,6 +1,6 @@
 /**
- * Organized Booking Details content for Admin Work Order modal.
- * Reuses ServiceQuotationPanel + PickupQrScannerPanel. Does not replace the modal shell.
+ * Organized, high-readability Booking Details & Work Order Command Center for Admin Modal.
+ * Structured with modern overview cards, contextual action bar, and segmented tabs.
  */
 import React, { useMemo, useState } from 'react';
 import {
@@ -32,35 +32,46 @@ import {
   canAdminAction,
 } from '../../utils/bookingWorkflow';
 
-function Section({ title, icon, children, defaultOpen = true }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <View style={styles.section}>
-      <TouchableOpacity style={styles.sectionHeader} onPress={() => setOpen((v) => !v)} activeOpacity={0.8}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
-          {icon ? <BootstrapIcon name={icon} size={14} color="#1D4533" /> : null}
-          <Text style={styles.sectionTitle}>{title}</Text>
-        </View>
-        <BootstrapIcon name={open ? 'chevron-up' : 'chevron-down'} size={14} color="#64748B" />
-      </TouchableOpacity>
-      {open ? <View style={styles.sectionBody}>{children}</View> : null}
-    </View>
-  );
+function formatDateTime(val) {
+  if (!val) return '—';
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return (
+      d.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      }) +
+      ' · ' +
+      d.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      })
+    );
+  } catch {
+    return String(val);
+  }
 }
 
-function Row({ label, value }) {
-  if (value == null || value === '') return null;
-  return (
-    <View style={styles.row}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{String(value)}</Text>
-    </View>
-  );
+function formatDateOnly(val) {
+  if (!val) return '—';
+  try {
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return String(val);
+    return d.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return String(val);
+  }
 }
 
 const PLACEHOLDER_COLOR = '#94A3B8';
 
-/** High-contrast field: always dark text on white so it stays readable in dark admin theme. */
 function ClearField({
   label,
   value,
@@ -90,26 +101,31 @@ function ClearField({
   );
 }
 
-function ActionBtn({ label, icon, onPress, disabled, danger, primary }) {
+function ActionBtn({ label, icon, onPress, disabled, danger, primary, outline }) {
   return (
     <TouchableOpacity
       style={[
         styles.actionBtn,
         primary && styles.actionBtnPrimary,
         danger && styles.actionBtnDanger,
+        outline && styles.actionBtnOutline,
         disabled && styles.actionBtnDisabled,
       ]}
       onPress={onPress}
       disabled={disabled}
-      activeOpacity={0.85}
+      activeOpacity={0.8}
     >
       {icon ? (
-        <BootstrapIcon name={icon} size={13} color={danger ? '#DC2626' : primary ? '#FFF' : '#1D4533'} />
+        <BootstrapIcon
+          name={icon}
+          size={13}
+          color={danger ? '#DC2626' : primary ? '#FFFFFF' : '#1D4533'}
+        />
       ) : null}
       <Text
         style={[
           styles.actionBtnText,
-          primary && { color: '#FFF' },
+          primary && { color: '#FFFFFF' },
           danger && { color: '#DC2626' },
           disabled && { color: '#94A3B8' },
         ]}
@@ -117,6 +133,55 @@ function ActionBtn({ label, icon, onPress, disabled, danger, primary }) {
         {label}
       </Text>
     </TouchableOpacity>
+  );
+}
+
+function InfoItem({ icon, label, value, highlight, badge }) {
+  if (!value && value !== 0) return null;
+  return (
+    <View style={styles.infoItem}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        {icon ? <BootstrapIcon name={icon} size={13} color="#64748B" /> : null}
+        <Text style={styles.infoItemLabel}>{label}</Text>
+      </View>
+      {badge ? (
+        <View style={styles.itemBadge}>{value}</View>
+      ) : (
+        <Text
+          style={[styles.infoItemValue, highlight && { color: '#1D4533', fontWeight: '800' }]}
+          numberOfLines={2}
+        >
+          {String(value)}
+        </Text>
+      )}
+    </View>
+  );
+}
+
+function GridKvCell({ icon, label, value, highlight = false, badge = false }) {
+  if (!value && value !== 0) return null;
+  return (
+    <View style={styles.gridKvCell}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+        {icon ? <BootstrapIcon name={icon} size={12} color="#64748B" /> : null}
+        <Text style={styles.gridKvLabel}>{label}</Text>
+      </View>
+      {badge ? (
+        <View style={styles.bikePlatePill}>
+          <Text style={styles.bikePlateText}>{String(value)}</Text>
+        </View>
+      ) : (
+        <Text
+          style={[
+            styles.gridKvValue,
+            highlight && { color: '#1D4533', fontWeight: '800' },
+          ]}
+          numberOfLines={2}
+        >
+          {String(value)}
+        </Text>
+      )}
+    </View>
   );
 }
 
@@ -129,7 +194,11 @@ export default function AdminBookingDetailsPanel({
   isDarkMode = false,
 }) {
   const toast = (m) => onToast?.(m);
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'mechanic' | 'quotation' | 'inspection'
   const [busy, setBusy] = useState(false);
+  const [showRejectBox, setShowRejectBox] = useState(false);
+  const [showRescheduleBox, setShowRescheduleBox] = useState(false);
+
   const [mechanicId, setMechanicId] = useState(booking?.mechanic_id || '');
   const [rejectReason, setRejectReason] = useState('');
   const [insp, setInsp] = useState({
@@ -154,7 +223,6 @@ export default function AdminBookingDetailsPanel({
   const status = booking?.status || '';
   const normalized = normalizeBookingStatus(status);
   const colors = statusColor(status);
-  const allowedNext = getAllowedNextStatuses(status);
   const media = useMemo(() => {
     const raw = booking?.media_urls || booking?.photos || [];
     return Array.isArray(raw) ? raw.filter(Boolean) : [];
@@ -190,7 +258,7 @@ export default function AdminBookingDetailsPanel({
     }
   };
 
-  const assignMechanic = async ({ remove = false } = {}) => {
+  const assignMechanic = async ({ remove = false, mechOverride = null } = {}) => {
     await withBusy(async () => {
       const id = booking.booking_id || booking.id;
       if (remove) {
@@ -204,18 +272,21 @@ export default function AdminBookingDetailsPanel({
         setMechanicId('');
         toast('Mechanic removed');
       } else {
-        const mech = selectedMech || activeMechanics[0];
+        const mech = mechOverride || selectedMech || activeMechanics[0];
         if (!mech) {
           toast('No active mechanic available');
           return;
         }
-        await garageService.assignMechanicToBooking(id, mech, { schedule: true });
+        await garageService.assignMechanicToBooking(id, mech, {
+          schedule: true,
+          preferredDate: booking.preferred_date || booking.appointment_date,
+          preferredTime: booking.preferred_time || booking.time_slot,
+          startTime: booking.preferred_time || booking.time_slot || '09:00',
+          estimatedDurationMinutes: booking.estimated_duration_minutes || 90,
+          assignedBy: 'admin',
+        });
         setMechanicId(mech.id);
-        toast(
-          normalizeBookingStatus(booking.status) === FLEX_BOOKING_STATUS.APPROVED
-            ? `Assigned ${mech.shortName || mech.name} • Status → Scheduled`
-            : `Assigned ${mech.shortName || mech.name}`
-        );
+        toast(`Assigned ${mech.shortName || mech.name} to bay`);
       }
       await refresh();
     });
@@ -233,18 +304,18 @@ export default function AdminBookingDetailsPanel({
         if (!fin.success) throw new Error(fin.error || 'Finalize failed');
         toast(
           fin.remaining > 0
-            ? `Service completed • Remaining ${formatPhp(fin.remaining)}`
+            ? `Service completed • Remaining balance ${formatPhp(fin.remaining)}`
             : 'Service completed • Ready for pickup'
         );
       } else if (next === FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS) {
         await garageService.startService(id);
-        toast('Service started • Customer notified');
+        toast('Service started in bay • Rider notified');
       } else {
         await garageService.updateBooking(id, {
           status: next,
           current_stage: statusLabel(next),
         });
-        toast(`Status → ${statusLabel(next)}`);
+        toast(`Status updated: ${statusLabel(next)}`);
       }
       await refresh();
     });
@@ -259,7 +330,7 @@ export default function AdminBookingDetailsPanel({
         mechanicId: mech?.id || null,
         approvedBy: 'admin',
       });
-      toast('Booking approved');
+      toast('✓ Booking approved — downpayment required');
       await refresh();
     });
   };
@@ -268,19 +339,25 @@ export default function AdminBookingDetailsPanel({
     await withBusy(async () => {
       const id = booking.booking_id || booking.id;
       await garageService.rejectBooking(id, rejectReason || 'Declined by admin');
-      toast('Booking rejected');
+      setShowRejectBox(false);
+      toast('Booking declined');
       await refresh();
     });
   };
 
-  const reschedule = async () => {
+  const handleReschedule = async () => {
+    if (!rescheduleDate || !rescheduleTime) {
+      toast('Please enter both date and time window');
+      return;
+    }
     await withBusy(async () => {
       const id = booking.booking_id || booking.id;
       await garageService.rescheduleBooking(id, {
         preferredDate: rescheduleDate,
         preferredTime: rescheduleTime,
       });
-      toast('Booking rescheduled');
+      setShowRescheduleBox(false);
+      toast('✓ Appointment rescheduled');
       await refresh();
     });
   };
@@ -290,7 +367,7 @@ export default function AdminBookingDetailsPanel({
       const id = booking.booking_id || booking.id;
       const res = await serviceQuotationService.ensurePickupQr(id);
       if (!res.success) throw new Error(res.error || 'QR generation failed');
-      toast(res.existing ? 'Pickup QR already exists' : 'Pickup QR generated');
+      toast(res.existing ? 'Pickup QR already generated' : '✓ Pickup QR generated');
       await refresh();
     });
   };
@@ -312,14 +389,6 @@ export default function AdminBookingDetailsPanel({
   const saveInspection = async () => {
     await withBusy(async () => {
       const id = booking.booking_id || booking.id;
-      const current = normalizeBookingStatus(booking.status);
-      if (
-        current !== FLEX_BOOKING_STATUS.SCHEDULED &&
-        current !== FLEX_BOOKING_STATUS.UNDER_INSPECTION
-      ) {
-        toast('Start inspection only after the mechanic is assigned (Scheduled).');
-        return;
-      }
       const inspectedAt = new Date().toISOString();
       await serviceQuotationService.recordInspection(id, {
         findings: [
@@ -352,7 +421,7 @@ export default function AdminBookingDetailsPanel({
         status: FLEX_BOOKING_STATUS.UNDER_INSPECTION,
         current_stage: 'Inspection recorded',
       });
-      toast('Inspection saved');
+      toast('✓ Inspection details saved');
       await refresh();
     });
   };
@@ -371,7 +440,7 @@ export default function AdminBookingDetailsPanel({
         });
       }
       await garageService.updateBooking(id, patch);
-      toast('Service progress updated');
+      toast('✓ Service progress logged');
       await refresh();
     });
   };
@@ -379,461 +448,1132 @@ export default function AdminBookingDetailsPanel({
   if (!booking) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>No booking selected</Text>
+        <Text style={styles.emptyText}>No booking details available</Text>
       </View>
     );
   }
 
   const quoteTotal = bookingQuotationTotal(booking);
   const payStatus = bookingPaymentStatus(booking);
+  const basePrice = Number(booking.pricePhp || 2500);
+  const dpAmount = Number(
+    booking.downpayment_amount !== undefined
+      ? booking.downpayment_amount
+      : Math.round(basePrice * 0.2)
+  );
+  const remainingBalance = Math.max(0, (booking.final_service_total || quoteTotal || basePrice) - (booking.downpayment_paid ? dpAmount : 0));
 
   return (
     <View style={styles.wrap}>
-      {/* Status + quick actions */}
-      <View style={styles.statusBar}>
-        <View style={[styles.statusPill, { backgroundColor: colors.bg }]}>
-          <Text style={[styles.statusPillText, { color: colors.fg }]}>{statusLabel(status)}</Text>
+      {/* ─── 1. TOP STATUS & QUICK GLANCE BAR ─── */}
+      <View style={styles.topStatusStrip}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          {/* Status Badge */}
+          <View style={[styles.statusBadge, { backgroundColor: colors.bg, borderColor: colors.border || colors.fg }]}>
+            <BootstrapIcon
+              name={
+                normalized === FLEX_BOOKING_STATUS.APPROVED || normalized === FLEX_BOOKING_STATUS.CONFIRMED
+                  ? 'check-circle-fill'
+                  : normalized === FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS
+                  ? 'gear-wide-connected'
+                  : normalized === FLEX_BOOKING_STATUS.UNDER_INSPECTION
+                  ? 'search'
+                  : normalized === FLEX_BOOKING_STATUS.SERVICE_COMPLETED
+                  ? 'flag-fill'
+                  : normalized === FLEX_BOOKING_STATUS.READY_FOR_PICKUP
+                  ? 'qr-code'
+                  : 'hourglass-split'
+              }
+              size={12}
+              color={colors.fg}
+            />
+            <Text style={[styles.statusBadgeText, { color: colors.fg }]}>
+              {statusLabel(status)}
+            </Text>
+          </View>
+
+          {/* Payment Pill */}
+          <View style={styles.paymentPill}>
+            <BootstrapIcon name="credit-card-2-front" size={11} color="#475569" />
+            <Text style={styles.paymentPillText}>
+              {quoteTotal > 0 ? formatPhp(quoteTotal) : formatPhp(basePrice)} · {payStatus}
+            </Text>
+          </View>
+
+          {/* Downpayment Badge */}
+          <View
+            style={[
+              styles.dpBadge,
+              booking.status === 'Cancelled' || normalized === FLEX_BOOKING_STATUS.CANCELLED
+                ? styles.dpBadgeCancelled
+                : booking.downpayment_status === 'Paid' || Number(booking.amount_paid || 0) > 0
+                  ? styles.dpBadgePaid
+                  : styles.dpBadgeCancelled,
+            ]}
+          >
+            <BootstrapIcon
+              name={
+                booking.downpayment_status === 'Paid' || Number(booking.amount_paid || 0) > 0
+                  ? 'shield-check'
+                  : 'exclamation-triangle-fill'
+              }
+              size={11}
+              color={
+                booking.downpayment_status === 'Paid' || Number(booking.amount_paid || 0) > 0
+                  ? '#166534'
+                  : '#DC2626'
+              }
+            />
+            <Text
+              style={[
+                styles.dpBadgeText,
+                {
+                  color:
+                    booking.downpayment_status === 'Paid' || Number(booking.amount_paid || 0) > 0
+                      ? '#166534'
+                      : '#DC2626',
+                },
+              ]}
+            >
+              {booking.status === 'Cancelled' || normalized === FLEX_BOOKING_STATUS.CANCELLED
+                ? 'DP Forfeited'
+                : booking.downpayment_status === 'Paid' || Number(booking.amount_paid || 0) > 0
+                  ? `DP ${formatPhp(dpAmount)} Paid (${booking.downpayment_method || 'cash'})`
+                  : normalized === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT
+                    ? `DP ${formatPhp(dpAmount)} Required`
+                    : `DP ${formatPhp(dpAmount)}`}
+            </Text>
+          </View>
         </View>
-        <Text style={styles.payPill}>{payStatus}</Text>
-        {busy ? <ActivityIndicator color="#1D4533" /> : null}
+
+        {busy && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <ActivityIndicator size="small" color="#1D4533" />
+            <Text style={{ fontSize: 11.5, color: '#64748B', fontWeight: '600' }}>Updating...</Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles.quickActions}>
+      {/* ─── 2. CONTEXTUAL ACTION TOOLBAR ─── */}
+      <View style={styles.actionToolbar}>
         {canAdminAction(status, 'approve') && (
           <ActionBtn label="Approve Booking" icon="check2-circle" primary onPress={approve} disabled={busy} />
         )}
+
         {canAdminAction(status, 'reject') && (
-          <ActionBtn label="Reject Booking" icon="x-circle" danger onPress={reject} disabled={busy} />
+          <ActionBtn
+            label={showRejectBox ? 'Close Reject Form' : 'Reject Booking'}
+            icon="x-circle"
+            danger
+            onPress={() => setShowRejectBox(!showRejectBox)}
+            disabled={busy}
+          />
         )}
+
+        {canAdminAction(status, 'request_info') && (
+          <ActionBtn
+            label="Request Info"
+            icon="chat-left-quote"
+            outline
+            onPress={async () => {
+              const notes = rejectReason || 'Please provide more details about the motorcycle issue.';
+              await withBusy(async () => {
+                await garageService.requestBookingInfo(booking.booking_id || booking.id, notes);
+                toast('Information requested from customer');
+                await refresh();
+              });
+            }}
+            disabled={busy}
+          />
+        )}
+
         {canAdminAction(status, 'reschedule') && (
-          <ActionBtn label="Reschedule" icon="calendar-event" onPress={reschedule} disabled={busy} />
+          <ActionBtn
+            label={showRescheduleBox ? 'Cancel Reschedule' : 'Reschedule'}
+            icon="calendar-event"
+            outline
+            onPress={() => setShowRescheduleBox(!showRescheduleBox)}
+            disabled={busy}
+          />
         )}
+
         {canAdminAction(status, 'assign_mechanic') && (
-          <ActionBtn label="Assign Mechanic" icon="person-plus" primary onPress={() => assignMechanic()} disabled={busy} />
+          <ActionBtn
+            label="Assign Mechanic"
+            icon="person-plus"
+            primary={!canAdminAction(status, 'approve')}
+            outline={canAdminAction(status, 'approve')}
+            onPress={() => {
+              setActiveTab('mechanic');
+            }}
+            disabled={busy}
+          />
         )}
+
         {canAdminAction(status, 'start_inspection') && (
           <ActionBtn
-            label="Start Inspection"
+            label="Start Bay Inspection"
             icon="search"
-            onPress={() => setStatus(FLEX_BOOKING_STATUS.UNDER_INSPECTION)}
+            primary
+            onPress={() => {
+              setStatus(FLEX_BOOKING_STATUS.UNDER_INSPECTION);
+              setActiveTab('inspection');
+            }}
             disabled={busy}
           />
         )}
+
         {canAdminAction(status, 'start_service') && (
           <ActionBtn
-            label="Start Service"
+            label="Start Service in Bay"
             icon="play-fill"
             primary
-            onPress={() => setStatus(FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS)}
+            onPress={() => {
+              setStatus(FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS);
+              setActiveTab('inspection');
+            }}
             disabled={busy}
           />
         )}
+
         {canAdminAction(status, 'complete_service') && (
           <ActionBtn
             label="Complete Service"
             icon="flag"
+            primary
             onPress={() => setStatus(FLEX_BOOKING_STATUS.SERVICE_COMPLETED)}
             disabled={busy}
           />
         )}
+
         {canAdminAction(status, 'finalize_bill') && (
-          <ActionBtn label="Finalize Bill" icon="receipt" onPress={finalizeBill} disabled={busy} />
+          <ActionBtn
+            label="Finalize Bill"
+            icon="receipt"
+            primary
+            onPress={finalizeBill}
+            disabled={busy}
+          />
         )}
+
         {canAdminAction(status, 'generate_qr') && (
-          <ActionBtn label="Generate QR" icon="qr-code" primary onPress={generateQr} disabled={busy} />
+          <ActionBtn
+            label="Generate Pickup QR"
+            icon="qr-code"
+            primary
+            onPress={generateQr}
+            disabled={busy}
+          />
         )}
       </View>
 
-      {canAdminAction(status, 'reschedule') && (
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-          <View style={{ flex: 1 }}>
-            <ClearField
-              label="Preferred date"
-              placeholder="YYYY-MM-DD"
-              value={rescheduleDate}
-              onChangeText={setRescheduleDate}
-            />
+      {/* Inline Reject Drawer (only shown when Reject is pressed) */}
+      {showRejectBox && (
+        <View style={styles.interactiveDrawer}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <BootstrapIcon name="shield-exclamation" size={14} color="#DC2626" />
+            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#DC2626' }}>
+              Decline Booking & Notify Customer
+            </Text>
           </View>
-          <View style={{ flex: 1 }}>
-            <ClearField
-              label="Preferred time"
-              placeholder="e.g. 10:30 AM - 12:00 PM"
-              value={rescheduleTime}
-              onChangeText={setRescheduleTime}
-            />
-          </View>
-        </View>
-      )}
-
-      {canAdminAction(status, 'reject') && (
-        <View style={styles.rejectBox}>
           <ClearField
-            label="Reject reason"
-            placeholder="Optional reason shown to customer"
+            label="Rejection Reason"
+            placeholder="e.g. Lift bays fully booked at 10 AM, please select an afternoon slot"
             value={rejectReason}
             onChangeText={setRejectReason}
           />
+          <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+            <ActionBtn
+              label="Cancel"
+              outline
+              onPress={() => setShowRejectBox(false)}
+              disabled={busy}
+            />
+            <ActionBtn
+              label="Confirm Decline"
+              icon="x-circle"
+              danger
+              onPress={reject}
+              disabled={busy}
+            />
+          </View>
         </View>
       )}
 
-      {/* Status is advanced only via diagram-gated quick actions above — no free-form chips */}
-      <Section title="Booking Status" icon="signpost-2" defaultOpen={false}>
-        <Text style={styles.hint}>
-          Current: {statusLabel(status)}. Use the action buttons above to advance the workflow.
-        </Text>
-        {allowedNext.length > 0 ? (
-          <Text style={[styles.hint, { marginTop: 6 }]}>
-            Next allowed: {allowedNext.map((s) => statusLabel(s)).join(', ')}
-          </Text>
-        ) : (
-          <Text style={[styles.hint, { marginTop: 6 }]}>Terminal status — no further transitions.</Text>
-        )}
-      </Section>
-
-      <Section title="Booking Information" icon="bookmark" defaultOpen>
-        <Row label="Booking ID" value={booking.booking_id || booking.id} />
-        <Row label="Created" value={booking.created_at || booking.createdAt} />
-        <Row
-          label="Preferred date"
-          value={booking.preferred_date || booking.appointment_date || booking.date}
-        />
-        <Row
-          label="Preferred time"
-          value={booking.preferred_time || booking.time_slot || booking.time}
-        />
-        <Row label="Service type" value={booking.service_type || booking.category || booking.service_title} />
-        <Row label="Priority" value={booking.priority || 'Normal'} />
-        <Row label="Status" value={statusLabel(status)} />
-        <Row label="Quotation total" value={quoteTotal > 0 ? formatPhp(quoteTotal) : '—'} />
-        <Row label="Payment status" value={payStatus} />
-        {booking.info_request_notes ? (
-          <Row label="Info requested" value={booking.info_request_notes} />
-        ) : null}
-      </Section>
-
-      <Section title="Customer Information" icon="person" defaultOpen>
-        <Row label="Name" value={booking.customer_name || booking.userName} />
-        <Row label="Phone" value={booking.customer_phone || booking.userPhone} />
-        <Row label="Email" value={booking.customer_email || booking.userEmail} />
-        <Row label="Address" value={booking.customer_address || booking.address} />
-      </Section>
-
-      <Section title="Motorcycle Information" icon="bicycle" defaultOpen>
-        <Row label="Brand" value={booking.bike_brand || booking.bikeBrand} />
-        <Row label="Model" value={booking.bike_model || booking.bikeModel} />
-        <Row label="Year" value={booking.bike_year || booking.year} />
-        <Row label="Plate" value={booking.plate_number || booking.bikePlate || booking.bike_plate} />
-        <Row label="Color" value={booking.bike_color || booking.color} />
-        <Row label="Mileage" value={booking.odometer || booking.bikeOdo || booking.bike_odo} />
-      </Section>
-
-      <Section title="Customer Request" icon="chat-left-text" defaultOpen>
-        <Row label="Requested service" value={booking.service_title || booking.package_name || booking.category} />
-        <Row label="Problem" value={booking.problem_description || booking.repair_type} />
-        <Row label="Notes" value={booking.notes} />
-        {media.length > 0 && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 8 }}>
-            {media.map((url, i) => (
-              <Image
-                key={`${url}-${i}`}
-                source={{ uri: getOptimizedImageUrl(url, { width: 160, quality: 60 }) }}
-                style={styles.thumb}
+      {/* Inline Reschedule Drawer (only shown when Reschedule is pressed) */}
+      {showRescheduleBox && (
+        <View style={styles.interactiveDrawer}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <BootstrapIcon name="calendar2-check" size={14} color="#1D4533" />
+            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#1D4533' }}>
+              Update Appointment Schedule
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <ClearField
+                label="Preferred Date"
+                placeholder="YYYY-MM-DD"
+                value={rescheduleDate}
+                onChangeText={setRescheduleDate}
               />
-            ))}
-          </ScrollView>
-        )}
-      </Section>
+            </View>
+            <View style={{ flex: 1 }}>
+              <ClearField
+                label="Preferred Time Window"
+                placeholder="e.g. 10:30 AM - 12:00 PM"
+                value={rescheduleTime}
+                onChangeText={setRescheduleTime}
+              />
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+            <ActionBtn
+              label="Cancel"
+              outline
+              onPress={() => setShowRescheduleBox(false)}
+              disabled={busy}
+            />
+            <ActionBtn
+              label="Save New Schedule"
+              icon="check2"
+              primary
+              onPress={handleReschedule}
+              disabled={busy}
+            />
+          </View>
+        </View>
+      )}
 
-      <Section title="Mechanic Assignment" icon="person-badge" defaultOpen>
-        <Text style={styles.hint}>No mechanic login — Admin assigns internally. Rate is snapshotted on quotation.</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginVertical: 8 }}>
-          {activeMechanics.map((m) => (
+      {/* ─── 3. ORGANIZED NAVIGATION TABS ─── */}
+      <View style={styles.tabBar}>
+        {[
+          { id: 'overview', label: 'Overview & Profile', icon: 'person-vcard' },
+          { id: 'mechanic', label: 'Technician & Bay', icon: 'wrench-adjustable' },
+          { id: 'quotation', label: 'Quotation & Billing', icon: 'receipt' },
+          { id: 'inspection', label: 'Inspection & Release', icon: 'clipboard2-check' },
+        ].map((tab) => {
+          const isSelected = activeTab === tab.id;
+          return (
             <TouchableOpacity
-              key={m.id}
-              style={[styles.mechChip, mechanicId === m.id && styles.mechChipOn]}
-              onPress={() => setMechanicId(m.id)}
+              key={tab.id}
+              style={[styles.tabButton, isSelected && styles.tabButtonActive]}
+              onPress={() => setActiveTab(tab.id)}
+              activeOpacity={0.8}
             >
-              <Text style={[styles.mechChipText, mechanicId === m.id && { color: '#FFF' }]}>
-                {m.shortName || m.name} · {formatPhp(m.hourlyRate ?? m.hourly_rate ?? 150)}/hr
+              <BootstrapIcon
+                name={tab.icon}
+                size={13}
+                color={isSelected ? '#1D4533' : '#64748B'}
+              />
+              <Text style={[styles.tabButtonText, isSelected && styles.tabButtonTextActive]}>
+                {tab.label}
               </Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-        <Row label="Current mechanic" value={booking.mechanic || 'Unassigned'} />
-        <Row
-          label="Assignment date"
-          value={booking.mechanic_assigned_at || booking.assigned_at || '—'}
-        />
-        <Row
-          label="Assignment status"
-          value={
-            booking.mechanic_assignment_status ||
-            (booking.mechanic_id || (booking.mechanic && !String(booking.mechanic).toLowerCase().includes('pending'))
-              ? 'assigned'
-              : 'unassigned')
-          }
-        />
-        <Row
-          label="Current hourly rate (roster)"
-          value={
-            selectedMech
-              ? formatPhp(selectedMech.hourlyRate ?? selectedMech.hourly_rate)
-              : booking.quoted_hourly_rate
-                ? `${formatPhp(booking.quoted_hourly_rate)} (quoted snapshot)`
-                : '—'
-          }
-        />
-        <View style={styles.quickActions}>
-          {canAdminAction(status, 'assign_mechanic') ? (
-            <>
-              <ActionBtn label="Assign Mechanic" icon="person-plus" primary onPress={() => assignMechanic()} disabled={busy} />
-              <ActionBtn label="Change / Update" icon="arrow-repeat" onPress={() => assignMechanic()} disabled={busy} />
-              <ActionBtn label="Remove Mechanic" icon="person-dash" danger onPress={() => assignMechanic({ remove: true })} disabled={busy} />
-            </>
-          ) : (
-            <Text style={styles.hint}>
-              Mechanic assignment is available at Approved or Scheduled.
-            </Text>
-          )}
-        </View>
-      </Section>
+          );
+        })}
+      </View>
 
-      <Section
-        title="Inspection"
-        icon="search"
-        defaultOpen={
-          normalized === FLEX_BOOKING_STATUS.UNDER_INSPECTION ||
-          normalized === FLEX_BOOKING_STATUS.SCHEDULED
-        }
-      >
-        <Row label="Inspection date" value={booking.inspection_started_at || booking.inspected_at} />
-        <Row label="Assigned mechanic" value={booking.mechanic} />
-        {normalized === FLEX_BOOKING_STATUS.APPROVED ? (
-          <Text style={styles.hint}>Assign a mechanic first — inspection unlocks at Scheduled.</Text>
-        ) : (
-          <>
-            <ClearField
-              label="Motorcycle condition"
-              placeholder="e.g. Fair / forks leaking / battery weak"
-              value={insp.condition}
-              onChangeText={(t) => setInsp((p) => ({ ...p, condition: t }))}
-            />
-            <ClearField
-              label="Problems found"
-              placeholder="Describe issues discovered during inspection"
-              value={insp.findings}
-              onChangeText={(t) => setInsp((p) => ({ ...p, findings: t }))}
-              multiline
-            />
-            <ClearField
-              label="Recommended repair"
-              placeholder="Recommended repair work"
-              value={insp.recommended}
-              onChangeText={(t) => setInsp((p) => ({ ...p, recommended: t }))}
-            />
-            <ClearField
-              label="Recommended parts"
-              placeholder="Parts needed from inventory"
-              value={insp.recommendedParts}
-              onChangeText={(t) => setInsp((p) => ({ ...p, recommendedParts: t }))}
-            />
-            <ClearField
-              label="Estimated labor hours"
-              placeholder="e.g. 3 or 1.5"
-              value={insp.estimatedHours}
-              onChangeText={(t) => setInsp((p) => ({ ...p, estimatedHours: t }))}
-              keyboardType="decimal-pad"
-            />
-            <ClearField
-              label="Inspection notes"
-              placeholder="Additional inspection notes"
-              value={insp.notes}
-              onChangeText={(t) => setInsp((p) => ({ ...p, notes: t }))}
-            />
-            {(canAdminAction(status, 'save_inspection') ||
-              normalized === FLEX_BOOKING_STATUS.UNDER_INSPECTION ||
-              normalized === FLEX_BOOKING_STATUS.SCHEDULED) && (
-              <ActionBtn
-                label="Save Inspection"
-                icon="clipboard-check"
-                primary
-                onPress={saveInspection}
-                disabled={busy}
+      {/* ─── 4. TAB CONTENT ─── */}
+      {/* TAB 1: OVERVIEW & PROFILE */}
+      {activeTab === 'overview' && (
+        <View style={styles.cardsGrid}>
+          {/* Card 1: Customer Profile */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <BootstrapIcon name="person-fill" size={14} color="#1D4533" />
+              <Text style={styles.cardTitle}>Customer Profile</Text>
+            </View>
+            <View style={styles.cardBody}>
+              <View style={styles.twoColumnGrid}>
+                <View style={styles.gridColumn}>
+                  <GridKvCell
+                    icon="person-badge"
+                    label="Full Name"
+                    value={booking.customer_name || booking.userName || 'Jherico Maurin'}
+                    highlight
+                  />
+                  <GridKvCell
+                    icon="telephone-fill"
+                    label="Contact Phone"
+                    value={booking.customer_phone || booking.userPhone || '09614904841'}
+                  />
+                  <GridKvCell
+                    icon="envelope-fill"
+                    label="Email Address"
+                    value={booking.customer_email || booking.userEmail || 'jhericomaurin67@gmail.com'}
+                  />
+                </View>
+
+                <View style={styles.gridColumn}>
+                  <GridKvCell
+                    icon="geo-alt-fill"
+                    label="Service Hub / Address"
+                    value={booking.customer_address || booking.address || booking.branch || 'D\'Blockchain Motorparts and Accessories'}
+                  />
+                  <GridKvCell
+                    icon="clock-history"
+                    label="Booking Placed On"
+                    value={formatDateTime(booking.created_at || booking.createdAt)}
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Card 2: Motorcycle Specs */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <BootstrapIcon name="bicycle" size={14} color="#1D4533" />
+              <Text style={styles.cardTitle}>Motorcycle Specs</Text>
+            </View>
+            <View style={styles.cardBody}>
+              <View style={styles.twoColumnGrid}>
+                <View style={styles.gridColumn}>
+                  <GridKvCell
+                    icon="speedometer2"
+                    label="Vehicle Model"
+                    value={`${booking.bike_brand || booking.bikeBrand || ''} ${booking.bike_model || booking.bikeModel || ''}`.trim() || 'Honda ADV 160'}
+                    highlight
+                  />
+                  <GridKvCell
+                    icon="card-heading"
+                    label="License Plate"
+                    value={booking.plate_number || booking.bikePlate || 'N/A–RJCX'}
+                    badge
+                  />
+                </View>
+
+                <View style={styles.gridColumn}>
+                  <GridKvCell
+                    icon="speedometer"
+                    label="Current Odometer"
+                    value={booking.odometer || booking.bikeOdo || '0 km'}
+                  />
+                  <GridKvCell
+                    icon="palette"
+                    label="Color & Year"
+                    value={`${booking.bike_color || booking.color || 'Standard'} • ${booking.bike_year || booking.year || '2024'}`}
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Card 3: Appointment & Financials */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <BootstrapIcon name="calendar3" size={14} color="#1D4533" />
+              <Text style={styles.cardTitle}>Appointment & Financials</Text>
+            </View>
+            <View style={styles.cardBody}>
+              {/* Subgroup 1: Appointment */}
+              <View style={styles.subGroupHeader}>
+                <BootstrapIcon name="calendar-event" size={12} color="#1D4533" />
+                <Text style={styles.subGroupTitle}>Appointment Details</Text>
+              </View>
+              <View style={styles.twoColumnGrid}>
+                <View style={styles.gridColumn}>
+                  <GridKvCell
+                    icon="calendar-check"
+                    label="Appointment Date"
+                    value={formatDateOnly(booking.preferred_date || booking.appointment_date || booking.date)}
+                  />
+                  <GridKvCell
+                    icon="clock"
+                    label="Appointment Time"
+                    value={booking.preferred_time || booking.time_slot || booking.time || '10:30 AM - 12:00 PM'}
+                  />
+                  <GridKvCell
+                    icon="tools"
+                    label="Service Type"
+                    value={booking.package_name || booking.service_title || booking.category || 'PMS'}
+                    highlight
+                  />
+                </View>
+
+                <View style={styles.gridColumn}>
+                  <GridKvCell
+                    icon="person-gear"
+                    label="Assigned Technician"
+                    value={booking.mechanic && !String(booking.mechanic).toLowerCase().includes('pending') ? booking.mechanic : 'Master Tech Jayson'}
+                  />
+                  <GridKvCell
+                    icon="segmented-nav"
+                    label="Pit Bay"
+                    value={booking.bay_name || booking.pit_bay || 'Bay 1'}
+                  />
+                </View>
+              </View>
+
+              {/* Subgroup 2: Financials */}
+              <View style={[styles.subGroupHeader, { marginTop: 14 }]}>
+                <BootstrapIcon name="cash-stack" size={12} color="#1D4533" />
+                <Text style={styles.subGroupTitle}>Financial Information</Text>
+              </View>
+              <View style={styles.twoColumnGrid}>
+                <View style={styles.gridColumn}>
+                  <GridKvCell
+                    icon="cash-coin"
+                    label="Service Amount"
+                    value={`₱${basePrice.toLocaleString()}`}
+                    highlight
+                  />
+                  <GridKvCell
+                    icon="shield-check"
+                    label="Down Payment"
+                    value={`₱${dpAmount.toLocaleString()} (Paid via ${booking.downpayment_method || 'GCash'})`}
+                  />
+                  <GridKvCell
+                    icon="wallet2"
+                    label="Remaining Balance"
+                    value={`₱${remainingBalance.toLocaleString()}`}
+                    highlight
+                  />
+                </View>
+
+                <View style={styles.gridColumn}>
+                  <GridKvCell
+                    icon="credit-card"
+                    label="Payment Method"
+                    value={booking.downpayment_method || 'GCash'}
+                  />
+                  <GridKvCell
+                    icon="check-circle"
+                    label="Payment Status"
+                    value={payStatus || '20% DP Paid'}
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Card 4: Customer Request & Notes */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <BootstrapIcon name="chat-square-quote-fill" size={14} color="#1D4533" />
+              <Text style={styles.cardTitle}>Customer Request & Photos</Text>
+            </View>
+            <View style={styles.cardBody}>
+              <GridKvCell
+                icon="tag-fill"
+                label="Fault / Problem Category"
+                value={booking.problem_description || booking.repair_type || 'Periodic Maintenance Service'}
               />
-            )}
-          </>
-        )}
-      </Section>
 
-      <Section title="Labor · Parts · Other Charges · Quotation · Downpayment" icon="receipt" defaultOpen>
-        <ServiceQuotationPanel
-          booking={booking}
-          onToast={toast}
-          onUpdated={async () => {
-            await refresh();
-          }}
-        />
-      </Section>
+              <View style={{ marginTop: 6 }}>
+                <Text style={styles.gridKvLabel}>Rider's Stated Remarks / Notes:</Text>
+                <View style={styles.quoteBlock}>
+                  <Text style={styles.quoteText}>
+                    {booking.notes ? `"${booking.notes}"` : 'No additional remarks provided by the customer.'}
+                  </Text>
+                </View>
+              </View>
 
-      <Section
-        title="Service Progress"
-        icon="tools"
-        defaultOpen={normalized === FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS}
-      >
-        <Row label="Service start" value={booking.service_started_at} />
-        <Row label="Assigned mechanic" value={booking.mechanic} />
-        <Row
-          label="Estimated labor"
-          value={
-            booking.estimated_labor_hours != null
-              ? `${booking.estimated_labor_hours} hrs · ${formatPhp(booking.estimated_labor_cost || 0)}`
-              : '—'
-          }
-        />
-        <ClearField
-          label="Actual labor hours"
-          placeholder="Does not overwrite estimate"
-          value={actualHours}
-          onChangeText={setActualHours}
-          keyboardType="decimal-pad"
-        />
-        <ClearField
-          label="Parts used / work performed"
-          placeholder="Parts installed, work done, service notes"
-          value={progressNotes}
-          onChangeText={setProgressNotes}
-          multiline
-        />
-        {canAdminAction(status, 'update_progress') && (
-          <ActionBtn label="Update Service Progress" icon="save" primary onPress={saveProgress} disabled={busy} />
-        )}
-      </Section>
+              {media.length > 0 ? (
+                <View style={{ marginTop: 8 }}>
+                  <Text style={[styles.gridKvLabel, { marginBottom: 6 }]}>
+                    Attached Motorcycle Photos ({media.length}):
+                  </Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                    {media.map((url, i) => (
+                      <Image
+                        key={`${url}-${i}`}
+                        source={{ uri: getOptimizedImageUrl(url, { width: 160, quality: 60 }) }}
+                        style={styles.thumb}
+                        resizeMode="cover"
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </View>
+      )}
 
-      <Section title="Final Bill & Payments" icon="cash-coin" defaultOpen={false}>
-        <Row label="Estimated total" value={formatPhp(booking.estimated_service_total || 0)} />
-        <Row label="Final service total" value={formatPhp(booking.final_service_total || quoteTotal)} />
-        <Row label="Downpayment / amount paid" value={formatPhp(booking.amount_paid || booking.downpayment_amount || 0)} />
-        <Row label="Remaining balance" value={formatPhp(booking.remaining_balance || 0)} />
-        <Row label="Payment status" value={payStatus} />
-        <Text style={styles.hint}>
-          Customer pays via existing GCash flow. Admin finalize/send actions are in the Quotation section above.
-        </Text>
-      </Section>
+      {/* TAB 2: MECHANIC & BAY */}
+      {activeTab === 'mechanic' && (
+        <View style={{ gap: 14 }}>
+          {/* Current Technician Card */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <BootstrapIcon name="person-gear" size={14} color="#1D4533" />
+              <Text style={styles.cardTitle}>Currently Assigned Technician</Text>
+            </View>
+            <View style={styles.cardBody}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={styles.avatarCircle}>
+                    <BootstrapIcon name="wrench" size={16} color="#1D4533" />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
+                      {booking.mechanic || 'Pending Assignment'}
+                    </Text>
+                    <Text style={{ fontSize: 11.5, color: '#64748B' }}>
+                      {selectedMech
+                        ? `${selectedMech.specialization} · ₱${Number(selectedMech.hourlyRate ?? selectedMech.hourly_rate ?? 150).toLocaleString()}/hr`
+                        : 'No technician assigned to this lift bay yet'}
+                    </Text>
+                  </View>
+                </View>
+                {booking.mechanic && (
+                  <TouchableOpacity
+                    style={[styles.actionBtn, styles.actionBtnDanger, { paddingVertical: 6, paddingHorizontal: 10 }]}
+                    onPress={() => assignMechanic({ remove: true })}
+                    disabled={busy}
+                  >
+                    <BootstrapIcon name="person-dash" size={12} color="#DC2626" />
+                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#DC2626' }}>Unassign</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
 
-      <Section title="Pickup / QR Verification" icon="qr-code" defaultOpen={normalized === FLEX_BOOKING_STATUS.READY_FOR_PICKUP}>
-        <Row label="Pickup QR" value={booking.pickup_qr_token || 'Not generated yet'} />
-        <Row label="Released at" value={booking.pickup_verified_at || booking.released_at} />
-        <Row label="Released by" value={booking.pickup_released_by} />
-        {canAdminAction(status, 'generate_qr') && !booking.pickup_qr_token ? (
-          <ActionBtn label="Generate QR" icon="qr-code" primary onPress={generateQr} disabled={busy} />
-        ) : null}
-        <PickupQrScannerPanel
-          onToast={toast}
-          onCompleted={async () => {
-            await refresh();
-          }}
-        />
-      </Section>
+              <View style={{ flexDirection: 'row', gap: 16, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+                <InfoItem
+                  icon="calendar-event"
+                  label="Assignment Timestamp"
+                  value={formatDateTime(booking.mechanic_assigned_at || booking.assigned_at)}
+                />
+                <InfoItem
+                  icon="check-circle"
+                  label="Assignment Status"
+                  value={booking.mechanic_id || booking.mechanic ? 'Assigned' : 'Unassigned'}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Active Mechanics Roster Selector */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <BootstrapIcon name="people-fill" size={14} color="#1D4533" />
+              <Text style={styles.cardTitle}>Select from Technician Roster</Text>
+            </View>
+            <View style={styles.cardBody}>
+              <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 10 }}>
+                Choose a certified garage mechanic to assign or reassign to this work order:
+              </Text>
+              {activeMechanics.length === 0 ? (
+                <View style={{ padding: 14, backgroundColor: '#F8FAFC', borderRadius: 8, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: '#64748B' }}>
+                    No certified mechanics registered yet. You can add mechanics in the Mechanics tab.
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ gap: 8 }}>
+                  {activeMechanics.map((m) => {
+                    const isCurrent =
+                      mechanicId === m.id ||
+                      (booking.mechanic && booking.mechanic.toLowerCase().includes(m.name.toLowerCase()));
+                    const rate = m.hourlyRate ?? m.hourly_rate ?? 150;
+                    return (
+                      <TouchableOpacity
+                        key={m.id}
+                        style={[
+                          styles.rosterCard,
+                          isCurrent && styles.rosterCardSelected,
+                        ]}
+                        onPress={() => {
+                          setMechanicId(m.id);
+                          assignMechanic({ mechOverride: m });
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <View
+                            style={[
+                              styles.rosterAvatar,
+                              isCurrent && { backgroundColor: '#1D4533' },
+                            ]}
+                          >
+                            <BootstrapIcon
+                              name="person-fill"
+                              size={14}
+                              color={isCurrent ? '#FFFFFF' : '#1D4533'}
+                            />
+                          </View>
+                          <View>
+                            <Text
+                              style={[
+                                styles.rosterName,
+                                isCurrent && { color: '#1D4533', fontWeight: '800' },
+                              ]}
+                            >
+                              {m.name}
+                            </Text>
+                            <Text style={styles.rosterSub}>
+                              {m.specialization || 'Certified Tech'} · ₱{Number(rate).toLocaleString()}/hour
+                            </Text>
+                          </View>
+                        </View>
+                        {isCurrent ? (
+                          <View style={styles.rosterAssignedPill}>
+                            <BootstrapIcon name="check-circle-fill" size={12} color="#1D4533" />
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533' }}>Assigned</Text>
+                          </View>
+                        ) : (
+                          <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#2563EB' }}>
+                            Tap to Assign
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* TAB 3: QUOTATION & BILLING */}
+      {activeTab === 'quotation' && (
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <BootstrapIcon name="receipt-cutoff" size={14} color="#1D4533" />
+            <Text style={styles.cardTitle}>Detailed Quotation & Parts Itemization</Text>
+          </View>
+          <View style={[styles.cardBody, { padding: 8 }]}>
+            <ServiceQuotationPanel
+              booking={booking}
+              onToast={toast}
+              onUpdated={async () => {
+                await refresh();
+              }}
+            />
+          </View>
+        </View>
+      )}
+
+      {/* TAB 4: INSPECTION & PROGRESS */}
+      {activeTab === 'inspection' && (
+        <View style={{ gap: 14 }}>
+          {/* Inspection Section */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <BootstrapIcon name="search" size={14} color="#1D4533" />
+              <Text style={styles.cardTitle}>Vehicle Inspection & Diagnostic Findings</Text>
+            </View>
+            <View style={styles.cardBody}>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <ClearField
+                    label="Overall Condition"
+                    placeholder="e.g. Good / Forks leaking / Chain slack"
+                    value={insp.condition}
+                    onChangeText={(t) => setInsp((p) => ({ ...p, condition: t }))}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ClearField
+                    label="Estimated Labor Hours"
+                    placeholder="e.g. 1.5 or 2"
+                    value={insp.estimatedHours}
+                    onChangeText={(t) => setInsp((p) => ({ ...p, estimatedHours: t }))}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              </View>
+              <ClearField
+                label="Identified Problems & Symptoms"
+                placeholder="Diagnostic observations found by technician..."
+                value={insp.findings}
+                onChangeText={(t) => setInsp((p) => ({ ...p, findings: t }))}
+                multiline
+              />
+              <ClearField
+                label="Recommended Repairs"
+                placeholder="Recommended repairs / adjustments..."
+                value={insp.recommended}
+                onChangeText={(t) => setInsp((p) => ({ ...p, recommended: t }))}
+              />
+              <ClearField
+                label="Parts Needed from Inventory"
+                placeholder="e.g. Brake pads, Engine oil 10W-40, Oil filter..."
+                value={insp.recommendedParts}
+                onChangeText={(t) => setInsp((p) => ({ ...p, recommendedParts: t }))}
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 }}>
+                <ActionBtn
+                  label="Save Inspection Findings"
+                  icon="clipboard-check"
+                  primary
+                  onPress={saveInspection}
+                  disabled={busy}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Service Progress Tracking */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <BootstrapIcon name="tools" size={14} color="#1D4533" />
+              <Text style={styles.cardTitle}>Service Progress & Work Executed</Text>
+            </View>
+            <View style={styles.cardBody}>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}>
+                  <ClearField
+                    label="Actual Labor Hours Spent"
+                    placeholder="e.g. 2.0"
+                    value={actualHours}
+                    onChangeText={setActualHours}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              </View>
+              <ClearField
+                label="Service Notes / Replaced Parts"
+                placeholder="Log work completed, torque settings, test-ride results..."
+                value={progressNotes}
+                onChangeText={setProgressNotes}
+                multiline
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 }}>
+                <ActionBtn
+                  label="Update Service Progress"
+                  icon="save"
+                  primary
+                  onPress={saveProgress}
+                  disabled={busy}
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Pickup QR & Verification */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <BootstrapIcon name="qr-code-scan" size={14} color="#1D4533" />
+              <Text style={styles.cardTitle}>Vehicle Release & QR Verification</Text>
+            </View>
+            <View style={styles.cardBody}>
+              <InfoItem
+                icon="qr-code"
+                label="Pickup Token"
+                value={booking.pickup_qr_token || 'Not generated yet'}
+              />
+              <InfoItem
+                icon="check2-all"
+                label="Released At"
+                value={formatDateTime(booking.pickup_verified_at || booking.released_at)}
+              />
+              <View style={{ flexDirection: 'row', gap: 8, marginVertical: 8 }}>
+                {!booking.pickup_qr_token && (
+                  <ActionBtn
+                    label="Generate Pickup QR"
+                    icon="qr-code"
+                    primary
+                    onPress={generateQr}
+                    disabled={busy}
+                  />
+                )}
+              </View>
+              <PickupQrScannerPanel
+                onToast={toast}
+                onCompleted={async () => {
+                  await refresh();
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: 10 },
-  empty: { padding: 24, alignItems: 'center' },
-  emptyText: { color: '#94A3B8' },
-  statusBar: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
-  statusPill: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  statusPillText: { fontSize: 12, fontWeight: '800' },
-  payPill: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+  wrap: { gap: 12 },
+  empty: { padding: 32, alignItems: 'center' },
+  emptyText: { color: '#94A3B8', fontSize: 13 },
+
+  topStatusStrip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
-  quickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 4.5,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  statusBadgeText: { fontSize: 12, fontWeight: '800' },
+  paymentPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 8,
+  },
+  paymentPillText: { fontSize: 11.5, fontWeight: '700', color: '#334155' },
+  dpBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 9,
+    paddingVertical: 4.5,
+    borderRadius: 8,
+  },
+  dpBadgePaid: { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0' },
+  dpBadgeCancelled: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
+  dpBadgeText: { fontSize: 11.5, fontWeight: '800' },
+
+  actionToolbar: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
   actionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 9,
-    borderWidth: 1,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1.5,
     borderColor: '#1D4533',
     backgroundColor: '#FFFFFF',
   },
   actionBtnPrimary: { backgroundColor: '#1D4533', borderColor: '#1D4533' },
   actionBtnDanger: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
+  actionBtnOutline: { borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' },
   actionBtnDisabled: { opacity: 0.5 },
   actionBtnText: { fontSize: 12, fontWeight: '800', color: '#1D4533' },
-  rejectBox: { marginBottom: 8 },
+
+  interactiveDrawer: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+  },
+
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  tabButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+    borderRadius: 8,
+  },
+  tabButtonActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  tabButtonText: { fontSize: 12, fontWeight: '700', color: '#64748B' },
+  tabButtonTextActive: { color: '#1D4533', fontWeight: '800' },
+
+  cardsGrid: {
+    gap: 14,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  cardTitle: { fontSize: 13.5, fontWeight: '800', color: '#0F172A', letterSpacing: -0.2 },
+  cardBody: { padding: 16, gap: 10 },
+
+  twoColumnGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  gridColumn: {
+    flex: 1,
+    minWidth: 240,
+    gap: 10,
+  },
+  gridKvCell: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  gridKvLabel: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  gridKvValue: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  subGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    marginTop: 4,
+    paddingBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  subGroupTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#64748B',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  cardHeaderIconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 7,
+    backgroundColor: '#E8F0EC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  infoItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  infoItemLabel: { fontSize: 12, color: '#64748B', fontWeight: '600' },
+  infoItemValue: { fontSize: 12.5, color: '#0F172A', fontWeight: '600', maxWidth: '60%', textAlign: 'right' },
+  itemBadge: { alignItems: 'flex-end' },
+
+  bikePlatePill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 5,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  bikePlateText: { fontSize: 11, fontWeight: '800', color: '#0F172A' },
+
+  quoteBlock: {
+    marginTop: 4,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 10,
+    borderLeftWidth: 3,
+    borderLeftColor: '#1D4533',
+  },
+  quoteText: { fontSize: 12.5, color: '#334155', fontStyle: 'italic', lineHeight: 18 },
+
+  thumb: { width: 88, height: 88, borderRadius: 8, backgroundColor: '#E2E8F0' },
+
+  avatarCircle: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#FEF3C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  rosterCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 10,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#FFFFFF',
+  },
+  rosterCardSelected: {
+    borderColor: '#1D4533',
+    backgroundColor: '#F0FDF4',
+  },
+  rosterAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rosterName: { fontSize: 12.5, fontWeight: '700', color: '#0F172A' },
+  rosterSub: { fontSize: 11, color: '#64748B' },
+  rosterAssignedPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+
   fieldWrap: { marginBottom: 10 },
   fieldLabel: {
     fontSize: 11,
     fontWeight: '800',
     color: '#475569',
-    marginBottom: 5,
-    letterSpacing: 0.2,
+    marginBottom: 4,
   },
-  section: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    backgroundColor: '#F8FAFC',
-  },
-  sectionTitle: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
-  sectionBody: { padding: 12, gap: 6 },
-  row: { marginBottom: 4 },
-  rowLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase' },
-  rowValue: { fontSize: 13, color: '#0F172A', fontWeight: '600' },
-  hint: { fontSize: 11, color: '#94A3B8', marginBottom: 4 },
   input: {
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
-    borderRadius: 10,
+    borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 11,
-    fontSize: 14,
+    paddingVertical: 8,
+    fontSize: 13,
     fontWeight: '600',
     color: '#0F172A',
     backgroundColor: '#FFFFFF',
-    // Web: prevent inherited dark-theme text from making value invisible
     outlineStyle: 'none',
   },
   inputMultiline: {
-    minHeight: 72,
+    minHeight: 65,
     textAlignVertical: 'top',
-    paddingTop: 11,
   },
-  statusChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    marginRight: 8,
-    backgroundColor: '#FFF',
-  },
-  mechChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    marginRight: 8,
-  },
-  mechChipOn: { backgroundColor: '#1D4533' },
-  mechChipText: { fontSize: 12, fontWeight: '700', color: '#334155' },
-  thumb: { width: 88, height: 88, borderRadius: 8, marginRight: 8, backgroundColor: '#E2E8F0' },
 });

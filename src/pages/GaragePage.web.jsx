@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Modal,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -36,6 +37,7 @@ import { garageWebStyles as gStyles } from '../styles/web/garagePage.web.styles'
 import { useAuth } from '../context/AuthContext';
 import {
   garageService,
+  generateBookingId,
   REPAIR_COMMON_ISSUES,
   BOOKING_CATEGORIES,
   GARAGE_BRANCHES,
@@ -77,13 +79,15 @@ export default function GaragePageWeb({
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
-    notificationService.getUnreadCount(currentUser?.id)
+    currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
   );
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
-      setUnreadNotifCount(notificationService.getUnreadCount(currentUser?.id));
+      setUnreadNotifCount(
+        currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
+      );
     });
     return () => unsub?.();
   }, [currentUser]);
@@ -100,6 +104,8 @@ export default function GaragePageWeb({
   const [servicesList, setServicesList] = useState(() => garageService.getActivePackages());
   const [userBookings, setUserBookings] = useState([]);
   const [bookingStatusFilter, setBookingStatusFilter] = useState('ALL');
+  const [bookingViewMode, setBookingViewMode] = useState('grid'); // 'grid' | 'list'
+  const [selectedBookingForModal, setSelectedBookingForModal] = useState(null);
   const [bookingsPage, setBookingsPage] = useState(1);
   const BOOKINGS_PAGE_SIZE = 6;
 
@@ -145,6 +151,13 @@ export default function GaragePageWeb({
   useEffect(() => {
     if (bookingsPage > bookingsTotalPages) setBookingsPage(1);
   }, [bookingsPage, bookingsTotalPages]);
+
+  // Keep selected booking in modal synced if userBookings refreshes
+  const activeModalBooking = useMemo(() => {
+    if (!selectedBookingForModal) return null;
+    const modalId = selectedBookingForModal?.booking_id || selectedBookingForModal?.id;
+    return userBookings.find((b) => (b?.booking_id || b?.id) === modalId) || selectedBookingForModal;
+  }, [userBookings, selectedBookingForModal]);
   const [toastMessage, setToastMessage] = useState('');
 
   // Live Mechanic Availability & Today Slot Status States
@@ -569,125 +582,125 @@ export default function GaragePageWeb({
 
   // Flexible booking: no package, no pricing, no downpayment. Admin quotes after inspection.
   const handleConfirmBooking = async () => {
-    if (!currentUser) {
-      showToast('⚠️ Please sign in to submit a service request.');
-      return;
+    try {
+      if (!currentUser) {
+        showToast('⚠️ Please sign in to submit a service request.');
+        return;
+      }
+      if (!selectedMotorcycleId && (!garageMotorcycles || garageMotorcycles.length === 0)) {
+        showToast('⚠️ Please select a registered motorcycle from My Garage.');
+        return;
+      }
+      if (!serviceNotes.trim()) {
+        showToast('⚠️ Please describe the problem or the service you need.');
+        return;
+      }
+      if (!selectedDate || !selectedTime) {
+        showToast('⚠️ Please choose your preferred date and time window.');
+        return;
+      }
+
+      const registeredBike =
+        (garageMotorcycles || []).find(
+          (m) => String(m.motorcycle_id || m.id) === String(selectedMotorcycleId)
+        ) || (garageMotorcycles && garageMotorcycles[0]) || null;
+
+      const brand = registeredBike?.brand || bikeBrand || 'Motorcycle';
+      const model = registeredBike?.model || bikeModel || '';
+      const plate = registeredBike?.plate_number || bikePlate || 'TEMP-PLATE';
+      const year = registeredBike?.year ? String(registeredBike.year) : bikeYear || '';
+      const odometer = registeredBike?.odometer ? String(registeredBike.odometer) : bikeOdo || '';
+
+      const serviceLabel = SERVICE_TYPE_LABELS[bookingType] || SERVICE_TYPE_LABELS.PMS;
+
+      const finalNotes =
+        bookingType === 'Repair' && selectedRepairIssue
+          ? `[Fault: ${selectedRepairIssue}] ${serviceNotes.trim()}`
+          : serviceNotes.trim();
+
+      const bookingId = generateBookingId(bookingType, userBookings || []);
+
+      const bookingDraft = {
+        id: bookingId,
+        booking_id: bookingId,
+        booking_mode: 'flexible',
+        flexible: true,
+        skip_downpayment: true,
+        serviceId: null,
+        service_id: null,
+        package_id: null,
+        package_name: serviceLabel,
+        package_price: 0,
+        serviceName: serviceLabel,
+        service_title: serviceLabel,
+        servicePrice: 0,
+        pricePhp: 0,
+        downpayment_required: false,
+        downpayment_percent: 0,
+        downpayment_amount: 0,
+        remaining_balance: 0,
+        is_non_refundable: false,
+        category: bookingType,
+        service_type: bookingType,
+        repair_type: bookingType === 'Repair' ? selectedRepairIssue : undefined,
+        problem_description: finalNotes,
+        userEmail: currentUser?.email || 'rider@mototrack.com',
+        customer_email: currentUser?.email || 'rider@mototrack.com',
+        userName: ownerName,
+        customer_name: ownerName,
+        userPhone: ownerPhone,
+        customer_phone: ownerPhone,
+        customer_id: currentUser?.customer_id || currentUser?.id,
+        motorcycle_id: selectedMotorcycleId || registeredBike?.motorcycle_id || registeredBike?.id || 'moto-default',
+        bikeBrand: brand,
+        bike_brand: brand,
+        bikeModel: model,
+        bike_model: model,
+        bikeYear: year,
+        bike_year: year,
+        year,
+        bikePlate: plate,
+        plate_number: plate,
+        bikeOdo: odometer,
+        bike_odo: odometer,
+        odometer,
+        photos: motorcyclePhotos,
+        media_urls: motorcyclePhotos,
+        branch: flagshipBranch.name,
+        branch_address: flagshipBranch.address,
+        appointment_date: selectedDate,
+        preferred_date: selectedDate,
+        date: selectedDate,
+        time_slot: selectedTime,
+        preferred_time: selectedTime,
+        time: selectedTime,
+        notes: additionalNotes.trim() ? additionalNotes.trim() : finalNotes,
+        additional_notes: additionalNotes.trim(),
+        status: 'PENDING_REVIEW',
+        service_progress: 0,
+        createdAt: new Date().toISOString(),
+        customerPhone: ownerPhone,
+      };
+
+      await garageService.addBooking(bookingDraft);
+      refreshBookings();
+      setIsBookingModalOpen(false);
+      setBookingStep(1);
+      setMotorcyclePhotos([]);
+      setServiceNotes('');
+      setAdditionalNotes('');
+      showToast(
+        `Your service request (#${bookingId}) has been submitted. Our admin will review your request and provide a quotation.`
+      );
+      setActiveTab('Scheduled');
+      setTimeout(() => {
+        const el = document.getElementById('scheduled-booking-section');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+    } catch (err) {
+      console.error('Booking confirmation failed:', err);
+      showToast('⚠️ Could not submit booking request. Please try again.');
     }
-    if (!selectedMotorcycleId) {
-      showToast('⚠️ Please select a registered motorcycle from My Garage.');
-      return;
-    }
-    if (!serviceNotes.trim()) {
-      showToast('⚠️ Please describe the problem or the service you need.');
-      return;
-    }
-    if (!selectedDate || !selectedTime) {
-      showToast('⚠️ Please choose your preferred date and time window.');
-      return;
-    }
-
-    const registeredBike =
-      (garageMotorcycles || []).find(
-        (m) => String(m.motorcycle_id) === String(selectedMotorcycleId)
-      ) || null;
-    if (!registeredBike) {
-      showToast('⚠️ That motorcycle is no longer in your garage. Please select another one.');
-      return;
-    }
-
-    const brand = registeredBike.brand || bikeBrand || '';
-    const model = registeredBike.model || bikeModel || '';
-    const plate = registeredBike.plate_number || bikePlate || '';
-    const year = registeredBike.year ? String(registeredBike.year) : bikeYear || '';
-    const odometer = registeredBike.odometer ? String(registeredBike.odometer) : bikeOdo || '';
-
-    const serviceLabel = SERVICE_TYPE_LABELS[bookingType] || SERVICE_TYPE_LABELS.PMS;
-    const catPrefix = bookingType === 'Repair' ? 'REP' : 'PMS';
-
-    const finalNotes =
-      bookingType === 'Repair' && selectedRepairIssue
-        ? `[Fault: ${selectedRepairIssue}] ${serviceNotes.trim()}`
-        : serviceNotes.trim();
-
-    const bookingId = `BK-${catPrefix}-` + Math.floor(10000 + Math.random() * 90000);
-
-    const bookingDraft = {
-      id: bookingId,
-      booking_id: bookingId,
-      booking_mode: 'flexible',
-      flexible: true,
-      skip_downpayment: true,
-      serviceId: null,
-      service_id: null,
-      package_id: null,
-      package_name: serviceLabel,
-      package_price: 0,
-      serviceName: serviceLabel,
-      service_title: serviceLabel,
-      servicePrice: 0,
-      pricePhp: 0,
-      downpayment_required: false,
-      downpayment_percent: 0,
-      downpayment_amount: 0,
-      remaining_balance: 0,
-      is_non_refundable: false,
-      category: bookingType,
-      service_type: bookingType,
-      repair_type: bookingType === 'Repair' ? selectedRepairIssue : undefined,
-      problem_description: finalNotes,
-      userEmail: currentUser?.email || 'rider@mototrack.com',
-      customer_email: currentUser?.email || 'rider@mototrack.com',
-      userName: ownerName,
-      customer_name: ownerName,
-      userPhone: ownerPhone,
-      customer_phone: ownerPhone,
-      customer_id: currentUser?.customer_id || currentUser?.id,
-      motorcycle_id: selectedMotorcycleId,
-      bikeBrand: brand,
-      bike_brand: brand,
-      bikeModel: model,
-      bike_model: model,
-      bikeYear: year,
-      bike_year: year,
-      year,
-      bikePlate: plate,
-      plate_number: plate,
-      bikeOdo: odometer,
-      bike_odo: odometer,
-      odometer,
-      photos: motorcyclePhotos,
-      media_urls: motorcyclePhotos,
-      branch: flagshipBranch.name,
-      branch_address: flagshipBranch.address,
-      appointment_date: selectedDate,
-      preferred_date: selectedDate,
-      date: selectedDate,
-      time_slot: selectedTime,
-      preferred_time: selectedTime,
-      time: selectedTime,
-      notes: additionalNotes.trim() ? additionalNotes.trim() : finalNotes,
-      additional_notes: additionalNotes.trim(),
-      status: 'PENDING_REVIEW',
-      service_progress: 0,
-      createdAt: new Date().toISOString(),
-      customerPhone: ownerPhone,
-    };
-
-    await garageService.addBooking(bookingDraft);
-    refreshBookings();
-    setIsBookingModalOpen(false);
-    setBookingStep(1);
-    setMotorcyclePhotos([]);
-    setServiceNotes('');
-    setAdditionalNotes('');
-    showToast(
-      `Your service request (#${bookingId}) has been submitted. Our admin will review your request and provide a quotation.`
-    );
-    setActiveTab('Scheduled');
-    setTimeout(() => {
-      const el = document.getElementById('scheduled-booking-section');
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 150);
   };
 
   const handlePromptCancelBooking = (booking) => {
@@ -776,6 +789,8 @@ export default function GaragePageWeb({
                 }}
                 activeOpacity={0.8}
                 title="Notifications"
+                dataSet={{ notificationButton: true }}
+                {...(Platform.OS === 'web' ? { 'data-notification-button': 'true' } : {})}
               >
                 <BootstrapIcon name="bell" size={16} color="#FFFFFF" />
                 {unreadNotifCount > 0 && (
@@ -788,9 +803,11 @@ export default function GaragePageWeb({
               <NotificationDropdown
                 isOpen={isNotifDropdownOpen}
                 onClose={() => setIsNotifDropdownOpen(false)}
-                onNavigateToScreen={(screen) => {
-                  if (screen === 'store') onNavigateToStore?.();
+                onNavigateToScreen={(screen, params) => {
+                  if (screen === 'store' || screen === 'shop') onNavigateToStore?.();
                   else if (screen === 'orders') onNavigateToOrders?.();
+                  else if (screen === 'notifications') onNavigateToProfile?.('notifications');
+                  else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
                 }}
                 currentUser={currentUser}
               />
@@ -888,6 +905,9 @@ export default function GaragePageWeb({
           <View style={gStyles.garageHeaderRow}>
             <View style={gStyles.garageHeaderLeft}>
               <Text style={gStyles.garageHeaderTitle}>Motorcycle Repair & Maintenance</Text>
+              <Text style={gStyles.garageHeaderSub}>
+                Manage your motorcycle service appointments and maintenance bookings.
+              </Text>
             </View>
 
             <View style={gStyles.garageHeaderActions}>
@@ -899,20 +919,21 @@ export default function GaragePageWeb({
                     borderColor: '#1D4533',
                     paddingHorizontal: 20,
                     paddingVertical: 10,
-                    borderRadius: 10,
+                    borderRadius: 12,
                     cursor: 'pointer',
                     boxShadow: '0 4px 14px rgba(29, 69, 51, 0.22)',
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 8,
+                    transition: 'all 0.2s ease',
                   },
                 ]}
                 onPress={() => handleOpenBooking('PMS')}
                 activeOpacity={0.85}
               >
                 <BootstrapIcon
-                  name="calendar-check-fill"
-                  size={14}
+                  name="calendar-plus-fill"
+                  size={15}
                   color="#FFFFFF"
                 />
                 <Text
@@ -929,59 +950,67 @@ export default function GaragePageWeb({
             </View>
           </View>
 
-          {/* ─── 4 KPI STATS GRID (COMPACT & SLEEK) ─── */}
-          <div className="flex flex-row flex-wrap gap-4 mb-6 w-full">
+          {/* ─── 4 KPI STATS GRID (CLEAN MODERN SAAS) ─── */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 w-full">
             {/* Card 1: MECHANICS AVAILABLE */}
             <div
-              className="premium-glass-card premium-hover-lift flex-1 min-w-[190px] min-h-[170px] p-5 border-l-4 border-teal-600 flex flex-col justify-between"
+              className="bg-white rounded-2xl p-5 border border-emerald-200/90 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px] cursor-pointer"
               onClick={() => setIsRosterModalOpen(true)}
             >
               <div>
-                <div className="w-10 h-10 mb-2.5 icon-glow-teal">
-                  <BootstrapIcon name="people-fill" size={18} color="#1D4533" />
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Mechanics Available
+                  </span>
+                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                    mechanicsData.availableCount > 0
+                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      : 'bg-slate-100 text-slate-500 border border-slate-200'
+                  }`}>
+                    {mechanicsData.availableCount > 0 ? `${mechanicsData.availableCount} Available` : 'Busy'}
+                  </span>
                 </div>
-                <span className="text-[11px] font-bold text-slate-400 mb-0.5 uppercase tracking-[1px] block">
-                  Mechanics Available
-                </span>
-                <span className="text-[30px] font-black text-slate-900 tracking-tight text-gradient-dark block leading-tight">
+                <span className="text-3xl font-extrabold text-slate-900 tracking-tight leading-none block font-mono">
                   {mechanicsData.availableCount}
                 </span>
               </div>
-              <span className="text-[11.5px] font-medium text-slate-400 leading-snug block mt-2">
+              <span className="text-[11.5px] font-medium text-slate-500 mt-3 block leading-snug">
                 {mechanicsData.availableCount > 0
                   ? `${mechanicsData.availableCount} of ${mechanicsData.totalCount} on-duty & available`
-                  : 'All technicians busy in pit bays'}
+                  : 'All technicians currently busy in pit bays'}
               </span>
             </div>
 
             {/* Card 2: TODAY'S SLOTS */}
             <div
-              className={`premium-glass-card premium-hover-lift flex-1 min-w-[190px] min-h-[170px] p-5 border-l-4 flex flex-col justify-between ${
-                todaySlotsData.isFullyBooked ? 'border-rose-500 bg-rose-50/20' : 'border-amber-500'
+              className={`bg-white rounded-2xl p-5 border shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px] ${
+                todaySlotsData.isFullyBooked
+                  ? 'border-rose-200 bg-rose-50/20'
+                  : 'border-amber-200/90'
               }`}
             >
               <div>
-                <div
-                  className={`w-10 h-10 mb-2.5 ${todaySlotsData.isFullyBooked ? 'icon-glow-rose' : 'icon-glow-amber'}`}
-                >
-                  <BootstrapIcon
-                    name={todaySlotsData.isFullyBooked ? 'calendar-x-fill' : 'calendar-check'}
-                    size={18}
-                    color={todaySlotsData.isFullyBooked ? '#e11d48' : '#d97706'}
-                  />
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Today's Slots
+                  </span>
+                  <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                    todaySlotsData.isFullyBooked
+                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                      : 'bg-amber-50 text-amber-700 border border-amber-200'
+                  }`}>
+                    {todaySlotsData.isFullyBooked ? 'Full' : `${todaySlotsData.totalSlots} Slots`}
+                  </span>
                 </div>
-                <span className="text-[11px] font-bold text-slate-400 mb-0.5 uppercase tracking-[1px] block">
-                  Today's Slots
-                </span>
                 <span
-                  className={`text-[30px] font-black tracking-tight block leading-tight ${
-                    todaySlotsData.isFullyBooked ? 'text-rose-600' : 'text-slate-900 text-gradient-dark'
+                  className={`text-3xl font-extrabold tracking-tight leading-none block font-mono ${
+                    todaySlotsData.isFullyBooked ? 'text-rose-600' : 'text-slate-900'
                   }`}
                 >
-                  {todaySlotsData.isFullyBooked ? 'No Slot Today' : todaySlotsData.availableSlotsCount}
+                  {todaySlotsData.isFullyBooked ? '0' : todaySlotsData.availableSlotsCount}
                 </span>
               </div>
-              <span className="text-[11.5px] font-medium text-slate-400 leading-snug block mt-2">
+              <span className="text-[11.5px] font-medium text-slate-500 mt-3 block leading-snug">
                 {todaySlotsData.isFullyBooked
                   ? 'Fully booked for today (0 remaining)'
                   : `${todaySlotsData.bookedSlotsCount} of ${todaySlotsData.totalSlots} daily slots reserved`}
@@ -989,19 +1018,21 @@ export default function GaragePageWeb({
             </div>
 
             {/* Card 3: NEXT OPENING */}
-            <div className="premium-glass-card premium-hover-lift flex-1 min-w-[190px] min-h-[170px] p-5 border-l-4 border-rose-500 flex flex-col justify-between">
+            <div className="bg-white rounded-2xl p-5 border border-purple-200/90 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px]">
               <div>
-                <div className="w-10 h-10 mb-2.5 icon-glow-rose">
-                  <BootstrapIcon name="clock-history" size={18} color="#e11d48" />
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Next Opening
+                  </span>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
+                    {todaySlotsData.isFullyBooked ? 'Tomorrow' : 'Express'}
+                  </span>
                 </div>
-                <span className="text-[11px] font-bold text-slate-400 mb-0.5 uppercase tracking-[1px] block">
-                  Next Opening
-                </span>
-                <span className="text-[30px] font-black text-slate-900 tracking-tight text-gradient-dark block leading-tight">
+                <span className="text-3xl font-extrabold text-slate-900 tracking-tight leading-none block font-mono">
                   {todaySlotsData.isFullyBooked ? 'Tomorrow' : 'Today'}
                 </span>
               </div>
-              <span className="text-[11.5px] font-medium text-slate-400 leading-snug block mt-2">
+              <span className="text-[11.5px] font-medium text-slate-500 mt-3 block leading-snug">
                 {todaySlotsData.isFullyBooked
                   ? '09:00 AM - 10:30 AM (Next Slot)'
                   : 'Immediate express pit bay slot'}
@@ -1009,19 +1040,21 @@ export default function GaragePageWeb({
             </div>
 
             {/* Card 4: PIT BAY CAPACITY */}
-            <div className="premium-glass-card premium-hover-lift flex-1 min-w-[190px] min-h-[170px] p-5 border-l-4 border-blue-600 flex flex-col justify-between">
+            <div className="bg-white rounded-2xl p-5 border border-sky-200/90 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px]">
               <div>
-                <div className="w-10 h-10 mb-2.5 icon-glow-blue">
-                  <BootstrapIcon name="speedometer2" size={18} color="#2563eb" />
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Pit Bay Capacity
+                  </span>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+                    Active Bays
+                  </span>
                 </div>
-                <span className="text-[11px] font-bold text-slate-400 mb-0.5 uppercase tracking-[1px] block">
-                  Pit Bay Capacity
-                </span>
-                <span className="text-[30px] font-black text-slate-900 tracking-tight text-gradient-dark block leading-tight">
+                <span className="text-3xl font-extrabold text-slate-900 tracking-tight leading-none block font-mono">
                   6
                 </span>
               </div>
-              <span className="text-[11.5px] font-medium text-slate-400 leading-snug block mt-2">
+              <span className="text-[11.5px] font-medium text-slate-500 mt-3 block leading-snug">
                 Dedicated bays & Dynojet cell
               </span>
             </div>
@@ -1069,156 +1102,193 @@ export default function GaragePageWeb({
           {/* ─── SCHEDULED BOOKING INFORMATION (MAIN VIEW) ─── */}
           <div id="scheduled-booking-section" className="w-full">
             <View style={gStyles.bookingsContainer}>
+              {/* Section Header & Count */}
               <View
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  marginBottom: 20,
+                  marginBottom: 16,
                   flexWrap: 'wrap',
                   gap: 12,
                 }}
               >
                 <View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <BootstrapIcon name="calendar3" size={18} color="#1D4533" />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 10,
+                        backgroundColor: '#ECFDF5',
+                        borderWidth: 1,
+                        borderColor: '#A7F3D0',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <BootstrapIcon name="calendar3" size={16} color="#059669" />
+                    </View>
                     <Text style={[gStyles.sectionTitle, { marginBottom: 0 }]}>Scheduled Bookings</Text>
                   </View>
+                  <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4, marginLeft: 44, fontWeight: '500' }}>
+                    View and manage your upcoming motorcycle service appointments.
+                  </Text>
                 </View>
+
                 <View
                   style={{
-                    backgroundColor: '#C8DDD3',
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
+                    backgroundColor: '#ECFDF5',
+                    borderWidth: 1,
+                    borderColor: '#A7F3D0',
+                    paddingHorizontal: 14,
+                    paddingVertical: 7,
                     borderRadius: 20,
                     flexDirection: 'row',
                     alignItems: 'center',
                     gap: 6,
                   }}
                 >
-                  <BootstrapIcon name="ticket-detailed" size={13} color="#1D4533" />
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#1D4533' }}>
+                  <BootstrapIcon name="ticket-detailed" size={13} color="#059669" />
+                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#065F46' }}>
                     {userBookings.length} Scheduled {userBookings.length === 1 ? 'Booking' : 'Bookings'}
                   </Text>
                 </View>
               </View>
 
-              {/* Booking History Status Filter Tabs */}
+              {/* Modern Segmented Status Filter Tabs + Grid/List View Toggle */}
               {currentUser && userBookings.length > 0 && (
-                <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-                  {[
-                    { key: 'ALL', label: `All (${userBookings.length})` },
-                    { key: 'PENDING', label: 'Pending Review' },
-                    { key: 'IN_PROGRESS', label: 'In Service' },
-                    { key: 'READY', label: 'Ready for Pickup' },
-                    { key: 'COMPLETED', label: 'Completed' },
-                  ].map((tab) => {
-                    const isSel = bookingStatusFilter === tab.key;
-                    return (
-                      <TouchableOpacity
-                        key={tab.key}
-                        onPress={() => {
-                          setBookingStatusFilter(tab.key);
-                          setBookingsPage(1);
-                        }}
-                        style={{
-                          paddingHorizontal: 14,
-                          paddingVertical: 7,
-                          borderRadius: 20,
-                          backgroundColor: isSel ? '#1D4533' : '#F1F5F9',
-                          borderWidth: 1,
-                          borderColor: isSel ? '#1D4533' : '#E2E8F0',
-                          cursor: 'pointer',
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: '800',
-                            color: isSel ? '#FFFFFF' : '#475569',
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+                  <div className="flex flex-row items-center gap-1.5 flex-wrap p-1 bg-slate-100/90 border border-slate-200/80 rounded-xl w-fit">
+                    {[
+                      { key: 'ALL', label: `All (${userBookings.length})` },
+                      { key: 'PENDING', label: 'Pending Review' },
+                      { key: 'IN_PROGRESS', label: 'In Service' },
+                      { key: 'READY', label: 'Ready for Pickup' },
+                      { key: 'COMPLETED', label: 'Completed' },
+                    ].map((tab) => {
+                      const isSel = bookingStatusFilter === tab.key;
+                      return (
+                        <button
+                          key={tab.key}
+                          onClick={() => {
+                            setBookingStatusFilter(tab.key);
+                            setBookingsPage(1);
                           }}
+                          className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
+                            isSel
+                              ? 'bg-[#1D4533] text-white shadow-xs'
+                              : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
+                          }`}
                         >
                           {tab.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Grid / List View Mode Toggle Button Group */}
+                  <div className="flex items-center gap-1 p-1 bg-slate-100/90 border border-slate-200/80 rounded-xl w-fit self-start sm:self-auto">
+                    <button
+                      onClick={() => setBookingViewMode('grid')}
+                      title="Grid View"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
+                        bookingViewMode === 'grid'
+                          ? 'bg-[#1D4533] text-white shadow-xs'
+                          : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
+                      }`}
+                    >
+                      <BootstrapIcon
+                        name="grid-fill"
+                        size={13}
+                        color={bookingViewMode === 'grid' ? '#FFFFFF' : '#475569'}
+                      />
+                      <span>Grid</span>
+                    </button>
+                    <button
+                      onClick={() => setBookingViewMode('list')}
+                      title="List View"
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
+                        bookingViewMode === 'list'
+                          ? 'bg-[#1D4533] text-white shadow-xs'
+                          : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
+                      }`}
+                    >
+                      <BootstrapIcon
+                        name="view-list"
+                        size={14}
+                        color={bookingViewMode === 'list' ? '#FFFFFF' : '#475569'}
+                      />
+                      <span>List</span>
+                    </button>
+                  </div>
+                </div>
               )}
 
               {!currentUser ? (
-                <View
-                  style={[
-                    gStyles.emptyBox,
-                    {
-                      backgroundColor: '#F8FAFC',
-                      borderWidth: 1,
-                      borderColor: '#E2E8F0',
-                      borderRadius: 20,
-                      padding: 32,
-                      alignItems: 'center',
-                    },
-                  ]}
-                >
-                  <BootstrapIcon name="person-lock" size={36} color="#1D4533" />
-                  <Text style={[gStyles.emptyTitle, { marginTop: 12 }]}>
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center flex flex-col items-center justify-center max-w-lg mx-auto shadow-xs my-4">
+                  <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-center mb-4 text-[#1D4533]">
+                    <BootstrapIcon name="person-lock" size={26} color="#1D4533" />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 mb-1">
                     Sign In to View Scheduled Bookings
-                  </Text>
-                  <Text style={[gStyles.emptySub, { textAlign: 'center', maxWidth: 440 }]}>
-                    Sign in to your account to view your scheduled appointments, track master mechanic
-                    assignments, and manage service downpayments.
-                  </Text>
-                  <TouchableOpacity
-                    style={{
-                      marginTop: 16,
-                      backgroundColor: '#1D4533',
-                      paddingHorizontal: 22,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      cursor: 'pointer',
-                    }}
-                    onPress={() => {
+                  </h3>
+                  <p className="text-xs text-slate-500 max-w-sm mb-5 leading-relaxed">
+                    Sign in to your account to view your scheduled appointments, track master mechanic assignments, and manage service downpayments.
+                  </p>
+                  <button
+                    onClick={() => {
                       setRedirectReason('Please sign in to view your booked pitstop appointments.');
                       onNavigateToLogin?.();
                     }}
-                    activeOpacity={0.85}
+                    className="bg-[#1D4533] hover:bg-[#153426] text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-2"
                   >
-                    <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>Sign In Now</Text>
-                  </TouchableOpacity>
-                </View>
+                    <BootstrapIcon name="box-arrow-in-right" size={13} color="#FFFFFF" />
+                    Sign In Now
+                  </button>
+                </div>
               ) : userBookings.length === 0 ? (
-                <View style={gStyles.emptyBox}>
-                  <BootstrapIcon name="calendar-x" size={36} color="#94A3B8" />
-                  <Text style={gStyles.emptyTitle}>No scheduled appointments yet</Text>
-                  <Text style={gStyles.emptySub}>
-                    Book a Repair or PMS service above to reserve your guaranteed slot and master technician
-                    allocation.
-                  </Text>
-                </View>
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-12 text-center flex flex-col items-center justify-center max-w-lg mx-auto shadow-xs my-4">
+                  <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center mb-4 text-[#1D4533]">
+                    <BootstrapIcon name="calendar-plus" size={26} color="#1D4533" />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-900 mb-1">No scheduled bookings</h3>
+                  <p className="text-xs text-slate-500 max-w-sm mb-5 leading-relaxed">
+                    You don't have any service appointments matching this filter. Book a service to get your slot reserved.
+                  </p>
+                  <button
+                    onClick={() => handleOpenBooking('PMS')}
+                    className="bg-[#1D4533] hover:bg-[#153426] text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-2"
+                  >
+                    <BootstrapIcon name="tools" size={13} color="#FFFFFF" />
+                    Book a Service
+                  </button>
+                </div>
               ) : filteredBookings.length === 0 ? (
-                <View style={[gStyles.emptyBox, { padding: 28, backgroundColor: '#F8FAFC' }]}>
-                  <BootstrapIcon name="calendar2-x" size={32} color="#94A3B8" />
-                  <Text style={[gStyles.emptyTitle, { fontSize: 15, marginTop: 8 }]}>No bookings in this filter</Text>
-                  <Text style={gStyles.emptySub}>Switch to "All" to view your full booking history.</Text>
-                  <TouchableOpacity
-                    onPress={() => {
+                <div className="bg-white rounded-2xl border border-slate-200/80 p-10 text-center flex flex-col items-center justify-center max-w-md mx-auto shadow-xs my-4">
+                  <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center mb-3 text-slate-400">
+                    <BootstrapIcon name="calendar2-x" size={22} color="#94A3B8" />
+                  </div>
+                  <h3 className="text-sm font-bold text-slate-800 mb-1">No bookings in this filter</h3>
+                  <p className="text-xs text-slate-500 mb-4">Switch to "All" to view your full booking history.</p>
+                  <button
+                    onClick={() => {
                       setBookingStatusFilter('ALL');
                       setBookingsPage(1);
                     }}
-                    style={{
-                      marginTop: 12,
-                      backgroundColor: '#1D4533',
-                      paddingHorizontal: 16,
-                      paddingVertical: 8,
-                      borderRadius: 10,
-                    }}
+                    className="bg-[#1D4533] hover:bg-[#153426] text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs transition-colors cursor-pointer"
                   >
-                    <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 12 }}>View All Bookings</Text>
-                  </TouchableOpacity>
-                </View>
+                    View All Bookings
+                  </button>
+                </div>
               ) : (
-                <View style={gStyles.bookingsGrid}>
+                <div
+                  className={
+                    bookingViewMode === 'grid'
+                      ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 w-full items-start'
+                      : 'flex flex-col gap-3.5 w-full'
+                  }
+                >
                   {pagedBookings.map((b) => {
                     const flexStatus = normalizeBookingStatus(b?.status);
                     const canCancel = [
@@ -1230,57 +1300,52 @@ export default function GaragePageWeb({
                       'AWAITING_DOWNPAYMENT',
                     ].includes(flexStatus);
                     return (
-                      <View key={b.id || b.booking_id}>
+                      <div key={b.id || b.booking_id} className="w-full">
                         <CustomerServiceBookingCard
                           booking={b}
+                          viewMode={bookingViewMode}
                           onToast={showToast}
                           onUpdated={() => refreshBookings()}
+                          canCancel={canCancel}
+                          onCancel={() => handlePromptCancelBooking(b)}
+                          onViewDetails={(item) => setSelectedBookingForModal(item)}
                         />
-                        {canCancel ? (
-                          <TouchableOpacity
-                            style={[gStyles.cancelBookingBtn, { marginTop: -4, marginBottom: 12 }]}
-                            onPress={() => handlePromptCancelBooking(b)}
-                            activeOpacity={0.8}
-                          >
-                            <BootstrapIcon name="x-circle" size={13} color="#DC2626" />
-                            <Text style={gStyles.cancelBookingBtnText}>Cancel Request</Text>
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
+                      </div>
                     );
                   })}
-                  {bookingsTotalPages > 1 ? (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 14,
-                        paddingVertical: 10,
-                        width: '100%',
-                      }}
-                    >
-                      <TouchableOpacity
-                        disabled={bookingsPage <= 1}
-                        onPress={() => setBookingsPage((p) => Math.max(1, p - 1))}
-                        style={{ opacity: bookingsPage <= 1 ? 0.4 : 1, padding: 6 }}
-                      >
-                        <BootstrapIcon name="chevron-left" size={16} color="#1D4533" />
-                      </TouchableOpacity>
-                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#475569' }}>
-                        Page {bookingsPage} of {bookingsTotalPages}
-                      </Text>
-                      <TouchableOpacity
-                        disabled={bookingsPage >= bookingsTotalPages}
-                        onPress={() => setBookingsPage((p) => Math.min(bookingsTotalPages, p + 1))}
-                        style={{ opacity: bookingsPage >= bookingsTotalPages ? 0.4 : 1, padding: 6 }}
-                      >
-                        <BootstrapIcon name="chevron-right" size={16} color="#1D4533" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : null}
-                </View>
+                </div>
               )}
+
+              {bookingsTotalPages > 1 ? (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 14,
+                    paddingVertical: 14,
+                    width: '100%',
+                  }}
+                >
+                  <TouchableOpacity
+                    disabled={bookingsPage <= 1}
+                    onPress={() => setBookingsPage((p) => Math.max(1, p - 1))}
+                    style={{ opacity: bookingsPage <= 1 ? 0.4 : 1, padding: 6 }}
+                  >
+                    <BootstrapIcon name="chevron-left" size={16} color="#1D4533" />
+                  </TouchableOpacity>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#475569' }}>
+                    Page {bookingsPage} of {bookingsTotalPages}
+                  </Text>
+                  <TouchableOpacity
+                    disabled={bookingsPage >= bookingsTotalPages}
+                    onPress={() => setBookingsPage((p) => Math.min(bookingsTotalPages, p + 1))}
+                    style={{ opacity: bookingsPage >= bookingsTotalPages ? 0.4 : 1, padding: 6 }}
+                  >
+                    <BootstrapIcon name="chevron-right" size={16} color="#1D4533" />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
             </View>
           </div>
         </View>
@@ -1817,12 +1882,7 @@ export default function GaragePageWeb({
                       <View style={gStyles.motorcycleCardGrid}>
                         {garageMotorcycles.map((m) => {
                           const isPicked = String(m.motorcycle_id) === String(selectedMotorcycleId);
-                          const bikePhoto =
-                            m.photo_url ||
-                            MOTORCYCLE_PHOTO_PRESETS?.find(
-                              (p) => p.brand?.toLowerCase() === m.brand?.toLowerCase()
-                            )?.url ||
-                            'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80';
+                          const bikePhoto = m.photo_url || null;
 
                           return (
                             <TouchableOpacity
@@ -1848,11 +1908,20 @@ export default function GaragePageWeb({
                                   padding: 6,
                                 }}
                               >
-                                <Image
-                                  source={{ uri: bikePhoto }}
-                                  style={{ width: '100%', height: '100%' }}
-                                  resizeMode="contain"
-                                />
+                                {bikePhoto ? (
+                                  <Image
+                                    source={{ uri: bikePhoto }}
+                                    style={{ width: '100%', height: '100%' }}
+                                    resizeMode="contain"
+                                  />
+                                ) : (
+                                  <View style={{ alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                                    <BootstrapIcon name="bicycle" size={42} color="#94A3B8" />
+                                    <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>
+                                      No photo uploaded
+                                    </Text>
+                                  </View>
+                                )}
 
                                 {/* Brand Badge (Top-Left) */}
                                 <View
@@ -2754,43 +2823,51 @@ export default function GaragePageWeb({
             </View>
 
             <ScrollView style={{ maxHeight: 460 }} showsVerticalScrollIndicator={true}>
-              {mechanicsData.mechanics.map((mech) => (
-                <View key={mech.id} style={gStyles.rosterItemCard}>
-                  <Image source={{ uri: mech.avatar }} style={gStyles.rosterItemAvatar} />
-                  <View style={gStyles.rosterItemBody}>
-                    <Text style={gStyles.rosterItemName}>{mech.name}</Text>
-                    <Text style={gStyles.rosterItemSpec}>
-                      ⚡ {mech.specialization} • {mech.experience}
-                    </Text>
-                    <Text style={gStyles.rosterItemBay}>
-                      📍 {mech.bay} • {mech.certifications}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      gStyles.rosterStatusPill,
-                      {
-                        backgroundColor: mech.isAvailable
-                          ? 'rgba(16, 185, 129, 0.15)'
-                          : 'rgba(239, 68, 68, 0.15)',
-                        borderWidth: 1,
-                        borderColor: mech.isAvailable ? '#10B981' : '#EF4444',
-                      },
-                    ]}
-                  >
-                    <BootstrapIcon
-                      name={mech.isAvailable ? 'check-circle-fill' : 'gear-wide-connected'}
-                      size={11}
-                      color={mech.isAvailable ? '#10B981' : '#EF4444'}
-                    />
-                    <Text
-                      style={[gStyles.rosterStatusText, { color: mech.isAvailable ? '#10B981' : '#EF4444' }]}
-                    >
-                      {mech.status}
-                    </Text>
-                  </View>
+              {mechanicsData.mechanics.length === 0 ? (
+                <View style={{ padding: 24, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center' }}>
+                    No certified mechanics currently registered.
+                  </Text>
                 </View>
-              ))}
+              ) : (
+                mechanicsData.mechanics.map((mech) => (
+                  <View key={mech.id} style={gStyles.rosterItemCard}>
+                    <Image source={{ uri: mech.avatar }} style={gStyles.rosterItemAvatar} />
+                    <View style={gStyles.rosterItemBody}>
+                      <Text style={gStyles.rosterItemName}>{mech.name}</Text>
+                      <Text style={gStyles.rosterItemSpec}>
+                        ⚡ {mech.specialization} • {mech.experience}
+                      </Text>
+                      <Text style={gStyles.rosterItemBay}>
+                        📍 {mech.bay} • {mech.certifications}
+                      </Text>
+                    </View>
+                    <View
+                      style={[
+                        gStyles.rosterStatusPill,
+                        {
+                          backgroundColor: mech.isAvailable
+                            ? 'rgba(16, 185, 129, 0.15)'
+                            : 'rgba(239, 68, 68, 0.15)',
+                          borderWidth: 1,
+                          borderColor: mech.isAvailable ? '#10B981' : '#EF4444',
+                        },
+                      ]}
+                    >
+                      <BootstrapIcon
+                        name={mech.isAvailable ? 'check-circle-fill' : 'gear-wide-connected'}
+                        size={11}
+                        color={mech.isAvailable ? '#10B981' : '#EF4444'}
+                      />
+                      <Text
+                        style={[gStyles.rosterStatusText, { color: mech.isAvailable ? '#10B981' : '#EF4444' }]}
+                      >
+                        {mech.status}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )}
             </ScrollView>
 
             <View
@@ -2868,6 +2945,171 @@ export default function GaragePageWeb({
           onNavigateToProfile?.('profile');
         }}
       />
+
+      {/* ─── BOOKING DETAILS & QUOTATION MODAL ─── */}
+      <Modal
+        visible={!!activeModalBooking}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedBookingForModal(null)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 16,
+            zIndex: 9999,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 24,
+              width: '100%',
+              maxWidth: 780,
+              maxHeight: '90%',
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 12 },
+              shadowOpacity: 0.2,
+              shadowRadius: 28,
+              elevation: 12,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+            }}
+          >
+            {/* Modal Header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 24,
+                paddingVertical: 18,
+                borderBottomWidth: 1,
+                borderBottomColor: '#E2E8F0',
+                backgroundColor: '#FFFFFF',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                <View
+                  style={{
+                    width: 42,
+                    height: 42,
+                    borderRadius: 12,
+                    backgroundColor: '#ECFDF5',
+                    borderWidth: 1,
+                    borderColor: '#A7F3D0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BootstrapIcon name="file-earmark-text" size={20} color="#059669" />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 18, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 }}>
+                    Booking Details & Quotation
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginTop: 2 }}>
+                    REF: {activeModalBooking?.booking_id || activeModalBooking?.id}
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => setSelectedBookingForModal(null)}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 10,
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+                activeOpacity={0.7}
+              >
+                <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Modal Scrollable Body */}
+            <ScrollView
+              style={{ flex: 1, backgroundColor: '#F8FAFC' }}
+              contentContainerStyle={{ padding: 22, paddingBottom: 28 }}
+              showsVerticalScrollIndicator={true}
+            >
+              {activeModalBooking ? (
+                <CustomerServiceBookingCard
+                  booking={activeModalBooking}
+                  onToast={showToast}
+                  onUpdated={() => refreshBookings()}
+                  defaultExpanded={true}
+                  isModalView={true}
+                  canCancel={[
+                    'PENDING_REVIEW',
+                    'APPROVED',
+                    'SCHEDULED',
+                    'AWAITING_CUSTOMER_APPROVAL',
+                    'QUOTATION_SENT',
+                    'AWAITING_DOWNPAYMENT',
+                  ].includes(normalizeBookingStatus(activeModalBooking?.status))}
+                  onCancel={() => {
+                    const b = activeModalBooking;
+                    setSelectedBookingForModal(null);
+                    handlePromptCancelBooking(b);
+                  }}
+                  style={{
+                    borderWidth: 0,
+                    shadowOpacity: 0,
+                    elevation: 0,
+                    padding: 0,
+                    backgroundColor: 'transparent',
+                    marginBottom: 0,
+                  }}
+                />
+              ) : null}
+            </ScrollView>
+
+            {/* Modal Footer */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'flex-end',
+                alignItems: 'center',
+                paddingHorizontal: 24,
+                paddingVertical: 14,
+                borderTopWidth: 1,
+                borderTopColor: '#E2E8F0',
+                backgroundColor: '#FFFFFF',
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setSelectedBookingForModal(null)}
+                style={{
+                  paddingHorizontal: 20,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  backgroundColor: '#F1F5F9',
+                  borderWidth: 1,
+                  borderColor: '#CBD5E1',
+                  alignItems: 'center',
+                  cursor: 'pointer',
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155' }}>Close Details</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

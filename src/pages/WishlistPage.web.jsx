@@ -7,6 +7,7 @@ import {
   Image,
   StyleSheet,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -23,6 +24,7 @@ import { wishlistWebStyles as wStyles } from '../styles/web/wishlistPage.web.sty
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { resolveReorderLevel } from '../utils/inventoryHelpers';
 import { notificationService } from '../services/notificationService';
 import { MOTOR_PARTS } from '../data/motorParts';
 import { productService } from '../services/productService';
@@ -51,13 +53,15 @@ export default function WishlistPageWeb({
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
 
   const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
-    notificationService.getUnreadCount(currentUser?.id)
+    currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
   );
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
-      setUnreadNotifCount(notificationService.getUnreadCount(currentUser?.id));
+      setUnreadNotifCount(
+        currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
+      );
     });
     return () => unsub?.();
   }, [currentUser]);
@@ -192,6 +196,8 @@ export default function WishlistPageWeb({
                 }}
                 activeOpacity={0.8}
                 title="Notifications"
+                dataSet={{ notificationButton: true }}
+                {...(Platform.OS === 'web' ? { 'data-notification-button': 'true' } : {})}
               >
                 <BootstrapIcon name="bell" size={16} color="#FFFFFF" />
                 {unreadNotifCount > 0 && (
@@ -204,9 +210,12 @@ export default function WishlistPageWeb({
               <NotificationDropdown
                 isOpen={isNotifDropdownOpen}
                 onClose={() => setIsNotifDropdownOpen(false)}
-                onNavigateToScreen={(screen) => {
-                  if (screen === 'store') onNavigateToStore?.();
+                onNavigateToScreen={(screen, params) => {
+                  if (screen === 'store' || screen === 'shop') onNavigateToStore?.();
                   else if (screen === 'orders') onNavigateToOrders?.();
+                  else if (screen === 'notifications') onNavigateToProfile?.('notifications');
+                  else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
+                  else if (screen === 'garage') onNavigateToGarage?.();
                 }}
                 currentUser={currentUser}
               />
@@ -430,7 +439,11 @@ export default function WishlistPageWeb({
                       </View>
                       <View style={wStyles.stockTag} className="bg-emerald-50 px-1.5 py-0.5 rounded">
                         <Text style={wStyles.stockTagText} className="text-[10px] font-bold text-emerald-700">
-                          {product.stock <= 5 ? `Only ${product.stock} left` : `${product.stock} in stock`}
+                          {product.stock <= 0
+                            ? 'Sold out'
+                            : product.stock <= resolveReorderLevel(product, 5)
+                              ? `Only ${product.stock} left`
+                              : `${product.stock} in stock`}
                         </Text>
                       </View>
                       {productHasCustomerRatings(product) ? (

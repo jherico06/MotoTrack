@@ -64,17 +64,50 @@ export default function DeliveryTokenModal({
       }
     };
 
+    const autoGenerate = async () => {
+      if (cancelled) return;
+      setBusy(true);
+      try {
+        const res = await deliveryService.regenerateDeliveryToken(orderId, adminUser);
+        if (cancelled) return;
+        if (res.success) {
+          await applyBundle({
+            token: res.token,
+            confirmUrl: res.confirmUrl,
+            qrImageUrl: res.qrImageUrl,
+            expiresAt: null,
+            phoneReachable: res.phoneReachable !== false,
+          });
+        } else {
+          setBundle(null);
+        }
+      } catch (_e) {
+        if (!cancelled) setBundle(null);
+      } finally {
+        if (!cancelled) setBusy(false);
+      }
+    };
+
     if (initialBundle?.token || initialBundle?.confirmUrl) {
       applyBundle(initialBundle);
       return () => {
         cancelled = true;
       };
     }
-    applyBundle(deliveryService.getAdminDeliveryTokenBundle(orderId));
+
+    const cached = deliveryService.getAdminDeliveryTokenBundle(orderId);
+    if (cached) {
+      applyBundle(cached);
+    } else {
+      // No cached token on this device — auto-generate so QR is immediately visible
+      autoGenerate();
+    }
+
     return () => {
       cancelled = true;
     };
   }, [visible, orderId, initialBundle]);
+
 
   const handleRegenerate = async () => {
     setBusy(true);
@@ -173,6 +206,13 @@ export default function DeliveryTokenModal({
 
               {bundle?.qrImageUrl ? (
                 <Image source={{ uri: bundle.qrImageUrl }} style={styles.qr} />
+              ) : busy ? (
+                <View style={[styles.qrPlaceholder, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
+                  <ActivityIndicator size="large" color="#1D4533" />
+                  <Text style={[styles.qrPlaceholderText, { marginTop: 10 }, isDark && { color: '#94A3B8' }]}>
+                    Generating QR code…
+                  </Text>
+                </View>
               ) : (
                 <View style={[styles.qrPlaceholder, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
                   <Text style={[styles.qrPlaceholderText, isDark && { color: '#94A3B8' }]}>
@@ -182,19 +222,34 @@ export default function DeliveryTokenModal({
               )}
 
               <View style={[styles.slipCard, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
-                <Text style={styles.slipKicker}>Wrap on parcel · Deliver to</Text>
-                <Text style={[styles.slipName, isDark && { color: '#F8FAFC' }]}>{slip.customerName}</Text>
-                {slip.phone ? <Text style={[styles.slipLine, isDark && { color: '#94A3B8' }]}>{slip.phone}</Text> : null}
-                <Text style={[styles.slipAddr, isDark && { color: '#CBD5E1' }]}>{slip.address || 'No address on file'}</Text>
-                {slip.items?.length ? (
-                  <Text style={[styles.slipItems, isDark && { color: '#94A3B8' }]} numberOfLines={3}>
-                    {slip.items.join(' · ')}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={styles.slipKicker}>Commercial Shipping Package</Text>
+                  <View style={{ backgroundColor: isDark ? '#132A26' : '#E8F0EC', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#1D4533', fontFamily: 'monospace' }}>
+                      Item Nº: {slip.itemNo}
+                    </Text>
+                  </View>
+                </View>
+
+                {slip.productName ? (
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 6 }}>
+                    {slip.productName}
                   </Text>
                 ) : null}
-                <Text style={styles.slipPay}>
-                  {slip.isCod ? 'Cash on delivery' : slip.payment}
-                  {slip.total != null && slip.total !== '' ? ` · ${formatPhp(slip.total)}` : ''}
-                </Text>
+
+                <Text style={[styles.slipName, isDark && { color: '#F8FAFC' }]}>To: {slip.customerName}</Text>
+                {slip.phone ? <Text style={[styles.slipLine, isDark && { color: '#94A3B8' }]}>{slip.phone}</Text> : null}
+                <Text style={[styles.slipAddr, isDark && { color: '#CBD5E1' }]}>{slip.address || 'No address on file'}</Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0' }}>
+                  <Text style={styles.slipPay}>
+                    {slip.isCod ? 'Cash on Delivery' : slip.payment}
+                    {slip.total != null && slip.total !== '' ? ` · ${formatPhp(slip.total)}` : ''}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#64748B' }}>
+                    🍷 Fragile · 🤲 Care · ⬆️ Up
+                  </Text>
+                </View>
               </View>
 
               <Text style={[styles.meta, isDark && { color: '#94A3B8' }]}>Valid until delivery is confirmed</Text>
@@ -253,6 +308,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 16,
+    zIndex: 999999,
   },
   sheet: {
     width: '100%',

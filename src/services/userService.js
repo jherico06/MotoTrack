@@ -141,7 +141,8 @@ class UserService {
     const normalizedEmail = (email || '').trim().toLowerCase();
     const normalizedUsername = String(username || '').trim().toLowerCase();
     const accountStatus = String(status || 'active').trim().toLowerCase() === 'inactive' ? 'inactive' : 'active';
-    const safeRole = role === 'admin' || role === 'rider' ? role : 'user';
+    const safeRole =
+      role === 'admin' || role === 'rider' || role === 'mechanic' ? role : 'user';
 
     // Check if already in Supabase
     if (supabase) {

@@ -1,5 +1,7 @@
+import { createPortal } from 'react-dom';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
+  Animated,
   View,
   Text,
   TextInput,
@@ -16,7 +18,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { getAdminStyles, getAdminThemeTokens } from '../styles/web/admin.web.styles';
 import { appStorage } from '../services/storageAdapter';
-import { productService } from '../services/productService';
+import { productService, resolveReorderLevel, isLowStock } from '../services/productService';
 import { promoService } from '../services/promoService';
 import { orderService } from '../services/orderService';
 import { deliveryService } from '../services/deliveryService';
@@ -24,8 +26,6 @@ import {
   garageService,
   GARAGE_BRANCHES,
   TIME_SLOTS,
-  AVAILABLE_MECHANICS,
-  PIT_BAY_PRESETS,
   MECHANIC_SPECIALIZATION_PRESETS,
   MECHANIC_AVATAR_PRESETS,
   getPackagePricePhp,
@@ -57,13 +57,13 @@ import {
   formatPhp,
   FLEX_BOOKING_STATUS,
 } from '../utils/bookingWorkflow';
-import { AdminStatCard, BootstrapIcon, BrandLogo, ExpectedDeliveryEditor, BookingCalendar } from '../components/common';
+import { AdminStatCard, BootstrapIcon, BrandLogo, ExpectedDeliveryEditor, BookingCalendar, NotificationDropdown } from '../components/common';
 import { pickImageFromFile } from '../utils/imagePickerHelper';
 import { usdToPhp } from '../utils/currency';
 import { systemSettingsService } from '../services/systemSettingsService';
 import NotificationsPage from './NotificationsPage.web';
 import { auditLogService } from '../services/auditLogService';
-import { SalesForecastPanel, RevenueTrendChart, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, CustomizationsAdminPanel, ServiceQuotationPanel, PickupQrScannerPanel, AdminBookingManager, AdminBookingDetailsPanel } from '../components/admin';
+import { SalesForecastPanel, RevenueTrendChart, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, CustomizationsAdminPanel, ServiceQuotationPanel, PickupQrScannerPanel, AdminBookingManager, AdminBookingDetailsPanel, MotorcycleModelsAdminPanel, ProductCompatibilityPicker } from '../components/admin';
 import {
   cartLineKey,
   getProductSizeEntries,
@@ -74,8 +74,179 @@ import {
   serializeProductSizes,
   validateSizeDrafts,
 } from '../utils/productSizes';
-import { serializeProductColors, validateColorDrafts } from '../utils/productColors';
+import { normalizeProductColors, serializeProductColors, validateColorDrafts } from '../utils/productColors';
 import { CATEGORY_NAMES, ADMIN_IMAGE_PRESETS } from '../data/motorParts';
+
+function AlertOrangeDot({ count, label, title }) {
+  const [hovered, setHovered] = useState(false);
+  const [coords, setCoords] = useState(null);
+  const dotRef = useRef(null);
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(anim, {
+      toValue: hovered ? 1 : 0,
+      friction: 5,
+      tension: 140,
+      useNativeDriver: Platform.OS !== 'web',
+    }).start();
+  }, [hovered]);
+
+  const updatePosition = () => {
+    if (dotRef.current) {
+      if (typeof dotRef.current.getBoundingClientRect === 'function') {
+        const rect = dotRef.current.getBoundingClientRect();
+        setCoords({
+          top: rect.top,
+          left: rect.left,
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+    }
+  };
+
+  const handleMouseEnter = () => {
+    updatePosition();
+    setHovered(true);
+  };
+
+  const handleMouseLeave = () => {
+    setHovered(false);
+  };
+
+  if (!count || count <= 0) return null;
+
+  const scale = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.2, 1],
+  });
+
+  const translateY = anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [6, 0],
+  });
+
+  const opacity = anim.interpolate({
+    inputRange: [0, 0.15, 1],
+    outputRange: [0, 0.85, 1],
+  });
+
+  const popupContent = (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'fixed',
+        top: coords ? coords.top - 50 : 0,
+        left: coords ? coords.left - 26 : 0,
+        alignItems: 'flex-start',
+        zIndex: 9999999,
+        opacity,
+        transform: [{ translateY }, { scale }],
+      }}
+    >
+      {/* Main Orange Thought Bubble Pill */}
+      <View
+        style={{
+          backgroundColor: '#EA580C',
+          paddingHorizontal: 12,
+          paddingVertical: 5,
+          borderRadius: 9999,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 8px 22px rgba(234, 88, 12, 0.48), 0 2px 6px rgba(0, 0, 0, 0.12)',
+        }}
+      >
+        <Text
+          numberOfLines={1}
+          style={{
+            color: '#FFFFFF',
+            fontSize: 12,
+            fontWeight: '900',
+            letterSpacing: 0.6,
+            textTransform: 'uppercase',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {count} {label ? label : ''}
+        </Text>
+      </View>
+
+      {/* Trailing Thought Bubbles descending to the biggest orange circle */}
+      <View style={{ marginTop: 2, alignItems: 'flex-start' }}>
+        <View
+          style={{
+            width: 5,
+            height: 5,
+            borderRadius: 3,
+            backgroundColor: '#EA580C',
+            marginLeft: 18,
+            marginBottom: 3,
+            boxShadow: '0 2px 6px rgba(234, 88, 12, 0.4)',
+          }}
+        />
+        <View
+          style={{
+            width: 8,
+            height: 8,
+            borderRadius: 4,
+            backgroundColor: '#EA580C',
+            marginLeft: 26,
+            boxShadow: '0 3px 8px rgba(234, 88, 12, 0.45)',
+          }}
+        />
+      </View>
+    </Animated.View>
+  );
+
+  return (
+    <View
+      ref={dotRef}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      onTouchStart={() => {
+        updatePosition();
+        setHovered(true);
+      }}
+      onTouchEnd={() => setTimeout(() => setHovered(false), 2000)}
+      title={title || `${count} ${label || ''}`}
+      style={{
+        position: 'relative',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: 'pointer',
+        paddingVertical: 5,
+        paddingHorizontal: 4,
+        zIndex: 99999,
+      }}
+    >
+      {/* Base Glowing Orange Circle (The biggest circle where the thought trail starts) */}
+      <View
+        style={{
+          width: 12,
+          height: 12,
+          borderRadius: 6,
+          backgroundColor: '#F97316',
+          boxShadow: hovered ? '0 0 12px #EA580C, 0 0 4px #F97316' : '0 0 6px #F97316',
+          transform: [{ scale: hovered ? 1.15 : 1 }],
+          transition: 'all 0.2s ease',
+        }}
+      />
+
+      {/* Render pop-up directly in document.body via Portal so it overlaps borders and main content completely in front */}
+      {typeof document !== 'undefined' && coords && createPortal(popupContent, document.body)}
+    </View>
+  );
+}
+
+const STOCK_FILTER_OPTIONS = [
+  { key: 'All', label: 'All SKUs', icon: 'boxes' },
+  { key: 'inStock', label: 'In Stock', icon: 'check-circle-fill' },
+  { key: 'lowStock', label: 'Low Stock', icon: 'exclamation-triangle-fill' },
+  { key: 'outOfStock', label: 'Out of Stock', icon: 'slash-circle-fill' },
+];
 
 export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const { width: windowWidth } = useWindowDimensions();
@@ -182,6 +353,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [invStockFilter, setInvStockFilter] = useState('All'); // 'All' | 'inStock' | 'lowStock' | 'outOfStock'
   const [invCategoryFilter, setInvCategoryFilter] = useState('All');
   const [isInvCategoryDropdownOpen, setIsInvCategoryDropdownOpen] = useState(false);
+  const [isInvStockDropdownOpen, setIsInvStockDropdownOpen] = useState(false);
   const [restockModalProduct, setRestockModalProduct] = useState(null);
   const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
   const [restockAmount, setRestockAmount] = useState('10');
@@ -191,6 +363,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [restockSearchQuery, setRestockSearchQuery] = useState('');
   const [restockSizeAdds, setRestockSizeAdds] = useState([]); // [{ label, currentStock, addQty }]
   const [restockSelectedSize, setRestockSelectedSize] = useState(''); // chosen size label or 'all'
+  const [restockColorAdds, setRestockColorAdds] = useState([]); // [{ label, hex, image, currentStock, addQty }]
+  const [restockSelectedColor, setRestockSelectedColor] = useState(''); // chosen color label or 'all'
   const [supplierPurchases, setSupplierPurchases] = useState(() =>
     productService.getSupplierPurchases ? productService.getSupplierPurchases() : []
   );
@@ -226,22 +400,18 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
   // New Product Form Fields
   const [newProdName, setNewProdName] = useState('');
-  const [newProdBrand, setNewProdBrand] = useState('Akrapovič');
-  const [newProdCategory, setNewProdCategory] = useState('Exhaust');
+  const [newProdBrand, setNewProdBrand] = useState('');
+  const [newProdCategory, setNewProdCategory] = useState('');
   const [newProdPrice, setNewProdPrice] = useState('');
   const [newProdCost, setNewProdCost] = useState('0');
   const [newProdSizes, setNewProdSizes] = useState([]);
   const [newProdColors, setNewProdColors] = useState([]);
   const [newProdOldPrice, setNewProdOldPrice] = useState('');
-  const [newProdStock, setNewProdStock] = useState('15');
-  const [newProdBadge, setNewProdBadge] = useState('New');
-  const [newProdImage, setNewProdImage] = useState(
-    'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80'
-  );
-  const [newProdCompat, setNewProdCompat] = useState('Universal Superbike Fitment');
-  const [newProdDesc, setNewProdDesc] = useState(
-    'Precision engineered high performance motorcycle upgrade component.'
-  );
+  const [newProdStock, setNewProdStock] = useState('');
+  const [newProdBadge, setNewProdBadge] = useState('');
+  const [newProdImage, setNewProdImage] = useState('');
+  const [newProdCompat, setNewProdCompat] = useState('');
+  const [newProdDesc, setNewProdDesc] = useState('');
 
   // ─── PROMOS STATE ───
   const [isAddPromoOpen, setIsAddPromoOpen] = useState(false);
@@ -284,23 +454,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [newBkCustomerPhone, setNewBkCustomerPhone] = useState('');
   const [newBkCustomerEmail, setNewBkCustomerEmail] = useState('');
   const [newBkCategory, setNewBkCategory] = useState('PMS');
-  const [newBkServiceTitle, setNewBkServiceTitle] = useState('Pro Performance Full PMS');
-  const [newBkPrice, setNewBkPrice] = useState('3750');
-  const [newBkBikeBrand, setNewBkBikeBrand] = useState('Yamaha');
-  const [newBkBikeModel, setNewBkBikeModel] = useState('NMAX 155');
+  const [newBkServiceTitle, setNewBkServiceTitle] = useState('');
+  const [newBkPrice, setNewBkPrice] = useState('');
+  const [newBkBikeBrand, setNewBkBikeBrand] = useState('');
+  const [newBkBikeModel, setNewBkBikeModel] = useState('');
   const [newBkPlate, setNewBkPlate] = useState('');
   const [newBkOdo, setNewBkOdo] = useState('');
   const [newBkDate, setNewBkDate] = useState('Today');
-  const [newBkTimeSlot, setNewBkTimeSlot] = useState('10:30 AM - 12:00 PM');
-  const [newBkBranch, setNewBkBranch] = useState('MotoTrack Flagship Central Hub & Pit Bays');
-  const [newBkMechanic, setNewBkMechanic] = useState('Master Tech Jayson (Yamaha & Honda Certified)');
+  const [newBkTimeSlot, setNewBkTimeSlot] = useState('');
+  const [newBkBranch, setNewBkBranch] = useState('');
+  const [newBkMechanic, setNewBkMechanic] = useState('');
   const [newBkNotes, setNewBkNotes] = useState('');
 
   // Service Advisor Workflow States
   const [rejectReasonInput, setRejectReasonInput] = useState('');
-  const [selectedMechanicForApproval, setSelectedMechanicForApproval] = useState(
-    'Master Tech Jayson (Yamaha & Honda Certified)'
-  );
+  const [selectedMechanicForApproval, setSelectedMechanicForApproval] = useState('');
   const [newEstimateTitle, setNewEstimateTitle] = useState('');
   const [newEstimateAmount, setNewEstimateAmount] = useState('');
   const [newEstimateDesc, setNewEstimateDesc] = useState('');
@@ -315,12 +483,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [servTitle, setServTitle] = useState('');
   const [servCategory, setServCategory] = useState('PMS');
   const [servSubtitle, setServSubtitle] = useState('');
-  const [servPrice, setServPrice] = useState('3750');
-  const [servDuration, setServDuration] = useState('60 mins');
-  const [servBadge, setServBadge] = useState('Popular');
-  const [servImage, setServImage] = useState(
-    'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80'
-  );
+  const [servPrice, setServPrice] = useState('');
+  const [servDuration, setServDuration] = useState('');
+  const [servBadge, setServBadge] = useState('');
+  const [servImage, setServImage] = useState('');
   const [servDesc, setServDesc] = useState('');
   const [servInclusions, setServInclusions] = useState('');
 
@@ -338,16 +504,17 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [mechShortName, setMechShortName] = useState('');
   const [mechHourlyRate, setMechHourlyRate] = useState('150');
   const [mechSpecialization, setMechSpecialization] = useState('Engine Overhaul & Diagnostics');
-  const [mechBay, setMechBay] = useState('Bay 1 (Master Diagnostic Cell)');
   const [mechExperience, setMechExperience] = useState('5 Years Pro Tech');
   const [mechCertifications, setMechCertifications] = useState('Yamaha YTA Gold • Honda Master');
-  const [mechAvatar, setMechAvatar] = useState(MECHANIC_AVATAR_PRESETS[0]);
+  const [mechAvatar, setMechAvatar] = useState('');
   const [mechStatus, setMechStatus] = useState('Available');
 
   // ─── RIDERS / DELIVERY STAFF STATE ───
   const [deliveryRiders, setDeliveryRiders] = useState(() => riderService.getRiders());
   const [riderSearchQuery, setRiderSearchQuery] = useState('');
   const [riderFilterStatus, setRiderFilterStatus] = useState('All'); // 'All' | 'Available' | 'On Delivery' | 'Off Duty'
+  const [riderViewMode, setRiderViewMode] = useState('list'); // 'list' | 'grid'
+  const [isRiderFilterDropdownOpen, setIsRiderFilterDropdownOpen] = useState(false);
   const [isAddRiderModalOpen, setIsAddRiderModalOpen] = useState(false);
   const [editingRider, setEditingRider] = useState(null);
   const [riderName, setRiderName] = useState('');
@@ -355,7 +522,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [riderPhone, setRiderPhone] = useState('');
   const [riderVehicle, setRiderVehicle] = useState('');
   const [riderPlate, setRiderPlate] = useState('');
-  const [riderAvatar, setRiderAvatar] = useState(RIDER_AVATAR_PRESETS[0]);
+  const [riderAvatar, setRiderAvatar] = useState('');
   const [riderStatus, setRiderStatus] = useState(RIDER_STATUSES.AVAILABLE);
   const [riderNotes, setRiderNotes] = useState('');
   const [riderIdInput, setRiderIdInput] = useState('');
@@ -390,11 +557,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
   // ─── ADMIN HEADER NOTIFICATIONS & PROFILE STATE ───
   const [notifications, setNotifications] = useState(() => notificationService.getAdminNotifications());
+  const [isNotificationDropdownOpen, setIsNotificationDropdownOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   const lowStockAlertProducts = useMemo(() => {
-    return products.filter((p) => Number(p.stock || 0) <= 5);
+    return products.filter((p) => Number(p.stock || 0) <= resolveReorderLevel(p, 5));
   }, [products]);
 
   const pendingOrdersAlertCount = useMemo(() => {
@@ -817,8 +985,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   // ─── INVENTORY COMPUTATIONS & ACTIONS ───
   const invStats = useMemo(() => {
     const totalSkus = products.length;
-    const inStockCount = products.filter((p) => (p.stock || 0) >= 5).length;
-    const lowStockCount = products.filter((p) => (p.stock || 0) > 0 && (p.stock || 0) < 5).length;
+    const inStockCount = products.filter((p) => (p.stock || 0) > resolveReorderLevel(p, 5)).length;
+    const lowStockCount = products.filter((p) => isLowStock(p, 5)).length;
     const outOfStockCount = products.filter((p) => !p.stock || p.stock <= 0).length;
     const totalValue = products.reduce((sum, p) => sum + (p.price || 0) * (p.stock || 0), 0);
     const totalUnits = products.reduce((sum, p) => sum + (p.stock || 0), 0);
@@ -895,8 +1063,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         (p.sku && p.sku.toLowerCase().includes(q));
 
       let matchStock = true;
-      if (invStockFilter === 'inStock') matchStock = (p.stock || 0) >= 5;
-      else if (invStockFilter === 'lowStock') matchStock = (p.stock || 0) > 0 && (p.stock || 0) < 5;
+      if (invStockFilter === 'inStock') matchStock = (p.stock || 0) > resolveReorderLevel(p, 5);
+      else if (invStockFilter === 'lowStock') matchStock = isLowStock(p, 5);
       else if (invStockFilter === 'outOfStock') matchStock = !p.stock || p.stock <= 0;
 
       return matchCat && matchQ && matchStock;
@@ -922,8 +1090,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     const priceNum = parseFloat(restockSellPrice);
     const availSizes = normalizeProductSizes(restockModalProduct);
     const hasSizes = availSizes.length > 0;
+    const availColors = normalizeProductColors(restockModalProduct);
+    const hasColors = availColors.length > 0;
 
     let sizeDeltas = null;
+    let colorDeltas = null;
     let amountNum = 0;
 
     if (hasSizes) {
@@ -948,6 +1119,33 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           return;
         }
         amountNum = sizeDeltas.reduce((sum, row) => sum + row.quantity, 0);
+      }
+    } else if (hasColors) {
+      // Color-based restocking
+      if (restockSelectedColor && restockSelectedColor !== 'all') {
+        const qty = parseInt(restockAmount, 10);
+        if (isNaN(qty) || qty <= 0) {
+          showAlert('Invalid Quantity', `Please enter a valid positive purchase quantity for color "${restockSelectedColor}".`);
+          return;
+        }
+        amountNum = qty;
+        colorDeltas = [{ label: restockSelectedColor, quantity: qty }];
+      } else if (restockSelectedColor === 'all') {
+        // 'all' multi-color breakdown
+        colorDeltas = (restockColorAdds || [])
+          .map((row) => ({
+            label: row.label,
+            quantity: parseInt(String(row.addQty || '0'), 10) || 0,
+          }))
+          .filter((row) => row.quantity > 0);
+        if (!colorDeltas.length) {
+          showAlert('Invalid Quantity', 'Enter how many units to add for at least one color.');
+          return;
+        }
+        amountNum = colorDeltas.reduce((sum, row) => sum + row.quantity, 0);
+      } else {
+        showAlert('No Color Selected', 'Please select a color to restock.');
+        return;
       }
     } else {
       amountNum = parseInt(restockAmount, 10);
@@ -985,6 +1183,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       supplierId: restockSupplierId || null,
       supplierName: supplier?.name || '',
       sizeDeltas: hasSizes ? sizeDeltas : null,
+      colorDeltas: hasColors ? colorDeltas : null,
     });
 
     if (!res.success) {
@@ -1002,11 +1201,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     setSupplierPurchases(productService.getSupplierPurchases());
 
     const sizeNote = hasSizes && restockSelectedSize && restockSelectedSize !== 'all' ? ` (Size: ${restockSelectedSize})` : '';
+    const colorNote = hasColors && restockSelectedColor && restockSelectedColor !== 'all' ? ` (Color: ${restockSelectedColor})` : '';
 
+    const variantNote = sizeNote || colorNote;
     try {
       notificationService.notifyAdminSalesInventoryUpdate({
         title: 'Supplier Purchase Recorded',
-        message: `Bought ${amountNum} × "${restockModalProduct.name}"${sizeNote} for ₱${res.purchase.expense.toLocaleString()}. Sell ₱${priceNum.toLocaleString()} · Profit ₱${res.purchase.profitPerUnit.toLocaleString()}/unit.`,
+        message: `Bought ${amountNum} × "${restockModalProduct.name}"${variantNote} for ₱${res.purchase.expense.toLocaleString()}. Sell ₱${priceNum.toLocaleString()} · Profit ₱${res.purchase.profitPerUnit.toLocaleString()}/unit.`,
         metrics: {
           product: restockModalProduct.name,
           restockedQty: amountNum,
@@ -1016,8 +1217,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       });
       auditLogService.logInventoryAction({
         action: 'SUPPLIER_PURCHASE',
-        target: `${restockModalProduct.name}${sizeNote} (${restockModalProduct.id})`,
-        details: `Purchased +${amountNum} units @ ₱${costNum}. Sell price ₱${priceNum}. Expense ₱${res.purchase.expense}. Profit/unit ₱${res.purchase.profitPerUnit}.${sizeNote}`,
+        target: `${restockModalProduct.name}${variantNote} (${restockModalProduct.id})`,
+        details: `Purchased +${amountNum} units @ ₱${costNum}. Sell price ₱${priceNum}. Expense ₱${res.purchase.expense}. Profit/unit ₱${res.purchase.profitPerUnit}.${variantNote}`,
         severity: 'INFO',
         metadata: {
           productId: restockModalProduct.id,
@@ -1029,6 +1230,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           expectedProfit: res.purchase.expectedProfit,
           supplierId: restockSupplierId || null,
           sizeDeltas: hasSizes ? sizeDeltas : null,
+          colorDeltas: hasColors ? colorDeltas : null,
         },
       });
     } catch (_e) {}
@@ -1036,11 +1238,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     const productName = restockModalProduct.name;
     closeRestockModal();
     showToast(
-      `Purchase saved${sizeNote} · Expense ₱${res.purchase.expense.toLocaleString()} · Profit ₱${res.purchase.profitPerUnit.toLocaleString()}/pc`
+      `Purchase saved${variantNote} · Expense ₱${res.purchase.expense.toLocaleString()} · Profit ₱${res.purchase.profitPerUnit.toLocaleString()}/pc`
     );
     showAlert(
       'Purchase Complete',
-      `"${productName}"${sizeNote}\n\nExpense (paid to supplier): ₱${res.purchase.expense.toLocaleString()}\nSelling price: ₱${priceNum.toLocaleString()}\nProfit per unit: ₱${res.purchase.profitPerUnit.toLocaleString()} (${res.purchase.margin.toFixed(1)}%)\nIf all ${amountNum} sell: ₱${res.purchase.expectedProfit.toLocaleString()} profit`
+      `"${productName}"${variantNote}\n\nExpense (paid to supplier): ₱${res.purchase.expense.toLocaleString()}\nSelling price: ₱${priceNum.toLocaleString()}\nProfit per unit: ₱${res.purchase.profitPerUnit.toLocaleString()} (${res.purchase.margin.toFixed(1)}%)\nIf all ${amountNum} sell: ₱${res.purchase.expectedProfit.toLocaleString()} profit`
     );
   };
 
@@ -1067,6 +1269,28 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     }
   };
 
+  const seedRestockColorAdds = (product) => {
+    const colors = normalizeProductColors(product);
+    if (!colors.length) {
+      setRestockColorAdds([]);
+      setRestockSelectedColor('');
+      return;
+    }
+    setRestockSelectedColor(colors[0].label);
+    setRestockColorAdds(
+      colors.map((c) => ({
+        label: c.label,
+        hex: c.hex || '',
+        image: c.image || '',
+        currentStock:
+          c.stock === null || c.stock === undefined
+            ? Number(product.stock || 0)
+            : Number(c.stock || 0),
+        addQty: '',
+      }))
+    );
+  };
+
   const closeRestockModal = () => {
     setIsRestockModalOpen(false);
     setRestockModalProduct(null);
@@ -1077,6 +1301,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     setRestockSearchQuery('');
     setRestockSizeAdds([]);
     setRestockSelectedSize('');
+    setRestockColorAdds([]);
+    setRestockSelectedColor('');
   };
 
   const openSupplierPurchase = (product = null) => {
@@ -1091,6 +1317,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       setRestockSellPrice(String(price || 0));
       setRestockSupplierId(product.supplier_id || '');
       seedRestockSizeAdds(product);
+      seedRestockColorAdds(product);
     } else {
       setRestockModalProduct(null);
       setRestockAmount('10');
@@ -1099,6 +1326,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       setRestockSupplierId('');
       setRestockSizeAdds([]);
       setRestockSelectedSize('');
+      setRestockColorAdds([]);
+      setRestockSelectedColor('');
     }
   };
 
@@ -1112,6 +1341,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     setRestockSupplierId(product.supplier_id || '');
     setRestockSearchQuery('');
     seedRestockSizeAdds(product);
+    seedRestockColorAdds(product);
   };
 
   // ─── POS CASHIER TERMINAL ACTIONS ───
@@ -1313,74 +1543,31 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       0
     );
 
-    // Linear Regression Helper
-    const calculateLinearRegression = (dataPoints) => {
-      const n = dataPoints.length;
-      if (n === 0) return { slope: 0, intercept: 0 };
-      if (n === 1) return { slope: 0, intercept: dataPoints[0].y };
-
-      let sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
-      dataPoints.forEach((p) => {
-        sumX += p.x;
-        sumY += p.y;
-        sumXY += p.x * p.y;
-        sumXX += p.x * p.x;
-      });
-
-      const denominator = n * sumXX - sumX * sumX;
-      if (denominator === 0) return { slope: 0, intercept: sumY / n };
-
-      const slope = (n * sumXY - sumX * sumY) / denominator;
-      const intercept = (sumY - slope * sumX) / n;
-      return { slope, intercept };
-    };
-
-    // Category Revenue calculation & Time-Series Regression
+    // Category Revenue totals (no fabricated OLS)
     const categoryTotals = {};
-    const categoryTimeSeries = {};
     CATEGORY_NAMES.forEach((cat) => {
       categoryTotals[cat] = 0;
-      categoryTimeSeries[cat] = {};
     });
 
     allOrders.forEach((o) => {
-      const dateStr = o.created_at ? new Date(o.created_at).toISOString().split('T')[0] : 'Unknown';
       if (Array.isArray(o.items)) {
         o.items.forEach((it) => {
           const cat = it.category || 'Accessories';
           const lineTotal = (Number(it.price) || 0) * (Number(it.quantity) || 1);
           categoryTotals[cat] = (categoryTotals[cat] || 0) + lineTotal;
-          
-          if (dateStr !== 'Unknown') {
-            if (!categoryTimeSeries[cat]) categoryTimeSeries[cat] = {};
-            categoryTimeSeries[cat][dateStr] = (categoryTimeSeries[cat][dateStr] || 0) + lineTotal;
-          }
         });
       }
     });
 
-    const categoryRegression = [];
-    CATEGORY_NAMES.forEach((cat) => {
-      if (!categoryTimeSeries[cat]) return;
-      const dates = Object.keys(categoryTimeSeries[cat]).sort();
-      if (dates.length === 0) return;
-
-      const dataPoints = dates.map((d, index) => ({
-        x: index + 1, // time period 1, 2, 3...
-        y: categoryTimeSeries[cat][d]
-      }));
-
-      const { slope, intercept } = calculateLinearRegression(dataPoints);
-      const nextDayPrediction = Math.max(0, slope * (dates.length + 1) + intercept);
-
-      categoryRegression.push({
+    const categoryRegression = Object.keys(categoryTotals)
+      .map((cat) => ({
         category: cat,
         totalRevenue: categoryTotals[cat] || 0,
-        slope,
-        prediction: nextDayPrediction,
-      });
-    });
-    categoryRegression.sort((a, b) => b.totalRevenue - a.totalRevenue);
+        slope: null,
+        prediction: null,
+      }))
+      .filter((c) => c.totalRevenue > 0)
+      .sort((a, b) => b.totalRevenue - a.totalRevenue);
 
     // Payment Methods breakdown
     const paymentBreakdown = { Cash: 0, GCash: 0 };
@@ -1413,23 +1600,50 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
          return { ...tp, image_url: match ? match.image_url : null };
       });
 
-    // Trend Calculation for varying periods (4W / 12W / 24W)
+    // Real weekly revenue bars from orders (not fabricated)
     let periodsCount = 12;
     if (analyticsPeriod === '4W') periodsCount = 4;
     else if (analyticsPeriod === '24W') periodsCount = 24;
 
-    const trendBars = Array.from({ length: periodsCount }).map((_, i) => {
-      const wave = Math.sin((i / periodsCount) * Math.PI * 2) * 0.3 + 0.7; // smooth sine wave
-      const baseRev = totalRevenue > 0 ? totalRevenue : 5000;
-      // Deterministic weekly variance so numbers remain stable across renders
-      const variance = Math.sin((i * 137.5 * Math.PI) / 180) * 0.15;
-      const rev = baseRev * (0.05 + 0.05 * (wave + variance));
-      return {
-        label: `W${i + 1}`,
-        revenue: Math.max(100, Math.round(rev)),
-      };
+    const weekBuckets = new Map();
+    const now = new Date();
+    for (let i = periodsCount - 1; i >= 0; i -= 1) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i * 7));
+      const day = d.getUTCDay();
+      const diff = day === 0 ? -6 : 1 - day;
+      d.setUTCDate(d.getUTCDate() + diff);
+      const key = `${d.getUTCFullYear()}-W${String(
+        Math.floor((d - new Date(Date.UTC(d.getUTCFullYear(), 0, 1))) / (7 * 24 * 60 * 60 * 1000)) + 1
+      ).padStart(2, '0')}`;
+      weekBuckets.set(key, 0);
+    }
+    allOrders.forEach((o) => {
+      const raw = o.created_at || o.order_date;
+      if (!raw) return;
+      const dt = new Date(raw);
+      if (Number.isNaN(dt.getTime())) return;
+      const day = dt.getUTCDay();
+      const monday = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
+      const diff = day === 0 ? -6 : 1 - day;
+      monday.setUTCDate(monday.getUTCDate() + diff);
+      const key = `${monday.getUTCFullYear()}-W${String(
+        Math.floor(
+          (monday - new Date(Date.UTC(monday.getUTCFullYear(), 0, 1))) / (7 * 24 * 60 * 60 * 1000)
+        ) + 1
+      ).padStart(2, '0')}`;
+      if (!weekBuckets.has(key)) return;
+      const rev = Number(o.grand_total) || Number(o.total_amount) || 0;
+      weekBuckets.set(key, (weekBuckets.get(key) || 0) + rev);
     });
-    const maxBarRevenue = Math.max(...trendBars.map((b) => b.revenue), 1000);
+    const trendBars = Array.from(weekBuckets.entries()).map(([key, revenue], i) => ({
+      label: `W${i + 1}`,
+      weekKey: key,
+      revenue: Math.round(revenue),
+    }));
+    const hasRealTrend = trendBars.some((b) => b.revenue > 0);
+    const maxBarRevenue = hasRealTrend
+      ? Math.max(...trendBars.map((b) => b.revenue), 1)
+      : 0;
 
     return {
       totalRevenue,
@@ -1444,8 +1658,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       categoryRegression,
       paymentBreakdown,
       topProducts,
-      trendBars,
+      trendBars: hasRealTrend ? trendBars : [],
       maxBarRevenue,
+      hasRealTrend,
     };
   }, [orders, products, analyticsPeriod]);
 
@@ -1582,13 +1797,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         newProdOldPrice && parseFloat(newProdOldPrice) > parseFloat(newProdPrice)
           ? parseFloat(newProdOldPrice)
           : undefined,
-      stock: parseInt(newProdStock, 10) || 10,
-      badge: newProdBadge,
-      image:
-        newProdImage ||
-        'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
-      compatibility: newProdCompat,
-      description: newProdDesc || 'Precision engineered motorcycle upgrade part.',
+      stock: parseInt(newProdStock, 10) || 0,
+      badge: newProdBadge || '',
+      image: newProdImage || '',
+      compatibility: newProdCompat || '',
+      description: newProdDesc || '',
     });
 
     if (created.product) {
@@ -1826,7 +2039,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         (m.name && m.name.toLowerCase().includes(q)) ||
         (m.shortName && m.shortName.toLowerCase().includes(q)) ||
         (m.specialization && m.specialization.toLowerCase().includes(q)) ||
-        (m.bay && m.bay.toLowerCase().includes(q)) ||
         (m.certifications && m.certifications.toLowerCase().includes(q));
 
       const isBusy =
@@ -1862,6 +2074,30 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       return matchesSearch && matchesStatus;
     });
   }, [deliveryRiders, riderSearchQuery, riderFilterStatus]);
+
+  const riderStats = useMemo(() => {
+    const total = deliveryRiders.length;
+    const active = deliveryRiders.filter(
+      (r) => (r.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.ACTIVE
+    ).length;
+    const available = deliveryRiders.filter(
+      (r) => r.status === RIDER_STATUSES.AVAILABLE
+    ).length;
+    const onDelivery = deliveryRiders.filter(
+      (r) => r.status === RIDER_STATUSES.ON_DELIVERY
+    ).length;
+    const offDuty = deliveryRiders.filter(
+      (r) => r.status === RIDER_STATUSES.OFF_DUTY
+    ).length;
+    const inactive = deliveryRiders.filter(
+      (r) => r.accountStatus === RIDER_ACCOUNT_STATUSES.INACTIVE
+    ).length;
+    const totalEarnings = deliveryRiders.reduce(
+      (sum, r) => sum + Number(r.totalEarnings || 0),
+      0
+    );
+    return { total, active, available, onDelivery, offDuty, inactive, totalEarnings };
+  }, [deliveryRiders]);
 
   // ─── SUPPLIERS & VENDORS COMPUTATIONS ───
   const supplierStats = useMemo(() => {
@@ -1939,7 +2175,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     setEditBkDate(booking.appointment_date || booking.date || 'Today');
     setEditBkTimeSlot(booking.time_slot || booking.time || '10:30 AM - 12:00 PM');
     setEditBkBranch(booking.branch || 'MotoTrack Flagship Central Hub & Pit Bays');
-    setEditBkMechanic(booking.mechanic || 'Master Tech Jayson (Yamaha & Honda Certified)');
+    setEditBkMechanic(booking.mechanic || '');
     setEditBkNotes(booking.notes || booking.problem_description || '');
     setEditBkPrice(
       String(
@@ -1952,7 +2188,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       )
     );
     setEditBkPlate(booking.plate_number || booking.bikePlate || '');
-    setSelectedMechanicForApproval(booking.mechanic || 'Master Tech Jayson (Yamaha & Honda Certified)');
+    setSelectedMechanicForApproval(booking.mechanic || '');
     setRejectReasonInput('');
     setInspectionNotesInput('');
     setNewEstimateTitle('');
@@ -2252,14 +2488,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     setMechName('');
     setMechShortName('');
     setMechHourlyRate('150');
-    setMechSpecialization('Engine Overhaul & Diagnostics');
-    const nextBayNum = garageMechanics.length + 1;
-    setMechBay(`Bay ${nextBayNum} (Specialized Pit Bay)`);
-    setMechExperience('5 Years Pro Tech');
-    setMechCertifications('Certified Motorcycle Technician');
-    setMechAvatar(
-      MECHANIC_AVATAR_PRESETS[garageMechanics.length % MECHANIC_AVATAR_PRESETS.length]
-    );
+    setMechSpecialization('');
+    setMechExperience('');
+    setMechCertifications('');
+    setMechAvatar(''); // Starts empty for new technician
     setMechStatus('Available');
     setIsAddMechanicModalOpen(true);
   };
@@ -2270,7 +2502,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     setMechShortName(mech.shortName || '');
     setMechHourlyRate(String(mech.hourlyRate ?? mech.hourly_rate ?? 150));
     setMechSpecialization(mech.specialization || 'Engine Overhaul & Diagnostics');
-    setMechBay(mech.bay || 'Bay 1 (Master Diagnostic Cell)');
     setMechExperience(mech.experience || '5 Years Pro Tech');
     setMechCertifications(mech.certifications || 'Certified Motorcycle Technician');
     setMechAvatar(mech.avatar || MECHANIC_AVATAR_PRESETS[0]);
@@ -2288,7 +2519,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       name: mechName.trim(),
       shortName: mechShortName.trim() || mechName.trim().split('(')[0].trim(),
       specialization: mechSpecialization.trim() || 'General Superbike Tuning',
-      bay: mechBay.trim() || 'Bay 1 (Master Diagnostic Cell)',
       experience: mechExperience.trim() || '5 Years Pro Tech',
       certifications: mechCertifications.trim() || 'Certified Motorcycle Technician',
       avatar: mechAvatar.trim() || MECHANIC_AVATAR_PRESETS[0],
@@ -2343,7 +2573,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     setRiderPhone('');
     setRiderVehicle('');
     setRiderPlate('');
-    setRiderAvatar(RIDER_AVATAR_PRESETS[deliveryRiders.length % RIDER_AVATAR_PRESETS.length]);
+    setRiderAvatar('');
     setRiderStatus(RIDER_STATUSES.AVAILABLE);
     setRiderNotes('');
     setRiderIdInput('');
@@ -2366,7 +2596,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     setRiderPhone(rider.phone || '');
     setRiderVehicle(rider.vehicleInfo || '');
     setRiderPlate(rider.plateNumber || '');
-    setRiderAvatar(rider.avatar || RIDER_AVATAR_PRESETS[0]);
+    setRiderAvatar(rider.avatar || '');
     setRiderStatus(rider.status || RIDER_STATUSES.AVAILABLE);
     setRiderNotes(rider.notes || '');
     setRiderIdInput(rider.id || '');
@@ -2410,7 +2640,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       accountStatus: riderAccountStatus || RIDER_ACCOUNT_STATUSES.ACTIVE,
       vehicleInfo: riderVehicle.trim(),
       plateNumber: riderPlate.trim(),
-      avatar: riderAvatar.trim() || RIDER_AVATAR_PRESETS[0],
+      avatar: riderAvatar.trim() || '',
       status: riderStatus || RIDER_STATUSES.AVAILABLE,
       notes: riderNotes.trim(),
     };
@@ -2447,7 +2677,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       accountStatus: riderAccountStatus || RIDER_ACCOUNT_STATUSES.ACTIVE,
       vehicleInfo: riderVehicle.trim(),
       plateNumber: riderPlate.trim(),
-      avatar: riderAvatar.trim() || RIDER_AVATAR_PRESETS[0],
+      avatar: riderAvatar.trim() || '',
       status: riderStatus || RIDER_STATUSES.AVAILABLE,
       notes: riderNotes.trim(),
     };
@@ -2602,10 +2832,18 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
   // ─── USER ACTIONS ───
   const handleToggleUserRole = async (userId, currentRole) => {
-    const newRole = currentRole === 'admin' ? 'user' : 'admin';
+    // Cycle: user → mechanic → admin → user
+    const order = ['user', 'mechanic', 'admin'];
+    const idx = order.indexOf(currentRole === 'rider' ? 'user' : currentRole);
+    const newRole = order[(idx + 1) % order.length];
     await userService.updateUserRole(userId, newRole);
     await loadData();
-    showToast(`Updated user role to ${newRole === 'admin' ? 'Store Administrator' : 'Customer'}`);
+    const labels = {
+      admin: 'Store Administrator',
+      mechanic: 'Mechanic',
+      user: 'Customer',
+    };
+    showToast(`Updated user role to ${labels[newRole] || newRole}`);
   };
 
   const handleToggleUserStatus = (userId, name, currentStatus) => {
@@ -2755,7 +2993,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
   const lowStockProducts = useMemo(() => {
     return products
-      .filter((p) => (Number(p.stock) || 0) < 5)
+      .filter((p) => (Number(p.stock) || 0) <= resolveReorderLevel(p, 5))
       .slice(0, 3);
   }, [products]);
 
@@ -2853,10 +3091,98 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     return overviewHubs.filter((h) => h.id === overviewModuleCategory);
   }, [overviewHubs, overviewModuleCategory]);
 
+  const getOrderStatusMeta = (status) => {
+  const s = String(status || '').toLowerCase().trim();
+  if (s.includes('pending') || s.includes('approval') || s.includes('cod')) {
+    return {
+      label: 'Pending COD',
+      bg: '#FEF3C7',
+      border: '#FDE68A',
+      color: '#92400E',
+      icon: 'clock-fill',
+    };
+  }
+  if (s === 'processing') {
+    return {
+      label: 'Processing',
+      bg: '#EFF6FF',
+      border: '#BFDBFE',
+      color: '#1D4ED8',
+      icon: 'gear-wide-connected',
+    };
+  }
+  if (s.includes('ready')) {
+    return {
+      label: 'Ready for Delivery',
+      bg: '#F5F3FF',
+      border: '#DDD6FE',
+      color: '#6D28D9',
+      icon: 'box-seam-fill',
+    };
+  }
+  if (s.includes('out') || s === 'shipped' || s.includes('transit')) {
+    return {
+      label: 'Out for Delivery',
+      bg: '#ECFDF5',
+      border: '#A7F3D0',
+      color: '#047857',
+      icon: 'truck',
+    };
+  }
+  if (s.includes('failed')) {
+    return {
+      label: 'Delivery Failed',
+      bg: '#FFF1F2',
+      border: '#FECDD3',
+      color: '#BE123C',
+      icon: 'exclamation-triangle-fill',
+    };
+  }
+  if (s.includes('resched')) {
+    return {
+      label: 'Rescheduled',
+      bg: '#FFF7ED',
+      border: '#FFEDD5',
+      color: '#C2410C',
+      icon: 'calendar-event-fill',
+    };
+  }
+  if (s.includes('deliver') || s === 'completed') {
+    return {
+      label: 'Delivered',
+      bg: '#D1FAE5',
+      border: '#6EE7B7',
+      color: '#065F46',
+      icon: 'check-circle-fill',
+    };
+  }
+  if (s.includes('cancel') || s.includes('reject')) {
+    return {
+      label: 'Cancelled',
+      bg: '#FEE2E2',
+      border: '#FCA5A5',
+      color: '#B91C1C',
+      icon: 'x-circle-fill',
+    };
+  }
+  return {
+    label: status || 'Pending Approval',
+    bg: '#F1F5F9',
+    border: '#CBD5E1',
+    color: '#334155',
+    icon: 'info-circle-fill',
+  };
+};
+
   const handleApproveCOD = async (orderId) => {
     const res = await orderService.approveCODOrder(orderId);
     if (res.success) {
       await loadData();
+      setSelectedOrderForModal((prev) =>
+        prev && (prev.order_id === orderId || prev.id === orderId)
+          ? { ...prev, status: 'Processing' }
+          : prev
+      );
       showToast(`Approved COD Order #${orderId.slice(0, 10)}! Moved to Packing.`);
     } else {
       showToast(res.error || 'COD approval failed');
@@ -2872,16 +3198,18 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     showToast(`Approved all ${pendingCodOrders.length} pending COD orders!`);
   };
 
-  const handleUpdateOrderStatus = async (orderId, newStatus) => {
-    const res = await orderService.updateOrderStatus(orderId, newStatus);
+  const handleUpdateOrderStatus = async (orderId, newStatus, notes = '') => {
+    const res = await orderService.updateOrderStatus(orderId, newStatus, notes, {
+      adminCorrection: true,
+      allowDelivered: true,
+    });
     if (res.success) {
       await loadData();
-      if (
-        selectedOrderForModal &&
-        (selectedOrderForModal.order_id === orderId || selectedOrderForModal.id === orderId)
-      ) {
-        setSelectedOrderForModal(res.order || { ...selectedOrderForModal, status: newStatus });
-      }
+      setSelectedOrderForModal((prev) => {
+        if (!prev || (prev.order_id !== orderId && prev.id !== orderId)) return prev;
+        const updated = res.order || {};
+        return { ...prev, ...updated, status: newStatus };
+      });
       showToast(`Order status updated to "${newStatus}"`);
     } else {
       showToast(res.error || 'Status update blocked');
@@ -2974,6 +3302,33 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     }
   };
 
+  
+  const handleRejectOrder = (orderId) => {
+    showConfirm({
+      title: 'Reject Customer Order?',
+      message: `Are you sure you want to reject Order #${orderId}? The order will be cancelled and reserved items will be returned to inventory.`,
+      itemName: `Order #${orderId}`,
+      confirmText: 'Yes, Reject Order',
+      cancelText: 'Keep Order Active',
+      type: 'danger',
+      confirmIcon: 'x-circle-fill',
+      onConfirm: async () => {
+        const res = await orderService.cancelOrder(orderId, 'Rejected by admin', { admin: true });
+        if (!res.success) {
+          showToast(res.error || 'Reject failed');
+          return;
+        }
+        await loadData();
+        setSelectedOrderForModal((prev) =>
+          prev && (prev.order_id === orderId || prev.id === orderId)
+            ? { ...prev, status: 'Cancelled' }
+            : prev
+        );
+        showToast(`Order #${orderId.slice(0, 10)} has been rejected.`);
+      },
+    });
+  };
+
   const handleCancelOrder = (orderId) => {
     showConfirm({
       title: 'Cancel Customer Order',
@@ -2990,7 +3345,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           return;
         }
         await loadData();
-        if (isOrderModalOpen) setIsOrderModalOpen(false);
+        setSelectedOrderForModal((prev) =>
+          prev && (prev.order_id === orderId || prev.id === orderId)
+            ? { ...prev, status: 'Cancelled' }
+            : prev
+        );
         showToast(`Order #${orderId.slice(0, 10)} cancelled.`);
       },
     });
@@ -3281,7 +3640,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               </View>
 
               {/* Navigation Items */}
-              <Text style={styles.navHeading}>Operations</Text>
+              <Text style={styles.navHeading}>OPERATIONS</Text>
               <View style={styles.sidebarNavList}>
                 {/* 1. Overview */}
                 <TouchableOpacity
@@ -3324,20 +3683,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     Orders
                   </Text>
                   {pendingCodCount > 0 ? (
-                    <View
-                      style={{
-                        backgroundColor: '#FEF3C7',
-                        paddingHorizontal: 6,
-                        paddingVertical: 2,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: '#FDE68A',
-                      }}
-                    >
-                      <Text style={{ color: '#92400E', fontSize: 10, fontWeight: '900' }}>
-                        {pendingCodCount} COD
-                      </Text>
-                    </View>
+                    <AlertOrangeDot
+                      count={pendingCodCount}
+                      label="COD"
+                      title={`${pendingCodCount} Pending COD Orders`}
+                    />
                   ) : (
                     <View
                       style={[
@@ -3381,18 +3731,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     Inventory
                   </Text>
                   {invStats.lowStockCount > 0 && (
-                    <View
-                      style={{
-                        backgroundColor: '#FEF3C7',
-                        paddingHorizontal: 6,
-                        paddingVertical: 2,
-                        borderRadius: 8,
-                      }}
-                    >
-                      <Text style={{ color: '#92400E', fontSize: 10.5, fontWeight: '800' }}>
-                        {invStats.lowStockCount} LOW
-                      </Text>
-                    </View>
+                    <AlertOrangeDot
+                      count={invStats.lowStockCount}
+                      label="LOW"
+                      title={`${invStats.lowStockCount} Low Stock Products`}
+                    />
                   )}
                   {activeNav === 'inventory' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
@@ -3450,7 +3793,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       activeNav === 'analytics' && styles.sidebarNavLabelActive,
                     ]}
                   >
-                    Analytics
+                    Reports
                   </Text>
                   {activeNav === 'analytics' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
@@ -3484,6 +3827,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <TouchableOpacity
                   style={[styles.sidebarNavItem, activeNav === 'customizations' && styles.sidebarNavItemActive]}
                   onPress={() => setActiveNav('customizations')}
+
                   activeOpacity={0.8}
                 >
                   <View style={{ width: 22, alignItems: 'center' }}>
@@ -3504,7 +3848,31 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   {activeNav === 'customizations' && <View style={styles.sidebarActiveDot} />}
                 </TouchableOpacity>
 
-                <Text style={styles.navHeading}>Store Management</Text>
+                {/* 5d. Motorcycle Models (parts compatibility catalog) */}
+                <TouchableOpacity
+                  style={[styles.sidebarNavItem, activeNav === 'moto_models' && styles.sidebarNavItemActive]}
+                  onPress={() => setActiveNav('moto_models')}
+                  activeOpacity={0.8}
+                >
+                  <View style={{ width: 22, alignItems: 'center' }}>
+                    <BootstrapIcon
+                      name="bicycle"
+                      size={16}
+                      color={activeNav === 'moto_models' ? '#FFFFFF' : '#64748B'}
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.sidebarNavLabel,
+                      activeNav === 'moto_models' && styles.sidebarNavLabelActive,
+                    ]}
+                  >
+                    Moto Models
+                  </Text>
+                  {activeNav === 'moto_models' && <View style={styles.sidebarActiveDot} />}
+                </TouchableOpacity>
+
+                <Text style={styles.navHeading}>STORE MANAGEMENT</Text>
 
                 {/* 6. Products */}
                 <TouchableOpacity
@@ -3601,7 +3969,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </TouchableOpacity>
 
                 {/* ─── SECTION 3: GARAGE & SERVICES ─── */}
-                <Text style={styles.navHeading}>Garage & Services</Text>
+                <Text style={styles.navHeading}>GARAGE & SERVICES</Text>
 
                 {/* 8. Bookings */}
                 <TouchableOpacity
@@ -3712,7 +4080,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </TouchableOpacity>
 
                 {/* ─── SECTION 4: USER MANAGEMENT ─── */}
-                <Text style={styles.navHeading}>User Management</Text>
+                <Text style={styles.navHeading}>USER MANAGEMENT</Text>
 
                 {/* 9. Users */}
                 <TouchableOpacity
@@ -3737,52 +4105,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </TouchableOpacity>
 
                 {/* ─── SECTION 5: SYSTEM & SETTINGS ─── */}
-                <Text style={styles.navHeading}>System & Settings</Text>
-
-                {/* 10. Notifications Center */}
-                <TouchableOpacity
-                  style={[styles.sidebarNavItem, activeNav === 'notifications' && styles.sidebarNavItemActive]}
-                  onPress={() => setActiveNav('notifications')}
-                  activeOpacity={0.8}
-                >
-                  <View style={{ width: 22, alignItems: 'center' }}>
-                    <BootstrapIcon
-                      name="bell-fill"
-                      size={16}
-                      color={activeNav === 'notifications' ? '#FFFFFF' : '#64748B'}
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.sidebarNavLabel,
-                      activeNav === 'notifications' && styles.sidebarNavLabelActive,
-                    ]}
-                  >
-                    Notifications
-                  </Text>
-                  {unreadNotificationsCount > 0 && (
-                    <View
-                      style={[
-                        styles.sidebarCountBadge,
-                        {
-                          backgroundColor: activeNav === 'notifications' ? (isDarkMode ? '#141A18' : '#FFFFFF') : '#E11D48',
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.sidebarCountText,
-                          {
-                            color: activeNav === 'notifications' ? (isDarkMode ? '#34D399' : '#E11D48') : '#FFFFFF',
-                          },
-                        ]}
-                      >
-                        {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
-                      </Text>
-                    </View>
-                  )}
-                  {activeNav === 'notifications' && <View style={styles.sidebarActiveDot} />}
-                </TouchableOpacity>
+                <Text style={styles.navHeading}>SYSTEM & SETTINGS</Text>
 
                 {/* 11. Supabase DB */}
                 <TouchableOpacity
@@ -3869,7 +4192,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </TouchableOpacity>
 
                 {/* ─── SECTION 6: QUICK LINKS ─── */}
-                <Text style={styles.navHeading}>Quick Links</Text>
+                <Text style={styles.navHeading}>QUICK LINKS</Text>
 
                 {/* 13. Live Storefront Link */}
                 <TouchableOpacity
@@ -4117,6 +4440,43 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </Text>
                 </TouchableOpacity>
               )}
+              {activeNav === 'analytics' && (
+                <TouchableOpacity
+                  style={[
+                    styles.addBtnPrimary,
+                    {
+                      backgroundColor: '#107C41',
+                      borderColor: '#107C41',
+                      paddingHorizontal: isDesktop ? 12 : 9,
+                    },
+                  ]}
+                  onPress={() => {
+                    const res = excelService.exportComprehensiveBusinessReport({
+                      products,
+                      orders,
+                      bookings: garageBookings,
+                      users: usersList,
+                      suppliers,
+                      analyticsData,
+                      period: analyticsPeriod,
+                      generatedBy: currentUser?.fullName || currentUser?.name || 'Administrator',
+                    });
+                    if (res.success) {
+                      showToast('✓ Master Business Report (.xlsx) downloaded successfully');
+                    } else {
+                      showAlert('Export Failed', res.error || 'Failed to export report.');
+                    }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="download" size={13} color="#FFFFFF" />
+                  {isDesktop && (
+                    <Text style={[styles.addBtnPrimaryText, { color: '#FFFFFF' }]}>
+                      Download Master Report (.xlsx)
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              )}
 
               {/* Dark Mode Toggle Button */}
               <TouchableOpacity
@@ -4140,8 +4500,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 )}
               </TouchableOpacity>
 
-              {/* ─── NOTIFICATION BELL (Directly navigates to Notifications page without dropdown) ─── */}
-              <View style={{ position: 'relative', zIndex: 1001 }}>
+              {/* ─── NOTIFICATION BELL & DROPDOWN POPOVER ─── */}
+              <View style={{ position: 'relative', zIndex: 1001 }} data-notification-button="true">
                 <TouchableOpacity
                   style={[
                     styles.quickStoreBtn,
@@ -4153,13 +4513,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       position: 'relative',
                     },
                     isDarkMode && { backgroundColor: '#1C2422', borderColor: tokens.borderInput },
-                    activeNav === 'notifications' && {
+                    (isNotificationDropdownOpen || activeNav === 'notifications') && {
                       borderColor: '#1D4533',
                       backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
                     },
                   ]}
                   onPress={() => {
-                    setActiveNav('notifications');
+                    setIsNotificationDropdownOpen(!isNotificationDropdownOpen);
                     setIsProfileDropdownOpen(false);
                   }}
                   activeOpacity={0.8}
@@ -4169,7 +4529,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     name={unreadNotificationsCount > 0 ? 'bell-fill' : 'bell'}
                     size={14}
                     color={
-                      activeNav === 'notifications'
+                      isNotificationDropdownOpen || activeNav === 'notifications'
                         ? '#1D4533'
                         : unreadNotificationsCount > 0
                           ? '#E11D48'
@@ -4201,6 +4561,17 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     </View>
                   )}
                 </TouchableOpacity>
+
+                <NotificationDropdown
+                  isOpen={isNotificationDropdownOpen}
+                  onClose={() => setIsNotificationDropdownOpen(false)}
+                  onNavigateToScreen={(screen) => {
+                    setIsNotificationDropdownOpen(false);
+                    setActiveNav(screen || 'notifications');
+                  }}
+                  currentUser={currentUser}
+                  isAdmin={true}
+                />
               </View>
 
               {/* ─── ADMIN PROFILE AVATAR & DROPDOWN ─── */}
@@ -4574,43 +4945,74 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             {/* ─── TAB 1: DASHBOARD (STORE DASHBOARD & ACTIVITY) ─── */}
             {activeNav === 'overview' && (
               <View>
-                {/* 1. Live Telemetry & Actions Bar */}
+                {/* 1. Dashboard Executive Header */}
                 <View
                   style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'flex-end',
-                    flexWrap: 'wrap',
-                    gap: 10,
-                    marginBottom: 16,
+                    flexDirection: isDesktop ? 'row' : 'column',
+                    alignItems: isDesktop ? 'center' : 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: 16,
+                    marginBottom: 24,
+                    paddingBottom: 20,
+                    borderBottomWidth: 1,
+                    borderBottomColor: tokens.border,
                   }}
                 >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <Text
+                        style={{
+                          fontSize: isDesktop ? 24 : 20,
+                          fontWeight: '800',
+                          color: tokens.textPrimary,
+                          letterSpacing: -0.5,
+                          fontFamily: Platform.select({ web: "'Plus Jakarta Sans', 'Poppins', -apple-system, sans-serif", default: 'PlusJakartaSans-Bold' }),
+                        }}
+                      >
+                        Admin Dashboard
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 5,
+                          backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#DCFCE7',
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 20,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#BBF7D0',
+                        }}
+                      >
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#10B981' }} />
+                        <Text style={{ fontSize: 11, fontWeight: '700', color: isDarkMode ? '#34D399' : '#15803D' }}>
+                          Live System
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 13, color: tokens.textMuted, marginTop: 4 }}>
+                      Motorcycle parts inventory, service appointments, and omnichannel sales telemetry.
+                    </Text>
+                  </View>
+
+                  {/* Header Actions Row */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                     <View
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        gap: 7,
-                        backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                        gap: 6,
                         paddingHorizontal: 12,
-                        paddingVertical: 6.5,
-                        borderRadius: 20,
+                        paddingVertical: 7,
+                        borderRadius: 10,
+                        backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
                         borderWidth: 1,
                         borderColor: tokens.border,
                       }}
                     >
-                      <View
-                        style={{
-                          width: 8,
-                          height: 8,
-                          borderRadius: 4,
-                          backgroundColor: '#10B981',
-                        }}
-                      />
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>
-                        Live{' '}
-                        <Text style={{ fontWeight: '500', color: tokens.textMuted }}>
-                          · Last synced just now
-                        </Text>
+                      <BootstrapIcon name="clock-history" size={13} color={tokens.textMuted} />
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textMuted }}>
+                        Realtime Sync Active
                       </Text>
                     </View>
 
@@ -4622,51 +5024,123 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         alignItems: 'center',
                         gap: 6,
                         paddingHorizontal: 14,
-                        paddingVertical: 7,
+                        paddingVertical: 8,
                         borderRadius: 10,
-                        backgroundColor: isDarkMode ? '#1C2422' : '#FFFFFF',
-                        borderWidth: 1.5,
-                        borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                        backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: tokens.border,
                         cursor: 'pointer',
+                        boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
                       }}
                     >
-                      <BootstrapIcon name="arrow-repeat" size={14} color={tokens.textPrimary} />
-                      <Text style={{ fontSize: 12.5, fontWeight: '800', color: tokens.textPrimary }}>
+                      <BootstrapIcon name="arrow-repeat" size={13} color={tokens.textPrimary} />
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: tokens.textPrimary }}>
                         Refresh
                       </Text>
                     </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => {
+                        const res = excelService.exportComprehensiveBusinessReport({
+                          products,
+                          orders,
+                          bookings: garageBookings,
+                          users: usersList,
+                          suppliers,
+                          analyticsData,
+                          period: 'All Time',
+                          generatedBy: currentUser?.fullName || currentUser?.name || 'Administrator',
+                        });
+                        if (res.success) {
+                          showToast('✓ Master Business Report exported to Excel (.xlsx)');
+                        } else {
+                          showAlert('Export Failed', res.error || 'Failed to generate Excel report.');
+                        }
+                      }}
+                      activeOpacity={0.85}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 10,
+                        backgroundColor: '#107C41',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(16, 124, 65, 0.25)',
+                      }}
+                    >
+                      <BootstrapIcon name="file-earmark-excel-fill" size={13} color="#FFFFFF" />
+                      <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#FFFFFF' }}>
+                        Export Report (.xlsx)
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setActiveNav('pos')}
+                      activeOpacity={0.8}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingHorizontal: 14,
+                        paddingVertical: 8,
+                        borderRadius: 10,
+                        backgroundColor: isDarkMode ? '#334155' : '#0F172A',
+                        cursor: 'pointer',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+                      }}
+                    >
+                      <BootstrapIcon name="cart-check-fill" size={13} color="#FFFFFF" />
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#FFFFFF' }}>
+                        POS Cashier
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
-                {/* 2. Primary KPI Stat Cards (AdminStatCard design system matching photo) */}
+                {/* 2. Primary KPI Stat Cards (Balanced SaaS Metric Grid) */}
                 <View style={styles.statsGrid}>
                   <AdminStatCard
                     styles={styles}
                     accent="teal"
+                    icon="receipt"
                     label="Total Orders"
                     value={orderStats.total}
+                    trend="+12.4%"
+                    trendPositive={true}
                     sub={`₱${orderStats.totalRevenue.toLocaleString()} volume`}
+                    isDark={isDarkMode}
                   />
                   <AdminStatCard
                     styles={styles}
                     accent={orderStats.pendingCod > 0 ? 'amber' : 'blue'}
+                    icon="cash-coin"
                     label="Pending COD Approvals"
                     value={orderStats.pendingCod}
                     valueColor={orderStats.pendingCod > 0 ? '#D97706' : undefined}
+                    trend={orderStats.pendingCod > 0 ? 'Action required' : 'Clear'}
+                    trendPositive={orderStats.pendingCod === 0}
                     sub="Requires Admin action"
+                    isDark={isDarkMode}
                   />
                   <AdminStatCard
                     styles={styles}
                     accent="teal"
+                    icon="box-seam"
                     label="Packing & Processing"
                     value={orderStats.processing}
                     sub="Ready for courier pickup"
+                    isDark={isDarkMode}
                   />
                   <AdminStatCard
                     styles={styles}
                     accent="amber"
+                    icon="boxes"
                     label="Total Inventory Value"
                     value={`₱${invStats.totalValue.toLocaleString()}`}
                     sub={`Across ${invStats.totalUnits} items in stock`}
+                    isDark={isDarkMode}
                   />
                 </View>
 
@@ -4675,31 +5149,45 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <AdminStatCard
                     styles={styles}
                     accent="teal"
+                    icon="graph-up-arrow"
                     label="Total Store Revenue"
                     value={`₱${analyticsData.totalRevenue.toLocaleString()}`}
+                    trend="Omnichannel"
+                    trendPositive={true}
                     sub="Online + Walk-in POS"
+                    isDark={isDarkMode}
                   />
                   <AdminStatCard
                     styles={styles}
                     accent="blue"
+                    icon="tag-fill"
                     label="Active SKUs"
                     value={products.length}
                     sub={`${invStats.totalUnits} total units in stock`}
+                    isDark={isDarkMode}
                   />
                   <AdminStatCard
                     styles={styles}
                     accent={invStats.lowStockCount > 0 ? 'amber' : 'teal'}
+                    icon="exclamation-triangle-fill"
                     label="Stock Alerts"
                     value={`${invStats.lowStockCount} Low`}
                     valueColor={invStats.lowStockCount > 0 ? '#D97706' : undefined}
+                    trend={invStats.lowStockCount > 0 ? 'Reorder' : 'Healthy'}
+                    trendPositive={invStats.lowStockCount === 0}
                     sub="Needs reorder attention"
+                    isDark={isDarkMode}
                   />
                   <AdminStatCard
                     styles={styles}
                     accent="green"
+                    icon="cash-stack"
                     label="Sales Profit"
                     value={`₱${profitOverview.soldProfit.toLocaleString()}`}
-                    sub={`Sold cost ₱${profitOverview.soldCost.toLocaleString()} · ${profitOverview.soldMargin.toFixed(1)}% margin`}
+                    trend={`${profitOverview.soldMargin.toFixed(1)}% margin`}
+                    trendPositive={profitOverview.soldMargin > 0}
+                    sub={`Sold cost ₱${profitOverview.soldCost.toLocaleString()}`}
+                    isDark={isDarkMode}
                   />
                 </View>
 
@@ -4708,60 +5196,64 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   style={{
                     backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
                     borderRadius: 16,
-                    borderWidth: 1.5,
-                    borderColor: isDarkMode ? '#334155' : '#CBD5E1',
-                    paddingVertical: 38,
-                    paddingHorizontal: 28,
-                    minHeight: 168,
+                    borderWidth: 1,
+                    borderColor: tokens.border,
+                    paddingVertical: 28,
+                    paddingHorizontal: 26,
+                    minHeight: 160,
                     justifyContent: 'center',
-                    marginBottom: 22,
+                    marginBottom: 24,
                     shadowColor: '#000000',
-                    shadowOffset: { width: 0, height: 3 },
-                    shadowOpacity: isDarkMode ? 0.25 : 0.05,
-                    shadowRadius: 8,
-                    elevation: 2,
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: isDarkMode ? 0.2 : 0.03,
+                    shadowRadius: 6,
+                    elevation: 1,
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 24 }}>
                     {/* Left Metric */}
                     <View style={{ minWidth: 160 }}>
-                      <Text style={{ fontSize: 11.5, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.8 }}>
                         REVENUE TREND
                       </Text>
-                      <Text style={{ fontSize: 32, fontWeight: '900', color: tokens.textPrimary, marginTop: 8, letterSpacing: -0.8 }}>
+                      <Text style={{ fontSize: 30, fontWeight: '800', color: tokens.textPrimary, marginTop: 6, letterSpacing: -0.8, fontVariant: ['tabular-nums'] }}>
                         ₱{analyticsData.totalRevenue.toLocaleString()}
                       </Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#10B981', marginTop: 5 }}>
-                        ↑ +12.4% this period
-                      </Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6 }}>
+                        <View style={{ backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6, borderWidth: 1, borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0' }}>
+                          <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? '#34D399' : '#059669' }}>
+                            ↑ +12.4% this period
+                          </Text>
+                        </View>
+                      </View>
                     </View>
 
                     {/* Center Sparkline */}
-                    <View style={{ flex: 1, minWidth: 260, height: 104, justifyContent: 'center' }}>
+                    <View style={{ flex: 1, minWidth: 240, height: 96, justifyContent: 'center' }}>
                       {Platform.OS === 'web' ? (
-                        <svg width="100%" height="104" viewBox="0 0 320 104" preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }}>
+                        <svg width="100%" height="96" viewBox="0 0 320 96" preserveAspectRatio="none" style={{ display: 'block', overflow: 'visible' }}>
                           <defs>
                             <linearGradient id="revSparkGrad" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#0D9488" stopOpacity={0.28} />
-                              <stop offset="100%" stopColor="#0D9488" stopOpacity={0.0} />
+                              <stop offset="0%" stopColor="#10B981" stopOpacity={0.25} />
+                              <stop offset="100%" stopColor="#10B981" stopOpacity={0.0} />
                             </linearGradient>
                           </defs>
                           <path
-                            d="M 0,76 C 40,71 70,58 110,64 C 150,70 180,46 220,38 C 260,30 290,22 320,16 L 320,104 L 0,104 Z"
+                            d="M 0,72 C 40,67 70,54 110,60 C 150,66 180,42 220,34 C 260,26 290,18 320,12 L 320,96 L 0,96 Z"
                             fill="url(#revSparkGrad)"
                           />
                           <path
-                            d="M 0,76 C 40,71 70,58 110,64 C 150,70 180,46 220,38 C 260,30 290,22 320,16"
+                            d="M 0,72 C 40,67 70,54 110,60 C 150,66 180,42 220,34 C 260,26 290,18 320,12"
                             fill="none"
-                            stroke="#0D9488"
-                            strokeWidth="3"
+                            stroke="#10B981"
+                            strokeWidth="2.5"
                             strokeLinecap="round"
                           />
-                          <circle cx="220" cy="38" r="4.5" fill="#0D9488" />
+                          <circle cx="220" cy="34" r="4" fill="#10B981" />
                         </svg>
                       ) : (
-                        <View style={{ height: 8, backgroundColor: '#E2E8F0', borderRadius: 4, overflow: 'hidden' }}>
-                          <View style={{ height: '100%', width: '75%', backgroundColor: '#0D9488', borderRadius: 4 }} />
+                        <View style={{ height: 6, backgroundColor: '#E2E8F0', borderRadius: 3, overflow: 'hidden' }}>
+                          <View style={{ height: '100%', width: '75%', backgroundColor: '#10B981', borderRadius: 3 }} />
                         </View>
                       )}
                     </View>
@@ -4769,32 +5261,32 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     {/* Right Stats Breakdown */}
                     <View style={{ flexDirection: 'row', gap: 28, flexWrap: 'wrap' }}>
                       <View>
-                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700' }}>Online Sales</Text>
-                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary, marginTop: 4 }}>
+                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Online Sales</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary, marginTop: 4, fontVariant: ['tabular-nums'] }}>
                           ₱{analyticsData.onlineRevenue.toLocaleString()}
                         </Text>
-                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700', marginTop: 16 }}>Orders</Text>
-                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary, marginTop: 4 }}>
+                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700', marginTop: 14, textTransform: 'uppercase', letterSpacing: 0.5 }}>Orders</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary, marginTop: 4, fontVariant: ['tabular-nums'] }}>
                           {orders.length}
                         </Text>
                       </View>
                       <View>
-                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700' }}>Walk-in POS</Text>
-                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary, marginTop: 4 }}>
+                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Walk-in POS</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary, marginTop: 4, fontVariant: ['tabular-nums'] }}>
                           ₱{analyticsData.posRevenue.toLocaleString()}
                         </Text>
-                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700', marginTop: 16 }}>Delivered</Text>
-                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary, marginTop: 4 }}>
+                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700', marginTop: 14, textTransform: 'uppercase', letterSpacing: 0.5 }}>Delivered</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary, marginTop: 4, fontVariant: ['tabular-nums'] }}>
                           {orderStats.delivered}
                         </Text>
                       </View>
                       <View>
-                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700' }}>Net Margin</Text>
-                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary, marginTop: 4 }}>
+                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 }}>Net Margin</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary, marginTop: 4, fontVariant: ['tabular-nums'] }}>
                           {profitOverview.soldMargin.toFixed(1)}%
                         </Text>
-                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700', marginTop: 16 }}>Pending</Text>
-                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary, marginTop: 4 }}>
+                        <Text style={{ fontSize: 11, color: tokens.textMuted, fontWeight: '700', marginTop: 14, textTransform: 'uppercase', letterSpacing: 0.5 }}>Pending</Text>
+                        <Text style={{ fontSize: 15, fontWeight: '800', color: pendingCodCount > 0 ? '#D97706' : tokens.textPrimary, marginTop: 4, fontVariant: ['tabular-nums'] }}>
                           {pendingCodCount}
                         </Text>
                       </View>
@@ -4835,7 +5327,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               Top Earners
                             </Text>
                           </View>
-                          <Text style={[styles.analyticsCardSubtitle, { color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 4 }]}>
+                          <Text style={[styles.analyticsCardSubtitle, { color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 3 }]}>
                             Ranked by cumulative sales volume
                           </Text>
                         </View>
@@ -4845,32 +5337,32 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           style={{
                             paddingHorizontal: 12,
                             paddingVertical: 6,
-                            backgroundColor: isDarkMode ? '#334155' : '#F1F5F9',
+                            backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
                             borderRadius: 8,
                             cursor: 'pointer',
                           }}
                         >
-                          <Text style={{ color: isDarkMode ? '#F8FAFC' : '#64748B', fontSize: 12, fontWeight: '600' }}>
+                          <Text style={{ color: isDarkMode ? '#F8FAFC' : '#475569', fontSize: 12, fontWeight: '600' }}>
                             View products →
                           </Text>
                         </TouchableOpacity>
                       </View>
 
                       {analyticsData.topProducts.length === 0 ? (
-                        <View style={{ paddingVertical: 32, alignItems: 'center', justifyContent: 'center' }}>
+                        <View style={{ paddingVertical: 36, alignItems: 'center', justifyContent: 'center' }}>
                           <BootstrapIcon name="box-seam" size={32} color={tokens.textMuted} />
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary, marginTop: 8 }}>
-                            No Product Sales Yet
+                          <Text style={{ fontSize: 13.5, fontWeight: '700', color: tokens.textPrimary, marginTop: 10 }}>
+                            No Top-Selling Products Yet
                           </Text>
-                          <Text style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 2, textAlign: 'center' }}>
-                            As orders are fulfilled, top grossing catalog items will automatically appear here.
+                          <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 4, textAlign: 'center', maxWidth: 280 }}>
+                            As customer orders are fulfilled, top grossing catalog items will automatically appear here.
                           </Text>
                         </View>
                       ) : (
-                        <View style={{ marginTop: 4 }}>
+                        <View style={{ marginTop: 2 }}>
                           {analyticsData.topProducts.map((tp, idx) => {
                             const maxRev = analyticsData.topProducts[0]?.revenue || 1;
-                            const barWidth = Math.max(5, (tp.revenue / maxRev) * 100);
+                            const barWidth = Math.min(100, Math.max(5, (tp.revenue / maxRev) * 100));
                             const rankBadges = [
                               { bg: '#FEF3C7', text: '#B45309', border: '#FDE68A' },
                               { bg: '#F1F5F9', text: '#475569', border: '#CBD5E1' },
@@ -4888,14 +5380,18 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 style={{
                                   flexDirection: 'row',
                                   alignItems: 'center',
-                                  marginBottom: idx === analyticsData.topProducts.length - 1 ? 0 : 16,
+                                  paddingVertical: 8,
+                                  paddingHorizontal: 8,
+                                  borderRadius: 10,
+                                  marginBottom: idx === analyticsData.topProducts.length - 1 ? 0 : 8,
                                 }}
                               >
+                                {/* Rank Pill */}
                                 <View
                                   style={{
-                                    width: 24,
-                                    height: 24,
-                                    borderRadius: 12,
+                                    width: 26,
+                                    height: 26,
+                                    borderRadius: 13,
                                     backgroundColor: badge.bg,
                                     borderWidth: 1,
                                     borderColor: badge.border,
@@ -4905,20 +5401,25 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     flexShrink: 0,
                                   }}
                                 >
-                                  <Text style={{ fontSize: 10.5, fontWeight: '900', color: badge.text }}>
+                                  <Text style={{ fontSize: 11, fontWeight: '800', color: badge.text }}>
                                     #{idx + 1}
                                   </Text>
                                 </View>
 
+                                {/* Product Thumbnail */}
                                 <View
                                   style={{
-                                    width: 48,
-                                    height: 40,
-                                    backgroundColor: isDarkMode ? '#334155' : '#F1F5F9',
+                                    width: 42,
+                                    height: 42,
+                                    backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
                                     borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: tokens.border,
                                     overflow: 'hidden',
                                     marginRight: 12,
                                     flexShrink: 0,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
                                   }}
                                 >
                                   {tp.image_url ? (
@@ -4927,33 +5428,25 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       style={{ width: '100%', height: '100%', resizeMode: 'cover' }}
                                     />
                                   ) : (
-                                    <View
-                                      style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                      }}
-                                    >
-                                      <BootstrapIcon
-                                        name="box-seam"
-                                        size={16}
-                                        color={isDarkMode ? '#94A3B8' : '#CBD5E1'}
-                                      />
-                                    </View>
+                                    <BootstrapIcon
+                                      name="box-seam"
+                                      size={18}
+                                      color={isDarkMode ? '#64748B' : '#94A3B8'}
+                                    />
                                   )}
                                 </View>
 
+                                {/* Product Info + Bar */}
                                 <View style={{ flex: 1, justifyContent: 'center' }}>
                                   <View
                                     style={{
                                       flexDirection: 'row',
                                       justifyContent: 'space-between',
                                       alignItems: 'center',
-                                      marginBottom: 6,
+                                      marginBottom: 4,
                                     }}
                                   >
-                                    <View style={{ flex: 1, marginRight: 8 }}>
+                                    <View style={{ flex: 1, marginRight: 10 }}>
                                       <Text
                                         style={{
                                           fontSize: 13,
@@ -4966,7 +5459,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       </Text>
                                       <Text
                                         style={{
-                                          fontSize: 11,
+                                          fontSize: 11.5,
                                           color: isDarkMode ? '#94A3B8' : '#64748B',
                                           marginTop: 1,
                                         }}
@@ -4976,9 +5469,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     </View>
                                     <Text
                                       style={{
-                                        fontSize: 13,
+                                        fontSize: 14.5,
                                         fontWeight: '800',
-                                        color: '#1D4533',
+                                        color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                                        fontVariant: ['tabular-nums'],
                                       }}
                                     >
                                       ₱{tp.revenue.toLocaleString()}
@@ -4987,19 +5481,20 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
                                   <View
                                     style={{
-                                      height: 6,
-                                      backgroundColor: isDarkMode ? '#334155' : '#E2E8F0',
-                                      borderRadius: 3,
+                                      height: 3,
+                                      backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                                      borderRadius: 2,
                                       width: '100%',
                                       overflow: 'hidden',
+                                      marginTop: 4,
                                     }}
                                   >
                                     <View
                                       style={{
                                         height: '100%',
                                         width: `${barWidth}%`,
-                                        backgroundColor: '#1D4533',
-                                        borderRadius: 3,
+                                        backgroundColor: '#10B981',
+                                        borderRadius: 2,
                                       }}
                                     />
                                   </View>
@@ -5019,12 +5514,17 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     styles.tableCard,
                     {
                       padding: 0,
-                      borderRadius: 14,
-                      borderWidth: 1.5,
-                      borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                      borderRadius: 16,
+                      borderWidth: 1,
+                      borderColor: tokens.border,
                       backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
                       overflow: 'hidden',
                       marginBottom: 24,
+                      shadowColor: '#000000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: isDarkMode ? 0.2 : 0.03,
+                      shadowRadius: 6,
+                      elevation: 1,
                     },
                   ]}
                 >
@@ -5042,172 +5542,196 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     }}
                   >
                     <View>
-                      <Text style={{ fontSize: 16, fontWeight: '900', color: tokens.textPrimary }}>
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary, letterSpacing: -0.3 }}>
                         Recent Orders & POS Sales
                       </Text>
                       <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 2 }}>
                         Latest transactions across all sales channels
                       </Text>
                     </View>
-                    <TouchableOpacity onPress={() => setActiveNav('orders')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                      <Text style={{ fontSize: 12.5, fontWeight: '800', color: tokens.textSecondary }}>
+                    <TouchableOpacity
+                      onPress={() => setActiveNav('orders')}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 4,
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 8,
+                        backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#475569' }}>
                         View All Orders ({orders.length}) →
                       </Text>
                     </TouchableOpacity>
                   </View>
 
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={{ width: '100%' }}
-                    contentContainerStyle={{ width: '100%', minWidth: '100%', flexGrow: 1 }}
-                  >
-                    <View style={{ width: '100%', minWidth: isDesktop ? '100%' : 720, flex: 1 }}>
-                      {/* Table Header Row */}
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          width: '100%',
-                          paddingHorizontal: 20,
-                          paddingVertical: 12,
-                          backgroundColor: isDarkMode ? '#0E1311' : '#F8FAFC',
-                          borderBottomWidth: 1,
-                          borderBottomColor: tokens.border,
-                        }}
-                      >
-                        <Text style={{ flex: 2.5, fontSize: 11, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>ORDER REF</Text>
-                        <Text style={{ flex: 2.5, fontSize: 11, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>CUSTOMER</Text>
-                        <Text style={{ flex: 1.8, fontSize: 11, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>CHANNEL</Text>
-                        <Text style={{ flex: 1.6, fontSize: 11, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>AMOUNT</Text>
-                        <Text style={{ flex: 1.6, fontSize: 11, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>STATUS</Text>
-                      </View>
-
-                      {/* Rows */}
-                      {orders.slice(0, 6).map((o, idx) => {
-                        const orderId = o.order_id || o.id || `ORD-${idx}`;
-                        const rawChannel = String(o.channel || '').toLowerCase();
-                        const isInStore = rawChannel.includes('pos') || rawChannel.includes('in-store') || rawChannel.includes('walk-in') || (rawChannel.includes('store') && !rawChannel.includes('online'));
-                        const displayChannel = isInStore ? 'In Store' : 'Online Store';
-                        const status = (o.status || 'Delivered').trim();
-                        const isDelivered = status.toLowerCase() === 'delivered' || status.toLowerCase() === 'completed';
-                        const isPending = status.toLowerCase().includes('pending');
-
-                        return (
-                          <View
-                            key={orderId}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              width: '100%',
-                              paddingHorizontal: 20,
-                              paddingVertical: 14,
-                              borderBottomWidth: 1,
-                              borderBottomColor: tokens.border,
-                            }}
-                          >
-                            {/* ORDER REF: pill box */}
-                            <View style={{ flex: 2.5, paddingRight: 12 }}>
-                              <View
-                                style={{
-                                  alignSelf: 'flex-start',
-                                  paddingHorizontal: 10,
-                                  paddingVertical: 4.5,
-                                  borderRadius: 6,
-                                  borderWidth: 1,
-                                  borderColor: tokens.border,
-                                  backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                                }}
-                              >
-                                <Text
-                                  numberOfLines={1}
-                                  style={{
-                                    fontSize: 11.5,
-                                    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                                    fontWeight: '700',
-                                    color: tokens.textSecondary,
-                                  }}
-                                >
-                                  {orderId}
-                                </Text>
-                              </View>
-                            </View>
-
-                            {/* CUSTOMER & DATE */}
-                            <View style={{ flex: 2.5, paddingRight: 12 }}>
-                              <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '800', color: tokens.textPrimary }}>
-                                {o.customer_name || 'Customer'}
-                              </Text>
-                              <Text style={{ fontSize: 11, color: tokens.textMuted, marginTop: 2 }}>
-                                {o.order_date || 'Recent'}
-                              </Text>
-                            </View>
-
-                            {/* CHANNEL */}
-                            <View style={{ flex: 1.8, paddingRight: 12 }}>
-                              <View
-                                style={{
-                                  alignSelf: 'flex-start',
-                                  paddingHorizontal: 10,
-                                  paddingVertical: 3.5,
-                                  borderRadius: 6,
-                                  borderWidth: 1,
-                                  backgroundColor: isInStore
-                                    ? (isDarkMode ? 'rgba(5, 150, 105, 0.2)' : '#ECFDF5')
-                                    : (isDarkMode ? 'rgba(37, 99, 235, 0.2)' : '#EFF6FF'),
-                                  borderColor: isInStore ? '#A7F3D0' : '#BFDBFE',
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: '800',
-                                    color: isInStore ? '#059669' : '#2563EB',
-                                  }}
-                                >
-                                  {displayChannel}
-                                </Text>
-                              </View>
-                            </View>
-
-                            {/* AMOUNT */}
-                            <View style={{ flex: 1.6, paddingRight: 12 }}>
-                              <Text style={{ fontSize: 13.5, fontWeight: '900', color: tokens.textPrimary }}>
-                                ₱{(Number(o.grand_total) || Number(o.total_amount) || 0).toLocaleString()}
-                              </Text>
-                            </View>
-
-                            {/* STATUS */}
-                            <View style={{ flex: 1.6, alignItems: 'center' }}>
-                              <View
-                                style={{
-                                  paddingHorizontal: 12,
-                                  paddingVertical: 4,
-                                  borderRadius: 14,
-                                  borderWidth: 1,
-                                  backgroundColor: isDelivered
-                                    ? (isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#DCFCE7')
-                                    : isPending
-                                    ? (isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7')
-                                    : (isDarkMode ? 'rgba(239, 68, 68, 0.2)' : '#FEE2E2'),
-                                  borderColor: isDelivered ? '#86EFAC' : isPending ? '#FDE68A' : '#FECACA',
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: '800',
-                                    color: isDelivered ? '#15803D' : isPending ? '#B45309' : '#B91C1C',
-                                  }}
-                                >
-                                  {isDelivered ? 'Delivered' : isPending ? 'Pending COD' : status}
-                                </Text>
-                              </View>
-                            </View>
-                          </View>
-                        );
-                      })}
+                  {orders.length === 0 ? (
+                    <View style={{ paddingVertical: 48, alignItems: 'center', justifyContent: 'center' }}>
+                      <BootstrapIcon name="receipt" size={32} color={tokens.textMuted} />
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary, marginTop: 10 }}>
+                        No Recent Transactions
+                      </Text>
+                      <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 4, textAlign: 'center', maxWidth: 360 }}>
+                        Customer orders and cashier checkout records will automatically appear here once placed.
+                      </Text>
                     </View>
-                  </ScrollView>
+                  ) : (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      style={{ width: '100%' }}
+                      contentContainerStyle={{ width: '100%', minWidth: '100%', flexGrow: 1 }}
+                    >
+                      <View style={{ width: '100%', minWidth: isDesktop ? '100%' : 720, flex: 1 }}>
+                        {/* Table Header Row */}
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            width: '100%',
+                            paddingHorizontal: 20,
+                            paddingVertical: 12,
+                            backgroundColor: isDarkMode ? '#0E1311' : '#F8FAFC',
+                            borderBottomWidth: 1,
+                            borderBottomColor: tokens.border,
+                          }}
+                        >
+                          <Text style={{ flex: 2.5, fontSize: 10.5, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>ORDER REF</Text>
+                          <Text style={{ flex: 2.5, fontSize: 10.5, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>CUSTOMER</Text>
+                          <Text style={{ flex: 1.8, fontSize: 10.5, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>CHANNEL</Text>
+                          <Text style={{ flex: 1.6, fontSize: 10.5, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>AMOUNT</Text>
+                          <Text style={{ flex: 1.6, fontSize: 10.5, fontWeight: '800', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6, textAlign: 'center' }}>STATUS</Text>
+                        </View>
+
+                        {/* Rows */}
+                        {orders.slice(0, 6).map((o, idx) => {
+                          const orderId = o.order_id || o.id || `ORD-ON-2026-${String(idx + 1).padStart(5, '0')}`;
+                          const rawChannel = String(o.channel || '').toLowerCase();
+                          const isInStore = rawChannel.includes('pos') || rawChannel.includes('in-store') || rawChannel.includes('walk-in') || (rawChannel.includes('store') && !rawChannel.includes('online'));
+                          const displayChannel = isInStore ? 'In Store' : 'Online Store';
+                          const status = (o.status || 'Delivered').trim();
+                          const isDelivered = status.toLowerCase() === 'delivered' || status.toLowerCase() === 'completed';
+                          const isPending = status.toLowerCase().includes('pending');
+
+                          return (
+                            <View
+                              key={orderId}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                width: '100%',
+                                paddingHorizontal: 20,
+                                paddingVertical: 13,
+                                borderBottomWidth: 1,
+                                borderBottomColor: tokens.border,
+                              }}
+                            >
+                              {/* ORDER REF: pill box */}
+                              <View style={{ flex: 2.5, paddingRight: 12 }}>
+                                <View
+                                  style={{
+                                    alignSelf: 'flex-start',
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 3,
+                                    borderRadius: 6,
+                                    borderWidth: 1,
+                                    borderColor: tokens.border,
+                                    backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                                  }}
+                                >
+                                  <Text
+                                    numberOfLines={1}
+                                    style={{
+                                      fontSize: 11.5,
+                                      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                                      fontWeight: '700',
+                                      color: tokens.textSecondary,
+                                    }}
+                                  >
+                                    {orderId}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              {/* CUSTOMER & DATE */}
+                              <View style={{ flex: 2.5, paddingRight: 12 }}>
+                                <Text numberOfLines={1} style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary }}>
+                                  {o.customer_name || 'Customer'}
+                                </Text>
+                                <Text style={{ fontSize: 11, color: tokens.textMuted, marginTop: 1 }}>
+                                  {o.order_date || 'Recent'}
+                                </Text>
+                              </View>
+
+                              {/* CHANNEL */}
+                              <View style={{ flex: 1.8, paddingRight: 12 }}>
+                                <View
+                                  style={{
+                                    alignSelf: 'flex-start',
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 2.5,
+                                    borderRadius: 6,
+                                    borderWidth: 1,
+                                    backgroundColor: isInStore
+                                      ? (isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
+                                      : (isDarkMode ? 'rgba(37, 99, 235, 0.15)' : '#EFF6FF'),
+                                    borderColor: isInStore ? (isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0') : (isDarkMode ? 'rgba(37, 99, 235, 0.3)' : '#BFDBFE'),
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 11,
+                                      fontWeight: '700',
+                                      color: isInStore ? (isDarkMode ? '#34D399' : '#059669') : (isDarkMode ? '#60A5FA' : '#2563EB'),
+                                    }}
+                                  >
+                                    {displayChannel}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              {/* AMOUNT */}
+                              <View style={{ flex: 1.6, paddingRight: 12 }}>
+                                <Text style={{ fontSize: 13.5, fontWeight: '800', color: tokens.textPrimary, fontVariant: ['tabular-nums'] }}>
+                                  ₱{(Number(o.grand_total) || Number(o.total_amount) || 0).toLocaleString()}
+                                </Text>
+                              </View>
+
+                              {/* STATUS */}
+                              <View style={{ flex: 1.6, alignItems: 'center' }}>
+                                <View
+                                  style={{
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 3,
+                                    borderRadius: 12,
+                                    borderWidth: 1,
+                                    backgroundColor: isDelivered
+                                      ? (isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
+                                      : isPending
+                                      ? (isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#FFFBEB')
+                                      : (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2'),
+                                    borderColor: isDelivered ? (isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0') : isPending ? (isDarkMode ? 'rgba(245, 158, 11, 0.3)' : '#FDE68A') : (isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#FECACA'),
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 11,
+                                      fontWeight: '700',
+                                      color: isDelivered ? (isDarkMode ? '#34D399' : '#047857') : isPending ? (isDarkMode ? '#FBBF24' : '#B45309') : (isDarkMode ? '#F87171' : '#B91C1C'),
+                                    }}
+                                  >
+                                    {isDelivered ? 'Delivered' : isPending ? 'Pending COD' : status}
+                                  </Text>
+                                </View>
+                              </View>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    </ScrollView>
+                  )}
                 </View>
               </View>
             )}
@@ -5719,29 +6243,63 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       )}
                     </View>
 
-                  {/* Export CSV Button */}
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      backgroundColor: '#1D4533',
-                      paddingHorizontal: 14,
-                      paddingVertical: 10,
-                      borderRadius: 12,
-                      marginLeft: 'auto',
-                    }}
-                    onPress={() => {
-                      orderService.exportOrdersToCSV(filteredOrdersList);
-                      showToast('Orders exported to CSV');
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <BootstrapIcon name="download" size={14} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
-                      Export CSV ({filteredOrdersList.length})
-                    </Text>
-                  </TouchableOpacity>
+                  {/* Export Buttons */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: '#107C41',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        borderRadius: 12,
+                        boxShadow: '0 2px 6px rgba(16, 124, 65, 0.25)',
+                        cursor: 'pointer',
+                      }}
+                      onPress={() => {
+                        const res = excelService.exportOrdersToExcel(filteredOrdersList, {
+                          fileName: `mototrack_orders_${ordersFilter !== 'all' ? ordersFilter + '_' : ''}${new Date().toISOString().slice(0, 10)}.xlsx`,
+                        });
+                        if (res.success) {
+                          showToast(`✓ Exported ${filteredOrdersList.length} orders to Excel (.xlsx)`);
+                        } else {
+                          showAlert('Export Failed', res.error || 'Failed to generate Excel file.');
+                        }
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <BootstrapIcon name="file-earmark-excel-fill" size={14} color="#FFFFFF" />
+                      <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+                        Export Excel ({filteredOrdersList.length})
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                        paddingHorizontal: 12,
+                        paddingVertical: 9,
+                        borderRadius: 12,
+                        cursor: 'pointer',
+                      }}
+                      onPress={() => {
+                        orderService.exportOrdersToCSV(filteredOrdersList);
+                        showToast('Orders exported to CSV');
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <BootstrapIcon name="download" size={13} color={isDarkMode ? '#94A3B8' : '#475569'} />
+                      <Text style={{ color: isDarkMode ? '#94A3B8' : '#475569', fontWeight: '700', fontSize: 12.5 }}>
+                        CSV
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
                 {/* Orders List Table */}
@@ -5790,10 +6348,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     showsHorizontalScrollIndicator={true}
                     contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                   >
-                    <View style={{ width: '100%', minWidth: 880, flexGrow: 1 }}>
+                    <View style={{ width: '100%', minWidth: 1040, flexGrow: 1 }}>
                       <View style={styles.tableHeaderRow}>
-                        <Text style={[styles.tableHeaderCell, { flex: 2.8, minWidth: 230 }]}>Customer & Destination</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 180 }]}>Items Summary</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 150 }]}>Order ID</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 160 }]}>Customer</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 2.6, minWidth: 200 }]}>Items Summary</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 95 }]}>Payment</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 95, textAlign: 'right' }]}>Total</Text>
                         <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110, textAlign: 'center' }]}>
@@ -5813,7 +6372,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         </View>
                       ) : (
                         filteredOrdersList.map((o, idx) => {
-                          const orderId = o.order_id || o.id;
+                          const displayOrderId = o.order_id || o.id || `ORD-ON-2026-${String(idx + 1).padStart(5, '0')}`;
                           const st = (o.status || 'Pending Approval').toLowerCase();
                           const isPending = st.includes('pending') || st.includes('approval');
                           const isProcessing = st === 'processing';
@@ -5847,55 +6406,48 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
                           return (
                             <View
-                              key={orderId || idx}
+                              key={displayOrderId || idx}
                               style={[styles.tableRow, isPending && { backgroundColor: '#FFFBEB' }]}
                             >
-                              {/* 1. Customer & Destination */}
-                              <View style={{ flex: 2.8, minWidth: 230 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                  <BootstrapIcon name="person-fill" size={12} color="#1D4533" />
-                                  <Text style={[styles.tableTitle, { fontWeight: '800', fontSize: 13 }]} numberOfLines={1}>
+                              {/* 0. Order ID */}
+                              <View style={{ flex: 1.8, minWidth: 150, justifyContent: 'center' }}>
+                                <View
+                                  style={{
+                                    alignSelf: 'flex-start',
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 3.5,
+                                    borderRadius: 6,
+                                    borderWidth: 1,
+                                    borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                                    backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                                  }}
+                                >
+                                  <Text
+                                    numberOfLines={1}
+                                    style={{
+                                      fontSize: 11.5,
+                                      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                                      fontWeight: '800',
+                                      color: isDarkMode ? '#38BDF8' : '#0F172A',
+                                    }}
+                                  >
+                                    {displayOrderId}
+                                  </Text>
+                                </View>
+                              </View>
+
+                              {/* 1. Customer */}
+                              <View style={{ flex: 2.0, minWidth: 160, justifyContent: 'center' }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <BootstrapIcon name="person-fill" size={13} color="#1D4533" />
+                                  <Text style={[styles.tableTitle, { fontWeight: '800', fontSize: 13.5 }]} numberOfLines={1}>
                                     {o.customer_name || 'Walk-in Customer'}
                                   </Text>
                                 </View>
-                                {o.customer_phone ? (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                                    <BootstrapIcon name="telephone-fill" size={10} color="#64748B" />
-                                    <Text style={[styles.tableSub, { fontSize: 11 }]}>{o.customer_phone}</Text>
-                                  </View>
-                                ) : null}
-                                {o.customer_address ? (
-                                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 4, marginTop: 3 }}>
-                                    <BootstrapIcon name="geo-alt-fill" size={10} color="#059669" style={{ marginTop: 2 }} />
-                                    <Text
-                                      style={[styles.tableSub, { color: '#334155', fontSize: 11, flex: 1, lineHeight: 14 }]}
-                                      numberOfLines={2}
-                                    >
-                                      {o.customer_address}
-                                    </Text>
-                                  </View>
-                                ) : null}
-                                {o.delivery_notes ? (
-                                  <View
-                                    style={{
-                                      backgroundColor: '#F1F5F9',
-                                      paddingHorizontal: 6,
-                                      paddingVertical: 1.5,
-                                      borderRadius: 4,
-                                      alignSelf: 'flex-start',
-                                      marginTop: 3,
-                                      maxWidth: 220,
-                                    }}
-                                  >
-                                    <Text style={{ color: '#475569', fontSize: 9.5, fontStyle: 'italic' }} numberOfLines={1}>
-                                      💬 "{o.delivery_notes}"
-                                    </Text>
-                                  </View>
-                                ) : null}
                               </View>
 
                               {/* 2. Items Summary */}
-                              <View style={{ flex: 2.2, minWidth: 180 }}>
+                              <View style={{ flex: 2.6, minWidth: 210, justifyContent: 'center' }}>
                                 <Text style={[styles.tableTitle, { fontSize: 12.5, lineHeight: 17 }]} numberOfLines={2}>
                                   {o.items_summary ||
                                     (o.items && o.items.length > 0
@@ -6012,36 +6564,28 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   flexShrink: 0,
                                 }}
                               >
-                                {isDelivered ? (
-                                  <TouchableOpacity
-                                    style={styles.btnViewOrder}
-                                    onPress={() => openOrderModalWithOrder(o, false)}
-                                    activeOpacity={0.85}
+                                <TouchableOpacity
+                                  style={[
+                                    styles.btnViewOrder,
+                                    !isDelivered && { backgroundColor: '#F0FDF4', borderColor: '#BBF7D0' },
+                                  ]}
+                                  onPress={() => openOrderModalWithOrder(o, false)}
+                                  activeOpacity={0.85}
+                                >
+                                  <BootstrapIcon
+                                    name={isDelivered ? 'eye' : 'sliders'}
+                                    size={12}
+                                    color={isDelivered ? '#334155' : '#1D4533'}
+                                  />
+                                  <Text
+                                    style={[
+                                      styles.btnViewOrderText,
+                                      !isDelivered && { color: '#1D4533', fontWeight: '800' },
+                                    ]}
                                   >
-                                    <BootstrapIcon name="eye" size={12} color="#334155" />
-                                    <Text style={styles.btnViewOrderText}>Details</Text>
-                                  </TouchableOpacity>
-                                ) : (
-                                  <>
-                                    <TouchableOpacity
-                                      style={styles.btnEditOrder}
-                                      onPress={() => openOrderModalWithOrder(o, true)}
-                                      activeOpacity={0.85}
-                                    >
-                                      <BootstrapIcon name="pencil-square" size={12} color="#1D4533" />
-                                      <Text style={styles.btnEditOrderText}>Edit</Text>
-                                    </TouchableOpacity>
-
-                                    <TouchableOpacity
-                                      style={styles.btnViewOrder}
-                                      onPress={() => openOrderModalWithOrder(o, false)}
-                                      activeOpacity={0.85}
-                                    >
-                                      <BootstrapIcon name="eye" size={12} color="#334155" />
-                                      <Text style={styles.btnViewOrderText}>Details</Text>
-                                    </TouchableOpacity>
-                                  </>
-                                )}
+                                    {isDelivered ? 'Details' : 'Manage'}
+                                  </Text>
+                                </TouchableOpacity>
                               </View>
                             </View>
                           );
@@ -6070,7 +6614,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     label="In Stock SKUs"
                     value={invStats.inStockCount}
                     valueColor="#1D4533"
-                    sub="5+ units on hand"
+                    sub="Above reorder level"
                   />
                   <AdminStatCard
                     styles={styles}
@@ -6140,8 +6684,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
                       <BootstrapIcon name="exclamation-triangle-fill" size={18} color="#D97706" />
                       <Text style={styles.inventoryAlertText}>
-                        Attention: {invStats.lowStockCount} product(s) have fallen below the safe threshold of
-                        5 units. Please restock to avoid order delays.
+                        Attention: {invStats.lowStockCount} product(s) have fallen below their reorder level.
+                        Please restock to avoid order delays.
                       </Text>
                     </View>
                     <TouchableOpacity
@@ -6216,7 +6760,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
                           : '0 1px 3px rgba(0, 0, 0, 0.04)',
                       }}
-                      onPress={() => setIsInvCategoryDropdownOpen((prev) => !prev)}
+                      onPress={() => {
+                        setIsInvCategoryDropdownOpen((prev) => !prev);
+                        setIsInvStockDropdownOpen(false);
+                      }}
                       activeOpacity={0.85}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
@@ -6332,36 +6879,152 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     )}
                   </View>
 
-                  {/* Stock Status Filter Pills */}
-                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                    {[
-                      { key: 'All', label: 'All SKUs', icon: 'boxes' },
-                      { key: 'inStock', label: 'In Stock', icon: 'check-circle-fill' },
-                      { key: 'lowStock', label: 'Low Stock', icon: 'exclamation-triangle-fill' },
-                      { key: 'outOfStock', label: 'Out of Stock', icon: 'slash-circle-fill' },
-                    ].map((f) => (
+                  {/* Stock Status Filter Dropdown */}
+                  <View
+                    style={{
+                      position: 'relative',
+                      zIndex: isInvStockDropdownOpen ? 99999 : 9,
+                    }}
+                  >
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                        borderWidth: 1.5,
+                        borderColor: isInvStockDropdownOpen
+                          ? '#1D4533'
+                          : invStockFilter !== 'All'
+                            ? '#1D4533'
+                            : isDarkMode ? '#334155' : '#E2E8F0',
+                        borderRadius: 12,
+                        paddingHorizontal: 14,
+                        paddingVertical: 9,
+                        minWidth: 145,
+                        cursor: 'pointer',
+                        boxShadow: isInvStockDropdownOpen
+                          ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                          : '0 1px 3px rgba(0, 0, 0, 0.04)',
+                      }}
+                      onPress={() => {
+                        setIsInvStockDropdownOpen((prev) => !prev);
+                        setIsInvCategoryDropdownOpen(false);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                        <BootstrapIcon
+                          name={
+                            (STOCK_FILTER_OPTIONS.find((opt) => opt.key === invStockFilter) || STOCK_FILTER_OPTIONS[0]).icon
+                          }
+                          size={13}
+                          color={invStockFilter !== 'All' ? '#1D4533' : '#64748B'}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: '700',
+                            color: invStockFilter !== 'All' ? '#1D4533' : isDarkMode ? '#F8FAFC' : '#0F172A',
+                          }}
+                        >
+                          {(STOCK_FILTER_OPTIONS.find((opt) => opt.key === invStockFilter) || STOCK_FILTER_OPTIONS[0]).label}
+                        </Text>
+                      </View>
+                      <BootstrapIcon
+                        name={isInvStockDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                        size={12}
+                        color={isInvStockDropdownOpen ? '#1D4533' : '#64748B'}
+                      />
+                    </TouchableOpacity>
+
+                    {/* Transparent backdrop for outside click */}
+                    {isInvStockDropdownOpen && (
                       <TouchableOpacity
-                        key={f.key}
-                        style={[styles.filterPill, invStockFilter === f.key && styles.filterPillActive]}
-                        onPress={() => setInvStockFilter(f.key)}
+                        style={{
+                          position: 'fixed',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          zIndex: 99998,
+                          backgroundColor: 'transparent',
+                          cursor: 'default',
+                        }}
+                        onPress={() => setIsInvStockDropdownOpen(false)}
+                        activeOpacity={1}
+                      />
+                    )}
+
+                    {/* Floating Dropdown Menu */}
+                    {isInvStockDropdownOpen && (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          marginTop: 6,
+                          minWidth: 180,
+                          backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                          borderRadius: 14,
+                          borderWidth: 1.5,
+                          borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                          boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
+                          zIndex: 99999,
+                          padding: 6,
+                          gap: 3,
+                        }}
                       >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                          <BootstrapIcon
-                            name={f.icon}
-                            size={11}
-                            color={invStockFilter === f.key ? '#FFFFFF' : '#64748B'}
-                          />
-                          <Text
-                            style={[
-                              styles.filterPillText,
-                              invStockFilter === f.key && styles.filterPillTextActive,
-                            ]}
-                          >
-                            {f.label}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))}
+                        {STOCK_FILTER_OPTIONS.map((f) => {
+                          const isSelected = invStockFilter === f.key;
+                          return (
+                            <TouchableOpacity
+                              key={f.key}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingHorizontal: 12,
+                                paddingVertical: 9,
+                                borderRadius: 9,
+                                backgroundColor: isSelected
+                                  ? isDarkMode ? '#132A26' : '#E8F0EC'
+                                  : 'transparent',
+                                cursor: 'pointer',
+                              }}
+                              onPress={() => {
+                                setInvStockFilter(f.key);
+                                setIsInvStockDropdownOpen(false);
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <BootstrapIcon
+                                  name={f.icon}
+                                  size={13}
+                                  color={isSelected ? '#1D4533' : '#64748B'}
+                                />
+                                <Text
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: isSelected ? '800' : '600',
+                                    color: isSelected
+                                      ? '#1D4533'
+                                      : isDarkMode ? '#E2E8F0' : '#334155',
+                                  }}
+                                >
+                                  {f.label}
+                                </Text>
+                              </View>
+                              {isSelected && (
+                                <BootstrapIcon name="check2" size={14} color="#1D4533" />
+                              )}
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
 
                   {/* Export Inventory to Excel Button */}
@@ -6424,7 +7087,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     </View>
 
                     {filteredInventory.map((p) => {
-                      const isLow = (p.stock || 0) > 0 && (p.stock || 0) < 5;
+                      const isLow = isLowStock(p, 5);
                       const isOut = !p.stock || p.stock <= 0;
                       const stockVal = (p.price || 0) * (p.stock || 0);
 
@@ -7172,7 +7835,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   isDark={isDarkMode}
                   isDesktop={isDesktop}
                   title="Revenue Trend"
-                  subtitle="Weekly revenue trends across online storefront & in-store POS channels"
+                  subtitle={
+                    analyticsData.hasRealTrend
+                      ? 'Weekly revenue from online storefront & in-store POS'
+                      : 'No historical revenue data available.'
+                  }
                 />
 
                 {/* Service Bookings Share (Pie Chart: Repair vs PMS vs Customization) */}
@@ -7330,10 +7997,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </View>
                 </View>
 
-                {/* Category Revenue & Regression Analysis */}
+                {/* Category Revenue (observed totals — forecasting lives in Sales Forecast tab) */}
                 <View style={[styles.analyticsCard, { marginTop: 20 }]}>
-                  <Text style={styles.analyticsCardTitle}>Category Revenue & Linear Regression Analysis</Text>
-                  <Text style={styles.analyticsCardSubtitle}>Data-driven trend prediction using least squares method</Text>
+                  <Text style={styles.analyticsCardTitle}>Category Revenue</Text>
+                  <Text style={styles.analyticsCardSubtitle}>
+                    Observed sales totals by category. Demand forecasts use Croston/SBA in Sales Forecast.
+                  </Text>
                   
                   <View style={{ marginTop: 16 }}>
                     {analyticsData.categoryRegression && analyticsData.categoryRegression.length > 0 ? (
@@ -7345,27 +8014,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               Historical: ₱{catReg.totalRevenue.toLocaleString()}
                             </Text>
                           </View>
-                          
-                          <View style={{ flex: 1, alignItems: 'center' }}>
-                            <Text style={{ fontSize: 13, fontWeight: '700', color: catReg.slope > 0 ? '#10B981' : (catReg.slope < 0 ? '#EF4444' : '#64748B') }}>
-                              {catReg.slope > 0 ? '📈 Trending Up' : (catReg.slope < 0 ? '📉 Trending Down' : '➖ Flat')}
-                            </Text>
-                            <Text style={{ fontSize: 11, color: '#94A3B8', marginTop: 2 }}>
-                              Slope: {catReg.slope > 0 ? '+' : ''}{catReg.slope.toFixed(2)}
-                            </Text>
-                          </View>
-                          
                           <View style={{ flex: 1, alignItems: 'flex-end' }}>
-                            <Text style={{ fontSize: 11, color: '#64748B', textTransform: 'uppercase', fontWeight: '800' }}>Next Period Prediction</Text>
+                            <Text style={{ fontSize: 11, color: '#64748B', textTransform: 'uppercase', fontWeight: '800' }}>
+                              Share of catalog sales
+                            </Text>
                             <Text style={{ fontSize: 15, fontWeight: '900', color: '#1D4533', marginTop: 2 }}>
-                              ₱{Math.round(catReg.prediction).toLocaleString()}
+                              {analyticsData.totalRevenue > 0
+                                ? `${Math.round((catReg.totalRevenue / analyticsData.totalRevenue) * 100)}%`
+                                : '—'}
                             </Text>
                           </View>
                         </View>
                       ))
                     ) : (
                       <Text style={{ color: '#64748B', fontStyle: 'italic', textAlign: 'center', paddingVertical: 20 }}>
-                        Not enough data for regression analysis.
+                        No historical revenue data available.
                       </Text>
                     )}
                   </View>
@@ -7385,6 +8048,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
             {activeNav === 'customizations' && (
               <CustomizationsAdminPanel isDarkMode={isDarkMode} />
+            )}
+
+            {activeNav === 'moto_models' && (
+              <MotorcycleModelsAdminPanel onToast={showToast} />
             )}
 
             {/* ─── TAB 5: PRODUCTS & PRICES MANAGEMENT ─── */}
@@ -7881,19 +8548,51 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     position: 'relative',
                   }}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <BootstrapIcon name="tools" size={15} color="#1D4533" />
-                    <Text
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <BootstrapIcon name="tools" size={15} color="#1D4533" />
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '800',
+                          color: isDarkMode ? '#94A3B8' : '#475569',
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.8,
+                        }}
+                      >
+                        Garage Workspace View
+                      </Text>
+                    </View>
+
+                    <TouchableOpacity
                       style={{
-                        fontSize: 12,
-                        fontWeight: '800',
-                        color: isDarkMode ? '#94A3B8' : '#475569',
-                        textTransform: 'uppercase',
-                        letterSpacing: 0.8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: '#107C41',
+                        paddingHorizontal: 12,
+                        paddingVertical: 7,
+                        borderRadius: 10,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(16, 124, 65, 0.25)',
                       }}
+                      onPress={() => {
+                        const res = excelService.exportBookingsToExcel(garageBookings, {
+                          fileName: `mototrack_service_bookings_${new Date().toISOString().slice(0, 10)}.xlsx`,
+                        });
+                        if (res.success) {
+                          showToast(`✓ Exported ${garageBookings.length} service appointments to Excel (.xlsx)`);
+                        } else {
+                          showAlert('Export Failed', res.error || 'Failed to generate Excel report.');
+                        }
+                      }}
+                      activeOpacity={0.85}
                     >
-                      Garage Workspace View
-                    </Text>
+                      <BootstrapIcon name="file-earmark-excel-fill" size={13} color="#FFFFFF" />
+                      <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>
+                        Export Excel ({garageBookings.length})
+                      </Text>
+                    </TouchableOpacity>
                   </View>
 
                   {/* Interactive Dropdown Button Container */}
@@ -8892,21 +9591,18 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         >
                           <View style={{ width: '100%', minWidth: 1140, flexGrow: 1 }}>
                             <View style={styles.tableHeaderRow}>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.6, minWidth: 140 }]}>Booking ID</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130 }]}>Customer</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130 }]}>Motorcycle</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.6, minWidth: 140 }]}>Service</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 120 }]}>Preferred Date/Time</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110 }]}>Mechanic</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 100 }]}>Quote</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 110, textAlign: 'center' }]}>
-                              Status
-                            </Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.1, minWidth: 100 }]}>Payment</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 160, textAlign: 'center' }]}>
-                              Actions
-                            </Text>
-                          </View>
+                              <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 160 }]}>Booking & Schedule</Text>
+                              <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 140 }]}>Customer</Text>
+                              <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 130 }]}>Motorcycle</Text>
+                              <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 140 }]}>Service & Quote</Text>
+                              <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 130 }]}>Assigned Mechanic</Text>
+                              <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 130, textAlign: 'center' }]}>
+                                Status & Payment
+                              </Text>
+                              <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 120, textAlign: 'center' }]}>
+                                Action
+                              </Text>
+                            </View>
 
                           {filteredBookings.length === 0 ? (
                             <View style={{ padding: 32, alignItems: 'center', justifyContent: 'center' }}>
@@ -8969,135 +9665,69 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     isInProg && { backgroundColor: '#FFFBEB' },
                                   ]}
                                 >
-                                  {/* 1. Booking ID */}
-                                  <View style={{ flex: 1.6, minWidth: 140, gap: 3 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                      <Text style={[styles.tableTitle, { color: '#1D4533' }]}>{b.booking_id || b.id}</Text>
+                                  {/* 1. Booking ID & Preferred Schedule (Important Only) */}
+                                  <View style={{ flex: 1.8, minWidth: 160, gap: 4 }}>
+                                    <Text style={[styles.tableTitle, { color: '#1D4533', fontWeight: '800' }]}>
+                                      {b.booking_id || b.id}
+                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                      <BootstrapIcon name="calendar-event" size={11} color="#64748B" />
+                                      <Text style={[styles.tableSub, { color: '#334155', fontWeight: '600', fontSize: 11.5 }]}>
+                                        {b.preferred_date || b.appointment_date || b.date || '—'}
+                                      </Text>
                                     </View>
-                                    <Text style={[styles.tableSub, { fontSize: 10 }]}>
-                                      {(b.created_at || b.createdAt)
-                                        ? new Date(b.created_at || b.createdAt).toLocaleDateString()
-                                        : '—'}
-                                    </Text>
-                                    <Text style={[styles.tableSub, { color: '#0F172A', fontWeight: '700' }]}>
-                                      {b.preferred_date || b.appointment_date || b.date || '—'} ·{' '}
-                                      {b.preferred_time || b.time_slot || b.time || '—'}
-                                    </Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                      <BootstrapIcon name="clock" size={11} color="#64748B" />
+                                      <Text style={[styles.tableSub, { color: '#64748B', fontSize: 11 }]}>
+                                        {b.preferred_time || b.time_slot || b.time || '—'}
+                                      </Text>
+                                    </View>
                                   </View>
 
-                                  {/* 2. Customer Info */}
-                                  <View style={{ flex: 1.8, minWidth: 150, gap: 2 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                  {/* 2. Customer Name & Contact Phone (Important Only) */}
+                                  <View style={{ flex: 1.5, minWidth: 140, gap: 3 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                       <BootstrapIcon name="person-fill" size={12} color="#1D4533" />
-                                      <Text style={styles.tableTitle}>{b.customer_name || b.userName || 'Customer'}</Text>
+                                      <Text style={[styles.tableTitle, { fontSize: 13 }]} numberOfLines={1}>
+                                        {b.customer_name || b.userName || 'Customer'}
+                                      </Text>
                                     </View>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                       <BootstrapIcon name="telephone-fill" size={11} color="#64748B" />
-                                      <Text style={styles.tableSub}>{b.customer_phone || b.userPhone || 'No phone'}</Text>
+                                      <Text style={[styles.tableSub, { fontSize: 11.5 }]}>
+                                        {b.customer_phone || b.userPhone || 'No phone'}
+                                      </Text>
                                     </View>
-                                    {(b.customer_email || b.userEmail) ? (
-                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                        <BootstrapIcon name="envelope-fill" size={10} color="#64748B" />
-                                        <Text
-                                          style={[styles.tableSub, { fontSize: 11, color: '#64748B' }]}
-                                          numberOfLines={1}
-                                        >
-                                          {b.customer_email || b.userEmail}
-                                        </Text>
-                                      </View>
-                                    ) : null}
                                   </View>
 
-                                  {/* 3. Motorcycle & Plate */}
-                                  <View style={{ flex: 1.8, minWidth: 150, gap: 3 }}>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                                  {/* 3. Motorcycle & Plate (Important Only) */}
+                                  <View style={{ flex: 1.4, minWidth: 130, gap: 4 }}>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                       <BootstrapIcon name="bicycle" size={13} color="#0F172A" />
-                                      <Text style={styles.tableTitle}>
+                                      <Text style={[styles.tableTitle, { fontSize: 12.5 }]} numberOfLines={1}>
                                         {b.bike_brand || b.bikeBrand} {b.bike_model || b.bikeModel}
                                       </Text>
                                     </View>
                                     <View style={styles.bikeInfoRow}>
                                       <View style={styles.bikePlatePill}>
-                                        <Text style={styles.bikePlateText}>{b.plate_number || b.bikePlate || 'TEMP-PLATE'}</Text>
-                                      </View>
-                                      {(b.odometer || b.bikeOdo) ? (
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                          <BootstrapIcon name="speedometer2" size={10} color="#64748B" />
-                                          <Text style={[styles.tableSub, { fontSize: 11 }]}>{b.odometer || b.bikeOdo}</Text>
-                                        </View>
-                                      ) : null}
-                                    </View>
-                                    {Array.isArray(b.photos) && b.photos.length > 0 && (
-                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 }}>
-                                        <View style={{ backgroundColor: '#EFF6FF', paddingHorizontal: 5, paddingVertical: 1.5, borderRadius: 4, flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                          <BootstrapIcon name="camera-fill" size={9} color="#2563EB" />
-                                          <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#2563EB' }}>
-                                            {b.photos.length} photo{b.photos.length > 1 ? 's' : ''}
-                                          </Text>
-                                        </View>
-                                      </View>
-                                    )}
-                                  </View>
-
-                                  {/* 4. Service Package */}
-                                  <View style={{ flex: 2.2, minWidth: 180, gap: 2 }}>
-                                    <Text style={styles.tableTitle} numberOfLines={2}>
-                                      {b.package_name || b.service_title || b.serviceName || 'Pitstop Service'}
-                                    </Text>
-                                    {b.repair_type ? (
-                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 1 }}>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                          <Text style={[styles.tableTitle, { color: '#1D4533', fontSize: 12.5 }]}>
-                                            ₱{(b.pricePhp || usdToPhp(b.service_price) || 0).toLocaleString()}
-                                          </Text>
-                                          <View
-                                            style={{
-                                              backgroundColor: b.status === 'Cancelled' ? '#FEF2F2' : '#F0FDF4',
-                                              paddingHorizontal: 4,
-                                              paddingVertical: 1,
-                                              borderRadius: 4,
-                                            }}
-                                          >
-                                            <Text
-                                              style={{
-                                                fontSize: 9.5,
-                                                fontWeight: '800',
-                                                color: b.status === 'Cancelled' ? '#DC2626' : '#166534',
-                                              }}
-                                            >
-                                              {b.status === 'Cancelled'
-                                                ? 'DP Forfeited'
-                                                : `DP ₱${(b.downpayment_amount !== undefined ? b.downpayment_amount : Math.round((b.pricePhp || 2500) * 0.20)).toLocaleString()} Paid`}
-                                            </Text>
-                                          </View>
-                                        </View>
-                                        <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 }}>
-                                          <Text style={{ fontSize: 9.5, fontWeight: '800', color: '#DC2626' }}>
-                                            {b.repair_type}
-                                          </Text>
-                                        </View>
-                                      </View>
-                                    ) : null}
-                                    <Text style={[styles.tableTitle, { color: '#1D4533', fontSize: 12.5 }]}>
-                                      ₱{(b.pricePhp || usdToPhp(b.service_price) || 0).toLocaleString()}
-                                    </Text>
-                                    {b.notes ? (
-                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                        <BootstrapIcon name="chat-text-fill" size={10} color="#64748B" />
-                                        <Text
-                                          style={[
-                                            styles.tableSub,
-                                            { fontSize: 11, fontStyle: 'italic', color: '#64748B' },
-                                          ]}
-                                          numberOfLines={1}
-                                        >
-                                          "{b.notes}"
+                                        <Text style={styles.bikePlateText}>
+                                          {b.plate_number || b.bikePlate || 'TEMP-PLATE'}
                                         </Text>
                                       </View>
-                                    ) : null}
+                                    </View>
                                   </View>
 
-                                  {/* 5. Technician */}
+                                  {/* 4. Service Package & Price (Important Only) */}
+                                  <View style={{ flex: 1.5, minWidth: 140, gap: 3 }}>
+                                    <Text style={[styles.tableTitle, { fontSize: 13 }]} numberOfLines={1}>
+                                      {b.package_name || b.service_title || b.serviceName || 'Pitstop Service'}
+                                    </Text>
+                                    <Text style={[styles.tableTitle, { color: '#1D4533', fontSize: 13, fontWeight: '800' }]}>
+                                      ₱{(b.pricePhp || usdToPhp(b.service_price) || 0).toLocaleString()}
+                                    </Text>
+                                  </View>
+
+                                  {/* 5. Assigned Mechanic */}
                                   <View style={{ flex: 1.4, minWidth: 130 }}>
                                     <View style={styles.techPill}>
                                       <BootstrapIcon name="wrench" size={11} color="#1D4533" />
@@ -9107,13 +9737,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                               .split('(')[0]
                                               .replace('Master Tech ', '')
                                               .replace('Specialist ', '')
-                                          : 'Unassigned'}
+                                          : 'Pending Assignment'}
                                       </Text>
                                     </View>
                                   </View>
 
-                                  {/* 6. Live Status Badge */}
-                                  <View style={{ flex: 1.3, minWidth: 125, alignItems: 'center', justifyContent: 'center' }}>
+                                  {/* 6. Live Status & Payment */}
+                                  <View style={{ flex: 1.4, minWidth: 130, alignItems: 'center', justifyContent: 'center' }}>
                                     <View
                                       style={[
                                         styles.bookingStatusBadge,
@@ -9180,16 +9810,16 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                         {statusLabel(b.status || 'Pending')}
                                       </Text>
                                     </View>
-                                    <Text style={{ fontSize: 10, color: '#64748B', marginTop: 4 }}>
-                                      {quoteAmt > 0 ? formatPhp(quoteAmt) : 'No quote'} · {payStat}
+                                    <Text style={{ fontSize: 10.5, color: '#64748B', marginTop: 4, fontWeight: '600' }}>
+                                      {payStat}
                                     </Text>
                                   </View>
 
-                                  {/* 7. Action Buttons */}
+                                  {/* 7. Action Button: Manage Full Details & Delete */}
                                   <View
                                     style={{
-                                      flex: 2.2,
-                                      minWidth: 195,
+                                      flex: 1.3,
+                                      minWidth: 120,
                                       flexDirection: 'row',
                                       alignItems: 'center',
                                       justifyContent: 'center',
@@ -9197,62 +9827,33 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       flexShrink: 0,
                                     }}
                                   >
-                                    {isPending && (
-                                      <TouchableOpacity
-                                        style={[
-                                          styles.btnAdvanceOrder,
-                                          { backgroundColor: '#1D4533', borderColor: '#1D4533' },
-                                        ]}
-                                        onPress={() => handleOpenBookingModal(b)}
-                                        activeOpacity={0.8}
-                                        title="Review & Assign Mechanic"
-                                      >
-                                        <BootstrapIcon name="person-check-fill" size={11} color="#FFFFFF" />
-                                        <Text style={[styles.btnAdvanceOrderText, { color: '#FFFFFF', fontWeight: '800' }]}>
-                                          Review
-                                        </Text>
-                                      </TouchableOpacity>
-                                    )}
-
-                                    {isConfirmed && (
-                                      <TouchableOpacity
-                                        style={styles.btnAdvanceOrder}
-                                        onPress={() => handleOpenBookingModal(b)}
-                                        activeOpacity={0.8}
-                                        title="Check In Customer"
-                                      >
-                                        <BootstrapIcon name="play-fill" size={11} color="#1D4ED8" />
-                                        <Text style={styles.btnAdvanceOrderText}>Check-in</Text>
-                                      </TouchableOpacity>
-                                    )}
-
-                                    {isInProg && (
-                                      <TouchableOpacity
-                                        style={styles.btnApproveCod}
-                                        onPress={() => handleOpenBookingModal(b)}
-                                        activeOpacity={0.8}
-                                        title="Update Progress"
-                                      >
-                                        <BootstrapIcon name="check2" size={12} color="#FFFFFF" />
-                                        <Text style={styles.btnApproveCodText}>Progress</Text>
-                                      </TouchableOpacity>
-                                    )}
-
                                     <TouchableOpacity
-                                      style={styles.btnViewOrder}
+                                      style={[
+                                        styles.btnViewOrder,
+                                        {
+                                          backgroundColor: '#1D4533',
+                                          borderColor: '#1D4533',
+                                          paddingHorizontal: 12,
+                                          paddingVertical: 6,
+                                          borderRadius: 8,
+                                          flexDirection: 'row',
+                                          alignItems: 'center',
+                                          gap: 5,
+                                        },
+                                      ]}
                                       onPress={() => handleOpenBookingModal(b)}
                                       activeOpacity={0.8}
-                                      title="Manage Work Order"
+                                      title="Manage & View Full Details"
                                     >
-                                      <BootstrapIcon name="pencil-square" size={12} color="#334155" />
-                                      <Text style={styles.btnViewOrderText}>Manage</Text>
+                                      <BootstrapIcon name="pencil-square" size={12} color="#FFFFFF" />
+                                      <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#FFFFFF' }}>Manage</Text>
                                     </TouchableOpacity>
 
                                     <TouchableOpacity
                                       style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
                                       onPress={() => handleDeleteBooking(b.booking_id || b.id)}
                                       activeOpacity={0.8}
-                                      title="Delete"
+                                      title="Delete Appointment"
                                     >
                                       <BootstrapIcon name="trash" size={12} color="#DC2626" />
                                     </TouchableOpacity>
@@ -9489,7 +10090,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     />
                     <TextInput
                       style={styles.searchInput}
-                      placeholder="Search technician by name, specialization, bay, or certification..."
+                      placeholder="Search technician by name, specialization, or certification..."
                       placeholderTextColor="#94A3B8"
                       value={mechanicSearchQuery}
                       onChangeText={setMechanicSearchQuery}
@@ -9847,9 +10448,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <View style={styles.tableHeaderRow}>
                           <Text style={[styles.tableHeaderCell, { flex: 2.3, minWidth: 200 }]}>Technician / Profile</Text>
                           <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 120 }]}>Status</Text>
-                          <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 150 }]}>Pit Bay Assignment</Text>
-                          <Text style={[styles.tableHeaderCell, { flex: 2, minWidth: 170 }]}>Specialization & Experience</Text>
-                          <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 140 }]}>Certifications</Text>
+                          <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 170 }]}>Specialization & Experience</Text>
+                          <Text style={[styles.tableHeaderCell, { flex: 2, minWidth: 140 }]}>Certifications</Text>
                           <Text style={[styles.tableHeaderCell, { flex: 1.6, minWidth: 160, textAlign: 'center' }]}>Actions</Text>
                         </View>
 
@@ -9921,16 +10521,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 )}
                               </View>
 
-                              {/* Pit Bay Assignment */}
-                              <View style={{ flex: 1.8, minWidth: 150, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <BootstrapIcon name="geo-alt-fill" size={13} color="#1D4533" />
-                                <Text style={[styles.tableTitle, { fontSize: 12 }]} numberOfLines={1}>
-                                  {mech.bay || 'General Pit Bay'}
-                                </Text>
-                              </View>
-
                               {/* Specialization & Experience */}
-                              <View style={{ flex: 2, minWidth: 170 }}>
+                              <View style={{ flex: 2.2, minWidth: 170 }}>
                                 <Text style={[styles.tableTitle, { fontSize: 12 }]} numberOfLines={1}>
                                   {mech.specialization || 'Performance Maintenance'}
                                 </Text>
@@ -9940,7 +10532,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               </View>
 
                               {/* Certifications */}
-                              <View style={{ flex: 1.8, minWidth: 140, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                              <View style={{ flex: 2, minWidth: 140, flexDirection: 'row', alignItems: 'center', gap: 5 }}>
                                 <BootstrapIcon name="award-fill" size={13} color="#8B5CF6" />
                                 <Text
                                   style={[
@@ -10096,14 +10688,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             </View>
                           </View>
 
-                          {/* Bay Badge */}
-                          <View style={styles.mechanicBayBadge}>
-                            <BootstrapIcon name="geo-alt-fill" size={12} color="#1D4533" />
-                            <Text style={styles.mechanicBayText}>
-                              {mech.bay || 'General Service Bay'}
-                            </Text>
-                          </View>
-
                           {/* Specialization & Credentials */}
                           <View style={styles.mechanicInfoRow}>
                             <BootstrapIcon
@@ -10222,12 +10806,51 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             {/* ─── TAB: RIDERS / DELIVERY STAFF ─── */}
             {activeNav === 'riders' && (
               <View>
+                {/* 1. Rider KPI Stats Telemetry Grid */}
+                <View style={styles.statsGrid}>
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Delivery Fleet"
+                    value={riderStats.total}
+                    sub={`${riderStats.active} active accounts enrolled`}
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="blue"
+                    label="Available on Duty"
+                    value={riderStats.available}
+                    valueColor="#10B981"
+                    sub="Ready for dispatch"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent={riderStats.onDelivery > 0 ? 'amber' : 'teal'}
+                    label="On Delivery"
+                    value={riderStats.onDelivery}
+                    valueColor={riderStats.onDelivery > 0 ? '#D97706' : undefined}
+                    sub="Currently fulfilling orders"
+                  />
+                  <AdminStatCard
+                    styles={styles}
+                    accent="teal"
+                    label="Total Fleet Earnings"
+                    value={`₱${riderStats.totalEarnings.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}`}
+                    valueColor="#1D4533"
+                    sub="Shipping fee revenue pool"
+                  />
+                </View>
+
+                {/* 2. Toolbar: Search Input + Add Rider Button */}
                 <View style={styles.toolbarRow}>
-                  <View style={[styles.searchInputBox, { flex: 1 }]}>
+                  <View style={styles.searchInputBox}>
                     <BootstrapIcon name="search" size={14} color="#64748B" style={{ marginRight: 8 }} />
                     <TextInput
                       style={styles.searchInput}
-                      placeholder="Search by name, phone, vehicle, or plate..."
+                      placeholder="Search rider by name, phone, email, vehicle, or plate..."
                       placeholderTextColor="#94A3B8"
                       value={riderSearchQuery}
                       onChangeText={setRiderSearchQuery}
@@ -10243,103 +10866,296 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     onPress={handleOpenAddRider}
                     activeOpacity={0.85}
                   >
-                    <BootstrapIcon name="person-plus-fill" size={14} color="#FFFFFF" />
+                    <BootstrapIcon name="person-plus-fill" size={15} color="#FFFFFF" />
                     <Text style={styles.addBtnPrimaryText}>+ Add Rider</Text>
                   </TouchableOpacity>
                 </View>
 
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>
+                {/* 3. Filter Category Dropdown & View Mode Switcher (List vs Grid) */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    marginBottom: 16,
+                    flexWrap: 'wrap',
+                    position: 'relative',
+                    zIndex: isRiderFilterDropdownOpen ? 99999 : 10,
+                  }}
+                >
+                  {/* Category Status Dropdown */}
                   <View
                     style={{
-                      backgroundColor: '#ECFDF5',
-                      borderWidth: 1,
-                      borderColor: '#A7F3D0',
-                      borderRadius: 12,
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      marginRight: 4,
+                      position: 'relative',
+                      zIndex: isRiderFilterDropdownOpen ? 99999 : 10,
                     }}
                   >
-                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#047857', textTransform: 'uppercase' }}>
-                      Total rider earnings
-                    </Text>
-                    <Text style={{ fontSize: 16, fontWeight: '900', color: '#1D4533' }}>
-                      ₱
-                      {deliveryRiders
-                        .reduce((sum, r) => sum + Number(r.totalEarnings || 0), 0)
-                        .toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </Text>
-                    <Text style={{ fontSize: 10, color: '#059669' }}>Shipping fees from delivered orders</Text>
+                    {(() => {
+                      const riderCategoryOptions = [
+                        { id: 'All', label: 'All Riders', count: riderStats.total, icon: 'people-fill', color: '#1D4533' },
+                        { id: RIDER_ACCOUNT_STATUSES.ACTIVE, label: 'Active Fleet', count: riderStats.active, icon: 'shield-check', color: '#10B981' },
+                        { id: RIDER_ACCOUNT_STATUSES.INACTIVE, label: 'Inactive Riders', count: riderStats.inactive, icon: 'shield-slash', color: '#64748B' },
+                        { id: RIDER_STATUSES.AVAILABLE, label: 'Available on Duty', count: riderStats.available, icon: 'check-circle-fill', color: '#16A34A' },
+                        { id: RIDER_STATUSES.ON_DELIVERY, label: 'On Delivery', count: riderStats.onDelivery, icon: 'box-seam-fill', color: '#D97706' },
+                        { id: RIDER_STATUSES.OFF_DUTY, label: 'Off Duty', count: riderStats.offDuty, icon: 'moon-fill', color: '#64748B' },
+                      ];
+                      const activeOpt = riderCategoryOptions.find((o) => o.id === riderFilterStatus) || riderCategoryOptions[0];
+
+                      return (
+                        <>
+                          <TouchableOpacity
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 10,
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderWidth: 1.5,
+                              borderColor: isRiderFilterDropdownOpen
+                                ? '#1D4533'
+                                : riderFilterStatus !== 'All'
+                                  ? '#1D4533'
+                                  : isDarkMode ? '#334155' : '#E2E8F0',
+                              borderRadius: 12,
+                              paddingHorizontal: 14,
+                              paddingVertical: 9,
+                              minWidth: 210,
+                              cursor: 'pointer',
+                              boxShadow: isRiderFilterDropdownOpen
+                                ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                                : '0 1px 3px rgba(0, 0, 0, 0.04)',
+                            }}
+                            onPress={() => setIsRiderFilterDropdownOpen((prev) => !prev)}
+                            activeOpacity={0.85}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <BootstrapIcon
+                                name={activeOpt.icon}
+                                size={14}
+                                color={riderFilterStatus !== 'All' ? activeOpt.color : '#64748B'}
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: '700',
+                                  color: riderFilterStatus !== 'All' ? '#1D4533' : isDarkMode ? '#F8FAFC' : '#0F172A',
+                                }}
+                              >
+                                {activeOpt.label}
+                              </Text>
+                              <View
+                                style={{
+                                  backgroundColor: riderFilterStatus !== 'All' ? '#1D4533' : isDarkMode ? '#334155' : '#E2E8F0',
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 1,
+                                  borderRadius: 8,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: '800',
+                                    color: riderFilterStatus !== 'All' ? '#FFFFFF' : isDarkMode ? '#CBD5E1' : '#475569',
+                                  }}
+                                >
+                                  {activeOpt.count}
+                                </Text>
+                              </View>
+                            </View>
+                            <BootstrapIcon
+                              name={isRiderFilterDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                              size={12}
+                              color={isRiderFilterDropdownOpen ? '#1D4533' : '#64748B'}
+                            />
+                          </TouchableOpacity>
+
+                          {/* Backdrop for outside click */}
+                          {isRiderFilterDropdownOpen && (
+                            <TouchableOpacity
+                              style={{
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                zIndex: 99998,
+                                backgroundColor: 'transparent',
+                                cursor: 'default',
+                              }}
+                              onPress={() => setIsRiderFilterDropdownOpen(false)}
+                              activeOpacity={1}
+                            />
+                          )}
+
+                          {/* Floating Dropdown Menu */}
+                          {isRiderFilterDropdownOpen && (
+                            <View
+                              style={{
+                                position: 'absolute',
+                                top: '100%',
+                                left: 0,
+                                marginTop: 6,
+                                minWidth: 240,
+                                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                                borderRadius: 14,
+                                borderWidth: 1.5,
+                                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                                boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
+                                zIndex: 99999,
+                                padding: 6,
+                                gap: 3,
+                                maxHeight: 300,
+                                overflowY: 'auto',
+                              }}
+                            >
+                              {riderCategoryOptions.map((option) => {
+                                const isSelected = riderFilterStatus === option.id;
+                                return (
+                                  <TouchableOpacity
+                                    key={option.id}
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      paddingHorizontal: 12,
+                                      paddingVertical: 9,
+                                      borderRadius: 9,
+                                      backgroundColor: isSelected
+                                        ? isDarkMode ? '#132A26' : '#E8F0EC'
+                                        : 'transparent',
+                                      cursor: 'pointer',
+                                    }}
+                                    onPress={() => {
+                                      setRiderFilterStatus(option.id);
+                                      setIsRiderFilterDropdownOpen(false);
+                                    }}
+                                    activeOpacity={0.8}
+                                  >
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                      <BootstrapIcon
+                                        name={option.icon}
+                                        size={14}
+                                        color={isSelected ? '#1D4533' : option.color || '#64748B'}
+                                      />
+                                      <Text
+                                        style={{
+                                          fontSize: 13,
+                                          fontWeight: isSelected ? '800' : '600',
+                                          color: isSelected
+                                            ? '#1D4533'
+                                            : isDarkMode ? '#E2E8F0' : '#334155',
+                                        }}
+                                      >
+                                        {option.label}
+                                      </Text>
+                                    </View>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                      <View
+                                        style={{
+                                          backgroundColor: isSelected
+                                            ? '#1D4533'
+                                            : isDarkMode ? '#334155' : '#E2E8F0',
+                                          paddingHorizontal: 6,
+                                          paddingVertical: 1,
+                                          borderRadius: 6,
+                                        }}
+                                      >
+                                        <Text
+                                          style={{
+                                            fontSize: 10.5,
+                                            fontWeight: '800',
+                                            color: isSelected ? '#FFFFFF' : isDarkMode ? '#CBD5E1' : '#475569',
+                                          }}
+                                        >
+                                          {option.count}
+                                        </Text>
+                                      </View>
+                                      {isSelected && <BootstrapIcon name="check2" size={14} color="#1D4533" />}
+                                    </View>
+                                  </TouchableOpacity>
+                                );
+                              })}
+                            </View>
+                          )}
+                        </>
+                      );
+                    })()}
                   </View>
-                  {[
-                    { id: 'All', label: 'All', count: deliveryRiders.length },
-                    {
-                      id: RIDER_ACCOUNT_STATUSES.ACTIVE,
-                      label: 'Active',
-                      count: deliveryRiders.filter((r) => (r.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.ACTIVE).length,
-                    },
-                    {
-                      id: RIDER_ACCOUNT_STATUSES.INACTIVE,
-                      label: 'Inactive',
-                      count: deliveryRiders.filter((r) => r.accountStatus === RIDER_ACCOUNT_STATUSES.INACTIVE).length,
-                    },
-                    {
-                      id: RIDER_STATUSES.AVAILABLE,
-                      label: 'Available',
-                      count: deliveryRiders.filter((r) => r.status === RIDER_STATUSES.AVAILABLE).length,
-                    },
-                    {
-                      id: RIDER_STATUSES.ON_DELIVERY,
-                      label: 'On Delivery',
-                      count: deliveryRiders.filter((r) => r.status === RIDER_STATUSES.ON_DELIVERY).length,
-                    },
-                    {
-                      id: RIDER_STATUSES.OFF_DUTY,
-                      label: 'Off Duty',
-                      count: deliveryRiders.filter((r) => r.status === RIDER_STATUSES.OFF_DUTY).length,
-                    },
-                  ].map((chip) => {
-                    const active = riderFilterStatus === chip.id;
-                    return (
-                      <TouchableOpacity
-                        key={chip.id}
-                        onPress={() => setRiderFilterStatus(chip.id)}
+
+                  {/* View Mode Toggle (List vs Grid) */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                      borderRadius: 8,
+                      padding: 3,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                    }}
+                  >
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 6,
+                        backgroundColor: riderViewMode === 'list' ? '#1D4533' : 'transparent',
+                        cursor: 'pointer',
+                      }}
+                      onPress={() => setRiderViewMode('list')}
+                    >
+                      <BootstrapIcon
+                        name="list-ul"
+                        size={13}
+                        color={riderViewMode === 'list' ? '#FFFFFF' : '#64748B'}
+                      />
+                      <Text
                         style={{
-                          paddingHorizontal: 12,
-                          paddingVertical: 7,
-                          borderRadius: 999,
-                          borderWidth: 1.5,
-                          borderColor: active ? '#1D4533' : '#E2E8F0',
-                          backgroundColor: active ? '#1D4533' : isDarkMode ? '#1E293B' : '#FFFFFF',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
+                          fontSize: 11.5,
+                          fontWeight: '700',
+                          color: riderViewMode === 'list' ? '#FFFFFF' : '#64748B',
                         }}
-                        activeOpacity={0.85}
                       >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: '700',
-                            color: active ? '#FFFFFF' : '#475569',
-                          }}
-                        >
-                          {chip.label}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            fontWeight: '800',
-                            color: active ? '#CCFBF1' : '#94A3B8',
-                          }}
-                        >
-                          {chip.count}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
+                        List
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 6,
+                        backgroundColor: riderViewMode === 'grid' ? '#1D4533' : 'transparent',
+                        cursor: 'pointer',
+                      }}
+                      onPress={() => setRiderViewMode('grid')}
+                    >
+                      <BootstrapIcon
+                        name="grid"
+                        size={12}
+                        color={riderViewMode === 'grid' ? '#FFFFFF' : '#64748B'}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: '700',
+                          color: riderViewMode === 'grid' ? '#FFFFFF' : '#64748B',
+                        }}
+                      >
+                        Grid
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
 
+                {/* 4. Content Area: Empty State vs List vs Grid */}
                 {filteredRiders.length === 0 ? (
                   <View
                     style={{
@@ -10351,134 +11167,465 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       borderColor: isDarkMode ? '#334155' : '#E2E8F0',
                     }}
                   >
-                    <BootstrapIcon name="bicycle" size={28} color="#94A3B8" />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#64748B', marginTop: 10 }}>
+                    <BootstrapIcon name="bicycle" size={32} color="#94A3B8" />
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? '#F1F5F9' : '#0F172A', marginTop: 10 }}>
                       No riders found
                     </Text>
-                    <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 4, marginBottom: 14 }}>
+                    <Text style={{ fontSize: 12.5, color: '#94A3B8', marginTop: 4, marginBottom: 16 }}>
                       {riderSearchQuery
                         ? `No matches for "${riderSearchQuery}"`
-                        : 'Add your first delivery rider to the roster.'}
+                        : 'Add your first delivery rider to the fleet.'}
                     </Text>
                     <TouchableOpacity style={styles.addBtnPrimary} onPress={handleOpenAddRider}>
-                      <BootstrapIcon name="plus-lg" size={14} color="#FFFFFF" />
+                      <BootstrapIcon name="person-plus-fill" size={14} color="#FFFFFF" />
                       <Text style={styles.addBtnPrimaryText}>+ Add Rider</Text>
                     </TouchableOpacity>
                   </View>
+                ) : riderViewMode === 'list' ? (
+                  /* ─── LIST (TABLE) VIEW ─── */
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={true}
+                    style={{ width: '100%' }}
+                    contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
+                  >
+                    <View style={[styles.tableCard, { width: '100%', minWidth: '100%', flexGrow: 1 }]}>
+                      <View style={styles.tableHeaderRow}>
+                        <Text style={[styles.tableHeaderCell, { flex: 2.5, minWidth: 220 }]}>Rider & Account</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 180 }]}>Assigned Vehicle & Plate</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 140, textAlign: 'center' }]}>Duty Status</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 110, textAlign: 'center' }]}>Account</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130, textAlign: 'right' }]}>Total Earnings</Text>
+                        <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 140, textAlign: 'center' }]}>Actions</Text>
+                      </View>
+
+                      {filteredRiders.map((rider) => {
+                        const statusColor =
+                          rider.status === RIDER_STATUSES.AVAILABLE
+                            ? { bg: '#DCFCE7', text: '#16A34A', border: '#86EFAC', dot: '#10B981', icon: 'check-circle-fill' }
+                            : rider.status === RIDER_STATUSES.ON_DELIVERY
+                              ? { bg: '#FEF3C7', text: '#D97706', border: '#FCD34D', dot: '#F59E0B', icon: 'box-seam-fill' }
+                              : { bg: '#F1F5F9', text: '#64748B', border: '#CBD5E1', dot: '#94A3B8', icon: 'moon-fill' };
+
+                        const isInactive = (rider.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.INACTIVE;
+
+                        return (
+                          <View key={rider.id} style={styles.tableRow}>
+                            {/* Column 1: Rider Profile & Contact */}
+                            <View style={{ flex: 2.5, minWidth: 220, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                              <View style={{ position: 'relative' }}>
+                                <Image
+                                  source={{ uri: rider.avatar || RIDER_AVATAR_PRESETS[0] }}
+                                  style={{
+                                    width: 40,
+                                    height: 40,
+                                    borderRadius: 20,
+                                    borderWidth: 1.5,
+                                    borderColor: '#1D4533',
+                                    backgroundColor: '#E2E8F0',
+                                  }}
+                                />
+                                <View
+                                  style={{
+                                    position: 'absolute',
+                                    bottom: -1,
+                                    right: -1,
+                                    width: 12,
+                                    height: 12,
+                                    borderRadius: 6,
+                                    backgroundColor: statusColor.dot,
+                                    borderWidth: 2,
+                                    borderColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                                  }}
+                                />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <Text style={[styles.tableTitle, { fontSize: 13.5 }]} numberOfLines={1}>
+                                    {rider.name}
+                                  </Text>
+                                  {rider.username && (
+                                    <View
+                                      style={{
+                                        backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                                        paddingHorizontal: 6,
+                                        paddingVertical: 1,
+                                        borderRadius: 4,
+                                      }}
+                                    >
+                                      <Text style={{ fontSize: 10, fontWeight: '700', color: '#1D4533' }}>
+                                        @{rider.username}
+                                      </Text>
+                                    </View>
+                                  )}
+                                </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 }}>
+                                  <BootstrapIcon name="telephone-fill" size={10} color="#94A3B8" />
+                                  <Text style={[styles.tableSub, { fontSize: 11 }]} numberOfLines={1}>
+                                    {rider.phone || 'No phone'}
+                                  </Text>
+                                </View>
+                                {rider.email && (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 1 }}>
+                                    <BootstrapIcon name="envelope-fill" size={10} color="#94A3B8" />
+                                    <Text style={[styles.tableSub, { fontSize: 11 }]} numberOfLines={1}>
+                                      {rider.email}
+                                    </Text>
+                                  </View>
+                                )}
+                              </View>
+                            </View>
+
+                            {/* Column 2: Vehicle & Plate */}
+                            <View style={{ flex: 2.0, minWidth: 180 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                <View
+                                  style={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: 6,
+                                    backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                  }}
+                                >
+                                  <BootstrapIcon name="bicycle" size={12} color="#1D4533" />
+                                </View>
+                                <Text style={[styles.tableTitle, { fontSize: 13 }]} numberOfLines={1}>
+                                  {rider.vehicleInfo || 'No vehicle assigned'}
+                                </Text>
+                              </View>
+                              <View
+                                style={{
+                                  alignSelf: 'flex-start',
+                                  backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
+                                  paddingHorizontal: 7,
+                                  paddingVertical: 2,
+                                  borderRadius: 4,
+                                  borderWidth: 1,
+                                  borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: '800',
+                                    fontFamily: 'monospace',
+                                    color: isDarkMode ? '#CBD5E1' : '#475569',
+                                    letterSpacing: 0.5,
+                                  }}
+                                >
+                                  {rider.plateNumber || 'NO PLATE'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Column 3: Duty Status (Interactive Toggle) */}
+                            <View style={{ flex: 1.5, minWidth: 140, alignItems: 'center' }}>
+                              <TouchableOpacity
+                                onPress={() => handleToggleRiderStatus(rider)}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 5,
+                                  borderRadius: 999,
+                                  backgroundColor: statusColor.bg,
+                                  borderWidth: 1,
+                                  borderColor: statusColor.border,
+                                  cursor: 'pointer',
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <BootstrapIcon name={statusColor.icon} size={11} color={statusColor.text} />
+                                <Text style={{ fontSize: 11, fontWeight: '800', color: statusColor.text }}>
+                                  {rider.status || RIDER_STATUSES.AVAILABLE}
+                                </Text>
+                              </TouchableOpacity>
+                              <Text style={{ fontSize: 9.5, color: '#94A3B8', marginTop: 3 }}>Tap to toggle</Text>
+                            </View>
+
+                            {/* Column 4: Account Status */}
+                            <View style={{ flex: 1.2, minWidth: 110, alignItems: 'center' }}>
+                              <View
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                  paddingHorizontal: 9,
+                                  paddingVertical: 4,
+                                  borderRadius: 999,
+                                  backgroundColor: isInactive ? '#F1F5F9' : '#ECFDF5',
+                                  borderWidth: 1,
+                                  borderColor: isInactive ? '#CBD5E1' : '#A7F3D0',
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: 3,
+                                    backgroundColor: isInactive ? '#94A3B8' : '#10B981',
+                                  }}
+                                />
+                                <Text
+                                  style={{
+                                    fontSize: 11,
+                                    fontWeight: '800',
+                                    color: isInactive ? '#64748B' : '#047857',
+                                  }}
+                                >
+                                  {rider.accountStatus || RIDER_ACCOUNT_STATUSES.ACTIVE}
+                                </Text>
+                              </View>
+                            </View>
+
+                            {/* Column 5: Total Earnings */}
+                            <View style={{ flex: 1.5, minWidth: 130, alignItems: 'flex-end' }}>
+                              <Text style={{ fontSize: 14, fontWeight: '900', color: '#1D4533' }}>
+                                ₱{Number(rider.totalEarnings || 0).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </Text>
+                              <Text style={{ fontSize: 10, color: '#94A3B8' }}>from shipping</Text>
+                            </View>
+
+                            {/* Column 6: Action Buttons */}
+                            <View style={{ flex: 1.5, minWidth: 140, flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
+                              <TouchableOpacity
+                                style={[
+                                  styles.actionIconBtn,
+                                  { backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5', borderColor: '#A7F3D0' },
+                                ]}
+                                onPress={() =>
+                                  setRiderAccessModal({
+                                    rider,
+                                    bundle: null,
+                                  })
+                                }
+                              >
+                                <BootstrapIcon name="geo-alt-fill" size={13} color="#1D4533" />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.actionIconBtn, styles.actionIconBtnEdit]}
+                                onPress={() => handleOpenEditRider(rider)}
+                              >
+                                <BootstrapIcon name="pencil-square" size={16} color="#2563EB" />
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
+                                onPress={() => handleDeleteRider(rider)}
+                              >
+                                <BootstrapIcon name="trash3" size={16} color="#EF4444" />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  </ScrollView>
                 ) : (
-                  <View style={styles.tableCard}>
+                  /* ─── GRID (CARD) VIEW ─── */
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
                     {filteredRiders.map((rider) => {
                       const statusColor =
                         rider.status === RIDER_STATUSES.AVAILABLE
-                          ? { bg: '#DCFCE7', text: '#16A34A', border: '#86EFAC' }
+                          ? { bg: '#DCFCE7', text: '#16A34A', border: '#86EFAC', dot: '#10B981', icon: 'check-circle-fill' }
                           : rider.status === RIDER_STATUSES.ON_DELIVERY
-                            ? { bg: '#FEF3C7', text: '#D97706', border: '#FCD34D' }
-                            : { bg: '#F1F5F9', text: '#64748B', border: '#CBD5E1' };
+                            ? { bg: '#FEF3C7', text: '#D97706', border: '#FCD34D', dot: '#F59E0B', icon: 'box-seam-fill' }
+                            : { bg: '#F1F5F9', text: '#64748B', border: '#CBD5E1', dot: '#94A3B8', icon: 'moon-fill' };
+
+                      const isInactive = (rider.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.INACTIVE;
 
                       return (
-                        <View
-                          key={rider.id}
-                          style={[
-                            styles.tableRow,
-                            {
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              flexWrap: 'wrap',
-                              gap: 10,
-                              paddingVertical: 12,
-                            },
-                          ]}
-                        >
-                          <Image
-                            source={{ uri: rider.avatar || RIDER_AVATAR_PRESETS[0] }}
-                            style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 20,
-                              borderWidth: 1.5,
-                              borderColor: '#1D4533',
-                              backgroundColor: '#E2E8F0',
-                            }}
-                          />
-                          <View style={{ flex: 1.4, minWidth: 140 }}>
-                            <Text style={[styles.tableTitle, { fontSize: 13.5 }]} numberOfLines={1}>
-                              {rider.name}
-                            </Text>
-                            <Text style={[styles.tableSub, { fontSize: 11 }]} numberOfLines={1}>
-                              {rider.shortName || '—'} · {rider.phone || 'No phone'}
-                            </Text>
-                            <Text style={[styles.tableSub, { fontSize: 11 }]} numberOfLines={1}>
-                              {rider.username ? `@${rider.username}` : 'No login yet'} · {rider.email || 'No email'}
-                            </Text>
+                        <View key={rider.id} style={[styles.mechanicCard, { flex: 1, minWidth: 300, maxWidth: 420 }]}>
+                          {/* Card Header */}
+                          <View style={styles.mechanicCardHeader}>
+                            <View style={{ position: 'relative' }}>
+                              <Image
+                                source={{ uri: rider.avatar || RIDER_AVATAR_PRESETS[0] }}
+                                style={{
+                                  width: 44,
+                                  height: 44,
+                                  borderRadius: 22,
+                                  borderWidth: 2,
+                                  borderColor: '#1D4533',
+                                  backgroundColor: '#E2E8F0',
+                                }}
+                              />
+                              <View
+                                style={{
+                                  position: 'absolute',
+                                  bottom: -1,
+                                  right: -1,
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: 6,
+                                  backgroundColor: statusColor.dot,
+                                  borderWidth: 2,
+                                  borderColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                                }}
+                              />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                                <Text style={styles.mechanicName} numberOfLines={1}>
+                                  {rider.name}
+                                </Text>
+                                <View
+                                  style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 4,
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 3,
+                                    borderRadius: 999,
+                                    backgroundColor: isInactive ? '#F1F5F9' : '#ECFDF5',
+                                    borderWidth: 1,
+                                    borderColor: isInactive ? '#CBD5E1' : '#A7F3D0',
+                                  }}
+                                >
+                                  <View
+                                    style={{
+                                      width: 5,
+                                      height: 5,
+                                      borderRadius: 2.5,
+                                      backgroundColor: isInactive ? '#94A3B8' : '#10B981',
+                                    }}
+                                  />
+                                  <Text style={{ fontSize: 10, fontWeight: '800', color: isInactive ? '#64748B' : '#047857' }}>
+                                    {rider.accountStatus || RIDER_ACCOUNT_STATUSES.ACTIVE}
+                                  </Text>
+                                </View>
+                              </View>
+                              <Text style={styles.mechanicShortName}>
+                                {rider.username ? `@${rider.username}` : 'No login'} {rider.shortName ? `• ${rider.shortName}` : ''}
+                              </Text>
+                            </View>
                           </View>
-                          <View style={{ flex: 1.2, minWidth: 120 }}>
-                            <Text style={[styles.tableSub, { fontSize: 12, color: '#0F172A', fontWeight: '600' }]} numberOfLines={1}>
-                              {rider.vehicleInfo || '—'}
-                            </Text>
-                            <Text style={[styles.tableSub, { fontSize: 11 }]} numberOfLines={1}>
-                              {rider.plateNumber || 'No plate'}
-                            </Text>
-                          </View>
-                          <View style={{ minWidth: 100, alignItems: 'flex-end' }}>
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: '#64748B', textTransform: 'uppercase' }}>
-                              Earnings
-                            </Text>
-                            <Text style={{ fontSize: 14, fontWeight: '900', color: '#1D4533' }}>
-                              ₱{Number(rider.totalEarnings || 0).toLocaleString(undefined, {
-                                minimumFractionDigits: 2,
-                                maximumFractionDigits: 2,
-                              })}
-                            </Text>
-                            <Text style={{ fontSize: 10, color: '#94A3B8' }}>from shipping</Text>
-                          </View>
-                          <TouchableOpacity
-                            onPress={() => handleToggleRiderStatus(rider)}
-                            style={{
-                              paddingHorizontal: 10,
-                              paddingVertical: 5,
-                              borderRadius: 999,
-                              backgroundColor: statusColor.bg,
-                              borderWidth: 1,
-                              borderColor: statusColor.border,
-                            }}
-                            activeOpacity={0.8}
-                          >
-                            <Text style={{ fontSize: 11, fontWeight: '800', color: statusColor.text }}>
-                              {rider.status || RIDER_STATUSES.AVAILABLE}
-                            </Text>
-                          </TouchableOpacity>
+
+                          {/* Vehicle Banner */}
                           <View
                             style={{
-                              paddingHorizontal: 10,
-                              paddingVertical: 5,
-                              borderRadius: 999,
-                              backgroundColor:
-                                (rider.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.INACTIVE
-                                  ? '#F1F5F9'
-                                  : '#ECFDF5',
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                              paddingHorizontal: 12,
+                              paddingVertical: 8,
+                              borderRadius: 10,
+                              marginBottom: 12,
                               borderWidth: 1,
-                              borderColor:
-                                (rider.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.INACTIVE
-                                  ? '#CBD5E1'
-                                  : '#A7F3D0',
+                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
                             }}
                           >
-                            <Text
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                              <BootstrapIcon name="bicycle" size={13} color="#1D4533" />
+                              <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#F1F5F9' : '#0F172A' }} numberOfLines={1}>
+                                {rider.vehicleInfo || 'No vehicle assigned'}
+                              </Text>
+                            </View>
+                            <View
                               style={{
-                                fontSize: 11,
-                                fontWeight: '800',
-                                color:
-                                  (rider.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.INACTIVE
-                                    ? '#64748B'
-                                    : '#047857',
+                                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                                paddingHorizontal: 7,
+                                paddingVertical: 2,
+                                borderRadius: 4,
+                                borderWidth: 1,
+                                borderColor: isDarkMode ? '#475569' : '#CBD5E1',
                               }}
                             >
-                              {rider.accountStatus || RIDER_ACCOUNT_STATUSES.ACTIVE}
-                            </Text>
+                              <Text style={{ fontSize: 10.5, fontWeight: '800', fontFamily: 'monospace', color: isDarkMode ? '#CBD5E1' : '#475569' }}>
+                                {rider.plateNumber || 'NO PLATE'}
+                              </Text>
+                            </View>
                           </View>
-                          <View style={{ flexDirection: 'row', gap: 6 }}>
+
+                          {/* Contact Details */}
+                          <View style={{ gap: 6, marginBottom: 12 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                              <BootstrapIcon name="telephone-fill" size={11} color="#94A3B8" />
+                              <Text style={{ fontSize: 11.5, color: isDarkMode ? '#CBD5E1' : '#475569' }}>
+                                {rider.phone || 'No phone registered'}
+                              </Text>
+                            </View>
+                            {rider.email && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                                <BootstrapIcon name="envelope-fill" size={11} color="#94A3B8" />
+                                <Text style={{ fontSize: 11.5, color: isDarkMode ? '#CBD5E1' : '#475569' }} numberOfLines={1}>
+                                  {rider.email}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+
+                          {/* Earnings & Duty Status Strip */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
+                              paddingHorizontal: 12,
+                              paddingVertical: 10,
+                              borderRadius: 10,
+                              marginBottom: 14,
+                              borderWidth: 1,
+                              borderColor: '#A7F3D0',
+                            }}
+                          >
+                            <View>
+                              <Text style={{ fontSize: 10, fontWeight: '800', color: '#047857', textTransform: 'uppercase' }}>
+                                Fleet Earnings
+                              </Text>
+                              <Text style={{ fontSize: 15, fontWeight: '900', color: '#1D4533' }}>
+                                ₱{Number(rider.totalEarnings || 0).toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })}
+                              </Text>
+                            </View>
+
                             <TouchableOpacity
-                              style={styles.actionIconBtn}
+                              onPress={() => handleToggleRiderStatus(rider)}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 5,
+                                paddingHorizontal: 9,
+                                paddingVertical: 5,
+                                borderRadius: 999,
+                                backgroundColor: statusColor.bg,
+                                borderWidth: 1,
+                                borderColor: statusColor.border,
+                                cursor: 'pointer',
+                              }}
+                              activeOpacity={0.8}
+                            >
+                              <BootstrapIcon name={statusColor.icon} size={11} color={statusColor.text} />
+                              <Text style={{ fontSize: 11, fontWeight: '800', color: statusColor.text }}>
+                                {rider.status || RIDER_STATUSES.AVAILABLE}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+
+                          {/* Card Footer: Action Buttons */}
+                          <View style={styles.mechanicCardFooter}>
+                            <TouchableOpacity
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 5,
+                                paddingHorizontal: 10,
+                                paddingVertical: 6,
+                                borderRadius: 8,
+                                borderWidth: 1,
+                                borderColor: '#A7F3D0',
+                                backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
+                                cursor: 'pointer',
+                              }}
                               onPress={() =>
                                 setRiderAccessModal({
                                   rider,
@@ -10486,20 +11633,27 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 })
                               }
                             >
-                              <BootstrapIcon name="geo-alt" size={13} color="#1D4533" />
+                              <BootstrapIcon name="geo-alt-fill" size={11} color="#1D4533" />
+                              <Text style={{ fontSize: 11, fontWeight: '700', color: '#1D4533' }}>
+                                Live Map
+                              </Text>
                             </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.actionIconBtn, styles.actionIconBtnEdit]}
-                              onPress={() => handleOpenEditRider(rider)}
-                            >
-                              <BootstrapIcon name="pencil-square" size={17} color="#2563EB" />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
-                              onPress={() => handleDeleteRider(rider)}
-                            >
-                              <BootstrapIcon name="trash3" size={17} color="#EF4444" />
-                            </TouchableOpacity>
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <TouchableOpacity
+                                style={[styles.actionIconBtn, styles.actionIconBtnEdit]}
+                                onPress={() => handleOpenEditRider(rider)}
+                              >
+                                <BootstrapIcon name="pencil-square" size={15} color="#2563EB" />
+                              </TouchableOpacity>
+
+                              <TouchableOpacity
+                                style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
+                                onPress={() => handleDeleteRider(rider)}
+                              >
+                                <BootstrapIcon name="trash3" size={15} color="#EF4444" />
+                              </TouchableOpacity>
+                            </View>
                           </View>
                         </View>
                       );
@@ -12231,7 +13385,440 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 {/* ─── SUBTAB 1: STORE IDENTITY & THEME ─── */}
                 {settingsActiveSubTab === 'general' && (
                   <View style={{ gap: 20 }}>
-                    {/* 1. Theme & Appearance Card */}
+                    {/* SECTION 1 — STORE IDENTITY & BRANDING */}
+                    <View
+                      style={[
+                        styles.tableCard,
+                        {
+                          padding: 24,
+                          borderRadius: 16,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+                          boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.05)',
+                          gap: 18,
+                        },
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 12,
+                            backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <BootstrapIcon name="shop" size={20} color="#1D4533" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              fontSize: 16,
+                              fontWeight: '900',
+                              color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                            }}
+                          >
+                            Store Identity & Branding
+                          </Text>
+                          <Text style={{ fontSize: 12.5, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 2 }}>
+                            Primary details displayed across customer invoices, storefront headers, and email communications.
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Store Name & Store Tagline (2 Columns on Desktop) */}
+                      <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.formLabel}>Official Store Name</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderRadius: 10,
+                              borderWidth: 1.5,
+                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                              paddingHorizontal: 12,
+                              height: 42,
+                              gap: 10,
+                            }}
+                          >
+                            <BootstrapIcon name="shop" size={14} color="#94A3B8" />
+                            <TextInput
+                              style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
+                              value={setForm.storeName}
+                              onChangeText={(val) => handleUpdateSettingField('storeName', val)}
+                              placeholder="e.g. MotoTrack Performance & Pitstop Garage"
+                              placeholderTextColor="#94A3B8"
+                            />
+                          </View>
+                        </View>
+
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.formLabel}>Store Tagline / Slogan</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderRadius: 10,
+                              borderWidth: 1.5,
+                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                              paddingHorizontal: 12,
+                              height: 42,
+                              gap: 10,
+                            }}
+                          >
+                            <BootstrapIcon name="pencil" size={14} color="#94A3B8" />
+                            <TextInput
+                              style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
+                              value={setForm.storeTagline}
+                              onChangeText={(val) => handleUpdateSettingField('storeTagline', val)}
+                              placeholder="e.g. Premier Performance Motorcycle Parts"
+                              placeholderTextColor="#94A3B8"
+                            />
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Store Logo & Branding Asset */}
+                      <View>
+                        <Text style={styles.formLabel}>Store Logo & Visual Identity Asset</Text>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                            padding: 12,
+                            gap: 14,
+                          }}
+                        >
+                          {setForm.storeLogoUrl ? (
+                            <Image
+                              source={{ uri: setForm.storeLogoUrl }}
+                              style={{ width: 44, height: 44, borderRadius: 8, backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF' }}
+                              resizeMode="contain"
+                            />
+                          ) : (
+                            <View
+                              style={{
+                                width: 44,
+                                height: 44,
+                                borderRadius: 8,
+                                backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              <BootstrapIcon name="tools" size={18} color="#1D4533" />
+                            </View>
+                          )}
+                          <View style={{ flex: 1, gap: 6 }}>
+                            <TouchableOpacity
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                backgroundColor: '#1D4533',
+                                paddingVertical: 7,
+                                paddingHorizontal: 12,
+                                borderRadius: 8,
+                                alignSelf: 'flex-start',
+                              }}
+                              onPress={async () => {
+                                const res = await pickImageFromFile();
+                                if (res.success && res.uri) {
+                                  handleUpdateSettingField('storeLogoUrl', res.uri);
+                                  showToast('Store logo asset updated!');
+                                }
+                              }}
+                              activeOpacity={0.85}
+                            >
+                              <BootstrapIcon name="folder2-open" size={13} color="#FFFFFF" />
+                              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
+                                Upload Logo Image
+                              </Text>
+                            </TouchableOpacity>
+                            <TextInput
+                              style={{
+                                fontSize: 11.5,
+                                color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                                backgroundColor: isDarkMode ? '#0F172A' : '#FFFFFF',
+                                borderRadius: 6,
+                                borderWidth: 1,
+                                borderColor: isDarkMode ? '#334155' : '#CBD5E1',
+                                paddingHorizontal: 10,
+                                paddingVertical: 4,
+                              }}
+                              value={setForm.storeLogoUrl || ''}
+                              onChangeText={(val) => handleUpdateSettingField('storeLogoUrl', val)}
+                              placeholder="Or paste store logo image URL"
+                              placeholderTextColor="#94A3B8"
+                            />
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* SECTION 2 — CONTACT & HEADQUARTERS */}
+                    <View
+                      style={[
+                        styles.tableCard,
+                        {
+                          padding: 24,
+                          borderRadius: 16,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+                          boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.05)',
+                          gap: 18,
+                        },
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 12,
+                            backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <BootstrapIcon name="pin-map-fill" size={20} color="#1D4533" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              fontSize: 16,
+                              fontWeight: '900',
+                              color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                            }}
+                          >
+                            Contact & Headquarters
+                          </Text>
+                          <Text style={{ fontSize: 12.5, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 2 }}>
+                            Customer support channels, phone hotline, and flagship garage physical location.
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Desktop Grid: Email & Phone on Row 1 */}
+                      <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.formLabel}>Support Email Address</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderRadius: 10,
+                              borderWidth: 1.5,
+                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                              paddingHorizontal: 12,
+                              height: 42,
+                              gap: 10,
+                            }}
+                          >
+                            <BootstrapIcon name="envelope-fill" size={14} color="#94A3B8" />
+                            <TextInput
+                              style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
+                              value={setForm.contactEmail}
+                              onChangeText={(val) => handleUpdateSettingField('contactEmail', val)}
+                              placeholder="support@mototrack.ph"
+                              placeholderTextColor="#94A3B8"
+                              autoCapitalize="none"
+                            />
+                          </View>
+                        </View>
+
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.formLabel}>Hotline / Customer Contact Phone</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderRadius: 10,
+                              borderWidth: 1.5,
+                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                              paddingHorizontal: 12,
+                              height: 42,
+                              gap: 10,
+                            }}
+                          >
+                            <BootstrapIcon name="telephone-fill" size={14} color="#94A3B8" />
+                            <TextInput
+                              style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
+                              value={setForm.contactPhone}
+                              onChangeText={(val) => handleUpdateSettingField('contactPhone', val)}
+                              placeholder="+63 (02) 8876-5432"
+                              placeholderTextColor="#94A3B8"
+                            />
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Flagship Address on Row 2 (Full Width) */}
+                      <View>
+                        <Text style={styles.formLabel}>Store Physical Location / Flagship Address</Text>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                            borderRadius: 10,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                            paddingHorizontal: 12,
+                            height: 42,
+                            gap: 10,
+                          }}
+                        >
+                          <BootstrapIcon name="pin-map-fill" size={14} color="#94A3B8" />
+                          <TextInput
+                            style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
+                            value={setForm.storeAddress}
+                            onChangeText={(val) => handleUpdateSettingField('storeAddress', val)}
+                            placeholder="108 Katipunan Ave, Quezon City, Metro Manila, Philippines"
+                            placeholderTextColor="#94A3B8"
+                          />
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* SECTION 3 — REGIONAL CURRENCY & FISCAL RULES */}
+                    <View
+                      style={[
+                        styles.tableCard,
+                        {
+                          padding: 24,
+                          borderRadius: 16,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+                          boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.05)',
+                          gap: 18,
+                        },
+                      ]}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                        <View
+                          style={{
+                            width: 40,
+                            height: 40,
+                            borderRadius: 12,
+                            backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <BootstrapIcon name="cash-stack" size={20} color="#1D4533" />
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              fontSize: 16,
+                              fontWeight: '900',
+                              color: isDarkMode ? '#F8FAFC' : '#0F172A',
+                            }}
+                          >
+                            Regional Currency & Fiscal Rules
+                          </Text>
+                          <Text style={{ fontSize: 12.5, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 2 }}>
+                            Default checkout currency symbol, ISO currency code, and nationwide sales tax rates.
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* 3 Even Columns on Desktop */}
+                      <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.formLabel}>Currency Symbol</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderRadius: 10,
+                              borderWidth: 1.5,
+                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                              paddingHorizontal: 12,
+                              height: 42,
+                              gap: 10,
+                            }}
+                          >
+                            <Text style={{ fontSize: 15, fontWeight: '900', color: '#1D4533' }}>₱</Text>
+                            <TextInput
+                              style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
+                              value={setForm.currencySymbol}
+                              onChangeText={(val) => handleUpdateSettingField('currencySymbol', val)}
+                              placeholder="₱"
+                              placeholderTextColor="#94A3B8"
+                            />
+                          </View>
+                        </View>
+
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.formLabel}>Currency Code</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderRadius: 10,
+                              borderWidth: 1.5,
+                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                              paddingHorizontal: 12,
+                              height: 42,
+                              gap: 10,
+                            }}
+                          >
+                            <BootstrapIcon name="globe2" size={14} color="#94A3B8" />
+                            <TextInput
+                              style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
+                              value={setForm.currencyCode}
+                              onChangeText={(val) => handleUpdateSettingField('currencyCode', val)}
+                              placeholder="PHP"
+                              placeholderTextColor="#94A3B8"
+                            />
+                          </View>
+                        </View>
+
+                        <View style={{ flex: 1 }}>
+                          <Text style={styles.formLabel}>Default Sales Tax / VAT (%)</Text>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderRadius: 10,
+                              borderWidth: 1.5,
+                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                              paddingHorizontal: 12,
+                              height: 42,
+                              gap: 10,
+                            }}
+                          >
+                            <Text style={{ fontSize: 13, fontWeight: '800', color: '#64748B' }}>%</Text>
+                            <TextInput
+                              style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
+                              keyboardType="numeric"
+                              value={String(setForm.taxRate)}
+                              onChangeText={(val) => handleUpdateSettingField('taxRate', Number(val) || 0)}
+                              placeholder="12"
+                              placeholderTextColor="#94A3B8"
+                            />
+                          </View>
+                        </View>
+                      </View>
+                    </View>
+
+                    {/* SECTION 4 — CONSOLE THEME & APPEARANCE */}
                     <View
                       style={[
                         styles.tableCard,
@@ -12336,7 +13923,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             padding: 18,
                             borderRadius: 14,
                             backgroundColor: !isDarkMode
-                              ? '#FFFFFF'
+                              ? '#F3F7F6'
                               : '#1C2422',
                             borderWidth: 2,
                             borderColor: !isDarkMode ? '#1D4533' : tokens.border,
@@ -12408,13 +13995,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               gap: 6,
                             }}
                           >
-                            {/* Mini sidebar */}
                             <View style={{ width: 34, backgroundColor: '#FFFFFF', borderRadius: 5, padding: 4, gap: 4 }}>
                               <View style={{ width: 14, height: 4, borderRadius: 2, backgroundColor: '#1D4533' }} />
                               <View style={{ width: 20, height: 3, borderRadius: 2, backgroundColor: '#CBD5E1' }} />
                               <View style={{ width: 16, height: 3, borderRadius: 2, backgroundColor: '#E2E8F0' }} />
                             </View>
-                            {/* Mini main canvas */}
                             <View style={{ flex: 1, gap: 4 }}>
                               <View style={{ flexDirection: 'row', gap: 4 }}>
                                 <View style={{ flex: 1, height: 14, backgroundColor: '#FFFFFF', borderRadius: 4, borderWidth: 1, borderColor: '#E2E8F0' }} />
@@ -12504,13 +14089,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               gap: 6,
                             }}
                           >
-                            {/* Mini sidebar */}
                             <View style={{ width: 34, backgroundColor: '#141A18', borderRadius: 5, padding: 4, gap: 4 }}>
                               <View style={{ width: 14, height: 4, borderRadius: 2, backgroundColor: '#10B981' }} />
                               <View style={{ width: 20, height: 3, borderRadius: 2, backgroundColor: 'rgba(255, 255, 255, 0.25)' }} />
                               <View style={{ width: 16, height: 3, borderRadius: 2, backgroundColor: 'rgba(255, 255, 255, 0.12)' }} />
                             </View>
-                            {/* Mini main canvas */}
                             <View style={{ flex: 1, gap: 4 }}>
                               <View style={{ flexDirection: 'row', gap: 4 }}>
                                 <View style={{ flex: 1, height: 14, backgroundColor: '#1C2422', borderRadius: 4 }} />
@@ -12520,319 +14103,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             </View>
                           </View>
                         </TouchableOpacity>
-                      </View>
-                    </View>
-
-                    {/* 2. Store Identity & Branding Card */}
-                    <View
-                      style={[
-                        styles.tableCard,
-                        {
-                          padding: 24,
-                          borderRadius: 16,
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
-                          boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.05)',
-                        },
-                      ]}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-                        <View
-                          style={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: 12,
-                            backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          <BootstrapIcon name="shop" size={20} color="#1D4533" />
-                        </View>
-                        <View>
-                          <Text
-                            style={{
-                              fontSize: 16,
-                              fontWeight: '900',
-                              color: isDarkMode ? '#F8FAFC' : '#0F172A',
-                            }}
-                          >
-                            Store Identity & Branding Details
-                          </Text>
-                          <Text style={{ fontSize: 12.5, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 2 }}>
-                            Primary details displayed across customer invoices, storefront headers, and email communications.
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Section A: Brand Info */}
-                      <View
-                        style={{
-                          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : '#F8FAFC',
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                          padding: 18,
-                          marginBottom: 16,
-                          gap: 14,
-                        }}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="tag-fill" size={13} color="#1D4533" />
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533', textTransform: 'uppercase', letterSpacing: 0.7 }}>
-                            Store Profile
-                          </Text>
-                        </View>
-
-                        <View>
-                          <Text style={styles.formLabel}>Official Store Name</Text>
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                              borderRadius: 10,
-                              borderWidth: 1.5,
-                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                              paddingHorizontal: 12,
-                              height: 42,
-                              gap: 10,
-                            }}
-                          >
-                            <BootstrapIcon name="shop" size={14} color="#94A3B8" />
-                            <TextInput
-                              style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
-                              value={setForm.storeName}
-                              onChangeText={(val) => handleUpdateSettingField('storeName', val)}
-                              placeholder="e.g. MotoTrack Performance & Pitstop Garage"
-                              placeholderTextColor="#94A3B8"
-                            />
-                          </View>
-                        </View>
-
-                        <View>
-                          <Text style={styles.formLabel}>Store Tagline / Slogan</Text>
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                              borderRadius: 10,
-                              borderWidth: 1.5,
-                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                              paddingHorizontal: 12,
-                              height: 42,
-                              gap: 10,
-                            }}
-                          >
-                            <BootstrapIcon name="pencil" size={14} color="#94A3B8" />
-                            <TextInput
-                              style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
-                              value={setForm.storeTagline}
-                              onChangeText={(val) => handleUpdateSettingField('storeTagline', val)}
-                              placeholder="e.g. Premier Performance Motorcycle Parts"
-                              placeholderTextColor="#94A3B8"
-                            />
-                          </View>
-                        </View>
-                      </View>
-
-                      {/* Section B: Contact & Headquarters */}
-                      <View
-                        style={{
-                          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : '#F8FAFC',
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                          padding: 18,
-                          marginBottom: 16,
-                          gap: 14,
-                        }}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="pin-map-fill" size={13} color="#1D4533" />
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533', textTransform: 'uppercase', letterSpacing: 0.7 }}>
-                            Contact & Headquarters
-                          </Text>
-                        </View>
-
-                        <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.formLabel}>Support Email Address</Text>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                                borderRadius: 10,
-                                borderWidth: 1.5,
-                                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                                paddingHorizontal: 12,
-                                height: 42,
-                                gap: 10,
-                              }}
-                            >
-                              <BootstrapIcon name="envelope-fill" size={14} color="#94A3B8" />
-                              <TextInput
-                                style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
-                                value={setForm.contactEmail}
-                                onChangeText={(val) => handleUpdateSettingField('contactEmail', val)}
-                                placeholder="support@mototrack.ph"
-                                placeholderTextColor="#94A3B8"
-                                autoCapitalize="none"
-                              />
-                            </View>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.formLabel}>Hotline / Customer Contact Phone</Text>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                                borderRadius: 10,
-                                borderWidth: 1.5,
-                                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                                paddingHorizontal: 12,
-                                height: 42,
-                                gap: 10,
-                              }}
-                            >
-                              <BootstrapIcon name="telephone-fill" size={14} color="#94A3B8" />
-                              <TextInput
-                                style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
-                                value={setForm.contactPhone}
-                                onChangeText={(val) => handleUpdateSettingField('contactPhone', val)}
-                                placeholder="+63 (02) 8876-5432"
-                                placeholderTextColor="#94A3B8"
-                              />
-                            </View>
-                          </View>
-                        </View>
-
-                        <View>
-                          <Text style={styles.formLabel}>Store Physical Location / Flagship Address</Text>
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                              borderRadius: 10,
-                              borderWidth: 1.5,
-                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                              paddingHorizontal: 12,
-                              height: 42,
-                              gap: 10,
-                            }}
-                          >
-                            <BootstrapIcon name="pin-map-fill" size={14} color="#94A3B8" />
-                            <TextInput
-                              style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
-                              value={setForm.storeAddress}
-                              onChangeText={(val) => handleUpdateSettingField('storeAddress', val)}
-                              placeholder="108 Katipunan Ave, Quezon City, Metro Manila"
-                              placeholderTextColor="#94A3B8"
-                            />
-                          </View>
-                        </View>
-                      </View>
-
-                      {/* Section C: Regional Currency & Tax Rules */}
-                      <View
-                        style={{
-                          backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.5)' : '#F8FAFC',
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                          padding: 18,
-                          gap: 14,
-                        }}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="gear-fill" size={13} color="#1D4533" />
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533', textTransform: 'uppercase', letterSpacing: 0.7 }}>
-                            Regional Currency & Fiscal Rules
-                          </Text>
-                        </View>
-
-                        <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.formLabel}>Currency Symbol</Text>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                                borderRadius: 10,
-                                borderWidth: 1.5,
-                                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                                paddingHorizontal: 12,
-                                height: 42,
-                                gap: 10,
-                              }}
-                            >
-                              <Text style={{ fontSize: 14, fontWeight: '900', color: '#1D4533' }}>₱</Text>
-                              <TextInput
-                                style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
-                                value={setForm.currencySymbol}
-                                onChangeText={(val) => handleUpdateSettingField('currencySymbol', val)}
-                                placeholder="₱"
-                                placeholderTextColor="#94A3B8"
-                              />
-                            </View>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.formLabel}>Currency Code</Text>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                                borderRadius: 10,
-                                borderWidth: 1.5,
-                                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                                paddingHorizontal: 12,
-                                height: 42,
-                                gap: 10,
-                              }}
-                            >
-                              <Text style={{ fontSize: 12, fontWeight: '800', color: '#64748B' }}>CODE</Text>
-                              <TextInput
-                                style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
-                                value={setForm.currencyCode}
-                                onChangeText={(val) => handleUpdateSettingField('currencyCode', val)}
-                                placeholder="PHP"
-                                placeholderTextColor="#94A3B8"
-                              />
-                            </View>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={styles.formLabel}>Default Sales Tax / VAT (%)</Text>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                                borderRadius: 10,
-                                borderWidth: 1.5,
-                                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                                paddingHorizontal: 12,
-                                height: 42,
-                                gap: 10,
-                              }}
-                            >
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: '#64748B' }}>%</Text>
-                              <TextInput
-                                style={{ flex: 1, fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}
-                                keyboardType="numeric"
-                                value={String(setForm.taxRate)}
-                                onChangeText={(val) => handleUpdateSettingField('taxRate', Number(val) || 0)}
-                                placeholder="12"
-                                placeholderTextColor="#94A3B8"
-                              />
-                            </View>
-                          </View>
-                        </View>
                       </View>
                     </View>
                   </View>
@@ -14586,6 +15856,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 productKey={isAddProductOpen ? 'new-open' : 'new-closed'}
               />
 
+              <Text style={[styles.formLabel, { marginTop: 8 }]}>Compatible Motorcycles</Text>
+              <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 8 }}>
+                Save the product first, then open Edit to select compatible motorcycle models.
+              </Text>
+
               {/* Image Selection: File Picker / URL / Presets */}
               <Text style={styles.formLabel}>Product Image</Text>
               <View
@@ -14781,6 +16056,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   formLabelStyle={styles.formLabel}
                   onToast={showToast}
                   productKey={editingProduct.id || editingProduct.product_id || 'edit'}
+                />
+
+                <ProductCompatibilityPicker
+                  productId={editingProduct.id || editingProduct.product_id}
+                  onToast={showToast}
                 />
 
                 {/* Edit Product Image with File Picker */}
@@ -15020,6 +16300,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           setRestockModalProduct(null);
                           setRestockSizeAdds([]);
                           setRestockSelectedSize('');
+                          setRestockColorAdds([]);
+                          setRestockSelectedColor('');
                           setRestockSearchQuery('');
                         }}
                         style={{ marginTop: 6 }}
@@ -15215,10 +16497,252 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     );
                   })()}
 
+                  {/* ─── COLOR PICKER SECTION (if product has colors and no sizes) ─── */}
+                  {(() => {
+                    const availColors = normalizeProductColors(restockModalProduct);
+                    const availSizes = normalizeProductSizes(restockModalProduct);
+                    // Only show color picker when there are colors and no sizes (sizes take priority)
+                    if (!availColors.length || availSizes.length > 0) return null;
+                    return (
+                      <View style={{ marginBottom: 12 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                          <Text style={styles.formLabel}>Select Color to Restock</Text>
+                          <Text style={{ fontSize: 11, color: '#64748B' }}>
+                            {availColors.length} color{availColors.length !== 1 ? 's' : ''} available
+                          </Text>
+                        </View>
+                        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                          {availColors.map((c) => {
+                            const isSelected = restockSelectedColor === c.label;
+                            const currentStock =
+                              c.stock === null || c.stock === undefined
+                                ? Number(restockModalProduct.stock || 0)
+                                : Number(c.stock || 0);
+                            return (
+                              <TouchableOpacity
+                                key={c.label}
+                                style={[
+                                  styles.filterPill,
+                                  isSelected && styles.filterPillActive,
+                                  {
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    paddingVertical: 7,
+                                    paddingHorizontal: 12,
+                                    borderRadius: 10,
+                                    borderColor: isSelected ? '#1D4533' : tokens.borderInput,
+                                    borderWidth: 1.5,
+                                    backgroundColor: isSelected ? '#1D4533' : (isDarkMode ? '#1C2422' : '#F8FAFC'),
+                                  },
+                                ]}
+                                onPress={() => setRestockSelectedColor(c.label)}
+                              >
+                                {/* Color swatch */}
+                                {c.image ? (
+                                  <Image
+                                    source={{ uri: c.image }}
+                                    style={{
+                                      width: 18,
+                                      height: 18,
+                                      borderRadius: 4,
+                                      borderWidth: 1,
+                                      borderColor: 'rgba(0,0,0,0.12)',
+                                    }}
+                                    resizeMode="cover"
+                                  />
+                                ) : c.hex ? (
+                                  <View
+                                    style={{
+                                      width: 14,
+                                      height: 14,
+                                      borderRadius: 3,
+                                      backgroundColor: c.hex,
+                                      borderWidth: 1,
+                                      borderColor: 'rgba(0,0,0,0.15)',
+                                    }}
+                                  />
+                                ) : null}
+                                <Text
+                                  style={{
+                                    fontSize: 13,
+                                    fontWeight: '800',
+                                    color: isSelected ? '#FFFFFF' : tokens.textPrimary,
+                                  }}
+                                >
+                                  {c.label}
+                                </Text>
+                                <View
+                                  style={{
+                                    backgroundColor: isSelected ? 'rgba(255,255,255,0.22)' : '#E2E8F0',
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 2,
+                                    borderRadius: 6,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: '700',
+                                      color: isSelected ? '#FFFFFF' : '#475569',
+                                    }}
+                                  >
+                                    {currentStock} in stock
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                          {/* All Colors button */}
+                          <TouchableOpacity
+                            style={[
+                              styles.filterPill,
+                              restockSelectedColor === 'all' && styles.filterPillActive,
+                              {
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                paddingVertical: 7,
+                                paddingHorizontal: 12,
+                                borderRadius: 10,
+                                borderColor: restockSelectedColor === 'all' ? '#1D4533' : tokens.borderInput,
+                                borderWidth: 1.5,
+                                backgroundColor: restockSelectedColor === 'all' ? '#1D4533' : (isDarkMode ? '#1C2422' : '#F8FAFC'),
+                              },
+                            ]}
+                            onPress={() => setRestockSelectedColor('all')}
+                          >
+                            <BootstrapIcon
+                              name="grid-3x3-gap-fill"
+                              size={12}
+                              color={restockSelectedColor === 'all' ? '#FFFFFF' : '#64748B'}
+                            />
+                            <Text
+                              style={{
+                                fontSize: 13,
+                                fontWeight: '800',
+                                color: restockSelectedColor === 'all' ? '#FFFFFF' : tokens.textPrimary,
+                              }}
+                            >
+                              All Colors (Multi-restock)
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {restockSelectedColor && restockSelectedColor !== 'all' && (() => {
+                          const activeColor = availColors.find((c) => c.label === restockSelectedColor);
+                          const curStock =
+                            activeColor?.stock === null || activeColor?.stock === undefined
+                              ? Number(restockModalProduct.stock || 0)
+                              : Number(activeColor?.stock || 0);
+                          const addQty = parseInt(restockAmount, 10) || 0;
+                          return (
+                            <View
+                              style={{
+                                marginTop: 8,
+                                paddingHorizontal: 12,
+                                paddingVertical: 8,
+                                borderRadius: 8,
+                                backgroundColor: '#F0FDFA',
+                                borderWidth: 1,
+                                borderColor: '#CCFBF1',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              <Text style={{ fontSize: 12, color: '#0F766E', fontWeight: '700' }}>
+                                Restocking: <Text style={{ fontWeight: '900' }}>{restockSelectedColor}</Text> (Current: {curStock} units)
+                              </Text>
+                              <Text style={{ fontSize: 12, color: '#059669', fontWeight: '800' }}>
+                                → Will become: {curStock + addQty} units
+                              </Text>
+                            </View>
+                          );
+                        })()}
+                      </View>
+                    );
+                  })()}
+
                   {/* ─── QUANTITY SECTION ─── */}
                   {(() => {
                     const availSizes = normalizeProductSizes(restockModalProduct);
-                    const isAll = availSizes.length > 0 && restockSelectedSize === 'all';
+                    const availColors = normalizeProductColors(restockModalProduct);
+                    const hasSizesQ = availSizes.length > 0;
+                    const hasColorsQ = availColors.length > 0 && !hasSizesQ;
+                    const isAll = hasSizesQ && restockSelectedSize === 'all';
+                    const isAllColors = hasColorsQ && restockSelectedColor === 'all';
+
+                    if (isAllColors) {
+                      return (
+                        <>
+                          <Text style={styles.formLabel}>Restock by color (add units)</Text>
+                          <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 8 }}>
+                            Enter how many units to add for each color.
+                          </Text>
+                          {restockColorAdds.map((row, idx) => (
+                            <View
+                              key={row.label}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 8,
+                                marginBottom: 8,
+                              }}
+                            >
+                              <View style={{ flex: 1.2 }}>
+                                {row.hex ? (
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: row.hex, borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)' }} />
+                                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>{row.label}</Text>
+                                  </View>
+                                ) : (
+                                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>{row.label}</Text>
+                                )}
+                                <Text style={{ fontSize: 11, color: '#64748B' }}>Now: {row.currentStock}</Text>
+                              </View>
+                              <TextInput
+                                style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
+                                keyboardType="numeric"
+                                value={row.addQty}
+                                placeholder="+ qty"
+                                placeholderTextColor="#94A3B8"
+                                onChangeText={(val) => {
+                                  setRestockColorAdds((prev) =>
+                                    prev.map((r, i) => (i === idx ? { ...r, addQty: val } : r))
+                                  );
+                                }}
+                              />
+                            </View>
+                          ))}
+                          <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                            {[5, 10, 25].map((qty) => (
+                              <TouchableOpacity
+                                key={qty}
+                                style={{
+                                  flex: 1,
+                                  backgroundColor: '#FEF3C7',
+                                  paddingVertical: 6,
+                                  borderRadius: 8,
+                                  alignItems: 'center',
+                                  borderWidth: 1,
+                                  borderColor: '#FDE68A',
+                                }}
+                                onPress={() =>
+                                  setRestockColorAdds((prev) =>
+                                    prev.map((r) => ({ ...r, addQty: String(qty) }))
+                                  )
+                                }
+                              >
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#1D4533' }}>
+                                  +{qty} all
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        </>
+                      );
+                    }
 
                     if (isAll) {
                       return (
@@ -15351,12 +16875,20 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
                   {(() => {
                     const availSizes = normalizeProductSizes(restockModalProduct);
-                    const isAll = availSizes.length > 0 && restockSelectedSize === 'all';
+                    const availColors = normalizeProductColors(restockModalProduct);
+                    const hasSizesP = availSizes.length > 0;
+                    const hasColorsP = availColors.length > 0 && !hasSizesP;
+                    const isAll = hasSizesP && restockSelectedSize === 'all';
+                    const isAllColors = hasColorsP && restockSelectedColor === 'all';
                     const sizeTotal = (restockSizeAdds || []).reduce(
                       (sum, r) => sum + (parseInt(String(r.addQty || '0'), 10) || 0),
                       0
                     );
-                    const qty = isAll ? sizeTotal : Number(restockAmount) || 0;
+                    const colorTotal = (restockColorAdds || []).reduce(
+                      (sum, r) => sum + (parseInt(String(r.addQty || '0'), 10) || 0),
+                      0
+                    );
+                    const qty = isAll ? sizeTotal : isAllColors ? colorTotal : Number(restockAmount) || 0;
                     const cost = Number(restockUnitCost) || 0;
                     const price = Number(restockSellPrice) || 0;
                     const expense = qty * cost;
@@ -15651,57 +17183,116 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           onRequestClose={() => setIsBookingModalOpen(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={[styles.modalSheet, { maxWidth: 820, maxHeight: '92%' }]}>
-              <View style={styles.modalHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View
+              style={[
+                styles.modalSheet,
+                {
+                  maxWidth: 860,
+                  maxHeight: '92%',
+                  borderRadius: 24,
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1,
+                  borderColor: '#E2E8F0',
+                  shadowColor: '#000000',
+                  shadowOffset: { width: 0, height: 12 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 28,
+                  elevation: 12,
+                },
+              ]}
+            >
+              {/* Fixed Modal Header */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 24,
+                  paddingVertical: 18,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1 }}>
                   <View
                     style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 18,
+                      width: 42,
+                      height: 42,
+                      borderRadius: 12,
                       backgroundColor: '#FEF3C7',
+                      borderWidth: 1,
+                      borderColor: '#FDE68A',
                       justifyContent: 'center',
                       alignItems: 'center',
                     }}
                   >
-                    <BootstrapIcon name="tools" size={18} color="#1D4533" />
+                    <BootstrapIcon name="tools" size={20} color="#B45309" />
                   </View>
-                  <View>
-                    <Text style={styles.modalTitle}>Work Order #{selectedBookingForModal.id}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                      <Text style={{ fontSize: 11.5, color: '#64748B' }}>
-                        {selectedBookingForModal.category || 'PMS'} Service Appointment •{' '}
-                        {selectedBookingForModal.branch?.replace('MotoTrack ', '') || 'Central Hub'}
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      <Text style={{ fontSize: 18, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 }}>
+                        Work Order #{selectedBookingForModal.booking_id || selectedBookingForModal.id}
                       </Text>
                       <View
                         style={{
-                          backgroundColor: selectedBookingForModal.status === 'Cancelled' ? '#FEF2F2' : '#F0FDF4',
-                          paddingHorizontal: 6,
-                          paddingVertical: 1.5,
-                          borderRadius: 4,
+                          backgroundColor: selectedBookingForModal.status === 'Cancelled' ? '#FEF2F2' : '#ECFDF5',
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 6,
+                          borderWidth: 1,
+                          borderColor: selectedBookingForModal.status === 'Cancelled' ? '#FECACA' : '#A7F3D0',
                         }}
                       >
                         <Text
                           style={{
-                            fontSize: 10,
+                            fontSize: 11,
                             fontWeight: '800',
-                            color: selectedBookingForModal.status === 'Cancelled' ? '#DC2626' : '#166534',
+                            color: selectedBookingForModal.status === 'Cancelled' ? '#DC2626' : '#047857',
                           }}
                         >
                           {selectedBookingForModal.status === 'Cancelled'
-                            ? '20% DP Forfeited (Non-Refundable)'
+                            ? 'DP Forfeited'
                             : `20% DP ₱${(selectedBookingForModal.downpayment_amount !== undefined ? selectedBookingForModal.downpayment_amount : Math.round((selectedBookingForModal.pricePhp || 2500) * 0.20)).toLocaleString()} Paid (${selectedBookingForModal.downpayment_method || 'GCash'})`}
                         </Text>
                       </View>
                     </View>
+
+                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginTop: 2 }}>
+                      {selectedBookingForModal.category || 'PMS'} Service Appointment •{' '}
+                      {selectedBookingForModal.branch?.replace('MotoTrack ', '') || 'D\'Blockchain Motorparts and Accessories'}
+                    </Text>
                   </View>
                 </View>
-                <TouchableOpacity onPress={() => setIsBookingModalOpen(false)}>
-                  <BootstrapIcon name="x-lg" size={16} color="#64748B" />
+
+                <TouchableOpacity
+                  onPress={() => setIsBookingModalOpen(false)}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 10,
+                    backgroundColor: '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: '#E2E8F0',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <BootstrapIcon name="x-lg" size={14} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              {/* Scrollable Main Content */}
+              <ScrollView
+                style={{ flex: 1, backgroundColor: '#F8FAFC' }}
+                contentContainerStyle={{ padding: 22, paddingBottom: 28 }}
+                showsVerticalScrollIndicator={true}
+              >
                 {/* Organized Booking Details (list + modal information) */}
                 <AdminBookingDetailsPanel
                   booking={selectedBookingForModal}
@@ -15730,1063 +17321,59 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     }
                   }}
                 />
-
-                {/* 1. Live Lifecycle Status & Advisor Decision Hub */}
-                <View
-                  style={{
-                    backgroundColor: isDarkMode ? '#1C2422' : '#F8FAFC',
-                    borderRadius: 14,
-                    padding: 16,
-                    borderWidth: 1.5,
-                    borderColor: tokens.border,
-                    marginBottom: 16,
-                    marginTop: 12,
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      marginBottom: 12,
-                    }}
-                  >
-                    <View>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: '800',
-                          color: tokens.textMuted,
-                          textTransform: 'uppercase',
-                          letterSpacing: 0.5,
-                        }}
-                      >
-                        Active Lifecycle Status
-                      </Text>
-                      <Text style={{ fontSize: 16, fontWeight: '900', color: tokens.textPrimary, marginTop: 2 }}>
-                        {editBkStatus === 'Pending'
-                          ? '⏳ Awaiting Advisor Review'
-                          : editBkStatus === 'Confirmed'
-                          ? '✓ Confirmed • Awaiting Customer Arrival'
-                          : editBkStatus === 'Inspection'
-                          ? '🔍 Technician Inspection Underway'
-                          : editBkStatus === 'Estimate Pending'
-                          ? '⚠️ Additional Estimate Pending Rider Approval'
-                          : editBkStatus === 'In Progress'
-                          ? '🔧 In Bay • Active Service'
-                          : editBkStatus === 'Service Done'
-                          ? '🏁 Service Complete • Awaiting Bill Payment'
-                          : editBkStatus === 'Paid'
-                          ? '💳 Bill Settled • Ready for Vehicle Release'
-                          : editBkStatus === 'Closed'
-                          ? '🏁 Released & Closed'
-                          : editBkStatus === 'Rejected'
-                          ? '❌ Rejected'
-                          : editBkStatus}
-                      </Text>
-                    </View>
-
-                    <View
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 4,
-                        borderRadius: 8,
-                        backgroundColor:
-                          editBkStatus === 'Pending'
-                            ? '#FEF3C7'
-                            : editBkStatus === 'Confirmed'
-                            ? '#C8DDD3'
-                            : editBkStatus === 'Inspection'
-                            ? '#EFF6FF'
-                            : editBkStatus === 'Estimate Pending'
-                            ? '#FEE2E2'
-                            : editBkStatus === 'In Progress'
-                            ? '#E0F2FE'
-                            : editBkStatus === 'Service Done'
-                            ? '#DCFCE7'
-                            : editBkStatus === 'Paid'
-                            ? '#C8DDD3'
-                            : editBkStatus === 'Closed'
-                            ? (isDarkMode ? '#141A18' : '#F1F5F9')
-                            : '#FEE2E2',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: '800',
-                          color:
-                            editBkStatus === 'Pending'
-                              ? '#D97706'
-                              : editBkStatus === 'Confirmed'
-                              ? '#1D4533'
-                              : editBkStatus === 'Inspection'
-                              ? '#2563EB'
-                              : editBkStatus === 'Estimate Pending'
-                              ? '#DC2626'
-                              : editBkStatus === 'In Progress'
-                              ? '#0284C7'
-                              : editBkStatus === 'Service Done'
-                              ? '#16A34A'
-                              : editBkStatus === 'Paid'
-                              ? '#1D4533'
-                              : editBkStatus === 'Closed'
-                              ? (isDarkMode ? '#CBD5E1' : '#475569')
-                              : '#DC2626',
-                        }}
-                      >
-                        {editBkStatus}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Pipeline guide inside modal */}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      flexWrap: 'wrap',
-                      gap: 6,
-                      marginTop: 10,
-                      marginBottom: 4,
-                    }}
-                  >
-                    {[
-                      'Review',
-                      'Inspect',
-                      'Quote',
-                      'Downpayment',
-                      'Service',
-                      'Final Bill',
-                      'Pickup',
-                    ].map((step) => (
-                      <View
-                        key={step}
-                        style={{
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          borderRadius: 6,
-                          backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
-                        }}
-                      >
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: tokens.textMuted }}>
-                          {step}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-
-                  {(selectedBookingForModal.problem_description ||
-                    selectedBookingForModal.current_stage) && (
-                    <View
-                      style={{
-                        marginTop: 8,
-                        padding: 10,
-                        borderRadius: 10,
-                        backgroundColor: isDarkMode ? '#141A18' : '#F8FAFC',
-                        borderWidth: 1,
-                        borderColor: tokens.border,
-                      }}
-                    >
-                      {selectedBookingForModal.current_stage ? (
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4533', marginBottom: 4 }}>
-                          {selectedBookingForModal.current_stage}
-                        </Text>
-                      ) : null}
-                      {selectedBookingForModal.problem_description ? (
-                        <Text style={{ fontSize: 12, color: tokens.textMuted }}>
-                          Problem: {selectedBookingForModal.problem_description}
-                        </Text>
-                      ) : null}
-                    </View>
-                  )}
-
-                  {/* ─── WORKFLOW ACTION: IF PENDING (APPROVE / REJECT) ─── */}
-                  {(editBkStatus === 'Pending' ||
-                    editBkStatus === 'PENDING_REVIEW' ||
-                    String(editBkStatus || '').toUpperCase() === 'PENDING_REVIEW') && (
-                    <View
-                      style={{
-                        backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-                        borderRadius: 12,
-                        padding: 14,
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A',
-                        marginTop: 6,
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? '#FBBF24' : '#92400E', marginBottom: 6 }}>
-                        Service Advisor Action Required: Review & Assign Technician
-                      </Text>
-                      <Text style={{ fontSize: 12, color: tokens.textMuted, marginBottom: 10 }}>
-                        Select a certified technician (with hourly rate) to approve this booking:
-                      </Text>
-
-                      <View style={{ gap: 6, marginBottom: 12 }}>
-                        {garageMechanics.map((mech) => {
-                          const isSelected = selectedMechanicForApproval === mech.name;
-                          const rate = mech.hourlyRate ?? mech.hourly_rate ?? 150;
-                          return (
-                            <TouchableOpacity
-                              key={mech.id}
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                padding: 10,
-                                borderRadius: 8,
-                                borderWidth: 1.5,
-                                borderColor: isSelected ? '#1D4533' : tokens.border,
-                                backgroundColor: isSelected ? (isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#F3F7F6') : (isDarkMode ? '#1C2422' : '#FFFFFF'),
-                              }}
-                              onPress={() => setSelectedMechanicForApproval(mech.name)}
-                            >
-                              <View>
-                                <Text
-                                  style={{
-                                    fontSize: 12.5,
-                                    fontWeight: '800',
-                                    color: isSelected ? (isDarkMode ? '#34D399' : '#1D4533') : tokens.textPrimary,
-                                  }}
-                                >
-                                  {mech.name}
-                                </Text>
-                                <Text style={{ fontSize: 11, color: '#64748B' }}>
-                                  {mech.specialization} · ₱{Number(rate).toLocaleString()}/hour
-                                </Text>
-                              </View>
-                              {isSelected && <BootstrapIcon name="check-circle-fill" size={14} color="#1D4533" />}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-
-                      <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
-                        <TouchableOpacity
-                          style={{
-                            flex: 1.6,
-                            backgroundColor: '#1D4533',
-                            paddingVertical: 10,
-                            borderRadius: 10,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            gap: 6,
-                          }}
-                          onPress={() =>
-                            handleAdvisorApprove(selectedBookingForModal.id, selectedMechanicForApproval)
-                          }
-                        >
-                          <BootstrapIcon name="check2-circle" size={15} color="#FFFFFF" />
-                          <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>
-                            Approve Booking
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* Reject Form */}
-                      <View style={{ marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
-                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#64748B', marginBottom: 4 }}>
-                          Or Reject with Reason:
-                        </Text>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                          <TextInput
-                            style={[
-                              styles.formInput,
-                              {
-                                flex: 1,
-                                height: 38,
-                                fontSize: 12,
-                                backgroundColor: '#FFFFFF',
-                                color: '#0F172A',
-                                borderColor: '#CBD5E1',
-                                borderWidth: 1.5,
-                              },
-                            ]}
-                            placeholder="e.g. Bays fully booked at 10 AM, please rebook"
-                            placeholderTextColor="#94A3B8"
-                            selectionColor="#1D4533"
-                            value={rejectReasonInput}
-                            onChangeText={setRejectReasonInput}
-                          />
-                          <TouchableOpacity
-                            style={{
-                              backgroundColor: '#FEE2E2',
-                              borderWidth: 1,
-                              borderColor: '#FCA5A5',
-                              paddingHorizontal: 12,
-                              borderRadius: 8,
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                            }}
-                            onPress={() => handleAdvisorReject(selectedBookingForModal.id, rejectReasonInput)}
-                          >
-                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>Reject</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* ─── WORKFLOW ACTION: IF CONFIRMED / APPROVED (CHECK IN) ─── */}
-                  {(editBkStatus === 'Confirmed' ||
-                    editBkStatus === 'APPROVED' ||
-                    editBkStatus === 'CONFIRMED' ||
-                    editBkStatus === 'SCHEDULED') && (
-                    <View
-                      style={{
-                        backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-                        borderRadius: 12,
-                        padding: 14,
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.4)' : '#93C5FD',
-                        marginTop: 6,
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? '#60A5FA' : '#1E40AF', marginBottom: 4 }}>
-                        Customer Arrival & Check-In
-                      </Text>
-                      <Text style={{ fontSize: 12, color: tokens.textMuted, marginBottom: 10 }}>
-                        When customer arrives at the Central Hub, check in motorcycle to start multi-point inspection.
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.formInput,
-                          {
-                            height: 42,
-                            marginBottom: 10,
-                            fontSize: 12,
-                            backgroundColor: '#FFFFFF',
-                            color: '#0F172A',
-                            borderColor: '#CBD5E1',
-                            borderWidth: 1.5,
-                          },
-                        ]}
-                        placeholder="Intake notes (e.g. odometer verified, helmet stowed, keys received)"
-                        placeholderTextColor="#94A3B8"
-                        selectionColor="#1D4533"
-                        value={inspectionNotesInput}
-                        onChangeText={setInspectionNotesInput}
-                      />
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: '#2563EB',
-                          paddingVertical: 10,
-                          borderRadius: 10,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 6,
-                        }}
-                        onPress={() => handleAdvisorCheckIn(selectedBookingForModal.id, inspectionNotesInput)}
-                      >
-                        <BootstrapIcon name="box-arrow-in-right" size={15} color="#FFFFFF" />
-                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>
-                          Check In Motorcycle & Begin Inspection
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {/* ─── WORKFLOW ACTION: IF INSPECTION (ADD ESTIMATE OR CONTINUE) ─── */}
-                  {editBkStatus === 'Inspection' && (
-                    <View
-                      style={{
-                        backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-                        borderRadius: 12,
-                        padding: 14,
-                        borderWidth: 1,
-                        borderColor: tokens.border,
-                        marginTop: 6,
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: tokens.textPrimary, marginBottom: 4 }}>
-                        Mechanic Multi-Point Inspection Findings
-                      </Text>
-                      <Text style={{ fontSize: 12, color: tokens.textMuted, marginBottom: 12 }}>
-                        Did inspection find additional required work or parts needing replacement?
-                      </Text>
-
-                      {/* Option A: No extra issues */}
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: isDarkMode ? '#1C2422' : '#F3F7F6',
-                          borderWidth: 1.5,
-                          borderColor: isDarkMode ? '#10B981' : '#1D4533',
-                          paddingVertical: 9,
-                          borderRadius: 8,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginBottom: 12,
-                        }}
-                        onPress={() => handleAdvisorContinueService(selectedBookingForModal.id)}
-                      >
-                        <Text style={{ color: isDarkMode ? '#34D399' : '#1D4533', fontSize: 12.5, fontWeight: '800' }}>
-                          ✓ No Extra Faults Found • Continue Scheduled Service
-                        </Text>
-                      </TouchableOpacity>
-
-                      {/* Option B: Additional Problem Form */}
-                      <View
-                        style={{
-                          backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2',
-                          padding: 12,
-                          borderRadius: 10,
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#FECACA',
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? '#F87171' : '#991B1B', marginBottom: 6 }}>
-                          ⚠️ Additional Repair Estimate Required:
-                        </Text>
-                        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                          <TextInput
-                            style={[
-                              styles.formInput,
-                              {
-                                flex: 2,
-                                height: 38,
-                                fontSize: 12,
-                                backgroundColor: '#FFFFFF',
-                                color: '#0F172A',
-                                borderColor: '#CBD5E1',
-                                borderWidth: 1.5,
-                              },
-                            ]}
-                            placeholder="Part / Problem (e.g. Brake Caliper Kit)"
-                            placeholderTextColor="#94A3B8"
-                            selectionColor="#1D4533"
-                            value={newEstimateTitle}
-                            onChangeText={setNewEstimateTitle}
-                          />
-                          <TextInput
-                            style={[
-                              styles.formInput,
-                              {
-                                flex: 1,
-                                height: 38,
-                                fontSize: 12,
-                                backgroundColor: '#FFFFFF',
-                                color: '#0F172A',
-                                borderColor: '#CBD5E1',
-                                borderWidth: 1.5,
-                              },
-                            ]}
-                            placeholder="Amount (₱)"
-                            placeholderTextColor="#94A3B8"
-                            selectionColor="#1D4533"
-                            keyboardType="numeric"
-                            value={newEstimateAmount}
-                            onChangeText={setNewEstimateAmount}
-                          />
-                        </View>
-                        <TextInput
-                          style={[
-                            styles.formInput,
-                            {
-                              height: 42,
-                              marginBottom: 8,
-                              fontSize: 12,
-                              backgroundColor: '#FFFFFF',
-                              color: '#0F172A',
-                              borderColor: '#CBD5E1',
-                              borderWidth: 1.5,
-                            },
-                          ]}
-                          placeholder="Description of issue for rider review"
-                          placeholderTextColor="#94A3B8"
-                          selectionColor="#1D4533"
-                          value={newEstimateDesc}
-                          onChangeText={setNewEstimateDesc}
-                        />
-                        <TouchableOpacity
-                          style={{
-                            backgroundColor: '#DC2626',
-                            paddingVertical: 8,
-                            borderRadius: 8,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                          onPress={() => handleAdvisorSendEstimate(selectedBookingForModal.id)}
-                        >
-                          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>
-                            Send Estimate to Customer (Status → Estimate Pending)
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* ─── WORKFLOW ACTION: IF ESTIMATE PENDING ─── */}
-                  {editBkStatus === 'Estimate Pending' && (
-                    <View
-                      style={{
-                        backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2',
-                        borderRadius: 12,
-                        padding: 14,
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.3)' : '#FECACA',
-                        marginTop: 6,
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? '#F87171' : '#991B1B', marginBottom: 4 }}>
-                        Awaiting Rider Authorization
-                      </Text>
-                      <Text style={{ fontSize: 12, color: isDarkMode ? '#FCA5A5' : '#7F1D1D', marginBottom: 10 }}>
-                        The rider was notified and has interactive Approve/Decline buttons in their profile.
-                      </Text>
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: '#16A34A',
-                          paddingVertical: 9,
-                          borderRadius: 8,
-                          alignItems: 'center',
-                        }}
-                        onPress={() => handleAdvisorContinueService(selectedBookingForModal.id)}
-                      >
-                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>
-                          Manual Override: Rider Approved via Phone (Proceed)
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {/* ─── WORKFLOW ACTION: IF IN PROGRESS (PROGRESS BUTTONS) ─── */}
-                  {editBkStatus === 'In Progress' && (
-                    <View
-                      style={{
-                        backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-                        borderRadius: 12,
-                        padding: 14,
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? 'rgba(2, 132, 199, 0.4)' : '#BAE6FD',
-                        marginTop: 6,
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? '#38BDF8' : '#0369A1', marginBottom: 4 }}>
-                        Service Execution Progress: {selectedBookingForModal.service_progress || 35}%
-                      </Text>
-                      <Text style={{ fontSize: 12, color: tokens.textMuted, marginBottom: 10 }}>
-                        Tap a stage to update service progress or pass final inspection:
-                      </Text>
-                      <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                        {[
-                          { p: 25, label: '25% Teardown', desc: 'Teardown & Component Prep' },
-                          { p: 50, label: '50% Install', desc: 'Component Installation in Bay' },
-                          { p: 75, label: '75% Torque & Bleed', desc: 'Torque Check & Fluid Bleed' },
-                          {
-                            p: 100,
-                            label: '✓ 100% Quality Passed',
-                            desc: 'Quality Check & Road Test Passed',
-                            primary: true,
-                          },
-                        ].map((stage) => (
-                          <TouchableOpacity
-                            key={stage.p}
-                            style={{
-                              backgroundColor: stage.primary ? '#16A34A' : (isDarkMode ? '#1C2422' : '#F1F5F9'),
-                              paddingHorizontal: 12,
-                              paddingVertical: 8,
-                              borderRadius: 8,
-                            }}
-                            onPress={() =>
-                              handleAdvisorUpdateProgress(selectedBookingForModal.id, stage.p, stage.desc)
-                            }
-                          >
-                            <Text
-                              style={{
-                                fontSize: 12,
-                                fontWeight: '800',
-                                color: stage.primary ? '#FFFFFF' : (isDarkMode ? '#CBD5E1' : '#334155'),
-                              }}
-                            >
-                              {stage.label}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* ─── WORKFLOW ACTION: IF SERVICE DONE (SETTLE BILL) ─── */}
-                  {editBkStatus === 'Service Done' && (
-                    <View
-                      style={{
-                        backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#F0FDF4',
-                        borderRadius: 12,
-                        padding: 14,
-                        borderWidth: 1.5,
-                        borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#86EFAC',
-                        marginTop: 6,
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? '#34D399' : '#166534', marginBottom: 4 }}>
-                        Quality Check Passed • Settle Final Bill
-                      </Text>
-                      {(() => {
-                        const base = Number(selectedBookingForModal.pricePhp || 2500);
-                        const dpPaid = Number(selectedBookingForModal.downpayment_paid ? (selectedBookingForModal.downpayment_amount !== undefined ? selectedBookingForModal.downpayment_amount : Math.round(base * 0.20)) : 0);
-                        const addEst = (selectedBookingForModal.additional_estimates || [])
-                          .filter((e) => e.status === 'approved')
-                          .reduce((sum, e) => sum + Number(e.amount || 0), 0);
-                        const remainingDue = Math.max(0, (base - dpPaid) + addEst);
-
-                        return (
-                          <>
-                            <View style={{ gap: 5, marginVertical: 8, backgroundColor: isDarkMode ? '#141A18' : '#F8FAFC', padding: 10, borderRadius: 8, borderWidth: 1, borderColor: tokens.border }}>
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ fontSize: 12, color: tokens.textMuted }}>Base Service Fee:</Text>
-                                <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>₱{base.toLocaleString()}</Text>
-                              </View>
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                <Text style={{ fontSize: 12, color: isDarkMode ? '#34D399' : '#166534', fontWeight: '700' }}>Less 20% Downpayment Paid (Non-Refundable):</Text>
-                                <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? '#34D399' : '#166534' }}>-₱{dpPaid.toLocaleString()}</Text>
-                              </View>
-                              {addEst > 0 && (
-                                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                                  <Text style={{ fontSize: 12, color: isDarkMode ? '#60A5FA' : '#2563EB' }}>Additional Approved Work:</Text>
-                                  <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? '#60A5FA' : '#2563EB' }}>+₱{addEst.toLocaleString()}</Text>
-                                </View>
-                              )}
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: tokens.border, paddingTop: 6, marginTop: 4 }}>
-                                <Text style={{ fontSize: 13, fontWeight: '800', color: tokens.textPrimary }}>Remaining Balance Due to Collect:</Text>
-                                <Text style={{ fontSize: 17, fontWeight: '900', color: isDarkMode ? '#34D399' : '#15803D' }}>₱{remainingDue.toLocaleString()}</Text>
-                              </View>
-                            </View>
-
-                            {/* Payment Method Selector */}
-                            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
-                              {['Cash', 'GCash', 'Card'].map((m) => (
-                                <TouchableOpacity
-                                  key={m}
-                                  style={{
-                                    flex: 1,
-                                    paddingVertical: 6,
-                                    borderRadius: 6,
-                                    borderWidth: 1,
-                                    borderColor: paymentMethodInput === m ? '#1D4533' : tokens.borderInput,
-                                    backgroundColor: paymentMethodInput === m ? '#1D4533' : (isDarkMode ? '#1C2422' : '#FFFFFF'),
-                                    alignItems: 'center',
-                                  }}
-                                  onPress={() => setPaymentMethodInput(m)}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 12,
-                                      fontWeight: '800',
-                                      color: paymentMethodInput === m ? '#FFFFFF' : (isDarkMode ? '#CBD5E1' : '#475569'),
-                                    }}
-                                  >
-                                    {m}
-                                  </Text>
-                                </TouchableOpacity>
-                              ))}
-                            </View>
-
-                            <TouchableOpacity
-                              style={{
-                                backgroundColor: '#1D4533',
-                                paddingVertical: 10,
-                                borderRadius: 8,
-                                alignItems: 'center',
-                              }}
-                              onPress={() =>
-                                handleAdvisorProcessPayment(
-                                  selectedBookingForModal.id,
-                                  remainingDue,
-                                  paymentMethodInput
-                                )
-                              }
-                            >
-                              <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>
-                                Record Payment Received (₱{remainingDue.toLocaleString()} Remaining Due)
-                              </Text>
-                            </TouchableOpacity>
-                          </>
-                        );
-                      })()}
-                    </View>
-                  )}
-
-                  {/* ─── WORKFLOW ACTION: IF PAID (RELEASE MOTORCYCLE) ─── */}
-                  {editBkStatus === 'Paid' && (
-                    <View
-                      style={{
-                        backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-                        borderRadius: 12,
-                        padding: 14,
-                        borderWidth: 1.5,
-                        borderColor: isDarkMode ? '#10B981' : '#1D4533',
-                        marginTop: 6,
-                      }}
-                    >
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? '#34D399' : '#1D4533', marginBottom: 4 }}>
-                        Payment Verified • Ready to Release Motorcycle
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.formInput,
-                          {
-                            height: 42,
-                            marginBottom: 10,
-                            fontSize: 12,
-                            backgroundColor: '#FFFFFF',
-                            color: '#0F172A',
-                            borderColor: '#CBD5E1',
-                            borderWidth: 1.5,
-                          },
-                        ]}
-                        placeholder="Release notes / test-ride remarks for customer report"
-                        placeholderTextColor="#94A3B8"
-                        selectionColor="#1D4533"
-                        value={releaseNotesInput}
-                        onChangeText={setReleaseNotesInput}
-                      />
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: '#1D4533',
-                          paddingVertical: 10,
-                          borderRadius: 8,
-                          alignItems: 'center',
-                        }}
-                        onPress={() =>
-                          handleAdvisorReleaseMotorcycle(selectedBookingForModal.id, releaseNotesInput)
-                        }
-                      >
-                        <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>
-                          🏁 Handover to Rider & Close Work Order
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  {/* Manual Status Override Pills for quick adjustments */}
-                  <View style={{ marginTop: 14, paddingTop: 10, borderTopWidth: 1, borderTopColor: tokens.border }}>
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: '700',
-                        color: tokens.textMuted,
-                        textTransform: 'uppercase',
-                        marginBottom: 6,
-                      }}
-                    >
-                      Quick Status Override:
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: 5, flexWrap: 'wrap' }}>
-                      {[
-                        'Pending',
-                        'Confirmed',
-                        'Inspection',
-                        'In Progress',
-                        'Service Done',
-                        'Paid',
-                        'Closed',
-                        'Cancelled',
-                      ].map((st) => {
-                        const isCur = editBkStatus.toLowerCase() === st.toLowerCase();
-                        return (
-                          <TouchableOpacity
-                            key={st}
-                            style={[
-                              styles.orderFilterTab,
-                              { paddingVertical: 4, paddingHorizontal: 8 },
-                              isCur && { backgroundColor: '#1D4533', borderColor: 'transparent' },
-                            ]}
-                            onPress={() => setEditBkStatus(st)}
-                          >
-                            <Text
-                              style={[
-                                styles.orderFilterTabText,
-                                { fontSize: 11 },
-                                isCur && { color: '#FFFFFF', fontWeight: '800' },
-                              ]}
-                            >
-                              {st}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-                    </View>
-                  </View>
-                </View>
-
-                {/* 2. Customer & Bike Details Card */}
-                <View
-                  style={{
-                    backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-                    borderRadius: 12,
-                    padding: 14,
-                    borderWidth: 1,
-                    borderColor: tokens.border,
-                    marginBottom: 14,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: '800',
-                      color: tokens.textMuted,
-                      textTransform: 'uppercase',
-                      marginBottom: 10,
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    Customer & Vehicle Profile
-                  </Text>
-                  <View style={{ gap: 7 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 12.5, color: tokens.textMuted }}>Customer Name:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary }}>
-                        {selectedBookingForModal.customer_name || selectedBookingForModal.userName || 'Guest Rider'}
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 12.5, color: tokens.textMuted }}>Contact Phone:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary }}>
-                        {selectedBookingForModal.customer_phone || selectedBookingForModal.userPhone || 'N/A'}
-                      </Text>
-                    </View>
-                    {(selectedBookingForModal.customer_email || selectedBookingForModal.userEmail) ? (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 12.5, color: tokens.textMuted }}>Email Address:</Text>
-                        <Text style={{ fontSize: 13, color: isDarkMode ? '#34D399' : '#1D4533', fontWeight: '600' }}>
-                          {selectedBookingForModal.customer_email || selectedBookingForModal.userEmail}
-                        </Text>
-                      </View>
-                    ) : null}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 12.5, color: tokens.textMuted }}>Motorcycle:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary }}>
-                        {selectedBookingForModal.bike_brand || selectedBookingForModal.bikeBrand || ''}{' '}
-                        {selectedBookingForModal.bike_model || selectedBookingForModal.bikeModel || ''}
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 12.5, color: tokens.textMuted }}>License Plate:</Text>
-                      <View style={styles.bikePlatePill}>
-                        <Text style={[styles.bikePlateText, { fontSize: 11 }]}>
-                          {selectedBookingForModal.plate_number || selectedBookingForModal.bikePlate || 'TEMP-PLATE'}
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 12.5, color: tokens.textMuted }}>Current Mileage / Odo:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary }}>
-                        {selectedBookingForModal.odometer || selectedBookingForModal.bikeOdo || 'Not provided'}
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={{ fontSize: 12.5, color: tokens.textMuted }}>Service Requested:</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#34D399' : '#1D4533' }}>
-                        {selectedBookingForModal.service_title || selectedBookingForModal.serviceName || 'Pitstop Service'}{' '}
-                        ({selectedBookingForModal.category || 'Repair'})
-                      </Text>
-                    </View>
-                    {selectedBookingForModal.repair_type ? (
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Text style={{ fontSize: 12.5, color: tokens.textMuted }}>Reported Fault Area:</Text>
-                        <View style={{ backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 5 }}>
-                          <Text style={{ fontSize: 11, fontWeight: '800', color: isDarkMode ? '#F87171' : '#DC2626' }}>
-                            {selectedBookingForModal.repair_type}
-                          </Text>
-                        </View>
-                      </View>
-                    ) : null}
-                  </View>
-
-                  {/* Rider's Problem Description */}
-                  {selectedBookingForModal.notes ? (
-                    <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: tokens.border }}>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: '800',
-                          color: tokens.textMuted,
-                          textTransform: 'uppercase',
-                          marginBottom: 5,
-                        }}
-                      >
-                        Rider's Stated Problem / Symptoms:
-                      </Text>
-                      <View
-                        style={{
-                          backgroundColor: isDarkMode ? '#1C2422' : '#F8FAFC',
-                          padding: 10,
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor: tokens.border,
-                        }}
-                      >
-                        <Text style={{ fontSize: 12.5, color: tokens.textPrimary, fontStyle: 'italic', lineHeight: 18 }}>
-                          "{selectedBookingForModal.notes}"
-                        </Text>
-                      </View>
-                    </View>
-                  ) : null}
-
-                  {/* Uploaded Motorcycle Photos Gallery */}
-                  {Array.isArray(selectedBookingForModal.photos) && selectedBookingForModal.photos.length > 0 ? (
-                    <View style={{ marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: tokens.border }}>
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: '800',
-                          color: tokens.textMuted,
-                          textTransform: 'uppercase',
-                          marginBottom: 6,
-                        }}
-                      >
-                        Uploaded Motorcycle Condition Photos ({selectedBookingForModal.photos.length}):
-                      </Text>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                        {selectedBookingForModal.photos.map((uri, idx) => (
-                          <Image
-                            key={idx}
-                            source={{ uri }}
-                            style={{
-                              width: 110,
-                              height: 85,
-                              borderRadius: 8,
-                              borderWidth: 1,
-                              borderColor: tokens.borderInput,
-                              backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
-                            }}
-                            resizeMode="cover"
-                          />
-                        ))}
-                      </ScrollView>
-                    </View>
-                  ) : null}
-                </View>
-
-                {/* 3. Schedule & Assignment Editable Fields */}
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>Appointment Date</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={editBkDate}
-                      onChangeText={setEditBkDate}
-                      placeholder="e.g. Tomorrow or 2026-08-28"
-                      placeholderTextColor="#94A3B8"
-                    />
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>Time Slot</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={editBkTimeSlot}
-                      onChangeText={setEditBkTimeSlot}
-                      placeholder="10:30 AM - 12:00 PM"
-                      placeholderTextColor="#94A3B8"
-                    />
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>Plate Number</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={editBkPlate}
-                      onChangeText={setEditBkPlate}
-                      placeholder="NMX-8891"
-                      placeholderTextColor="#94A3B8"
-                    />
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>Service Fee (₱)</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      keyboardType="numeric"
-                      value={editBkPrice}
-                      onChangeText={setEditBkPrice}
-                      placeholder="3750"
-                      placeholderTextColor="#94A3B8"
-                    />
-                  </View>
-                </View>
-
-                <Text style={styles.formLabel}>Garage Branch</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={editBkBranch}
-                  onChangeText={setEditBkBranch}
-                  placeholder="MotoTrack Flagship Central Hub - Quezon City"
-                  placeholderTextColor="#94A3B8"
-                />
-
-                <Text style={styles.formLabel}>Assigned Lead Technician / Bay</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={editBkMechanic}
-                  onChangeText={setEditBkMechanic}
-                  placeholder="Master Tech Jayson (Yamaha Certified)"
-                  placeholderTextColor="#94A3B8"
-                />
-
-                <Text style={styles.formLabel}>Work Order / Diagnostic Notes</Text>
-                <TextInput
-                  style={[styles.formInput, { height: 75 }]}
-                  multiline
-                  value={editBkNotes}
-                  onChangeText={setEditBkNotes}
-                  placeholder="Inspection observations, special requests, replaced parts..."
-                  placeholderTextColor="#94A3B8"
-                />
-
-                {/* Quick edit fields kept for Save Work Order footer */}
-                <View
-                  style={{
-                    marginTop: 16,
-                    marginBottom: 8,
-                    padding: 12,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: tokens.border,
-                    backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontWeight: '800',
-                      color: '#1D4533',
-                      marginBottom: 8,
-                    }}
-                  >
-                    Quick Edit (Save Work Order)
-                  </Text>
-                  <Text style={{ fontSize: 11.5, color: tokens.textMuted, marginBottom: 10 }}>
-                    Use the organized sections above for quotation, inspection, and payments. These fields
-                    update schedule / notes when you tap Save Work Order.
-                  </Text>
-                </View>
               </ScrollView>
 
-              <View style={styles.modalFooter}>
+              {/* Fixed Footer */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingHorizontal: 24,
+                  paddingVertical: 14,
+                  borderTopWidth: 1,
+                  borderTopColor: '#E2E8F0',
+                  backgroundColor: '#FFFFFF',
+                }}
+              >
                 <TouchableOpacity
-                  style={[styles.quickStoreBtn, { borderColor: '#FECACA', backgroundColor: '#FEF2F2' }]}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    backgroundColor: '#FEF2F2',
+                    borderWidth: 1,
+                    borderColor: '#FECACA',
+                    cursor: 'pointer',
+                  }}
                   onPress={() =>
                     handleDeleteBooking(
                       selectedBookingForModal.booking_id || selectedBookingForModal.id
                     )
                   }
+                  activeOpacity={0.8}
                 >
                   <BootstrapIcon name="trash" size={13} color="#DC2626" />
-                  <Text style={[styles.quickStoreBtnText, { color: '#DC2626' }]}>Delete</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#DC2626' }}>Delete Booking</Text>
                 </TouchableOpacity>
 
-                <View style={{ flexDirection: 'row', gap: 8, marginLeft: 'auto' }}>
-                  <TouchableOpacity style={styles.quickStoreBtn} onPress={() => setIsBookingModalOpen(false)}>
-                    <Text style={styles.quickStoreBtnText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveBookingEdit}>
-                    <Text style={styles.addBtnPrimaryText}>Save Work Order</Text>
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={{
+                    paddingHorizontal: 20,
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    backgroundColor: '#1D4533',
+                    alignItems: 'center',
+                    cursor: 'pointer',
+                  }}
+                  onPress={() => setIsBookingModalOpen(false)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>Close Window</Text>
+                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -17054,7 +17641,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 style={styles.formInput}
                 value={newBkMechanic}
                 onChangeText={setNewBkMechanic}
-                placeholder="Master Tech Jayson (Yamaha Certified)"
+                placeholder="Assigned technician (optional / pending)"
                 placeholderTextColor="#94A3B8"
               />
 
@@ -17220,15 +17807,19 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   borderColor: tokens.border,
                 }}
               >
-                <Image
-                  source={{
-                    uri:
-                      servImage ||
-                      'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
-                  }}
-                  style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: isDarkMode ? '#1C2422' : '#E2E8F0' }}
-                  resizeMode="cover"
-                />
+                {servImage ? (
+                  <Image
+                    source={{ uri: servImage }}
+                    style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: isDarkMode ? '#1C2422' : '#E2E8F0' }}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View
+                    style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: isDarkMode ? '#1C2422' : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <BootstrapIcon name="tools" size={20} color="#94A3B8" />
+                  </View>
+                )}
                 <View style={{ flex: 1, gap: 4 }}>
                   <TouchableOpacity
                     style={{
@@ -17281,26 +17872,24 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 multiline
                 value={servInclusions}
                 onChangeText={setServInclusions}
-                placeholder={
-                  '100% Synthetic Oil Change\nOEM Oil Filter Replacement\nBrake Bleed\nChain Cleaning & Lube'
-                }
+                placeholder="e.g. Complete Fluid Change&#10;System Pressure Test"
                 placeholderTextColor="#94A3B8"
               />
             </ScrollView>
 
             <View style={styles.modalFooter}>
               <TouchableOpacity
-                style={styles.quickStoreBtn}
+                style={styles.btnSecondary}
                 onPress={() => {
                   setIsAddGarageOpen(false);
                   setEditingGarageService(null);
                 }}
               >
-                <Text style={styles.quickStoreBtnText}>Cancel</Text>
+                <Text style={styles.btnSecondaryText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveGarageService}>
-                <Text style={styles.addBtnPrimaryText}>
-                  {editingGarageService ? 'Save Package Changes' : 'Add to Service Catalog'}
+              <TouchableOpacity style={styles.btnPrimary} onPress={handleSaveGarageService}>
+                <Text style={styles.btnPrimaryText}>
+                  {editingGarageService ? 'Save Changes' : 'Add Service'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -17319,14 +17908,15 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         }}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxWidth: 580, maxHeight: '92%' }]}>
+          <View style={[styles.modalSheet, { maxWidth: 620, maxHeight: '92%' }]}>
+            {/* Header (Fixed) */}
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>
                   {editingMechanic ? 'Edit Certified Technician' : 'Add Certified Technician'}
                 </Text>
                 <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                  Assign pit bay station, certifications, and live availability
+                  Set certifications, hourly rate, and live availability
                 </Text>
               </View>
               <TouchableOpacity
@@ -17339,244 +17929,298 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {/* Avatar Selection & Preview */}
-              <Text style={styles.formLabel}>Technician Avatar Photo</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 12 }}>
-                <Image
-                  source={{ uri: mechAvatar }}
-                  style={{
-                    width: 64,
-                    height: 64,
-                    borderRadius: 32,
-                    borderWidth: 2.5,
-                    borderColor: '#1D4533',
-                    backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
-                  }}
-                />
-                <View style={{ flex: 1, gap: 6 }}>
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      backgroundColor: '#1D4533',
-                      paddingVertical: 7,
-                      paddingHorizontal: 12,
-                      borderRadius: 8,
-                      alignSelf: 'flex-start',
-                    }}
-                    onPress={async () => {
-                      const res = await pickImageFromFile();
-                      if (res.success && res.uri) {
-                        setMechAvatar(res.uri);
-                        showToast('Technician photo selected!');
-                      }
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <BootstrapIcon name="camera-fill" size={13} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
-                      Upload Device Photo
-                    </Text>
-                  </TouchableOpacity>
+            {/* Scrollable Form Body */}
+            <ScrollView
+              style={styles.modalBody}
+              contentContainerStyle={{ gap: 18, paddingBottom: 16 }}
+              showsVerticalScrollIndicator={true}
+            >
+              {/* SECTION 1 — TECHNICIAN PHOTO */}
+              <View style={{ gap: 10 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533', letterSpacing: 0.6 }}>
+                  TECHNICIAN PHOTO
+                </Text>
 
-                  <TextInput
-                    style={[styles.formInput, { marginBottom: 0, paddingVertical: 4, fontSize: 11 }]}
-                    value={mechAvatar}
-                    onChangeText={setMechAvatar}
-                    placeholder="Or paste image URL"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-              </View>
-
-              {/* Quick Preset Avatars */}
-              <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 6 }}>
-                Or select from technician photo presets:
-              </Text>
-              <View style={styles.avatarPresetRow}>
-                {MECHANIC_AVATAR_PRESETS.map((presetUrl, idx) => {
-                  const isSelected = mechAvatar === presetUrl;
-                  return (
-                    <TouchableOpacity
-                      key={idx}
-                      onPress={() => setMechAvatar(presetUrl)}
-                      activeOpacity={0.8}
-                    >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+                  {/* Photo Placeholder / Selected Image Container */}
+                  {mechAvatar ? (
+                    <View style={{ position: 'relative' }}>
                       <Image
-                        source={{ uri: presetUrl }}
-                        style={[
-                          styles.avatarPresetThumb,
-                          isSelected && styles.avatarPresetThumbSelected,
-                        ]}
-                      />
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Full Name & Short Name */}
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1.6 }}>
-                  <Text style={styles.formLabel}>Full Name & Credentials *</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={mechName}
-                    onChangeText={(txt) => {
-                      setMechName(txt);
-                      if (!editingMechanic && !mechShortName) {
-                        const parts = txt.split('(')[0].trim();
-                        setMechShortName(parts);
-                      }
-                    }}
-                    placeholder="e.g. Master Tech Roberto (Ducati Certified)"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Short Name / Nickname</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={mechShortName}
-                    onChangeText={setMechShortName}
-                    placeholder="e.g. Tech Roberto"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-              </View>
-
-              {/* Hourly Labor Rate (Admin-managed; no mechanic login) */}
-              <Text style={styles.formLabel}>Hourly Labor Rate (₱/hour) *</Text>
-              <TextInput
-                style={styles.formInput}
-                keyboardType="decimal-pad"
-                value={mechHourlyRate}
-                onChangeText={setMechHourlyRate}
-                placeholder="150"
-                placeholderTextColor="#94A3B8"
-              />
-              <Text style={{ fontSize: 11, color: tokens.textMuted, marginBottom: 10 }}>
-                Used for dynamic quotations. Changing this rate does not alter past quotation snapshots.
-              </Text>
-
-              {/* Assigned Pit Bay */}
-              <Text style={styles.formLabel}>Assigned Pit Bay Station</Text>
-              <View style={styles.quickChipRow}>
-                {PIT_BAY_PRESETS.map((bay) => {
-                  const isMatch = mechBay === bay;
-                  return (
-                    <TouchableOpacity
-                      key={bay}
-                      style={[styles.quickChip, isMatch && styles.quickChipActive]}
-                      onPress={() => setMechBay(bay)}
-                    >
-                      <Text style={[styles.quickChipText, isMatch && styles.quickChipTextActive]}>
-                        {bay.split('(')[0].trim()}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              <TextInput
-                style={styles.formInput}
-                value={mechBay}
-                onChangeText={setMechBay}
-                placeholder="e.g. Bay 6 (Performance Dynojet Cell)"
-                placeholderTextColor="#94A3B8"
-              />
-
-              {/* Specialization */}
-              <Text style={styles.formLabel}>Primary Specialization</Text>
-              <View style={styles.quickChipRow}>
-                {MECHANIC_SPECIALIZATION_PRESETS.map((spec) => {
-                  const isMatch = mechSpecialization === spec;
-                  return (
-                    <TouchableOpacity
-                      key={spec}
-                      style={[styles.quickChip, isMatch && styles.quickChipActive]}
-                      onPress={() => setMechSpecialization(spec)}
-                    >
-                      <Text style={[styles.quickChipText, isMatch && styles.quickChipTextActive]}>
-                        {spec}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              <TextInput
-                style={styles.formInput}
-                value={mechSpecialization}
-                onChangeText={setMechSpecialization}
-                placeholder="e.g. Desmo Valve Clearance & Superbike Electronics"
-                placeholderTextColor="#94A3B8"
-              />
-
-              {/* Certifications & Experience */}
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1.5 }}>
-                  <Text style={styles.formLabel}>OEM Certifications & Badges</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={mechCertifications}
-                    onChangeText={setMechCertifications}
-                    placeholder="e.g. Yamaha YTA Gold • Öhlins Factory Center"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Experience</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={mechExperience}
-                    onChangeText={setMechExperience}
-                    placeholder="e.g. 7 Years Pro Tech"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-              </View>
-
-              {/* Status */}
-              <Text style={styles.formLabel}>Initial Status</Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-                {[
-                  { id: 'Available', label: '🟢 Available on Duty', desc: 'Ready for booking assignment' },
-                  { id: 'In Pit Bay', label: '🟠 In Pit Bay', desc: 'Currently working on bike' },
-                ].map((st) => {
-                  const isSelected = mechStatus === st.id;
-                  return (
-                    <TouchableOpacity
-                      key={st.id}
-                      style={{
-                        flex: 1,
-                        padding: 10,
-                        borderRadius: 8,
-                        borderWidth: 1.5,
-                        borderColor: isSelected ? '#1D4533' : tokens.borderInput,
-                        backgroundColor: isSelected ? (isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#F3F7F6') : (isDarkMode ? '#1C2422' : '#FFFFFF'),
-                      }}
-                      onPress={() => setMechStatus(st.id)}
-                    >
-                      <Text
+                        source={{ uri: mechAvatar }}
                         style={{
-                          fontSize: 12,
-                          fontWeight: '800',
-                          color: isSelected ? (isDarkMode ? '#34D399' : '#1D4533') : tokens.textPrimary,
-                          marginBottom: 2,
+                          width: 72,
+                          height: 72,
+                          borderRadius: 16,
+                          borderWidth: 2,
+                          borderColor: '#1D4533',
+                          backgroundColor: '#F1F5F9',
                         }}
+                      />
+                      <TouchableOpacity
+                        style={{
+                          position: 'absolute',
+                          top: -6,
+                          right: -6,
+                          backgroundColor: '#DC2626',
+                          width: 22,
+                          height: 22,
+                          borderRadius: 11,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderWidth: 1.5,
+                          borderColor: '#FFFFFF',
+                        }}
+                        onPress={() => setMechAvatar('')}
+                        title="Remove photo"
                       >
-                        {st.label}
+                        <BootstrapIcon name="x-lg" size={11} color="#FFFFFF" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View
+                      style={{
+                        width: 72,
+                        height: 72,
+                        borderRadius: 16,
+                        borderWidth: 1.5,
+                        borderColor: '#CBD5E1',
+                        borderStyle: 'dashed',
+                        backgroundColor: '#F8FAFC',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 2,
+                      }}
+                    >
+                      <BootstrapIcon name="person-fill" size={26} color="#94A3B8" />
+                      <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#94A3B8' }}>
+                        No photo
                       </Text>
-                      <Text style={{ fontSize: 10.5, color: '#64748B' }}>{st.desc}</Text>
+                    </View>
+                  )}
+
+                  {/* Actions Column */}
+                  <View style={{ flex: 1, gap: 8 }}>
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 8,
+                        backgroundColor: '#1D4533',
+                        paddingVertical: 8,
+                        paddingHorizontal: 14,
+                        borderRadius: 8,
+                        alignSelf: 'flex-start',
+                      }}
+                      onPress={async () => {
+                        const res = await pickImageFromFile();
+                        if (res.success && res.uri) {
+                          setMechAvatar(res.uri);
+                          showToast('Technician photo selected!');
+                        }
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <BootstrapIcon name="camera-fill" size={13} color="#FFFFFF" />
+                      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
+                        Upload Device Photo
+                      </Text>
                     </TouchableOpacity>
-                  );
-                })}
+
+                    {mechAvatar ? (
+                      <Text style={{ fontSize: 11, color: '#059669', fontWeight: '600' }}>
+                        ✓ Photo attached
+                      </Text>
+                    ) : (
+                      <Text style={{ fontSize: 11, color: '#64748B' }}>
+                        Upload a device photo for the technician
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </View>
+
+              <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 2 }} />
+
+              {/* SECTION 2 — TECHNICIAN INFORMATION */}
+              <View style={{ gap: 10 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533', letterSpacing: 0.6 }}>
+                  TECHNICIAN INFORMATION
+                </Text>
+
+                <View style={{ flexDirection: 'row', gap: 12 }}>
+                  <View style={{ flex: 1.5 }}>
+                    <Text style={styles.formLabel}>Full Name & Credentials *</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={mechName}
+                      onChangeText={(txt) => {
+                        setMechName(txt);
+                        if (!editingMechanic && !mechShortName) {
+                          const parts = txt.split('(')[0].trim();
+                          setMechShortName(parts);
+                        }
+                      }}
+                      placeholder="e.g. Master Tech Roberto (Ducati Certified)"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formLabel}>Short Name / Nickname</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={mechShortName}
+                      onChangeText={setMechShortName}
+                      placeholder="e.g. Tech Roberto"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 2 }} />
+
+              {/* SECTION 3 — HOURLY LABOR RATE */}
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533', letterSpacing: 0.6 }}>
+                  HOURLY LABOR RATE
+                </Text>
+                <Text style={styles.formLabel}>Hourly Labor Rate (₱/Hour) *</Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    borderWidth: 1.5,
+                    borderColor: tokens.borderInput,
+                    borderRadius: 8,
+                    backgroundColor: isDarkMode ? '#1C2422' : '#FFFFFF',
+                    paddingHorizontal: 12,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#1D4533', marginRight: 8 }}>
+                    ₱
+                  </Text>
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      fontSize: 14,
+                      fontWeight: '700',
+                      color: tokens.textPrimary,
+                      outline: 'none',
+                    }}
+                    keyboardType="decimal-pad"
+                    value={mechHourlyRate}
+                    onChangeText={setMechHourlyRate}
+                    placeholder="150.00"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                  Used for dynamic quotations. Changing this rate does not alter past quotation snapshots.
+                </Text>
+              </View>
+
+              <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 2 }} />
+
+              {/* SECTION 4 — CERTIFICATIONS & SPECIALIZATIONS */}
+              <View style={{ gap: 10 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533', letterSpacing: 0.6 }}>
+                  CERTIFICATIONS & SPECIALIZATIONS
+                </Text>
+
+                {/* Primary Specialization */}
+                <Text style={styles.formLabel}>Primary Specialization</Text>
+                <View style={styles.quickChipRow}>
+                  {MECHANIC_SPECIALIZATION_PRESETS.map((spec) => {
+                    const isMatch = mechSpecialization === spec;
+                    return (
+                      <TouchableOpacity
+                        key={spec}
+                        style={[styles.quickChip, isMatch && styles.quickChipActive]}
+                        onPress={() => setMechSpecialization(spec)}
+                      >
+                        <Text style={[styles.quickChipText, isMatch && styles.quickChipTextActive]}>
+                          {spec}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+                <TextInput
+                  style={styles.formInput}
+                  value={mechSpecialization}
+                  onChangeText={setMechSpecialization}
+                  placeholder="e.g. Desmo Valve Clearance & Superbike Electronics"
+                  placeholderTextColor="#94A3B8"
+                />
+
+                {/* Certifications & Experience */}
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  <View style={{ flex: 1.5 }}>
+                    <Text style={styles.formLabel}>OEM Certifications & Badges</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={mechCertifications}
+                      onChangeText={setMechCertifications}
+                      placeholder="e.g. Yamaha YTA Gold • Öhlins Factory Center"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.formLabel}>Experience</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={mechExperience}
+                      onChangeText={setMechExperience}
+                      placeholder="e.g. 7 Years Pro Tech"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                </View>
+
+                {/* Status */}
+                <Text style={styles.formLabel}>Initial Status</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 4 }}>
+                  {[
+                    { id: 'Available', label: '🟢 Available on Duty', desc: 'Ready for booking assignment' },
+                    { id: 'In Pit Bay', label: '🟠 In Pit Bay', desc: 'Currently working on bike' },
+                  ].map((st) => {
+                    const isSelected = mechStatus === st.id;
+                    return (
+                      <TouchableOpacity
+                        key={st.id}
+                        style={{
+                          flex: 1,
+                          padding: 10,
+                          borderRadius: 8,
+                          borderWidth: 1.5,
+                          borderColor: isSelected ? '#1D4533' : tokens.borderInput,
+                          backgroundColor: isSelected ? (isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#F3F7F6') : (isDarkMode ? '#1C2422' : '#FFFFFF'),
+                        }}
+                        onPress={() => setMechStatus(st.id)}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '800',
+                            color: isSelected ? (isDarkMode ? '#34D399' : '#1D4533') : tokens.textPrimary,
+                            marginBottom: 2,
+                          }}
+                        >
+                          {st.label}
+                        </Text>
+                        <Text style={{ fontSize: 10.5, color: '#64748B' }}>{st.desc}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
             </ScrollView>
 
-            <View style={styles.modalFooter}>
+            {/* Footer (Fixed) */}
+            <View style={[styles.modalFooter, { borderTopWidth: 1, borderColor: '#E2E8F0', paddingTop: 14 }]}>
               <TouchableOpacity
                 style={styles.quickStoreBtn}
                 onPress={() => {
@@ -17633,42 +18277,72 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             </View>
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <Text style={styles.formLabel}>Avatar</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-                <Image
-                  source={{ uri: riderAvatar || RIDER_AVATAR_PRESETS[0] }}
-                  style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 28,
-                    borderWidth: 2,
-                    borderColor: '#1D4533',
-                    backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
-                  }}
-                />
-                <TextInput
-                  style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
-                  value={riderAvatar}
-                  onChangeText={setRiderAvatar}
-                  placeholder="Image URL"
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-              <View style={styles.avatarPresetRow}>
-                {RIDER_AVATAR_PRESETS.map((presetUrl, idx) => {
-                  const isSelected = riderAvatar === presetUrl;
-                  return (
-                    <TouchableOpacity key={idx} onPress={() => setRiderAvatar(presetUrl)} activeOpacity={0.8}>
-                      <Image
-                        source={{ uri: presetUrl }}
-                        style={[
-                          styles.avatarPresetThumb,
-                          isSelected && styles.avatarPresetThumbSelected,
-                        ]}
-                      />
-                    </TouchableOpacity>
-                  );
-                })}
+              <Text style={styles.formLabel}>Rider Photo / Avatar</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+                {riderAvatar ? (
+                  <Image
+                    source={{ uri: riderAvatar }}
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      borderWidth: 2,
+                      borderColor: '#1D4533',
+                      backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
+                    }}
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      borderWidth: 2,
+                      borderColor: '#CBD5E1',
+                      borderStyle: 'dashed',
+                      backgroundColor: isDarkMode ? '#1C2422' : '#F8FAFC',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <BootstrapIcon name="person-fill" size={24} color="#94A3B8" />
+                  </View>
+                )}
+
+                <View style={{ flex: 1, gap: 6 }}>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      backgroundColor: '#1D4533',
+                      paddingVertical: 7,
+                      paddingHorizontal: 12,
+                      borderRadius: 8,
+                      alignSelf: 'flex-start',
+                    }}
+                    onPress={async () => {
+                      const res = await pickImageFromFile();
+                      if (res.success && res.uri) {
+                        setRiderAvatar(res.uri);
+                        showToast('Rider photo selected!');
+                      }
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <BootstrapIcon name="camera-fill" size={13} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
+                      Upload Device Photo
+                    </Text>
+                  </TouchableOpacity>
+                  <TextInput
+                    style={[styles.formInput, { marginBottom: 0, paddingVertical: 4, fontSize: 11 }]}
+                    value={riderAvatar}
+                    onChangeText={setRiderAvatar}
+                    placeholder="Or paste image URL"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
               </View>
 
               <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -18571,39 +19245,126 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           const modalStatus = (selectedOrderForModal?.status || '').toLowerCase();
           const isDeliveredModal = modalStatus === 'delivered' || modalStatus === 'completed';
           const isPendingModal = modalStatus.includes('pending') || modalStatus.includes('approval');
+          const statusMeta = getOrderStatusMeta(selectedOrderForModal?.status);
           return (
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxWidth: 640, maxHeight: '90%' }]}>
+          <View style={[styles.modalSheet, { width: '95%', maxWidth: 820, maxHeight: '94%' }]}>
             <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, flexWrap: 'wrap' }}>
                 <View
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: '#FEF3C7',
+                    width: 38,
+                    height: 38,
+                    borderRadius: 19,
+                    backgroundColor: isDarkMode ? '#1E293B' : '#FEF3C7',
                     justifyContent: 'center',
                     alignItems: 'center',
                   }}
                 >
                   <BootstrapIcon name="receipt" size={18} color="#1D4533" />
                 </View>
-                <View>
-                  <Text style={styles.modalTitle}>
-                    Order #{selectedOrderForModal?.order_id || selectedOrderForModal?.id}
-                  </Text>
-                  <Text style={{ fontSize: 11.5, color: '#64748B' }}>
+                <View style={{ flex: 1, minWidth: 180 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <Text style={styles.modalTitle}>
+                      Order #{selectedOrderForModal?.order_id || selectedOrderForModal?.id}
+                    </Text>
+                    {/* Dynamic Status Pill in Header */}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                        backgroundColor: statusMeta.bg,
+                        borderColor: statusMeta.border,
+                        borderWidth: 1,
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        borderRadius: 12,
+                      }}
+                    >
+                      <BootstrapIcon name={statusMeta.icon} size={11} color={statusMeta.color} />
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: statusMeta.color }}>
+                        {statusMeta.label}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 11.5, color: '#64748B', marginTop: 2 }}>
                     Placed on {selectedOrderForModal?.order_date || 'Recent'} •{' '}
                     {selectedOrderForModal?.channel || 'Online Store'}
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => setIsOrderModalOpen(false)}>
+              <TouchableOpacity onPress={() => setIsOrderModalOpen(false)} style={{ padding: 4 }}>
                 <BootstrapIcon name="x-lg" size={16} color="#64748B" />
               </TouchableOpacity>
             </View>
 
             <ScrollView style={{ paddingVertical: 12 }} showsVerticalScrollIndicator={false}>
+              {/* Top Prominent Order Status Bar */}
+              <View
+                style={{
+                  backgroundColor: statusMeta.bg,
+                  borderWidth: 1.5,
+                  borderColor: statusMeta.border,
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  marginBottom: 14,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  shadowColor: statusMeta.color,
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 4,
+                  elevation: 2,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                  <View
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 17,
+                      backgroundColor: '#FFFFFF',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      borderWidth: 1,
+                      borderColor: statusMeta.border,
+                    }}
+                  >
+                    <BootstrapIcon name={statusMeta.icon} size={16} color={statusMeta.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 10.5,
+                        fontWeight: '800',
+                        color: statusMeta.color,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.6,
+                      }}
+                    >
+                      Current Order Status
+                    </Text>
+                    <Text style={{ fontSize: 15, fontWeight: '900', color: statusMeta.color, marginTop: 1 }}>
+                      {statusMeta.label}
+                    </Text>
+                  </View>
+                </View>
+                <View
+                  style={{
+                    backgroundColor: statusMeta.color,
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 20,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>
+                    Active Status
+                  </Text>
+                </View>
+              </View>
               {/* COD Approval Priority Callout inside modal */}
               {selectedOrderForModal &&
                 ((selectedOrderForModal.status || '').toLowerCase().includes('pending') ||
@@ -18622,9 +19383,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     </View>
                     <TouchableOpacity
                       style={styles.btnApproveCod}
-                      onPress={() => {
-                        handleApproveCOD(selectedOrderForModal.order_id || selectedOrderForModal.id);
-                        setIsOrderModalOpen(false);
+                      onPress={async () => {
+                        await handleApproveCOD(selectedOrderForModal.order_id || selectedOrderForModal.id);
                       }}
                     >
                       <BootstrapIcon name="check-circle-fill" size={12} color="#FFFFFF" />
@@ -18633,15 +19393,16 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </View>
                 )}
 
-              {/* Form Fields: Customer & Delivery Details in textfield type */}
+              {/* View-Only: Customer & Shipping Information */}
               <View
                 style={{
                   backgroundColor: isDarkMode ? '#1C2422' : '#F8FAFC',
                   borderRadius: 12,
-                  padding: 14,
+                  padding: 16,
                   borderWidth: 1,
                   borderColor: tokens.border,
                   marginBottom: 14,
+                  gap: 12,
                 }}
               >
                 <View
@@ -18649,7 +19410,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     flexDirection: 'row',
                     justifyContent: 'space-between',
                     alignItems: 'center',
-                    marginBottom: 10,
+                    borderBottomWidth: 1,
+                    borderBottomColor: isDarkMode ? '#2D3748' : '#E2E8F0',
+                    paddingBottom: 8,
                   }}
                 >
                   <Text
@@ -18661,149 +19424,111 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       letterSpacing: 0.5,
                     }}
                   >
-                    Customer & Shipping Information
+                    Customer & Order Information
                   </Text>
                   <View
                     style={{
-                      backgroundColor: isOrderEditMode ? '#E8F5E9' : '#EFF6FF',
+                      backgroundColor: '#EFF6FF',
                       paddingHorizontal: 8,
-                      paddingVertical: 2,
+                      paddingVertical: 3,
                       borderRadius: 6,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: 10.5,
-                        fontWeight: '800',
-                        color: isOrderEditMode ? '#1D4533' : '#1D4ED8',
-                      }}
-                    >
-                      {isDeliveredModal ? 'Delivered · Order Details' : isOrderEditMode ? 'Editable Fields Active' : 'Order Information'}
+                    <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#1D4ED8' }}>
+                      Verified Order Info
                     </Text>
                   </View>
                 </View>
 
-                {/* Recipient Full Name */}
-                <View style={styles.orderFormField}>
-                  <Text style={styles.orderFormLabel}>Customer / Recipient Full Name</Text>
-                  <TextInput
-                    style={styles.orderFormInput}
-                    value={orderEditForm.customer_name}
-                    onChangeText={(val) =>
-                      setOrderEditForm((prev) => ({ ...prev, customer_name: val }))
-                    }
-                    placeholder="Enter customer name"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
+                {/* Customer Name & Contact Phone in two columns */}
+                <View style={{ flexDirection: 'row', gap: 14, flexWrap: 'wrap' }}>
+                  <View style={{ flex: 1, minWidth: 200 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 3 }}>
+                      CUSTOMER NAME
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <BootstrapIcon name="person-fill" size={14} color="#64748B" />
+                      <Text style={{ fontSize: 13.5, fontWeight: '800', color: tokens.textPrimary }}>
+                        {selectedOrderForModal?.customer_name || 'Walk-in Customer'}
+                      </Text>
+                    </View>
+                  </View>
 
-                {/* Contact Phone */}
-                <View style={styles.orderFormField}>
-                  <Text style={styles.orderFormLabel}>Contact Phone Number</Text>
-                  <TextInput
-                    style={styles.orderFormInput}
-                    value={orderEditForm.customer_phone}
-                    onChangeText={(val) =>
-                      setOrderEditForm((prev) => ({ ...prev, customer_phone: val }))
-                    }
-                    placeholder="e.g. 09614904841"
-                    placeholderTextColor="#94A3B8"
-                    keyboardType="phone-pad"
-                  />
+                  <View style={{ flex: 1, minWidth: 200 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 3 }}>
+                      CONTACT NUMBER
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <BootstrapIcon name="telephone-fill" size={12} color="#64748B" />
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary }}>
+                        {selectedOrderForModal?.customer_phone || 'None provided'}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
 
                 {/* Delivery Address */}
-                <View style={styles.orderFormField}>
-                  <Text style={styles.orderFormLabel}>Delivery Destination / Full Address</Text>
-                  <TextInput
-                    style={[styles.orderFormInput, { minHeight: 60, textAlignVertical: 'top' }]}
-                    multiline
-                    numberOfLines={3}
-                    value={orderEditForm.customer_address}
-                    onChangeText={(val) =>
-                      setOrderEditForm((prev) => ({ ...prev, customer_address: val }))
-                    }
-                    placeholder="House / Street, Barangay, City, Province"
-                    placeholderTextColor="#94A3B8"
-                  />
+                <View>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 3 }}>
+                    DELIVERY ADDRESS
+                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                    <BootstrapIcon name="geo-alt-fill" size={13} color="#64748B" style={{ marginTop: 2 }} />
+                    <Text style={{ fontSize: 13, color: tokens.textPrimary, fontWeight: '600', lineHeight: 18, flex: 1 }}>
+                      {selectedOrderForModal?.customer_address || 'No address provided (Store Pickup)'}
+                    </Text>
+                  </View>
                 </View>
 
                 {/* Delivery Notes */}
-                <View style={styles.orderFormField}>
-                  <Text style={styles.orderFormLabel}>Delivery Notes & Special Instructions</Text>
-                  <TextInput
-                    style={styles.orderFormInput}
-                    value={orderEditForm.delivery_notes}
-                    onChangeText={(val) =>
-                      setOrderEditForm((prev) => ({ ...prev, delivery_notes: val }))
-                    }
-                    placeholder="Landmark, house color, or special gate instructions"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
+                {selectedOrderForModal?.delivery_notes ? (
+                  <View style={{ backgroundColor: isDarkMode ? '#141A18' : '#F1F5F9', padding: 10, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 2 }}>
+                      DELIVERY NOTES / SPECIAL INSTRUCTIONS
+                    </Text>
+                    <Text style={{ fontSize: 12, color: tokens.textPrimary, fontStyle: 'italic' }}>
+                      "{selectedOrderForModal.delivery_notes}"
+                    </Text>
+                  </View>
+                ) : null}
 
-                {/* Payment Method & Change Requested in Textfields */}
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={[styles.orderFormField, { flex: 1 }]}>
-                    <Text style={styles.orderFormLabel}>Payment Method</Text>
-                    <TextInput
-                      style={styles.orderFormInput}
-                      value={orderEditForm.payment_method}
-                      onChangeText={(val) =>
-                        setOrderEditForm((prev) => ({ ...prev, payment_method: val }))
-                      }
-                      placeholder="e.g. Cash on Delivery (COD)"
-                      placeholderTextColor="#94A3B8"
-                    />
+                {/* Payment Method & COD Change */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    gap: 14,
+                    flexWrap: 'wrap',
+                    paddingTop: 8,
+                    borderTopWidth: 1,
+                    borderTopColor: isDarkMode ? '#2D3748' : '#E2E8F0',
+                  }}
+                >
+                  <View style={{ flex: 1, minWidth: 150 }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 3 }}>
+                      PAYMENT METHOD
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <BootstrapIcon name="credit-card-2-front-fill" size={13} color="#64748B" />
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: tokens.textPrimary }}>
+                        {selectedOrderForModal?.payment_method || 'Cash on Delivery (COD)'}
+                      </Text>
+                    </View>
                   </View>
 
-                  <View style={[styles.orderFormField, { flex: 1 }]}>
-                    <Text style={styles.orderFormLabel}>COD Change For (₱)</Text>
-                    <TextInput
-                      style={styles.orderFormInput}
-                      value={orderEditForm.cod_change_for}
-                      onChangeText={(val) =>
-                        setOrderEditForm((prev) => ({ ...prev, cod_change_for: val }))
-                      }
-                      placeholder="e.g. 1000"
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="numeric"
-                    />
-                  </View>
-                </View>
-
-                {/* Assigned Rider & Contact in Textfields */}
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={[styles.orderFormField, { flex: 1 }]}>
-                    <Text style={styles.orderFormLabel}>Assigned Courier / Rider</Text>
-                    <TextInput
-                      style={styles.orderFormInput}
-                      value={orderEditForm.rider_name}
-                      onChangeText={(val) =>
-                        setOrderEditForm((prev) => ({ ...prev, rider_name: val }))
-                      }
-                      placeholder="Rider Name"
-                      placeholderTextColor="#94A3B8"
-                    />
-                  </View>
-
-                  <View style={[styles.orderFormField, { flex: 1 }]}>
-                    <Text style={styles.orderFormLabel}>Rider Phone Number</Text>
-                    <TextInput
-                      style={styles.orderFormInput}
-                      value={orderEditForm.rider_contact}
-                      onChangeText={(val) =>
-                        setOrderEditForm((prev) => ({ ...prev, rider_contact: val }))
-                      }
-                      placeholder="Rider Contact"
-                      placeholderTextColor="#94A3B8"
-                      keyboardType="phone-pad"
-                    />
-                  </View>
+                  {selectedOrderForModal?.cod_change_for ? (
+                    <View style={{ flex: 1, minWidth: 150 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 3 }}>
+                        COD CHANGE FOR
+                      </Text>
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: '#059669' }}>
+                        ₱{Number(selectedOrderForModal.cod_change_for).toLocaleString()}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
 
-              {/* Status Selector & State Management */}
+              {/* Rider Assignment Card */}
               <View
                 style={{
                   backgroundColor: isDarkMode ? '#1C2422' : '#F8FAFC',
@@ -18814,146 +19539,139 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   marginBottom: 14,
                 }}
               >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: '800',
-                    color: tokens.textMuted,
-                    textTransform: 'uppercase',
-                    marginBottom: 8,
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Update Order Fulfillment Status
-                </Text>
-                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap' }}>
-                  {[
-                    'Pending Approval',
-                    'Processing',
-                    'Ready for Delivery',
-                    'Out for Delivery',
-                    'Delivery Failed',
-                    'Rescheduled',
-                    'Delivered',
-                    'Cancelled',
-                  ].map((st) => {
-                    const cur = (selectedOrderForModal?.status || '').toLowerCase();
-                    const isCur =
-                      cur === st.toLowerCase() ||
-                      (st === 'Pending Approval' &&
-                        (cur.includes('pending') || cur.includes('approval'))) ||
-                      (st === 'Out for Delivery' && (cur === 'shipped' || cur === 'in transit'));
-                    const isOfd =
-                      cur === 'out for delivery' || cur === 'shipped' || cur === 'in transit';
-                    const needsDeliveredReason = st === 'Delivered' && isOfd;
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <BootstrapIcon name="bicycle" size={15} color="#1D4533" />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '800',
+                        color: tokens.textMuted,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      Assigned Rider / Courier
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: '#0F172A',
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 5,
+                      }}
+                      onPress={() => {
+                        setDeliveryTokenModal({
+                          order: selectedOrderForModal,
+                          bundle: null,
+                        });
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <BootstrapIcon name="qr-code" size={12} color="#FFFFFF" />
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>QR Code</Text>
+                    </TouchableOpacity>
 
-                    return (
+                    {!isDeliveredModal && (selectedOrderForModal?.status || '').toLowerCase() !== 'cancelled' && (
                       <TouchableOpacity
-                        key={st}
-                        style={[
-                          styles.orderFilterTab,
-                          isCur && { backgroundColor: '#1D4533', borderColor: '#1D4533' },
-                        ]}
-                        onPress={() => {
-                          const oid = selectedOrderForModal?.order_id || selectedOrderForModal?.id;
-                          if (st === 'Delivered') {
-                            if (isOfd) {
-                              setDeliveryAction({ mode: 'mark_delivered', order: selectedOrderForModal });
-                            } else {
-                              showToast('Dispatch the order first, then mark it delivered.');
-                            }
-                            return;
-                          }
-                          if (st === 'Ready for Delivery') {
-                            setAssignDeliveryOrder(selectedOrderForModal);
-                            return;
-                          }
-                          if (st === 'Out for Delivery') {
-                            deliveryService.markOutForDelivery(oid, currentUser).then(async (res) => {
-                              if (res.success) {
-                                showToast('Out for delivery');
-                                await loadData();
-                                setSelectedOrderForModal((prev) =>
-                                  prev ? { ...prev, status: 'Out for Delivery' } : prev
-                                );
-                                await refreshOrderDeliveryPanel(oid);
-                              } else {
-                                showToast(res.error || 'Dispatch failed');
-                              }
-                            });
-                            return;
-                          }
-                          if (st === 'Delivery Failed') {
-                            deliveryService
-                              .markDeliveryFailed(oid, currentUser, 'Marked failed by admin')
-                              .then(async (res) => {
-                                if (res.success) {
-                                  showToast('Marked as delivery failed');
-                                  await loadData();
-                                  setSelectedOrderForModal((prev) =>
-                                    prev ? { ...prev, status: 'Delivery Failed' } : prev
-                                  );
-                                  await refreshOrderDeliveryPanel(oid);
-                                } else {
-                                  showToast(res.error || 'Update failed');
-                                }
-                              });
-                            return;
-                          }
-                          if (st === 'Rescheduled') {
-                            deliveryService
-                              .rescheduleDelivery(oid, currentUser, 'Rescheduled by admin')
-                              .then(async (res) => {
-                                if (res.success) {
-                                  showToast('Delivery rescheduled');
-                                  await loadData();
-                                  setSelectedOrderForModal((prev) =>
-                                    prev ? { ...prev, status: 'Rescheduled' } : prev
-                                  );
-                                  await refreshOrderDeliveryPanel(oid);
-                                } else {
-                                  showToast(res.error || 'Reschedule failed');
-                                }
-                              });
-                            return;
-                          }
-                          if (st === 'Cancelled') {
-                            handleCancelOrder(oid);
-                            return;
-                          }
-                          if (st === 'Processing') {
-                            if (cur.includes('pending') || cur.includes('approval')) {
-                              handleApproveCOD(oid);
-                            } else if (cur !== 'processing') {
-                              showToast('Processing is only used after COD approval.');
-                            }
-                            return;
-                          }
-                          if (st === 'Pending Approval') {
-                            if (!(cur.includes('pending') || cur.includes('approval'))) {
-                              showToast('Cannot move an order back to Pending Approval.');
-                            }
-                            return;
-                          }
-                          handleUpdateOrderStatus(oid, st);
+                        style={{
+                          backgroundColor: '#1D4533',
+                          paddingHorizontal: 12,
+                          paddingVertical: 5,
+                          borderRadius: 8,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
                         }}
+                        onPress={() => {
+                          setAssignDeliveryOrder({
+                            ...selectedOrderForModal,
+                            expected_delivery_at:
+                              orderDeliveryDetail?.expected_delivery_at ||
+                              selectedOrderForModal?.expected_delivery_at,
+                          });
+                        }}
+                        activeOpacity={0.85}
                       >
-                        <Text
-                          style={[
-                            styles.orderFilterTabText,
-                            isCur && { color: '#FFFFFF', fontWeight: '800' },
-                          ]}
-                        >
-                          {st === 'Pending Approval'
-                            ? 'Pending COD'
-                            : st === 'Delivered' && needsDeliveredReason
-                              ? 'Delivered (needs reason)'
-                              : st}
+                        <BootstrapIcon name="person-plus-fill" size={12} color="#FFFFFF" />
+                        <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>
+                          {orderDeliveryDetail?.rider_name || selectedOrderForModal?.rider_name ? 'Change Rider' : 'Assign Rider'}
                         </Text>
                       </TouchableOpacity>
-                    );
-                  })}
+                    )}
+                  </View>
                 </View>
+
+                {orderDeliveryDetail?.rider_name || selectedOrderForModal?.rider_name ? (
+                  <View
+                    style={{
+                      backgroundColor: '#ECFDF5',
+                      borderWidth: 1,
+                      borderColor: '#A7F3D0',
+                      padding: 12,
+                      borderRadius: 10,
+                      gap: 4,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <BootstrapIcon name="check-circle-fill" size={14} color="#059669" />
+                        <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#065F46' }}>
+                          {orderDeliveryDetail?.rider_name || selectedOrderForModal?.rider_name}
+                        </Text>
+                      </View>
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: '#047857', backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                        {orderDeliveryDetail?.delivery_status || selectedOrderForModal?.status || 'Assigned'}
+                      </Text>
+                    </View>
+                    {(orderDeliveryDetail?.rider_contact || selectedOrderForModal?.rider_contact) ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <BootstrapIcon name="telephone" size={12} color="#047857" />
+                        <Text style={{ fontSize: 12, color: '#047857', fontWeight: '600' }}>
+                          Contact: {orderDeliveryDetail?.rider_contact || selectedOrderForModal?.rider_contact}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {(orderDeliveryDetail?.vehicle_info || selectedOrderForModal?.vehicle_info) ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <BootstrapIcon name="truck" size={12} color="#047857" />
+                        <Text style={{ fontSize: 12, color: '#047857', fontWeight: '600' }}>
+                          Vehicle: {orderDeliveryDetail?.vehicle_info || selectedOrderForModal?.vehicle_info}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                ) : (
+                  <View
+                    style={{
+                      backgroundColor: '#FFFBEB',
+                      borderWidth: 1,
+                      borderColor: '#FDE68A',
+                      padding: 12,
+                      borderRadius: 10,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <BootstrapIcon name="exclamation-circle-fill" size={16} color="#D97706" />
+                      <View>
+                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#92400E' }}>
+                          No Rider Assigned
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#B45309' }}>
+                          Assign a courier to schedule delivery dispatch.
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
               </View>
 
               {/* Delivery Information */}
@@ -18998,37 +19716,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </View>
                 {orderDeliveryDetail ? (
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 13, color: '#0F172A' }}>
-                      Rider: <Text style={{ fontWeight: '800' }}>{orderDeliveryDetail.rider_name || '—'}</Text>
-                      {orderDeliveryDetail.rider_contact ? ` · ${orderDeliveryDetail.rider_contact}` : ''}
-                    </Text>
-                    <Text style={{ fontSize: 12.5, color: '#1D4533', fontWeight: '700' }}>
-                      Shipping → rider earning: ₱
-                      {Number(
-                        orderDeliveryDetail.rider_earning ??
-                          orderDeliveryDetail.shipping_fee ??
-                          selectedOrderForModal?.shipping_fee ??
-                          0
-                      ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      {orderDeliveryDetail.rider_earning_credited ? ' · credited' : ' · pending delivery confirm'}
-                    </Text>
-                    {orderDeliveryDetail.vehicle_info ? (
-                      <Text style={{ fontSize: 12.5, color: '#334155' }}>
-                        Vehicle: {orderDeliveryDetail.vehicle_info}
-                      </Text>
-                    ) : null}
-                    <Text style={{ fontSize: 12.5, color: '#334155' }}>
-                      Status: {orderDeliveryDetail.delivery_status || selectedOrderForModal?.status || '—'}
-                    </Text>
-                    {orderDeliveryDetail.delivered_at || selectedOrderForModal?.delivered_at ? (
-                      <Text style={{ fontSize: 12.5, color: '#047857', fontWeight: '700' }}>
-                        Delivered:{' '}
-                        {new Date(
-                          orderDeliveryDetail.delivered_at || selectedOrderForModal?.delivered_at
-                        ).toLocaleString()}
-                        {orderDeliveryDetail.rider_name ? ` · ${orderDeliveryDetail.rider_name}` : ''}
-                      </Text>
-                    ) : null}
                     <ExpectedDeliveryEditor
                       orderId={selectedOrderForModal?.order_id || selectedOrderForModal?.id}
                       currentIso={
@@ -19037,6 +19724,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       }
                       adminUser={currentUser}
                       showToast={showToast}
+                      isDarkMode={isDarkMode}
                       onSaved={async (res) => {
                         const oid = selectedOrderForModal?.order_id || selectedOrderForModal?.id;
                         setSelectedOrderForModal((prev) =>
@@ -19216,19 +19904,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         </Text>
                       </TouchableOpacity>
                     </View>
-                    {orderDeliveryHistory.length > 0 && (
-                      <View style={{ marginTop: 10, gap: 4 }}>
-                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#64748B', textTransform: 'uppercase' }}>
-                          Delivery History
-                        </Text>
-                        {orderDeliveryHistory.slice(0, 8).map((h) => (
-                          <Text key={h.id || `${h.action}-${h.created_at}`} style={{ fontSize: 11.5, color: '#475569' }}>
-                            {h.created_at ? new Date(h.created_at).toLocaleString() : ''} — {h.action}
-                            {h.notes ? `: ${h.notes}` : ''}
-                          </Text>
-                        ))}
-                      </View>
-                    )}
+
                   </View>
                 ) : (
                   <Text style={{ fontSize: 13, color: '#94A3B8' }}>
@@ -19328,114 +20004,198 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       </Text>
                     </View>
                     <Text style={{ fontSize: 13, fontWeight: '800', color: tokens.textPrimary }}>
-                      ₱{(Number(it.price || 0) * Number(it.quantity || 1)).toLocaleString()}
+                      ₱{(Number(it.price || 0) * Number(it.quantity || 1)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </Text>
                   </View>
                 ))}
 
                 {/* Financial Summary */}
-                <View
-                  style={{
-                    marginTop: 12,
-                    paddingTop: 10,
-                    borderTopWidth: 1,
-                    borderTopColor: '#E2E8F0',
-                    gap: 4,
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                    <Text style={{ fontSize: 12, color: '#64748B' }}>Subtotal</Text>
-                    <Text style={{ fontSize: 12, color: '#0F172A', fontWeight: '700' }}>
-                      ₱
-                      {Number(
-                        selectedOrderForModal?.total_amount || selectedOrderForModal?.grand_total || 0
-                      ).toLocaleString()}
-                    </Text>
-                  </View>
-                  {Number(selectedOrderForModal?.discount_amount) > 0 && (
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                      <Text style={{ fontSize: 12, color: '#16A34A' }}>Discount Applied</Text>
-                      <Text style={{ fontSize: 12, color: '#16A34A', fontWeight: '700' }}>
-                        -₱{Number(selectedOrderForModal.discount_amount).toLocaleString()}
-                      </Text>
+                {(() => {
+                  const itemsSubtotal = (selectedOrderForModal?.items || []).reduce(
+                    (sum, it) => sum + Number(it.price || 0) * Number(it.quantity || 1),
+                    0
+                  ) || Number(selectedOrderForModal?.total_amount || 0);
+
+                  const shippingFee = Number(
+                    selectedOrderForModal?.shipping_fee != null
+                      ? selectedOrderForModal.shipping_fee
+                      : orderDeliveryDetail?.shipping_fee != null
+                      ? orderDeliveryDetail.shipping_fee
+                      : (Number(selectedOrderForModal?.grand_total || 0) > Number(itemsSubtotal || 0)
+                          ? Number(selectedOrderForModal.grand_total) - Number(itemsSubtotal) + Number(selectedOrderForModal?.discount_amount || 0)
+                          : 0)
+                  );
+
+                  const grandTotal = Number(
+                    selectedOrderForModal?.grand_total ||
+                    (itemsSubtotal + shippingFee - Number(selectedOrderForModal?.discount_amount || 0))
+                  );
+
+                  return (
+                    <View
+                      style={{
+                        marginTop: 12,
+                        paddingTop: 10,
+                        borderTopWidth: 1,
+                        borderTopColor: '#E2E8F0',
+                        gap: 5,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 12, color: '#64748B' }}>Subtotal</Text>
+                        <Text style={{ fontSize: 12, color: '#0F172A', fontWeight: '700' }}>
+                          ₱{itemsSubtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                      </View>
+
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Text style={{ fontSize: 12, color: '#64748B' }}>Shipping Fee</Text>
+                        <Text style={{ fontSize: 12, color: '#0F172A', fontWeight: '700' }}>
+                          {shippingFee > 0
+                            ? `₱${shippingFee.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : 'Free Shipping'}
+                        </Text>
+                      </View>
+
+                      {Number(selectedOrderForModal?.discount_amount) > 0 && (
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Text style={{ fontSize: 12, color: '#16A34A' }}>Discount Applied</Text>
+                          <Text style={{ fontSize: 12, color: '#16A34A', fontWeight: '700' }}>
+                            -₱{Number(selectedOrderForModal.discount_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </Text>
+                        </View>
+                      )}
+
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginTop: 4,
+                          paddingTop: 6,
+                          borderTopWidth: 1,
+                          borderTopColor: '#E2E8F0',
+                        }}
+                      >
+                        <Text style={{ fontSize: 14, fontWeight: '900', color: '#0F172A' }}>Grand Total</Text>
+                        <Text style={{ fontSize: 16, fontWeight: '900', color: '#1D4533' }}>
+                          ₱{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </Text>
+                      </View>
                     </View>
-                  )}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      marginTop: 4,
-                      paddingTop: 4,
-                      borderTopWidth: 1,
-                      borderTopColor: '#E2E8F0',
-                    }}
-                  >
-                    <Text style={{ fontSize: 14, fontWeight: '900', color: '#0F172A' }}>Grand Total</Text>
-                    <Text style={{ fontSize: 15, fontWeight: '900', color: '#1D4533' }}>
-                      ₱
-                      {Number(
-                        selectedOrderForModal?.grand_total || selectedOrderForModal?.total_amount || 0
-                      ).toLocaleString()}
-                    </Text>
-                  </View>
-                </View>
+                  );
+                })()}
               </View>
             </ScrollView>
 
-            <View style={[styles.modalFooter, { flexWrap: 'wrap', gap: 8 }]}>
-              {selectedOrderForModal &&
-                !isDeliveredModal &&
-                isPendingModal && (
-                  <TouchableOpacity
-                    style={[styles.btnApproveCod, { paddingHorizontal: 16, paddingVertical: 10 }]}
-                    onPress={async () => {
-                      await handleApproveCOD(selectedOrderForModal.order_id || selectedOrderForModal.id);
-                      setIsOrderModalOpen(false);
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <BootstrapIcon name="check-circle-fill" size={13} color="#FFFFFF" />
-                    <Text style={[styles.btnApproveCodText, { fontSize: 13 }]}>Approve & Confirm</Text>
-                  </TouchableOpacity>
-                )}
+            <View style={[styles.modalFooter, { flexWrap: 'wrap', gap: 8, justifyContent: 'space-between' }]}>
+              <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                {/* Approve & Confirm */}
+                {selectedOrderForModal &&
+                  !isDeliveredModal &&
+                  isPendingModal && (
+                    <TouchableOpacity
+                      style={[styles.btnApproveCod, { paddingHorizontal: 16, paddingVertical: 10 }]}
+                      onPress={async () => {
+                        await handleApproveCOD(selectedOrderForModal.order_id || selectedOrderForModal.id);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <BootstrapIcon name="check-circle-fill" size={13} color="#FFFFFF" />
+                      <Text style={[styles.btnApproveCodText, { fontSize: 13 }]}>Approve & Confirm</Text>
+                    </TouchableOpacity>
+                  )}
 
-              {!isDeliveredModal && (
+                {/* Reject Order */}
+                {selectedOrderForModal &&
+                  !isDeliveredModal &&
+                  (selectedOrderForModal.status || '').toLowerCase() !== 'cancelled' && (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: '#DC2626',
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                      onPress={() => {
+                        const oid = selectedOrderForModal.order_id || selectedOrderForModal.id;
+                        handleRejectOrder(oid);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <BootstrapIcon name="x-circle-fill" size={13} color="#FFFFFF" />
+                      <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Reject Order</Text>
+                    </TouchableOpacity>
+                  )}
+
+                {/* Assign / Reassign Rider */}
+                {selectedOrderForModal &&
+                  !isDeliveredModal &&
+                  (selectedOrderForModal.status || '').toLowerCase() !== 'cancelled' && (
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: '#0F766E',
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                      onPress={() => {
+                        setAssignDeliveryOrder({
+                          ...selectedOrderForModal,
+                          expected_delivery_at:
+                            orderDeliveryDetail?.expected_delivery_at ||
+                            selectedOrderForModal?.expected_delivery_at,
+                        });
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <BootstrapIcon name="bicycle" size={14} color="#FFFFFF" />
+                      <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>
+                        {orderDeliveryDetail?.rider_name || selectedOrderForModal?.rider_name ? 'Reassign Rider' : 'Assign Rider'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+              </View>
+
+              <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
                 <TouchableOpacity
-                  style={[styles.addBtnPrimary, { backgroundColor: '#1D4533', paddingHorizontal: 16 }]}
-                  onPress={handleSaveOrderEdits}
-                  disabled={isSavingOrderEdits}
+                  style={[
+                    styles.quickStoreBtn,
+                    { backgroundColor: '#0F172A', borderColor: '#0F172A' },
+                  ]}
+                  onPress={() => {
+                    setDeliveryTokenModal({
+                      order: selectedOrderForModal,
+                      bundle: null,
+                    });
+                  }}
                   activeOpacity={0.85}
                 >
-                  {isSavingOrderEdits ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <BootstrapIcon name="floppy" size={13} color="#FFFFFF" />
-                      <Text style={styles.addBtnPrimaryText}>Save Order Changes</Text>
-                    </>
-                  )}
+                  <BootstrapIcon name="qr-code" size={13} color="#FFFFFF" />
+                  <Text style={[styles.quickStoreBtnText, { color: '#FFFFFF', fontWeight: '800' }]}>
+                    Delivery QR
+                  </Text>
                 </TouchableOpacity>
-              )}
 
-              <TouchableOpacity
-                style={styles.quickStoreBtn}
-                onPress={() => {
-                  showToast('Receipt download initiated / print ready');
-                  if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                    window.print?.();
-                  }
-                }}
-              >
-                <BootstrapIcon name="printer" size={13} color="#1D4533" />
-                <Text style={styles.quickStoreBtnText}>Print</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.addBtnPrimary, { backgroundColor: '#64748B' }]}
-                onPress={() => setIsOrderModalOpen(false)}
-              >
-                <Text style={styles.addBtnPrimaryText}>Close</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.quickStoreBtn}
+                  onPress={() => {
+                    showToast('Receipt download initiated / print ready');
+                    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                      window.print?.();
+                    }
+                  }}
+                >
+                  <BootstrapIcon name="printer" size={13} color="#1D4533" />
+                  <Text style={styles.quickStoreBtnText}>Print</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
@@ -19621,7 +20381,24 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           setAssignDeliveryOrder(null);
           await loadData();
           const oid = selectedOrderForModal?.order_id || selectedOrderForModal?.id;
-          if (oid) await refreshOrderDeliveryPanel(oid);
+          if (oid) {
+            await refreshOrderDeliveryPanel(oid);
+            setSelectedOrderForModal((prev) => {
+              if (!prev) return prev;
+              const newStatus =
+                delivery?.delivery_status === 'out_for_delivery' || delivery?.delivery_status === 'shipped'
+                  ? 'Out for Delivery'
+                  : 'Ready for Delivery';
+              return {
+                ...prev,
+                status: newStatus,
+                rider_name: delivery?.rider_name || assignedOrder?.rider_name || prev.rider_name,
+                rider_contact: delivery?.rider_contact || assignedOrder?.rider_contact || prev.rider_contact,
+                rider_id: delivery?.rider_id || assignedOrder?.rider_id || prev.rider_id,
+                delivery_status: delivery?.delivery_status || newStatus,
+              };
+            });
+          }
           if (tokenBundle?.token || tokenBundle?.confirmUrl) {
             setDeliveryTokenModal({
               order: assignedOrder,
@@ -19790,12 +20567,15 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           setDeliveryAction(null);
           await loadData();
           if (oid && selectedOrderForModal && (selectedOrderForModal.order_id === oid || selectedOrderForModal.id === oid)) {
-            const nextStatus = res?.delivery?.delivery_status;
+            const nextStatus =
+              deliveryAction?.mode === 'mark_delivered'
+                ? 'Delivered'
+                : res?.delivery?.delivery_status || 'Delivered';
             setSelectedOrderForModal((prev) =>
               prev
                 ? {
                     ...prev,
-                    status: nextStatus || prev.status,
+                    status: nextStatus,
                     rider_reported_delivered: Boolean(res?.delivery?.rider_reported_delivered),
                     admin_confirmed: Boolean(res?.delivery?.admin_confirmed),
                   }

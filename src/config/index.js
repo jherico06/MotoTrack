@@ -21,9 +21,9 @@ export const APP_CONFIG = {
     adminEmail: env.EXPO_PUBLIC_ADMIN_EMAIL || 'admin@mototrack.com',
   },
   gemini: {
-    apiKey: env.EXPO_PUBLIC_GEMINI_API_KEY || '',
+    // Client must NOT embed Gemini secrets. Use server GEMINI_API_KEY + /api/gemini/* proxy.
+    apiKey: '',
     model: env.EXPO_PUBLIC_GEMINI_MODEL || 'gemini-1.5-flash',
-    // Image generation / editing model (Nano Banana family)
     imageModel: env.EXPO_PUBLIC_GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image',
   },
   // Express AI Customizer API (bike+part multipart). Use LAN IP for physical devices.

@@ -9,3 +9,5 @@ export { default as ServiceQuotationPanel } from './ServiceQuotationPanel';
 export { default as PickupQrScannerPanel } from './PickupQrScannerPanel';
 export { default as AdminBookingManager } from './AdminBookingManager';
 export { default as AdminBookingDetailsPanel } from './AdminBookingDetailsPanel';
+export { default as MotorcycleModelsAdminPanel } from './MotorcycleModelsAdminPanel';
+export { default as ProductCompatibilityPicker } from './ProductCompatibilityPicker';

@@ -56,32 +56,45 @@ export function mapsEmbedUrl(lat, lng, address = '') {
 export async function geocodeAddress(address) {
   const raw = String(address || '').trim();
   if (!raw) return null;
-  const q = /philippines/i.test(raw) ? raw : `${raw}, Philippines`;
 
-  try {
-    const photon = await fetch(
-      `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,
-      { headers: { Accept: 'application/json' } }
-    );
-    if (photon.ok) {
-      const data = await photon.json();
-      const [lng, lat] = data?.features?.[0]?.geometry?.coordinates || [];
-      const parsed = parseLatLng(lat, lng);
-      if (parsed) return parsed;
-    }
-  } catch (_e) {}
+  const parts = raw.split(',').map((p) => p.trim()).filter(Boolean);
+  const candidates = [
+    raw,
+    parts.slice(1).join(', '),
+    parts.slice(-2).join(', '),
+    parts.slice(-1)[0],
+  ].filter((c) => c && c.length >= 3);
 
-  try {
-    const nominatim = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
-      { headers: { Accept: 'application/json' } }
-    );
-    if (nominatim.ok) {
-      const rows = await nominatim.json();
-      const parsed = parseLatLng(rows?.[0]?.lat, rows?.[0]?.lon);
-      if (parsed) return parsed;
-    }
-  } catch (_e) {}
+  const uniqueQueries = Array.from(new Set(candidates)).map((c) =>
+    /philippines/i.test(c) ? c : `${c}, Philippines`
+  );
+
+  for (const q of uniqueQueries) {
+    try {
+      const photon = await fetch(
+        `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=1`,
+        { headers: { Accept: 'application/json' } }
+      );
+      if (photon.ok) {
+        const data = await photon.json();
+        const [lng, lat] = data?.features?.[0]?.geometry?.coordinates || [];
+        const parsed = parseLatLng(lat, lng);
+        if (parsed) return parsed;
+      }
+    } catch (_e) {}
+
+    try {
+      const nominatim = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`,
+        { headers: { Accept: 'application/json' } }
+      );
+      if (nominatim.ok) {
+        const rows = await nominatim.json();
+        const parsed = parseLatLng(rows?.[0]?.lat, rows?.[0]?.lon);
+        if (parsed) return parsed;
+      }
+    } catch (_e) {}
+  }
 
   return null;
 }

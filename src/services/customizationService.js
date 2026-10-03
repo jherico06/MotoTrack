@@ -889,11 +889,12 @@ export const customizationService = {
 
     // Primary: Google Gemini edits the registered motorcycle photo
     try {
-      if (!geminiService.hasApiKey()) {
+      const hasKey = await geminiService.hasApiKey();
+      if (!hasKey) {
         return {
           success: false,
           error:
-            'Gemini API key is required. Add EXPO_PUBLIC_GEMINI_API_KEY in .env so parts can be installed on your registered motorcycle photo.',
+            'AI server is not configured. Start the MotoTrack server with GEMINI_API_KEY in server/.env.',
         };
       }
 

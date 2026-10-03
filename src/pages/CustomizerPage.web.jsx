@@ -71,13 +71,15 @@ export default function CustomizerPageWeb({
 
   // ─── NOTIFICATION STATE ───
   const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
-    notificationService.getUnreadCount(currentUser?.id)
+    currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
   );
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
-      setUnreadNotifCount(notificationService.getUnreadCount(currentUser?.id));
+      setUnreadNotifCount(
+        currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
+      );
     });
     return () => unsub?.();
   }, [currentUser]);
@@ -155,16 +157,16 @@ export default function CustomizerPageWeb({
   ]);
 
   const currentBasePhoto = useMemo(() => {
-    if (bikeSourceMode === 'registered' && selectedRegisteredBike?.photo_url) {
-      return selectedRegisteredBike.photo_url;
+    if (bikeSourceMode === 'registered') {
+      return selectedRegisteredBike?.photo_url || null;
     }
     if (bikeSourceMode === 'presets' && selectedPreset?.image) {
       return selectedPreset.image;
     }
-    if (selectedRegisteredBike?.photo_url) {
-      return selectedRegisteredBike.photo_url;
+    if (selectedRegisteredBike) {
+      return selectedRegisteredBike.photo_url || null;
     }
-    return customPhotoUri || selectedPreset?.image;
+    return customPhotoUri || null;
   }, [bikeSourceMode, selectedRegisteredBike, selectedPreset, customPhotoUri]);
 
   const currentBikeTitle = useMemo(() => {
@@ -385,6 +387,10 @@ export default function CustomizerPageWeb({
       showToast('⚠️ Please select at least 1 product to install on your motorcycle.');
       return;
     }
+    if (!currentBasePhoto) {
+      showToast('⚠️ Please upload or select a photo of your motorcycle to generate an AI customization.');
+      return;
+    }
 
     setIsGenerating(true);
     setGenerationProgress({
@@ -571,6 +577,8 @@ export default function CustomizerPageWeb({
                   setIsNotifDropdownOpen((prev) => !prev);
                 }}
                 activeOpacity={0.8}
+                dataSet={{ notificationButton: true }}
+                {...(Platform.OS === 'web' ? { 'data-notification-button': 'true' } : {})}
               >
                 <BootstrapIcon name="bell" size={16} color="#FFFFFF" />
                 {unreadNotifCount > 0 && (
@@ -583,9 +591,12 @@ export default function CustomizerPageWeb({
               <NotificationDropdown
                 isOpen={isNotifDropdownOpen}
                 onClose={() => setIsNotifDropdownOpen(false)}
-                onNavigateToScreen={(screen) => {
-                  if (screen === 'store') onNavigateToStore?.();
+                onNavigateToScreen={(screen, params) => {
+                  if (screen === 'store' || screen === 'shop') onNavigateToStore?.();
                   else if (screen === 'orders') onNavigateToOrders?.();
+                  else if (screen === 'notifications') onNavigateToProfile?.('notifications');
+                  else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
+                  else if (screen === 'garage') onNavigateToGarage?.();
                 }}
                 currentUser={currentUser}
               />
@@ -1033,11 +1044,17 @@ export default function CustomizerPageWeb({
                               onPress={() => handleSelectRegisteredBike(bike)}
                               activeOpacity={0.85}
                             >
-                              <Image
-                                source={{ uri: bike.photo_url || MOTORCYCLE_PHOTO_PRESETS[0]?.url }}
-                                style={styles.regBikeThumb}
-                                resizeMode="cover"
-                              />
+                              {bike.photo_url ? (
+                                <Image
+                                  source={{ uri: bike.photo_url }}
+                                  style={styles.regBikeThumb}
+                                  resizeMode="cover"
+                                />
+                              ) : (
+                                <View style={[styles.regBikeThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#F1F5F9' }]}>
+                                  <BootstrapIcon name="bicycle" size={24} color="#94A3B8" />
+                                </View>
+                              )}
                               <View style={styles.regBikeHeader}>
                                 <Text style={styles.regBikeTitle} numberOfLines={1}>
                                   {bike.year ? `${bike.year} ` : ''}

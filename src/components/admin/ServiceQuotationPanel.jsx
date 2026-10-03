@@ -41,17 +41,30 @@ export default function ServiceQuotationPanel({
 }) {
   const bookingId = booking?.booking_id || booking?.id;
   const statusNorm = normalizeBookingStatus(booking?.status);
-  const canSendQuote = canAdminAction(booking?.status, 'send_quotation') ||
+  const canSendQuote =
+    canAdminAction(booking?.status, 'send_quotation') ||
     canAdminAction(booking?.status, 'create_quotation') ||
-    statusNorm === FLEX_BOOKING_STATUS.UNDER_INSPECTION;
-  const canRecordActual = canAdminAction(booking?.status, 'update_progress') ||
+    canAdminAction(booking?.status, 'review_estimate') ||
+    statusNorm === FLEX_BOOKING_STATUS.UNDER_INSPECTION ||
+    statusNorm === FLEX_BOOKING_STATUS.ESTIMATE_SUBMITTED;
+  const canRecordActual =
+    canAdminAction(booking?.status, 'update_progress') ||
     statusNorm === FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS;
-  const canCreateAdditional = canAdminAction(booking?.status, 'create_additional');
+  const canCreateAdditional =
+    canAdminAction(booking?.status, 'create_additional') ||
+    canAdminAction(booking?.status, 'review_additional') ||
+    canAdminAction(booking?.status, 'send_additional');
   const canFinalize = canAdminAction(booking?.status, 'finalize_bill');
+  const canRecordPayment = canAdminAction(booking?.status, 'record_payment');
   const [mechanics, setMechanics] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [mechanicEstimate, setMechanicEstimate] = useState(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('cash');
+  const [payRef, setPayRef] = useState('');
+  const [payNotes, setPayNotes] = useState('');
 
   const [mechanicId, setMechanicId] = useState(booking?.mechanic_id || '');
   const [hourlyRate, setHourlyRate] = useState(String(booking?.quoted_hourly_rate || 150));
@@ -80,28 +93,34 @@ export default function ServiceQuotationPanel({
     (async () => {
       setLoading(true);
       try {
-        const [mechs, prods, quotation] = await Promise.all([
+        const [mechs, prods, quotation, estimate] = await Promise.all([
           garageService.fetchMechanics(),
           productService.getProducts?.() || Promise.resolve([]),
-          serviceQuotationService.getQuotationForBooking(bookingId, { force: true }),
+          serviceQuotationService.getQuotationForBooking(bookingId, {
+            force: true,
+            preferType: 'customer',
+          }),
+          serviceQuotationService.getMechanicEstimate(bookingId, { force: true }),
         ]);
         if (!mounted) return;
         setMechanics(Array.isArray(mechs) ? mechs.filter((m) => m.isActive !== false) : []);
         setProducts(Array.isArray(prods) ? prods : []);
-        if (quotation) {
-          setMechanicId(quotation.mechanic_id || '');
-          setHourlyRate(String(quotation.hourly_rate ?? 150));
-          setEstimatedHours(String(quotation.estimated_labor_hours ?? 3));
-          if (quotation.actual_labor_hours != null) {
-            setActualHours(String(quotation.actual_labor_hours));
+        setMechanicEstimate(estimate || null);
+        const source = quotation || estimate;
+        if (source) {
+          setMechanicId(source.mechanic_id || '');
+          setHourlyRate(String(source.hourly_rate ?? 150));
+          setEstimatedHours(String(source.estimated_labor_hours ?? 3));
+          if (source.actual_labor_hours != null) {
+            setActualHours(String(source.actual_labor_hours));
           }
-          setDiscountType(quotation.discount_type || 'fixed');
-          setDiscountValue(String(quotation.discount_value || 0));
-          setDownpaymentType(quotation.downpayment_type || 'percent');
-          setDownpaymentPercent(String(quotation.downpayment_percent ?? 30));
-          setDownpaymentFixed(String(quotation.downpayment_amount || 0));
-          const qParts = (quotation.items || []).filter((i) => i.item_type === 'part');
-          const qOther = (quotation.items || []).filter((i) => i.item_type !== 'part');
+          setDiscountType(source.discount_type || 'fixed');
+          setDiscountValue(String(source.discount_value || 0));
+          setDownpaymentType(source.downpayment_type || 'percent');
+          setDownpaymentPercent(String(source.downpayment_percent ?? 30));
+          setDownpaymentFixed(String(source.downpayment_amount || 0));
+          const qParts = (source.items || []).filter((i) => i.item_type === 'part');
+          const qOther = (source.items || []).filter((i) => i.item_type !== 'part');
           setParts(
             qParts.map((i) => ({
               product_id: i.product_id,
@@ -253,7 +272,7 @@ export default function ServiceQuotationPanel({
     if (!bookingId) return;
     setSaving(true);
     try {
-      const result = await serviceQuotationService.upsertEstimatedQuotation(bookingId, {
+      const result = await serviceQuotationService.upsertCustomerQuotation(bookingId, {
         mechanic_id: mechanicId || null,
         mechanic_name: selectedMechanic?.shortName || selectedMechanic?.name || booking?.mechanic,
         hourly_rate: Number(hourlyRate || 0),
@@ -264,13 +283,15 @@ export default function ServiceQuotationPanel({
         downpayment_type: downpaymentType,
         downpayment_percent: Number(downpaymentPercent || 0),
         downpayment_amount: Number(downpaymentFixed || 0),
+        source_quotation_id: mechanicEstimate?.quotation_id || null,
         status: 'draft',
+        created_by: 'admin',
       });
       if (!result.success) {
         toast(result.error || 'Failed to save quotation');
         return;
       }
-      toast('Estimated quotation saved (prices snapshotted)');
+      toast('Customer quotation saved (mechanic estimate preserved)');
       onUpdated?.(result.quotation);
     } finally {
       setSaving(false);
@@ -383,20 +404,43 @@ export default function ServiceQuotationPanel({
         {[booking?.bike_brand, booking?.bike_model].filter(Boolean).join(' ')}
       </Text>
 
+      {mechanicEstimate ? (
+        <View style={styles.estimateBox}>
+          <Text style={styles.estimateTitle}>Mechanic Estimate (read-only)</Text>
+          <Text style={styles.sub}>
+            {mechanicEstimate.mechanic_name || 'Mechanic'} ·{' '}
+            {formatPhp(mechanicEstimate.total_amount)} · submitted{' '}
+            {mechanicEstimate.status || 'submitted'}
+          </Text>
+          <Text style={styles.muted}>
+            Labor {formatLaborLine(mechanicEstimate.estimated_labor_hours, mechanicEstimate.hourly_rate)} ·
+            Parts {formatPhp(mechanicEstimate.parts_total)} · Other{' '}
+            {formatPhp(mechanicEstimate.other_charges_total)}
+          </Text>
+          <Text style={styles.muted}>
+            Adjust below to create the customer quotation. The mechanic estimate is never overwritten.
+          </Text>
+        </View>
+      ) : null}
+
       <Text style={styles.section}>Assigned Mechanic (internal)</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-        {mechanics.map((m) => (
-          <TouchableOpacity
-            key={m.id}
-            style={[styles.chip, mechanicId === m.id && styles.chipActive]}
-            onPress={() => onSelectMechanic(m)}
-          >
-            <Text style={[styles.chipText, mechanicId === m.id && styles.chipTextActive]}>
-              {m.shortName || m.name} · {formatPhp(m.hourlyRate ?? m.hourly_rate ?? 150)}/hr
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {mechanics.length === 0 ? (
+        <Text style={[styles.muted, { marginBottom: 12 }]}>No mechanics registered yet.</Text>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
+          {mechanics.map((m) => (
+            <TouchableOpacity
+              key={m.id}
+              style={[styles.chip, mechanicId === m.id && styles.chipActive]}
+              onPress={() => onSelectMechanic(m)}
+            >
+              <Text style={[styles.chipText, mechanicId === m.id && styles.chipTextActive]}>
+                {m.shortName || m.name} · {formatPhp(m.hourlyRate ?? m.hourly_rate ?? 150)}/hr
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       <View style={styles.row}>
         <View style={styles.field}>
@@ -546,18 +590,53 @@ export default function ServiceQuotationPanel({
       </View>
 
       <View style={styles.totalsBox}>
-        <Text style={styles.totalsTitle}>ESTIMATED</Text>
-        <Text style={styles.totalsLine}>Labor: {formatPhp(estimated.laborCost)}</Text>
-        <Text style={styles.totalsLine}>Parts: {formatPhp(estimated.partsTotal)}</Text>
-        <Text style={styles.totalsLine}>Other: {formatPhp(estimated.otherChargesTotal)}</Text>
-        <Text style={styles.totalsLine}>Discount: −{formatPhp(estimated.discountAmount)}</Text>
-        <Text style={styles.totalsTotal}>Total: {formatPhp(estimated.totalAmount)}</Text>
-        <Text style={styles.totalsLine}>
-          Required Downpayment: {formatPhp(estimated.downpaymentAmount)}
-        </Text>
-        <Text style={styles.totalsLine}>
-          Remaining Estimated Balance: {formatPhp(estimated.remainingBalance)}
-        </Text>
+        <Text style={styles.totalsTitle}>ESTIMATED SUMMARY</Text>
+
+        <View style={styles.tableHeaderRow}>
+          <Text style={styles.colHeaderLeft}>DESCRIPTION</Text>
+          <Text style={styles.colHeaderRight}>SUBTOTAL</Text>
+        </View>
+        <View style={styles.tableHeaderDivider} />
+
+        <View style={styles.tableRow}>
+          <Text style={styles.tableRowLabel}>Labor</Text>
+          <Text style={styles.tableRowValue}>{formatPhp(estimated.laborCost)}</Text>
+        </View>
+
+        <View style={styles.tableRow}>
+          <Text style={styles.tableRowLabel}>Parts</Text>
+          <Text style={styles.tableRowValue}>{formatPhp(estimated.partsTotal)}</Text>
+        </View>
+
+        <View style={styles.tableRow}>
+          <Text style={styles.tableRowLabel}>Other Charges</Text>
+          <Text style={styles.tableRowValue}>{formatPhp(estimated.otherChargesTotal)}</Text>
+        </View>
+
+        <View style={styles.tableRow}>
+          <Text style={styles.tableRowLabel}>Discount</Text>
+          <Text style={[styles.tableRowValue, Number(estimated.discountAmount) > 0 && { color: '#DC2626' }]}>
+            −{formatPhp(estimated.discountAmount)}
+          </Text>
+        </View>
+
+        <View style={styles.tableTotalDivider} />
+
+        <View style={styles.tableTotalRow}>
+          <Text style={styles.totalsTotalLabel}>Total</Text>
+          <Text style={styles.totalsTotalValue}>{formatPhp(estimated.totalAmount)}</Text>
+        </View>
+
+        <View style={styles.breakdownSubBox}>
+          <View style={styles.tableRow}>
+            <Text style={styles.tableSubLabel}>Required Downpayment</Text>
+            <Text style={styles.tableSubValueDp}>{formatPhp(estimated.downpaymentAmount)}</Text>
+          </View>
+          <View style={styles.tableRow}>
+            <Text style={styles.tableSubLabel}>Remaining Estimated Balance</Text>
+            <Text style={styles.tableSubValueRem}>{formatPhp(estimated.remainingBalance)}</Text>
+          </View>
+        </View>
       </View>
 
       <View style={styles.actions}>
@@ -572,10 +651,101 @@ export default function ServiceQuotationPanel({
           </>
         ) : (
           <Text style={styles.muted}>
-            Quotation editing unlocks during Under Inspection.
+            Quotation editing unlocks when a mechanic estimate is submitted (or during inspection).
           </Text>
         )}
       </View>
+
+      {canRecordPayment ? (
+        <View style={{ marginTop: 16, gap: 8 }}>
+          <Text style={styles.section}>Manual Payment Recording</Text>
+          <Text style={styles.muted}>
+            Record Cash or Other payments received at the shop. GCash gateway is not enabled yet.
+          </Text>
+          <View style={styles.row}>
+            <TouchableOpacity
+              style={[styles.chip, payMethod === 'cash' && styles.chipActive]}
+              onPress={() => setPayMethod('cash')}
+            >
+              <Text style={styles.chipText}>Cash</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.chip, payMethod === 'other' && styles.chipActive]}
+              onPress={() => setPayMethod('other')}
+            >
+              <Text style={styles.chipText}>Other</Text>
+            </TouchableOpacity>
+            <TextInput
+              style={[styles.input, { flex: 1 }]}
+              placeholder="Amount ₱"
+              keyboardType="decimal-pad"
+              value={payAmount}
+              onChangeText={setPayAmount}
+              {...FIELD_PROPS}
+            />
+          </View>
+          <TextInput
+            style={styles.input}
+            placeholder="Reference / receipt # (optional)"
+            value={payRef}
+            onChangeText={setPayRef}
+            {...FIELD_PROPS}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Notes (optional)"
+            value={payNotes}
+            onChangeText={setPayNotes}
+            {...FIELD_PROPS}
+          />
+          <TouchableOpacity
+            style={styles.btnPrimary}
+            disabled={saving}
+            onPress={async () => {
+              setSaving(true);
+              try {
+                const paymentType =
+                  statusNorm === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT
+                    ? 'DOWNPAYMENT'
+                    : 'FINAL_PAYMENT';
+                const amt =
+                  Number(payAmount) ||
+                  (paymentType === 'DOWNPAYMENT'
+                    ? Number(booking?.downpayment_amount || 0)
+                    : Number(booking?.remaining_balance || 0));
+                const res = await serviceQuotationService.recordBookingPayment({
+                  bookingId,
+                  customerId: booking?.customer_id,
+                  amount: amt,
+                  paymentType,
+                  paymentMethod: payMethod,
+                  transactionReference: payRef || undefined,
+                  receivedBy: 'admin',
+                  notes: payNotes || undefined,
+                });
+                if (!res.success) {
+                  toast(res.error || 'Payment failed');
+                  return;
+                }
+                toast(`${paymentType === 'DOWNPAYMENT' ? 'Downpayment' : 'Payment'} recorded`);
+                setPayAmount('');
+                setPayRef('');
+                setPayNotes('');
+                onUpdated?.(res);
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <Text style={styles.btnPrimaryText}>
+              Record{' '}
+              {statusNorm === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT
+                ? 'Downpayment'
+                : 'Final Payment'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <Text style={styles.section}>ACTUAL Labor (after service)</Text>
       {canRecordActual ? (
@@ -734,16 +904,109 @@ const styles = StyleSheet.create({
   },
   smallBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
   totalsBox: {
-    marginTop: 12,
+    marginTop: 14,
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
-    padding: 14,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#C8DDD3',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  totalsTitle: { fontWeight: '800', color: '#1D4533', marginBottom: 6 },
-  totalsLine: { fontSize: 13, color: '#475569', marginBottom: 2 },
-  totalsTotal: { fontSize: 16, fontWeight: '800', color: '#0F172A', marginVertical: 6 },
+  totalsTitle: {
+    fontWeight: '800',
+    fontSize: 12.5,
+    letterSpacing: 0.8,
+    color: '#1D4533',
+    marginBottom: 12,
+  },
+  tableHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 4,
+  },
+  colHeaderLeft: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.6,
+  },
+  colHeaderRight: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.6,
+  },
+  tableHeaderDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginBottom: 10,
+    marginTop: 4,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  tableRowLabel: {
+    fontSize: 13.5,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  tableRowValue: {
+    fontSize: 13.5,
+    color: '#0F172A',
+    fontWeight: '600',
+  },
+  tableTotalDivider: {
+    height: 1.5,
+    backgroundColor: '#CBD5E1',
+    marginTop: 10,
+    marginBottom: 10,
+  },
+  tableTotalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  totalsTotalLabel: {
+    fontSize: 15.5,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  totalsTotalValue: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: '#1D4533',
+  },
+  breakdownSubBox: {
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    gap: 4,
+  },
+  tableSubLabel: {
+    fontSize: 12.5,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  tableSubValueDp: {
+    fontSize: 13,
+    color: '#D97706',
+    fontWeight: '700',
+  },
+  tableSubValueRem: {
+    fontSize: 13,
+    color: '#1D4533',
+    fontWeight: '700',
+  },
   actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
   btnPrimary: {
     flex: 1,
@@ -766,4 +1029,14 @@ const styles = StyleSheet.create({
   btnSecondaryText: { color: '#1D4533', fontWeight: '700', fontSize: 13 },
   muted: { fontSize: 12, color: '#94A3B8', marginTop: 4 },
   savingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+  estimateBox: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    marginBottom: 12,
+    gap: 4,
+  },
+  estimateTitle: { fontSize: 13, fontWeight: '800', color: '#4338CA' },
 });

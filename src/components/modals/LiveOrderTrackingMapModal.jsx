@@ -17,6 +17,7 @@ import { WebView } from 'react-native-webview';
 import BootstrapIcon from '../common/BootstrapIcon';
 import { useAuth } from '../../context/AuthContext';
 import { orderService, canCustomerCancelStatus, canCustomerRequestReturnStatus, canCustomerEditAddressStatus } from '../../services/orderService';
+import { geocodeAddress, STORE_LOCATION } from '../../utils/geo';
 
 // Route Waypoints focused across City of Naga, Cebu, Philippines
 const ROUTE_WAYPOINTS = [
@@ -314,15 +315,50 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   const distanceKm = ((1 - progress) * 5.6).toFixed(1);
   const currentSpeed = isPlaying && progress < 1 ? Math.floor(32 + Math.random() * 12) : 0;
 
+  // Dynamically resolve customer delivery coordinates (geocoding or order lat/lng)
+  const [customerCoords, setCustomerCoords] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const oLat = Number(activeOrder?.delivery_lat);
+    const oLng = Number(activeOrder?.delivery_lng);
+    if (Number.isFinite(oLat) && Number.isFinite(oLng) && oLat !== 0 && oLng !== 0) {
+      setCustomerCoords({ lat: oLat, lng: oLng });
+      return;
+    }
+
+    if (deliveryAddressStr) {
+      geocodeAddress(deliveryAddressStr)
+        .then((coords) => {
+          if (isMounted && coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng)) {
+            setCustomerCoords(coords);
+          } else if (isMounted) {
+            // Default land coordinates in City of Naga, Cebu (Inoburan / South Naga)
+            setCustomerCoords({ lat: 10.2185, lng: 123.7535 });
+          }
+        })
+        .catch(() => {
+          if (isMounted) setCustomerCoords({ lat: 10.2185, lng: 123.7535 });
+        });
+    } else if (isMounted) {
+      setCustomerCoords({ lat: 10.2185, lng: 123.7535 });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [deliveryAddressStr, activeOrder?.delivery_lat, activeOrder?.delivery_lng]);
+
   // Self-contained, robust interactive Leaflet HTML map that works 100% on Mobile WebViews without blinking
   const leafletMapHtml = useMemo(() => {
-    const hubLat = 10.20663;
-    const hubLng = 123.75675;
-    const destLat = 10.224;
-    const destLng = 123.77;
+    const hubLat = STORE_LOCATION?.lat || 10.20663;
+    const hubLng = STORE_LOCATION?.lng || 123.75675;
+    const destLat = customerCoords?.lat ?? 10.2185;
+    const destLng = customerCoords?.lng ?? 123.7535;
 
-    const safeDestTitle = (destSummary || 'Inoburan, City of Naga').replace(/'/g, "\\'");
-    const safeRiderName = (riderInfo?.name || 'Awaiting rider').replace(/'/g, "\\'");
+    const safeDestTitle = (destSummary || 'Inoburan, City of Naga').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    const safeRiderName = (riderInfo?.name || 'Awaiting rider').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    const safeAddress = (deliveryAddressStr || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
 
     return `
 <!DOCTYPE html>
@@ -416,8 +452,8 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
 
         var routeCoords = [
           [hubLat, hubLng],
-          [10.2115, 123.7605],
-          [10.2175, 123.7655],
+          [hubLat + (destLat - hubLat) * 0.33, hubLng + (destLng - hubLng) * 0.25],
+          [hubLat + (destLat - hubLat) * 0.66, hubLng + (destLng - hubLng) * 0.75],
           [destLat, destLng]
         ];
 
@@ -446,7 +482,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
           iconSize: [30, 30],
           iconAnchor: [15, 15]
         });
-        L.marker([destLat, destLng], { icon: destIcon }).addTo(map).bindPopup("<b>Delivery Destination</b><br/>${safeDestTitle}");
+        L.marker([destLat, destLng], { icon: destIcon }).addTo(map).bindPopup("<b>Delivery Destination</b><br/><b>" + "${safeDestTitle}" + "</b><br/><span style='color:#64748B;font-size:11px;'>" + "${safeAddress}" + "</span>");
 
         // Animated Rider Pin
         var currentProgress = 0.45;
@@ -488,7 +524,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
       if (typeof L === 'undefined') {
         var mapEl = document.getElementById('map');
         if (mapEl) {
-          mapEl.innerHTML = '<iframe width="100%" height="100%" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="https://www.openstreetmap.org/export/embed.html?bbox=123.74%2C10.19%2C123.78%2C10.23&amp;layer=mapnik&amp;marker=' + 10.20663 + '%2C' + 123.75675 + '" style="border:0;width:100%;height:100%;"></iframe>';
+          mapEl.innerHTML = '<iframe width="100%" height="100%" frameborder="0" scrolling="no" marginheight="0" marginwidth="0" src="https://www.openstreetmap.org/export/embed.html?bbox=123.74%2C10.19%2C123.78%2C10.23&amp;layer=mapnik&amp;marker=' + destLat + '%2C' + destLng + '" style="border:0;width:100%;height:100%;"></iframe>';
         }
       }
     }, 2500);
@@ -498,7 +534,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
 </body>
 </html>
     `;
-  }, [destSummary, riderInfo?.name]);
+  }, [destSummary, riderInfo?.name, deliveryAddressStr, customerCoords]);
 
   // Live GPS movement ticker
   useEffect(() => {
@@ -824,7 +860,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                         width="100%"
                         height="100%"
                         style={{ border: 0, width: '100%', height: 280, minHeight: 280, borderRadius: 16 }}
-                        src="https://maps.google.com/maps?q=10.20663,123.75675&z=15&output=embed"
+                        src={`https://maps.google.com/maps?q=${customerCoords?.lat || 10.2185},${customerCoords?.lng || 123.7535}&z=15&output=embed`}
                       />
                     </View>
                   )}

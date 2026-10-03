@@ -6,6 +6,8 @@ This app is a motorcycle parts store. The three roles are:
 - [Admin](#admin)
 - [Rider](#rider)
 
+For numbered use-case lists (diagram-style), see [USE_CASES.md](./USE_CASES.md).
+
 ---
 
 ## Customer

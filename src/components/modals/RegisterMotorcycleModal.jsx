@@ -14,7 +14,6 @@ import {
 import BootstrapIcon from '../common/BootstrapIcon';
 import {
   MOTORCYCLE_BRANDS,
-  MOTORCYCLE_PHOTO_PRESETS,
 } from '../../services/motorcycleService';
 import { pickImageFromFile } from '../../utils/imagePickerHelper';
 
@@ -30,8 +29,8 @@ export default function RegisterMotorcycleModal({
   const [brand, setBrand] = useState('Yamaha');
   const [model, setModel] = useState('');
   const [plateNumber, setPlateNumber] = useState('');
-  const [year, setYear] = useState(String(new Date().getFullYear()));
-  const [engineCc, setEngineCc] = useState('155');
+  const [year, setYear] = useState('');
+  const [engineCc, setEngineCc] = useState('');
   const [color, setColor] = useState('');
   const [odometer, setOdometer] = useState('');
   const [nickname, setNickname] = useState('');
@@ -47,8 +46,8 @@ export default function RegisterMotorcycleModal({
       setBrand(motorcycle.brand || 'Yamaha');
       setModel(motorcycle.model || '');
       setPlateNumber(motorcycle.plate_number || '');
-      setYear(motorcycle.year ? String(motorcycle.year) : String(new Date().getFullYear()));
-      setEngineCc(motorcycle.engine_cc ? String(motorcycle.engine_cc) : '155');
+      setYear(motorcycle.year ? String(motorcycle.year) : '');
+      setEngineCc(motorcycle.engine_cc ? String(motorcycle.engine_cc) : '');
       setColor(motorcycle.color || '');
       setOdometer(motorcycle.odometer || '');
       setNickname(motorcycle.nickname || '');
@@ -59,8 +58,8 @@ export default function RegisterMotorcycleModal({
       setBrand('Yamaha');
       setModel('');
       setPlateNumber('');
-      setYear(String(new Date().getFullYear()));
-      setEngineCc('155');
+      setYear('');
+      setEngineCc('');
       setColor('');
       setOdometer('');
       setNickname('');
@@ -78,13 +77,6 @@ export default function RegisterMotorcycleModal({
   const borderCol = isDarkMode ? '#334155' : '#E2E8F0';
   const textMain = isDarkMode ? '#F8FAFC' : '#0F172A';
   const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
-
-  const defaultPhotoForBrand = (brandName) => {
-    const preset = MOTORCYCLE_PHOTO_PRESETS.find(
-      (p) => p.brand.toLowerCase() === String(brandName || '').toLowerCase()
-    );
-    return preset?.url || MOTORCYCLE_PHOTO_PRESETS[0]?.url || '';
-  };
 
   const handleUploadPhoto = async () => {
     setErrorMessage('');
@@ -125,13 +117,13 @@ export default function RegisterMotorcycleModal({
         brand: brand.trim(),
         model: model.trim(),
         plate_number: plateNumber.trim().toUpperCase(),
-        year: parseInt(year, 10) || new Date().getFullYear(),
-        engine_cc: parseInt(engineCc, 10) || 150,
-        color: color.trim() || 'Standard',
-        odometer: odometer.trim() || '0 km',
-        nickname: nickname.trim() || `${brand} ${model.trim()}`,
+        year: year.trim() ? parseInt(year, 10) : null,
+        engine_cc: engineCc.trim() ? parseInt(engineCc, 10) : null,
+        color: color.trim() || '',
+        odometer: odometer.trim() || '',
+        nickname: nickname.trim() || '',
         vin_number: '',
-        photo_url: photoUrl.trim() || defaultPhotoForBrand(brand),
+        photo_url: photoUrl.trim() || null,
         is_primary: isPrimary,
         notes: notes.trim(),
       };

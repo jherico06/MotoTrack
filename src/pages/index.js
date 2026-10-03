@@ -11,4 +11,5 @@ export { default as NotificationsPage } from './NotificationsPage';
 export { default as DeliveryConfirmPage } from './DeliveryConfirmPage';
 export { default as RiderRunPage } from './RiderRunPage';
 export { default as RiderDashboard } from './RiderDashboard';
+export { default as MechanicDashboard } from './MechanicDashboard';
 export { default as ProductDetailsPage } from './ProductDetailsPage';

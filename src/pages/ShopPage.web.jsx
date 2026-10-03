@@ -8,6 +8,7 @@ import {
   Image,
   StyleSheet,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
@@ -23,6 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { productNeedsSizes, withSelectedSize, isSizeSoldOut } from '../utils/productSizes';
+import { resolveReorderLevel } from '../utils/inventoryHelpers';
 import { getRatedScore, productHasCustomerRatings } from '../utils/productCatalog';
 
 // ─── COMPONENTS & MODALS ───────────────────────────────────────────────────
@@ -46,6 +48,11 @@ import {
   NotificationDropdown,
 } from '../components/common';
 import HeroBanner from '../components/shop/HeroBanner';
+import CompatibilityBadge from '../components/shop/CompatibilityBadge';
+import {
+  compatibilityService,
+  COMPAT_STATUS,
+} from '../services/compatibilityService';
 import { shopWebStyles as webStyles } from '../styles/web/shopPage.web.styles';
 
 export default function ShopPageWeb({ onNavigateToScreen }) {
@@ -79,6 +86,11 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterSort, setFilterSort] = useState('all');
+  const [activeBike, setActiveBike] = useState(null);
+  const [userBikes, setUserBikes] = useState([]);
+  const [isBikeDropdownOpen, setIsBikeDropdownOpen] = useState(false);
+  const [compatMap, setCompatMap] = useState(null);
+  const [compatOnly, setCompatOnly] = useState(false);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
 
   // Modal states
@@ -97,7 +109,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
   const [pendingGcashOrderData, setPendingGcashOrderData] = useState(null);
   const [buyNowItems, setBuyNowItems] = useState(null);
   const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
-    notificationService.getUnreadCount(currentUser?.id)
+    currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
   );
   const [isCompanyInfoOpen, setIsCompanyInfoOpen] = useState(false);
   const [companyInfoTab, setCompanyInfoTab] = useState('about');
@@ -123,10 +135,12 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
-      setUnreadNotifCount(notificationService.getUnreadCount(currentUser?.id));
+      setUnreadNotifCount(
+        currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
+      );
     });
     return () => unsub?.();
-  }, []);
+  }, [currentUser]);
 
   // Load products & subscribe to real-time inventory
   useEffect(() => {
@@ -139,15 +153,67 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
     return () => unsubscribe();
   }, []);
 
+  // One cached compatibility matrix and customer motorcycles list for the whole shop
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const map = await compatibilityService.getCompatibilityMap();
+      if (alive) setCompatMap(map);
+      const userId = currentUser?.id || currentUser?.user_id || currentUser?.customer_id;
+      if (userId) {
+        try {
+          const [bike, list] = await Promise.all([
+            compatibilityService.getActiveMotorcycle(userId),
+            compatibilityService.listCustomerMotorcycles(userId),
+          ]);
+          if (alive) {
+            setUserBikes(list || []);
+            setActiveBike(bike || (list && list[0]) || null);
+          }
+        } catch (_e) {
+          if (alive) {
+            setUserBikes([]);
+            setActiveBike(null);
+          }
+        }
+      } else if (alive) {
+        setUserBikes([]);
+        setActiveBike(null);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [currentUser?.id, currentUser?.user_id, currentUser?.customer_id]);
+
+  const handleSelectBike = async (bike) => {
+    setIsBikeDropdownOpen(false);
+    if (!bike) {
+      setActiveBike(null);
+      setCompatOnly(false);
+      showToast('Showing parts for all motorcycles');
+      return;
+    }
+    setActiveBike(bike);
+    const userId = currentUser?.id || currentUser?.user_id || currentUser?.customer_id;
+    if (userId && bike.motorcycle_id) {
+      try {
+        await compatibilityService.setActiveMotorcycle(bike.motorcycle_id, userId);
+      } catch (_e) {}
+    }
+    showToast(`${bike.brand} ${bike.model} selected`);
+  };
+
   const categories = useMemo(() => {
     const prods = Array.isArray(productsList) ? productsList : [];
     const cats = ['All', ...new Set(prods.map((p) => p.category).filter(Boolean))];
     return cats;
   }, [productsList]);
 
-  // Filtered & Sorted products list
+  // Filtered & Sorted products list (+ optional compatible-only filter)
   const filteredProducts = useMemo(() => {
     const prods = Array.isArray(productsList) ? productsList : [];
+    const map = compatMap || new Map();
     let list = prods.filter((item) => {
       const matchCategory =
         selectedCategory === 'All' || item.category.toLowerCase() === selectedCategory.toLowerCase();
@@ -161,6 +227,12 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
       return matchCategory && matchSearch;
     });
 
+    list = compatibilityService.annotateProducts(list, activeBike, map);
+
+    if (compatOnly && activeBike) {
+      list = list.filter((p) => p.compatStatus === COMPAT_STATUS.COMPATIBLE);
+    }
+
     if (filterSort === 'price-low') {
       list = [...list].sort((a, b) => a.price - b.price);
     } else if (filterSort === 'price-high') {
@@ -170,7 +242,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
     }
 
     return list;
-  }, [productsList, selectedCategory, searchQuery, filterSort]);
+  }, [productsList, selectedCategory, searchQuery, filterSort, activeBike, compatMap, compatOnly]);
 
   const handleAddToCartAttempt = (product, qty = 1, options = {}) => {
     if (!currentUser) {
@@ -191,7 +263,11 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
       showToast(`Size ${size} is sold out`);
       return;
     }
-    addToCart(product, qty, { size });
+    const warn =
+      product.compatStatus === COMPAT_STATUS.INCOMPATIBLE && activeBike
+        ? `⚠ This part is not marked as compatible with your ${compatibilityService.bikeLabel(activeBike)}.`
+        : null;
+    addToCart(product, qty, { size, compatWarning: warn });
   };
 
   const handleBuyNowAttempt = (product, qty = 1, options = {}) => {
@@ -453,6 +529,8 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                 }}
                 activeOpacity={0.8}
                 title="Notifications"
+                dataSet={{ notificationButton: true }}
+                {...(Platform.OS === 'web' ? { 'data-notification-button': 'true' } : {})}
               >
                 <BootstrapIcon name="bell" size={16} color="#FFFFFF" />
                 {unreadNotifCount > 0 && (
@@ -502,12 +580,14 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                 <UserProfileDropdown
                   currentUser={currentUser}
                   isOpen={isProfileDropdownOpen}
+                  currentScreen="shop"
+                  showDashboard={true}
                   onClose={() => setIsProfileDropdownOpen(false)}
                   onNavigateToDashboard={(tab = 'overview') => onNavigateToScreen?.('profile', { tab })}
                   onNavigateToOrders={() => onNavigateToScreen?.('profile', { tab: 'orders' })}
                   onNavigateToProfile={() => onNavigateToScreen?.('profile')}
                   onNavigateToSettings={() => onNavigateToScreen?.('profile', { tab: 'settings' })}
-                  onNavigateToNotifications={() => onNavigateToScreen?.('notifications')}
+                  onNavigateToNotifications={() => onNavigateToScreen?.('profile', { tab: 'notifications' })}
                   onNavigateToAdmin={() => {
                     if (currentUser?.role === 'admin') {
                       onNavigateToScreen?.('admin');
@@ -548,11 +628,11 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
         <View style={webStyles.maxContainer}>
           <HeroBanner onSelectCategory={setSelectedCategory} showToast={showToast} />
 
-          {/* ─── CATEGORY DROPDOWN, SEARCH & SORTING TOOLBAR ─── */}
-          <View style={webStyles.toolbarRow}>
-            {/* Left Cluster: Category Dropdown & Relocated Search Bar */}
-            <View style={webStyles.toolbarLeftGroup}>
-              {/* Category Dropdown */}
+          {/* ─── CATEGORY, MOTORCYCLE SELECTOR & SORTING TOOLBAR ─── */}
+          <View style={[webStyles.toolbarRow, { marginTop: 16 }]}>
+            {/* Left Cluster: Category Dropdown, Motorcycle Dropdown & Compatibility Filter */}
+            <View style={[webStyles.toolbarLeftGroup, { flexWrap: 'wrap', gap: 10 }]}>
+              {/* 1. Category Dropdown */}
               <View style={webStyles.categoryDropdownContainer}>
                 <TouchableOpacity
                   style={[
@@ -560,7 +640,11 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                     (isCategoryDropdownOpen || selectedCategory !== 'All') &&
                       webStyles.categoryDropdownBtnActive,
                   ]}
-                  onPress={() => setIsCategoryDropdownOpen((prev) => !prev)}
+                  onPress={() => {
+                    setIsBikeDropdownOpen(false);
+                    setIsSortDropdownOpen(false);
+                    setIsCategoryDropdownOpen((prev) => !prev);
+                  }}
                   activeOpacity={0.85}
                 >
                   <BootstrapIcon
@@ -646,6 +730,209 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                   </>
                 )}
               </View>
+
+              {/* 2. Motorcycle Selector Dropdown (Aligned with Category) */}
+              <View style={webStyles.categoryDropdownContainer}>
+                <TouchableOpacity
+                  style={[
+                    webStyles.categoryDropdownBtn,
+                    (isBikeDropdownOpen || activeBike) && webStyles.categoryDropdownBtnActive,
+                  ]}
+                  onPress={() => {
+                    setIsCategoryDropdownOpen(false);
+                    setIsSortDropdownOpen(false);
+                    setIsBikeDropdownOpen((prev) => !prev);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon
+                    name="scooter"
+                    size={14}
+                    color={activeBike ? '#1D4533' : '#64748B'}
+                  />
+                  <Text
+                    style={[
+                      webStyles.categoryDropdownBtnText,
+                      activeBike && webStyles.categoryDropdownBtnTextActive,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {activeBike ? `${activeBike.brand} ${activeBike.model}` : 'My Motorcycle'}
+                  </Text>
+                  <BootstrapIcon
+                    name={isBikeDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                    size={12}
+                    color={activeBike ? '#1D4533' : '#94A3B8'}
+                  />
+                </TouchableOpacity>
+
+                {/* Motorcycle Dropdown Floating Menu */}
+                {isBikeDropdownOpen && (
+                  <>
+                    <TouchableOpacity
+                      style={webStyles.dropdownBackdrop}
+                      onPress={() => setIsBikeDropdownOpen(false)}
+                      activeOpacity={1}
+                    />
+                    <View style={[webStyles.categoryDropdownMenu, { minWidth: 260 }]}>
+                      <View
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 9,
+                          borderBottomWidth: 1,
+                          borderBottomColor: '#F1F5F9',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            fontWeight: '800',
+                            color: '#64748B',
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          My Motorcycle
+                        </Text>
+                      </View>
+                      <ScrollView style={{ maxHeight: 280 }} showsVerticalScrollIndicator={false}>
+                        {/* Option: All Motorcycles (No filter) */}
+                        <TouchableOpacity
+                          style={[
+                            webStyles.categoryDropdownItem,
+                            !activeBike && webStyles.categoryDropdownItemActive,
+                          ]}
+                          onPress={() => handleSelectBike(null)}
+                          activeOpacity={0.8}
+                        >
+                          <View style={webStyles.categoryDropdownItemLeft}>
+                            {!activeBike ? (
+                              <BootstrapIcon name="check-circle-fill" size={13} color="#1D4533" />
+                            ) : (
+                              <BootstrapIcon name="circle" size={9} color="#CBD5E1" />
+                            )}
+                            <Text
+                              style={[
+                                webStyles.categoryDropdownItemText,
+                                !activeBike && webStyles.categoryDropdownItemTextActive,
+                              ]}
+                            >
+                              All Motorcycles (No Filter)
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+
+                        {userBikes.length === 0 ? (
+                          <View style={{ padding: 14, alignItems: 'center' }}>
+                            <Text style={{ fontSize: 12, color: '#64748B', textAlign: 'center' }}>
+                              {currentUser
+                                ? 'No motorcycles found in your garage.'
+                                : 'Sign in to select your registered motorcycle.'}
+                            </Text>
+                            {currentUser && (
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  color: '#059669',
+                                  fontWeight: '700',
+                                  marginTop: 4,
+                                }}
+                              >
+                                Add your bike in Customer Garage
+                              </Text>
+                            )}
+                          </View>
+                        ) : (
+                          userBikes.map((b) => {
+                            const isSelected = activeBike?.motorcycle_id
+                              ? activeBike.motorcycle_id === b.motorcycle_id
+                              : activeBike?.brand === b.brand && activeBike?.model === b.model;
+
+                            return (
+                              <TouchableOpacity
+                                key={b.motorcycle_id || `${b.brand}-${b.model}`}
+                                style={[
+                                  webStyles.categoryDropdownItem,
+                                  isSelected && webStyles.categoryDropdownItemActive,
+                                ]}
+                                onPress={() => handleSelectBike(b)}
+                                activeOpacity={0.8}
+                              >
+                                <View style={webStyles.categoryDropdownItemLeft}>
+                                  {isSelected ? (
+                                    <BootstrapIcon
+                                      name="check-circle-fill"
+                                      size={13}
+                                      color="#1D4533"
+                                    />
+                                  ) : (
+                                    <BootstrapIcon name="circle" size={9} color="#CBD5E1" />
+                                  )}
+                                  <View>
+                                    <Text
+                                      style={[
+                                        webStyles.categoryDropdownItemText,
+                                        isSelected && webStyles.categoryDropdownItemTextActive,
+                                      ]}
+                                    >
+                                      {b.brand} {b.model}
+                                    </Text>
+                                    {b.nickname ? (
+                                      <Text style={{ fontSize: 10.5, color: '#94A3B8' }}>
+                                        {b.nickname}
+                                      </Text>
+                                    ) : null}
+                                  </View>
+                                </View>
+                                {b.is_primary ? (
+                                  <Text
+                                    style={[
+                                      webStyles.categoryDropdownBadge,
+                                      webStyles.categoryDropdownBadgeActive,
+                                      { fontSize: 10 },
+                                    ]}
+                                  >
+                                    Default
+                                  </Text>
+                                ) : null}
+                              </TouchableOpacity>
+                            );
+                          })
+                        )}
+                      </ScrollView>
+                    </View>
+                  </>
+                )}
+              </View>
+
+              {/* 3. Compatible with My Motorcycle Filter Toggle */}
+              {activeBike && (
+                <TouchableOpacity
+                  style={[
+                    webStyles.categoryDropdownBtn,
+                    compatOnly && {
+                      backgroundColor: '#1D4533',
+                      borderColor: '#1D4533',
+                    },
+                  ]}
+                  onPress={() => setCompatOnly((v) => !v)}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon
+                    name={compatOnly ? 'check-circle-fill' : 'shield-check'}
+                    size={13}
+                    color={compatOnly ? '#FFFFFF' : '#1D4533'}
+                  />
+                  <Text
+                    style={[
+                      webStyles.categoryDropdownBtnText,
+                      compatOnly && { color: '#FFFFFF' },
+                    ]}
+                  >
+                    Compatible Only
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Sorting Dropdown */}
@@ -656,7 +943,11 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                     webStyles.categoryDropdownBtn,
                     filterSort !== 'all' && webStyles.categoryDropdownBtnActive,
                   ]}
-                  onPress={() => setIsSortDropdownOpen((prev) => !prev)}
+                  onPress={() => {
+                    setIsCategoryDropdownOpen(false);
+                    setIsBikeDropdownOpen(false);
+                    setIsSortDropdownOpen((prev) => !prev);
+                  }}
                   activeOpacity={0.85}
                 >
                   <BootstrapIcon
@@ -809,6 +1100,14 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                       {product.name}
                     </Text>
 
+                    {product.compatMessage ? (
+                      <CompatibilityBadge
+                        status={product.compatStatus}
+                        message={product.compatMessage}
+                        style={{ marginBottom: 6 }}
+                      />
+                    ) : null}
+
                     {/* Price Row: Bold Teal Brand Color (matching app) */}
                     <View style={webStyles.priceRow} className="flex flex-row items-baseline gap-1.5 mb-1.5">
                       <Text
@@ -839,7 +1138,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                         >
                           {product.stock <= 0
                             ? 'Sold out'
-                            : product.stock <= 5
+                            : product.stock <= resolveReorderLevel(product, 5)
                               ? `Only ${product.stock} left`
                               : `${product.stock} in stock`}
                         </Text>
@@ -1171,7 +1470,7 @@ export default function ShopPageWeb({ onNavigateToScreen }) {
                 onNavigateToScreen?.('profile', { tab: 'bookings' });
               }
             } else if (tab === 'Notifications') {
-              onNavigateToScreen?.('notifications');
+              onNavigateToScreen?.('profile', { tab: 'notifications' });
             } else if (tab === 'Admin') {
               if (currentUser?.role === 'admin') {
                 onNavigateToScreen?.('admin');
