@@ -12,8 +12,10 @@ export const APP_CONFIG = {
   // (LAN IP or hosted https). localhost will fail on iPhone.
   publicAppUrl: String(env.EXPO_PUBLIC_APP_URL || '').trim(),
   supabase: {
-    url: env.EXPO_PUBLIC_SUPABASE_URL || '',
-    anonKey: env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '',
+    url: env.EXPO_PUBLIC_SUPABASE_URL || 'https://vtbdmurblidtdghaotne.supabase.co',
+    anonKey:
+      env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ0YmRtdXJibGlkdGRnaGFvdG5lIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODcwMzc1MTgsImV4cCI6MjEwMjYxMzUxOH0.MBzHtE42GqOTEReIr35QZfTSejrsk6UIdmc1mwIBqwI',
   },
   admin: {
     secretKey: env.EXPO_PUBLIC_ADMIN_SECRET_KEY || 'ADMIN2026',
