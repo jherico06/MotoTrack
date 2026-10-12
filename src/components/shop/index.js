@@ -1,7 +1,9 @@
-export { default as MobileHeader } from './MobileHeader';
-export { default as HeroBanner } from './HeroBanner';
-export { default as CategoryPills } from './CategoryPills';
-export { default as CategoryDropdown } from './CategoryDropdown';
-export { default as FilterChips } from './FilterChips';
-export { default as ProductCard } from './ProductCard';
-export { default as FloatingCartBar } from './FloatingCartBar';
+export { default as MobileHeader } from '../mobile/customer/MobileHeader.jsx';
+export { default as HeroBanner } from './HeroBanner.jsx';
+export { default as CategoryPills } from './CategoryPills.jsx';
+export { default as CategoryDropdown } from './CategoryDropdown.jsx';
+export { default as FilterChips } from './FilterChips.jsx';
+export { default as ProductCard } from './ProductCard.jsx';
+export { default as CompatibilityBadge } from './CompatibilityBadge.jsx';
+export { default as CompatibilityIndicator } from './CompatibilityIndicator.jsx';
+export { default as FloatingCartBar } from './FloatingCartBar.jsx';

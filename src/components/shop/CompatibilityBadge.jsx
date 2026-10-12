@@ -3,7 +3,7 @@
  */
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { COMPAT_STATUS } from '../../services/compatibilityService';
+import { COMPAT_STATUS } from '../../services/products/compatibilityService.js';
 
 export default function CompatibilityBadge({ status, message, style }) {
   if (!status && !message) return null;

@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Platform, Animated } from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
+import BootstrapIcon from './BootstrapIcon.jsx';
 
 /**
  * SegmentedToggle — Smooth sliding segmented control for MotoTrack

@@ -1,9 +1,9 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { BootstrapIcon } from './BootstrapIcon';
-import { useWishlist } from '../../context/WishlistContext';
-import { useCart } from '../../context/CartContext';
-import { useAuth } from '../../context/AuthContext';
+import { BootstrapIcon } from './BootstrapIcon.jsx';
+import { useWishlist } from '../../context/WishlistContext.jsx';
+import { useCart } from '../../context/CartContext.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function BottomNavBar({
   activeTab = 'Home',

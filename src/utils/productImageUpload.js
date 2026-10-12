@@ -2,13 +2,13 @@
  * Upload images to Supabase Storage and return a short public URL.
  * Avoids storing multi-hundred-KB base64 in Postgres (major egress waste).
  */
-import { supabaseManager } from '../services/supabaseClient';
+import { supabaseManager } from '../lib/supabase.js';
 import {
   MAX_IMAGE_BYTES,
   MAX_IMAGE_MB,
   estimateDataUriBytes,
   isImageTooLarge,
-} from './imagePickerHelper';
+} from './imagePickerHelper.js';
 
 const BUCKET = 'product-images';
 

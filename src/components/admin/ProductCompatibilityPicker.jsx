@@ -12,13 +12,17 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { BootstrapIcon } from '../common';
-import { compatibilityService } from '../../services/compatibilityService';
+import { compatibilityService } from '../../services/products/compatibilityService.js';
+import { getThemeTokens } from '../../styles/theme.js';
 
 export default function ProductCompatibilityPicker({
   productId,
   onToast,
   style,
+  isDarkMode = false,
 }) {
+  const t = useMemo(() => getThemeTokens(isDarkMode), [isDarkMode]);
+  const styles = useMemo(() => createStyles(t, isDarkMode), [t, isDarkMode]);
   const [models, setModels] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [loading, setLoading] = useState(true);
@@ -142,7 +146,7 @@ export default function ProductCompatibilityPicker({
   if (loading) {
     return (
       <View style={[styles.wrap, style]}>
-        <ActivityIndicator color="#0C6258" />
+        <ActivityIndicator color={isDarkMode ? t.accentBrand : '#0C6258'} />
       </View>
     );
   }
@@ -160,14 +164,14 @@ export default function ProductCompatibilityPicker({
           value={newBrand}
           onChangeText={setNewBrand}
           placeholder="Brand"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={t.placeholder}
         />
         <TextInput
           style={[styles.addInput, styles.addModel]}
           value={newModel}
           onChangeText={setNewModel}
           placeholder="Model (e.g. Click 125)"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={t.placeholder}
           onSubmitEditing={addModel}
         />
         <TouchableOpacity
@@ -188,7 +192,7 @@ export default function ProductCompatibilityPicker({
         value={search}
         onChangeText={setSearch}
         placeholder="Search brand or model…"
-        placeholderTextColor="#94A3B8"
+        placeholderTextColor={t.placeholder}
       />
       <ScrollView style={styles.list} nestedScrollEnabled>
         {filtered.map((m) => {
@@ -203,7 +207,7 @@ export default function ProductCompatibilityPicker({
               <BootstrapIcon
                 name={on ? 'check-square-fill' : 'square'}
                 size={16}
-                color={on ? '#0C6258' : '#94A3B8'}
+                color={on ? (isDarkMode ? t.accentBrand : '#0C6258') : t.textMuted}
               />
               <Text style={[styles.rowText, on && styles.rowTextOn]}>
                 {m.brand} — {m.model}
@@ -230,76 +234,78 @@ export default function ProductCompatibilityPicker({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 12,
-    marginTop: 12,
-  },
-  title: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
-  sub: { fontSize: 12, color: '#64748B', marginTop: 4, marginBottom: 8 },
-  addForm: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 10,
-    alignItems: 'center',
-  },
-  addInput: {
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: '#FFF',
-    color: '#0F172A',
-    fontSize: 13,
-  },
-  addBrand: { flexGrow: 1, flexBasis: 90, minWidth: 90 },
-  addModel: { flexGrow: 2, flexBasis: 140, minWidth: 120 },
-  addBtn: {
-    backgroundColor: '#0C6258',
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 9,
-    minWidth: 72,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addBtnDisabled: { opacity: 0.7 },
-  addBtnText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
-  search: {
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    backgroundColor: '#FFF',
-    color: '#0F172A',
-    marginBottom: 8,
-  },
-  list: { maxHeight: 220 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-  },
-  rowOn: { backgroundColor: '#E6F8F5' },
-  rowText: { fontSize: 13, color: '#334155', fontWeight: '600' },
-  rowTextOn: { color: '#0C6258' },
-  empty: { fontSize: 12, color: '#94A3B8', padding: 8 },
-  saveBtn: {
-    marginTop: 10,
-    backgroundColor: '#0C6258',
-    borderRadius: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  saveText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
-});
+function createStyles(t, isDark) {
+  return StyleSheet.create({
+    wrap: {
+      backgroundColor: isDark ? t.bgSub : '#F8FAFC',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: t.border,
+      padding: 12,
+      marginTop: 12,
+    },
+    title: { fontSize: 14, fontWeight: '800', color: t.textPrimary },
+    sub: { fontSize: 12, color: t.textMuted, marginTop: 4, marginBottom: 8 },
+    addForm: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 10,
+      alignItems: 'center',
+    },
+    addInput: {
+      borderWidth: 1,
+      borderColor: t.borderInput,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      backgroundColor: isDark ? t.inputBg : '#FFF',
+      color: t.textPrimary,
+      fontSize: 13,
+    },
+    addBrand: { flexGrow: 1, flexBasis: 90, minWidth: 90 },
+    addModel: { flexGrow: 2, flexBasis: 140, minWidth: 120 },
+    addBtn: {
+      backgroundColor: isDark ? '#1F6B52' : '#0C6258',
+      borderRadius: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      minWidth: 72,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addBtnDisabled: { opacity: 0.7 },
+    addBtnText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
+    search: {
+      borderWidth: 1,
+      borderColor: t.borderInput,
+      borderRadius: 8,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      backgroundColor: isDark ? t.inputBg : '#FFF',
+      color: t.textPrimary,
+      marginBottom: 8,
+    },
+    list: { maxHeight: 220 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 8,
+      paddingHorizontal: 8,
+      borderRadius: 8,
+    },
+    rowOn: { backgroundColor: isDark ? t.accentBg : '#E6F8F5' },
+    rowText: { fontSize: 13, color: isDark ? t.textSecondary : '#334155', fontWeight: '600' },
+    rowTextOn: { color: isDark ? t.accentBrand : '#0C6258' },
+    empty: { fontSize: 12, color: t.textMuted, padding: 8 },
+    saveBtn: {
+      marginTop: 10,
+      backgroundColor: isDark ? '#1F6B52' : '#0C6258',
+      borderRadius: 10,
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    saveText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
+  });
+}

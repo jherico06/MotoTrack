@@ -1,2 +1,2 @@
-export { default as CustomizationWorkspace } from './CustomizationWorkspace';
-export { default as AiMotorcycleInstallStudio } from './AiMotorcycleInstallStudio';
+export { default as CustomizationWorkspace } from './CustomizationWorkspace.jsx';
+export { default as AiMotorcycleInstallStudio } from './AiMotorcycleInstallStudio.jsx';

@@ -8,8 +8,8 @@ import {
   StyleSheet,
   TouchableWithoutFeedback,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { CATEGORY_PILLS } from '../../data/motorParts';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { CATEGORY_PILLS } from '../../data/motorParts.js';
 
 const RATING_OPTIONS = [
   { id: 'all', label: 'All Ratings', desc: 'Show all catalog items', icon: 'grid-fill', color: '#1D4533', bgColor: '#ECFDF5', borderColor: '#A7F3D0' },

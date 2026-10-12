@@ -1,668 +1,746 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Platform, TouchableOpacity } from 'react-native';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
+import { View, Text, TouchableOpacity, Platform } from 'react-native';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { aggregateSalesTrend } from '../../services/inventory/dashboardInsightsService.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
+
+function formatPeso(n) {
+  const v = Math.round(Number(n) || 0);
+  return `₱${v.toLocaleString()}`;
+}
+
+function computeVisibleXLabels(points, gW, isDesktop) {
+  const total = points.length;
+  if (total === 0) return new Set();
+
+  // On desktop with 16 or fewer points (such as the default 14-day daily telemetry)
+  // or when each point has ample width (>= 40px), show all labels without skipping any dates
+  const stepW = gW / Math.max(1, total - 1);
+  if ((isDesktop && total <= 16) || stepW >= 40) {
+    return new Set(points.map((_, i) => i));
+  }
+
+  const visible = new Set();
+  const placedX = [];
+  const minDistancePx = 36;
+
+  // 1. Always prioritize active points with revenue or order activity (e.g. peak points like Oct 2)
+  points.forEach((p, i) => {
+    if (p.revenue > 0 || p.ordersCount > 0) {
+      visible.add(i);
+      placedX.push(p.x);
+    }
+  });
+
+  // 2. Always try to include start (index 0) and end (index total - 1)
+  [0, total - 1].forEach((idx) => {
+    const px = points[idx].x;
+    const collides = placedX.some((x) => Math.abs(x - px) < minDistancePx);
+    if (!collides) {
+      visible.add(idx);
+      placedX.push(px);
+    }
+  });
+
+  // 3. Stride across the remaining points to evenly distribute labels without overlapping
+  const stride = Math.max(2, Math.ceil(minDistancePx / Math.max(1, stepW)));
+  for (let i = 0; i < total; i += stride) {
+    const px = points[i].x;
+    const collides = placedX.some((x) => Math.abs(x - px) < minDistancePx);
+    if (!collides) {
+      visible.add(i);
+      placedX.push(px);
+    }
+  }
+
+  return visible;
+}
+
+function computeMonotoneCubicSpline(pts, padding, gH, baseline) {
+  const n = pts.length;
+  if (n === 0) return { linePath: '', areaPath: '' };
+  if (n === 1) {
+    const l = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+    return { linePath: l, areaPath: '' };
+  }
+
+  const dxs = [];
+  const dys = [];
+  const slopes = [];
+  for (let i = 0; i < n - 1; i++) {
+    const dx = pts[i + 1].x - pts[i].x;
+    const dy = pts[i + 1].y - pts[i].y;
+    dxs.push(dx);
+    dys.push(dy);
+    slopes.push(dx !== 0 ? dy / dx : 0);
+  }
+
+  const m = new Array(n);
+  m[0] = slopes[0];
+  m[n - 1] = slopes[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    if (slopes[i - 1] * slopes[i] <= 0) {
+      m[i] = 0;
+    } else {
+      m[i] = (slopes[i - 1] + slopes[i]) / 2;
+    }
+  }
+
+  for (let i = 0; i < n - 1; i++) {
+    if (Math.abs(slopes[i]) < 1e-6) {
+      m[i] = 0;
+      m[i + 1] = 0;
+    } else {
+      const alpha = m[i] / slopes[i];
+      const beta = m[i + 1] / slopes[i];
+      const dist = alpha * alpha + beta * beta;
+      if (dist > 9) {
+        const tau = 3 / Math.sqrt(dist);
+        m[i] = tau * alpha * slopes[i];
+        m[i + 1] = tau * beta * slopes[i];
+      }
+    }
+  }
+
+  let lPath = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const step = dxs[i] / 3;
+
+    const cp1x = p1.x + step;
+    let cp1y = p1.y + m[i] * step;
+    const cp2x = p2.x - step;
+    let cp2y = p2.y - m[i + 1] * step;
+
+    // Strictly clamp control points between padding.top and baseline
+    cp1y = Math.min(baseline, Math.max(padding.top, cp1y));
+    cp2y = Math.min(baseline, Math.max(padding.top, cp2y));
+
+    lPath += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+  }
+
+  const aPath = `${lPath} L ${pts[n - 1].x.toFixed(1)},${baseline.toFixed(1)} L ${pts[0].x.toFixed(1)},${baseline.toFixed(1)} Z`;
+  return { linePath: lPath, areaPath: aPath };
+}
 
 /**
- * RevenueTrendChart — Unified with the Sales Forecast chart design system.
- * Features:
- * - Smooth area chart with #1D4533 Road Teal gradient
- * - Weekly average dashed benchmark line
- * - Interactive data point nodes with hover/click crosshair
- * - Floating tooltip showing exact currency value & performance vs. average
- * - Period selector tabs [4W, 12W, 24W]
- * - Legend with quick telemetry chips (Total, Average, Peak)
+ * RevenueTrendChart — Unified modern revenue trend chart.
+ * Matches the Dashboard Revenue Trend design system with Daily, Weekly, and Monthly views.
  */
 export default function RevenueTrendChart({
-  data = [],
-  period = '12W',
-  onPeriodChange,
-  isDark = false,
+  orders = [],
+  data,
+  granularity,
+  onGranularityChange,
+  isDark,
   isDesktop = true,
   title = 'Revenue Trend',
-  subtitle = 'Weekly revenue trends across online storefront & in-store POS channels',
+  subtitle,
+  style,
 }) {
-  const [hoveredIdx, setHoveredIdx] = useState(null);
+  const themeContext = useTheme?.();
+  const activeIsDark =
+    isDark !== undefined && isDark !== null
+      ? Boolean(isDark)
+      : Boolean(themeContext?.isDarkMode);
 
-  // Theme tokens
-  const colors = useMemo(() => {
-    if (isDark) {
-      return {
-        cardBg: '#161820',
-        border: '#272930',
-        textPrimary: '#F8FAFC',
-        textMuted: '#94A3B8',
-        gridLine: '#334155',
-        primary: '#1D4533',
-        primarySoft: 'rgba(29, 69, 51, 0.45)',
-        tabBg: '#1E293B',
-        tabBorder: '#334155',
-        chipBg: '#1E293B',
-        tooltipBg: '#1E293B',
-        tooltipBorder: '#334155',
-      };
+  const [internalGranularity, setInternalGranularity] = useState('daily');
+  const activeGranularity = granularity || internalGranularity;
+
+  const handleGranularityChange = (g) => {
+    if (typeof onGranularityChange === 'function') {
+      onGranularityChange(g);
     }
-    return {
-      cardBg: '#FFFFFF',
-      border: '#E2E8F0',
-      textPrimary: '#0F172A',
-      textMuted: '#64748B',
-      gridLine: '#E2E8F0',
-      primary: '#1D4533',
-      primarySoft: 'rgba(29, 69, 51, 0.18)',
-      tabBg: '#F1F5F9',
-      tabBorder: '#E2E8F0',
-      chipBg: '#F8FAFC',
-      tooltipBg: '#FFFFFF',
-      tooltipBorder: '#CBD5E1',
-    };
-  }, [isDark]);
+    setInternalGranularity(g);
+  };
 
-  // Compute metrics and layout
+  const chartData = useMemo(() => {
+    if (Array.isArray(orders) && orders.length > 0) {
+      return aggregateSalesTrend(orders, activeGranularity);
+    }
+    if (Array.isArray(data) && data.length > 0) {
+      return data;
+    }
+    return aggregateSalesTrend([], activeGranularity);
+  }, [orders, data, activeGranularity]);
+
+  const [hoveredIdx, setHoveredIdx] = useState(null);
+  const containerRef = useRef(null);
+  const [measuredWidth, setMeasuredWidth] = useState(0);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const update = () => {
+      if (containerRef.current) {
+        const w = containerRef.current.clientWidth || containerRef.current.offsetWidth;
+        if (w > 100) setMeasuredWidth(w);
+      }
+    };
+    update();
+    let ro;
+    if (typeof ResizeObserver !== 'undefined' && containerRef.current) {
+      ro = new ResizeObserver((entries) => {
+        for (const entry of entries) {
+          const w = entry.contentRect.width;
+          if (w > 100) setMeasuredWidth(w);
+        }
+      });
+      ro.observe(containerRef.current);
+    }
+    window.addEventListener('resize', update);
+    return () => {
+      ro?.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
+  const chartWidth = measuredWidth > 150 ? measuredWidth : (isDesktop ? 860 : 420);
+  const chartHeight = isDesktop ? 220 : 190;
+  const padding = { top: 22, right: 28, bottom: 32, left: isDesktop ? 62 : 48 };
+
   const {
-    chartWidth,
-    chartHeight,
-    pad,
     points,
-    maxRev,
-    niceMax,
+    roundedMax,
     yTicks,
     totalRev,
     avgRev,
     peakRev,
     peakLabel,
+    totalOrders,
     avgY,
+    baseline,
     linePath,
     areaPath,
+    gW,
+    gH,
+    hasData,
   } = useMemo(() => {
-    const rawList = Array.isArray(data) && data.length > 0 ? data : [];
+    const rawList = Array.isArray(chartData) ? chartData : [];
     const len = Math.max(rawList.length, 2);
-
-    // Calculate dynamic dimensions
-    const cWidth = isDesktop ? Math.max(760, len * 58) : Math.max(560, len * 48);
-    const cHeight = isDesktop ? 320 : 280;
-    const padding = { top: 24, right: 28, bottom: 38, left: 62 };
-
-    const gW = cWidth - padding.left - padding.right;
-    const gH = cHeight - padding.top - padding.bottom;
+    const w = Math.max(10, chartWidth - padding.left - padding.right);
+    const h = Math.max(10, chartHeight - padding.top - padding.bottom);
+    const bLine = padding.top + h;
 
     const revenues = rawList.map((d) => Number(d.revenue) || 0);
     const total = revenues.reduce((acc, v) => acc + v, 0);
     const avg = revenues.length > 0 ? total / revenues.length : 0;
     const max = Math.max(...revenues, 100);
+    const ordersCountSum = rawList.reduce((acc, d) => acc + (Number(d.ordersCount) || 0), 0);
 
-    // Nice round tick numbers for Y-axis (e.g. 500, 1000, 1500, 2000)
     const magnitude = Math.pow(10, Math.floor(Math.log10(max)));
-    const ratio = max / magnitude;
-    let factor = 1.2;
-    if (ratio <= 1.2) factor = 1.5;
-    else if (ratio <= 2) factor = 2.5;
-    else if (ratio <= 5) factor = 6;
-    else factor = 12;
-    const roundedMax = Math.ceil((max * 1.1) / (magnitude / 2)) * (magnitude / 2) || 1000;
+    const rMax = Math.ceil((max * 1.15) / (magnitude / 2)) * (magnitude / 2) || 1000;
+    const ticks = [0, 0.33, 0.66, 1].map((f) => Math.round(rMax * f));
 
-    // 5 ticks: 0%, 25%, 50%, 75%, 100%
-    const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(roundedMax * f));
-
-    // Peak calculation
-    let peakVal = 0;
-    let peakName = '—';
+    let pVal = 0;
+    let pName = '—';
     rawList.forEach((d) => {
       const rev = Number(d.revenue) || 0;
-      if (rev > peakVal) {
-        peakVal = rev;
-        peakName = d.label || '';
+      if (rev > pVal) {
+        pVal = rev;
+        pName = d.label || '';
       }
     });
 
-    // Map each data point to X, Y
     const pts = rawList.map((d, i) => {
-      const x = padding.left + (i / Math.max(1, len - 1)) * gW;
+      const x = padding.left + (i / Math.max(1, len - 1)) * w;
       const rev = Number(d.revenue) || 0;
-      const y = padding.top + gH - (rev / roundedMax) * gH;
+      const y = padding.top + h - (rev / rMax) * h;
       return {
         index: i,
-        label: d.label || `W${i + 1}`,
+        label: d.label || '',
+        fullLabel: d.fullLabel || d.label || '',
         revenue: rev,
+        ordersCount: Number(d.ordersCount) || 0,
         x,
         y,
       };
     });
 
-    // Average line Y coordinate
-    const averageY = padding.top + gH - (avg / roundedMax) * gH;
-
-    // Build smooth Bezier spline line and area paths
-    let lPath = '';
-    let aPath = '';
-    if (pts.length > 0) {
-      lPath = `M ${pts[0].x.toFixed(1)},${pts[0].y.toFixed(1)}`;
-      for (let i = 0; i < pts.length - 1; i++) {
-        const p0 = pts[i === 0 ? 0 : i - 1];
-        const p1 = pts[i];
-        const p2 = pts[i + 1];
-        const p3 = pts[i + 2 >= pts.length ? pts.length - 1 : i + 2];
-
-        const cp1x = p1.x + (p2.x - p0.x) / 6;
-        const cp1y = p1.y + (p2.y - p0.y) / 6;
-        const cp2x = p2.x - (p3.x - p1.x) / 6;
-        const cp2y = p2.y - (p3.y - p1.y) / 6;
-
-        lPath += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-      }
-      const baseline = padding.top + gH;
-      aPath = `${lPath} L ${pts[pts.length - 1].x.toFixed(1)},${baseline.toFixed(1)} L ${pts[0].x.toFixed(1)},${baseline.toFixed(1)} Z`;
-    }
+    const averageY = padding.top + h - (avg / rMax) * h;
+    const paths = computeMonotoneCubicSpline(pts, padding, h, bLine);
 
     return {
-      chartWidth: cWidth,
-      chartHeight: cHeight,
-      pad: padding,
       points: pts,
-      maxRev: max,
-      niceMax: roundedMax,
+      roundedMax: rMax,
       yTicks: ticks,
       totalRev: total,
       avgRev: avg,
-      peakRev: peakVal,
-      peakLabel: peakName,
+      peakRev: pVal,
+      peakLabel: pName,
+      totalOrders: ordersCountSum,
       avgY: averageY,
-      linePath: lPath,
-      areaPath: aPath,
+      baseline: bLine,
+      linePath: paths.linePath,
+      areaPath: paths.areaPath,
+      gW: w,
+      gH: h,
+      hasData: revenues.some((v) => v > 0),
     };
-  }, [data, isDesktop]);
+  }, [chartData, chartWidth, chartHeight]);
+
+  const visibleXLabels = useMemo(() => {
+    return computeVisibleXLabels(points, gW, isDesktop);
+  }, [points, gW, isDesktop]);
 
   const activePoint = hoveredIdx != null && points[hoveredIdx] ? points[hoveredIdx] : null;
 
-  // Difference vs average
-  const activeDiff = activePoint ? activePoint.revenue - avgRev : 0;
-  const activeDiffPct =
-    avgRev > 0 ? Math.round((Math.abs(activeDiff) / avgRev) * 100) : 0;
+  const resolvedSubtitle =
+    subtitle ||
+    (activeGranularity === 'daily'
+      ? 'Daily telemetry (last 14 days)'
+      : activeGranularity === 'weekly'
+      ? 'Weekly telemetry (last 8 weeks)'
+      : 'Monthly telemetry (last 6 months)');
+
+  const periodSelector = (
+    <View
+      style={{
+        flexDirection: 'row',
+        backgroundColor: activeIsDark ? '#151C19' : '#F1F5F9',
+        borderRadius: 9,
+        padding: 3,
+        borderWidth: 1,
+        borderColor: activeIsDark ? '#26332E' : '#E2E8F0',
+        gap: 3,
+      }}
+    >
+      {[
+        { id: 'daily', label: 'Daily' },
+        { id: 'weekly', label: 'Weekly' },
+        { id: 'monthly', label: 'Monthly' },
+      ].map((tab) => {
+        const active = activeGranularity === tab.id;
+        return (
+          <TouchableOpacity
+            key={tab.id}
+            onPress={() => handleGranularityChange(tab.id)}
+            activeOpacity={0.8}
+            style={{
+              paddingHorizontal: 11,
+              paddingVertical: 5,
+              borderRadius: 7,
+              backgroundColor: active
+                ? (activeIsDark ? '#10B981' : '#1D4533')
+                : 'transparent',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 11.5,
+                fontWeight: active ? '700' : '600',
+                color: active
+                  ? '#FFFFFF'
+                  : (activeIsDark ? '#AAB4B0' : '#64748B'),
+              }}
+            >
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
 
   return (
     <View
-      style={{
-        backgroundColor: colors.cardBg,
-        borderRadius: 16,
-        borderWidth: 1.5,
-        borderColor: colors.border,
-        padding: 22,
-        marginBottom: 24,
-        shadowColor: isDark ? '#000000' : 'rgba(15, 23, 42, 0.08)',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
-      }}
+      ref={containerRef}
+      style={[
+        {
+          backgroundColor: activeIsDark ? '#0F1412' : '#FFFFFF',
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: activeIsDark ? '#26332E' : '#E2E8F0',
+          padding: 20,
+          marginBottom: 20,
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: activeIsDark ? 0.25 : 0.03,
+          shadowRadius: 4,
+          elevation: 1,
+        },
+        style,
+      ]}
     >
-      {/* Card Header Row: Title & Period Tabs */}
-      <View
-        style={{
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-          gap: 12,
-          flexWrap: 'wrap',
-          marginBottom: 14,
-        }}
-      >
-        <View style={{ flex: 1, minWidth: 240 }}>
-          <Text
-            style={{
-              fontSize: 16,
-              fontWeight: '800',
-              color: colors.textPrimary,
-              letterSpacing: -0.2,
-            }}
-          >
-            {title}
-          </Text>
-          <Text
-            style={{
-              fontSize: 12,
-              color: colors.textMuted,
-              marginTop: 3,
-              lineHeight: 17,
-            }}
-          >
-            {subtitle}
-          </Text>
-        </View>
-
-        {/* Period Tabs: 4W / 12W / 24W */}
-        {onPeriodChange && data?.length > 0 && (
-          <View
-            style={{
-              flexDirection: 'row',
-              backgroundColor: colors.tabBg,
-              borderRadius: 10,
-              padding: 3,
-              borderWidth: 1,
-              borderColor: colors.tabBorder,
-              gap: 4,
-            }}
-          >
-            {['4W', '12W', '24W'].map((p) => {
-              const active = period === p;
-              return (
-                <TouchableOpacity
-                  key={p}
-                  style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 6,
-                    borderRadius: 8,
-                    backgroundColor: active ? colors.primary : 'transparent',
-                  }}
-                  onPress={() => onPeriodChange(p)}
-                  activeOpacity={0.85}
-                >
-                  <Text
-                    style={{
-                      fontSize: 11.5,
-                      fontWeight: '700',
-                      color: active ? '#FFFFFF' : colors.textMuted,
-                    }}
-                  >
-                    {p}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-      </View>
-
-      {(!Array.isArray(data) || data.length === 0 || data.every((d) => !(Number(d.revenue) > 0))) && (
-        <View style={{ paddingVertical: 48, alignItems: 'center' }}>
-          <Text style={{ fontSize: 14, color: colors.textMuted, fontStyle: 'italic' }}>
-            No historical revenue data available.
-          </Text>
-        </View>
-      )}
-
-      {Array.isArray(data) && data.some((d) => Number(d.revenue) > 0) && (
-      <>
-      {/* Legend & Telemetry Bar */}
+      {/* Chart Header */}
       <View
         style={{
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
+          marginBottom: 14,
           flexWrap: 'wrap',
           gap: 12,
-          paddingVertical: 10,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-          marginBottom: 16,
         }}
       >
-        {/* Legend */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View
-              style={{
-                width: 16,
-                height: 3,
-                borderRadius: 2,
-                backgroundColor: colors.primary,
-              }}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 8,
+              backgroundColor: activeIsDark ? 'rgba(16, 185, 129, 0.16)' : 'rgba(29, 69, 51, 0.08)',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <BootstrapIcon
+              name="graph-up"
+              size={15}
+              color={activeIsDark ? '#4ADE80' : '#1D4533'}
             />
-            <Text style={{ fontSize: 11.5, fontWeight: '600', color: colors.textMuted }}>
-              Actual Revenue
-            </Text>
           </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View
+          <View>
+            <Text
               style={{
-                width: 16,
-                height: 0,
-                borderTopWidth: 2,
-                borderTopColor: colors.textMuted,
-                borderStyle: 'dashed',
+                fontSize: 14,
+                fontWeight: '800',
+                color: activeIsDark ? '#F5F7F6' : '#0F172A',
+                letterSpacing: 0.2,
               }}
-            />
-            <Text style={{ fontSize: 11.5, fontWeight: '600', color: colors.textMuted }}>
-              Weekly Average (₱{Math.round(avgRev).toLocaleString()})
+            >
+              {title}
+            </Text>
+            <Text style={{ fontSize: 11.5, color: activeIsDark ? '#AAB4B0' : '#64748B', marginTop: 1 }}>
+              {resolvedSubtitle}
             </Text>
           </View>
         </View>
 
-        {/* Quick Telemetry Summary Pills */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: colors.chipBg,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: colors.border,
-              gap: 5,
-            }}
-          >
-            <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '500' }}>
-              Period Total:
-            </Text>
-            <Text style={{ fontSize: 11.5, fontWeight: '800', color: colors.textPrimary }}>
-              ₱{totalRev.toLocaleString()}
-            </Text>
-          </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {avgRev > 0 && (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: activeIsDark ? '#151C19' : '#F8FAFC',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 7,
+                borderWidth: 1,
+                borderColor: activeIsDark ? '#26332E' : '#E2E8F0',
+              }}
+            >
+              <View
+                style={{
+                  width: 12,
+                  height: 2,
+                  borderTopWidth: 2,
+                  borderTopColor: activeIsDark ? '#4ADE80' : '#1D4533',
+                  borderStyle: 'dashed',
+                }}
+              />
+              <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#AAB4B0' : '#64748B' }}>
+                Avg: {formatPeso(avgRev)}/{activeGranularity === 'daily' ? 'day' : activeGranularity === 'weekly' ? 'wk' : 'mo'}
+              </Text>
+            </View>
+          )}
 
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: colors.chipBg,
-              paddingHorizontal: 10,
-              paddingVertical: 4,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: colors.border,
-              gap: 5,
-            }}
-          >
-            <Text style={{ fontSize: 11, color: colors.textMuted, fontWeight: '500' }}>
-              Peak:
-            </Text>
-            <Text style={{ fontSize: 11.5, fontWeight: '800', color: colors.primary }}>
-              ₱{peakRev.toLocaleString()}{peakLabel ? ` (${peakLabel})` : ''}
-            </Text>
-          </View>
+          {periodSelector}
         </View>
       </View>
 
-      {/* SVG Chart Container with ScrollView for responsiveness */}
-      <View style={{ width: '100%', position: 'relative' }}>
-        {/* Floating Tooltip */}
-        {activePoint && Platform.OS === 'web' && (
+      {/* Main Chart Body */}
+      {!hasData ? (
+        <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
           <View
-            pointerEvents="none"
             style={{
-              position: 'absolute',
-              left: Math.min(
-                Math.max(activePoint.x - 70, 8),
-                Math.max(chartWidth - 170, 8)
-              ),
-              top: Math.max(activePoint.y - 82, 6),
-              zIndex: 30,
-              backgroundColor: colors.tooltipBg,
-              borderRadius: 10,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              minWidth: 155,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: activeIsDark ? '#151C19' : '#F8FAFC',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 10,
               borderWidth: 1,
-              borderColor: colors.tooltipBorder,
-              boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+              borderColor: activeIsDark ? '#26332E' : '#E2E8F0',
             }}
           >
-            <Text
-              style={{
-                color: colors.textPrimary,
-                fontSize: 12.5,
-                fontWeight: '800',
-                marginBottom: 4,
-              }}
-            >
-              Week {activePoint.index + 1} ({activePoint.label})
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: colors.primary,
-                }}
-              />
-              <Text style={{ fontSize: 12, fontWeight: '500', color: colors.textMuted }}>
-                Revenue:{' '}
-                <Text style={{ fontWeight: '800', color: colors.primary }}>
-                  ₱{activePoint.revenue.toLocaleString()}
-                </Text>
-              </Text>
-            </View>
-            <Text
-              style={{
-                fontSize: 10.5,
-                fontWeight: '600',
-                color:
-                  activeDiff > 0
-                    ? '#1D4533'
-                    : activeDiff < 0
-                    ? '#D97706'
-                    : colors.textMuted,
-              }}
-            >
-              {activeDiff > 0
-                ? `▲ +₱${Math.round(activeDiff).toLocaleString()} (+${activeDiffPct}%) vs avg`
-                : activeDiff < 0
-                ? `▼ -₱${Math.round(Math.abs(activeDiff)).toLocaleString()} (-${activeDiffPct}%) vs avg`
-                : 'Exactly at weekly average'}
-            </Text>
+            <BootstrapIcon name="bar-chart" size={20} color={activeIsDark ? '#AAB4B0' : '#64748B'} />
           </View>
-        )}
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={{ width: '100%' }}
-          contentContainerStyle={{ minWidth: '100%' }}
-        >
+          <Text style={{ fontSize: 13, fontWeight: '700', color: activeIsDark ? '#F5F7F6' : '#0F172A' }}>
+            No sales recorded for this period
+          </Text>
+          <Text style={{ fontSize: 11.5, color: activeIsDark ? '#AAB4B0' : '#64748B', marginTop: 3 }}>
+            Order transactions within this date range will appear here automatically.
+          </Text>
+        </View>
+      ) : (
+        <View style={{ width: '100%', height: chartHeight, position: 'relative' }}>
           {Platform.OS === 'web' ? (
-            <div style={{ width: '100%', minWidth: chartWidth, height: chartHeight }}>
-              <svg
-                width="100%"
-                height={chartHeight}
-                viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                preserveAspectRatio="none"
-                style={{ display: 'block' }}
-                onMouseLeave={() => setHoveredIdx(null)}
-              >
-                <defs>
-                  <linearGradient id="revAreaGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#1D4533" stopOpacity={isDark ? 0.45 : 0.3} />
-                    <stop offset="100%" stopColor="#1D4533" stopOpacity={0.0} />
-                  </linearGradient>
-                </defs>
-
-                {/* Horizontal Gridlines and Y-axis Currency Labels */}
-                {yTicks.map((tick, i) => {
-                  const y = pad.top + (chartHeight - pad.top - pad.bottom) * (1 - tick / niceMax);
-                  return (
-                    <g key={`yt-${i}`}>
-                      <line
-                        x1={pad.left}
-                        y1={y}
-                        x2={chartWidth - pad.right}
-                        y2={y}
-                        stroke={colors.gridLine}
-                        strokeWidth="1"
-                        strokeDasharray={tick > 0 ? '4 4' : undefined}
-                      />
-                      <text
-                        x={pad.left - 10}
-                        y={y + 4}
-                        textAnchor="end"
-                        fontSize="11"
-                        fill={colors.textMuted}
-                        fontFamily="'Plus Jakarta Sans', sans-serif"
-                        fontWeight="500"
-                      >
-                        ₱{tick.toLocaleString()}
-                      </text>
-                    </g>
-                  );
-                })}
-
-                {/* Area Gradient Fill */}
-                {areaPath ? <path d={areaPath} fill="url(#revAreaGradient)" /> : null}
-
-                {/* Dashed Average Benchmark Line */}
-                {avgY >= pad.top && avgY <= chartHeight - pad.bottom && (
-                  <line
-                    x1={pad.left}
-                    y1={avgY}
-                    x2={chartWidth - pad.right}
-                    y2={avgY}
-                    stroke={colors.textMuted}
-                    strokeWidth="1.5"
-                    strokeDasharray="5 4"
-                    opacity="0.75"
+            <svg
+              width="100%"
+              height={chartHeight}
+              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+              style={{ display: 'block', overflow: 'visible', userSelect: 'none' }}
+            >
+              <defs>
+                <linearGradient id="reportsRevTrendGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop
+                    offset="0%"
+                    stopColor={activeIsDark ? '#10B981' : '#1D4533'}
+                    stopOpacity={activeIsDark ? 0.35 : 0.22}
                   />
-                )}
-
-                {/* Solid Spline Curve Line */}
-                {linePath ? (
-                  <path
-                    d={linePath}
-                    fill="none"
-                    stroke={colors.primary}
-                    strokeWidth="2.75"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
+                  <stop
+                    offset="100%"
+                    stopColor={activeIsDark ? '#10B981' : '#1D4533'}
+                    stopOpacity={0.0}
                   />
-                ) : null}
+                </linearGradient>
+              </defs>
 
-                {/* Active Hover Crosshair Vertical Line */}
-                {activePoint && (
-                  <line
-                    x1={activePoint.x}
-                    y1={pad.top}
-                    x2={activePoint.x}
-                    y2={chartHeight - pad.bottom}
-                    stroke={colors.primary}
-                    strokeWidth="1.5"
-                    strokeDasharray="3 3"
-                    opacity="0.65"
-                  />
-                )}
+              {/* Horizontal Gridlines & Y-Axis Labels */}
+              {yTicks.map((val, idx) => {
+                const yPos = padding.top + gH - (val / roundedMax) * gH;
+                return (
+                  <g key={`ytick-${idx}`}>
+                    <line
+                      x1={padding.left}
+                      y1={yPos}
+                      x2={chartWidth - padding.right}
+                      y2={yPos}
+                      stroke={activeIsDark ? 'rgba(255, 255, 255, 0.06)' : '#E2E8F0'}
+                      strokeWidth="1"
+                      strokeDasharray={idx === 0 ? undefined : '3 3'}
+                    />
+                    <text
+                      x={padding.left - 8}
+                      y={yPos + 3.5}
+                      textAnchor="end"
+                      fontSize="10"
+                      fontWeight="600"
+                      fill={activeIsDark ? '#AAB4B0' : '#64748B'}
+                      fontFamily="inherit"
+                    >
+                      ₱{val >= 1000 ? `${(val / 1000).toFixed(val % 1000 === 0 ? 0 : 1)}k` : val}
+                    </text>
+                  </g>
+                );
+              })}
 
-                {/* Data Points and X-Axis Labels */}
-                {points.map((p, idx) => {
-                  const isHovered = hoveredIdx === idx;
-                  return (
-                    <g key={`pt-${idx}`}>
-                      {/* Active Point Halo Ring */}
-                      {isHovered && (
-                        <circle
-                          cx={p.x}
-                          cy={p.y}
-                          r="12"
-                          fill={colors.primary}
-                          opacity="0.18"
-                        />
-                      )}
+              {/* Average Benchmark Dashed Line */}
+              {avgRev > 0 && avgY >= padding.top && avgY <= baseline && (
+                <line
+                  x1={padding.left}
+                  y1={avgY}
+                  x2={chartWidth - padding.right}
+                  y2={avgY}
+                  stroke={activeIsDark ? '#34D399' : '#1D4533'}
+                  strokeWidth="1.2"
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.7}
+                />
+              )}
 
-                      {/* Point Circle */}
-                      <circle
-                        cx={p.x}
-                        cy={p.y}
-                        r={isHovered ? 6 : 4.5}
-                        fill={colors.primary}
-                        stroke={colors.cardBg}
-                        strokeWidth="2.5"
-                        style={{ cursor: 'pointer' }}
-                        onMouseEnter={() => setHoveredIdx(idx)}
-                        onClick={() => setHoveredIdx(idx)}
-                      />
+              {/* Area Fill */}
+              {areaPath ? <path d={areaPath} fill="url(#reportsRevTrendGrad)" /> : null}
 
-                      {/* X-Axis Week Label */}
+              {/* Spline Line */}
+              {linePath ? (
+                <path
+                  d={linePath}
+                  fill="none"
+                  stroke={activeIsDark ? '#34D399' : '#1D4533'}
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ) : null}
+
+              {/* Crosshair Line */}
+              {activePoint ? (
+                <line
+                  x1={activePoint.x}
+                  y1={padding.top}
+                  x2={activePoint.x}
+                  y2={baseline}
+                  stroke={activeIsDark ? '#34D399' : '#1D4533'}
+                  strokeWidth="1.2"
+                  strokeDasharray="3 3"
+                  strokeOpacity={0.8}
+                />
+              ) : null}
+
+              {/* Interactive Data Point Nodes & Invisible Targets */}
+              {points.map((p, i) => {
+                const isHovered = hoveredIdx === i;
+                const stepW = gW / Math.max(1, points.length - 1);
+                const targetX = Math.max(0, p.x - stepW / 2);
+
+                return (
+                  <g key={`pt-${i}`}>
+                    {/* Circle */}
+                    <circle
+                      cx={p.x}
+                      cy={p.y}
+                      r={isHovered ? 6 : p.revenue > 0 ? 3.5 : 2}
+                      fill={isHovered ? (activeIsDark ? '#34D399' : '#1D4533') : activeIsDark ? '#0F1412' : '#FFFFFF'}
+                      stroke={activeIsDark ? '#34D399' : '#1D4533'}
+                      strokeWidth={isHovered ? 2.5 : 2}
+                      style={{ transition: 'all 0.15s ease' }}
+                    />
+
+                    {/* X-Axis Date Label */}
+                    {(visibleXLabels.has(i) || isHovered) ? (
                       <text
                         x={p.x}
-                        y={chartHeight - 12}
+                        y={baseline + 18}
                         textAnchor="middle"
-                        fontSize="11"
-                        fill={isHovered ? colors.primary : colors.textMuted}
-                        fontWeight={isHovered ? '800' : '600'}
-                        fontFamily="'Plus Jakarta Sans', sans-serif"
+                        fontSize="10"
+                        fontWeight={isHovered ? '700' : '600'}
+                        fill={isHovered ? (activeIsDark ? '#F5F7F6' : '#0F172A') : (activeIsDark ? '#AAB4B0' : '#64748B')}
+                        fontFamily="inherit"
                       >
                         {p.label}
                       </text>
-                    </g>
-                  );
-                })}
+                    ) : null}
 
-                {/* Invisible Hover Rectangles spanning each column for effortless hover */}
-                {points.map((p, idx) => {
-                  const colW =
-                    (chartWidth - pad.left - pad.right) / Math.max(1, points.length - 1);
-                  const xStart = idx === 0 ? pad.left : p.x - colW / 2;
-                  const rectW =
-                    idx === 0 || idx === points.length - 1 ? colW / 2 : colW;
-                  return (
+                    {/* Invisible Wide Capture Target */}
                     <rect
-                      key={`hit-${idx}`}
-                      x={xStart}
-                      y={pad.top}
-                      width={rectW}
-                      height={chartHeight - pad.top - pad.bottom}
+                      x={targetX}
+                      y={padding.top}
+                      width={stepW}
+                      height={gH + 24}
                       fill="transparent"
                       style={{ cursor: 'pointer' }}
-                      onMouseEnter={() => setHoveredIdx(idx)}
-                      onClick={() => setHoveredIdx(idx)}
+                      onMouseEnter={() => setHoveredIdx(i)}
+                      onMouseLeave={() => setHoveredIdx(null)}
+                      onClick={() => setHoveredIdx(hoveredIdx === i ? null : i)}
                     />
-                  );
-                })}
-              </svg>
-            </div>
-          ) : (
-            /* Native Fallback View */
-            <View
-              style={{
-                width: chartWidth,
-                height: chartHeight,
-                flexDirection: 'row',
-                alignItems: 'flex-end',
-                paddingHorizontal: 8,
-                paddingBottom: 28,
-                gap: 6,
-              }}
-            >
-              {points.map((p, idx) => {
-                const barH = Math.max(8, (p.revenue / niceMax) * (chartHeight - 50));
-                return (
-                  <View
-                    key={idx}
-                    style={{ flex: 1, alignItems: 'center', minWidth: 24 }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 9,
-                        color: colors.textMuted,
-                        marginBottom: 4,
-                        fontWeight: '700',
-                      }}
-                    >
-                      ₱{Math.round(p.revenue / 1000)}k
-                    </Text>
-                    <View
-                      style={{
-                        width: '70%',
-                        height: barH,
-                        borderRadius: 6,
-                        backgroundColor: colors.primary,
-                      }}
-                    />
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        color: colors.textMuted,
-                        marginTop: 6,
-                        fontWeight: '600',
-                      }}
-                    >
-                      {p.label}
-                    </Text>
-                  </View>
+                  </g>
                 );
               })}
+            </svg>
+          ) : (
+            <View style={{ height: 6, backgroundColor: activeIsDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0', borderRadius: 3, overflow: 'hidden' }}>
+              <View
+                style={{
+                  height: '100%',
+                  width: hasData ? '70%' : '10%',
+                  backgroundColor: activeIsDark ? '#34D399' : '#1D4533',
+                  borderRadius: 3,
+                }}
+              />
             </View>
           )}
-        </ScrollView>
-      </View>
-      </>
+
+          {/* Floating Tooltip */}
+          {activePoint ? (
+            <View
+              pointerEvents="none"
+              style={{
+                position: 'absolute',
+                top: Math.max(0, activePoint.y - 70),
+                left: Math.min(
+                  Math.max(10, activePoint.x - 70),
+                  Math.max(10, chartWidth - 170)
+                ),
+                backgroundColor: activeIsDark ? '#151C19' : '#0F172A',
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 8,
+                shadowColor: '#000000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.35,
+                shadowRadius: 8,
+                elevation: 6,
+                borderWidth: 1,
+                borderColor: activeIsDark ? '#26332E' : 'rgba(255,255,255,0.1)',
+                zIndex: 99,
+                minWidth: 140,
+              }}
+            >
+              <Text style={{ fontSize: 10, fontWeight: '600', color: '#94A3B8' }}>
+                {activePoint.fullLabel}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: '800',
+                  color: '#FFFFFF',
+                  marginTop: 2,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {formatPeso(activePoint.revenue)}
+              </Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4, gap: 8 }}>
+                <Text style={{ fontSize: 10, color: '#CBD5E1' }}>
+                  {activePoint.ordersCount} order{activePoint.ordersCount === 1 ? '' : 's'}
+                </Text>
+                {avgRev > 0 && activePoint.revenue > 0 ? (
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      fontWeight: '700',
+                      color: activePoint.revenue >= avgRev ? '#4ADE80' : '#F87171',
+                    }}
+                  >
+                    {activePoint.revenue >= avgRev ? '↑' : '↓'}{' '}
+                    {Math.round((Math.abs(activePoint.revenue - avgRev) / avgRev) * 100)}% vs avg
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+        </View>
       )}
+
+      {/* Telemetry Summary Bar */}
+      <View
+        style={{
+          flexDirection: 'row',
+          flexWrap: 'wrap',
+          gap: 12,
+          marginTop: 16,
+          paddingTop: 14,
+          borderTopWidth: 1,
+          borderTopColor: activeIsDark ? '#26332E' : '#E2E8F0',
+        }}
+      >
+        <View style={{ flex: 1, minWidth: 120 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            Period Total
+          </Text>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+            {formatPeso(totalRev)}
+          </Text>
+        </View>
+
+        <View style={{ flex: 1, minWidth: 120 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            Period Average
+          </Text>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+            {formatPeso(avgRev)}{' '}
+            <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#AAB4B0' : '#64748B' }}>
+              /{activeGranularity === 'daily' ? 'day' : activeGranularity === 'weekly' ? 'wk' : 'mo'}
+            </Text>
+          </Text>
+        </View>
+
+        <View style={{ flex: 1, minWidth: 120 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            Peak Period
+          </Text>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+            {peakRev > 0 ? formatPeso(peakRev) : '₱0'}{' '}
+            <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#AAB4B0' : '#64748B' }}>
+              ({peakLabel})
+            </Text>
+          </Text>
+        </View>
+
+        <View style={{ flex: 1, minWidth: 120 }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            Orders in Period
+          </Text>
+          <Text style={{ fontSize: 15, fontWeight: '800', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+            {totalOrders} order{totalOrders === 1 ? '' : 's'}
+          </Text>
+        </View>
+      </View>
     </View>
   );
 }

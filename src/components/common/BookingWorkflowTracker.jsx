@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, Platform } from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
+import BootstrapIcon from './BootstrapIcon.jsx';
 
 /**
  * Minimalist Booking Workflow Stepper Component

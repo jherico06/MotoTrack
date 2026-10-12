@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, StyleSheet, SafeAreaView, Platform } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
 
 /**
  * Web overlay for QR paste (camera is native-only). Confirm still pops in-web.
  */
-export default function RiderQrScanSheet({ visible, order, onClose, onScanned }) {
+export default function RiderQrScanSheet({ visible, onClose, onScanned }) {
   const [paste, setPaste] = useState('');
 
   useEffect(() => {
@@ -20,11 +20,9 @@ export default function RiderQrScanSheet({ visible, order, onClose, onScanned })
         <View style={styles.topBar}>
           <View style={{ flex: 1 }}>
             <Text style={styles.kicker}>MotoTrack Rider</Text>
-            <Text style={styles.title}>Scan order QR</Text>
+            <Text style={styles.title}>Scan Order QR</Text>
             <Text style={styles.hint}>
-              {order?.orderId
-                ? `Paste the packing-label QR link for order #${order.orderId}. On a phone, the camera opens in the app.`
-                : 'Paste the packing-label QR link. On a phone, the camera opens in the app.'}
+              Scan the customer's delivery QR code to confirm this order. Paste the packing-label link here.
             </Text>
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessibilityRole="button">

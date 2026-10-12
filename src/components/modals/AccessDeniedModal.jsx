@@ -1,8 +1,8 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { shopStyles as styles } from '../../styles/shop.styles';
-import { useAuth } from '../../context/AuthContext';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { shopStyles as styles } from '../../styles/shop.styles.js';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin, onNavigateToAdmin }) {
   const { currentUser, adminLogin, logout, setRedirectReason } = useAuth();

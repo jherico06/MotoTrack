@@ -13,9 +13,9 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { BootstrapIcon } from '../common';
-import { serviceQuotationService } from '../../services/serviceQuotationService';
-import { garageService } from '../../services/garageService';
-import { productService } from '../../services/productService';
+import { serviceQuotationService } from '../../services/bookings/serviceQuotationService.js';
+import { garageService } from '../../services/bookings/garageService.js';
+import { productService } from '../../services/products/productService.js';
 import {
   calcLaborCost,
   calcServiceTotals,
@@ -24,21 +24,28 @@ import {
   formatLaborLine,
   FLEX_BOOKING_STATUS,
   normalizeBookingStatus,
-} from '../../utils/serviceQuotation';
-import { canAdminAction } from '../../utils/bookingWorkflow';
+} from '../../utils/serviceQuotation.js';
+import { canAdminAction } from '../../utils/bookingWorkflow.js';
+import { getThemeTokens } from '../../styles/theme.js';
 
-const FIELD_PROPS = {
-  placeholderTextColor: '#94A3B8',
-  selectionColor: '#1D4533',
-  underlineColorAndroid: 'transparent',
-};
+function getFieldProps(t, isDark) {
+  return {
+    placeholderTextColor: isDark ? t.placeholder : '#94A3B8',
+    selectionColor: isDark ? t.accentBrand : '#1D4533',
+    underlineColorAndroid: 'transparent',
+  };
+}
 
 export default function ServiceQuotationPanel({
   booking,
   onToast,
   onUpdated,
   style,
+  isDarkMode = false,
 }) {
+  const t = useMemo(() => getThemeTokens(isDarkMode), [isDarkMode]);
+  const styles = useMemo(() => createStyles(t, isDarkMode), [t, isDarkMode]);
+  const fieldProps = useMemo(() => getFieldProps(t, isDarkMode), [t, isDarkMode]);
   const bookingId = booking?.booking_id || booking?.id;
   const statusNorm = normalizeBookingStatus(booking?.status);
   const canSendQuote =
@@ -391,7 +398,7 @@ export default function ServiceQuotationPanel({
   if (loading) {
     return (
       <View style={[styles.wrap, styles.center, style]}>
-        <ActivityIndicator color="#1D4533" />
+        <ActivityIndicator color={isDarkMode ? t.accentBrand : '#1D4533'} />
       </View>
     );
   }
@@ -451,7 +458,7 @@ export default function ServiceQuotationPanel({
             value={hourlyRate}
             onChangeText={setHourlyRate}
             placeholder="150"
-            {...FIELD_PROPS}
+            {...fieldProps}
           />
         </View>
         <View style={styles.field}>
@@ -462,7 +469,7 @@ export default function ServiceQuotationPanel({
             value={estimatedHours}
             onChangeText={setEstimatedHours}
             placeholder="3"
-            {...FIELD_PROPS}
+            {...fieldProps}
           />
         </View>
       </View>
@@ -476,7 +483,7 @@ export default function ServiceQuotationPanel({
         placeholder="Search products…"
         value={productSearch}
         onChangeText={setProductSearch}
-        {...FIELD_PROPS}
+        {...fieldProps}
       />
       {filteredProducts.map((p) => (
         <TouchableOpacity key={p.product_id || p.id} style={styles.productRow} onPress={() => addPart(p)}>
@@ -493,7 +500,7 @@ export default function ServiceQuotationPanel({
             {formatPhp(p.quantity * p.unit_price)}
           </Text>
           <TouchableOpacity onPress={() => setParts((prev) => prev.filter((_, i) => i !== idx))}>
-            <BootstrapIcon name="x-lg" size={14} color="#DC2626" />
+            <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? t.statusDangerText : '#DC2626'} />
           </TouchableOpacity>
         </View>
       ))}
@@ -505,7 +512,7 @@ export default function ServiceQuotationPanel({
           placeholder="Description"
           value={otherDesc}
           onChangeText={setOtherDesc}
-          {...FIELD_PROPS}
+          {...fieldProps}
         />
         <TextInput
           style={[styles.input, { flex: 1 }]}
@@ -513,7 +520,7 @@ export default function ServiceQuotationPanel({
           keyboardType="decimal-pad"
           value={otherAmount}
           onChangeText={setOtherAmount}
-          {...FIELD_PROPS}
+          {...fieldProps}
         />
         <TouchableOpacity style={styles.smallBtn} onPress={addOtherCharge}>
           <Text style={styles.smallBtnText}>Add</Text>
@@ -525,7 +532,7 @@ export default function ServiceQuotationPanel({
             {o.description}: {formatPhp(o.amount)}
           </Text>
           <TouchableOpacity onPress={() => setOtherCharges((prev) => prev.filter((_, i) => i !== idx))}>
-            <BootstrapIcon name="x-lg" size={14} color="#DC2626" />
+            <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? t.statusDangerText : '#DC2626'} />
           </TouchableOpacity>
         </View>
       ))}
@@ -550,7 +557,7 @@ export default function ServiceQuotationPanel({
           value={discountValue}
           onChangeText={setDiscountValue}
           placeholder="0"
-          {...FIELD_PROPS}
+          {...fieldProps}
         />
       </View>
 
@@ -575,7 +582,7 @@ export default function ServiceQuotationPanel({
             value={downpaymentPercent}
             onChangeText={setDownpaymentPercent}
             placeholder="30"
-            {...FIELD_PROPS}
+            {...fieldProps}
           />
         ) : (
           <TextInput
@@ -584,7 +591,7 @@ export default function ServiceQuotationPanel({
             value={downpaymentFixed}
             onChangeText={setDownpaymentFixed}
             placeholder="0"
-            {...FIELD_PROPS}
+            {...fieldProps}
           />
         )}
       </View>
@@ -615,7 +622,7 @@ export default function ServiceQuotationPanel({
 
         <View style={styles.tableRow}>
           <Text style={styles.tableRowLabel}>Discount</Text>
-          <Text style={[styles.tableRowValue, Number(estimated.discountAmount) > 0 && { color: '#DC2626' }]}>
+          <Text style={[styles.tableRowValue, Number(estimated.discountAmount) > 0 && { color: isDarkMode ? t.statusDangerText : '#DC2626' }]}>
             −{formatPhp(estimated.discountAmount)}
           </Text>
         </View>
@@ -681,7 +688,7 @@ export default function ServiceQuotationPanel({
               keyboardType="decimal-pad"
               value={payAmount}
               onChangeText={setPayAmount}
-              {...FIELD_PROPS}
+              {...fieldProps}
             />
           </View>
           <TextInput
@@ -689,14 +696,14 @@ export default function ServiceQuotationPanel({
             placeholder="Reference / receipt # (optional)"
             value={payRef}
             onChangeText={setPayRef}
-            {...FIELD_PROPS}
+            {...fieldProps}
           />
           <TextInput
             style={styles.input}
             placeholder="Notes (optional)"
             value={payNotes}
             onChangeText={setPayNotes}
-            {...FIELD_PROPS}
+            {...fieldProps}
           />
           <TouchableOpacity
             style={styles.btnPrimary}
@@ -757,7 +764,7 @@ export default function ServiceQuotationPanel({
               keyboardType="decimal-pad"
               value={actualHours}
               onChangeText={setActualHours}
-              {...FIELD_PROPS}
+              {...fieldProps}
             />
             <TouchableOpacity style={styles.smallBtn} onPress={saveActualLabor} disabled={saving}>
               <Text style={styles.smallBtnText}>Save Actual</Text>
@@ -788,7 +795,7 @@ export default function ServiceQuotationPanel({
             value={addTitle}
             onChangeText={setAddTitle}
             placeholder="Title"
-            {...FIELD_PROPS}
+            {...fieldProps}
           />
           <View style={styles.row}>
             <TextInput
@@ -797,7 +804,7 @@ export default function ServiceQuotationPanel({
               keyboardType="decimal-pad"
               value={addLaborHours}
               onChangeText={setAddLaborHours}
-              {...FIELD_PROPS}
+              {...fieldProps}
             />
             <TextInput
               style={[styles.input, { flex: 1 }]}
@@ -805,7 +812,7 @@ export default function ServiceQuotationPanel({
               keyboardType="decimal-pad"
               value={addPartsAmount}
               onChangeText={setAddPartsAmount}
-              {...FIELD_PROPS}
+              {...fieldProps}
             />
           </View>
           <Text style={styles.calcLine}>
@@ -828,7 +835,7 @@ export default function ServiceQuotationPanel({
 
       {saving && (
         <View style={styles.savingRow}>
-          <ActivityIndicator color="#1D4533" />
+          <ActivityIndicator color={isDarkMode ? t.accentBrand : '#1D4533'} />
           <Text style={styles.muted}> Saving…</Text>
         </View>
       )}
@@ -836,207 +843,209 @@ export default function ServiceQuotationPanel({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { backgroundColor: '#F8FAFC', borderRadius: 12 },
-  content: { padding: 16, paddingBottom: 40 },
-  center: { padding: 24, alignItems: 'center', justifyContent: 'center' },
-  title: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
-  sub: { fontSize: 13, color: '#64748B', marginBottom: 12 },
-  section: {
-    marginTop: 16,
-    marginBottom: 8,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1D4533',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  chipRow: { flexGrow: 0, marginBottom: 8 },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 8,
-    marginRight: 8,
-  },
-  chipActive: { backgroundColor: '#1D4533' },
-  chipText: { fontSize: 12, color: '#334155', fontWeight: '600' },
-  chipTextActive: { color: '#FFFFFF' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  field: { flex: 1 },
-  label: { fontSize: 11, color: '#475569', marginBottom: 5, fontWeight: '800' },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0F172A',
-    marginBottom: 6,
-    outlineStyle: 'none',
-  },
-  calcLine: { fontSize: 13, color: '#0F172A', fontWeight: '600', marginBottom: 6 },
-  productRow: {
-    backgroundColor: '#FFFFFF',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 6,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  productName: { fontSize: 13, fontWeight: '600', color: '#0F172A' },
-  productPrice: { fontSize: 12, color: '#64748B' },
-  lineItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  lineText: { fontSize: 13, color: '#334155', flex: 1 },
-  smallBtn: {
-    backgroundColor: '#1D4533',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-  },
-  smallBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
-  totalsBox: {
-    marginTop: 14,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#C8DDD3',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  totalsTitle: {
-    fontWeight: '800',
-    fontSize: 12.5,
-    letterSpacing: 0.8,
-    color: '#1D4533',
-    marginBottom: 12,
-  },
-  tableHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingBottom: 4,
-  },
-  colHeaderLeft: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-    letterSpacing: 0.6,
-  },
-  colHeaderRight: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#94A3B8',
-    letterSpacing: 0.6,
-  },
-  tableHeaderDivider: {
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    marginBottom: 10,
-    marginTop: 4,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  tableRowLabel: {
-    fontSize: 13.5,
-    color: '#475569',
-    fontWeight: '500',
-  },
-  tableRowValue: {
-    fontSize: 13.5,
-    color: '#0F172A',
-    fontWeight: '600',
-  },
-  tableTotalDivider: {
-    height: 1.5,
-    backgroundColor: '#CBD5E1',
-    marginTop: 10,
-    marginBottom: 10,
-  },
-  tableTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 2,
-  },
-  totalsTotalLabel: {
-    fontSize: 15.5,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  totalsTotalValue: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#1D4533',
-  },
-  breakdownSubBox: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-    gap: 4,
-  },
-  tableSubLabel: {
-    fontSize: 12.5,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  tableSubValueDp: {
-    fontSize: 13,
-    color: '#D97706',
-    fontWeight: '700',
-  },
-  tableSubValueRem: {
-    fontSize: 13,
-    color: '#1D4533',
-    fontWeight: '700',
-  },
-  actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  btnPrimary: {
-    flex: 1,
-    backgroundColor: '#1D4533',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  btnPrimaryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
-  btnSecondary: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#1D4533',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  btnSecondaryText: { color: '#1D4533', fontWeight: '700', fontSize: 13 },
-  muted: { fontSize: 12, color: '#94A3B8', marginTop: 4 },
-  savingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
-  estimateBox: {
-    backgroundColor: '#EEF2FF',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#C7D2FE',
-    marginBottom: 12,
-    gap: 4,
-  },
-  estimateTitle: { fontSize: 13, fontWeight: '800', color: '#4338CA' },
-});
+function createStyles(t, isDark) {
+  return StyleSheet.create({
+    wrap: { backgroundColor: isDark ? t.bgSub : '#F8FAFC', borderRadius: 12 },
+    content: { padding: 16, paddingBottom: 40 },
+    center: { padding: 24, alignItems: 'center', justifyContent: 'center' },
+    title: { fontSize: 18, fontWeight: '700', color: isDark ? t.textPrimary : '#0F172A' },
+    sub: { fontSize: 13, color: isDark ? t.textMuted : '#64748B', marginBottom: 12 },
+    section: {
+      marginTop: 16,
+      marginBottom: 8,
+      fontSize: 13,
+      fontWeight: '700',
+      color: isDark ? t.accentBrand : '#1D4533',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    chipRow: { flexGrow: 0, marginBottom: 8 },
+    chip: {
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: isDark ? t.bgElevated : '#E2E8F0',
+      borderRadius: 8,
+      marginRight: 8,
+    },
+    chipActive: { backgroundColor: isDark ? '#1F6B52' : '#1D4533' },
+    chipText: { fontSize: 12, color: isDark ? t.textSecondary : '#334155', fontWeight: '600' },
+    chipTextActive: { color: '#FFFFFF' },
+    row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+    field: { flex: 1 },
+    label: { fontSize: 11, color: isDark ? t.textSecondary : '#475569', marginBottom: 5, fontWeight: '800' },
+    input: {
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+      borderWidth: 1.5,
+      borderColor: isDark ? t.borderInput : '#CBD5E1',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 11,
+      fontSize: 14,
+      fontWeight: '600',
+      color: isDark ? t.textPrimary : '#0F172A',
+      marginBottom: 6,
+      outlineStyle: 'none',
+    },
+    calcLine: { fontSize: 13, color: isDark ? t.textPrimary : '#0F172A', fontWeight: '600', marginBottom: 6 },
+    productRow: {
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+      padding: 10,
+      borderRadius: 8,
+      marginBottom: 6,
+      borderWidth: 1,
+      borderColor: isDark ? t.border : '#E2E8F0',
+    },
+    productName: { fontSize: 13, fontWeight: '600', color: isDark ? t.textPrimary : '#0F172A' },
+    productPrice: { fontSize: 12, color: isDark ? t.textMuted : '#64748B' },
+    lineItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 6,
+    },
+    lineText: { fontSize: 13, color: isDark ? t.textSecondary : '#334155', flex: 1 },
+    smallBtn: {
+      backgroundColor: isDark ? '#1F6B52' : '#1D4533',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 8,
+    },
+    smallBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 12 },
+    totalsBox: {
+      marginTop: 14,
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: isDark ? t.accentBorder : '#C8DDD3',
+      shadowColor: isDark ? '#000000' : '#0F172A',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    totalsTitle: {
+      fontWeight: '800',
+      fontSize: 12.5,
+      letterSpacing: 0.8,
+      color: isDark ? t.accentBrand : '#1D4533',
+      marginBottom: 12,
+    },
+    tableHeaderRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingBottom: 4,
+    },
+    colHeaderLeft: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: isDark ? t.textMuted : '#94A3B8',
+      letterSpacing: 0.6,
+    },
+    colHeaderRight: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: isDark ? t.textMuted : '#94A3B8',
+      letterSpacing: 0.6,
+    },
+    tableHeaderDivider: {
+      height: 1,
+      backgroundColor: isDark ? t.border : '#E2E8F0',
+      marginBottom: 10,
+      marginTop: 4,
+    },
+    tableRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 4,
+    },
+    tableRowLabel: {
+      fontSize: 13.5,
+      color: isDark ? t.textSecondary : '#475569',
+      fontWeight: '500',
+    },
+    tableRowValue: {
+      fontSize: 13.5,
+      color: isDark ? t.textPrimary : '#0F172A',
+      fontWeight: '600',
+    },
+    tableTotalDivider: {
+      height: 1.5,
+      backgroundColor: isDark ? t.borderInput : '#CBD5E1',
+      marginTop: 10,
+      marginBottom: 10,
+    },
+    tableTotalRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 2,
+    },
+    totalsTotalLabel: {
+      fontSize: 15.5,
+      fontWeight: '800',
+      color: isDark ? t.textPrimary : '#0F172A',
+    },
+    totalsTotalValue: {
+      fontSize: 17,
+      fontWeight: '800',
+      color: isDark ? t.money : '#1D4533',
+    },
+    breakdownSubBox: {
+      marginTop: 10,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? t.border : '#F1F5F9',
+      gap: 4,
+    },
+    tableSubLabel: {
+      fontSize: 12.5,
+      color: isDark ? t.textMuted : '#64748B',
+      fontWeight: '500',
+    },
+    tableSubValueDp: {
+      fontSize: 13,
+      color: isDark ? t.statusWarningText : '#D97706',
+      fontWeight: '700',
+    },
+    tableSubValueRem: {
+      fontSize: 13,
+      color: isDark ? t.money : '#1D4533',
+      fontWeight: '700',
+    },
+    actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
+    btnPrimary: {
+      flex: 1,
+      backgroundColor: isDark ? '#1F6B52' : '#1D4533',
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    btnPrimaryText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+    btnSecondary: {
+      flex: 1,
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+      borderWidth: 1,
+      borderColor: isDark ? t.accentBorder : '#1D4533',
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    btnSecondaryText: { color: isDark ? t.accentBrand : '#1D4533', fontWeight: '700', fontSize: 13 },
+    muted: { fontSize: 12, color: isDark ? t.textMuted : '#94A3B8', marginTop: 4 },
+    savingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+    estimateBox: {
+      backgroundColor: isDark ? t.statusPurpleBg : '#EEF2FF',
+      borderRadius: 10,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(150, 145, 165, 0.28)' : '#C7D2FE',
+      marginBottom: 12,
+      gap: 4,
+    },
+    estimateTitle: { fontSize: 13, fontWeight: '800', color: isDark ? t.statusPurpleText : '#4338CA' },
+  });
+}

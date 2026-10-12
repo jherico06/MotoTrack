@@ -1,1 +1,1 @@
-export * from './motorParts';
+export * from './motorParts.js';

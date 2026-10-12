@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, TextInput, Modal } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { shopStyles as styles } from '../../styles/shop.styles';
-import { useCart } from '../../context/CartContext';
-import { promoService } from '../../services/promoService';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { shopStyles as styles } from '../../styles/shop.styles.js';
+import { useCart } from '../../context/CartContext.jsx';
+import { promoService } from '../../services/products/promoService.js';
 
 export default function CartModal({ visible, onClose, onProceedToCheckout }) {
   const {
@@ -11,7 +11,6 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
     updateCartQuantity,
     removeFromCart,
     cartItemCount,
-    selectedLineKeys,
     selectedCartItems,
     selectedCartItemCount,
     selectedCartSubtotal,
@@ -24,11 +23,13 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
     toggleSelectAll,
     discountPercent,
     isFreeShipping,
+    appliedPromoMeta,
     promoCode,
     setPromoCode,
     applyPromo,
     promoFeedback,
     showToast,
+    shippingRate,
   } = useCart();
 
   const [availablePromos, setAvailablePromos] = useState([]);
@@ -224,7 +225,10 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                     {availablePromos.map((p) => {
                       const isSelected = promoCode.trim().toUpperCase() === p.code;
-                      const isFreeShip = p.description?.toLowerCase().includes('free shipping');
+                      const isFreeShip = p.promoType === 'FREE_SHIPPING';
+                      const label = isFreeShip
+                        ? `${p.code} (Free Ship)`
+                        : `${p.code} (${p.discountPercent}% OFF)`;
                       return (
                         <TouchableOpacity
                           key={p.code}
@@ -257,7 +261,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                               color: isSelected ? '#FFFFFF' : '#0F172A',
                             }}
                           >
-                            {p.code} ({p.discountPercent}% OFF{isFreeShip ? ' + Free Ship' : ''})
+                            {label}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -267,21 +271,26 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
               )}
 
               {/* Promo Code Input */}
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                <TextInput
-                  style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
-                  placeholder="Promo Code (e.g. SWIM30)"
-                  placeholderTextColor="#94A3B8"
-                  value={promoCode}
-                  onChangeText={setPromoCode}
-                  autoCapitalize="characters"
-                />
-                <TouchableOpacity
-                  style={[styles.checkoutBtn, { marginTop: 0, paddingHorizontal: 16, height: 42 }]}
-                  onPress={() => applyPromo(promoCode)}
-                >
-                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Apply</Text>
-                </TouchableOpacity>
+              <View style={{ marginBottom: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 6 }}>
+                  Promo Code
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                  <TextInput
+                    style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
+                    placeholder="Enter promo code..."
+                    placeholderTextColor="#94A3B8"
+                    value={promoCode}
+                    onChangeText={setPromoCode}
+                    autoCapitalize="characters"
+                  />
+                  <TouchableOpacity
+                    style={[styles.checkoutBtn, { marginTop: 0, paddingHorizontal: 16, height: 42 }]}
+                    onPress={() => applyPromo(promoCode)}
+                  >
+                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Apply</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {promoFeedback?.text ? (
@@ -302,13 +311,14 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                 <Text style={styles.cartSummaryValue}>₱{selectedCartSubtotal.toFixed(2)}</Text>
               </View>
 
-              {discountPercent > 0 && (
+              {selectedDiscountAmount > 0 && (
                 <View style={styles.cartSummaryRow}>
                   <Text style={[styles.cartSummaryLabel, { color: '#16A34A' }]}>
-                    Discount ({discountPercent}%)
+                    {appliedPromoMeta?.code || promoCode || 'Promo'}
+                    {discountPercent > 0 ? ` −${discountPercent}%` : ''}
                   </Text>
                   <Text style={[styles.cartSummaryValue, { color: '#16A34A' }]}>
-                    -₱{selectedDiscountAmount.toFixed(2)}
+                    −₱{selectedDiscountAmount.toFixed(2)}
                   </Text>
                 </View>
               )}
@@ -316,9 +326,20 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
               <View style={styles.cartSummaryRow}>
                 <Text style={styles.cartSummaryLabel}>Shipping</Text>
                 <Text style={styles.cartSummaryValue}>
-                  {selectedCartItems.length === 0 ? '₱0.00' : (isFreeShipping ? 'Free' : `₱${selectedShippingFee.toFixed(2)}`)}
+                  {selectedCartItems.length === 0
+                    ? '₱0.00'
+                    : `₱${(isFreeShipping ? shippingRate : selectedShippingFee).toFixed(2)}`}
                 </Text>
               </View>
+
+              {isFreeShipping && selectedCartItems.length > 0 && (
+                <View style={styles.cartSummaryRow}>
+                  <Text style={[styles.cartSummaryLabel, { color: '#16A34A' }]}>Free Shipping</Text>
+                  <Text style={[styles.cartSummaryValue, { color: '#16A34A' }]}>
+                    −₱{Number(shippingRate || 0).toFixed(2)}
+                  </Text>
+                </View>
+              )}
 
               <View style={styles.cartSummaryRow}>
                 <Text style={styles.cartTotalLabel}>Total</Text>

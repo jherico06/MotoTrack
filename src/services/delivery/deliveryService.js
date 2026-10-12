@@ -1,0 +1,2892 @@
+/**
+ * MotoTrack Delivery Management & Proof of Delivery
+ * Admin assigns riders; authenticated riders confirm via packing QR.
+ */
+import { appStorage } from '../system/storageAdapter.js';
+import { supabaseManager } from '../../lib/supabase.js';
+import { orderService } from '../orders/orderService.js';
+import { notificationService } from '../notifications/notificationService.js';
+import { auditLogService } from '../system/auditLogService.js';
+import { riderService, RIDER_STATUSES } from '../staff/riderService.js';
+import {
+  generateSecureToken,
+  hashDeliveryToken,
+  normalizeTokenHash,
+  buildDeliveryConfirmUrl,
+  qrImageUrlForLink,
+  makePhoneReachableConfirmBundle,
+} from '../../utils/deliveryToken.js';
+import { dateInputToIso, expectedDeliveryStatusText } from '../../utils/deliveryDate.js';
+import {
+  classifyOrderIdentifier,
+  normalizeOrderIdentifier,
+  parseDeliveryQrPayload,
+  sameOrderIdentifier,
+} from '../../utils/orderIdentifier.js';
+import { riderAccessService } from './riderAccessService.js';
+import { geocodeAddress } from '../../utils/geo.js';
+import { resolveImageForDatabase } from '../../utils/productImageUpload.js';
+import { deliveryLocationService } from './deliveryLocationService.js';
+
+const STORAGE_KEY_DELIVERIES = 'mototrack_order_deliveries';
+const STORAGE_KEY_HISTORY = 'mototrack_delivery_history';
+/** Local map: orderId → last plaintext token (admin device only; never synced as plaintext) */
+const STORAGE_KEY_TOKEN_CACHE = 'mototrack_delivery_token_cache';
+
+const deliveryListeners = new Set();
+let deliveryRealtimeChannel = null;
+let deliveryRealtimeTimer = null;
+
+function notifyDeliveryListeners(payload = { source: 'local' }) {
+  deliveryListeners.forEach((fn) => {
+    try {
+      fn(payload);
+    } catch (e) {
+      console.warn('[DeliveryService] listener error:', e);
+    }
+  });
+}
+
+function scheduleDeliveryRealtimeNotify() {
+  if (deliveryRealtimeTimer) clearTimeout(deliveryRealtimeTimer);
+  deliveryRealtimeTimer = setTimeout(() => {
+    deliveryRealtimeTimer = null;
+    notifyDeliveryListeners({ source: 'realtime', at: Date.now() });
+  }, 1200);
+}
+
+function setupDeliveryRealtime() {
+  if (deliveryRealtimeChannel) return;
+  try {
+    const client = supabaseManager.getClient();
+    if (!client) return;
+
+    deliveryRealtimeChannel = client
+      .channel('public:delivery_realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'order_deliveries' }, () => {
+        scheduleDeliveryRealtimeNotify();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        scheduleDeliveryRealtimeNotify();
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          // Connected — clients will receive live delivery/order updates.
+        }
+      });
+  } catch (e) {
+    console.warn('[DeliveryService] realtime setup failed:', e);
+  }
+}
+
+export const DELIVERY_STATUSES = {
+  READY: 'Ready for Delivery',
+  OUT: 'Out for Delivery',
+  REPORTED: 'Delivery Reported',
+  DELIVERED: 'Delivered',
+  FAILED: 'Delivery Issue',
+  RESCHEDULED: 'Rescheduled',
+};
+
+export { buildDeliveryConfirmUrl, qrImageUrlForLink };
+
+function makeId(prefix) {
+  return `${prefix}-${Date.now()}-${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
+async function tokenShareBundle(plainToken) {
+  const bundle = await makePhoneReachableConfirmBundle(plainToken);
+  return {
+    token: bundle.token,
+    confirmUrl: bundle.confirmUrl,
+    qrImageUrl: bundle.qrImageUrl,
+    expiresAt: null,
+    phoneReachable: bundle.phoneReachable,
+  };
+}
+
+function stripOtpSecrets(delivery) {
+  if (!delivery) return null;
+  const {
+    otp_hash,
+    confirmation_token_hash,
+    _plain_token,
+    ...safe
+  } = delivery;
+  return safe;
+}
+
+function enrichDeliveryWithRider(delivery) {
+  if (!delivery) return null;
+  const rider = delivery.rider_id ? riderService.getRiderById(delivery.rider_id) : null;
+  if (!rider) {
+    return {
+      ...delivery,
+      rider_name: delivery.rider_name || null,
+      rider_contact: delivery.rider_contact || null,
+      vehicle_info: delivery.vehicle_info || null,
+      rider_plate: delivery.rider_plate || null,
+      rider_avatar: delivery.rider_avatar || null,
+    };
+  }
+  return {
+    ...delivery,
+    rider_name: delivery.rider_name || rider.name,
+    rider_contact: delivery.rider_contact || rider.phone || '',
+    vehicle_info: delivery.vehicle_info || rider.vehicleInfo || '',
+    rider_plate: delivery.rider_plate || rider.plateNumber || '',
+    rider_avatar: delivery.rider_avatar || rider.avatar || '',
+  };
+}
+
+/** Columns allowed on public.order_deliveries after normalization + token fields */
+function toDeliveryDbRow(record) {
+  return {
+    delivery_id: record.delivery_id,
+    order_id: record.order_id,
+    rider_id: record.rider_id || null,
+    rider_name: record.rider_name || null,
+    rider_contact: record.rider_contact || null,
+    vehicle_info: record.vehicle_info || null,
+    delivery_notes: record.delivery_notes || '',
+    delivery_status: record.delivery_status,
+    expected_delivery_at: record.expected_delivery_at || null,
+    expected_delivery_end_at: record.expected_delivery_end_at || null,
+    otp_hash: record.otp_hash || null,
+    otp_expires_at: record.otp_expires_at || null,
+    otp_verified: Boolean(record.otp_verified),
+    otp_verified_at: record.otp_verified_at || null,
+    confirmation_token_hash: record.confirmation_token_hash || null,
+    confirmation_token_expires_at: record.confirmation_token_expires_at || null,
+    confirmation_token_used_at: record.confirmation_token_used_at || null,
+    confirmation_token_invalidated_at: record.confirmation_token_invalidated_at || null,
+    confirmation_token_created_at: record.confirmation_token_created_at || null,
+    token_verified: Boolean(record.token_verified),
+    customer_confirmed: Boolean(record.customer_confirmed),
+    customer_confirmed_at: record.customer_confirmed_at || null,
+    confirmed_by_customer_id: record.confirmed_by_customer_id || null,
+    proof_of_delivery: record.proof_of_delivery || null,
+    proof_uploaded_by: record.proof_uploaded_by || null,
+    proof_uploaded_at: record.proof_uploaded_at || null,
+    delivery_photo: record.delivery_photo || null,
+    delivery_issue_notes: record.delivery_issue_notes || null,
+    shipping_fee: Number(record.shipping_fee || 0) || 0,
+    rider_earning: Number(record.rider_earning || 0) || 0,
+    rider_earning_credited: Boolean(record.rider_earning_credited),
+    rider_earning_credited_at: record.rider_earning_credited_at || null,
+    assigned_by: record.assigned_by || null,
+    assigned_at: record.assigned_at || null,
+    delivered_at: record.delivered_at || null,
+    rider_reported_delivered: Boolean(record.rider_reported_delivered),
+    rider_reported_at: record.rider_reported_at || null,
+    rider_reported_by: record.rider_reported_by || null,
+    rider_report_notes: record.rider_report_notes || '',
+    admin_confirmed: Boolean(record.admin_confirmed),
+    admin_confirmed_at: record.admin_confirmed_at || null,
+    admin_confirmed_reason: record.admin_confirmed_reason || '',
+    confirmed_by_admin: record.confirmed_by_admin || null,
+    created_at: record.created_at,
+    updated_at: record.updated_at,
+  };
+}
+
+function isOutForDeliveryStatus(status) {
+  const s = String(status || '').toLowerCase();
+  return s === 'out for delivery' || s === 'shipped' || s === 'in transit';
+}
+
+function isReportedStatus(status) {
+  const s = String(status || '').toLowerCase();
+  return s === 'delivery reported' || s === 'reported';
+}
+
+function isIssueStatus(status) {
+  const s = String(status || '').toLowerCase();
+  return s === 'delivery issue' || s === 'delivery failed' || s === 'failed';
+}
+
+function getTokenCache() {
+  try {
+    const raw = appStorage.getItem(STORAGE_KEY_TOKEN_CACHE);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === 'object') return parsed;
+    }
+  } catch (_e) {}
+  return {};
+}
+
+function saveTokenCache(map) {
+  try {
+    appStorage.setItem(STORAGE_KEY_TOKEN_CACHE, JSON.stringify(map || {}));
+  } catch (_e) {}
+}
+
+function cachePlainToken(orderId, plainToken) {
+  if (!orderId || !plainToken) return;
+  const map = getTokenCache();
+  map[orderId] = {
+    token: plainToken,
+    cached_at: new Date().toISOString(),
+  };
+  saveTokenCache(map);
+}
+
+function clearCachedToken(orderId) {
+  if (!orderId) return;
+  const map = getTokenCache();
+  delete map[orderId];
+  saveTokenCache(map);
+}
+
+function getCachedPlainToken(orderId) {
+  const entry = getTokenCache()[orderId];
+  return entry?.token || null;
+}
+
+function createTokenFields() {
+  const plainToken = generateSecureToken(32);
+  const nowIso = new Date().toISOString();
+  return {
+    plainToken,
+    fields: {
+      confirmation_token_hash: hashDeliveryToken(plainToken),
+      // No time expiry — token stays valid until used / delivered / invalidated
+      confirmation_token_expires_at: null,
+      confirmation_token_used_at: null,
+      confirmation_token_invalidated_at: null,
+      confirmation_token_created_at: nowIso,
+      token_verified: false,
+    },
+  };
+}
+
+const confirmInflight = new Set();
+
+const RIDER_VERIFY_NETWORK =
+  'Unable to verify the order. Please check your connection and try again.';
+const RIDER_CONFIRM_NETWORK =
+  'Unable to confirm the delivery. Please check your connection and try again.';
+
+const CONFIRMABLE_DELIVERY_STATUSES = [
+  'Out for Delivery',
+  'Delivery Reported',
+  'Shipped',
+  'In Transit',
+];
+
+const ORDER_CARD_COLUMNS =
+  'order_id,customer_name,customer_phone,customer_address,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,delivery_notes,delivery_landmark,created_at,updated_at';
+
+function logQrValidation(entry) {
+  if (typeof __DEV__ !== 'undefined' && !__DEV__) return;
+  console.info('[MotoTrack QR]', entry);
+}
+
+function riderQrFailure(code, error, title) {
+  return title ? { success: false, code, error, title } : { success: false, code, error };
+}
+
+function isClosedDeliveryStatus(status) {
+  const s = String(status || '').toLowerCase();
+  return (
+    s === 'delivered' ||
+    s === 'cancelled' ||
+    s === 'canceled' ||
+    s === 'refunded' ||
+    s === 'returned' ||
+    s.includes('return requested')
+  );
+}
+
+function deliveryAllowsRiderConfirm(delivery, order) {
+  const orderStatus = String(order?.status || '');
+  const deliveryStatus = String(delivery?.delivery_status || '');
+  if (isClosedDeliveryStatus(orderStatus) || isClosedDeliveryStatus(deliveryStatus)) {
+    const delivered =
+      orderStatus.toLowerCase() === 'delivered' || deliveryStatus.toLowerCase() === 'delivered';
+    if (delivered) {
+      return riderQrFailure(
+        'already_delivered',
+        'This order has already been delivered.',
+        'Order Already Delivered'
+      );
+    }
+    return riderQrFailure(
+      'unavailable',
+      'This order is not ready for delivery confirmation.'
+    );
+  }
+  if (isIssueStatus(orderStatus) || isIssueStatus(deliveryStatus)) {
+    return riderQrFailure('unavailable', 'This order is not ready for delivery confirmation.');
+  }
+  const outLike =
+    isOutForDeliveryStatus(orderStatus) ||
+    isOutForDeliveryStatus(deliveryStatus) ||
+    isReportedStatus(orderStatus) ||
+    isReportedStatus(deliveryStatus);
+  if (!outLike) {
+    return riderQrFailure('not_ready', 'This order is not ready for delivery confirmation.');
+  }
+  return null;
+}
+
+async function findDeliveryByTokenHash(tokenHash) {
+  const client = supabaseManager.getClient();
+  if (!client) {
+    return (
+      getLocalDeliveries().find(
+        (d) => normalizeTokenHash(d.confirmation_token_hash) === tokenHash
+      ) || null
+    );
+  }
+  const { data, error } = await client
+    .from('order_deliveries')
+    .select('*')
+    .eq('confirmation_token_hash', tokenHash)
+    .limit(1);
+  if (error) {
+    const err = new Error('network');
+    err.cause = error;
+    throw err;
+  }
+  if (data?.[0]) {
+    upsertLocalDelivery(data[0]);
+    return data[0];
+  }
+  return null;
+}
+
+async function findDeliveryByOrderIdentifier(rawId) {
+  const normalized = normalizeOrderIdentifier(rawId);
+  if (!normalized || /[%_]/.test(normalized)) return null;
+  if (classifyOrderIdentifier(normalized) === 'unknown') return null;
+  const client = supabaseManager.getClient();
+  if (!client) {
+    return getLocalDeliveries().find((d) => sameOrderIdentifier(d.order_id, normalized)) || null;
+  }
+  const { data, error } = await client
+    .from('order_deliveries')
+    .select('*')
+    .ilike('order_id', normalized)
+    .limit(2);
+  if (error) {
+    const err = new Error('network');
+    err.cause = error;
+    throw err;
+  }
+  const exact = (data || []).find((row) => sameOrderIdentifier(row.order_id, normalized));
+  if (exact) {
+    upsertLocalDelivery(exact);
+    return exact;
+  }
+  const { data: orders, error: orderError } = await client
+    .from('orders')
+    .select('order_id')
+    .ilike('order_id', normalized)
+    .limit(2);
+  if (orderError) {
+    const err = new Error('network');
+    err.cause = orderError;
+    throw err;
+  }
+  const orderHit = (orders || []).find((row) => sameOrderIdentifier(row.order_id, normalized));
+  if (!orderHit?.order_id) return null;
+  const { data: deliveries, error: deliveryError } = await client
+    .from('order_deliveries')
+    .select('*')
+    .eq('order_id', orderHit.order_id)
+    .limit(1);
+  if (deliveryError) {
+    const err = new Error('network');
+    err.cause = deliveryError;
+    throw err;
+  }
+  if (deliveries?.[0]) {
+    upsertLocalDelivery(deliveries[0]);
+    return deliveries[0];
+  }
+  return null;
+}
+
+async function fetchOrderForCard(orderId) {
+  const local = findOrder(orderId);
+  const client = supabaseManager.getClient();
+  if (!client || !orderId) return local || null;
+  const { data, error } = await client
+    .from('orders')
+    .select(ORDER_CARD_COLUMNS)
+    .eq('order_id', orderId)
+    .limit(1);
+  if (error) {
+    if (local) return local;
+    const err = new Error('network');
+    err.cause = error;
+    throw err;
+  }
+  if (data?.[0]) return { ...(local || {}), ...data[0] };
+  return local || null;
+}
+
+function invalidateTokenFields(delivery) {
+  return {
+    ...delivery,
+    confirmation_token_hash: null,
+    confirmation_token_expires_at: null,
+    confirmation_token_used_at: delivery?.confirmation_token_used_at || null,
+    confirmation_token_invalidated_at: new Date().toISOString(),
+    confirmation_token_created_at: delivery?.confirmation_token_created_at || null,
+    token_verified: Boolean(delivery?.token_verified),
+  };
+}
+
+/** Resolve shipping fee that becomes rider earnings (₱0 if free shipping). */
+function resolveShippingFee(order, delivery) {
+  const fromDelivery = Number(delivery?.shipping_fee);
+  if (Number.isFinite(fromDelivery) && fromDelivery >= 0 && delivery?.shipping_fee != null) {
+    return fromDelivery;
+  }
+  const fromOrder = Number(order?.shipping_fee);
+  if (Number.isFinite(fromOrder) && fromOrder >= 0 && order?.shipping_fee != null) {
+    return fromOrder;
+  }
+  // Infer for older orders: grand_total - (subtotal - discount)
+  const grand = Number(order?.grand_total);
+  const sub = Number(order?.total_amount);
+  const disc = Number(order?.discount_amount || 0);
+  if (Number.isFinite(grand) && Number.isFinite(sub)) {
+    const inferred = grand - (sub - disc);
+    if (Number.isFinite(inferred) && inferred >= 0) return Math.round(inferred * 100) / 100;
+  }
+  return 0;
+}
+
+function mergeLocalOrderMeta(orderId, patch) {
+  const orders = orderService.getLocalOrders();
+  const next = orders.map((o) =>
+    o.order_id === orderId || o.id === orderId ? { ...o, ...patch } : o
+  );
+  orderService.saveLocalOrders(next);
+}
+
+function isAdminUser(user) {
+  return Boolean(user && (user.role === 'admin' || user.isAdmin));
+}
+
+function getLocalDeliveries() {
+  try {
+    const raw = appStorage.getItem(STORAGE_KEY_DELIVERIES);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (_e) {}
+  return [];
+}
+
+function saveLocalDeliveries(list) {
+  try {
+    appStorage.setItem(STORAGE_KEY_DELIVERIES, JSON.stringify(list));
+  } catch (_e) {}
+}
+
+function getLocalHistory() {
+  try {
+    const raw = appStorage.getItem(STORAGE_KEY_HISTORY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (_e) {}
+  return [];
+}
+
+function saveLocalHistory(list) {
+  try {
+    appStorage.setItem(STORAGE_KEY_HISTORY, JSON.stringify(list));
+  } catch (_e) {}
+}
+
+function upsertLocalDelivery(record) {
+  const list = getLocalDeliveries();
+  const idx = list.findIndex((d) => d.order_id === record.order_id || d.delivery_id === record.delivery_id);
+  if (idx >= 0) list[idx] = { ...list[idx], ...record };
+  else list.unshift(record);
+  saveLocalDeliveries(list);
+  return record;
+}
+
+async function appendHistory({ orderId, action, previousStatus, newStatus, performedBy, notes, metadata }) {
+  const row = {
+    id: makeId('dh'),
+    order_id: orderId,
+    action,
+    previous_status: previousStatus || null,
+    new_status: newStatus || null,
+    performed_by: performedBy || 'System',
+    notes: notes || '',
+    metadata: metadata || {},
+    created_at: new Date().toISOString(),
+  };
+  const hist = getLocalHistory();
+  hist.unshift(row);
+  saveLocalHistory(hist);
+
+  const client = supabaseManager.getClient();
+  if (client) {
+    try {
+      await client.from('delivery_history').insert([row]);
+    } catch (e) {
+      console.warn('[DeliveryService] history insert failed:', e);
+    }
+  }
+  return row;
+}
+
+function findOrder(orderId) {
+  const orders = orderService.getLocalOrders();
+  return orders.find((o) => o.order_id === orderId || o.id === orderId) || null;
+}
+
+function mapOrderItemsForPreview(order) {
+  const items = Array.isArray(order?.items) ? order.items : [];
+  if (items.length) {
+    return items.map((it) => ({
+      name: it.name || 'Motorcycle Part',
+      brand: it.brand || '',
+      quantity: Number(it.quantity || 1),
+      price: Number(it.price || it.cost || 0),
+      size: it.size || null,
+      image: it.image || null,
+    }));
+  }
+  const summary = String(order?.items_summary || '').trim();
+  if (!summary) return [];
+  return summary.split(',').map((part) => {
+    const raw = part.trim();
+    const m = raw.match(/^(.*)\s*\(x(\d+)\)\s*$/i);
+    return {
+      name: m ? m[1].trim() : raw,
+      brand: '',
+      quantity: m ? Number(m[2]) : 1,
+      price: 0,
+      size: null,
+      image: null,
+    };
+  });
+}
+
+function buildOrderDetailsFromOrder(order) {
+  if (!order) return {};
+  const items = mapOrderItemsForPreview(order);
+  return {
+    customerName: order.customer_name || null,
+    customerPhone: order.customer_phone || null,
+    customerAddress: order.customer_address || null,
+    paymentMethod: order.payment_method || null,
+    totalAmount: Number(order.grand_total ?? order.total_amount ?? order.total ?? 0),
+    shippingFee: Number(order.shipping_fee || 0),
+    discountAmount: Number(order.discount_amount || 0),
+    itemsSummary: order.items_summary || items.map((i) => `${i.name} (x${i.quantity})`).join(', '),
+    items,
+    itemCount: order.items_count || items.reduce((s, i) => s + Number(i.quantity || 0), 0) || items.length,
+  };
+}
+
+function normalizePreviewItems(raw) {
+  if (!raw) return [];
+  let list = raw;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list);
+    } catch (_e) {
+      return [];
+    }
+  }
+  if (!Array.isArray(list)) return [];
+  return list.map((it) => ({
+    name: it?.name || 'Motorcycle Part',
+    brand: it?.brand || '',
+    quantity: Number(it?.quantity || 1),
+    price: Number(it?.price || it?.cost || 0),
+    size: it?.size || null,
+    image: it?.image || null,
+  }));
+}
+
+function mapRpcPreviewRow(row) {
+  if (!row) return null;
+  const items = normalizePreviewItems(row.items);
+  return {
+    orderId: row.order_id,
+    deliveryId: row.delivery_id,
+    deliveryStatus: row.delivery_status,
+    orderStatus: row.order_status,
+    riderName: row.rider_name,
+    riderContact: row.rider_contact,
+    itemCount: row.item_count ?? items.reduce((s, i) => s + Number(i.quantity || 0), 0) ?? 0,
+    destinationHint: row.destination_hint,
+    expectedDeliveryAt: row.expected_delivery_at,
+    expiresAt: row.token_expires_at,
+    tokenUsed: row.token_used,
+    tokenInvalidated: row.token_invalidated,
+    tokenExpired: row.token_expired,
+    isValid: row.is_valid,
+    customerName: row.customer_name || null,
+    customerPhone: row.customer_phone || null,
+    customerAddress: row.customer_address || null,
+    paymentMethod: row.payment_method || null,
+    totalAmount: row.total_amount != null ? Number(row.total_amount) : null,
+    shippingFee: row.shipping_fee != null ? Number(row.shipping_fee) : null,
+    discountAmount: row.discount_amount != null ? Number(row.discount_amount) : null,
+    itemsSummary: row.items_summary || null,
+    items,
+  };
+}
+
+async function enrichPreviewWithLocalOrder(preview) {
+  if (!preview?.orderId) return preview;
+  const hasItems = Array.isArray(preview.items) && preview.items.length > 0;
+  const hasAddress = Boolean(preview.customerAddress);
+  if (hasItems && hasAddress && preview.customerName) return preview;
+
+  const order = findOrder(preview.orderId);
+  if (!order) {
+    // Remote fallback when rider device has no local order cache
+    const client = supabaseManager.getClient();
+    if (!client) return preview;
+    try {
+      const { data, error } = await client
+        .from('orders')
+        .select(
+          'order_id, customer_name, customer_phone, customer_address, payment_method, total_amount, grand_total, shipping_fee, discount_amount, items_summary, items_count, order_items(quantity, cost, size, products(name, brand, image, price))'
+        )
+        .eq('order_id', preview.orderId)
+        .limit(1);
+      if (error || !data?.[0]) return preview;
+      const o = data[0];
+      const items = Array.isArray(o.order_items)
+        ? o.order_items.map((oi) => ({
+            name: oi.products?.name || 'Motorcycle Part',
+            brand: oi.products?.brand || '',
+            quantity: Number(oi.quantity || 1),
+            price: Number(oi.cost ?? oi.products?.price ?? 0),
+            size: oi.size || null,
+            image: oi.products?.image || null,
+          }))
+        : [];
+      const details = buildOrderDetailsFromOrder({
+        ...o,
+        items,
+        items_count: o.items_count || items.length,
+      });
+      return { ...preview, ...details, itemCount: details.itemCount || preview.itemCount };
+    } catch (e) {
+      console.warn('[DeliveryService] enrichPreviewWithLocalOrder remote:', e);
+      return preview;
+    }
+  }
+
+  const details = buildOrderDetailsFromOrder(order);
+  return {
+    ...preview,
+    customerName: preview.customerName || details.customerName,
+    customerPhone: preview.customerPhone || details.customerPhone,
+    customerAddress: preview.customerAddress || details.customerAddress,
+    paymentMethod: preview.paymentMethod || details.paymentMethod,
+    totalAmount: preview.totalAmount ?? details.totalAmount,
+    shippingFee: preview.shippingFee ?? details.shippingFee,
+    discountAmount: preview.discountAmount ?? details.discountAmount,
+    itemsSummary: preview.itemsSummary || details.itemsSummary,
+    items: hasItems ? preview.items : details.items,
+    itemCount: preview.itemCount || details.itemCount,
+  };
+}
+
+export const deliveryService = {
+  DELIVERY_STATUSES,
+
+  /**
+   * Live updates when order_deliveries / orders change in Supabase.
+   * Rider + Admin screens subscribe so status updates appear without manual refresh.
+   */
+  subscribe(listener) {
+    if (typeof listener !== 'function') return () => {};
+    deliveryListeners.add(listener);
+    setupDeliveryRealtime();
+    return () => deliveryListeners.delete(listener);
+  },
+
+  notifyChanged(payload = { source: 'mutation' }) {
+    notifyDeliveryListeners(payload);
+  },
+
+  normalizeStatus(status) {
+    const s = String(status || '').trim();
+    const lower = s.toLowerCase();
+    if (lower === 'shipped' || lower === 'in transit') return DELIVERY_STATUSES.OUT;
+    if (lower === 'delivery failed' || lower === 'failed') return DELIVERY_STATUSES.FAILED;
+    if (lower === 'delivery reported' || lower === 'reported') return DELIVERY_STATUSES.REPORTED;
+    return s;
+  },
+
+  async getDeliveryForOrder(orderId, { includeOtpHash = false } = {}) {
+    if (!orderId) return null;
+    let record = getLocalDeliveries().find((d) => d.order_id === orderId);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        const { data, error } = await client
+          .from('order_deliveries')
+          .select('*')
+          .eq('order_id', orderId)
+          .limit(1);
+        if (!error && data?.[0]) {
+          record = data[0];
+          upsertLocalDelivery(record);
+        }
+      } catch (e) {
+        console.warn('[DeliveryService] getDeliveryForOrder:', e);
+      }
+    }
+
+    if (!record) return null;
+    const enriched = enrichDeliveryWithRider(record);
+    return includeOtpHash ? enriched : stripOtpSecrets(enriched);
+  },
+
+  async getDeliveryHistory(orderId) {
+    if (!orderId) return [];
+    let rows = getLocalHistory().filter((h) => h.order_id === orderId);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        const { data, error } = await client
+          .from('delivery_history')
+          .select('id,order_id,action,previous_status,new_status,performed_by,notes,created_at')
+          .eq('order_id', orderId)
+          .order('created_at', { ascending: false })
+          .limit(40);
+        if (!error && Array.isArray(data) && data.length) {
+          rows = data;
+          const others = getLocalHistory().filter((h) => h.order_id !== orderId);
+          saveLocalHistory([...data, ...others]);
+        }
+      } catch (e) {
+        console.warn('[DeliveryService] getDeliveryHistory:', e);
+      }
+    }
+
+    return rows.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  },
+
+  /**
+   * Admin assigns a registered rider (staff roster) and marks Ready for Delivery.
+   */
+  async assignDelivery({
+    orderId,
+    riderId,
+    notes = '',
+    expectedDate = null,
+    expectedEndDate = null,
+    adminUser,
+    // Legacy free-text fields ignored when riderId is provided
+    riderName,
+    riderContact,
+    vehicleInfo = '',
+  }) {
+    if (!isAdminUser(adminUser)) {
+      return { success: false, error: 'Only authorized admins can assign delivery.' };
+    }
+    if (!orderId) {
+      return { success: false, error: 'Order ID is required.' };
+    }
+
+    let rider = null;
+    if (riderId) {
+      await riderService.fetchRiders();
+      rider = riderService.getRiderById(riderId);
+      if (!rider) {
+        return { success: false, error: 'Selected rider was not found in the staff roster.' };
+      }
+      if ((rider.status || '').toLowerCase() === RIDER_STATUSES.OFF_DUTY.toLowerCase()) {
+        return { success: false, error: 'That rider is Off Duty. Choose an Available rider.' };
+      }
+    } else if (String(riderName || '').trim()) {
+      // Ad-hoc rider record (name + contact only — no account / login)
+      rider = {
+        id: null,
+        name: String(riderName).trim(),
+        phone: String(riderContact || '').trim(),
+        vehicleInfo: String(vehicleInfo || '').trim(),
+        plateNumber: '',
+        avatar: '',
+      };
+    } else {
+      return {
+        success: false,
+        error: 'Select a registered rider or enter the rider name and contact.',
+      };
+    }
+
+    const order = findOrder(orderId);
+    if (!order) return { success: false, error: 'Order not found.' };
+
+    const prev = this.normalizeStatus(order.status);
+    const blockedStatuses = ['cancelled', 'delivered', 'completed', 'return requested', 'returned'];
+    if (blockedStatuses.includes(prev.toLowerCase())) {
+      return {
+        success: false,
+        error: `Cannot assign delivery while order is "${order.status}".`,
+      };
+    }
+
+    const nowIso = new Date().toISOString();
+    const existing = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    const deliveryId = existing?.delivery_id || makeId('del');
+    const adminLabel = adminUser?.name || adminUser?.email || adminUser?.id || 'Admin';
+    const shippingFee = resolveShippingFee(order, existing);
+
+    const expectedIso = expectedDate ? dateInputToIso(expectedDate) : null;
+    const expectedEndIso = expectedEndDate
+      ? dateInputToIso(expectedEndDate)
+      : expectedIso;
+    const expectedLabel = expectedDeliveryStatusText(expectedIso, 'Expected', expectedEndIso);
+    const record = enrichDeliveryWithRider({
+      delivery_id: deliveryId,
+      order_id: orderId,
+      rider_id: rider.id || null,
+      rider_name: rider.name,
+      rider_contact: rider.phone || '',
+      vehicle_info: rider.vehicleInfo || '',
+      delivery_notes: String(notes || '').trim(),
+      delivery_status: DELIVERY_STATUSES.READY,
+      expected_delivery_at: expectedIso,
+      expected_delivery_end_at: expectedEndIso,
+      shipping_fee: shippingFee,
+      rider_earning: shippingFee,
+      rider_earning_credited: false,
+      rider_earning_credited_at: null,
+      otp_hash: existing?.otp_hash || null,
+      otp_expires_at: existing?.otp_expires_at || null,
+      otp_verified: false,
+      otp_verified_at: null,
+      confirmation_token_hash: null,
+      confirmation_token_expires_at: null,
+      confirmation_token_used_at: null,
+      confirmation_token_invalidated_at: existing?.confirmation_token_invalidated_at || null,
+      confirmation_token_created_at: null,
+      token_verified: false,
+      customer_confirmed: false,
+      customer_confirmed_at: null,
+      confirmed_by_customer_id: null,
+      rider_reported_delivered: false,
+      rider_reported_at: null,
+      rider_reported_by: null,
+      rider_report_notes: '',
+      admin_confirmed: false,
+      admin_confirmed_at: null,
+      admin_confirmed_reason: '',
+      confirmed_by_admin: null,
+      delivery_photo: null,
+      delivery_issue_notes: null,
+      proof_of_delivery: existing?.proof_of_delivery || null,
+      proof_uploaded_by: existing?.proof_uploaded_by || null,
+      proof_uploaded_at: existing?.proof_uploaded_at || null,
+      assigned_by: adminLabel,
+      assigned_at: nowIso,
+      created_at: existing?.created_at || nowIso,
+      updated_at: nowIso,
+    });
+
+    clearCachedToken(orderId);
+    upsertLocalDelivery(record);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        const { error: upsertErr } = await client
+          .from('order_deliveries')
+          .upsert([toDeliveryDbRow(record)], { onConflict: 'order_id' });
+        if (upsertErr) {
+          console.warn('[DeliveryService] assignDelivery upsert:', upsertErr.message || upsertErr);
+          return {
+            success: false,
+            error: upsertErr.message || 'Could not save delivery assignment to the database.',
+          };
+        }
+        const { error: orderErr } = await client
+          .from('orders')
+          .update({
+            status: DELIVERY_STATUSES.READY,
+            estimated_delivery: expectedIso ? expectedLabel : 'Ready for dispatch',
+            updated_at: nowIso,
+          })
+          .eq('order_id', orderId);
+        if (orderErr) {
+          console.warn('[DeliveryService] assignDelivery order update:', orderErr.message || orderErr);
+        }
+      } catch (e) {
+        console.warn('[DeliveryService] assignDelivery supabase:', e);
+        return { success: false, error: e?.message || 'Could not save delivery assignment.' };
+      }
+    }
+
+    await orderService.updateOrderStatus(orderId, DELIVERY_STATUSES.READY, 'Delivery assigned', {
+      allowDelivered: false,
+      skipTransitionCheck: true,
+      deliveryMeta: {
+        // Client-side display fields only (not DB columns on orders)
+        rider_id: record.rider_id,
+        rider_name: record.rider_name,
+        rider_contact: record.rider_contact,
+        rider_vehicle: record.vehicle_info,
+        rider_plate: record.rider_plate,
+        rider_avatar: record.rider_avatar,
+        expected_delivery_at: record.expected_delivery_at,
+        expected_delivery_end_at: record.expected_delivery_end_at,
+        estimated_delivery: expectedIso ? expectedLabel : 'Ready for dispatch',
+      },
+    });
+
+    await appendHistory({
+      orderId,
+      action: 'ASSIGN_RIDER',
+      previousStatus: prev,
+      newStatus: DELIVERY_STATUSES.READY,
+      performedBy: adminLabel,
+      notes: `Assigned rider ${record.rider_name}${record.rider_contact ? ` (${record.rider_contact})` : ''}`,
+      metadata: {
+        rider_id: record.rider_id,
+        rider_name: record.rider_name,
+      },
+    });
+
+    try {
+      auditLogService.logOrderAction({
+        action: 'DELIVERY_ASSIGNED',
+        target: `Order #${orderId}`,
+        details: `Admin assigned rider ${record.rider_name} to Order #${orderId}.`,
+        severity: 'INFO',
+        metadata: { orderId, rider: record.rider_name, rider_id: record.rider_id },
+      });
+    } catch (_e) {}
+
+    try {
+      if (!order.delivery_lat || !order.delivery_lng) {
+        const geo = await geocodeAddress(order.customer_address);
+        if (geo && client) {
+          await client
+            .from('orders')
+            .update({ delivery_lat: geo.lat, delivery_lng: geo.lng, delivery_landmark: order.delivery_notes || null })
+            .eq('order_id', orderId);
+        }
+      }
+    } catch (_e) {}
+
+    let riderAccess = null;
+    try {
+      riderAccess = await riderAccessService.issueRiderAccess({
+        riderId: record.rider_id,
+        riderName: record.rider_name,
+        riderContact: record.rider_contact,
+        adminUser,
+      });
+    } catch (e) {
+      console.warn('[DeliveryService] rider access:', e);
+    }
+
+    this.notifyChanged({ source: 'assign', orderId });
+    return { success: true, delivery: stripOtpSecrets(record), riderAccess };
+  },
+
+  /**
+   * Admin marks Out for Delivery and issues a single-use secure confirmation token/QR.
+   */
+  async markOutForDelivery(orderId, adminUser, { expectedDate = null } = {}) {
+    if (!isAdminUser(adminUser)) {
+      return { success: false, error: 'Only authorized admins can mark out for delivery.' };
+    }
+    const order = findOrder(orderId);
+    if (!order) return { success: false, error: 'Order not found.' };
+
+    let delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery?.rider_name && !delivery?.rider_id) {
+      return { success: false, error: 'Assign a rider (name + contact) before marking Out for Delivery.' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const adminLabel = adminUser?.name || adminUser?.email || 'Admin';
+    const prev = delivery.delivery_status || order.status;
+    const { plainToken, fields: tokenFields } = createTokenFields();
+    const shippingFee = resolveShippingFee(order, delivery);
+    const expectedIso = expectedDate ? dateInputToIso(expectedDate) : delivery.expected_delivery_at || null;
+    const expectedEndIso = delivery.expected_delivery_end_at || expectedIso;
+    const outExpectedLabel = expectedIso
+      ? expectedDeliveryStatusText(expectedIso, 'Out for delivery — expected', expectedEndIso)
+      : 'Out for delivery today';
+
+    delivery = {
+      ...delivery,
+      delivery_status: DELIVERY_STATUSES.OUT,
+      expected_delivery_at: expectedIso,
+      expected_delivery_end_at: expectedEndIso,
+      shipping_fee: shippingFee,
+      rider_earning: shippingFee,
+      otp_hash: null,
+      otp_expires_at: null,
+      otp_verified: false,
+      otp_verified_at: null,
+      ...tokenFields,
+      customer_confirmed: false,
+      customer_confirmed_at: null,
+      rider_reported_delivered: false,
+      rider_reported_at: null,
+      rider_reported_by: null,
+      rider_report_notes: '',
+      admin_confirmed: false,
+      admin_confirmed_at: null,
+      admin_confirmed_reason: '',
+      confirmed_by_admin: null,
+      delivery_photo: null,
+      delivery_issue_notes: null,
+      updated_at: nowIso,
+    };
+    upsertLocalDelivery(delivery);
+    cachePlainToken(orderId, plainToken);
+
+    if (delivery.rider_id) {
+      try {
+        await riderService.setRiderStatus(delivery.rider_id, RIDER_STATUSES.ON_DELIVERY);
+      } catch (_e) {}
+    }
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client.from('order_deliveries').upsert([toDeliveryDbRow(delivery)], { onConflict: 'order_id' });
+        await client
+          .from('orders')
+          .update({
+            status: DELIVERY_STATUSES.OUT,
+            estimated_delivery: outExpectedLabel,
+            updated_at: nowIso,
+          })
+          .eq('order_id', orderId);
+      } catch (e) {
+        console.warn('[DeliveryService] markOutForDelivery supabase:', e);
+      }
+    }
+
+    await orderService.updateOrderStatus(orderId, DELIVERY_STATUSES.OUT, 'Out for delivery', {
+      skipTransitionCheck: true,
+      deliveryMeta: {
+        rider_id: delivery.rider_id,
+        rider_name: delivery.rider_name,
+        rider_contact: delivery.rider_contact,
+        rider_vehicle: delivery.vehicle_info,
+        rider_plate: delivery.rider_plate,
+        rider_avatar: delivery.rider_avatar,
+        has_delivery_token: true,
+        confirmation_token_expires_at: null,
+        expected_delivery_at: expectedIso,
+        expected_delivery_end_at: expectedEndIso,
+        estimated_delivery: outExpectedLabel,
+      },
+    });
+
+    await appendHistory({
+      orderId,
+      action: 'OUT_FOR_DELIVERY',
+      previousStatus: prev,
+      newStatus: DELIVERY_STATUSES.OUT,
+      performedBy: adminLabel,
+      notes: 'Dispatched. Secure confirmation QR/link issued (valid until delivery is confirmed).',
+      metadata: { no_time_expiry: true },
+    });
+
+    const customerUserId = order.user_id || order.customer_id || null;
+    try {
+      await notificationService.notifyCustomerOutForDelivery({
+        userId: customerUserId,
+        orderId,
+        riderName: delivery.rider_name,
+        expectedDelivery: delivery.expected_delivery_at,
+      });
+    } catch (e) {
+      console.warn('[DeliveryService] customer out-for-delivery notification failed:', e);
+    }
+
+    return {
+      success: true,
+      delivery: stripOtpSecrets(delivery),
+      ...(await tokenShareBundle(plainToken)),
+    };
+  },
+
+  /**
+   * Admin regenerates a new QR/token (invalidates the previous one).
+   */
+  async regenerateDeliveryToken(orderId, adminUser, { orderSnapshot = null } = {}) {
+    if (!isAdminUser(adminUser)) {
+      return { success: false, error: 'Only authorized admins can regenerate delivery tokens.' };
+    }
+    const order = findOrder(orderId) || orderSnapshot || null;
+    if (!order) return { success: false, error: 'Order not found.' };
+
+    const status = this.normalizeStatus(order.status);
+    const statusRaw = String(order.status || '');
+    if (
+      status !== DELIVERY_STATUSES.OUT &&
+      status !== DELIVERY_STATUSES.RESCHEDULED &&
+      status !== DELIVERY_STATUSES.READY &&
+      status !== DELIVERY_STATUSES.REPORTED &&
+      !isOutForDeliveryStatus(statusRaw)
+    ) {
+      return {
+        success: false,
+        error: 'A new confirmation token can only be issued for active delivery orders.',
+      };
+    }
+
+    let delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery) {
+      // Create a minimal delivery row so QR can still be issued after assign.
+      delivery = {
+        delivery_id: makeId('del'),
+        order_id: orderId,
+        rider_id: order.rider_id || null,
+        rider_name: order.rider_name || null,
+        rider_contact: order.rider_contact || null,
+        delivery_status: order.status || DELIVERY_STATUSES.READY,
+        created_at: new Date().toISOString(),
+      };
+    }
+
+    const nowIso = new Date().toISOString();
+    const adminLabel = adminUser?.name || adminUser?.email || 'Admin';
+    const { plainToken, fields: tokenFields } = createTokenFields();
+
+    delivery = {
+      ...delivery,
+      ...tokenFields,
+      token_verified: false,
+      rider_reported_delivered: false,
+      rider_reported_at: null,
+      rider_reported_by: null,
+      rider_report_notes: '',
+      updated_at: nowIso,
+    };
+    upsertLocalDelivery(delivery);
+    cachePlainToken(orderId, plainToken);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client.from('order_deliveries').upsert([toDeliveryDbRow(delivery)], { onConflict: 'order_id' });
+      } catch (e) {
+        console.warn('[DeliveryService] regenerateDeliveryToken supabase:', e);
+      }
+    }
+
+    await appendHistory({
+      orderId,
+      action: 'TOKEN_REGENERATED',
+      previousStatus: order.status,
+      newStatus: order.status,
+      performedBy: adminLabel,
+      notes: 'Previous confirmation token invalidated. New QR/link issued (valid until delivery is confirmed).',
+      metadata: { no_time_expiry: true },
+    });
+
+    return {
+      success: true,
+      delivery: stripOtpSecrets(delivery),
+      ...(await tokenShareBundle(plainToken)),
+    };
+  },
+
+  /**
+   * Returns cached plaintext token for admin re-display (same device), if still valid.
+   */
+  getAdminDeliveryTokenBundle(orderId) {
+    const plain = getCachedPlainToken(orderId);
+    if (!plain) return null;
+    const delivery = getLocalDeliveries().find((d) => d.order_id === orderId);
+    if (!delivery?.confirmation_token_hash) return null;
+    if (delivery.confirmation_token_used_at || delivery.confirmation_token_invalidated_at) return null;
+    if (normalizeTokenHash(delivery.confirmation_token_hash) !== hashDeliveryToken(plain)) {
+      return null;
+    }
+    const confirmUrl = buildDeliveryConfirmUrl(plain);
+    return {
+      token: plain,
+      confirmUrl,
+      qrImageUrl: qrImageUrlForLink(confirmUrl),
+      expiresAt: null,
+    };
+  },
+
+  /**
+   * Admin sets or changes the customer-facing expected delivery date.
+   */
+  async updateExpectedDelivery(orderId, expectedDate, adminUser) {
+    if (!isAdminUser(adminUser)) {
+      return { success: false, error: 'Only authorized admins can set the expected delivery date.' };
+    }
+    if (!orderId) return { success: false, error: 'Order ID is required.' };
+    const expectedIso = dateInputToIso(expectedDate);
+    if (!expectedIso) {
+      return { success: false, error: 'Pick a valid expected delivery date.' };
+    }
+
+    const order = findOrder(orderId);
+    if (!order) return { success: false, error: 'Order not found.' };
+
+    let delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    const nowIso = new Date().toISOString();
+    const adminLabel = adminUser?.name || adminUser?.email || 'Admin';
+    const statusLabel = this.normalizeStatus(order.status);
+    const outLike = statusLabel === DELIVERY_STATUSES.OUT || isOutForDeliveryStatus(order.status);
+    const estimated = expectedDeliveryStatusText(
+      expectedIso,
+      outLike ? 'Out for delivery — expected' : 'Expected'
+    );
+
+    if (!delivery) {
+      delivery = {
+        delivery_id: makeId('del'),
+        order_id: orderId,
+        delivery_status: order.status || DELIVERY_STATUSES.READY,
+        expected_delivery_at: expectedIso,
+        assigned_by: adminLabel,
+        assigned_at: nowIso,
+        created_at: nowIso,
+        updated_at: nowIso,
+      };
+    } else {
+      delivery = {
+        ...delivery,
+        expected_delivery_at: expectedIso,
+        updated_at: nowIso,
+      };
+    }
+    upsertLocalDelivery(delivery);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client.from('order_deliveries').upsert([toDeliveryDbRow(delivery)], { onConflict: 'order_id' });
+        await client
+          .from('orders')
+          .update({
+            estimated_delivery: estimated,
+            updated_at: nowIso,
+          })
+          .eq('order_id', orderId);
+      } catch (e) {
+        console.warn('[DeliveryService] updateExpectedDelivery supabase:', e);
+      }
+    }
+
+    await orderService.updateOrderStatus(orderId, order.status, 'Expected delivery date updated', {
+      skipTransitionCheck: true,
+      deliveryMeta: {
+        expected_delivery_at: expectedIso,
+        estimated_delivery: estimated,
+      },
+    });
+
+    await appendHistory({
+      orderId,
+      action: 'EXPECTED_DELIVERY_SET',
+      previousStatus: order.status,
+      newStatus: order.status,
+      performedBy: adminLabel,
+      notes: estimated,
+      metadata: { expected_delivery_at: expectedIso },
+    });
+
+    return { success: true, delivery: stripOtpSecrets(delivery), estimated_delivery: estimated };
+  },
+
+  async uploadProofOfDelivery(orderId, imageUri, adminUser) {
+    if (!isAdminUser(adminUser)) {
+      return { success: false, error: 'Only authorized admins can upload proof of delivery.' };
+    }
+    if (!imageUri) return { success: false, error: 'No image provided.' };
+
+    const delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery) {
+      return { success: false, error: 'Assign delivery before uploading proof.' };
+    }
+
+    const resolved = await resolveImageForDatabase(imageUri, {
+      folder: 'delivery-proofs',
+      orderId,
+      fileName: `delivery-proofs/${orderId}-${Date.now()}.jpg`,
+    });
+    if (!resolved.url) {
+      return { success: false, error: resolved.error || 'Could not upload proof photo.' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const adminLabel = adminUser?.name || adminUser?.email || 'Admin';
+    const updated = {
+      ...delivery,
+      proof_of_delivery: resolved.url,
+      delivery_photo: resolved.url,
+      proof_uploaded_by: adminLabel,
+      proof_uploaded_at: nowIso,
+      updated_at: nowIso,
+    };
+    upsertLocalDelivery(updated);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client.from('order_deliveries').upsert([toDeliveryDbRow(updated)], { onConflict: 'order_id' });
+      } catch (e) {
+        console.warn('[DeliveryService] proof upload supabase:', e);
+      }
+    }
+
+    await appendHistory({
+      orderId,
+      action: 'PROOF_UPLOADED',
+      previousStatus: delivery.delivery_status,
+      newStatus: delivery.delivery_status,
+      performedBy: adminLabel,
+      notes: 'Admin uploaded proof of delivery photo.',
+    });
+
+    return { success: true, delivery: stripOtpSecrets(updated) };
+  },
+
+  async markDeliveryFailed(orderId, adminUser, notes = '') {
+    if (!isAdminUser(adminUser)) {
+      return { success: false, error: 'Only authorized admins can mark a delivery issue.' };
+    }
+    const order = findOrder(orderId);
+    if (!order) return { success: false, error: 'Order not found.' };
+
+    const prev = this.normalizeStatus(order.status);
+    if (
+      prev !== DELIVERY_STATUSES.OUT &&
+      prev !== DELIVERY_STATUSES.REPORTED &&
+      !isOutForDeliveryStatus(order.status) &&
+      !isReportedStatus(order.status)
+    ) {
+      return { success: false, error: 'Only Out for Delivery or Delivery Reported orders can be marked as an issue.' };
+    }
+
+    const delivery = (await this.getDeliveryForOrder(orderId, { includeOtpHash: true })) || {
+      delivery_id: makeId('del'),
+      order_id: orderId,
+    };
+    const nowIso = new Date().toISOString();
+    const adminLabel = adminUser?.name || adminUser?.email || 'Admin';
+    const noteText = String(notes || '').trim();
+    let updated = {
+      ...delivery,
+      delivery_status: DELIVERY_STATUSES.FAILED,
+      delivery_notes: noteText || delivery.delivery_notes || '',
+      delivery_issue_notes: noteText,
+      otp_hash: null,
+      otp_expires_at: null,
+      rider_reported_delivered: Boolean(delivery.rider_reported_delivered),
+      updated_at: nowIso,
+    };
+    updated = invalidateTokenFields(updated);
+    upsertLocalDelivery(updated);
+    clearCachedToken(orderId);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client.from('order_deliveries').upsert([toDeliveryDbRow(updated)], { onConflict: 'order_id' });
+      } catch (e) {
+        console.warn('[DeliveryService] markFailed supabase:', e);
+      }
+    }
+
+    await orderService.updateOrderStatus(orderId, DELIVERY_STATUSES.FAILED, noteText || 'Delivery issue', {
+      skipTransitionCheck: true,
+      deliveryMeta: {
+        delivery_status: DELIVERY_STATUSES.FAILED,
+        rider_id: updated.rider_id,
+        rider_name: updated.rider_name,
+        delivery_issue_notes: noteText,
+      },
+    });
+
+    if (updated.rider_id) {
+      try {
+        await riderService.setRiderStatus(updated.rider_id, RIDER_STATUSES.AVAILABLE);
+      } catch (_e) {}
+    }
+
+    await appendHistory({
+      orderId,
+      action: 'DELIVERY_ISSUE',
+      previousStatus: prev,
+      newStatus: DELIVERY_STATUSES.FAILED,
+      performedBy: adminLabel,
+      notes: noteText || 'Delivery issue reported by admin',
+      metadata: { token_invalidated: true },
+    });
+
+    try {
+      await deliveryLocationService.clearLocation(orderId, {
+        riderId: updated.rider_id,
+      });
+    } catch (_e) {}
+
+    try {
+      await notificationService.notifyCustomerDeliveryFailed({
+        userId: order.user_id || order.customer_id,
+        orderId,
+        notes: noteText || 'Delivery attempt had an issue',
+      });
+    } catch (e) {
+      console.warn('[DeliveryService] fail notification failed:', e);
+    }
+
+    return { success: true, delivery: stripOtpSecrets(updated) };
+  },
+
+  /** Alias used by Admin UI */
+  async markDeliveryIssue(orderId, adminUser, notes = '') {
+    return this.markDeliveryFailed(orderId, adminUser, notes);
+  },
+
+  async rescheduleDelivery(orderId, adminUser, notes = '', { generateNewToken = false } = {}) {
+    if (!isAdminUser(adminUser)) {
+      return { success: false, error: 'Only authorized admins can reschedule delivery.' };
+    }
+    const order = findOrder(orderId);
+    if (!order) return { success: false, error: 'Order not found.' };
+
+    const prev = this.normalizeStatus(order.status);
+    if (prev !== DELIVERY_STATUSES.FAILED && prev !== DELIVERY_STATUSES.RESCHEDULED && !isIssueStatus(order.status)) {
+      return { success: false, error: 'Reschedule is available after a delivery issue.' };
+    }
+
+    const delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    const nowIso = new Date().toISOString();
+    const adminLabel = adminUser?.name || adminUser?.email || 'Admin';
+    let updated = {
+      ...(delivery || { delivery_id: makeId('del'), order_id: orderId }),
+      delivery_status: DELIVERY_STATUSES.RESCHEDULED,
+      delivery_notes: notes || delivery?.delivery_notes || '',
+      updated_at: nowIso,
+    };
+    updated = invalidateTokenFields(updated);
+    clearCachedToken(orderId);
+
+    let tokenBundle = null;
+    if (generateNewToken) {
+      const { plainToken, fields: tokenFields } = createTokenFields();
+      updated = { ...updated, ...tokenFields };
+      cachePlainToken(orderId, plainToken);
+      tokenBundle = {
+        ...(await tokenShareBundle(plainToken)),
+        expiresAt: updated.confirmation_token_expires_at,
+      };
+    }
+
+    upsertLocalDelivery(updated);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client.from('order_deliveries').upsert([toDeliveryDbRow(updated)], { onConflict: 'order_id' });
+      } catch (e) {
+        console.warn('[DeliveryService] reschedule supabase:', e);
+      }
+    }
+
+    await orderService.updateOrderStatus(orderId, DELIVERY_STATUSES.RESCHEDULED, notes || 'Delivery rescheduled', {
+      skipTransitionCheck: true,
+      deliveryMeta: {
+        delivery_status: DELIVERY_STATUSES.RESCHEDULED,
+        rider_id: updated.rider_id,
+        rider_name: updated.rider_name,
+      },
+    });
+
+    if (updated.rider_id) {
+      try {
+        await riderService.setRiderStatus(updated.rider_id, RIDER_STATUSES.AVAILABLE);
+      } catch (_e) {}
+    }
+
+    await appendHistory({
+      orderId,
+      action: 'RESCHEDULED',
+      previousStatus: prev,
+      newStatus: DELIVERY_STATUSES.RESCHEDULED,
+      performedBy: adminLabel,
+      notes: notes || 'Delivery rescheduled; previous confirmation token invalidated.',
+      metadata: { new_token: Boolean(tokenBundle) },
+    });
+
+    try {
+      await notificationService.notifyCustomerDeliveryRescheduled({
+        userId: order.user_id || order.customer_id,
+        orderId,
+        notes: notes || 'Delivery was rescheduled',
+      });
+    } catch (e) {
+      console.warn('[DeliveryService] reschedule notification failed:', e);
+    }
+
+    return {
+      success: true,
+      delivery: stripOtpSecrets(updated),
+      ...(tokenBundle || {}),
+    };
+  },
+
+  /**
+   * Admin manually logs that the rider reported drop-off (fallback if QR unused).
+   * Moves order to Delivery Reported — not Delivered.
+   */
+  async reportRiderDelivered({ orderId, notes = '', adminUser }) {
+    if (!isAdminUser(adminUser)) {
+      return { success: false, error: 'Only authorized admins can log a rider drop-off report.' };
+    }
+    if (!orderId) return { success: false, error: 'Order ID is required.' };
+
+    const order = findOrder(orderId);
+    if (!order) return { success: false, error: 'Order not found.' };
+    if (!isOutForDeliveryStatus(order.status) && this.normalizeStatus(order.status) !== DELIVERY_STATUSES.OUT) {
+      return { success: false, error: 'Rider drop-off can only be logged while the order is Out for Delivery.' };
+    }
+
+    const delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery) {
+      return { success: false, error: 'No delivery assignment found for this order.' };
+    }
+    if ((order.status || '').toLowerCase() === 'delivered' || delivery.delivery_status === DELIVERY_STATUSES.DELIVERED) {
+      return { success: false, error: 'This order is already delivered.' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const adminLabel = adminUser?.name || adminUser?.email || 'Admin';
+    const noteText = String(notes || '').trim();
+    let updated = {
+      ...delivery,
+      delivery_status: DELIVERY_STATUSES.REPORTED,
+      rider_reported_delivered: true,
+      rider_reported_at: nowIso,
+      rider_reported_by: adminLabel,
+      rider_report_notes: noteText,
+      updated_at: nowIso,
+    };
+    // Burn any outstanding token so it cannot be reused
+    updated = {
+      ...updated,
+      confirmation_token_used_at: delivery.confirmation_token_used_at || nowIso,
+      confirmation_token_invalidated_at: delivery.confirmation_token_invalidated_at || nowIso,
+    };
+    upsertLocalDelivery(updated);
+    clearCachedToken(orderId);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client.from('order_deliveries').upsert([toDeliveryDbRow(updated)], { onConflict: 'order_id' });
+        await client
+          .from('orders')
+          .update({
+            status: DELIVERY_STATUSES.REPORTED,
+            estimated_delivery: 'Delivery reported — awaiting admin confirmation',
+            updated_at: nowIso,
+          })
+          .eq('order_id', orderId);
+      } catch (e) {
+        console.warn('[DeliveryService] reportRiderDelivered supabase:', e);
+      }
+    }
+
+    await orderService.updateOrderStatus(
+      orderId,
+      DELIVERY_STATUSES.REPORTED,
+      noteText || 'Rider reported delivery',
+      {
+        skipTransitionCheck: true,
+        deliveryMeta: {
+          rider_reported_delivered: true,
+          rider_reported_at: nowIso,
+          rider_reported_by: adminLabel,
+          rider_report_notes: noteText,
+          rider_id: updated.rider_id,
+          rider_name: updated.rider_name,
+          rider_contact: updated.rider_contact,
+        },
+      }
+    );
+
+    mergeLocalOrderMeta(orderId, {
+      status: DELIVERY_STATUSES.REPORTED,
+      rider_reported_delivered: true,
+      rider_reported_at: nowIso,
+      rider_reported_by: adminLabel,
+      rider_report_notes: noteText,
+      updated_at: nowIso,
+    });
+
+    await appendHistory({
+      orderId,
+      action: 'RIDER_REPORTED_DELIVERED',
+      previousStatus: delivery.delivery_status || order.status,
+      newStatus: DELIVERY_STATUSES.REPORTED,
+      performedBy: adminLabel,
+      notes: noteText
+        ? `${updated.rider_name || 'Rider'} reported drop-off. ${noteText}`
+        : `${updated.rider_name || 'Rider'} reported the item was delivered.`,
+      metadata: { rider_id: updated.rider_id, rider_name: updated.rider_name },
+    });
+
+    try {
+      await notificationService.notifyAdminRiderReportedDelivered({
+        orderId,
+        riderName: updated.rider_name,
+        notes: noteText,
+        reportedBy: adminLabel,
+      });
+    } catch (e) {
+      console.warn('[DeliveryService] rider report notification failed:', e);
+    }
+
+    try {
+      auditLogService.logOrderAction({
+        action: 'RIDER_REPORTED_DELIVERED',
+        target: `Order #${orderId}`,
+        details: `Rider ${updated.rider_name || ''} reported drop-off for Order #${orderId}. Status: Delivery Reported.`,
+        severity: 'INFO',
+        metadata: { orderId, rider_id: updated.rider_id },
+      });
+    } catch (_e) {}
+
+    return { success: true, delivery: stripOtpSecrets(updated) };
+  },
+
+  /**
+   * Public (no auth): validate token and return order details for rider confirmation page.
+   */
+  async getPublicDeliveryPreview(plainToken) {
+    const token = String(plainToken || '').trim();
+    if (!token || token.length < 16) {
+      return { success: false, error: 'Invalid or missing confirmation token.', preview: null };
+    }
+    const tokenHash = hashDeliveryToken(token);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        const { data, error } = await client.rpc('get_delivery_confirm_preview', {
+          p_token_hash: tokenHash,
+        });
+        if (!error && data) {
+          const row = Array.isArray(data) ? data[0] : data;
+          if (row) {
+            const preview = await enrichPreviewWithLocalOrder(mapRpcPreviewRow(row));
+            return {
+              success: Boolean(row.is_valid),
+              error: row.is_valid ? null : row.invalid_reason || 'Token is not valid',
+              preview,
+            };
+          }
+        }
+      } catch (e) {
+        console.warn('[DeliveryService] getPublicDeliveryPreview rpc:', e);
+      }
+    }
+
+    // Local / offline fallback
+    const list = getLocalDeliveries();
+    const delivery = list.find(
+      (d) => normalizeTokenHash(d.confirmation_token_hash) === tokenHash
+    );
+    if (!delivery) {
+      return { success: false, error: 'Token not found', preview: null };
+    }
+    const order = findOrder(delivery.order_id);
+    const used = Boolean(delivery.confirmation_token_used_at || delivery.token_verified);
+    const invalidated = Boolean(delivery.confirmation_token_invalidated_at);
+    const expired = false; // Tokens do not time-expire
+    const ofd =
+      isOutForDeliveryStatus(order?.status) ||
+      this.normalizeStatus(order?.status) === DELIVERY_STATUSES.OUT;
+    let reason = null;
+    let ok = true;
+    if (used) {
+      reason = 'Token already used';
+      ok = false;
+    } else if (invalidated) {
+      reason = 'Token invalidated';
+      ok = false;
+    } else if (!ofd) {
+      reason = 'Order is not out for delivery';
+      ok = false;
+    }
+
+    const addr = String(order?.customer_address || '');
+    const parts = addr.split(',').map((p) => p.trim()).filter(Boolean);
+    const destinationHint = parts.length ? parts[parts.length - 1] : 'Delivery address on file';
+    const orderDetails = buildOrderDetailsFromOrder(order);
+
+    const preview = await enrichPreviewWithLocalOrder({
+      orderId: delivery.order_id,
+      deliveryId: delivery.delivery_id,
+      deliveryStatus: delivery.delivery_status,
+      orderStatus: order?.status || null,
+      riderName: delivery.rider_name,
+      riderContact: delivery.rider_contact,
+      itemCount: orderDetails.itemCount || order?.items_count || (order?.items || []).length || 0,
+      destinationHint,
+      expectedDeliveryAt: delivery.expected_delivery_at,
+      expiresAt: delivery.confirmation_token_expires_at,
+      tokenUsed: used,
+      tokenInvalidated: invalidated,
+      tokenExpired: expired,
+      isValid: ok,
+      ...orderDetails,
+    });
+
+    return {
+      success: ok,
+      error: ok ? null : reason,
+      preview,
+    };
+  },
+
+  /**
+   * Public (no auth): rider taps Confirm Delivered → Delivery Reported (not Delivered).
+   */
+  async confirmDeliveryByToken({ token, notes = '', photo = null }) {
+    const plain = String(token || '').trim();
+    if (!plain || plain.length < 16) {
+      return { success: false, error: 'Invalid confirmation token.' };
+    }
+    const tokenHash = hashDeliveryToken(plain);
+    const noteText = String(notes || '').trim();
+
+    let photoUri = photo || null;
+    if (photoUri && String(photoUri).startsWith('data:')) {
+      const previewForName = await this.getPublicDeliveryPreview(plain);
+      const orderHint = previewForName?.preview?.orderId || 'token';
+      const resolved = await resolveImageForDatabase(photoUri, {
+        folder: 'delivery-proofs',
+        orderId: orderHint,
+        fileName: `delivery-proofs/${orderHint}-${Date.now()}.jpg`,
+      });
+      if (resolved.url) photoUri = resolved.url;
+      else photoUri = null;
+    }
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        const { data, error } = await client.rpc('confirm_delivery_by_token', {
+          p_token_hash: tokenHash,
+          p_notes: noteText || null,
+          p_photo: photoUri,
+        });
+        if (!error && data) {
+          const row = Array.isArray(data) ? data[0] : data;
+          if (row?.success) {
+            const orderId = row.order_id;
+            const nowIso = new Date().toISOString();
+            // Sync local cache
+            let delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+            if (delivery) {
+              delivery = {
+                ...delivery,
+                delivery_status: DELIVERY_STATUSES.REPORTED,
+                rider_reported_delivered: true,
+                rider_reported_at: nowIso,
+                rider_reported_by: delivery.rider_name || 'Rider (token)',
+                rider_report_notes: noteText,
+                delivery_photo: photoUri || delivery.delivery_photo,
+                proof_of_delivery: photoUri || delivery.proof_of_delivery,
+                token_verified: true,
+                confirmation_token_used_at: nowIso,
+                updated_at: nowIso,
+              };
+              upsertLocalDelivery(delivery);
+            }
+            mergeLocalOrderMeta(orderId, {
+              status: DELIVERY_STATUSES.REPORTED,
+              rider_reported_delivered: true,
+              rider_reported_at: nowIso,
+              token_verified: true,
+              updated_at: nowIso,
+            });
+            clearCachedToken(orderId);
+
+            try {
+              await notificationService.notifyAdminRiderReportedDelivered({
+                orderId,
+                riderName: delivery?.rider_name,
+                notes: noteText || 'Confirmed via secure QR/link',
+                reportedBy: delivery?.rider_name || 'Rider',
+              });
+            } catch (_e) {}
+
+            return {
+              success: true,
+              orderId,
+              message: 'Delivery reported. The store admin will confirm shortly.',
+              delivery: stripOtpSecrets(delivery),
+            };
+          }
+          return { success: false, error: row?.error_message || 'Confirmation failed.' };
+        }
+        if (error) console.warn('[DeliveryService] confirm rpc error:', error);
+      } catch (e) {
+        console.warn('[DeliveryService] confirmDeliveryByToken rpc:', e);
+      }
+    }
+
+    // Local fallback
+    const previewRes = await this.getPublicDeliveryPreview(plain);
+    if (!previewRes.success || !previewRes.preview?.isValid) {
+      return { success: false, error: previewRes.error || 'Token is not valid for confirmation.' };
+    }
+
+    const orderId = previewRes.preview.orderId;
+    const order = findOrder(orderId);
+    let delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery) return { success: false, error: 'Delivery record not found.' };
+
+    const nowIso = new Date().toISOString();
+    delivery = {
+      ...delivery,
+      delivery_status: DELIVERY_STATUSES.REPORTED,
+      rider_reported_delivered: true,
+      rider_reported_at: nowIso,
+      rider_reported_by: delivery.rider_name || 'Rider (token)',
+      rider_report_notes: noteText,
+      delivery_photo: photoUri || delivery.delivery_photo,
+      proof_of_delivery: photoUri || delivery.proof_of_delivery,
+      proof_uploaded_by: photoUri ? delivery.rider_name || 'Rider (token)' : delivery.proof_uploaded_by,
+      proof_uploaded_at: photoUri ? nowIso : delivery.proof_uploaded_at,
+      token_verified: true,
+      confirmation_token_used_at: nowIso,
+      updated_at: nowIso,
+    };
+    upsertLocalDelivery(delivery);
+    clearCachedToken(orderId);
+
+    await orderService.updateOrderStatus(
+      orderId,
+      DELIVERY_STATUSES.REPORTED,
+      noteText || 'Rider confirmed via QR/link',
+      {
+        skipTransitionCheck: true,
+        deliveryMeta: {
+          rider_reported_delivered: true,
+          rider_reported_at: nowIso,
+          token_verified: true,
+          rider_name: delivery.rider_name,
+          rider_contact: delivery.rider_contact,
+        },
+      }
+    );
+
+    await appendHistory({
+      orderId,
+      action: 'RIDER_TOKEN_CONFIRMED',
+      previousStatus: order?.status || DELIVERY_STATUSES.OUT,
+      newStatus: DELIVERY_STATUSES.REPORTED,
+      performedBy: delivery.rider_name || 'Rider (token)',
+      notes: noteText || 'Rider confirmed delivery via secure QR/link',
+      metadata: {
+        token_verified: true,
+        has_photo: Boolean(photoUri),
+        rider_name: delivery.rider_name,
+        rider_contact: delivery.rider_contact,
+      },
+    });
+
+    try {
+      await notificationService.notifyAdminRiderReportedDelivered({
+        orderId,
+        riderName: delivery.rider_name,
+        notes: noteText || 'Confirmed via secure QR/link',
+        reportedBy: delivery.rider_name || 'Rider',
+      });
+    } catch (_e) {}
+
+    this.notifyChanged({ source: 'token_confirm', orderId });
+    return {
+      success: true,
+      orderId,
+      message: 'Delivery reported. The store admin will confirm shortly.',
+      delivery: stripOtpSecrets(delivery),
+    };
+  },
+
+  /**
+   * Optional customer "Confirm Received" on My Orders — does not mark Delivered alone.
+   */
+  async customerConfirmReceived({ orderId, customerUser }) {
+    if (!orderId) return { success: false, error: 'Order ID is required.' };
+    const order = findOrder(orderId);
+    if (!order) return { success: false, error: 'Order not found.' };
+
+    const status = this.normalizeStatus(order.status);
+    if (
+      status !== DELIVERY_STATUSES.OUT &&
+      status !== DELIVERY_STATUSES.REPORTED &&
+      !isOutForDeliveryStatus(order.status) &&
+      !isReportedStatus(order.status)
+    ) {
+      return { success: false, error: 'You can only confirm receipt while the order is out for delivery or reported.' };
+    }
+
+    const delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery) return { success: false, error: 'No delivery found for this order.' };
+
+    const nowIso = new Date().toISOString();
+    const customerLabel =
+      customerUser?.name || customerUser?.email || order.customer_name || 'Customer';
+    const updated = {
+      ...delivery,
+      customer_confirmed: true,
+      customer_confirmed_at: nowIso,
+      confirmed_by_customer_id: customerUser?.id || order.customer_id || null,
+      updated_at: nowIso,
+    };
+    upsertLocalDelivery(updated);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client.from('order_deliveries').upsert([toDeliveryDbRow(updated)], { onConflict: 'order_id' });
+      } catch (e) {
+        console.warn('[DeliveryService] customerConfirmReceived supabase:', e);
+      }
+    }
+
+    mergeLocalOrderMeta(orderId, {
+      customer_delivery_confirmed: true,
+      customer_delivery_confirmed_at: nowIso,
+      updated_at: nowIso,
+    });
+
+    await appendHistory({
+      orderId,
+      action: 'CUSTOMER_CONFIRMED_RECEIVED',
+      previousStatus: order.status,
+      newStatus: order.status,
+      performedBy: customerLabel,
+      notes: 'Customer tapped Confirm Received on My Orders.',
+    });
+
+    try {
+      await notificationService.addNotification({
+        target: 'admin',
+        category: 'customer_confirmed_received',
+        type: 'order',
+        priority: 'medium',
+        title: 'Customer confirmed receipt',
+        message: `${customerLabel} confirmed they received order #${orderId}. Review and mark Delivered when ready.`,
+        meta: { orderId },
+        link: 'orders',
+        icon: 'person-check',
+      });
+    } catch (_e) {}
+
+    return { success: true, delivery: stripOtpSecrets(updated) };
+  },
+
+  /**
+   * Admin closes Delivery Reported (or Out for Delivery override) as Delivered.
+   */
+  async adminMarkDelivered({ orderId, reason, adminUser }) {
+    if (!isAdminUser(adminUser)) {
+      return { success: false, error: 'Only authorized admins can mark an order delivered.' };
+    }
+    const reasonText = String(reason || '').trim();
+    if (!reasonText) {
+      return { success: false, error: 'A reason is required to mark this order as delivered.' };
+    }
+    if (!orderId) return { success: false, error: 'Order ID is required.' };
+
+    const order = findOrder(orderId);
+    if (!order) return { success: false, error: 'Order not found.' };
+
+    const status = this.normalizeStatus(order.status);
+    const localDelivered =
+      status === DELIVERY_STATUSES.DELIVERED || (order.status || '').toLowerCase() === 'delivered';
+    const localReported = status === DELIVERY_STATUSES.REPORTED || isReportedStatus(order.status);
+    const localOfd = isOutForDeliveryStatus(order.status) || status === DELIVERY_STATUSES.OUT;
+    if (!localDelivered && !localReported && !localOfd) {
+      return {
+        success: false,
+        error: 'Only Delivery Reported (or Out for Delivery) orders can be confirmed as delivered.',
+      };
+    }
+
+    const delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery) {
+      return { success: false, error: 'Assign and dispatch a rider before marking delivered.' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const adminLabel = adminUser?.name || adminUser?.email || 'Admin';
+    const prevStatus = order.status;
+    const shippingFee = resolveShippingFee(order, delivery);
+    let updatedDelivery = {
+      ...delivery,
+      delivery_status: DELIVERY_STATUSES.DELIVERED,
+      shipping_fee: shippingFee,
+      rider_earning: shippingFee,
+      admin_confirmed: true,
+      admin_confirmed_at: nowIso,
+      admin_confirmed_reason: reasonText,
+      confirmed_by_admin: adminLabel,
+      rider_reported_delivered: true,
+      rider_reported_at: delivery.rider_reported_at || nowIso,
+      rider_reported_by: delivery.rider_reported_by || adminLabel,
+      updated_at: nowIso,
+    };
+    updatedDelivery = invalidateTokenFields(updatedDelivery);
+
+    // Credit shipping fee as rider earnings (once)
+    if (!delivery.rider_earning_credited && shippingFee > 0) {
+      try {
+        const creditRes = await riderService.creditShippingEarning({
+          riderId: updatedDelivery.rider_id,
+          riderName: updatedDelivery.rider_name,
+          orderId,
+          deliveryId: updatedDelivery.delivery_id,
+          amount: shippingFee,
+          creditedBy: adminLabel,
+          notes: `Shipping fee earnings for order #${orderId}`,
+        });
+        if (creditRes.success && !creditRes.skipped) {
+          updatedDelivery.rider_earning_credited = true;
+          updatedDelivery.rider_earning_credited_at = nowIso;
+        }
+      } catch (e) {
+        console.warn('[DeliveryService] rider earning credit failed:', e);
+      }
+    } else if (shippingFee <= 0) {
+      updatedDelivery.rider_earning_credited = true;
+      updatedDelivery.rider_earning_credited_at = nowIso;
+    }
+
+    upsertLocalDelivery(updatedDelivery);
+    clearCachedToken(orderId);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client
+          .from('order_deliveries')
+          .upsert([toDeliveryDbRow(updatedDelivery)], { onConflict: 'order_id' });
+        await client
+          .from('orders')
+          .update({
+            status: 'Delivered',
+            estimated_delivery: 'Delivered (admin confirmed)',
+            updated_at: nowIso,
+          })
+          .eq('order_id', orderId);
+      } catch (e) {
+        console.warn('[DeliveryService] adminMarkDelivered supabase:', e);
+      }
+    }
+
+    await orderService.updateOrderStatus(orderId, 'Delivered', `Admin confirmed delivery: ${reasonText}`, {
+      allowDelivered: true,
+      skipTransitionCheck: true,
+      adminCorrection: true,
+      deliveryMeta: {
+        rider_id: updatedDelivery.rider_id,
+        rider_name: updatedDelivery.rider_name,
+        rider_contact: updatedDelivery.rider_contact,
+        rider_vehicle: updatedDelivery.vehicle_info,
+        rider_plate: updatedDelivery.rider_plate,
+        rider_avatar: updatedDelivery.rider_avatar,
+        rider_reported_delivered: true,
+        rider_reported_at: updatedDelivery.rider_reported_at,
+        admin_confirmed: true,
+        admin_confirmed_at: nowIso,
+        admin_confirmed_reason: reasonText,
+        confirmed_by_admin: adminLabel,
+        token_verified: Boolean(updatedDelivery.token_verified),
+        customer_delivery_confirmed: Boolean(updatedDelivery.customer_confirmed),
+        customer_delivery_confirmed_at: updatedDelivery.customer_confirmed_at || null,
+      },
+    });
+
+    if (updatedDelivery.rider_id) {
+      try {
+        await riderService.setRiderStatus(updatedDelivery.rider_id, RIDER_STATUSES.AVAILABLE);
+      } catch (_e) {}
+    }
+
+    try {
+      await deliveryLocationService.clearLocation(orderId, {
+        riderId: updatedDelivery.rider_id,
+      });
+    } catch (_e) {}
+
+    await appendHistory({
+      orderId,
+      action: 'ADMIN_MARKED_DELIVERED',
+      previousStatus: prevStatus,
+      newStatus: 'Delivered',
+      performedBy: adminLabel,
+      notes: reasonText,
+      metadata: {
+        admin_confirmed: true,
+        token_verified: Boolean(updatedDelivery.token_verified),
+        customer_confirmed: Boolean(updatedDelivery.customer_confirmed),
+        shipping_fee: shippingFee,
+        rider_earning: shippingFee,
+        rider_earning_credited: Boolean(updatedDelivery.rider_earning_credited),
+      },
+    });
+
+    try {
+      await notificationService.notifyAdminDeliveryConfirmed({
+        orderId,
+        customerName: order.customer_name,
+        riderName: updatedDelivery.rider_name,
+        confirmedAt: nowIso,
+        adminOverride: true,
+      });
+      await notificationService.notifyCustomerDeliveryConfirmed({
+        userId: order.user_id || order.customer_id,
+        orderId,
+      });
+    } catch (e) {
+      console.warn('[DeliveryService] admin mark delivered notifications failed:', e);
+    }
+
+    return {
+      success: true,
+      delivery: stripOtpSecrets(updatedDelivery),
+      message: 'Order marked as delivered by admin.',
+    };
+  },
+
+  /**
+   * Gated admin correction: Delivered → another status with required reason.
+   */
+  async adminCorrectDeliveryStatus(orderId, newStatus, reason, adminUser) {
+    if (!isAdminUser(adminUser)) {
+      return { success: false, error: 'Only authorized admins can correct delivery status.' };
+    }
+    if (!String(reason || '').trim()) {
+      return { success: false, error: 'A correction reason is required.' };
+    }
+    const order = findOrder(orderId);
+    if (!order) return { success: false, error: 'Order not found.' };
+
+    if (String(newStatus || '').toLowerCase() === 'delivered') {
+      return this.adminMarkDelivered({ orderId, reason, adminUser });
+    }
+
+    const adminLabel = adminUser?.name || adminUser?.email || 'Admin';
+    await orderService.updateOrderStatus(orderId, newStatus, `Admin correction: ${reason}`, {
+      allowDelivered: false,
+      skipTransitionCheck: true,
+      adminCorrection: true,
+    });
+
+    await appendHistory({
+      orderId,
+      action: 'ADMIN_CORRECTION',
+      previousStatus: order.status,
+      newStatus,
+      performedBy: adminLabel,
+      notes: reason,
+    });
+
+    return { success: true };
+  },
+
+  riderFacingStatus(status) {
+    const n = this.normalizeStatus(status);
+    if (n === DELIVERY_STATUSES.READY) return 'Assigned';
+    if (n === DELIVERY_STATUSES.OUT) return 'Out for Delivery';
+    if (n === DELIVERY_STATUSES.REPORTED) return 'Reported';
+    if (n === DELIVERY_STATUSES.DELIVERED) return 'Delivered';
+    return n || 'Assigned';
+  },
+
+  buildRiderDeliveryCard(delivery, order) {
+    const items = Array.isArray(order?.items)
+      ? order.items
+      : orderService.parseItemsSummary
+        ? orderService.parseItemsSummary(order?.items_summary)
+        : [];
+    const itemsSummary =
+      order?.items_summary ||
+      (Array.isArray(items)
+        ? items.map((it) => `${it.name || it.product_name || 'Item'} (x${it.quantity || 1})`).join(', ')
+        : '');
+    const paymentMethod = order?.payment_method || delivery?.payment_method || '';
+    const paymentStatus =
+      order?.payment_status ||
+      (/cod|cash on delivery/i.test(paymentMethod) ? 'Unpaid (COD)' : 'Paid');
+    const statusSource = delivery?.delivery_status || order?.status;
+    return {
+      orderId: delivery?.order_id || order?.order_id,
+      deliveryId: delivery?.delivery_id,
+      riderId: delivery?.rider_id || order?.rider_id,
+      customerName: order?.customer_name || 'Customer',
+      customerPhone: order?.customer_phone || '',
+      customerAddress: order?.customer_address || '',
+      landmark: order?.delivery_landmark || order?.delivery_notes || delivery?.delivery_notes || '',
+      items,
+      itemsSummary,
+      itemsCount: Number(order?.items_count || items?.length || 0),
+      totalAmount: Number(order?.grand_total ?? order?.total_amount ?? 0) || 0,
+      paymentMethod,
+      paymentStatus,
+      deliveryStatus: this.riderFacingStatus(statusSource),
+      rawStatus: statusSource,
+      lat: order?.delivery_lat ?? delivery?.delivery_lat,
+      lng: order?.delivery_lng ?? delivery?.delivery_lng,
+      expectedDeliveryAt: delivery?.expected_delivery_at || order?.expected_delivery_at || null,
+      expectedDeliveryEndAt: delivery?.expected_delivery_end_at || order?.expected_delivery_end_at || null,
+      deliveredAt: delivery?.delivered_at || order?.delivered_at || null,
+      assignedAt: delivery?.assigned_at || null,
+      riderName: delivery?.rider_name || '',
+      shippingFee: Number(delivery?.shipping_fee ?? order?.shipping_fee ?? 0) || 0,
+      riderEarning: Number(delivery?.rider_earning ?? delivery?.shipping_fee ?? order?.shipping_fee ?? 0) || 0,
+      deliveryPhoto: delivery?.delivery_photo || delivery?.proof_of_delivery || null,
+    };
+  },
+
+  async getMyDeliveries(riderId) {
+    if (!riderId) return [];
+    await riderService.fetchRiders();
+    let deliveries = getLocalDeliveries().filter((d) => d.rider_id === riderId);
+    let orders = orderService.getLocalOrders();
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        // Note: delivery_lat/lng live on `orders`, not `order_deliveries`.
+        const { data: drows, error: dErr } = await client
+          .from('order_deliveries')
+          .select(
+            'delivery_id,order_id,rider_id,rider_name,rider_contact,vehicle_info,delivery_status,delivery_notes,expected_delivery_at,expected_delivery_end_at,shipping_fee,rider_earning,rider_earning_credited,rider_reported_delivered,rider_reported_at,rider_report_notes,admin_confirmed,delivered_at,assigned_at,updated_at'
+          )
+          .eq('rider_id', riderId)
+          .order('updated_at', { ascending: false })
+          .limit(80);
+        if (dErr) {
+          console.warn('[DeliveryService] getMyDeliveries deliveries:', dErr.message || dErr);
+        } else if (Array.isArray(drows)) {
+          deliveries = drows;
+          drows.forEach((row) => upsertLocalDelivery(row));
+        }
+
+        const ids = [...new Set(deliveries.map((d) => d.order_id).filter(Boolean))];
+        if (ids.length) {
+          const { data: orows, error: oErr } = await client
+            .from('orders')
+            .select(
+              'order_id,customer_name,customer_phone,customer_address,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,created_at,updated_at'
+            )
+            .in('order_id', ids)
+            .limit(80);
+          if (oErr) {
+            console.warn('[DeliveryService] getMyDeliveries orders:', oErr.message || oErr);
+          } else if (Array.isArray(orows) && orows.length) {
+            const byId = new Map(orows.map((o) => [o.order_id, o]));
+            orders = orders.map((o) => byId.get(o.order_id) || o);
+            orows.forEach((o) => {
+              if (!orders.some((x) => x.order_id === o.order_id)) orders.push(o);
+            });
+          }
+        }
+
+        // History fallback: completed jobs credited to this rider (not used for assignment)
+        const { data: completedOrders, error: cErr } = await client
+          .from('orders')
+          .select(
+            'order_id,customer_name,customer_phone,customer_address,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,created_at,updated_at'
+          )
+          .eq('delivered_by_rider_id', riderId)
+          .limit(40);
+        if (cErr) {
+          console.warn('[DeliveryService] getMyDeliveries completed:', cErr.message || cErr);
+        } else if (Array.isArray(completedOrders)) {
+          completedOrders.forEach((o) => {
+            if (!orders.some((x) => x.order_id === o.order_id)) orders.push(o);
+            if (!deliveries.some((d) => d.order_id === o.order_id)) {
+              deliveries.push({
+                order_id: o.order_id,
+                rider_id: riderId,
+                delivery_status: o.status || 'Delivered',
+                delivered_at: o.delivered_at || null,
+              });
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('[DeliveryService] getMyDeliveries:', e);
+      }
+    }
+
+    const cards = deliveries
+      .filter((d) => d.rider_id === riderId)
+      .map((d) => {
+        const order = orders.find((o) => o.order_id === d.order_id || o.id === d.order_id) || {};
+        return this.buildRiderDeliveryCard(d, order);
+      })
+      .filter((c) => c.orderId);
+
+    const rank = (s) => {
+      const v = String(s || '').toLowerCase();
+      if (v === 'delivered') return 3;
+      if (v.includes('out')) return 1;
+      if (v.includes('assigned') || v.includes('ready')) return 0;
+      return 2;
+    };
+    cards.sort((a, b) => rank(a.deliveryStatus) - rank(b.deliveryStatus));
+    return cards;
+  },
+
+  async riderMarkOutForDelivery({ riderId, orderId, riderUser }) {
+    if (!riderId || !orderId) return { success: false, error: 'Missing rider or order.' };
+    const sessionRider = riderUser?.rider_id;
+    if (sessionRider && sessionRider !== riderId) {
+      return { success: false, error: 'You can only update your own deliveries.' };
+    }
+
+    const order = findOrder(orderId);
+    let delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery) return { success: false, error: 'Delivery assignment not found.' };
+    if (delivery.rider_id !== riderId) {
+      return { success: false, error: 'This order is not assigned to you.' };
+    }
+
+    const current = this.riderFacingStatus(delivery.delivery_status || order?.status);
+    if (current === 'Delivered') {
+      return { success: false, error: 'This order is already delivered.' };
+    }
+    if (current === 'Out for Delivery') {
+      return { success: true, delivery: stripOtpSecrets(delivery), already: true };
+    }
+
+    const nowIso = new Date().toISOString();
+    const riderLabel = riderUser?.name || delivery.rider_name || 'Rider';
+    let tokenFields = {};
+    let plainToken = null;
+    if (!delivery.confirmation_token_hash) {
+      const created = createTokenFields();
+      plainToken = created.plainToken;
+      tokenFields = created.fields;
+    }
+
+    delivery = {
+      ...delivery,
+      delivery_status: DELIVERY_STATUSES.OUT,
+      ...tokenFields,
+      updated_at: nowIso,
+    };
+    upsertLocalDelivery(delivery);
+    if (plainToken) cachePlainToken(orderId, plainToken);
+
+    try {
+      await riderService.setRiderStatus(riderId, RIDER_STATUSES.ON_DELIVERY);
+    } catch (_e) {}
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client.from('order_deliveries').upsert([toDeliveryDbRow(delivery)], { onConflict: 'order_id' });
+        await client
+          .from('orders')
+          .update({
+            status: DELIVERY_STATUSES.OUT,
+            estimated_delivery: 'Out for delivery',
+            updated_at: nowIso,
+          })
+          .eq('order_id', orderId);
+      } catch (e) {
+        console.warn('[DeliveryService] riderMarkOutForDelivery supabase:', e);
+      }
+    }
+
+    await orderService.updateOrderStatus(orderId, DELIVERY_STATUSES.OUT, 'Rider started delivery', {
+      skipTransitionCheck: true,
+      deliveryMeta: {
+        rider_id: delivery.rider_id,
+        rider_name: delivery.rider_name,
+        has_delivery_token: Boolean(delivery.confirmation_token_hash),
+      },
+    });
+
+    await appendHistory({
+      orderId,
+      action: 'OUT_FOR_DELIVERY',
+      previousStatus: current,
+      newStatus: DELIVERY_STATUSES.OUT,
+      performedBy: riderLabel,
+      notes: 'Rider marked Out for Delivery',
+    });
+
+    try {
+      await notificationService.notifyCustomerOutForDelivery?.({
+        userId: order?.user_id || order?.customer_id || null,
+        orderId,
+        riderName: delivery.rider_name,
+        expectedDelivery: delivery.expected_delivery_at,
+      });
+    } catch (_e) {}
+
+    this.notifyChanged({ source: 'rider_out', orderId });
+    return { success: true, delivery: stripOtpSecrets(delivery) };
+  },
+
+  async riderVerifyDeliveryQr({ riderId, orderId, scannedRaw }) {
+    if (!riderId) return riderQrFailure('session', 'Rider session required.');
+    const parsed = parseDeliveryQrPayload(scannedRaw);
+    const normalizedId = parsed.orderId ? normalizeOrderIdentifier(parsed.orderId) : '';
+    logQrValidation({
+      step: 'parsed',
+      kind: parsed.kind,
+      hasToken: Boolean(parsed.token),
+      parsedOrderId: normalizedId || null,
+      hintOrderId: orderId ? normalizeOrderIdentifier(orderId) : null,
+      riderId,
+    });
+
+    if (parsed.kind === 'empty' || parsed.kind === 'invalid' || (!parsed.token && !normalizedId)) {
+      logQrValidation({ step: 'rejected', result: 'invalid_qr', riderId });
+      return riderQrFailure('invalid_qr', 'This QR code is not a valid MotoTrack delivery QR.');
+    }
+
+    let delivery = null;
+    try {
+      if (parsed.token) {
+        delivery = await findDeliveryByTokenHash(hashDeliveryToken(parsed.token));
+      }
+      if (!delivery && normalizedId) {
+        delivery = await findDeliveryByOrderIdentifier(normalizedId);
+      }
+    } catch (e) {
+      logQrValidation({
+        step: 'lookup_failed',
+        result: 'network',
+        riderId,
+        parsedOrderId: normalizedId || null,
+      });
+      console.warn('[DeliveryService] riderVerifyDeliveryQr lookup:', e?.cause?.message || e?.message || e);
+      return riderQrFailure('network', RIDER_VERIFY_NETWORK);
+    }
+
+    if (!delivery) {
+      const result = normalizedId && !parsed.token ? 'not_found' : 'invalid_qr';
+      logQrValidation({
+        step: 'rejected',
+        result,
+        riderId,
+        parsedOrderId: normalizedId || null,
+        matchedOrderId: null,
+      });
+      return riderQrFailure(
+        result,
+        result === 'not_found'
+          ? 'Order not found.'
+          : 'This QR code is not a valid MotoTrack delivery QR.'
+      );
+    }
+
+    let order = null;
+    try {
+      order = (await fetchOrderForCard(delivery.order_id)) || findOrder(delivery.order_id) || {};
+    } catch (e) {
+      logQrValidation({ step: 'order_lookup_failed', result: 'network', riderId, matchedOrderId: delivery.order_id });
+      console.warn('[DeliveryService] riderVerifyDeliveryQr order:', e?.cause?.message || e?.message || e);
+      return riderQrFailure('network', RIDER_VERIFY_NETWORK);
+    }
+
+    const matchedOrderId = delivery.order_id || order?.order_id || '';
+    const hintDiffers = Boolean(orderId) && !sameOrderIdentifier(orderId, matchedOrderId);
+    logQrValidation({
+      step: 'matched',
+      riderId,
+      assignedRiderId: delivery.rider_id || null,
+      parsedOrderId: normalizedId || null,
+      normalizedOrderId: normalizeOrderIdentifier(matchedOrderId),
+      matchedOrderId,
+      orderStatus: order?.status || null,
+      deliveryStatus: delivery.delivery_status || null,
+      hintDiffers,
+    });
+
+    if (!delivery.rider_id || delivery.rider_id !== riderId) {
+      logQrValidation({
+        step: 'rejected',
+        result: 'wrong_rider',
+        riderId,
+        assignedRiderId: delivery.rider_id || null,
+        matchedOrderId,
+      });
+      return riderQrFailure(
+        'wrong_rider',
+        'This order is not assigned to you.',
+        'Wrong Delivery Assignment'
+      );
+    }
+
+    const blocked = deliveryAllowsRiderConfirm(delivery, order);
+    if (blocked) {
+      logQrValidation({
+        step: 'rejected',
+        result: blocked.code,
+        riderId,
+        assignedRiderId: delivery.rider_id,
+        matchedOrderId,
+        orderStatus: order?.status || null,
+        deliveryStatus: delivery.delivery_status || null,
+      });
+      return blocked;
+    }
+
+    const card = this.buildRiderDeliveryCard(delivery, order);
+    logQrValidation({
+      step: 'accepted',
+      result: 'ok',
+      riderId,
+      assignedRiderId: delivery.rider_id,
+      matchedOrderId: card.orderId,
+      orderStatus: order?.status || null,
+      deliveryStatus: delivery.delivery_status || null,
+      hintDiffers,
+    });
+    return {
+      success: true,
+      delivery: card,
+      verifiedToken: parsed.token || '',
+      hintMismatch: hintDiffers,
+    };
+  },
+
+  async riderConfirmDeliveredByQr({ riderId, riderUser, orderId, scannedRaw }) {
+    const lockKey = `${riderId || ''}:${String(scannedRaw || orderId || '').slice(0, 120)}`;
+    if (confirmInflight.has(lockKey)) {
+      return riderQrFailure('in_progress', 'Confirmation is already in progress.');
+    }
+    confirmInflight.add(lockKey);
+    let orderLock = '';
+    try {
+      const verified = await this.riderVerifyDeliveryQr({ riderId, orderId, scannedRaw });
+      if (!verified.success) return verified;
+
+      const targetOrderId = verified.delivery.orderId;
+      orderLock = `${riderId}:${targetOrderId}`;
+      if (orderLock !== lockKey && confirmInflight.has(orderLock)) {
+        return riderQrFailure('in_progress', 'Confirmation is already in progress.');
+      }
+      confirmInflight.add(orderLock);
+
+      const order = (await fetchOrderForCard(targetOrderId).catch(() => null)) || findOrder(targetOrderId) || {};
+      let delivery = await this.getDeliveryForOrder(targetOrderId, { includeOtpHash: true });
+      if (!delivery || delivery.rider_id !== riderId) {
+        return riderQrFailure(
+          'wrong_rider',
+          'This order is not assigned to you.',
+          'Wrong Delivery Assignment'
+        );
+      }
+      const blocked = deliveryAllowsRiderConfirm(delivery, order);
+      if (blocked) return blocked;
+
+      const nowIso = new Date().toISOString();
+      const riderLabel = riderUser?.name || delivery.rider_name || 'Rider';
+      const shippingFee = resolveShippingFee(order, delivery);
+      const previousStatus = delivery.delivery_status;
+
+      let updatedDelivery = {
+        ...delivery,
+        delivery_status: DELIVERY_STATUSES.DELIVERED,
+        delivered_at: nowIso,
+        token_verified: true,
+        confirmation_token_used_at: nowIso,
+        rider_reported_delivered: true,
+        rider_reported_at: nowIso,
+        rider_reported_by: riderLabel,
+        rider_report_notes: 'Confirmed via order QR scan',
+        admin_confirmed: true,
+        admin_confirmed_at: nowIso,
+        admin_confirmed_reason: 'Rider QR confirmation',
+        confirmed_by_admin: riderLabel,
+        shipping_fee: shippingFee,
+        rider_earning: shippingFee,
+        updated_at: nowIso,
+      };
+
+      const client = supabaseManager.getClient();
+      if (client) {
+        const patch = {
+          delivery_status: DELIVERY_STATUSES.DELIVERED,
+          delivered_at: nowIso,
+          token_verified: true,
+          confirmation_token_used_at: nowIso,
+          rider_reported_delivered: true,
+          rider_reported_at: nowIso,
+          rider_reported_by: riderLabel,
+          rider_report_notes: 'Confirmed via order QR scan',
+          admin_confirmed: true,
+          admin_confirmed_at: nowIso,
+          admin_confirmed_reason: 'Rider QR confirmation',
+          confirmed_by_admin: riderLabel,
+          shipping_fee: shippingFee,
+          rider_earning: shippingFee,
+          updated_at: nowIso,
+        };
+        let updatedRows = null;
+        try {
+          const { data, error } = await client
+            .from('order_deliveries')
+            .update(patch)
+            .eq('order_id', targetOrderId)
+            .eq('rider_id', riderId)
+            .in('delivery_status', CONFIRMABLE_DELIVERY_STATUSES)
+            .select('delivery_id');
+          if (error) throw error;
+          updatedRows = data;
+        } catch (e) {
+          console.warn('[DeliveryService] riderConfirmDeliveredByQr update:', e?.message || e);
+          return riderQrFailure('network', RIDER_CONFIRM_NETWORK);
+        }
+        if (!updatedRows?.length) {
+          try {
+            const { data: current } = await client
+              .from('order_deliveries')
+              .select('delivery_status,rider_id')
+              .eq('order_id', targetOrderId)
+              .limit(1);
+            const status = current?.[0]?.delivery_status;
+            if (String(status || '').toLowerCase() === 'delivered') {
+              return riderQrFailure(
+                'already_delivered',
+                'This order has already been delivered.',
+                'Order Already Delivered'
+              );
+            }
+          } catch (_e) {}
+          return riderQrFailure('unavailable', 'This order is not ready for delivery confirmation.');
+        }
+
+        if (!delivery.rider_earning_credited && shippingFee > 0) {
+          try {
+            const creditRes = await riderService.creditShippingEarning({
+              riderId,
+              riderName: updatedDelivery.rider_name,
+              orderId: targetOrderId,
+              deliveryId: updatedDelivery.delivery_id,
+              amount: shippingFee,
+              creditedBy: riderLabel,
+              notes: `Shipping fee earnings for order #${targetOrderId}`,
+            });
+            if (creditRes.success && !creditRes.skipped) {
+              updatedDelivery.rider_earning_credited = true;
+              updatedDelivery.rider_earning_credited_at = nowIso;
+              await client
+                .from('order_deliveries')
+                .update({
+                  rider_earning_credited: true,
+                  rider_earning_credited_at: nowIso,
+                })
+                .eq('order_id', targetOrderId)
+                .eq('rider_id', riderId);
+            }
+          } catch (e) {
+            console.warn('[DeliveryService] rider earning credit failed:', e?.message || e);
+          }
+        }
+
+        try {
+          const { error: orderError } = await client
+            .from('orders')
+            .update({
+              status: DELIVERY_STATUSES.DELIVERED,
+              estimated_delivery: 'Delivered',
+              delivered_at: nowIso,
+              delivered_by_rider_id: riderId,
+              updated_at: nowIso,
+            })
+            .eq('order_id', targetOrderId);
+          if (orderError) console.warn('[DeliveryService] order status update:', orderError.message || orderError);
+        } catch (e) {
+          console.warn('[DeliveryService] order status update:', e?.message || e);
+        }
+      } else if (!delivery.rider_earning_credited && shippingFee > 0) {
+        try {
+          const creditRes = await riderService.creditShippingEarning({
+            riderId,
+            riderName: updatedDelivery.rider_name,
+            orderId: targetOrderId,
+            deliveryId: updatedDelivery.delivery_id,
+            amount: shippingFee,
+            creditedBy: riderLabel,
+            notes: `Shipping fee earnings for order #${targetOrderId}`,
+          });
+          if (creditRes.success && !creditRes.skipped) {
+            updatedDelivery.rider_earning_credited = true;
+            updatedDelivery.rider_earning_credited_at = nowIso;
+          }
+        } catch (e) {
+          console.warn('[DeliveryService] rider earning credit failed:', e?.message || e);
+        }
+      }
+
+      upsertLocalDelivery(updatedDelivery);
+      clearCachedToken(targetOrderId);
+      mergeLocalOrderMeta(targetOrderId, {
+        status: DELIVERY_STATUSES.DELIVERED,
+        delivered_at: nowIso,
+        delivered_by_rider_id: riderId,
+        updated_at: nowIso,
+      });
+
+      try {
+        await riderService.setRiderStatus(riderId, RIDER_STATUSES.AVAILABLE);
+      } catch (_e) {}
+
+      try {
+        await orderService.updateOrderStatus(targetOrderId, DELIVERY_STATUSES.DELIVERED, 'Rider confirmed delivery via QR', {
+          allowDelivered: true,
+          skipTransitionCheck: true,
+          deliveryMeta: {
+            rider_id: riderId,
+            rider_name: updatedDelivery.rider_name,
+            delivered_at: nowIso,
+            delivered_by_rider_id: riderId,
+            token_verified: true,
+          },
+        });
+      } catch (e) {
+        console.warn('[DeliveryService] riderConfirmDeliveredByQr order service:', e?.message || e);
+      }
+
+      try {
+        await appendHistory({
+          orderId: targetOrderId,
+          action: 'DELIVERED',
+          previousStatus,
+          newStatus: DELIVERY_STATUSES.DELIVERED,
+          performedBy: riderLabel,
+          notes: 'Rider scanned order QR and confirmed delivered',
+          metadata: { delivered_at: nowIso, rider_id: riderId },
+        });
+      } catch (e) {
+        console.warn('[DeliveryService] delivery history:', e?.message || e);
+      }
+
+      try {
+        await notificationService.notifyCustomerDelivered?.({
+          userId: order?.user_id || order?.customer_id || null,
+          orderId: targetOrderId,
+          riderName: updatedDelivery.rider_name,
+        });
+      } catch (_e) {}
+
+      try {
+        await deliveryLocationService.clearLocation(targetOrderId, { riderId });
+      } catch (_e) {}
+
+      logQrValidation({
+        step: 'confirmed',
+        result: 'delivered',
+        riderId,
+        assignedRiderId: riderId,
+        matchedOrderId: targetOrderId,
+        orderStatus: DELIVERY_STATUSES.DELIVERED,
+        deliveryStatus: DELIVERY_STATUSES.DELIVERED,
+      });
+      this.notifyChanged({ source: 'rider_delivered', orderId: targetOrderId });
+      return {
+        success: true,
+        delivery: this.buildRiderDeliveryCard(updatedDelivery, {
+          ...order,
+          status: DELIVERY_STATUSES.DELIVERED,
+          delivered_at: nowIso,
+        }),
+      };
+    } finally {
+      confirmInflight.delete(lockKey);
+      if (orderLock) confirmInflight.delete(orderLock);
+    }
+  },
+
+  /**
+   * Rider uploads a proof-of-delivery photo from the dashboard.
+   * Does NOT change the order status — just attaches the photo to the delivery record.
+   * The admin's "Confirm Delivery" remains the final step.
+   */
+  async riderUploadProofPhoto({ riderId, orderId, photoUri }) {
+    if (!riderId || !orderId) return { success: false, error: 'Missing rider or order.' };
+    if (!photoUri) return { success: false, error: 'No photo provided.' };
+
+    let delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery) return { success: false, error: 'Delivery assignment not found for this order.' };
+
+    const resolved = await resolveImageForDatabase(photoUri, {
+      folder: 'delivery-proofs',
+      orderId,
+      fileName: `delivery-proofs/${orderId}-rider-${Date.now()}.jpg`,
+    });
+    if (!resolved.url) {
+      return { success: false, error: resolved.error || 'Could not upload proof photo.' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const riderLabel = delivery.rider_name || 'Rider';
+
+    const updated = {
+      ...delivery,
+      delivery_photo: resolved.url,
+      proof_of_delivery: resolved.url,
+      proof_uploaded_by: riderLabel,
+      proof_uploaded_at: nowIso,
+      updated_at: nowIso,
+    };
+    upsertLocalDelivery(updated);
+
+    const client = supabaseManager.getClient();
+    if (client) {
+      try {
+        await client
+          .from('order_deliveries')
+          .upsert([toDeliveryDbRow(updated)], { onConflict: 'order_id' });
+      } catch (e) {
+        console.warn('[DeliveryService] riderUploadProofPhoto supabase:', e);
+      }
+    }
+
+    await appendHistory({
+      orderId,
+      action: 'PROOF_PHOTO_UPLOADED',
+      previousStatus: delivery.delivery_status,
+      newStatus: delivery.delivery_status,
+      performedBy: riderLabel,
+      notes: 'Rider uploaded proof-of-delivery photo.',
+      metadata: { has_photo: true, rider_id: riderId },
+    });
+
+    this.notifyChanged({ source: 'rider_proof_photo', orderId });
+    return { success: true, delivery: stripOtpSecrets(updated) };
+  },
+};
+
+export default deliveryService;

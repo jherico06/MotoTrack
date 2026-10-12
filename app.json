@@ -13,7 +13,9 @@
       "bundleIdentifier": "com.moto.shop",
       "infoPlist": {
         "NSCameraUsageDescription": "MotoTrack riders use the camera to scan order QR codes and take delivery proof photos.",
-        "NSPhotoLibraryUsageDescription": "MotoTrack needs photo library access so riders and staff can attach delivery proof and product images."
+        "NSPhotoLibraryUsageDescription": "MotoTrack needs photo library access so riders and staff can attach delivery proof and product images.",
+        "NSLocationWhenInUseUsageDescription": "MotoTrack uses your location only while you are actively delivering an order so customers and admins can track the delivery.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "MotoTrack uses your location only while you are actively delivering an order so customers and admins can track the delivery."
       }
     },
     "androidStatusBar": {
@@ -25,6 +27,10 @@
       "permissions": [
         "CAMERA",
         "android.permission.CAMERA",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
         "READ_MEDIA_IMAGES",
         "READ_EXTERNAL_STORAGE"
       ],
@@ -54,6 +60,14 @@
           "photosPermission": "MotoTrack needs photo access to attach delivery proof and product images.",
           "cameraPermission": "MotoTrack needs camera access to take delivery proof photos and scan delivery QR codes.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "MotoTrack uses your location only while you are actively delivering an order so customers and admins can track the delivery.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
         }
       ]
     ]

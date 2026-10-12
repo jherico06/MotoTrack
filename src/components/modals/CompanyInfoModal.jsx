@@ -8,8 +8,9 @@ import {
   StyleSheet,
   useWindowDimensions,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import BrandLogo from '../common/BrandLogo';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import BrandLogo from '../common/BrandLogo.jsx';
+import { systemSettingsService } from '../../services/system/systemSettingsService.js';
 
 export default function CompanyInfoModal({
   visible,
@@ -18,8 +19,14 @@ export default function CompanyInfoModal({
   showToast,
 }) {
   const [activeTab, setActiveTab] = useState(initialTab);
+  const [brandSettings, setBrandSettings] = useState(() => systemSettingsService.getSettings());
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
+
+  React.useEffect(() => {
+    const unsub = systemSettingsService.subscribe(setBrandSettings);
+    return unsub;
+  }, []);
 
   // Sync tab if initialTab changes when opening
   React.useEffect(() => {
@@ -50,7 +57,7 @@ export default function CompanyInfoModal({
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <BrandLogo size={28} />
               <View>
-                <Text style={styles.headerTitle}>MotoTrack Information Center</Text>
+                <Text style={styles.headerTitle}>{brandSettings.storeName || 'MotoTrack'} Information Center</Text>
                 <Text style={styles.headerSubtitle}>Official Performance Network & Legal Policies</Text>
               </View>
             </View>

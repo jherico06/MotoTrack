@@ -14,14 +14,15 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { BootstrapIcon } from '../common';
-import ServiceQuotationPanel from './ServiceQuotationPanel';
-import PickupQrScannerPanel from './PickupQrScannerPanel';
-import { garageService } from '../../services/garageService';
+import { getThemeTokens } from '../../styles/theme.js';
+import ServiceQuotationPanel from './ServiceQuotationPanel.jsx';
+import PickupQrScannerPanel from './PickupQrScannerPanel.jsx';
+import { garageService } from '../../services/bookings/garageService.js';
 import {
   FLEX_BOOKING_STATUS,
   normalizeBookingStatus,
   formatPhp,
-} from '../../utils/serviceQuotation';
+} from '../../utils/serviceQuotation.js';
 
 /** Workflow stages for admin (grouped, actionable) — payment after approve */
 export const BOOKING_PIPELINE = [
@@ -128,6 +129,23 @@ export const BOOKING_PIPELINE = [
   },
 ];
 
+const DARK_STAGE_TONE = {
+  review: 'Warning',
+  payment: 'Warning',
+  schedule: 'Info',
+  inspect: 'Purple',
+  waiting_customer: 'Info',
+  service: 'Success',
+  billing: 'Success',
+};
+
+function stageTheme(stage, t, isDark) {
+  if (!isDark) return stage;
+  const tone = DARK_STAGE_TONE[stage.id];
+  if (!tone) return { ...stage, color: t.textMuted, bg: t.bgSub };
+  return { ...stage, color: t['status' + tone + 'Text'], bg: t['status' + tone + 'Bg'] };
+}
+
 function stageForBooking(booking) {
   const status = booking?.status || '';
   const normalized = normalizeBookingStatus(status);
@@ -204,7 +222,10 @@ export default function AdminBookingManager({
   onToast,
   onOpenLegacyModal,
   styles: parentStyles,
+  isDarkMode = false,
 }) {
+  const t = useMemo(() => getThemeTokens(isDarkMode), [isDarkMode]);
+  const s = useMemo(() => createStyles(t, isDarkMode), [t, isDarkMode]);
   const [pipelineFilter, setPipelineFilter] = useState('review');
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState(null);
@@ -367,7 +388,7 @@ export default function AdminBookingManager({
           </Text>
         </View>
         <TouchableOpacity style={s.refreshBtn} onPress={refresh} activeOpacity={0.85}>
-          <BootstrapIcon name="arrow-clockwise" size={14} color="#1D4533" />
+          <BootstrapIcon name="arrow-clockwise" size={14} color={isDarkMode ? t.accentBrand : '#1D4533'} />
           <Text style={s.refreshText}>Refresh</Text>
         </TouchableOpacity>
       </View>
@@ -382,26 +403,28 @@ export default function AdminBookingManager({
             All ({counts.all})
           </Text>
         </TouchableOpacity>
-        {BOOKING_PIPELINE.map((stage) => {
+        {BOOKING_PIPELINE.map((rawStage) => {
+          const stage = stageTheme(rawStage, t, isDarkMode);
           const on = pipelineFilter === stage.id;
           const n = counts[stage.id] || 0;
+          const onChipText = isDarkMode ? t.textPrimary : '#FFF';
           return (
             <TouchableOpacity
               key={stage.id}
               style={[
                 s.pipeChip,
                 { borderColor: stage.color },
-                on && { backgroundColor: stage.color },
+                on && { backgroundColor: isDarkMode ? t.bgElevated : stage.color },
                 n > 0 && stage.id !== 'done' && !on && { backgroundColor: stage.bg },
               ]}
               onPress={() => setPipelineFilter(stage.id)}
             >
-              <BootstrapIcon name={stage.icon} size={12} color={on ? '#FFF' : stage.color} />
-              <Text style={[s.pipeChipText, { color: on ? '#FFF' : stage.color }]}>
+              <BootstrapIcon name={stage.icon} size={12} color={on ? onChipText : stage.color} />
+              <Text style={[s.pipeChipText, { color: on ? onChipText : stage.color }]}>
                 {stage.label}
               </Text>
               <View style={[s.badge, on && { backgroundColor: 'rgba(255,255,255,0.25)' }]}>
-                <Text style={[s.badgeText, on && { color: '#FFF' }]}>{n}</Text>
+                <Text style={[s.badgeText, on && { color: onChipText }]}>{n}</Text>
               </View>
             </TouchableOpacity>
           );
@@ -410,17 +433,17 @@ export default function AdminBookingManager({
 
       {/* Search */}
       <View style={s.searchRow}>
-        <BootstrapIcon name="search" size={14} color="#64748B" />
+        <BootstrapIcon name="search" size={14} color={isDarkMode ? t.textMuted : '#64748B'} />
         <TextInput
           style={s.searchInput}
           placeholder="Search booking ID, customer, plate, bike…"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={isDarkMode ? t.placeholder : '#94A3B8'}
           value={search}
           onChangeText={setSearch}
         />
         {!!search && (
           <TouchableOpacity onPress={() => setSearch('')}>
-            <BootstrapIcon name="x-circle" size={14} color="#94A3B8" />
+            <BootstrapIcon name="x-circle" size={14} color={isDarkMode ? t.placeholder : '#94A3B8'} />
           </TouchableOpacity>
         )}
       </View>
@@ -430,14 +453,14 @@ export default function AdminBookingManager({
         <ScrollView style={s.listPane} contentContainerStyle={{ paddingBottom: 40 }}>
           {filtered.length === 0 ? (
             <View style={s.empty}>
-              <BootstrapIcon name="calendar-x" size={28} color="#94A3B8" />
+              <BootstrapIcon name="calendar-x" size={28} color={isDarkMode ? t.placeholder : '#94A3B8'} />
               <Text style={s.emptyTitle}>No bookings in this stage</Text>
               <Text style={s.emptySub}>Try another pipeline filter or clear search.</Text>
             </View>
           ) : (
             filtered.map((b) => {
               const id = b.booking_id || b.id;
-              const stage = stageForBooking(b);
+              const stage = stageTheme(stageForBooking(b), t, isDarkMode);
               const action = primaryAction(b);
               const isSel = selectedId === id;
               const isBusy = busyId === id;
@@ -478,7 +501,7 @@ export default function AdminBookingManager({
                   ) : null}
                   <View style={s.cardActions}>
                     <TouchableOpacity
-                      style={[s.primaryBtn, { backgroundColor: stage.color }]}
+                      style={[s.primaryBtn, { backgroundColor: isDarkMode ? '#1F6B52' : stage.color }]}
                       onPress={() => runAction(b, action.id)}
                       disabled={!!isBusy}
                     >
@@ -511,7 +534,7 @@ export default function AdminBookingManager({
         <ScrollView style={s.detailPane} contentContainerStyle={{ paddingBottom: 48 }}>
           {!selected ? (
             <View style={s.emptyDetail}>
-              <BootstrapIcon name="grid-1x2-fill" size={32} color="#CBD5E1" />
+              <BootstrapIcon name="grid-1x2-fill" size={32} color={isDarkMode ? t.textSubtle : '#CBD5E1'} />
               <Text style={s.emptyTitle}>Select a booking</Text>
               <Text style={s.emptySub}>
                 Choose a card on the left to review, assign a mechanic, build a quotation, or verify pickup.
@@ -534,33 +557,33 @@ export default function AdminBookingManager({
                     style={s.legacyBtn}
                     onPress={() => onOpenLegacyModal(selected)}
                   >
-                    <BootstrapIcon name="pencil-square" size={13} color="#1D4533" />
+                    <BootstrapIcon name="pencil-square" size={13} color={isDarkMode ? t.accentBrand : '#1D4533'} />
                     <Text style={s.legacyBtnText}>Full form</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               <View style={s.infoGrid}>
-                <InfoRow
+                <InfoRow s={s}
                   label="Motorcycle"
                   value={`${selected.bike_brand || selected.bikeBrand || ''} ${selected.bike_model || selected.bikeModel || ''}`.trim() || '—'}
                 />
-                <InfoRow label="Plate" value={selected.plate_number || selected.bikePlate || '—'} />
-                <InfoRow
+                <InfoRow s={s} label="Plate" value={selected.plate_number || selected.bikePlate || '—'} />
+                <InfoRow s={s}
                   label="Schedule"
                   value={`${selected.appointment_date || selected.preferred_date || selected.date || '—'} · ${selected.time_slot || selected.preferred_time || selected.time || '—'}`}
                 />
-                <InfoRow label="Phone" value={selected.customer_phone || selected.userPhone || '—'} />
-                <InfoRow label="Service" value={selected.service_title || selected.serviceName || selected.category || '—'} />
-                <InfoRow label="Mechanic" value={selected.mechanic || 'Unassigned'} />
+                <InfoRow s={s} label="Phone" value={selected.customer_phone || selected.userPhone || '—'} />
+                <InfoRow s={s} label="Service" value={selected.service_title || selected.serviceName || selected.category || '—'} />
+                <InfoRow s={s} label="Mechanic" value={selected.mechanic || 'Unassigned'} />
                 {(selected.estimated_service_total > 0 || selected.final_service_total > 0) && (
-                  <InfoRow
+                  <InfoRow s={s}
                     label="Quoted / Final"
                     value={`${formatPhp(selected.estimated_service_total || 0)} / ${formatPhp(selected.final_service_total || selected.estimated_service_total || 0)}`}
                   />
                 )}
                 {selected.problem_description || selected.notes ? (
-                  <InfoRow
+                  <InfoRow s={s}
                     label="Problem / Notes"
                     value={selected.problem_description || selected.notes}
                   />
@@ -595,7 +618,7 @@ export default function AdminBookingManager({
                   </ScrollView>
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                     <TouchableOpacity
-                      style={[s.primaryBtn, { flex: 1, backgroundColor: '#1D4533' }]}
+                      style={[s.primaryBtn, { flex: 1, backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533' }]}
                       onPress={() => runAction(selected, 'approve')}
                     >
                       <Text style={s.primaryBtnText}>Approve Booking</Text>
@@ -620,8 +643,9 @@ export default function AdminBookingManager({
                     value={rejectReason}
                     onChangeText={setRejectReason}
                     placeholder="Schedule conflict, incomplete info…"
+                    placeholderTextColor={isDarkMode ? t.placeholder : undefined}
                   />
-                  <TouchableOpacity style={[s.primaryBtn, { backgroundColor: '#DC2626' }]} onPress={confirmReject}>
+                  <TouchableOpacity style={[s.primaryBtn, { backgroundColor: isDarkMode ? '#5A3A3A' : '#DC2626' }]} onPress={confirmReject}>
                     <Text style={s.primaryBtnText}>Confirm Reject</Text>
                   </TouchableOpacity>
                 </View>
@@ -632,6 +656,7 @@ export default function AdminBookingManager({
                 <Text style={s.blockTitle}>2. Quotation, labor & billing</Text>
                 <ServiceQuotationPanel
                   booking={selected}
+                  isDarkMode={isDarkMode}
                   onToast={toast}
                   onUpdated={async () => {
                     await refresh();
@@ -652,6 +677,7 @@ export default function AdminBookingManager({
                 </TouchableOpacity>
                 {showPickup && (
                   <PickupQrScannerPanel
+                    isDarkMode={isDarkMode}
                     onToast={toast}
                     onCompleted={async () => {
                       await refresh();
@@ -668,7 +694,7 @@ export default function AdminBookingManager({
   );
 }
 
-function InfoRow({ label, value }) {
+function InfoRow({ s, label, value }) {
   return (
     <View style={s.infoRow}>
       <Text style={s.infoLabel}>{label}</Text>
@@ -677,194 +703,199 @@ function InfoRow({ label, value }) {
   );
 }
 
-const s = StyleSheet.create({
-  root: { flex: 1 },
-  hero: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 12,
-  },
-  heroTitle: { fontSize: 20, fontWeight: '800', color: '#0F172A' },
-  heroSub: { fontSize: 13, color: '#64748B', marginTop: 2 },
-  refreshBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#1D4533',
-    backgroundColor: '#FFFFFF',
-  },
-  refreshText: { color: '#1D4533', fontWeight: '700', fontSize: 12 },
-  pipelineScroll: { flexGrow: 0, marginBottom: 10 },
-  pipeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-    marginRight: 8,
-  },
-  pipeChipOn: { backgroundColor: '#1D4533', borderColor: '#1D4533' },
-  pipeChipText: { fontSize: 12, fontWeight: '700', color: '#475569' },
-  pipeChipTextOn: { color: '#FFFFFF' },
-  badge: {
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-  },
-  badgeText: { fontSize: 11, fontWeight: '800', color: '#334155' },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 12,
-  },
-  searchInput: { flex: 1, fontSize: 14, color: '#0F172A', outlineStyle: 'none' },
-  split: {
-    flexDirection: 'row',
-    gap: 14,
-    minHeight: 560,
-    alignItems: 'stretch',
-  },
-  listPane: {
-    flex: 0.95,
-    maxWidth: 420,
-    minWidth: 300,
-  },
-  detailPane: {
-    flex: 1.4,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 14,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderLeftWidth: 4,
-    padding: 12,
-    marginBottom: 10,
-  },
-  cardSelected: {
-    borderColor: '#1D4533',
-    backgroundColor: '#F0FDFA',
-  },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  ref: { fontSize: 12, fontWeight: '800', color: '#1D4533' },
-  statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  statusPillText: { fontSize: 10, fontWeight: '800' },
-  customer: { fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 6 },
-  meta: { fontSize: 12, color: '#64748B', marginTop: 2 },
-  stageLine: { fontSize: 11, color: '#1D4533', marginTop: 6, fontWeight: '600' },
-  cardActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  primaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 9,
-    flex: 1,
-  },
-  primaryBtnText: { color: '#FFF', fontWeight: '800', fontSize: 12 },
-  rejectBtn: {
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: 9,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  rejectBtnText: { color: '#DC2626', fontWeight: '800', fontSize: 12 },
-  empty: { padding: 32, alignItems: 'center' },
-  emptyDetail: { padding: 40, alignItems: 'center' },
-  emptyTitle: { fontSize: 15, fontWeight: '800', color: '#475569', marginTop: 8 },
-  emptySub: { fontSize: 12, color: '#94A3B8', marginTop: 4, textAlign: 'center' },
-  detailHeader: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  detailRef: { fontSize: 13, fontWeight: '800', color: '#1D4533' },
-  detailCustomer: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
-  legacyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#C8DDD3',
-    height: 36,
-  },
-  legacyBtnText: { fontSize: 12, fontWeight: '700', color: '#1D4533' },
-  infoGrid: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 12,
-    gap: 6,
-  },
-  infoRow: { gap: 2 },
-  infoLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase' },
-  infoValue: { fontSize: 13, color: '#0F172A', fontWeight: '600' },
-  actionBlock: {
-    marginBottom: 14,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  blockTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#1D4533',
-    textTransform: 'uppercase',
-    marginBottom: 8,
-    letterSpacing: 0.3,
-  },
-  mechChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: '#F1F5F9',
-    marginRight: 8,
-  },
-  mechChipOn: { backgroundColor: '#1D4533' },
-  mechChipText: { fontSize: 12, fontWeight: '700', color: '#334155' },
-  input: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 8,
-    fontSize: 14,
-  },
-  secondaryBtn: {
-    borderWidth: 1,
-    borderColor: '#1D4533',
-    borderRadius: 9,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  secondaryBtnText: { color: '#1D4533', fontWeight: '700', fontSize: 13 },
-});
+function createStyles(t, isDark) {
+  return StyleSheet.create({
+    root: { flex: 1 },
+    hero: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+      gap: 12,
+    },
+    heroTitle: { fontSize: 20, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A' },
+    heroSub: { fontSize: 13, color: isDark ? t.textMuted : '#64748B', marginTop: 2 },
+    refreshBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: isDark ? t.accentBorder : '#1D4533',
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+    },
+    refreshText: { color: isDark ? t.accentBrand : '#1D4533', fontWeight: '700', fontSize: 12 },
+    pipelineScroll: { flexGrow: 0, marginBottom: 10 },
+    pipeChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: 1.5,
+      borderColor: isDark ? t.chipBorder : '#E2E8F0',
+      backgroundColor: isDark ? t.chipBg : '#FFFFFF',
+      marginRight: 8,
+    },
+    pipeChipOn: isDark
+      ? { backgroundColor: '#1F6B52', borderColor: t.accentBorder }
+      : { backgroundColor: '#1D4533', borderColor: '#1D4533' },
+    pipeChipText: { fontSize: 12, fontWeight: '700', color: isDark ? t.chipText : '#475569' },
+    pipeChipTextOn: { color: isDark ? t.textPrimary : '#FFFFFF' },
+    badge: {
+      minWidth: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: isDark ? t.bgSub : '#F1F5F9',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 5,
+    },
+    badgeText: { fontSize: 11, fontWeight: '800', color: isDark ? t.textSecondary : '#334155' },
+    searchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: isDark ? t.inputBg : '#FFFFFF',
+      borderWidth: 1,
+      borderColor: isDark ? t.borderInput : '#E2E8F0',
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      marginBottom: 12,
+    },
+    searchInput: { flex: 1, fontSize: 14, color: isDark ? t.textPrimary : '#0F172A', outlineStyle: 'none' },
+    split: {
+      flexDirection: 'row',
+      gap: 14,
+      minHeight: 560,
+      alignItems: 'stretch',
+    },
+    listPane: {
+      flex: 0.95,
+      maxWidth: 420,
+      minWidth: 300,
+    },
+    detailPane: {
+      flex: 1.4,
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: isDark ? t.border : '#E2E8F0',
+      padding: 14,
+    },
+    card: {
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: isDark ? t.border : '#E2E8F0',
+      borderLeftWidth: 4,
+      padding: 12,
+      marginBottom: 10,
+    },
+    cardSelected: {
+      borderColor: isDark ? t.accentBrand : '#1D4533',
+      backgroundColor: isDark ? t.accentBg : '#F0FDFA',
+    },
+    cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    ref: { fontSize: 12, fontWeight: '800', color: isDark ? t.accentBrand : '#1D4533' },
+    statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    statusPillText: { fontSize: 10, fontWeight: '800' },
+    customer: { fontSize: 15, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A', marginTop: 6 },
+    meta: { fontSize: 12, color: isDark ? t.textMuted : '#64748B', marginTop: 2 },
+    stageLine: { fontSize: 11, color: isDark ? t.accentBrand : '#1D4533', marginTop: 6, fontWeight: '600' },
+    cardActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+    primaryBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 9,
+      paddingHorizontal: 12,
+      borderRadius: 9,
+      flex: 1,
+    },
+    primaryBtnText: { color: '#FFF', fontWeight: '800', fontSize: 12 },
+    rejectBtn: {
+      paddingVertical: 9,
+      paddingHorizontal: 12,
+      borderRadius: 9,
+      backgroundColor: isDark ? t.statusDangerBg : '#FEF2F2',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(180, 120, 120, 0.28)' : '#FECACA',
+    },
+    rejectBtnText: { color: isDark ? t.statusDangerText : '#DC2626', fontWeight: '800', fontSize: 12 },
+    empty: { padding: 32, alignItems: 'center' },
+    emptyDetail: { padding: 40, alignItems: 'center' },
+    emptyTitle: { fontSize: 15, fontWeight: '800', color: isDark ? t.textSecondary : '#475569', marginTop: 8 },
+    emptySub: { fontSize: 12, color: isDark ? t.textMuted : '#94A3B8', marginTop: 4, textAlign: 'center' },
+    detailHeader: { flexDirection: 'row', gap: 10, marginBottom: 12 },
+    detailRef: { fontSize: 13, fontWeight: '800', color: isDark ? t.accentBrand : '#1D4533' },
+    detailCustomer: { fontSize: 18, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A' },
+    legacyBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: isDark ? t.accentBorder : '#C8DDD3',
+      height: 36,
+    },
+    legacyBtnText: { fontSize: 12, fontWeight: '700', color: isDark ? t.accentBrand : '#1D4533' },
+    infoGrid: {
+      backgroundColor: isDark ? t.bgSub : '#F8FAFC',
+      borderRadius: 10,
+      padding: 10,
+      marginBottom: 12,
+      gap: 6,
+    },
+    infoRow: { gap: 2 },
+    infoLabel: { fontSize: 10, fontWeight: '800', color: isDark ? t.textMuted : '#94A3B8', textTransform: 'uppercase' },
+    infoValue: { fontSize: 13, color: isDark ? t.textPrimary : '#0F172A', fontWeight: '600' },
+    actionBlock: {
+      marginBottom: 14,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? t.border : '#F1F5F9',
+    },
+    blockTitle: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: isDark ? t.accentBrand : '#1D4533',
+      textTransform: 'uppercase',
+      marginBottom: 8,
+      letterSpacing: 0.3,
+    },
+    mechChip: {
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderRadius: 8,
+      backgroundColor: isDark ? t.bgSub : '#F1F5F9',
+      marginRight: 8,
+    },
+    mechChipOn: { backgroundColor: isDark ? '#1F6B52' : '#1D4533' },
+    mechChipText: { fontSize: 12, fontWeight: '700', color: isDark ? t.textSecondary : '#334155' },
+    input: {
+      borderWidth: 1,
+      borderColor: isDark ? t.borderInput : '#E2E8F0',
+      borderRadius: 8,
+      padding: 10,
+      marginBottom: 8,
+      fontSize: 14,
+      ...(isDark ? { color: t.textPrimary, backgroundColor: t.inputBg } : null),
+    },
+    secondaryBtn: {
+      borderWidth: 1,
+      borderColor: isDark ? t.accentBorder : '#1D4533',
+      borderRadius: 9,
+      paddingVertical: 10,
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    secondaryBtnText: { color: isDark ? t.accentBrand : '#1D4533', fontWeight: '700', fontSize: 13 },
+  });
+}

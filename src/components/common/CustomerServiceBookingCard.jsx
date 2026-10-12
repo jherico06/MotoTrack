@@ -18,12 +18,13 @@ import {
   TextInput,
   Platform,
 } from 'react-native';
-import { serviceQuotationService } from '../../services/serviceQuotationService';
-import { garageService } from '../../services/garageService';
-import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../../services/motorcycleService';
-import BootstrapIcon from './BootstrapIcon';
-import BookingWorkflowTracker from './BookingWorkflowTracker';
-import { getOptimizedImageUrl } from '../../utils/imageUrl';
+import { serviceQuotationService } from '../../services/bookings/serviceQuotationService.js';
+import { garageService } from '../../services/bookings/garageService.js';
+import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../../services/products/motorcycleService.js';
+import BootstrapIcon from './BootstrapIcon.jsx';
+import BookingWorkflowTracker from './BookingWorkflowTracker.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
+import { getOptimizedImageUrl } from '../../utils/imageUrl.js';
 import {
   formatPhp,
   formatPhpDecimals,
@@ -31,12 +32,12 @@ import {
   FLEX_BOOKING_STATUS,
   normalizeBookingStatus,
   calcLaborCost,
-} from '../../utils/serviceQuotation';
+} from '../../utils/serviceQuotation.js';
 import {
   customerStatusLabel,
   getCustomerProgress,
   statusColor,
-} from '../../utils/bookingWorkflow';
+} from '../../utils/bookingWorkflow.js';
 
 function qrImageUrl(token) {
   const data = encodeURIComponent(String(token || ''));
@@ -48,6 +49,47 @@ function fmtDate(v) {
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) return String(v);
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function fmtDateTime(v) {
+  if (!v) return '—';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return String(v);
+  return d.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function isPastDeadline(v) {
+  if (!v) return false;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return false;
+  return d.getTime() < Date.now();
+}
+
+function getDueCountdown(v, nowMs = Date.now()) {
+  if (!v) return null;
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return null;
+  const diff = d.getTime() - nowMs;
+  if (diff <= 0) {
+    return { overdue: true, label: 'Past due — pay now or booking may cancel' };
+  }
+  const totalSec = Math.floor(diff / 1000);
+  const hours = Math.floor(totalSec / 3600);
+  const mins = Math.floor((totalSec % 3600) / 60);
+  const secs = totalSec % 60;
+  if (hours > 0) {
+    return { overdue: false, label: `${hours}h ${mins}m left` };
+  }
+  if (mins > 0) {
+    return { overdue: false, label: `${mins}m ${secs}s left` };
+  }
+  return { overdue: false, label: `${secs}s left` };
 }
 
 function fmtShortDate(v) {
@@ -193,6 +235,7 @@ export default function CustomerServiceBookingCard({
   viewMode = 'grid',
   isModalView = false,
 }) {
+  const { isDarkMode = false } = useTheme?.() || {};
   const bookingId = booking?.booking_id || booking?.id;
   const status = normalizeBookingStatus(booking?.status);
   const colors = statusColor(status);
@@ -208,8 +251,15 @@ export default function CustomerServiceBookingCard({
   const [declineReason, setDeclineReason] = useState('');
   const [showDeclineBox, setShowDeclineBox] = useState(false);
   const [infoReply, setInfoReply] = useState('');
+  const [nowTick, setNowTick] = useState(() => Date.now());
 
   const toast = (m) => onToast?.(m);
+
+  useEffect(() => {
+    if (!booking?.payment_deadline) return undefined;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [booking?.payment_deadline]);
 
   // Load quotation (cache-first with force on status change) + charges + authoritative payments
   const reload = useCallback(async () => {
@@ -354,6 +404,13 @@ export default function CustomerServiceBookingCard({
     status === FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL ||
     status === FLEX_BOOKING_STATUS.QUOTATION_SENT;
   const showDownpayment = status === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT;
+  const showDueTime = Boolean(
+    booking?.payment_deadline &&
+      showDownpayment &&
+      String(booking?.downpayment_status || '').toLowerCase() !== 'paid' &&
+      Number(booking?.amount_paid || 0) <= 0
+  );
+  const dueCountdown = showDueTime ? getDueCountdown(booking.payment_deadline, nowTick) : null;
   const showFinalBill =
     status === FLEX_BOOKING_STATUS.SERVICE_COMPLETED ||
     status === FLEX_BOOKING_STATUS.AWAITING_FINAL_PAYMENT ||
@@ -492,6 +549,53 @@ export default function CustomerServiceBookingCard({
     });
 
   if (!bookingId) return null;
+
+  const renderDueTimePanel = (variant = 'full') => {
+    if (!showDueTime) return null;
+    const overdue = dueCountdown?.overdue || isPastDeadline(booking.payment_deadline);
+    if (variant === 'compact') {
+      return (
+        <View style={[styles.dueTimeCompact, overdue && styles.dueTimeCompactUrgent]}>
+          <BootstrapIcon name="alarm" size={12} color={overdue ? '#DC2626' : '#C2410C'} />
+          <Text style={[styles.dueTimeCompactText, overdue && { color: '#991B1B' }]} numberOfLines={1}>
+            Due {fmtDateTime(booking.payment_deadline)}
+            {dueCountdown?.label ? ` · ${dueCountdown.label}` : ''}
+          </Text>
+        </View>
+      );
+    }
+    if (variant === 'grid') {
+      return (
+        <Text style={[styles.gridDueDateText, overdue && { color: '#FCA5A5' }]} numberOfLines={2}>
+          Downpayment Due Time · {fmtDateTime(booking.payment_deadline)}
+          {dueCountdown?.label ? `\n${dueCountdown.label}` : ''}
+        </Text>
+      );
+    }
+    return (
+      <View style={[styles.dueDateBanner, overdue && styles.dueDateBannerUrgent]}>
+        <View style={styles.dueDateBannerHeader}>
+          <BootstrapIcon name="alarm" size={16} color={overdue ? '#DC2626' : '#C2410C'} />
+          <Text style={[styles.dueDateBannerTitle, overdue && { color: '#991B1B' }]}>
+            Downpayment Due Time
+          </Text>
+        </View>
+        <Text style={[styles.dueDateBannerValue, overdue && { color: '#991B1B' }]}>
+          {fmtDateTime(booking.payment_deadline)}
+        </Text>
+        {dueCountdown?.label ? (
+          <Text style={[styles.dueDateCountdown, overdue && { color: '#991B1B' }]}>
+            {dueCountdown.label}
+          </Text>
+        ) : null}
+        <Text style={styles.dueDateBannerHint}>
+          {overdue
+            ? 'This due time has passed. Pay now or the booking may be cancelled automatically.'
+            : 'Pay before this due time or your booked service will be cancelled automatically and you will be notified.'}
+        </Text>
+      </View>
+    );
+  };
 
   const bikeLabel = `${booking?.bike_brand || booking?.bikeBrand || ''} ${
     booking?.bike_model || booking?.bikeModel || ''
@@ -966,19 +1070,15 @@ export default function CustomerServiceBookingCard({
                 </Text>
               </View>
             </View>
-
-            {booking?.payment_deadline ? (
-              <View style={[styles.statusRowItem, { marginTop: 6 }]}>
-                <Text style={styles.statusRowLabel}>Payment deadline</Text>
-                <Text style={styles.statusRowValue}>{fmtDate(booking.payment_deadline)}</Text>
-              </View>
-            ) : null}
           </View>
 
           <View style={[styles.noteBox, { marginTop: 10 }]}>
             <Text style={styles.noteText}>
               Pay the downpayment at the shop (Cash or Other). Admin will record your payment.
               Once confirmed, a mechanic will be assigned and your official receipt will be generated.
+              {booking?.payment_deadline
+                ? ' If payment is not made by the Downpayment Due Time, this booking will be cancelled automatically.'
+                : ''}
             </Text>
           </View>
         </Section>
@@ -1135,7 +1235,8 @@ export default function CustomerServiceBookingCard({
         style={[
           styles.listCard,
           {
-            borderColor: semanticColors.border || '#C8DDD3',
+            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#C8DDD3'),
+            backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
             cursor: 'pointer',
           },
           style,
@@ -1147,8 +1248,8 @@ export default function CustomerServiceBookingCard({
           {/* Left Column: Ref, Status, Title, Motorcycle */}
           <View style={styles.listColLeft}>
             <View style={styles.listRefRow}>
-              <View style={styles.refContainer}>
-                <Text style={styles.refLabel}>REF: {bookingId}</Text>
+              <View style={[styles.refContainer, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
+                <Text style={[styles.refLabel, isDarkMode && { color: '#CBDCEE' }]}>REF: {bookingId}</Text>
               </View>
               <View
                 style={[
@@ -1166,13 +1267,13 @@ export default function CustomerServiceBookingCard({
               </View>
             </View>
 
-            <Text style={styles.listServiceTitle} numberOfLines={1}>
+            <Text style={[styles.listServiceTitle, isDarkMode && { color: '#F5F7F6' }]} numberOfLines={1}>
               {booking?.service_title || booking?.package_name || 'Service Booking'}
             </Text>
 
-            <View style={styles.listMotoBadge}>
-              <BootstrapIcon name="bicycle" size={13} color="#1D4533" />
-              <Text style={styles.listMotoText} numberOfLines={1}>
+            <View style={[styles.listMotoBadge, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
+              <BootstrapIcon name="bicycle" size={13} color={isDarkMode ? '#4DB896' : '#1D4533'} />
+              <Text style={[styles.listMotoText, isDarkMode && { color: '#CBDCEE' }]} numberOfLines={1}>
                 {bikeLabel || 'Registered Motorcycle'}
                 {plate ? ` • ${plate}` : ''}
               </Text>
@@ -1204,6 +1305,8 @@ export default function CustomerServiceBookingCard({
                 </Text>
               </View>
             ) : null}
+
+            {renderDueTimePanel('compact')}
           </View>
 
           {/* Right Column: Price & Actions */}
@@ -1211,7 +1314,7 @@ export default function CustomerServiceBookingCard({
             {finalTotal > 0 ? (
               <View style={styles.listPriceBox}>
                 <Text style={styles.listPriceLabel}>Total Quote</Text>
-                <Text style={styles.listPriceValue}>{formatPhp(finalTotal)}</Text>
+                <Text style={[styles.listPriceValue, isDarkMode && { color: '#4DB896' }]}>{formatPhp(finalTotal)}</Text>
               </View>
             ) : (
               <View style={styles.listPriceBox}>
@@ -1267,7 +1370,9 @@ export default function CustomerServiceBookingCard({
         };
 
     const ctaButtonText = isDownpaymentDue
-      ? 'View Payment Due'
+      ? dueCountdown?.label
+        ? `Due · ${dueCountdown.label}`
+        : 'View Due Time'
       : showQuotationActions
       ? 'Review Quote'
       : showFinalPay
@@ -1428,6 +1533,8 @@ export default function CustomerServiceBookingCard({
                 {stageLine}
               </Text>
             ) : null}
+
+            {renderDueTimePanel('grid')}
           </View>
 
           {/* Bottom Area: Large Bold Price & Prominent White Pill Button */}
@@ -1478,7 +1585,8 @@ export default function CustomerServiceBookingCard({
         style: [
           styles.card,
           {
-            borderColor: semanticColors.border || '#C8DDD3',
+            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#C8DDD3'),
+            backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
           },
           style,
         ],
@@ -1487,7 +1595,8 @@ export default function CustomerServiceBookingCard({
         style: [
           styles.card,
           {
-            borderColor: semanticColors.border || '#C8DDD3',
+            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#C8DDD3'),
+            backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
             cursor: 'pointer',
           },
           style,
@@ -1500,8 +1609,8 @@ export default function CustomerServiceBookingCard({
     <CardContainer {...containerProps}>
       {/* 1. Top Row: Reference Number + Semantic Status Badge */}
       <View style={styles.cardHeaderRow}>
-        <View style={styles.refContainer}>
-          <Text style={styles.refLabel}>REF: {bookingId}</Text>
+        <View style={[styles.refContainer, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
+          <Text style={[styles.refLabel, isDarkMode && { color: '#CBDCEE' }]}>REF: {bookingId}</Text>
         </View>
         <View
           style={[
@@ -1521,24 +1630,24 @@ export default function CustomerServiceBookingCard({
 
       {/* 2. Service Title + Optional Total */}
       <View style={styles.titleRow}>
-        <Text style={styles.serviceTitle} numberOfLines={1}>
+        <Text style={[styles.serviceTitle, isDarkMode && { color: '#F5F7F6' }]} numberOfLines={1}>
           {booking?.service_title || booking?.package_name || 'Service Booking'}
         </Text>
         {finalTotal > 0 ? (
-          <Text style={styles.headTotal}>{formatPhp(finalTotal)}</Text>
+          <Text style={[styles.headTotal, isDarkMode && { color: '#4DB896' }]}>{formatPhp(finalTotal)}</Text>
         ) : null}
       </View>
 
       {/* 3. Motorcycle Info Badge */}
-      <View style={styles.motoInfoBox}>
-        <View style={styles.motoIconWrap}>
-          <BootstrapIcon name="bicycle" size={14} color="#1D4533" />
+      <View style={[styles.motoInfoBox, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
+        <View style={[styles.motoIconWrap, isDarkMode && { backgroundColor: '#23302B' }]}>
+          <BootstrapIcon name="bicycle" size={14} color={isDarkMode ? '#4DB896' : '#1D4533'} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.motoName} numberOfLines={1}>
+          <Text style={[styles.motoName, isDarkMode && { color: '#F5F7F6' }]} numberOfLines={1}>
             {bikeLabel || 'Registered Motorcycle'}
           </Text>
-          <Text style={styles.motoPlate}>
+          <Text style={[styles.motoPlate, isDarkMode && { color: '#9CA3AF' }]}>
             {plate ? `Plate: ${plate}` : 'Plate: N/A'}
           </Text>
         </View>
@@ -1560,6 +1669,8 @@ export default function CustomerServiceBookingCard({
           </Text>
         </View>
       </View>
+
+      {renderDueTimePanel(isModalView || expanded ? 'full' : 'compact')}
 
       {/* 5. Short Status / Current Stage / Assigned Mechanic */}
       {booking?.current_stage || (booking?.mechanic && !String(booking.mechanic).toLowerCase().includes('pending')) ? (
@@ -1630,7 +1741,11 @@ export default function CustomerServiceBookingCard({
             onViewDetails ? onViewDetails(booking) : setExpanded(true);
           }}
         >
-          <Text style={styles.ctaText}>View Downpayment Due</Text>
+          <Text style={styles.ctaText}>
+            {booking?.payment_deadline
+              ? `Due ${fmtDateTime(booking.payment_deadline)}${dueCountdown?.label ? ` · ${dueCountdown.label}` : ''}`
+              : 'View Downpayment Due Time'}
+          </Text>
           <BootstrapIcon name="arrow-right" size={13} color="#FFFFFF" />
         </TouchableOpacity>
       ) : null}
@@ -1772,6 +1887,25 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#166534',
+  },
+  listDueDateBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3.5,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
+  listDueDateText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#C2410C',
+    flexShrink: 1,
   },
   listColRight: {
     minWidth: 170,
@@ -2582,6 +2716,79 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#92400E',
+  },
+  dueDateBanner: {
+    marginTop: 12,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1.5,
+    borderColor: '#FDBA74',
+    borderRadius: 12,
+    padding: 14,
+    gap: 4,
+  },
+  dueDateBannerUrgent: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  dueDateBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  dueDateBannerTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#C2410C',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  dueDateBannerValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#9A3412',
+    marginTop: 2,
+  },
+  dueDateCountdown: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#C2410C',
+    marginTop: 2,
+  },
+  dueDateBannerHint: {
+    fontSize: 12,
+    color: '#9A3412',
+    fontWeight: '500',
+    marginTop: 2,
+    lineHeight: 17,
+  },
+  dueTimeCompact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    alignSelf: 'stretch',
+  },
+  dueTimeCompactUrgent: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  dueTimeCompactText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#C2410C',
+    flexShrink: 1,
+  },
+  gridDueDateText: {
+    fontSize: 12.5,
+    fontWeight: '700',
+    color: '#FDBA74',
+    marginTop: 4,
   },
   gridHeroCard: {
     borderRadius: 24,

@@ -1,12 +1,15 @@
 /**
  * Admin pickup QR scan / manual token verify — two-step confirm release.
  */
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
-import { serviceQuotationService } from '../../services/serviceQuotationService';
-import { formatPhp } from '../../utils/serviceQuotation';
+import { serviceQuotationService } from '../../services/bookings/serviceQuotationService.js';
+import { formatPhp } from '../../utils/serviceQuotation.js';
+import { getThemeTokens } from '../../styles/theme.js';
 
-export default function PickupQrScannerPanel({ onToast, onCompleted, style, verifiedBy = 'admin' }) {
+export default function PickupQrScannerPanel({ onToast, onCompleted, style, verifiedBy = 'admin', isDarkMode = false }) {
+  const t = useMemo(() => getThemeTokens(isDarkMode), [isDarkMode]);
+  const styles = useMemo(() => createStyles(t, isDarkMode), [t, isDarkMode]);
   const [token, setToken] = useState('');
   const [busy, setBusy] = useState(false);
   const [preview, setPreview] = useState(null);
@@ -73,8 +76,8 @@ export default function PickupQrScannerPanel({ onToast, onCompleted, style, veri
       <TextInput
         style={styles.input}
         placeholder="Paste pickup QR token (MT-PKP-…)"
-        placeholderTextColor="#94A3B8"
-        selectionColor="#1D4533"
+        placeholderTextColor={isDarkMode ? t.placeholder : '#94A3B8'}
+        selectionColor={isDarkMode ? t.accentBrand : '#1D4533'}
         underlineColorAndroid="transparent"
         value={token}
         onChangeText={(v) => {
@@ -120,52 +123,59 @@ export default function PickupQrScannerPanel({ onToast, onCompleted, style, veri
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  title: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
-  sub: { fontSize: 12, color: '#64748B', marginVertical: 8 },
-  input: {
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    marginBottom: 10,
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0F172A',
-    backgroundColor: '#FFFFFF',
-    outlineStyle: 'none',
-  },
-  btn: {
-    backgroundColor: '#1D4533',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  confirmBtn: {
-    backgroundColor: '#059669',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  btnText: { color: '#FFF', fontWeight: '700' },
-  err: { color: '#DC2626', marginTop: 8, fontSize: 13 },
-  preview: {
-    marginTop: 14,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-  },
-  previewTitle: { fontSize: 14, fontWeight: '800', color: '#166534', marginBottom: 8 },
-  row: { fontSize: 13, color: '#334155', marginBottom: 4 },
-});
+function createStyles(t, isDark) {
+  return StyleSheet.create({
+    wrap: {
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+      borderRadius: 12,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: isDark ? t.border : '#E2E8F0',
+    },
+    title: { fontSize: 16, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A' },
+    sub: { fontSize: 12, color: isDark ? t.textMuted : '#64748B', marginVertical: 8 },
+    input: {
+      borderWidth: 1.5,
+      borderColor: isDark ? t.borderInput : '#CBD5E1',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      marginBottom: 10,
+      fontSize: 14,
+      fontWeight: '600',
+      color: isDark ? t.textPrimary : '#0F172A',
+      backgroundColor: isDark ? t.inputBg : '#FFFFFF',
+      outlineStyle: 'none',
+    },
+    btn: {
+      backgroundColor: isDark ? '#1F6B52' : '#1D4533',
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    confirmBtn: {
+      backgroundColor: isDark ? '#1F6B52' : '#059669',
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      marginTop: 12,
+    },
+    btnText: { color: '#FFF', fontWeight: '700' },
+    err: { color: isDark ? t.statusDangerText : '#DC2626', marginTop: 8, fontSize: 13 },
+    preview: {
+      marginTop: 14,
+      padding: 12,
+      borderRadius: 10,
+      backgroundColor: isDark ? t.statusSuccessBg : '#F0FDF4',
+      borderWidth: 1,
+      borderColor: isDark ? t.accentBorder : '#BBF7D0',
+    },
+    previewTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: isDark ? t.statusSuccessText : '#166534',
+      marginBottom: 8,
+    },
+    row: { fontSize: 13, color: isDark ? t.textSecondary : '#334155', marginBottom: 4 },
+  });
+}

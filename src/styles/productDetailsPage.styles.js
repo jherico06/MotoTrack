@@ -1,5 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
-import { ANDROID_STATUS_BAR_HEIGHT, ANDROID_BOTTOM_INSET } from '../utils/safeArea';
+import { ANDROID_STATUS_BAR_HEIGHT, ANDROID_BOTTOM_INSET } from '../utils/safeArea.js';
 
 export const productDetailsStyles = StyleSheet.create({
   safeArea: {

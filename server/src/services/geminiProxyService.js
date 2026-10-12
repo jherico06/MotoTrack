@@ -27,7 +27,7 @@ export async function proxyGenerateContent({
     model ||
     process.env.GEMINI_ANALYSIS_MODEL ||
     process.env.GEMINI_MODEL ||
-    'gemini-2.5-flash';
+    'gemini-3.8-flash';
 
   const parts = [];
   if (inlineImageBase64) {
@@ -83,6 +83,8 @@ export async function proxyGenerateImage({
   const candidates = [
     model,
     process.env.GEMINI_IMAGE_FALLBACK_MODEL,
+    'gemini-3.1-flash-image',
+    'gemini-3-pro-image',
     'gemini-2.5-flash-image',
   ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 

@@ -7,12 +7,15 @@ export const orderWebStyles = StyleSheet.create({
   },
   headerWrapper: {
     backgroundColor: '#1D4533',
+    backdropFilter: 'blur(16px)',
+    WebkitBackdropFilter: 'blur(16px)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.10)',
     position: 'sticky',
     top: 0,
     zIndex: 1000,
-    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+    minHeight: 67,
   },
   headerInner: {
     maxWidth: 1360,
@@ -20,9 +23,11 @@ export const orderWebStyles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: 24,
     paddingVertical: 12,
+    minHeight: 66,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 20,
   },
   logoWrap: {
     flexDirection: 'row',

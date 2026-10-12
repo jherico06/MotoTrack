@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Modal } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { shopStyles as styles } from '../../styles/shop.styles';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { shopStyles as styles } from '../../styles/shop.styles.js';
 import {
   getProductSizeEntries,
   getSizePrice,
@@ -10,18 +10,17 @@ import {
   isSizeSoldOut,
   productNeedsSizes,
   withSelectedSize,
-} from '../../utils/productSizes';
+} from '../../utils/productSizes.js';
 import {
   getColorImage,
   getProductColorEntries,
   isColorSoldOut,
   productHasColors,
   withSelectedColor,
-} from '../../utils/productColors';
+} from '../../utils/productColors.js';
 
 /**
- * Buy Now / Add to Cart options modal — size & color selection + Place Order / Add to Cart.
- * Selecting a color swaps the product preview image when that color has its own photo.
+ * Buy Now / Add to Cart options modal — size, color, quantity + Place Order / Add to Cart.
  */
 export default function PlaceOrderModal({
   visible,
@@ -38,6 +37,7 @@ export default function PlaceOrderModal({
 
   const [selectedSize, setSelectedSize] = useState('');
   const [selectedColor, setSelectedColor] = useState('');
+  const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     if (!visible || !product) return;
@@ -48,7 +48,23 @@ export default function PlaceOrderModal({
     const colors = getProductColorEntries(product);
     const firstColor = colors.find((e) => !isColorSoldOut(product, e.label));
     setSelectedColor(firstColor?.label || (colors.length === 1 ? colors[0].label : ''));
+    setQuantity(1);
   }, [visible, product]);
+
+  const availableStock = useMemo(() => {
+    if (!product) return 0;
+    if (selectedSize) {
+      const sized = getSizeStock(product, selectedSize);
+      if (sized != null) return Math.max(0, Number(sized) || 0);
+    }
+    return Math.max(0, Number(product?.stock) || 0);
+  }, [product, selectedSize]);
+
+  const maxQty = Math.max(1, availableStock || 1);
+
+  useEffect(() => {
+    setQuantity((prev) => Math.min(Math.max(1, prev), maxQty));
+  }, [maxQty, selectedSize]);
 
   if (!product) return null;
 
@@ -57,6 +73,7 @@ export default function PlaceOrderModal({
 
   const canConfirm =
     !productSoldOut &&
+    availableStock > 0 &&
     (!needsSize || (Boolean(selectedSize) && !sizeSoldOut)) &&
     (!needsColor || (Boolean(selectedColor) && !colorSoldOut));
 
@@ -69,6 +86,7 @@ export default function PlaceOrderModal({
 
   const handleConfirm = () => {
     if (!canConfirm) return;
+    const qty = Math.min(Math.max(1, Number(quantity) || 1), maxQty);
     let finalProduct = needsSize ? withSelectedSize(product, selectedSize) : { ...product };
     if (selectedColor) {
       finalProduct = withSelectedColor(finalProduct, selectedColor);
@@ -76,17 +94,19 @@ export default function PlaceOrderModal({
     onConfirm?.(finalProduct, {
       size: selectedSize || '',
       color: selectedColor || '',
+      quantity: qty,
       mode,
     });
   };
 
   const isBuy = mode === 'buy';
   const title = isBuy ? 'Place Order' : 'Add to Cart';
+  const lineTotal = Number(displayPrice) * Math.max(1, quantity);
   const confirmLabel = isBuy
-    ? productSoldOut || sizeSoldOut || colorSoldOut
+    ? productSoldOut || sizeSoldOut || colorSoldOut || availableStock <= 0
       ? 'Unavailable'
-      : 'Place Order'
-    : 'Add to Cart';
+      : `Place Order · ₱${lineTotal.toFixed(2)}`
+    : `Add ${quantity} to Cart · ₱${lineTotal.toFixed(2)}`;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
@@ -115,7 +135,7 @@ export default function PlaceOrderModal({
               <Text style={styles.specPriceMain}>₱{Number(displayPrice).toFixed(2)}</Text>
             </View>
 
-            {productSoldOut ? (
+            {productSoldOut || availableStock <= 0 ? (
               <View
                 style={{
                   alignSelf: 'flex-start',
@@ -272,11 +292,81 @@ export default function PlaceOrderModal({
               </View>
             ) : null}
 
-            {!needsSize && !needsColor ? (
-              <Text style={{ fontSize: 13, color: '#64748B', marginTop: 8, fontWeight: '600' }}>
-                Ready to {isBuy ? 'place your order' : 'add this item to your cart'}.
-              </Text>
-            ) : null}
+            {/* Quantity stepper */}
+            <View
+              style={{
+                marginTop: 16,
+                marginBottom: 8,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: '#F8FAFC',
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+                paddingHorizontal: 14,
+                paddingVertical: 12,
+              }}
+            >
+              <View>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Quantity</Text>
+                <Text style={{ fontSize: 11.5, color: '#64748B', fontWeight: '600', marginTop: 2 }}>
+                  {availableStock > 0 ? `${availableStock} in stock` : 'Out of stock'}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <TouchableOpacity
+                  onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+                  disabled={quantity <= 1 || availableStock <= 0}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    backgroundColor: quantity <= 1 ? '#E2E8F0' : '#FFFFFF',
+                    borderWidth: 1.5,
+                    borderColor: '#CBD5E1',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: quantity <= 1 ? 0.55 : 1,
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="dash" size={14} color="#0F172A" />
+                </TouchableOpacity>
+
+                <Text
+                  style={{
+                    fontSize: 16,
+                    fontWeight: '900',
+                    color: '#0F172A',
+                    minWidth: 28,
+                    textAlign: 'center',
+                  }}
+                >
+                  {quantity}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => setQuantity((q) => Math.min(maxQty, q + 1))}
+                  disabled={quantity >= maxQty || availableStock <= 0}
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    backgroundColor: quantity >= maxQty ? '#E2E8F0' : '#FFFFFF',
+                    borderWidth: 1.5,
+                    borderColor: '#CBD5E1',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: quantity >= maxQty ? 0.55 : 1,
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="plus" size={14} color="#0F172A" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </ScrollView>
 
           <View style={{ marginTop: 12, gap: 8 }}>

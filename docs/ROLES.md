@@ -1,75 +1,99 @@
 # MotoTrack — Role Functions
 
-This app is a motorcycle parts store. The three roles are:
+This app is a motorcycle parts store with garage service and delivery. The login roles are:
 
 - [Customer](#customer)
 - [Admin](#admin)
 - [Rider](#rider)
+- [Mechanic](#mechanic)
 
-For numbered use-case lists (diagram-style), see [USE_CASES.md](./USE_CASES.md).
+For numbered use cases, see [USE_CASES.md](./USE_CASES.md).  
+For Input–Process–Output diagrams, see [USE_CASE_PROCESSES.md](./USE_CASE_PROCESSES.md).
 
 ---
 
 ## Customer
 
 ### Shopping
-- Browse the store (products, filters, search, categories, hero banner)
+- Browse the store (products, filters, search, categories)
+- Check part compatibility against registered motorcycles
 - Add items to cart, apply promo vouchers, and checkout
 - Payment options: Cash on Delivery (COD), GCash, Card
-
-### Orders
-- Track orders and view order history
-- Cancel / resubmit orders
-- Rate delivered orders
-
-### Personalization
-- AI Customizer to build a custom motorcycle setup
-- Save setups to their Garage (PMS, tuning services)
 - Wishlist for later
 
+### Orders
+- Track orders, view order history, and live GPS when out for delivery
+- Cancel orders while pending/processing; request returns after delivery
+- Confirm delivery via QR token / public confirm link
+
+### Garage & personalization
+- Register motorcycles (brand, model, year, photos)
+- Book PMS / repair (flexible quote-after-inspection workflow)
+- Accept or decline service quotations and additional work
+- Show pickup QR when the bike is ready
+- AI Customizer / Install Studio to preview parts and save setups
+
 ### Account
-- Manage profile, address, and notifications
-- Confirm delivery via QR token when receiving an order
+- Manage profile, address, password, and notifications
+- Dark mode preference
 
 ---
 
 ## Admin (Store Administrator)
 
 ### Operations
-- **Overview** — dashboard with live stats and pending COD count
-- **Orders & COD Fulfillment** — approve COD orders, process, mark ready for delivery / out for delivery, cancel, handle returns
-- **Inventory & Stock** — restock, adjust stock, search/filter, low-stock alerts
-- **Point of Sale (POS)** — in-store walk-in cashier sales, payment handling, receipts
-- **Analytics & Reports** — revenue (POS vs online), average order value, top-selling products, payment method breakdown
+- **Overview** — stocks, sales trends, financial snapshot, pending COD
+- **Orders & COD Fulfillment** — approve COD, process, assign riders, delivery tokens, live GPS, returns/reschedule
+- **Inventory & Stock** — restock by size/color, low-stock alerts, valuation
+- **Point of Sale (POS)** — walk-in cashier sales and receipts
+- **Analytics & Reports** — revenue (POS vs online), AOV, payment mix, Excel export
+- **Forecast** — demand forecast, safety stock, restock recommendations
+- **Customizations** — review customer AI / saved customization records
 
-### Store Management
-- **Products & Prices** — add / edit / delete products, update prices and categories
-- **Promo Vouchers** — create, activate/deactivate, and delete discount codes
-- **Garage Services** — manage PMS and tuning service listings
+### Store management
+- **Products & Prices** — CRUD catalog, sizes/colors, compatibility picker
+- **Moto Models** — brand/model catalog for compatibility
+- **Promo Vouchers** — create, activate/deactivate, delete
+- **Suppliers** — partner CRUD and restock linking
 
-### People & Platform
-- **Riders / Delivery Staff** — add / edit / delete riders, assign deliveries, manage rider status (available / on-delivery / off-duty), grant rider login access
-- **User Accounts** — promote users to admin, delete accounts
-- **Notifications** — send and manage alerts
-- **Supabase Database Settings** — configure DB credentials, test connection
-- **System Settings** — platform-wide settings, factory presets reset
+### Garage & people
+- **Bookings** — approve/reject, assign mechanic/bay, quotations, payments, pickup QR release
+- **Mechanics** — roster, specializations, linked login accounts
+- **Riders** — status, login access, delivery assignment
+
+### Platform
+- **Users** — roles and account management
+- **Notifications / Audit** — alerts and security-ops log
+- **System Settings** — branding, shipping, delivery/pickup, downpayment, backup, PIN lock
 
 ---
 
 ## Rider (Delivery Staff)
 
 ### Dashboard
-- Weekly earnings summary (shipping fees earned)
-- Delivered vs. undelivered counts
+- Weekly earnings summary (shipping fees)
+- Delivered vs open assignment counts
 
 ### Active route
-- List of assigned deliveries grouped by area
-- Navigate to customer via Google Maps
-- Call the customer
-- View order details (items, payment method, total)
+- Assigned deliveries grouped by area
+- Navigate via Google Maps; call customer
+- View order details (items, payment, total)
 
 ### Delivery workflow
-- Mark orders **Out for Delivery**
-- Scan the customer's delivery QR to verify the order
-- Confirm delivery using the QR token
-- Delivery history with earnings per completed stop
+- Mark **Out for Delivery** and share live GPS
+- Scan delivery QR to verify the order
+- Confirm delivery with optional proof-of-delivery photo
+- Report delivery issues; view history and earnings
+
+---
+
+## Mechanic
+
+### Assigned jobs
+- View jobs filtered by today, upcoming, inspection, estimate, in service, completed
+
+### Workflow
+- Start / save inspection (checklist, odometer, findings)
+- Submit labor/parts estimate for admin quotation
+- Update service progress and request additional work
+- Complete service notes (payment and bike release remain admin-only)

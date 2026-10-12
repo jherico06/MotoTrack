@@ -11,18 +11,18 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { deliveryService } from '../../services/deliveryService';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { deliveryService } from '../../services/delivery/deliveryService.js';
 import {
   confirmUrlNeedsPhoneRewrite,
   makePhoneReachableConfirmBundle,
-} from '../../utils/deliveryToken';
+} from '../../utils/deliveryToken.js';
 import {
   getDeliverySlipFields,
   printDeliveryPackingSlip,
   shareDeliveryPackingSlip,
-} from '../../utils/deliveryPackingSlip';
-import { formatPhp } from '../../utils/currency';
+} from '../../utils/deliveryPackingSlip.js';
+import { formatPhp } from '../../utils/currency.js';
 
 /**
  * Shows the secure delivery QR + link for the admin to share with the rider.
@@ -37,95 +37,164 @@ export default function DeliveryTokenModal({
 }) {
   const [bundle, setBundle] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [statusNote, setStatusNote] = useState('');
   const orderId = order?.order_id || order?.id;
+  const orderStatus = String(order?.status || '').toLowerCase();
 
   useEffect(() => {
     if (!visible || !orderId) return;
     let cancelled = false;
+    let loadSeq = 0;
+
+    const finishBusy = () => {
+      if (!cancelled) setBusy(false);
+    };
 
     const applyBundle = async (raw) => {
       if (!raw) {
         if (!cancelled) setBundle(null);
-        return;
+        return false;
       }
-      if (raw.confirmUrl && !confirmUrlNeedsPhoneRewrite(raw.confirmUrl) && raw.qrImageUrl) {
-        if (!cancelled) setBundle({ ...raw, phoneReachable: true });
-        return;
-      }
-      const reachable = await makePhoneReachableConfirmBundle(raw.token, raw.confirmUrl);
-      if (!cancelled) {
-        setBundle({
-          ...raw,
-          token: reachable.token || raw.token,
-          confirmUrl: reachable.confirmUrl || raw.confirmUrl,
-          qrImageUrl: reachable.qrImageUrl || raw.qrImageUrl,
-          phoneReachable: reachable.phoneReachable,
-        });
-      }
-    };
-
-    const autoGenerate = async () => {
-      if (cancelled) return;
-      setBusy(true);
-      try {
-        const res = await deliveryService.regenerateDeliveryToken(orderId, adminUser);
-        if (cancelled) return;
-        if (res.success) {
-          await applyBundle({
-            token: res.token,
-            confirmUrl: res.confirmUrl,
-            qrImageUrl: res.qrImageUrl,
-            expiresAt: null,
-            phoneReachable: res.phoneReachable !== false,
+      // Prefer already-built QR URL so we don't block on LAN discovery.
+      if (raw.qrImageUrl && raw.confirmUrl) {
+        if (!cancelled) {
+          setBundle({
+            ...raw,
+            phoneReachable: raw.phoneReachable !== false && !confirmUrlNeedsPhoneRewrite(raw.confirmUrl),
           });
-        } else {
-          setBundle(null);
         }
+        return true;
+      }
+      try {
+        const reachable = await Promise.race([
+          makePhoneReachableConfirmBundle(raw.token, raw.confirmUrl),
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  token: raw.token,
+                  confirmUrl: raw.confirmUrl || '',
+                  qrImageUrl: raw.confirmUrl
+                    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(raw.confirmUrl)}&margin=8`
+                    : '',
+                  phoneReachable: false,
+                }),
+              2000
+            )
+          ),
+        ]);
+        if (!cancelled) {
+          setBundle({
+            ...raw,
+            token: reachable.token || raw.token,
+            confirmUrl: reachable.confirmUrl || raw.confirmUrl,
+            qrImageUrl: reachable.qrImageUrl || raw.qrImageUrl,
+            phoneReachable: reachable.phoneReachable,
+          });
+        }
+        return Boolean(reachable?.qrImageUrl || reachable?.confirmUrl || raw.qrImageUrl);
       } catch (_e) {
-        if (!cancelled) setBundle(null);
-      } finally {
-        if (!cancelled) setBusy(false);
+        if (!cancelled && raw.confirmUrl) {
+          setBundle({
+            ...raw,
+            qrImageUrl: `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(raw.confirmUrl)}&margin=8`,
+            phoneReachable: false,
+          });
+          return true;
+        }
+        return false;
       }
     };
 
-    if (initialBundle?.token || initialBundle?.confirmUrl) {
-      applyBundle(initialBundle);
-      return () => {
-        cancelled = true;
-      };
-    }
+    const run = async () => {
+      const seq = ++loadSeq;
+      setBusy(true);
+      setStatusNote('');
+      setBundle(null);
 
-    const cached = deliveryService.getAdminDeliveryTokenBundle(orderId);
-    if (cached) {
-      applyBundle(cached);
-    } else {
-      // No cached token on this device — auto-generate so QR is immediately visible
-      autoGenerate();
-    }
+      try {
+        if (orderStatus === 'delivered' || orderStatus === 'completed' || orderStatus === 'cancelled') {
+          setStatusNote(
+            `This order is already "${order?.status || 'closed'}". A delivery confirmation QR is not needed.`
+          );
+          return;
+        }
+
+        if (initialBundle?.token || initialBundle?.confirmUrl) {
+          await applyBundle(initialBundle);
+          return;
+        }
+
+        const cached = deliveryService.getAdminDeliveryTokenBundle(orderId);
+        if (cached) {
+          await applyBundle(cached);
+          return;
+        }
+
+        // Active order with no local QR cache → generate a fresh token so the QR can show.
+        const res = await deliveryService.regenerateDeliveryToken(orderId, adminUser, {
+          orderSnapshot: order,
+        });
+        if (cancelled || seq !== loadSeq) return;
+        if (!res.success) {
+          setStatusNote(res.error || 'Could not generate delivery QR.');
+          showToast?.(res.error || 'Could not generate delivery QR');
+          return;
+        }
+        await applyBundle({
+          token: res.token,
+          confirmUrl: res.confirmUrl,
+          qrImageUrl: res.qrImageUrl,
+          expiresAt: null,
+          phoneReachable: res.phoneReachable !== false,
+        });
+      } catch (e) {
+        if (!cancelled) {
+          setStatusNote(e?.message || 'Could not generate delivery QR.');
+        }
+      } finally {
+        finishBusy();
+      }
+    };
+
+    run();
 
     return () => {
       cancelled = true;
+      setBusy(false);
     };
-  }, [visible, orderId, initialBundle]);
-
+    // Intentionally only re-run when the modal opens for an order — not on every toast/adminUser identity change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, orderId]);
 
   const handleRegenerate = async () => {
     setBusy(true);
+    setStatusNote('');
     try {
-      const res = await deliveryService.regenerateDeliveryToken(orderId, adminUser);
+      const res = await deliveryService.regenerateDeliveryToken(orderId, adminUser, {
+        orderSnapshot: order,
+      });
       if (!res.success) {
+        setStatusNote(res.error || 'Could not generate a new token');
         showToast?.(res.error || 'Could not generate a new token');
         return;
       }
-      setBundle({
+      const next = {
         token: res.token,
         confirmUrl: res.confirmUrl,
         qrImageUrl: res.qrImageUrl,
         expiresAt: null,
         phoneReachable: res.phoneReachable !== false,
-      });
-      showToast?.('New QR / link generated — previous token invalidated');
+      };
+      if (next.qrImageUrl && next.confirmUrl) {
+        setBundle(next);
+      } else {
+        const reachable = await makePhoneReachableConfirmBundle(next.token, next.confirmUrl);
+        setBundle({ ...next, ...reachable });
+      }
+      showToast?.('New QR / link generated — previous token invalidated. Re-print the packing label.');
     } catch (e) {
+      setStatusNote(e?.message || 'Failed to regenerate token');
       showToast?.(e?.message || 'Failed to regenerate token');
     } finally {
       setBusy(false);
@@ -216,10 +285,17 @@ export default function DeliveryTokenModal({
               ) : (
                 <View style={[styles.qrPlaceholder, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
                   <Text style={[styles.qrPlaceholderText, isDark && { color: '#94A3B8' }]}>
-                    No active token on this device. Generate a new QR to share with the rider.
+                    {statusNote ||
+                      'No QR yet. Tap Generate QR below to create one, then print the packing label.'}
                   </Text>
                 </View>
               )}
+
+              {statusNote && bundle?.qrImageUrl ? (
+                <Text style={[styles.meta, { color: isDark ? '#FBBF24' : '#B45309', marginBottom: 8 }]}>
+                  {statusNote}
+                </Text>
+              ) : null}
 
               <View style={[styles.slipCard, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -252,7 +328,13 @@ export default function DeliveryTokenModal({
                 </View>
               </View>
 
-              <Text style={[styles.meta, isDark && { color: '#94A3B8' }]}>Valid until delivery is confirmed</Text>
+              <Text style={[styles.meta, isDark && { color: '#94A3B8' }]}>
+                {bundle?.qrImageUrl
+                  ? 'Valid until delivery is confirmed'
+                  : statusNote
+                    ? ''
+                    : 'Generate a QR to enable packing-label confirmation'}
+              </Text>
 
               {bundle?.confirmUrl ? (
                 <Text style={[styles.link, isDark && { color: '#34D399', backgroundColor: '#1C2422' }]} numberOfLines={3} selectable>
@@ -277,23 +359,27 @@ export default function DeliveryTokenModal({
                 <Text style={styles.ghostBtnText}>Copy link</Text>
               </TouchableOpacity>
             ) : null}
-            <TouchableOpacity
-              style={[styles.secondaryBtn, busy && { opacity: 0.7 }]}
-              onPress={handleRegenerate}
-              disabled={busy}
-              activeOpacity={0.85}
-            >
-              {busy ? (
-                <ActivityIndicator color="#1D4533" />
-              ) : (
-                <>
-                  <BootstrapIcon name="arrow-repeat" size={14} color="#1D4533" />
-                  <Text style={styles.secondaryBtnText}>
-                    {bundle ? 'Regenerate QR' : 'Generate QR'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
+            {orderStatus === 'delivered' ||
+            orderStatus === 'completed' ||
+            orderStatus === 'cancelled' ? null : (
+              <TouchableOpacity
+                style={[styles.secondaryBtn, busy && { opacity: 0.7 }]}
+                onPress={handleRegenerate}
+                disabled={busy}
+                activeOpacity={0.85}
+              >
+                {busy ? (
+                  <ActivityIndicator color="#1D4533" />
+                ) : (
+                  <>
+                    <BootstrapIcon name="arrow-repeat" size={14} color="#1D4533" />
+                    <Text style={styles.secondaryBtnText}>
+                      {bundle ? 'Regenerate QR' : 'Generate QR'}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>

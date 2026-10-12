@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity } from 'react-native';
-import { shopStyles as styles } from '../../styles/shop.styles';
-import { useCart } from '../../context/CartContext';
+import { shopStyles as styles } from '../../styles/shop.styles.js';
+import { useCart } from '../../context/CartContext.jsx';
 
 export default function FloatingCartBar({ onOpenCart }) {
   const { cart, cartItemCount, cartTotal } = useCart();

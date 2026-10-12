@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { pickImageFromFile } from '../../utils/imagePickerHelper';
-import { uploadProductImage } from '../../utils/productImageUpload';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { pickImageFromFile } from '../../utils/imagePickerHelper.js';
+import { uploadProductImage } from '../../utils/productImageUpload.js';
 
 function toDraftRows(colors) {
   if (!Array.isArray(colors)) return [];
@@ -129,7 +129,7 @@ export default function ProductColorsEditor({
   return (
     <View style={{ marginBottom: 10 }}>
       <Text style={formLabelStyle}>Colors & Preview Images</Text>
-      <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : '#64748B', marginBottom: 8 }}>
+          <Text style={{ fontSize: 11, color: isDark ? '#AAB4B0' : '#64748B', marginBottom: 8 }}>
         Add each color with a name, then upload a photo for that finish. Customers see the matching
         photo when they pick the color. Color names are required when a photo is set.
       </Text>
@@ -143,7 +143,7 @@ export default function ProductColorsEditor({
             borderRadius: 12,
             borderWidth: 1,
             borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0',
-            backgroundColor: isDark ? '#1C2422' : '#F8FAFC',
+            backgroundColor: isDark ? '#1A2320' : '#F8FAFC',
             gap: 10,
           }}
         >
@@ -217,7 +217,7 @@ export default function ProductColorsEditor({
                 gap: 12,
                 alignItems: 'center',
                 padding: 10,
-                backgroundColor: isDark ? '#141A18' : '#FFFFFF',
+                backgroundColor: isDark ? '#151C19' : '#FFFFFF',
                 borderRadius: 12,
                 borderWidth: 1,
                 borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0',
@@ -230,7 +230,7 @@ export default function ProductColorsEditor({
                     width: 72,
                     height: 72,
                     borderRadius: 10,
-                    backgroundColor: isDark ? '#1C2422' : '#E2E8F0',
+                    backgroundColor: isDark ? '#1A2320' : '#E2E8F0',
                     borderWidth: 1,
                     borderColor: isDark ? 'rgba(255,255,255,0.15)' : '#CBD5E1',
                   }}
@@ -242,7 +242,7 @@ export default function ProductColorsEditor({
                     width: 72,
                     height: 72,
                     borderRadius: 10,
-                    backgroundColor: isDark ? '#1C2422' : '#E2E8F0',
+                    backgroundColor: isDark ? '#1A2320' : '#E2E8F0',
                     alignItems: 'center',
                     justifyContent: 'center',
                     borderWidth: 1,

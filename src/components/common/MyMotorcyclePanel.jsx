@@ -12,8 +12,8 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
-import { BootstrapIcon } from '../common';
-import { compatibilityService } from '../../services/compatibilityService';
+import { BootstrapIcon } from './';
+import { compatibilityService } from '../../services/products/compatibilityService.js';
 
 export default function MyMotorcyclePanel({
   currentUser,

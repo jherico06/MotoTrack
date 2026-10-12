@@ -1,5 +1,5 @@
 import { StyleSheet } from 'react-native';
-import { ANDROID_TOP_INSET } from '../utils/safeArea';
+import { ANDROID_TOP_INSET } from '../utils/safeArea.js';
 
 export const customizerStyles = StyleSheet.create({
   // ─── BASE CANVAS & SCROLL CONTAINER ───

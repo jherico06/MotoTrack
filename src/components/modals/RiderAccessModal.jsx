@@ -11,13 +11,13 @@ import {
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import ExternalLink from '../common/ExternalLink';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import ExternalLink from '../common/ExternalLink.jsx';
 import {
   riderAccessService,
   makePhoneReachableRiderBundle,
-} from '../../services/riderAccessService';
-import { confirmUrlNeedsPhoneRewrite } from '../../utils/deliveryToken';
+} from '../../services/delivery/riderAccessService.js';
+import { confirmUrlNeedsPhoneRewrite } from '../../utils/deliveryToken.js';
 
 /**
  * Admin share sheet for the temporary rider dashboard link (no rider account).

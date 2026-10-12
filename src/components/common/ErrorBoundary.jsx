@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, Platform } from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
+import BootstrapIcon from './BootstrapIcon.jsx';
 
 export default class ErrorBoundary extends React.Component {
   constructor(props) {

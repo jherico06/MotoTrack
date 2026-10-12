@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { shopStyles as styles } from '../../styles/shop.styles';
-import { promoService } from '../../services/promoService';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { shopStyles as styles } from '../../styles/shop.styles.js';
+import { promoService } from '../../services/products/promoService.js';
 
 const BANNER_IMAGES = [
   'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',

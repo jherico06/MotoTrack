@@ -1,5 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
-import { ANDROID_TOP_INSET } from '../utils/safeArea';
+import { ANDROID_TOP_INSET } from '../utils/safeArea.js';
 
 export const loginPageStyles = StyleSheet.create({
   container: {
@@ -175,13 +175,39 @@ export const loginPageStyles = StyleSheet.create({
   },
 
   forgotPasswordRow: {
-    alignSelf: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginTop: -4,
     marginBottom: 18,
   },
   forgotPasswordText: {
     fontSize: 12.5,
     color: '#88A9A3',
+    fontWeight: '600',
+  },
+  rememberMeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rememberCheckbox: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#88A9A3',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rememberCheckboxChecked: {
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
+  },
+  rememberMeText: {
+    fontSize: 12.5,
+    color: '#475569',
     fontWeight: '600',
   },
 

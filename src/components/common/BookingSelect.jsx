@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Platform, ScrollView } from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
+import BootstrapIcon from './BootstrapIcon.jsx';
 
 const SELECT_STYLE = {
   width: '100%',

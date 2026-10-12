@@ -1,5 +1,5 @@
 import { StyleSheet, Platform } from 'react-native';
-import { ANDROID_TOP_INSET } from '../utils/safeArea';
+import { ANDROID_TOP_INSET } from '../utils/safeArea.js';
 
 export const orderStyles = StyleSheet.create({
   container: {

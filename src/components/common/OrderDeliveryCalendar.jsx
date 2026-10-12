@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
-import { localYmd } from '../../utils/deliveryDate';
+import BootstrapIcon from './BootstrapIcon.jsx';
+import { localYmd } from '../../utils/deliveryDate.js';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -19,27 +19,35 @@ const DAY_HEADERS = [
 ];
 
 /**
- * OrderDeliveryCalendar — A sleek, compact delivery calendar inspired by the MotoTrack BookingCalendar UI.
- * Designed specifically for order management and fulfillment modals.
+ * OrderDeliveryCalendar — compact delivery calendar for order / assign modals.
  *
  * Props:
- * - selectedDate: string (YYYY-MM-DD)
- * - onSelectDate: (dateStr: string) => void
- * - minDate: string (YYYY-MM-DD)
- * - isDarkMode: boolean
+ * - selectedDate / startDate / endDate: YYYY-MM-DD
+ * - mode: 'single' | 'range'
+ * - onSelectDate: (dateStr) => void  (single)
+ * - onRangeChange: ({ start, end }) => void  (range)
+ * - minDate, isDarkMode
  */
 export default function OrderDeliveryCalendar({
   selectedDate,
+  startDate,
+  endDate,
   onSelectDate,
+  onRangeChange,
+  mode = 'single',
   minDate,
   isDarkMode = false,
 }) {
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => localYmd(today), [today]);
+  const rangeMode = mode === 'range';
+  const rangeStart = startDate || selectedDate || '';
+  const rangeEnd = endDate || '';
 
   const [viewDate, setViewDate] = useState(() => {
-    if (selectedDate) {
-      const parts = selectedDate.split('-');
+    const seed = rangeStart || selectedDate;
+    if (seed) {
+      const parts = seed.split('-');
       if (parts.length === 3) {
         return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, 1);
       }
@@ -68,12 +76,21 @@ export default function OrderDeliveryCalendar({
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const cutoff = minDate || todayStr;
     const isPast = cutoff ? dateStr < cutoff : false;
+    const inRange =
+      rangeMode &&
+      rangeStart &&
+      rangeEnd &&
+      dateStr >= rangeStart &&
+      dateStr <= rangeEnd;
+    const isRangeEdge =
+      rangeMode && (dateStr === rangeStart || dateStr === rangeEnd);
     cells.push({
       day: d,
       isCurrentMonth: true,
       dateStr,
       isPast,
-      isSelected: dateStr === selectedDate,
+      isSelected: rangeMode ? isRangeEdge : dateStr === selectedDate,
+      isInRange: Boolean(inRange),
       isToday: dateStr === todayStr,
     });
   }
@@ -103,7 +120,28 @@ export default function OrderDeliveryCalendar({
 
   const handleJumpToToday = () => {
     setViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
-    if (onSelectDate) onSelectDate(todayStr);
+    if (rangeMode) {
+      onRangeChange?.({ start: todayStr, end: todayStr });
+    } else {
+      onSelectDate?.(todayStr);
+    }
+  };
+
+  const handleDayPress = (dateStr) => {
+    if (!rangeMode) {
+      onSelectDate?.(dateStr);
+      return;
+    }
+    // First click = start; second = end; third resets start
+    if (!rangeStart || (rangeStart && rangeEnd)) {
+      onRangeChange?.({ start: dateStr, end: '' });
+      return;
+    }
+    if (dateStr < rangeStart) {
+      onRangeChange?.({ start: dateStr, end: rangeStart });
+    } else {
+      onRangeChange?.({ start: rangeStart, end: dateStr });
+    }
   };
 
   return (
@@ -200,7 +238,7 @@ export default function OrderDeliveryCalendar({
               }
 
               const isSunday = cIdx === 0;
-              const { isSelected, isToday, isPast } = cell;
+              const { isSelected, isToday, isPast, isInRange } = cell;
 
               let cardBg = isDarkMode ? '#1E293B' : '#FFFFFF';
               let cardBorder = isDarkMode ? '#334155' : '#E2E8F0';
@@ -215,7 +253,17 @@ export default function OrderDeliveryCalendar({
                 borderWidth = 1.8;
                 numColor = isDarkMode ? '#FFFFFF' : '#143325';
                 dotColor = '#1D4533';
-                statusLabel = 'Selected';
+                statusLabel = rangeMode
+                  ? cell.dateStr === rangeStart
+                    ? 'Start'
+                    : 'End'
+                  : 'Selected';
+              } else if (isInRange) {
+                cardBg = isDarkMode ? 'rgba(29, 69, 51, 0.35)' : '#F0FDF4';
+                cardBorder = isDarkMode ? '#1D4533' : '#86EFAC';
+                numColor = isDarkMode ? '#A7F3D0' : '#143325';
+                dotColor = '#1D4533';
+                statusLabel = 'In range';
               } else if (isToday && !isSelected) {
                 cardBg = isDarkMode ? '#064E3B' : '#F0FDF4';
                 cardBorder = '#86EFAC';
@@ -232,7 +280,7 @@ export default function OrderDeliveryCalendar({
                 <TouchableOpacity
                   key={cIdx}
                   disabled={isPast}
-                  onPress={() => onSelectDate?.(cell.dateStr)}
+                  onPress={() => handleDayPress(cell.dateStr)}
                   activeOpacity={0.75}
                   style={[
                     styles.cell,

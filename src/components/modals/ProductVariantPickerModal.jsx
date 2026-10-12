@@ -9,15 +9,15 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { variantModalStyles as styles } from '../../styles/productVariantPickerModal.styles';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { variantModalStyles as styles } from '../../styles/productVariantPickerModal.styles.js';
 import {
   getProductColorEntries,
   getColorImage,
   isColorSoldOut,
   productHasColors,
   withSelectedColor,
-} from '../../utils/productColors';
+} from '../../utils/productColors.js';
 import {
   getProductSizeEntries,
   getSizePrice,
@@ -26,8 +26,8 @@ import {
   isSizeSoldOut,
   productNeedsSizes,
   withSelectedSize,
-} from '../../utils/productSizes';
-import { sanitizeCompareAtPrice } from '../../utils/productCatalog';
+} from '../../utils/productSizes.js';
+import { sanitizeCompareAtPrice } from '../../utils/productCatalog.js';
 
 export default function ProductVariantPickerModal({
   visible,

@@ -8,8 +8,8 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { CATEGORY_PILLS } from '../../data/motorParts';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { CATEGORY_PILLS } from '../../data/motorParts.js';
 
 export default function CategoryDropdown({
   selectedCategory = 'All',

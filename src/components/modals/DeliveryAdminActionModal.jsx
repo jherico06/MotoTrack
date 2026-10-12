@@ -9,8 +9,8 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { deliveryService } from '../../services/deliveryService';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { deliveryService } from '../../services/delivery/deliveryService.js';
 
 /**
  * Admin records a rider drop-off report, confirms delivery, or logs a delivery issue.

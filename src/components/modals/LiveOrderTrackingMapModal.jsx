@@ -14,10 +14,11 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { useAuth } from '../../context/AuthContext';
-import { orderService, canCustomerCancelStatus, canCustomerRequestReturnStatus, canCustomerEditAddressStatus } from '../../services/orderService';
-import { geocodeAddress, STORE_LOCATION } from '../../utils/geo';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import DeliveryTrackingPanel from '../common/DeliveryTrackingPanel.jsx';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { orderService, canCustomerCancelStatus, canCustomerRequestReturnStatus, canCustomerEditAddressStatus } from '../../services/orders/orderService.js';
+import { geocodeAddress, STORE_LOCATION } from '../../utils/geo.js';
 
 // Route Waypoints focused across City of Naga, Cebu, Philippines
 const ROUTE_WAYPOINTS = [
@@ -333,15 +334,14 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
           if (isMounted && coords && Number.isFinite(coords.lat) && Number.isFinite(coords.lng)) {
             setCustomerCoords(coords);
           } else if (isMounted) {
-            // Default land coordinates in City of Naga, Cebu (Inoburan / South Naga)
-            setCustomerCoords({ lat: 10.2185, lng: 123.7535 });
+            setCustomerCoords(null);
           }
         })
         .catch(() => {
-          if (isMounted) setCustomerCoords({ lat: 10.2185, lng: 123.7535 });
+          if (isMounted) setCustomerCoords(null);
         });
     } else if (isMounted) {
-      setCustomerCoords({ lat: 10.2185, lng: 123.7535 });
+      setCustomerCoords(null);
     }
 
     return () => {
@@ -625,16 +625,21 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   };
 
   const handleOpenGoogleMapsApp = () => {
-    const query = encodeURIComponent(deliveryAddressStr);
-    const url = Platform.select({
-      ios: `maps:0,0?q=${query}`,
-      android: `geo:0,0?q=${query}`,
-      default: `https://www.google.com/maps/search/?api=1&query=${query}`,
+    const origin = `${STORE_LOCATION.lat},${STORE_LOCATION.lng}`;
+    const destCoords =
+      customerCoords &&
+      Number.isFinite(customerCoords.lat) &&
+      Number.isFinite(customerCoords.lng)
+        ? `${customerCoords.lat},${customerCoords.lng}`
+        : null;
+    const destination = destCoords || encodeURIComponent(deliveryAddressStr);
+    const directionsUrl = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=driving`;
+    Linking.openURL(directionsUrl).catch(() => {
+      Linking.openURL(
+        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(deliveryAddressStr)}`
+      );
     });
-    Linking.openURL(url).catch(() => {
-      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${query}`);
-    });
-    showToast('Opening Google Maps...');
+    showToast('Opening Google Maps directions from store…');
   };
 
   const formatMoney = (n) =>
@@ -799,71 +804,22 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                   </TouchableOpacity>
                 </View>
 
-                {/* Map Canvas Container */}
+                {/* Live GPS map — rider location from delivery_locations (Realtime) */}
                 <View style={styles.mapCanvasWrapper}>
-                  {!webViewFailed ? (
-                    Platform.OS === 'web' ? (
-                      <View style={styles.iframeMapContainer}>
-                        <iframe
-                          key={`map-web-${deliveryAddressStr}`}
-                          title="Live Street Map"
-                          width="100%"
-                          height="100%"
-                          style={{ border: 0, width: '100%', height: 280, minHeight: 280, borderRadius: 16 }}
-                          srcDoc={leafletMapHtml}
-                        />
-                        {/* Floating Courier Badge on Live Map */}
-                        <View style={styles.googleMapLiveBadge}>
-                          <View style={styles.mapHudLiveDot} />
-                          <Text style={styles.googleMapLiveText} numberOfLines={1}>
-                            Live Street GPS • D'Blockchain to {destCity}
-                          </Text>
-                        </View>
-                      </View>
-                    ) : (
-                      <View style={styles.iframeMapContainer}>
-                        <WebView
-                          key={`map-native-${deliveryAddressStr}`}
-                          source={{ html: leafletMapHtml, baseUrl: 'https://unpkg.com' }}
-                          style={styles.nativeWebView}
-                          originWhitelist={['*']}
-                          javaScriptEnabled={true}
-                          domStorageEnabled={true}
-                          scalesPageToFit={true}
-                          androidHardwareAccelerationDisabled={false}
-                          androidLayerType="hardware"
-                          mixedContentMode="always"
-                          startInLoadingState={true}
-                          onError={() => setWebViewFailed(true)}
-                          onHttpError={() => setWebViewFailed(true)}
-                          renderLoading={() => (
-                            <View style={styles.mapLoadingOverlay}>
-                              <ActivityIndicator size="small" color="#1D4533" />
-                              <Text style={styles.mapLoadingText}>Loading Live GPS Map...</Text>
-                            </View>
-                          )}
-                        />
-                        {/* Floating Courier Badge on Live Map */}
-                        <View style={styles.googleMapLiveBadge}>
-                          <View style={styles.mapHudLiveDot} />
-                          <Text style={styles.googleMapLiveText} numberOfLines={1}>
-                            Live Street GPS • D'Blockchain to {destCity}
-                          </Text>
-                        </View>
-                      </View>
-                    )
-                  ) : (
-                    /* Fallback Direct Embed */
-                    <View style={styles.iframeMapContainer}>
-                      <iframe
-                        title="Google Maps Fallback"
-                        width="100%"
-                        height="100%"
-                        style={{ border: 0, width: '100%', height: 280, minHeight: 280, borderRadius: 16 }}
-                        src={`https://maps.google.com/maps?q=${customerCoords?.lat || 10.2185},${customerCoords?.lng || 123.7535}&z=15&output=embed`}
-                      />
-                    </View>
-                  )}
+                  <DeliveryTrackingPanel
+                    order={{
+                      ...activeOrder,
+                      order_id: activeOrder?.order_id || activeOrder?.id,
+                      delivery_lat: customerCoords?.lat ?? activeOrder?.delivery_lat,
+                      delivery_lng: customerCoords?.lng ?? activeOrder?.delivery_lng,
+                      customer_address: deliveryAddressStr,
+                      status: activeOrder?.status,
+                    }}
+                    statusOverride={activeOrder?.status}
+                    height={300}
+                    title="Live delivery map"
+                    showWhenInactive
+                  />
                 </View>
 
                 {/* Rider Contact Card */}

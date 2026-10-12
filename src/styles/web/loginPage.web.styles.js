@@ -192,12 +192,44 @@ export const authWebStyles = StyleSheet.create({
   },
   forgotPasswordBtn: {
     alignSelf: 'flex-end',
-    marginBottom: 10,
-    marginTop: -4,
+    marginBottom: 0,
+    marginTop: 0,
   },
   forgotPasswordText: {
     fontSize: 11.5,
     color: '#88A9A3',
+    fontWeight: '600',
+  },
+  rememberForgotRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    marginTop: -2,
+  },
+  rememberMeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  rememberCheckbox: {
+    width: 16,
+    height: 16,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#88A9A3',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rememberCheckboxChecked: {
+    backgroundColor: '#1D4533',
+    borderColor: '#1D4533',
+  },
+  rememberMeText: {
+    fontSize: 11.5,
+    color: '#475569',
     fontWeight: '600',
   },
   primaryTealBtn: {

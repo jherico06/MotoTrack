@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { customizationService } from '../services/customizationService';
-import { motorcycleService } from '../services/motorcycleService';
+import { customizationService } from '../services/bookings/customizationService.js';
+import { motorcycleService } from '../services/products/motorcycleService.js';
 import {
   CUSTOMIZATION_CATEGORIES,
   getCatalogBrands,
   getCatalogModels,
   getCatalogYears,
   getVehicleType,
-} from '../data/motorcycleCatalog';
+} from '../data/motorcycleCatalog.js';
 
 /**
  * Shared customization builder state for native + web Customizer pages.

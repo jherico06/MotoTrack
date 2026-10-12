@@ -261,6 +261,100 @@ export function calculateMASE(pairs) {
   return mae / naive;
 }
 
+/**
+ * Mean Absolute Error across scored forecast/actual pairs.
+ */
+export function calculateMAE(pairs) {
+  const cleaned = (pairs || []).filter(
+    (x) => x.actual != null && x.predicted != null && Number.isFinite(Number(x.actual))
+  );
+  if (cleaned.length === 0) return null;
+  let sum = 0;
+  for (const row of cleaned) {
+    sum += Math.abs(Number(row.actual) - Number(row.predicted));
+  }
+  return Math.round((sum / cleaned.length) * 100) / 100;
+}
+
+/**
+ * Forecast bias = mean(predicted − actual). Positive = over-forecasting.
+ */
+export function calculateForecastBias(pairs) {
+  const cleaned = (pairs || []).filter(
+    (x) => x.actual != null && x.predicted != null && Number.isFinite(Number(x.actual))
+  );
+  if (cleaned.length === 0) return null;
+  let sum = 0;
+  for (const row of cleaned) {
+    sum += Number(row.predicted) - Number(row.actual);
+  }
+  return Math.round((sum / cleaned.length) * 100) / 100;
+}
+
+/**
+ * Confidence score (0–100) from data richness + demand regularity.
+ * Deterministic — never invented beyond available series stats.
+ */
+export function calculateForecastConfidence({
+  observations = 0,
+  nonZeroObservations = 0,
+  demandSeries = [],
+  minPeriods = MIN_SBA_PERIODS,
+  minNonZero = MIN_NONZERO_DEMANDS,
+  historicalWape = null,
+} = {}) {
+  if (observations < minPeriods || nonZeroObservations < minNonZero) {
+    return {
+      score: null,
+      level: 'LOW',
+      label: 'Low',
+      sufficient: false,
+    };
+  }
+
+  // Period coverage: more history → higher confidence (caps at 12+)
+  const periodScore = Math.min(1, observations / 12) * 40;
+  // Demand event density
+  const density = nonZeroObservations / Math.max(observations, 1);
+  const densityScore = Math.min(1, density / 0.5) * 25;
+  // Stability: lower CV → higher confidence
+  const vals = (demandSeries || []).map((v) => Math.max(0, Number(v) || 0));
+  const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  const sd = demandStdDev(vals);
+  const cv = mean > 0 ? sd / mean : 1;
+  const stabilityScore = Math.max(0, 1 - Math.min(cv, 1.5) / 1.5) * 20;
+  // Historical accuracy bonus when WAPE available
+  let accuracyScore = 10;
+  if (historicalWape != null && Number.isFinite(historicalWape)) {
+    accuracyScore = Math.max(0, Math.min(15, (1 - historicalWape) * 15));
+  }
+
+  const raw = periodScore + densityScore + stabilityScore + accuracyScore;
+  const score = Math.round(Math.min(95, Math.max(35, raw)));
+  let level = 'MEDIUM';
+  if (score >= 75) level = 'HIGH';
+  else if (score < 55) level = 'LOW';
+
+  return {
+    score,
+    level,
+    label: level === 'HIGH' ? 'High' : level === 'MEDIUM' ? 'Medium' : 'Low',
+    sufficient: true,
+  };
+}
+
+/**
+ * Approximate prediction interval around a point forecast using demand σ.
+ */
+export function forecastRange(pointForecast, demandSeries, z = 1.28) {
+  const point = Math.max(0, Number(pointForecast) || 0);
+  const sigma = demandStdDev(demandSeries);
+  const half = z * sigma;
+  const low = Math.max(0, Math.round(point - half));
+  const high = Math.max(low, Math.round(point + half));
+  return { low, high, point: Math.round(point) };
+}
+
 export default {
   calculateCrostonSBA,
   computeSeasonalFactors,
@@ -271,6 +365,10 @@ export default {
   toAverageDailyDemand,
   calculateWAPE,
   calculateMASE,
+  calculateMAE,
+  calculateForecastBias,
+  calculateForecastConfidence,
+  forecastRange,
   MIN_SBA_PERIODS,
   MIN_NONZERO_DEMANDS,
   MIN_PERIODS_FOR_SEASONALITY,

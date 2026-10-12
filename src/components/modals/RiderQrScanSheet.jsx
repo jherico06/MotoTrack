@@ -12,7 +12,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import BootstrapIcon from '../common/BootstrapIcon';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 
@@ -20,7 +20,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
  * Full-screen QR scanner for riders.
  * Prefers the system barcode scanner (reliable on Expo Go), falls back to CameraView.
  */
-export default function RiderQrScanSheet({ visible, order, onClose, onScanned }) {
+export default function RiderQrScanSheet({ visible, onClose, onScanned }) {
   const [permission, requestPermission] = useCameraPermissions();
   const [paste, setPaste] = useState('');
   const [camError, setCamError] = useState('');
@@ -168,12 +168,8 @@ export default function RiderQrScanSheet({ visible, order, onClose, onScanned })
         <View style={styles.topBar}>
           <View style={{ flex: 1 }}>
             <Text style={styles.kicker}>MotoTrack Rider</Text>
-            <Text style={styles.title}>Scan order QR</Text>
-            <Text style={styles.hint}>
-              {order?.orderId
-                ? `Scan the packing label for order #${order.orderId}.`
-                : 'Scan the customer packing-label QR.'}
-            </Text>
+            <Text style={styles.title}>Scan Order QR</Text>
+            <Text style={styles.hint}>Scan the customer's delivery QR code to confirm this order.</Text>
           </View>
           <TouchableOpacity onPress={onClose} style={styles.closeBtn} accessibilityRole="button">
             <BootstrapIcon name="x-lg" size={16} color="#E2E8F0" />

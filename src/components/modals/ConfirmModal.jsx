@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Platform, ActivityIndicator } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
 
 /**
  * MotoTrack Custom Confirmation & Alert Dialog Modal

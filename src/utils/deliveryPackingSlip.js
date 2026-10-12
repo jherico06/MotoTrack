@@ -3,8 +3,60 @@
  * Formatted as an industrial logistics shipping label matching standard commercial package design.
  */
 import { Platform, Share } from 'react-native';
-import { formatPhp } from './currency';
-import { qrImageUrlForLink } from './deliveryToken';
+import { formatPhp } from './currency.js';
+import { qrImageUrlForLink } from './deliveryToken.js';
+import { systemSettingsService } from '../services/system/systemSettingsService.js';
+
+/** Known placeholder / demo store addresses — never print these on labels. */
+const MOCK_STORE_ADDRESSES = [
+  'KM 14 West Service Rd, Sun Valley',
+  'Parañaque, Metro Manila',
+  '108 Katipunan Ave, Quezon City, Metro Manila, Philippines',
+  '108 Katipunan Ave, Quezon City, Metro Manila',
+];
+
+function isMockStoreAddress(value) {
+  const s = String(value || '').trim().toLowerCase();
+  if (!s) return true;
+  return MOCK_STORE_ADDRESSES.some((m) => s === m.toLowerCase() || s.includes(m.toLowerCase()));
+}
+
+/** Split store address into label lines (street / city / zip). */
+function resolveStoreFromFields(settings = {}) {
+  const company = String(settings.storeName || 'MotoTrack').trim() || 'MotoTrack';
+  const rawAddress = String(settings.storeAddress || '').trim();
+  const cityLocation = String(settings.cityLocation || '').trim();
+  const usableAddress = isMockStoreAddress(rawAddress) ? '' : rawAddress;
+
+  if (!usableAddress && !cityLocation) {
+    return {
+      fromCompany: company,
+      fromAddress: 'Store address not set',
+      fromCity: 'Update in System Settings',
+      fromZip: 'PH',
+    };
+  }
+
+  // Prefer explicit newlines; otherwise split on commas into up to 3 lines
+  let parts = usableAddress
+    ? usableAddress.split(/\n+/).map((p) => p.trim()).filter(Boolean)
+    : [];
+  if (parts.length <= 1 && usableAddress.includes(',')) {
+    parts = usableAddress.split(',').map((p) => p.trim()).filter(Boolean);
+  }
+
+  let fromAddress = parts[0] || cityLocation || 'Store address';
+  let fromCity = parts[1] || (parts[0] && cityLocation && parts[0] !== cityLocation ? cityLocation : '') || '';
+  let fromZip = parts.slice(2).join(', ') || '';
+
+  // If only one address line and we have cityLocation distinct from it, use city as second line
+  if (!fromCity && cityLocation && cityLocation !== fromAddress) {
+    fromCity = cityLocation;
+  }
+  if (!fromZip) fromZip = 'PH';
+
+  return { fromCompany: company, fromAddress, fromCity, fromZip };
+}
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -59,6 +111,14 @@ export function getDeliverySlipFields(order = {}, bundle = {}) {
   const numericOnly = String(orderId).replace(/\D/g, '');
   const itemNo = numericOnly ? numericOnly.padStart(7, '0').slice(-7) : cleanId.slice(0, 7) || '0004321';
 
+  let settings = {};
+  try {
+    settings = systemSettingsService.getSettings?.() || {};
+  } catch (_e) {
+    settings = {};
+  }
+  const from = resolveStoreFromFields(settings);
+
   return {
     orderId,
     customerName,
@@ -77,10 +137,7 @@ export function getDeliverySlipFields(order = {}, bundle = {}) {
     qrImageUrl,
     confirmUrl: bundle.confirmUrl || '',
     notes: order.delivery_notes || order.notes || '',
-    fromCompany: 'MotoTrack Performance Hub',
-    fromAddress: 'KM 14 West Service Rd, Sun Valley',
-    fromCity: 'Parañaque, Metro Manila',
-    fromZip: '1700 PH',
+    ...from,
   };
 }
 
@@ -471,7 +528,7 @@ function buildPackingSlipHtml(fields) {
           <path d="M9 12.5L5.5 17.5" />
           <path d="M14.5 12.5L18.5 17.5" />
         </svg>
-        <span class="header-logo-text">MOTOTRACK</span>
+        <span class="header-logo-text">${escapeHtml(String(fields.fromCompany || 'MOTOTRACK').toUpperCase())}</span>
       </div>
       <div class="header-product-box">
         <span class="header-product-text">${escapeHtml(fields.productName)}</span>
@@ -488,9 +545,9 @@ function buildPackingSlipHtml(fields) {
             <span class="bold-title">From :</span>
             <span class="company-title">${escapeHtml(fields.fromCompany)}</span>
           </div>
-          <div class="detail-text">${escapeHtml(fields.fromAddress)}</div>
-          <div class="detail-text">${escapeHtml(fields.fromCity)}</div>
-          <div class="detail-text">${escapeHtml(fields.fromZip)}</div>
+          ${fields.fromAddress ? `<div class="detail-text">${escapeHtml(fields.fromAddress)}</div>` : ''}
+          ${fields.fromCity ? `<div class="detail-text">${escapeHtml(fields.fromCity)}</div>` : ''}
+          ${fields.fromZip ? `<div class="detail-text">${escapeHtml(fields.fromZip)}</div>` : ''}
         </div>
 
         <!-- 1 2 3 A B C D ... + Barcode -->
@@ -519,8 +576,12 @@ function buildPackingSlipHtml(fields) {
                 <span class="bold-title">To :</span>
                 <span class="company-title">${escapeHtml(fields.customerName)}</span>
               </div>
-              <div class="detail-text box-to-details">${escapeHtml(fields.address || 'Standard Delivery Address')}</div>
-              <div class="detail-text box-to-details">${escapeHtml(fields.phone ? `Tel: ${fields.phone}` : 'Metro Manila, PH')}</div>
+              <div class="detail-text box-to-details">${escapeHtml(fields.address || 'No delivery address on file')}</div>
+              ${
+                fields.phone
+                  ? `<div class="detail-text box-to-details">${escapeHtml(`Tel: ${fields.phone}`)}</div>`
+                  : ''
+              }
             </div>
 
             <!-- 3 Standard Packaging Handling Icons -->

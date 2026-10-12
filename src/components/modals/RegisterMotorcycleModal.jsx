@@ -11,11 +11,11 @@ import {
   StyleSheet,
   Platform,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import {
   MOTORCYCLE_BRANDS,
-} from '../../services/motorcycleService';
-import { pickImageFromFile } from '../../utils/imagePickerHelper';
+} from '../../services/products/motorcycleService.js';
+import { pickImageFromFile } from '../../utils/imagePickerHelper.js';
 
 export default function RegisterMotorcycleModal({
   visible = false,
@@ -278,79 +278,92 @@ export default function RegisterMotorcycleModal({
             <View style={styles.section}>
               <Text style={[styles.label, { color: textMain }]}>Details</Text>
               <View style={styles.grid}>
-                <View style={styles.fieldHalf}>
-                  <Text style={[styles.fieldHint, { color: textMuted }]}>Model *</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
-                    placeholder="e.g. Click 160"
-                    placeholderTextColor={textMuted}
-                    value={model}
-                    onChangeText={setModel}
-                  />
+                {/* Row 1: Model & Nickname */}
+                <View style={styles.fieldRow}>
+                  <View style={styles.fieldCol}>
+                    <Text style={[styles.fieldHint, { color: textMuted }]}>Model *</Text>
+                    <TextInput
+                      style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
+                      placeholder="e.g. Click 160"
+                      placeholderTextColor={textMuted}
+                      value={model}
+                      onChangeText={setModel}
+                    />
+                  </View>
+                  <View style={styles.fieldCol}>
+                    <Text style={[styles.fieldHint, { color: textMuted }]}>Nickname</Text>
+                    <TextInput
+                      style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
+                      placeholder="Optional"
+                      placeholderTextColor={textMuted}
+                      value={nickname}
+                      onChangeText={setNickname}
+                    />
+                  </View>
                 </View>
-                <View style={styles.fieldHalf}>
-                  <Text style={[styles.fieldHint, { color: textMuted }]}>Nickname</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
-                    placeholder="Optional"
-                    placeholderTextColor={textMuted}
-                    value={nickname}
-                    onChangeText={setNickname}
-                  />
+
+                {/* Row 2: Plate / MV No. & Year */}
+                <View style={styles.fieldRow}>
+                  <View style={styles.fieldCol}>
+                    <Text style={[styles.fieldHint, { color: textMuted }]}>Plate / MV No. *</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: bgInput,
+                          borderColor: borderCol,
+                          color: textMain,
+                          fontWeight: '700',
+                          letterSpacing: 0.6,
+                        },
+                      ]}
+                      placeholder="ABC-1234"
+                      placeholderTextColor={textMuted}
+                      value={plateNumber}
+                      onChangeText={setPlateNumber}
+                      autoCapitalize="characters"
+                    />
+                  </View>
+                  <View style={styles.fieldCol}>
+                    <Text style={[styles.fieldHint, { color: textMuted }]}>Year</Text>
+                    <TextInput
+                      style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
+                      placeholder="2025"
+                      placeholderTextColor={textMuted}
+                      value={year}
+                      onChangeText={setYear}
+                      keyboardType="numeric"
+                    />
+                  </View>
                 </View>
-                <View style={styles.fieldHalf}>
-                  <Text style={[styles.fieldHint, { color: textMuted }]}>Plate / MV No. *</Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      {
-                        backgroundColor: bgInput,
-                        borderColor: borderCol,
-                        color: textMain,
-                        fontWeight: '700',
-                        letterSpacing: 0.6,
-                      },
-                    ]}
-                    placeholder="ABC-1234"
-                    placeholderTextColor={textMuted}
-                    value={plateNumber}
-                    onChangeText={setPlateNumber}
-                    autoCapitalize="characters"
-                  />
+
+                {/* Row 3: Engine (cc) & Color */}
+                <View style={styles.fieldRow}>
+                  <View style={styles.fieldCol}>
+                    <Text style={[styles.fieldHint, { color: textMuted }]}>Engine (cc)</Text>
+                    <TextInput
+                      style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
+                      placeholder="160"
+                      placeholderTextColor={textMuted}
+                      value={engineCc}
+                      onChangeText={setEngineCc}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <View style={styles.fieldCol}>
+                    <Text style={[styles.fieldHint, { color: textMuted }]}>Color</Text>
+                    <TextInput
+                      style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
+                      placeholder="e.g. Matte Gray"
+                      placeholderTextColor={textMuted}
+                      value={color}
+                      onChangeText={setColor}
+                    />
+                  </View>
                 </View>
-                <View style={styles.fieldThird}>
-                  <Text style={[styles.fieldHint, { color: textMuted }]}>Year</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
-                    placeholder="2025"
-                    placeholderTextColor={textMuted}
-                    value={year}
-                    onChangeText={setYear}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={styles.fieldThird}>
-                  <Text style={[styles.fieldHint, { color: textMuted }]}>Engine (cc)</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
-                    placeholder="160"
-                    placeholderTextColor={textMuted}
-                    value={engineCc}
-                    onChangeText={setEngineCc}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={styles.fieldHalf}>
-                  <Text style={[styles.fieldHint, { color: textMuted }]}>Color</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
-                    placeholder="e.g. Matte Gray"
-                    placeholderTextColor={textMuted}
-                    value={color}
-                    onChangeText={setColor}
-                  />
-                </View>
-                <View style={styles.fieldHalf}>
+
+                {/* Row 4: Odometer (Full Width) */}
+                <View style={styles.fieldFull}>
                   <Text style={[styles.fieldHint, { color: textMuted }]}>Odometer</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: bgInput, borderColor: borderCol, color: textMain }]}
@@ -627,19 +640,27 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   grid: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 12,
+  },
+  fieldRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
+    alignItems: 'flex-start',
+    gap: 12,
+    width: '100%',
+  },
+  fieldCol: {
+    flex: 1,
+  },
+  fieldFull: {
+    width: '100%',
   },
   fieldHalf: {
-    flexGrow: 1,
-    flexBasis: '46%',
-    minWidth: 140,
+    flex: 1,
   },
   fieldThird: {
-    flexGrow: 1,
-    flexBasis: '30%',
-    minWidth: 100,
+    flex: 1,
   },
   input: {
     borderWidth: 1,
@@ -647,9 +668,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 13,
+    height: 42,
+    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
   },
   textArea: {
-    minHeight: 72,
+    minHeight: 74,
+    height: 'auto',
     textAlignVertical: 'top',
   },
   primaryToggle: {

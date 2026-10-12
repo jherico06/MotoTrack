@@ -8,13 +8,12 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { shopStyles as styles } from '../../styles/shop.styles';
-import { productService } from '../../services/productService';
-import { isProductSoldOut, productNeedsSizes } from '../../utils/productSizes';
-import { productHasColors } from '../../utils/productColors';
-import { sanitizeCompareAtPrice } from '../../utils/productCatalog';
-import PlaceOrderModal from './PlaceOrderModal';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { shopStyles as styles } from '../../styles/shop.styles.js';
+import { productService } from '../../services/products/productService.js';
+import { isProductSoldOut } from '../../utils/productSizes.js';
+import { sanitizeCompareAtPrice } from '../../utils/productCatalog.js';
+import PlaceOrderModal from './PlaceOrderModal.jsx';
 
 function StarRow({ rating, size = 14 }) {
   const score = Math.max(0, Math.min(5, Number(rating) || 0));
@@ -91,7 +90,6 @@ export default function ProductSpecsModal({
 
   if (!product) return null;
 
-  const needsOptions = productNeedsSizes(product) || productHasColors(product);
   const displayPrice = Number(product.price) || 0;
   const compareAt = sanitizeCompareAtPrice(product.oldPrice, displayPrice);
   const avgReviewScore =
@@ -107,12 +105,8 @@ export default function ProductSpecsModal({
 
   const handleAddToCartPress = () => {
     if (productSoldOut) return;
-    if (needsOptions) {
-      openOrderModal('cart');
-      return;
-    }
-    onAddToCart?.(product, 1, {});
-    onClose?.();
+    // Always open options modal so customer can choose quantity (and size/color when needed)
+    openOrderModal('cart');
   };
 
   const handleBuyNowPress = () => {
@@ -123,11 +117,12 @@ export default function ProductSpecsModal({
   const handleOrderConfirm = (finalProduct, options = {}) => {
     const size = options.size || finalProduct?.selectedSize || '';
     const color = options.color || finalProduct?.selectedColor || '';
+    const qty = Math.max(1, Number(options.quantity) || 1);
     const payloadOpts = { size, color };
     if (options.mode === 'cart' || orderMode === 'cart') {
-      onAddToCart?.(finalProduct, 1, payloadOpts);
+      onAddToCart?.(finalProduct, qty, payloadOpts);
     } else {
-      onBuyNow?.(finalProduct, 1, payloadOpts);
+      onBuyNow?.(finalProduct, qty, payloadOpts);
     }
     setOrderModalOpen(false);
     onClose?.();
@@ -289,20 +284,22 @@ export default function ProductSpecsModal({
                 style={[
                   styles.checkoutBtn,
                   {
-                    flex: 1,
+                    width: 48,
+                    minWidth: 48,
+                    paddingHorizontal: 0,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 6,
                     opacity: productSoldOut ? 0.5 : 1,
                   },
                 ]}
                 disabled={productSoldOut}
                 onPress={handleAddToCartPress}
                 activeOpacity={0.9}
+                accessibilityLabel="Add to Cart"
+                accessibilityRole="button"
               >
-                <BootstrapIcon name="cart-plus-fill" size={14} color="#ffffff" />
-                <Text style={styles.checkoutBtnText}>Add to Cart</Text>
+                <BootstrapIcon name="cart-plus-fill" size={18} color="#ffffff" />
               </TouchableOpacity>
 
               <TouchableOpacity

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useMemo, useRef, useEffect } from 'react';
-import { promoService } from '../services/promoService';
-import { cartLineKey, isSizeSoldOut, productNeedsSizes, withSelectedSize } from '../utils/productSizes';
+import { promoService, PROMO_TYPES } from '../services/products/promoService.js';
+import { cartLineKey, isSizeSoldOut, productNeedsSizes, withSelectedSize } from '../utils/productSizes.js';
 
 const CartContext = createContext(null);
 
@@ -13,13 +13,19 @@ export function CartProvider({ children }) {
   const [selectedLineKeys, setSelectedLineKeys] = useState([]);
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromoId, setAppliedPromoId] = useState(null);
+  const [appliedPromoMeta, setAppliedPromoMeta] = useState(null);
   const [discountPercent, setDiscountPercent] = useState(0);
-  const [isFreeShipping, setIsFreeShipping] = useState(false);
+  const [productDiscountAmount, setProductDiscountAmount] = useState(0);
+  const [promoFreeShipping, setPromoFreeShipping] = useState(false);
+  const [autoFreeShipping, setAutoFreeShipping] = useState(false);
+  const [autoFreeShippingPromoId, setAutoFreeShippingPromoId] = useState(null);
   const [promoFeedback, setPromoFeedback] = useState({ text: '', isError: false });
   const [toastMessage, setToastMessage] = useState('');
 
   const shippingRate = 150;
   const selectionInitializedRef = useRef(false);
+  const revalidateTimerRef = useRef(null);
+  const isFreeShipping = promoFreeShipping || autoFreeShipping;
 
   // Initialize selection when cart first gets items
   useEffect(() => {
@@ -34,6 +40,40 @@ export function CartProvider({ children }) {
     setTimeout(() => {
       setToastMessage('');
     }, 2500);
+  };
+
+  const clearPromoState = (feedback = { text: '', isError: false }) => {
+    setDiscountPercent(0);
+    setProductDiscountAmount(0);
+    setPromoFreeShipping(false);
+    setAppliedPromoId(null);
+    setAppliedPromoMeta(null);
+    setPromoCode('');
+    setPromoFeedback(feedback);
+  };
+
+  const applyValidatedResult = (result, code) => {
+    setPromoCode(result.code || code);
+    setDiscountPercent(result.discountPercent || 0);
+    setProductDiscountAmount(Number(result.productDiscount || 0));
+    setPromoFreeShipping(Boolean(result.isFreeShipping));
+    setAppliedPromoId(result.promoId || null);
+    setAppliedPromoMeta({
+      code: result.code,
+      promoType: result.promoType,
+      discountPercent: result.discountPercent || 0,
+      productIds: result.productIds || [],
+      appliesTo: result.appliesTo,
+      message: result.message,
+    });
+
+    const successText =
+      result.message ||
+      (result.promoType === PROMO_TYPES.FREE_SHIPPING
+        ? '✓ Free Shipping Applied'
+        : `✓ ${result.discountPercent}% Discount Applied`);
+
+    setPromoFeedback({ text: successText, isError: false });
   };
 
   const addToCart = (product, qty = 1, options = {}) => {
@@ -143,11 +183,9 @@ export function CartProvider({ children }) {
   const clearCart = () => {
     setCart([]);
     setSelectedLineKeys([]);
-    setDiscountPercent(0);
-    setIsFreeShipping(false);
-    setPromoCode('');
-    setAppliedPromoId(null);
-    setPromoFeedback({ text: '', isError: false });
+    setAutoFreeShipping(false);
+    setAutoFreeShippingPromoId(null);
+    clearPromoState({ text: '', isError: false });
   };
 
   // Selection controls
@@ -198,9 +236,23 @@ export function CartProvider({ children }) {
     return selectedCartItems.reduce((total, item) => total + item.product.price * item.quantity, 0);
   }, [selectedCartItems]);
 
+  // Discount only on eligible selected items (stored amount from last validation,
+  // recomputed when selection / meta changes for display consistency)
   const selectedDiscountAmount = useMemo(() => {
-    return (selectedCartSubtotal * discountPercent) / 100;
-  }, [selectedCartSubtotal, discountPercent]);
+    if (!appliedPromoMeta || !appliedPromoId) return 0;
+    if (appliedPromoMeta.promoType === PROMO_TYPES.FREE_SHIPPING) return 0;
+    const pct = Number(appliedPromoMeta.discountPercent || discountPercent || 0);
+    if (pct <= 0) return 0;
+
+    const allProducts = appliedPromoMeta.appliesTo === 'ALL_PRODUCTS';
+    const allowed = new Set((appliedPromoMeta.productIds || []).map(String));
+    const eligibleSubtotal = selectedCartItems.reduce((sum, item) => {
+      const pid = String(item.product?.id || item.product?.product_id || '');
+      if (!allProducts && !allowed.has(pid)) return sum;
+      return sum + Number(item.product?.price || 0) * Number(item.quantity || 1);
+    }, 0);
+    return (eligibleSubtotal * pct) / 100;
+  }, [selectedCartItems, appliedPromoMeta, appliedPromoId, discountPercent]);
 
   const selectedShippingFee = useMemo(() => {
     if (selectedCartItems.length === 0) return 0;
@@ -217,6 +269,9 @@ export function CartProvider({ children }) {
   const removeSelectedFromCart = () => {
     setCart((prevCart) => prevCart.filter((item) => !selectedLineKeys.includes(lineKeyOf(item))));
     setSelectedLineKeys([]);
+    setAutoFreeShipping(false);
+    setAutoFreeShippingPromoId(null);
+    clearPromoState({ text: '', isError: false });
     showToast('Checked out items removed from cart');
   };
 
@@ -230,8 +285,19 @@ export function CartProvider({ children }) {
   }, [cart]);
 
   const discountAmount = useMemo(() => {
-    return (cartSubtotal * discountPercent) / 100;
-  }, [cartSubtotal, discountPercent]);
+    if (!appliedPromoMeta || !appliedPromoId) return 0;
+    if (appliedPromoMeta.promoType === PROMO_TYPES.FREE_SHIPPING) return 0;
+    const pct = Number(appliedPromoMeta.discountPercent || discountPercent || 0);
+    if (pct <= 0) return 0;
+    const allProducts = appliedPromoMeta.appliesTo === 'ALL_PRODUCTS';
+    const allowed = new Set((appliedPromoMeta.productIds || []).map(String));
+    const eligibleSubtotal = cart.reduce((sum, item) => {
+      const pid = String(item.product?.id || item.product?.product_id || '');
+      if (!allProducts && !allowed.has(pid)) return sum;
+      return sum + Number(item.product?.price || 0) * Number(item.quantity || 1);
+    }, 0);
+    return (eligibleSubtotal * pct) / 100;
+  }, [cart, appliedPromoMeta, appliedPromoId, discountPercent]);
 
   const shippingFee = useMemo(() => {
     if (cart.length === 0) return 0;
@@ -243,48 +309,107 @@ export function CartProvider({ children }) {
     return total > 0 ? total : 0;
   }, [cartSubtotal, discountAmount, shippingFee]);
 
-  const applyPromo = async (codeToApply) => {
+  const applyPromo = async (codeToApply, itemsOverride = null) => {
     const code = (codeToApply || promoCode).trim();
     if (!code) {
-      setPromoFeedback({ text: 'Please enter a voucher code', isError: true });
+      setPromoFeedback({ text: 'Please enter a promo code.', isError: true });
       return { success: false };
     }
-    const result = await promoService.validatePromo(code);
+
+    const items = itemsOverride || selectedCartItems;
+    const ship =
+      items.length === 0 ? 0 : shippingRate;
+
+    const result = await promoService.validatePromo(code, {
+      cartItems: items,
+      shippingFee: ship,
+    });
+
     if (result.valid) {
-      setDiscountPercent(result.discountPercent);
-      const freeShip = result.description?.toLowerCase().includes('free shipping');
-      setIsFreeShipping(freeShip);
-      setAppliedPromoId(result.promoId || null);
-
-      const benefitText = [
-        result.discountPercent > 0 ? `${result.discountPercent}% OFF` : '',
-        freeShip ? 'Free Shipping' : '',
-      ]
-        .filter(Boolean)
-        .join(' + ');
-
-      setPromoFeedback({
-        text: `✅ Promo "${result.code}" applied! (${benefitText})`,
-        isError: false,
-      });
+      // Prevent stacking the same promo: always replace previous application
+      applyValidatedResult(result, code);
       showToast(`Applied ${result.code}!`);
       return {
         success: true,
         discountPercent: result.discountPercent,
         promoId: result.promoId,
-        isFreeShipping: freeShip,
+        isFreeShipping: result.isFreeShipping,
+        productDiscount: result.productDiscount,
       };
     }
 
-    setDiscountPercent(0);
-    setIsFreeShipping(false);
-    setAppliedPromoId(null);
-    setPromoFeedback({
-      text: `❌ ${result.message || result.error || 'Invalid code'}`,
+    clearPromoState({
+      text: result.error || 'Promo code is invalid.',
       isError: true,
     });
-    return { success: false, message: result.message || result.error };
+    return { success: false, message: result.error };
   };
+
+  // Recalculate manual promo + auto free-shipping whenever cart/selection changes
+  useEffect(() => {
+    if (revalidateTimerRef.current) clearTimeout(revalidateTimerRef.current);
+    revalidateTimerRef.current = setTimeout(async () => {
+      const items = selectedCartItems;
+
+      if (items.length === 0) {
+        setAutoFreeShipping(false);
+        setAutoFreeShippingPromoId(null);
+        if (appliedPromoId || promoCode) {
+          clearPromoState({ text: '', isError: false });
+        }
+        return;
+      }
+
+      // Revalidate manually entered promo (percent or free-ship code)
+      if (appliedPromoId && promoCode) {
+        const result = await promoService.validatePromo(promoCode, {
+          cartItems: items,
+          shippingFee: shippingRate,
+        });
+        if (result.valid) {
+          applyValidatedResult(result, promoCode);
+        } else {
+          clearPromoState({
+            text: result.error || 'Promo no longer applies to your cart.',
+            isError: true,
+          });
+        }
+      }
+
+      // Auto-apply active FREE_SHIPPING promos for eligible products (no code required)
+      try {
+        const freeShip = await promoService.findApplicableFreeShipping(items, shippingRate);
+        if (freeShip) {
+          setAutoFreeShipping(true);
+          setAutoFreeShippingPromoId(freeShip.promoId || null);
+          if (!promoCode) {
+            setPromoFeedback({
+              text: '✓ Free Shipping Applied',
+              isError: false,
+            });
+          } else if (appliedPromoMeta?.promoType === PROMO_TYPES.PERCENT_OFF) {
+            setPromoFeedback({
+              text: `✓ ${appliedPromoMeta.discountPercent}% Discount + Free Shipping Applied`,
+              isError: false,
+            });
+          }
+        } else {
+          setAutoFreeShipping(false);
+          setAutoFreeShippingPromoId(null);
+        }
+      } catch (e) {
+        console.warn('Auto free-shipping check failed:', e);
+      }
+    }, 250);
+
+    return () => {
+      if (revalidateTimerRef.current) clearTimeout(revalidateTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cart, selectedLineKeys]);
+
+  const effectivePromoId =
+    appliedPromoId || (autoFreeShipping ? autoFreeShippingPromoId : null);
 
   const value = {
     cart,
@@ -312,12 +437,16 @@ export function CartProvider({ children }) {
     cartSubtotal,
     discountPercent,
     discountAmount,
+    productDiscountAmount,
     shippingFee,
+    shippingRate,
     isFreeShipping,
+    autoFreeShipping,
     cartTotal,
     promoCode,
     setPromoCode,
-    appliedPromoId,
+    appliedPromoId: effectivePromoId,
+    appliedPromoMeta,
     applyPromo,
     promoFeedback,
     setPromoFeedback,

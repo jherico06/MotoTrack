@@ -10,11 +10,11 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { shopStyles as styles } from '../../styles/shop.styles';
-import { useAuth } from '../../context/AuthContext';
-import { useCart } from '../../context/CartContext';
-import { formatPHPhone } from './LiveOrderTrackingMapModal';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { shopStyles as styles } from '../../styles/shop.styles.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { useCart } from '../../context/CartContext.jsx';
+import { formatPHPhone } from './LiveOrderTrackingMapModal.jsx';
 
 export default function CheckoutModal({
   visible,
@@ -33,19 +33,62 @@ export default function CheckoutModal({
     cartTotal,
     selectedCartItems,
     selectedCartItemCount,
+    selectedCartSubtotal,
+    selectedDiscountAmount,
+    selectedShippingFee,
     selectedCartTotal,
+    shippingRate,
+    isFreeShipping,
+    discountPercent,
+    appliedPromoMeta,
     showToast,
   } = useCart();
 
   const activeCartItems = selectedCartItems && selectedCartItems.length > 0 ? selectedCartItems : cart;
   const activeCartCount = selectedCartItems && selectedCartItems.length > 0 ? selectedCartItemCount : cartItemCount;
   const activeCartTotal = selectedCartItems && selectedCartItems.length > 0 ? selectedCartTotal : cartTotal;
+  const activeSubtotal =
+    selectedCartItems && selectedCartItems.length > 0
+      ? selectedCartSubtotal
+      : activeCartItems.reduce(
+          (sum, item) => sum + Number(item.product?.price || 0) * Number(item.quantity || 1),
+          0
+        );
+  const activeDiscount =
+    selectedCartItems && selectedCartItems.length > 0 ? selectedDiscountAmount : 0;
+  const activeShipping =
+    selectedCartItems && selectedCartItems.length > 0
+      ? selectedShippingFee
+      : activeCartItems.length > 0
+        ? isFreeShipping
+          ? 0
+          : shippingRate
+        : 0;
 
   const displayItemCount = overrideItemCount != null ? overrideItemCount : activeCartCount;
   const displayTotal = overrideTotal != null ? overrideTotal : activeCartTotal;
   const displayItems = Array.isArray(overrideItems) && overrideItems.length > 0
     ? overrideItems
     : (Array.isArray(activeCartItems) ? activeCartItems : []);
+
+  // When override items are provided (Buy Now), derive summary from those items
+  const overrideSubtotal =
+    Array.isArray(overrideItems) && overrideItems.length > 0
+      ? overrideItems.reduce(
+          (sum, item) => sum + Number(item.product?.price || 0) * Number(item.quantity || 1),
+          0
+        )
+      : null;
+  const summarySubtotal = overrideSubtotal != null ? overrideSubtotal : activeSubtotal;
+  const summaryDiscount = overrideSubtotal != null ? 0 : activeDiscount;
+  const summaryShipping =
+    overrideTotal != null && overrideSubtotal != null
+      ? Math.max(0, Number(overrideTotal) - Number(overrideSubtotal))
+      : activeShipping;
+  const summaryFreeShipping =
+    overrideTotal != null
+      ? Number(overrideTotal) <= Number(overrideSubtotal || 0) + 0.001
+      : isFreeShipping;
 
   // Delivery Notes & Payment State
   const [deliveryNotes, setDeliveryNotes] = useState('');
@@ -576,13 +619,67 @@ export default function CheckoutModal({
                 borderColor: '#E2E8F0',
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
-                Order Summary ({displayItemCount} items)
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 8 }}>
+                Order Summary ({displayItemCount} {displayItemCount === 1 ? 'item' : 'items'})
               </Text>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: '#1D4533', marginTop: 4 }}>
-                Total to Pay: ₱
-                {displayTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </Text>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={{ fontSize: 12.5, color: '#64748B', fontWeight: '600' }}>Subtotal</Text>
+                <Text style={{ fontSize: 12.5, color: '#0F172A', fontWeight: '700' }}>
+                  ₱{Number(summarySubtotal || 0).toFixed(2)}
+                </Text>
+              </View>
+
+              {summaryDiscount > 0 ? (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>
+                    {appliedPromoMeta?.code || 'Discount'}
+                    {discountPercent > 0 ? ` −${discountPercent}%` : ''}
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>
+                    −₱{Number(summaryDiscount).toFixed(2)}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                <Text style={{ fontSize: 12.5, color: '#64748B', fontWeight: '600' }}>Shipping</Text>
+                <Text style={{ fontSize: 12.5, color: '#0F172A', fontWeight: '700' }}>
+                  ₱{Number(summaryFreeShipping ? shippingRate || 150 : summaryShipping || 0).toFixed(2)}
+                </Text>
+              </View>
+
+              {summaryFreeShipping ? (
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>
+                    ✓ Free Shipping
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>
+                    −₱{Number(shippingRate || 150).toFixed(2)}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View
+                style={{
+                  borderTopWidth: 1,
+                  borderTopColor: '#E2E8F0',
+                  marginTop: 8,
+                  paddingTop: 8,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>Total to Pay</Text>
+                <Text style={{ fontSize: 18, fontWeight: '900', color: '#1D4533' }}>
+                  ₱
+                  {Number(displayTotal).toLocaleString(undefined, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </Text>
+              </View>
             </View>
           </ScrollView>
 

@@ -11,12 +11,12 @@ import {
   Image,
 } from 'react-native';
 import { BootstrapIcon, AdminStatCard } from '../common';
-import ForecastChart from './ForecastChart';
+import ForecastChart from './ForecastChart.jsx';
 import {
   getForecastStyles,
   getForecastTokens,
   getStockStatusColors,
-} from '../../styles/forecast.styles';
+} from '../../styles/forecast.styles.js';
 import {
   forecastService,
   getHistoricalSales,
@@ -24,9 +24,9 @@ import {
   buildProductForecastTable,
   generateCategoryForecast,
   buildCategoryForecastTable,
-} from '../../services/forecastService';
-import { formatRegressionEquation } from '../../utils/linearRegression';
-import { resolveReorderLevel, isLowStock } from '../../services/productService';
+} from '../../services/inventory/forecastService.js';
+import { formatRegressionEquation } from '../../utils/linearRegression.js';
+import { resolveReorderLevel, isLowStock } from '../../services/products/productService.js';
 
 const CHART_LOOKBACK_WEEK = [
   { key: 4, label: '4W' },
@@ -96,16 +96,23 @@ function StatusBadge({ status, isDark }) {
 }
 
 function TrendCell({ trend, tokens }) {
-  if (!trend || trend === '—') {
+  if (!trend || trend === '—' || String(trend).includes('Insufficient')) {
     return <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>—</Text>;
   }
-  const up = trend === 'Increasing';
-  const down = trend === 'Decreasing';
-  const color = up ? tokens.success : down ? tokens.danger : tokens.mutedForeground;
-  const icon = up ? '↑' : down ? '↓' : '→';
+  const t = String(trend).toLowerCase();
+  const up = t.includes('increasing') || t.includes('up');
+  const down = t.includes('decreasing') || t.includes('down');
+  const volatile = t.includes('volatile');
+  const color = up
+    ? tokens.success
+    : down
+      ? tokens.danger
+      : volatile
+        ? tokens.amber || '#D97706'
+        : tokens.mutedForeground;
   return (
-    <Text style={{ fontSize: 12, fontWeight: '700', color }}>
-      {icon} {trend}
+    <Text style={{ fontSize: 12, fontWeight: '700', color }} numberOfLines={1}>
+      {trend}
     </Text>
   );
 }
@@ -131,8 +138,12 @@ function getCategoryIcon(category) {
 export default function SalesForecastPanel({
   orders = [],
   products = [],
+  suppliers = [],
   isDarkMode = false,
   isDesktop = true,
+  initialProductId = null,
+  onNavigate = null,
+  onRestock = null,
 }) {
   const styles = useMemo(() => getForecastStyles(isDarkMode), [isDarkMode]);
   const tokens = useMemo(() => getForecastTokens(isDarkMode), [isDarkMode]);
@@ -141,11 +152,12 @@ export default function SalesForecastPanel({
   const [lookbackPeriods, setLookbackPeriods] = useState(14);
   const [forecastAhead, setForecastAhead] = useState(1);
   const [horizonLabel, setHorizonLabel] = useState('Next Day');
+  const [accuracyWindow, setAccuracyWindow] = useState(30);
 
   // Forecasting Scope: 'product' (by motorcycle part) | 'category' (by category)
   const [forecastScope, setForecastScope] = useState('product');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [selectedProductId, setSelectedProductId] = useState(null);
+  const [selectedProductId, setSelectedProductId] = useState(initialProductId || null);
 
   const [productPickerOpen, setProductPickerOpen] = useState(false);
   const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
@@ -201,6 +213,13 @@ export default function SalesForecastPanel({
       return matchesSearch && matchesCat;
     });
   }, [productOptions, productSearchQuery, productCategoryFilter]);
+
+  useEffect(() => {
+    if (initialProductId) {
+      setSelectedProductId(initialProductId);
+      setForecastScope('product');
+    }
+  }, [initialProductId]);
 
   useEffect(() => {
     if (!selectedProductId && productOptions.length > 0) {
@@ -352,6 +371,58 @@ export default function SalesForecastPanel({
   const periodNoun =
     activePeriodType === 'day' ? 'days' : activePeriodType === 'month' ? 'months' : 'weeks';
 
+  const accuracyScore = useMemo(
+    () => forecastService.scoreForecastAccuracy(history, { days: accuracyWindow }),
+    [history, accuracyWindow]
+  );
+
+  const attentionRows = useMemo(() => {
+    return (tableRows || [])
+      .filter((r) => !r.insufficient && (Number(r.recommendedRestock) > 0 || r.belowReorderPoint))
+      .sort((a, b) => Number(b.recommendedRestock || 0) - Number(a.recommendedRestock || 0))
+      .slice(0, 12);
+  }, [tableRows]);
+
+  const preferredSupplier = useMemo(() => {
+    if (!selectedProduct || !suppliers?.length) return null;
+    const sid = selectedProduct.supplier_id || selectedProduct.supplierId;
+    let match = null;
+    if (sid) {
+      match = suppliers.find(
+        (s) => String(s.id) === String(sid) || String(s.supplier_id) === String(sid)
+      );
+    }
+    if (!match) {
+      const cat = String(selectedProduct.category || '').toLowerCase();
+      match = suppliers.find((s) =>
+        (Array.isArray(s.categories) ? s.categories : []).some(
+          (c) => String(c).toLowerCase() === cat
+        )
+      );
+    }
+    if (!match) return null;
+    const lead =
+      selectedProduct.lead_time_days ??
+      selectedProduct.leadTimeDays ??
+      forecast?.leadTimeDays ??
+      3;
+    return {
+      id: match.id || match.supplier_id,
+      name: match.name || 'Supplier',
+      leadTimeDays: lead,
+      leadTimeLabel: match.lead_time || `${lead} days`,
+    };
+  }, [selectedProduct, suppliers, forecast?.leadTimeDays]);
+
+  const stockSubLabel = useMemo(() => {
+    if (!forecast) return 'Available inventory';
+    if (forecast.belowReorderPoint) return 'Below reorder point';
+    if (forecast.stockStatus === 'Critical Stock') return 'Out of stock / critical';
+    if (forecast.stockStatus === 'Low Stock') return 'Below reorder point';
+    if (forecast.stockStatus === 'Overstocked') return 'Above expected demand';
+    return 'Healthy inventory level';
+  }, [forecast]);
+
   const renderPickerModal = (visible, onClose, title, children) => (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' }}>
@@ -426,7 +497,7 @@ export default function SalesForecastPanel({
               paddingBottom: 14,
               borderBottomWidth: 1,
               borderBottomColor: tokens.border,
-              backgroundColor: isDarkMode ? '#171922' : '#FAFCFF',
+              backgroundColor: isDarkMode ? tokens.card : '#FAFCFF',
             }}
           >
             <View
@@ -466,7 +537,7 @@ export default function SalesForecastPanel({
                   width: 32,
                   height: 32,
                   borderRadius: 16,
-                  backgroundColor: isDarkMode ? '#222530' : '#F1F5F9',
+                  backgroundColor: isDarkMode ? tokens.secondary : '#F1F5F9',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -481,7 +552,7 @@ export default function SalesForecastPanel({
                 style={{
                   flexDirection: 'row',
                   alignItems: 'center',
-                  backgroundColor: isDarkMode ? '#1E2028' : '#FFFFFF',
+                  backgroundColor: isDarkMode ? tokens.card : '#FFFFFF',
                   borderRadius: 10,
                   borderWidth: 1,
                   borderColor: tokens.border,
@@ -617,7 +688,7 @@ export default function SalesForecastPanel({
                         style={{
                           width: '100%',
                           aspectRatio: 1.15,
-                          backgroundColor: isDarkMode ? '#14161C' : '#F1F5F9',
+                          backgroundColor: isDarkMode ? tokens.muted : '#F1F5F9',
                           overflow: 'hidden',
                           position: 'relative',
                           alignItems: 'center',
@@ -1131,19 +1202,21 @@ export default function SalesForecastPanel({
             label: 'Forecasted Demand',
             value:
               forecast?.insufficient || forecast?.forecastedDemand == null ? (
-                '—'
+                'N/A'
               ) : (
                 <>
                   {forecast.forecastedDemand}
                   <Text style={styles.statUnit}> units</Text>
                 </>
               ),
-            sub: forecast?.forecastPeriodLabel
-              ? `Next period · ${forecast.forecastPeriodLabel}`
-              : 'Next period',
+            sub: forecast?.insufficient
+              ? 'Needs more sales history'
+              : forecast?.forecastPeriodLabel
+                ? `Next period · ${horizonLabel}`
+                : `Next period · ${horizonLabel}`,
           },
           {
-            accent: 'blue',
+            accent: forecast?.belowReorderPoint ? 'amber' : 'blue',
             label: 'Current Stock',
             value: (
               <>
@@ -1151,13 +1224,14 @@ export default function SalesForecastPanel({
                 <Text style={styles.statUnit}> units</Text>
               </>
             ),
-            sub: 'Available inventory',
+            sub: stockSubLabel,
+            valueColor: forecast?.belowReorderPoint ? tokens.amber || '#D97706' : undefined,
           },
           {
             accent: 'purple',
             label: 'Recommended Restock',
             value: forecast?.insufficient ? (
-              '—'
+              'N/A'
             ) : (
               <>
                 {String(forecast?.recommendedRestock ?? 0)}
@@ -1168,13 +1242,18 @@ export default function SalesForecastPanel({
               !forecast?.insufficient && (forecast?.recommendedRestock ?? 0) > 0
                 ? tokens.primary
                 : undefined,
-            sub: 'Suggested order quantity',
+            sub: forecast?.insufficient
+              ? 'Unavailable until forecast is ready'
+              : 'Recommended order quantity',
           },
           {
             accent: 'amber',
             label: 'Sales Trend',
-            value: forecast?.insufficient ? '—' : forecast?.trendLabel || '—',
-            sub: 'Based on historical sales',
+            value: forecast?.trendLabel || '— Insufficient Data',
+            sub:
+              forecast?.trendPct != null && !forecast?.insufficient
+                ? `${forecast.trendPct > 0 ? '+' : ''}${forecast.trendPct}% vs earlier periods`
+                : forecast?.trendExplanation || 'Based on historical sales',
           },
         ].map((card) => (
           <AdminStatCard
@@ -1185,10 +1264,85 @@ export default function SalesForecastPanel({
             value={card.value}
             valueColor={card.valueColor}
             sub={card.sub}
+            isDark={isDarkMode}
             style={!isDesktop && styles.statCardMobile}
           />
         ))}
       </View>
+
+      {/* Forecast Confidence strip */}
+      {forecast ? (
+        <View
+          style={[
+            styles.card,
+            {
+              marginTop: -4,
+              marginBottom: 16,
+              paddingVertical: 14,
+              paddingHorizontal: 18,
+              flexDirection: isDesktop ? 'row' : 'column',
+              alignItems: isDesktop ? 'center' : 'flex-start',
+              justifyContent: 'space-between',
+              gap: 12,
+            },
+          ]}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <Text style={{ fontSize: 12, fontWeight: '800', color: tokens.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+              Forecast Confidence
+            </Text>
+            <View
+              style={{
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 999,
+                backgroundColor:
+                  forecast.confidence?.level === 'HIGH'
+                    ? isDarkMode
+                      ? 'rgba(16,185,129,0.18)'
+                      : '#ECFDF5'
+                    : forecast.confidence?.level === 'MEDIUM'
+                      ? isDarkMode
+                        ? 'rgba(217,119,6,0.18)'
+                        : '#FFFBEB'
+                      : isDarkMode
+                        ? 'rgba(220,38,38,0.15)'
+                        : '#FEF2F2',
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: '800',
+                  color:
+                    forecast.confidence?.level === 'HIGH'
+                      ? '#059669'
+                      : forecast.confidence?.level === 'MEDIUM'
+                        ? '#D97706'
+                        : '#DC2626',
+                }}
+              >
+                {forecast.confidence?.label || 'Low'}
+                {forecast.confidence?.score != null ? ` · ${forecast.confidence.score}%` : ''}
+              </Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+            <Text style={{ fontSize: 12, color: tokens.mutedForeground, fontWeight: '600' }}>
+              Historical periods:{' '}
+              <Text style={{ color: tokens.foreground, fontWeight: '800' }}>
+                {forecast.distinctPeriods ?? forecast.historical?.length ?? 0}
+              </Text>
+            </Text>
+            <Text style={{ fontSize: 12, color: tokens.mutedForeground, fontWeight: '600' }}>
+              Demand events:{' '}
+              <Text style={{ color: tokens.foreground, fontWeight: '800' }}>
+                {forecast.sba?.nonZeroObservations ?? 0}
+              </Text>
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       {/* Sales Forecast chart */}
       <View style={styles.card}>
@@ -1218,11 +1372,79 @@ export default function SalesForecastPanel({
         </View>
 
         {forecast?.insufficient ? (
-          <View style={styles.emptyState}>
-            <BootstrapIcon name="exclamation-triangle" size={22} color={tokens.amber} />
-            <Text style={styles.emptyText}>
-              {forecast.error || 'Insufficient historical sales data for forecasting.'}
+          <View
+            style={{
+              paddingVertical: 28,
+              paddingHorizontal: 16,
+              alignItems: 'flex-start',
+              backgroundColor: isDarkMode ? 'rgba(217,119,6,0.08)' : '#FFFBEB',
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: isDarkMode ? 'rgba(217,119,6,0.25)' : '#FDE68A',
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 13,
+                fontWeight: '800',
+                color: tokens.foreground,
+                textTransform: 'uppercase',
+                letterSpacing: 0.5,
+                marginBottom: 8,
+              }}
+            >
+              Limited Historical Data
             </Text>
+            <Text style={{ fontSize: 13.5, color: tokens.foreground, lineHeight: 20, marginBottom: 14 }}>
+              {forecast.limitedDataMessage?.summary ||
+                forecast.error ||
+                'Not enough sales history for a reliable forecast yet.'}
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 20, marginBottom: 16 }}>
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.mutedForeground }}>
+                  Forecast Confidence
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#D97706', marginTop: 2 }}>
+                  Low
+                </Text>
+              </View>
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.mutedForeground }}>
+                  Historical Periods
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.foreground, marginTop: 2 }}>
+                  {forecast.limitedDataMessage?.periods ?? forecast.distinctPeriods ?? 0}
+                </Text>
+              </View>
+              <View>
+                <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.mutedForeground }}>
+                  Demand Events
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.foreground, marginTop: 2 }}>
+                  {forecast.limitedDataMessage?.demandEvents ?? forecast.sba?.nonZeroObservations ?? 0}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => onNavigate?.('analytics')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 8,
+                backgroundColor: isDarkMode ? tokens.card : '#FFFFFF',
+                borderWidth: 1,
+                borderColor: tokens.border,
+              }}
+            >
+              <BootstrapIcon name="graph-up" size={13} color={tokens.primary} />
+              <Text style={{ fontSize: 12.5, fontWeight: '700', color: tokens.primary }}>
+                View Sales History
+              </Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <>
@@ -1234,7 +1456,7 @@ export default function SalesForecastPanel({
             <View style={[styles.legendRow, { marginTop: 0, marginBottom: 12 }]}>
               <View style={styles.legendItem}>
                 <View style={[styles.legendLine, { backgroundColor: tokens.primary }]} />
-                <Text style={styles.legendText}>Actual Sales</Text>
+                <Text style={styles.legendText}>Historical Sales</Text>
               </View>
               <View style={styles.legendItem}>
                 <View
@@ -1243,7 +1465,7 @@ export default function SalesForecastPanel({
                     { backgroundColor: tokens.mutedForeground, opacity: 0.7 },
                   ]}
                 />
-                <Text style={styles.legendText}>Regression Trend</Text>
+                <Text style={styles.legendText}>SBA Level</Text>
               </View>
               <View style={styles.legendItem}>
                 <View style={[styles.legendLine, { backgroundColor: tokens.forecast }]} />
@@ -1256,34 +1478,67 @@ export default function SalesForecastPanel({
               isDark={isDarkMode}
               periodType={activePeriodType}
               height={isDesktop ? 300 : 260}
+              confidence={forecast?.confidence}
+              forecastSummary={{
+                demand: forecast?.forecastedDemand,
+                rangeLow: forecast?.forecastRange?.low,
+                rangeHigh: forecast?.forecastRange?.high,
+              }}
             />
           </>
         )}
       </View>
 
-      {/* Regression + Stock Optimization */}
+      {/* Demand Model + Stock Optimization */}
       <View style={[styles.splitRow, !isDesktop && { flexDirection: 'column' }]}>
         <View style={[styles.card, styles.splitMain]}>
           <Text style={styles.cardTitle}>Demand Forecast Model</Text>
           <Text style={styles.cardSubtitle}>
-            Uses historical sales (including zero-demand periods) with Croston/SBA for intermittent motorcycle-parts demand.
+            Croston / SBA estimates intermittent motorcycle-parts demand from historical sales,
+            including zero-demand periods. Results are statistical — not invented.
           </Text>
 
           {forecast?.insufficient ? (
-            <Text style={styles.emptyText}>{forecast.error}</Text>
+            <Text style={styles.emptyText}>
+              {forecast.limitedDataMessage?.summary || forecast.error}
+            </Text>
           ) : (
             <>
               <View style={styles.equationBox}>
-                <Text style={styles.equationLabel}>Forecast Model</Text>
-                <Text style={styles.equationText}>{equationDisplay}</Text>
+                <Text style={styles.equationLabel}>Method</Text>
+                <Text style={styles.equationText}>Croston / SBA</Text>
                 <Text style={styles.equationHint}>
                   {forecast?.seasonalityEnabled
-                    ? 'Croston/SBA with seasonal adjustment'
-                    : 'Croston / Syntetos-Boylan Approximation (intermittent demand)'}
+                    ? 'With seasonal adjustment for recurring demand patterns'
+                    : 'Syntetos-Boylan Approximation for sparse / intermittent demand'}
                 </Text>
               </View>
 
               <View style={styles.metaGrid}>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Historical Periods</Text>
+                  <Text style={styles.metaValue}>
+                    {forecast?.distinctPeriods ?? forecast?.historical?.length ?? 0}
+                  </Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Demand Events</Text>
+                  <Text style={styles.metaValue}>
+                    {forecast?.sba?.nonZeroObservations ?? 0}
+                  </Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Forecast Horizon</Text>
+                  <Text style={styles.metaValue}>{horizonLabel}</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Forecast Accuracy</Text>
+                  <Text style={styles.metaValue}>
+                    {accuracyScore.sufficient && accuracyScore.accuracyPct != null
+                      ? `${accuracyScore.accuracyPct}%`
+                      : 'Pending history'}
+                  </Text>
+                </View>
                 <View style={styles.metaItem}>
                   <Text style={styles.metaLabel}>Demand size (z)</Text>
                   <Text style={styles.metaValue}>
@@ -1296,36 +1551,34 @@ export default function SalesForecastPanel({
                     {Number(forecast?.sba?.p ?? 0).toFixed(2)}
                   </Text>
                 </View>
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaLabel}>Historical Periods</Text>
-                  <Text style={styles.metaValue}>
-                    {forecast?.distinctPeriods ?? forecast?.historical?.length ?? 0} {periodNoun}
-                  </Text>
-                </View>
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaLabel}>Forecast Period</Text>
-                  <Text style={styles.metaValue}>{horizonLabel}</Text>
-                </View>
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaLabel}>Reorder Point</Text>
-                  <Text style={styles.metaValue}>{forecast?.reorderPoint ?? '—'}</Text>
-                </View>
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaLabel}>Lead Time (days)</Text>
-                  <Text style={styles.metaValue}>{forecast?.leadTimeDays ?? '—'}</Text>
-                </View>
               </View>
 
-              <View style={styles.predictedBox}>
-                <Text style={styles.predictedLabel}>Predicted Demand</Text>
-                <Text style={styles.predictedValue}>
-                  {forecast?.forecastedDemand ?? '—'} units
+              {/* Sales Trend classification */}
+              <View
+                style={{
+                  marginTop: 14,
+                  padding: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  borderColor: tokens.border,
+                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
+                }}
+              >
+                <Text style={{ fontSize: 11, fontWeight: '800', color: tokens.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Sales Trend
+                </Text>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: tokens.foreground, marginTop: 6 }}>
+                  {forecast?.trendLabel}
+                  {forecast?.trendPct != null ? (
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.mutedForeground }}>
+                      {'  '}({forecast.trendPct > 0 ? '+' : ''}{forecast.trendPct}%)
+                    </Text>
+                  ) : null}
+                </Text>
+                <Text style={{ fontSize: 12.5, color: tokens.mutedForeground, marginTop: 4, lineHeight: 18 }}>
+                  {forecast?.trendExplanation}
                 </Text>
               </View>
-
-              <Text style={[styles.cardSubtitle, { marginTop: 12, marginBottom: 0 }]}>
-                {forecast?.trendExplanation}
-              </Text>
             </>
           )}
         </View>
@@ -1338,38 +1591,76 @@ export default function SalesForecastPanel({
             ) : null}
           </View>
 
+          {forecast?.belowReorderPoint ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                padding: 10,
+                borderRadius: 8,
+                backgroundColor: isDarkMode ? 'rgba(217,119,6,0.15)' : '#FFFBEB',
+                borderWidth: 1,
+                borderColor: isDarkMode ? 'rgba(217,119,6,0.3)' : '#FDE68A',
+                marginBottom: 12,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#D97706' }}>
+                ⚠ Below reorder point
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.flowStep}>
             <Text style={styles.flowLabel}>Current Stock</Text>
             <Text style={styles.flowValue}>{forecast?.currentStock ?? 0} units</Text>
           </View>
-
-          <View style={styles.flowArrow}>
-            <BootstrapIcon name="arrow-down" size={14} color={tokens.mutedForeground} />
-          </View>
-
           <View style={styles.flowStep}>
             <Text style={styles.flowLabel}>Forecasted Demand</Text>
             <Text style={styles.flowValue}>
-              {forecast?.insufficient ? '—' : `${forecast?.forecastedDemand ?? '—'} units`}
+              {forecast?.insufficient ? 'N/A' : `${forecast?.forecastedDemand ?? '—'} units`}
+            </Text>
+          </View>
+          <View style={styles.flowStep}>
+            <Text style={styles.flowLabel}>Safety Stock</Text>
+            <Text style={styles.flowValue}>{forecast?.safetyStock ?? 0} units</Text>
+          </View>
+          <View style={styles.flowStep}>
+            <Text style={styles.flowLabel}>Reorder Point</Text>
+            <Text style={styles.flowValue}>
+              {forecast?.reorderPoint != null ? `${forecast.reorderPoint} units` : '—'}
             </Text>
           </View>
 
-          <Text style={styles.safetyNote}>
-            + Safety Stock: {forecast?.safetyStock ?? 0} units
-          </Text>
-
-          <View style={styles.flowArrow}>
-            <BootstrapIcon name="arrow-down" size={14} color={tokens.mutedForeground} />
-          </View>
-
-          <View style={[styles.flowStep, styles.flowStepHighlight]}>
+          <View style={[styles.flowStep, styles.flowStepHighlight, { marginTop: 8 }]}>
             <Text style={[styles.flowLabel, { color: tokens.primary }]}>Recommended Restock</Text>
             <Text style={[styles.flowValue, { color: tokens.primary, fontSize: 26 }]}>
-              {forecast?.insufficient ? '—' : `${forecast?.recommendedRestock ?? 0} units`}
+              {forecast?.insufficient ? 'N/A' : `${forecast?.recommendedRestock ?? 0} units`}
             </Text>
           </View>
 
-          <View style={styles.safetyRow}>
+          {forecast?.belowReorderPoint || (forecast?.recommendedRestock ?? 0) > 0 ? (
+            <TouchableOpacity
+              onPress={() => {
+                if (onRestock && selectedProduct) {
+                  onRestock(selectedProduct, forecast?.recommendedRestock || 0);
+                } else {
+                  onNavigate?.('inventory');
+                }
+              }}
+              style={{
+                marginTop: 12,
+                backgroundColor: tokens.primary,
+                borderRadius: 10,
+                paddingVertical: 10,
+                alignItems: 'center',
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Restock</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          <View style={[styles.safetyRow, { marginTop: 14 }]}>
             <Text style={[styles.metaLabel, { marginBottom: 0 }]}>Safety stock</Text>
             <TouchableOpacity
               style={[styles.chip, safetyConfig.mode === 'absolute' && styles.chipActive]}
@@ -1410,6 +1701,312 @@ export default function SalesForecastPanel({
         </View>
       </View>
 
+      {/* Why this forecast + Restock recommendation + Forecast performance */}
+      <View style={[styles.splitRow, !isDesktop && { flexDirection: 'column' }]}>
+        <View style={[styles.card, { flex: 1 }]}>
+          <Text style={styles.cardTitle}>Why This Forecast?</Text>
+          {forecast?.insufficient || !(forecast?.whyReasons || []).length ? (
+            <Text style={styles.emptyText}>
+              {forecast?.insufficient
+                ? 'Reasons appear once enough historical demand is available.'
+                : 'Generate a forecast to see data-backed explanations.'}
+            </Text>
+          ) : (
+            <>
+              <Text style={[styles.cardSubtitle, { marginBottom: 10 }]}>
+                The system predicts this demand because:
+              </Text>
+              {(forecast.whyReasons || []).map((reason, idx) => (
+                <View key={idx} style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                  <Text style={{ color: '#059669', fontWeight: '800' }}>✓</Text>
+                  <Text style={{ flex: 1, fontSize: 13, color: tokens.foreground, lineHeight: 19 }}>
+                    {reason}
+                  </Text>
+                </View>
+              ))}
+              {forecast.confidence?.score != null ? (
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: tokens.mutedForeground, marginTop: 8 }}>
+                  Forecast Confidence: {forecast.confidence.score}%
+                </Text>
+              ) : null}
+            </>
+          )}
+        </View>
+
+        <View style={[styles.card, { flex: 1 }]}>
+          <Text style={styles.cardTitle}>Restock Recommendation</Text>
+          {!forecast || forecast.insufficient || !(forecast.recommendedRestock > 0) ? (
+            <Text style={styles.emptyText}>
+              No restock needed for the current selection, or forecast data is limited.
+            </Text>
+          ) : (
+            <>
+              <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.foreground, marginBottom: 12 }}>
+                {forecast.productName || selectedName}
+              </Text>
+              <View style={styles.metaGrid}>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Recommended Quantity</Text>
+                  <Text style={styles.metaValue}>{forecast.recommendedRestock} units</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Preferred Supplier</Text>
+                  <Text style={styles.metaValue}>
+                    {preferredSupplier?.name || 'Assign in Suppliers'}
+                  </Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Text style={styles.metaLabel}>Estimated Lead Time</Text>
+                  <Text style={styles.metaValue}>
+                    {preferredSupplier?.leadTimeLabel ||
+                      `${forecast.leadTimeDays ?? 3} days`}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (onRestock && selectedProduct) {
+                      onRestock(selectedProduct, forecast.recommendedRestock);
+                    } else {
+                      onNavigate?.('suppliers');
+                    }
+                  }}
+                  style={{
+                    backgroundColor: tokens.primary,
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                  }}
+                >
+                  <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 12.5 }}>
+                    Create Purchase Order
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => onNavigate?.('suppliers')}
+                  style={{
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    borderWidth: 1,
+                    borderColor: tokens.border,
+                  }}
+                >
+                  <Text style={{ color: tokens.foreground, fontWeight: '700', fontSize: 12.5 }}>
+                    View Suppliers
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => onNavigate?.('inventory')}
+                  style={{
+                    borderRadius: 8,
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    borderWidth: 1,
+                    borderColor: tokens.border,
+                  }}
+                >
+                  <Text style={{ color: tokens.foreground, fontWeight: '700', fontSize: 12.5 }}>
+                    Inventory
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+
+        <View style={[styles.card, { flex: 1 }]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
+            <Text style={styles.cardTitle}>Forecast Performance</Text>
+            <View style={{ flexDirection: 'row', gap: 4 }}>
+              {[30, 60, 90].map((d) => (
+                <TouchableOpacity
+                  key={d}
+                  onPress={() => setAccuracyWindow(d)}
+                  style={[
+                    styles.chip,
+                    accuracyWindow === d && styles.chipActive,
+                    { paddingHorizontal: 8, paddingVertical: 4 },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.chipText,
+                      accuracyWindow === d && styles.chipTextActive,
+                      { fontSize: 11 },
+                    ]}
+                  >
+                    {d}d
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+          {!accuracyScore.sufficient ? (
+            <Text style={styles.emptyText}>
+              More scored forecast history is required (at least 3 forecasts with actuals in the
+              selected window). Keep generating forecasts as sales occur.
+            </Text>
+          ) : (
+            <View style={styles.metaGrid}>
+              <View style={styles.metaItem}>
+                <Text style={styles.metaLabel}>Forecast Accuracy</Text>
+                <Text style={styles.metaValue}>
+                  {accuracyScore.accuracyPct != null ? `${accuracyScore.accuracyPct}%` : '—'}
+                </Text>
+              </View>
+              <View style={styles.metaItem}>
+                <Text style={styles.metaLabel}>MAE</Text>
+                <Text style={styles.metaValue}>
+                  {accuracyScore.mae != null ? `${accuracyScore.mae} units` : '—'}
+                </Text>
+              </View>
+              <View style={styles.metaItem}>
+                <Text style={styles.metaLabel}>Forecast Bias</Text>
+                <Text style={styles.metaValue}>
+                  {accuracyScore.bias != null
+                    ? `${accuracyScore.bias > 0 ? '+' : ''}${accuracyScore.bias}`
+                    : '—'}
+                </Text>
+              </View>
+              <View style={styles.metaItem}>
+                <Text style={styles.metaLabel}>Samples</Text>
+                <Text style={styles.metaValue}>{accuracyScore.sampleSize}</Text>
+              </View>
+            </View>
+          )}
+        </View>
+      </View>
+
+      {/* Products Needing Attention */}
+      <View style={styles.card}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <View>
+            <Text style={styles.cardTitle}>Products Needing Attention</Text>
+            <Text style={styles.cardSubtitle}>
+              Below reorder point or recommended for restock based on live forecasts
+            </Text>
+          </View>
+        </View>
+        {attentionRows.length === 0 ? (
+          <Text style={styles.emptyText}>
+            No products currently need restock attention from the forecast engine.
+          </Text>
+        ) : (
+          <ScrollView horizontal showsHorizontalScrollIndicator>
+            <View style={{ minWidth: isDesktop ? '100%' : 720 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  paddingVertical: 10,
+                  paddingHorizontal: 8,
+                  borderBottomWidth: 1,
+                  borderBottomColor: tokens.border,
+                  backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
+                }}
+              >
+                {['Product', 'Current Stock', 'Forecasted Demand', 'Reorder Point', 'Recommendation', 'Action'].map(
+                  (h) => (
+                    <Text
+                      key={h}
+                      style={{
+                        flex: h === 'Product' ? 2 : 1.2,
+                        minWidth: h === 'Action' ? 100 : 90,
+                        fontSize: 10.5,
+                        fontWeight: '800',
+                        color: tokens.mutedForeground,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.4,
+                      }}
+                    >
+                      {h}
+                    </Text>
+                  )
+                )}
+              </View>
+              {attentionRows.map((row) => {
+                const need = Number(row.recommendedRestock) || 0;
+                const rec =
+                  need > 0 ? `Restock ${need}` : row.belowReorderPoint ? 'Restock now' : 'Stock sufficient';
+                return (
+                  <View
+                    key={row.productId}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: 12,
+                      paddingHorizontal: 8,
+                      borderBottomWidth: 1,
+                      borderBottomColor: tokens.border,
+                    }}
+                  >
+                    <TouchableOpacity
+                      style={{ flex: 2, minWidth: 120 }}
+                      onPress={() => {
+                        setSelectedProductId(row.productId);
+                        setForecastScope('product');
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.primary }} numberOfLines={1}>
+                        {row.productName}
+                      </Text>
+                    </TouchableOpacity>
+                    <Text style={{ flex: 1.2, fontSize: 13, fontWeight: '700', color: tokens.foreground }}>
+                      {row.currentStock}
+                    </Text>
+                    <Text style={{ flex: 1.2, fontSize: 13, fontWeight: '700', color: tokens.foreground }}>
+                      {row.forecastedDemand ?? '—'}
+                    </Text>
+                    <Text style={{ flex: 1.2, fontSize: 13, fontWeight: '700', color: tokens.foreground }}>
+                      {row.reorderPoint ?? '—'}
+                    </Text>
+                    <Text style={{ flex: 1.2, fontSize: 12.5, fontWeight: '700', color: need > 0 ? '#D97706' : tokens.mutedForeground }}>
+                      {rec}
+                    </Text>
+                    <View style={{ flex: 1.2, minWidth: 100 }}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const prod = products.find(
+                            (p) =>
+                              String(p.id) === String(row.productId) ||
+                              String(p.product_id) === String(row.productId)
+                          );
+                          if (need > 0 && onRestock && prod) {
+                            onRestock(prod, need);
+                          } else if (prod) {
+                            setSelectedProductId(row.productId);
+                          } else {
+                            onNavigate?.('inventory');
+                          }
+                        }}
+                        style={{
+                          alignSelf: 'flex-start',
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          backgroundColor: need > 0 ? tokens.primary : isDarkMode ? '#1E293B' : '#F1F5F9',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: '800',
+                            color: need > 0 ? '#FFF' : tokens.foreground,
+                          }}
+                        >
+                          {need > 0 ? 'Restock' : 'View'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </ScrollView>
+        )}
+      </View>
+
       {/* Forecast Breakdown Table (Product vs Category) */}
       <View style={styles.card}>
         <View
@@ -1437,7 +2034,7 @@ export default function SalesForecastPanel({
           <View
             style={{
               flexDirection: 'row',
-              backgroundColor: isDarkMode ? '#1E2028' : '#F1F5F9',
+              backgroundColor: isDarkMode ? tokens.card : '#F1F5F9',
               borderRadius: 8,
               padding: 3,
               borderWidth: 1,

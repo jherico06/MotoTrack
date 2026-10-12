@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
+import BootstrapIcon from './BootstrapIcon.jsx';
 
 export default function UserProfileButton({ currentUser, onPress, size = 40 }) {
   const badgeSize = Math.round(size * 0.44); // ~18px for 40px avatar

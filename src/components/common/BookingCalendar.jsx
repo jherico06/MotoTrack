@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Platform, useWindowDimensions } from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
-import BookingSelect from './BookingSelect';
+import BootstrapIcon from './BootstrapIcon.jsx';
+import BookingSelect from './BookingSelect.jsx';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',

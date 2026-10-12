@@ -11,12 +11,12 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { deliveryService } from '../../services/deliveryService';
-import { riderService, RIDER_STATUSES, RIDER_ACCOUNT_STATUSES } from '../../services/riderService';
-import { orderService } from '../../services/orderService';
-import ExpectedDateField from '../common/ExpectedDateField';
-import { addDaysDateInput, toDateInputValue } from '../../utils/deliveryDate';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { deliveryService } from '../../services/delivery/deliveryService.js';
+import { riderService, RIDER_STATUSES, RIDER_ACCOUNT_STATUSES } from '../../services/staff/riderService.js';
+import { orderService } from '../../services/orders/orderService.js';
+import ExpectedDateField from '../common/ExpectedDateField.jsx';
+import { addDaysDateInput, toDateInputValue, normalizeDateRange } from '../../utils/deliveryDate.js';
 
 export default function AssignDeliveryModal({
   visible,
@@ -33,6 +33,7 @@ export default function AssignDeliveryModal({
   const [manualContact, setManualContact] = useState('');
   const [notes, setNotes] = useState('');
   const [expectedDate, setExpectedDate] = useState('');
+  const [expectedEndDate, setExpectedEndDate] = useState('');
   const [busy, setBusy] = useState(false);
   const [alsoDispatch, setAlsoDispatch] = useState(true);
   const [loadingRiders, setLoadingRiders] = useState(false);
@@ -45,7 +46,17 @@ export default function AssignDeliveryModal({
     setManualName('');
     setManualContact('');
     setManualMode(false);
-    setExpectedDate(toDateInputValue(order.expected_delivery_at) || addDaysDateInput(1));
+    {
+      const start =
+        toDateInputValue(order.expected_delivery_at) || addDaysDateInput(1);
+      const end =
+        toDateInputValue(order.expected_delivery_end_at) ||
+        toDateInputValue(order.expected_delivery_at) ||
+        addDaysDateInput(3);
+      const range = normalizeDateRange(start, end);
+      setExpectedDate(range.start);
+      setExpectedEndDate(range.end || range.start);
+    }
     setAlsoDispatch(true);
     setSelectedRiderId(order.rider_id || '');
     setLoadingRiders(true);
@@ -103,8 +114,13 @@ export default function AssignDeliveryModal({
       );
       return;
     }
-    if (!String(expectedDate || '').trim()) {
-      showToast?.('Pick an expected delivery date');
+    const range = normalizeDateRange(expectedDate, expectedEndDate || expectedDate);
+    if (!range.start) {
+      showToast?.('Pick an expected delivery date range');
+      return;
+    }
+    if (!range.end) {
+      showToast?.('Pick an end date for the delivery window');
       return;
     }
     setBusy(true);
@@ -121,7 +137,8 @@ export default function AssignDeliveryModal({
           riderName: manualMode ? manualName.trim() : undefined,
           riderContact: manualMode ? manualContact.trim() : undefined,
           notes: notes.trim(),
-          expectedDate: expectedDate || null,
+          expectedDate: range.start || null,
+          expectedEndDate: range.end || range.start || null,
           adminUser,
         });
         if (!assignRes.success) {
@@ -277,11 +294,17 @@ export default function AssignDeliveryModal({
             ) : null}
 
             <ExpectedDateField
-              value={expectedDate}
-              onChange={setExpectedDate}
-              label="Expected delivery date"
-              hint="This date is shown to the customer on order tracking."
+              mode="range"
+              startDate={expectedDate}
+              endDate={expectedEndDate}
+              onRangeChange={({ start, end }) => {
+                setExpectedDate(start || '');
+                setExpectedEndDate(end || start || '');
+              }}
+              label="Expected delivery window"
+              hint="Select a start and end date (e.g. Oct 24, 2026 - Oct 27, 2026). Shown on customer tracking."
               isDarkMode={isDark}
+              defaultOpen
             />
 
             <Text style={[styles.label, isDark && { color: '#E2E8F0' }]}>Delivery Notes</Text>

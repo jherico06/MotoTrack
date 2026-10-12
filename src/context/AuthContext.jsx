@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
-import { authService } from '../services/authService';
-import { supabase } from '../services/supabaseClient';
+import { authService } from '../services/auth/authService.js';
+import { supabase } from '../lib/supabase.js';
 
 const AuthContext = createContext(null);
 
@@ -245,7 +245,16 @@ export function AuthProvider({ children }) {
     if (!currentUser) return { success: false, error: 'No active session' };
     const userId = param2 ? param1 : (currentUser.id || currentUser.user_id);
     const payload = param2 || param1;
-    return await authService.changePassword(userId, payload);
+    const res = await authService.changePassword(userId, payload);
+    if (res.success) {
+      const refreshed = authService.getCurrentUser?.() || {
+        ...currentUser,
+        ...(res.user || {}),
+        must_change_password: false,
+      };
+      setCurrentUser(refreshed);
+    }
+    return res;
   };
 
   const getAccountLogs = async () => {

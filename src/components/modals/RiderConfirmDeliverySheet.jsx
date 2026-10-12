@@ -1,6 +1,6 @@
 import React from 'react';
 import { Modal, View, StyleSheet, Platform } from 'react-native';
-import DeliveryConfirmPage from '../../pages/DeliveryConfirmPage';
+import DeliveryConfirmPage from '../../screens/shared/delivery/DeliveryConfirmPage.jsx';
 
 /**
  * In-app / in-web popup for the packing-label Confirm Delivery screen.

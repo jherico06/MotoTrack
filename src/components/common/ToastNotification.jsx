@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text } from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
-import { shopStyles as styles } from '../../styles/shop.styles';
+import BootstrapIcon from './BootstrapIcon.jsx';
+import { shopStyles as styles } from '../../styles/shop.styles.js';
 
 export default function ToastNotification({ message }) {
   if (!message) return null;

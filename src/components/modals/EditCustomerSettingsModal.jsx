@@ -10,7 +10,7 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
 
 const ADDRESS_PRESETS = [
   { label: 'Inoburan, Naga', address: 'Purok Avocado 4, Inoburan, City of Naga, Cebu', city: 'City of Naga' },

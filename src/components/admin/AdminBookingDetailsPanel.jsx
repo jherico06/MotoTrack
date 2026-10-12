@@ -2,7 +2,7 @@
  * Organized, high-readability Booking Details & Work Order Command Center for Admin Modal.
  * Structured with modern overview cards, contextual action bar, and segmented tabs.
  */
-import React, { useMemo, useState } from 'react';
+import React, { createContext, useContext, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { BootstrapIcon } from '../common';
-import ServiceQuotationPanel from './ServiceQuotationPanel';
-import PickupQrScannerPanel from './PickupQrScannerPanel';
-import { garageService } from '../../services/garageService';
-import { serviceQuotationService } from '../../services/serviceQuotationService';
-import { getOptimizedImageUrl } from '../../utils/imageUrl';
+import { getThemeTokens } from '../../styles/theme.js';
+import ServiceQuotationPanel from './ServiceQuotationPanel.jsx';
+import PickupQrScannerPanel from './PickupQrScannerPanel.jsx';
+import { garageService } from '../../services/bookings/garageService.js';
+import { serviceQuotationService } from '../../services/bookings/serviceQuotationService.js';
+import { getOptimizedImageUrl } from '../../utils/imageUrl.js';
 import {
   FLEX_BOOKING_STATUS,
   normalizeBookingStatus,
@@ -30,7 +31,7 @@ import {
   bookingQuotationTotal,
   bookingPaymentStatus,
   canAdminAction,
-} from '../../utils/bookingWorkflow';
+} from '../../utils/bookingWorkflow.js';
 
 function formatDateTime(val) {
   if (!val) return '—';
@@ -70,7 +71,34 @@ function formatDateOnly(val) {
   }
 }
 
-const PLACEHOLDER_COLOR = '#94A3B8';
+const DARK_STATUS_TONE = {
+  '#D97706': 'Warning',
+  '#C2410C': 'Warning',
+  '#EA580C': 'Warning',
+  '#B45309': 'Warning',
+  '#1D4533': 'Success',
+  '#16A34A': 'Success',
+  '#059669': 'Success',
+  '#0284C7': 'Info',
+  '#7C3AED': 'Purple',
+  '#4338CA': 'Purple',
+  '#DC2626': 'Danger',
+  '#B91C1C': 'Danger',
+  '#991B1B': 'Danger',
+};
+
+function darkStatusColors(colors, t) {
+  const tone = DARK_STATUS_TONE[String(colors?.fg || '').toUpperCase()];
+  if (!tone) return { bg: t.bgSub, fg: t.textMuted, border: t.border };
+  return { bg: t['status' + tone + 'Bg'], fg: t['status' + tone + 'Text'], border: t.accentBorder };
+}
+
+const LIGHT_TOKENS = getThemeTokens(false);
+const DetailsThemeContext = createContext({
+  t: LIGHT_TOKENS,
+  isDark: false,
+  styles: createStyles(LIGHT_TOKENS, false),
+});
 
 function ClearField({
   label,
@@ -82,6 +110,7 @@ function ClearField({
   style,
   ...rest
 }) {
+  const { t, isDark, styles } = useContext(DetailsThemeContext);
   return (
     <View style={styles.fieldWrap}>
       {label ? <Text style={styles.fieldLabel}>{label}</Text> : null}
@@ -90,11 +119,11 @@ function ClearField({
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={PLACEHOLDER_COLOR}
+        placeholderTextColor={isDark ? t.placeholder : '#94A3B8'}
         multiline={multiline}
         keyboardType={keyboardType}
         underlineColorAndroid="transparent"
-        selectionColor="#1D4533"
+        selectionColor={isDark ? t.accentBrand : "#1D4533"}
         {...rest}
       />
     </View>
@@ -102,6 +131,7 @@ function ClearField({
 }
 
 function ActionBtn({ label, icon, onPress, disabled, danger, primary, outline }) {
+  const { t, isDark, styles } = useContext(DetailsThemeContext);
   return (
     <TouchableOpacity
       style={[
@@ -119,15 +149,15 @@ function ActionBtn({ label, icon, onPress, disabled, danger, primary, outline })
         <BootstrapIcon
           name={icon}
           size={13}
-          color={danger ? '#DC2626' : primary ? '#FFFFFF' : '#1D4533'}
+          color={danger ? (isDark ? t.statusDangerText : '#DC2626') : primary ? '#FFFFFF' : (isDark ? t.accentBrand : '#1D4533')}
         />
       ) : null}
       <Text
         style={[
           styles.actionBtnText,
           primary && { color: '#FFFFFF' },
-          danger && { color: '#DC2626' },
-          disabled && { color: '#94A3B8' },
+          danger && { color: (isDark ? t.statusDangerText : '#DC2626') },
+          disabled && { color: (isDark ? t.textMuted : '#94A3B8') },
         ]}
       >
         {label}
@@ -137,18 +167,19 @@ function ActionBtn({ label, icon, onPress, disabled, danger, primary, outline })
 }
 
 function InfoItem({ icon, label, value, highlight, badge }) {
+  const { t, isDark, styles } = useContext(DetailsThemeContext);
   if (!value && value !== 0) return null;
   return (
     <View style={styles.infoItem}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        {icon ? <BootstrapIcon name={icon} size={13} color="#64748B" /> : null}
+        {icon ? <BootstrapIcon name={icon} size={13} color={isDark ? t.textMuted : "#64748B"} /> : null}
         <Text style={styles.infoItemLabel}>{label}</Text>
       </View>
       {badge ? (
         <View style={styles.itemBadge}>{value}</View>
       ) : (
         <Text
-          style={[styles.infoItemValue, highlight && { color: '#1D4533', fontWeight: '800' }]}
+          style={[styles.infoItemValue, highlight && { color: (isDark ? t.accentBrand : '#1D4533'), fontWeight: '800' }]}
           numberOfLines={2}
         >
           {String(value)}
@@ -159,11 +190,12 @@ function InfoItem({ icon, label, value, highlight, badge }) {
 }
 
 function GridKvCell({ icon, label, value, highlight = false, badge = false }) {
+  const { t, isDark, styles } = useContext(DetailsThemeContext);
   if (!value && value !== 0) return null;
   return (
     <View style={styles.gridKvCell}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 3 }}>
-        {icon ? <BootstrapIcon name={icon} size={12} color="#64748B" /> : null}
+        {icon ? <BootstrapIcon name={icon} size={12} color={isDark ? t.textMuted : "#64748B"} /> : null}
         <Text style={styles.gridKvLabel}>{label}</Text>
       </View>
       {badge ? (
@@ -174,7 +206,7 @@ function GridKvCell({ icon, label, value, highlight = false, badge = false }) {
         <Text
           style={[
             styles.gridKvValue,
-            highlight && { color: '#1D4533', fontWeight: '800' },
+            highlight && { color: (isDark ? t.accentBrand : '#1D4533'), fontWeight: '800' },
           ]}
           numberOfLines={2}
         >
@@ -185,14 +217,8 @@ function GridKvCell({ icon, label, value, highlight = false, badge = false }) {
   );
 }
 
-export default function AdminBookingDetailsPanel({
-  booking,
-  mechanics = [],
-  onToast,
-  onBookingUpdated,
-  tokens = {},
-  isDarkMode = false,
-}) {
+function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBookingUpdated }) {
+  const { t, isDark, styles } = useContext(DetailsThemeContext);
   const toast = (m) => onToast?.(m);
   const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'mechanic' | 'quotation' | 'inspection'
   const [busy, setBusy] = useState(false);
@@ -222,7 +248,7 @@ export default function AdminBookingDetailsPanel({
 
   const status = booking?.status || '';
   const normalized = normalizeBookingStatus(status);
-  const colors = statusColor(status);
+  const colors = isDark ? darkStatusColors(statusColor(status), t) : statusColor(status);
   const media = useMemo(() => {
     const raw = booking?.media_urls || booking?.photos || [];
     return Array.isArray(raw) ? raw.filter(Boolean) : [];
@@ -494,7 +520,7 @@ export default function AdminBookingDetailsPanel({
 
           {/* Payment Pill */}
           <View style={styles.paymentPill}>
-            <BootstrapIcon name="credit-card-2-front" size={11} color="#475569" />
+            <BootstrapIcon name="credit-card-2-front" size={11} color={isDark ? t.textSecondary : "#475569"} />
             <Text style={styles.paymentPillText}>
               {quoteTotal > 0 ? formatPhp(quoteTotal) : formatPhp(basePrice)} · {payStatus}
             </Text>
@@ -520,8 +546,8 @@ export default function AdminBookingDetailsPanel({
               size={11}
               color={
                 booking.downpayment_status === 'Paid' || Number(booking.amount_paid || 0) > 0
-                  ? '#166534'
-                  : '#DC2626'
+                  ? (isDark ? t.statusSuccessText : '#166534')
+                  : (isDark ? t.statusDangerText : '#DC2626')
               }
             />
             <Text
@@ -530,8 +556,8 @@ export default function AdminBookingDetailsPanel({
                 {
                   color:
                     booking.downpayment_status === 'Paid' || Number(booking.amount_paid || 0) > 0
-                      ? '#166534'
-                      : '#DC2626',
+                      ? (isDark ? t.statusSuccessText : '#166534')
+                      : (isDark ? t.statusDangerText : '#DC2626'),
                 },
               ]}
             >
@@ -541,15 +567,22 @@ export default function AdminBookingDetailsPanel({
                   ? `DP ${formatPhp(dpAmount)} Paid (${booking.downpayment_method || 'cash'})`
                   : normalized === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT
                     ? `DP ${formatPhp(dpAmount)} Required`
+                    : normalized === FLEX_BOOKING_STATUS.BOOKING_EXPIRED
+                      ? 'Cancelled — DP deadline missed'
                     : `DP ${formatPhp(dpAmount)}`}
             </Text>
           </View>
+          {normalized === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT && booking.payment_deadline ? (
+            <Text style={{ fontSize: 11, color: (isDark ? t.statusWarningText : '#EA580C'), fontWeight: '700', marginTop: 4 }}>
+              Due by {new Date(booking.payment_deadline).toLocaleString()} · auto-cancels if unpaid
+            </Text>
+          ) : null}
         </View>
 
         {busy && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <ActivityIndicator size="small" color="#1D4533" />
-            <Text style={{ fontSize: 11.5, color: '#64748B', fontWeight: '600' }}>Updating...</Text>
+            <ActivityIndicator size="small" color={isDark ? t.accentBrand : "#1D4533"} />
+            <Text style={{ fontSize: 11.5, color: (isDark ? t.textMuted : '#64748B'), fontWeight: '600' }}>Updating...</Text>
           </View>
         )}
       </View>
@@ -671,8 +704,8 @@ export default function AdminBookingDetailsPanel({
       {showRejectBox && (
         <View style={styles.interactiveDrawer}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <BootstrapIcon name="shield-exclamation" size={14} color="#DC2626" />
-            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#DC2626' }}>
+            <BootstrapIcon name="shield-exclamation" size={14} color={isDark ? t.statusDangerText : "#DC2626"} />
+            <Text style={{ fontSize: 12.5, fontWeight: '800', color: (isDark ? t.statusDangerText : '#DC2626') }}>
               Decline Booking & Notify Customer
             </Text>
           </View>
@@ -704,8 +737,8 @@ export default function AdminBookingDetailsPanel({
       {showRescheduleBox && (
         <View style={styles.interactiveDrawer}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <BootstrapIcon name="calendar2-check" size={14} color="#1D4533" />
-            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#1D4533' }}>
+            <BootstrapIcon name="calendar2-check" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
+            <Text style={{ fontSize: 12.5, fontWeight: '800', color: (isDark ? t.accentBrand : '#1D4533') }}>
               Update Appointment Schedule
             </Text>
           </View>
@@ -764,7 +797,7 @@ export default function AdminBookingDetailsPanel({
               <BootstrapIcon
                 name={tab.icon}
                 size={13}
-                color={isSelected ? '#1D4533' : '#64748B'}
+                color={isSelected ? (isDark ? t.accentBrand : '#1D4533') : (isDark ? t.textMuted : '#64748B')}
               />
               <Text style={[styles.tabButtonText, isSelected && styles.tabButtonTextActive]}>
                 {tab.label}
@@ -781,7 +814,7 @@ export default function AdminBookingDetailsPanel({
           {/* Card 1: Customer Profile */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="person-fill" size={14} color="#1D4533" />
+              <BootstrapIcon name="person-fill" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
               <Text style={styles.cardTitle}>Customer Profile</Text>
             </View>
             <View style={styles.cardBody}>
@@ -824,7 +857,7 @@ export default function AdminBookingDetailsPanel({
           {/* Card 2: Motorcycle Specs */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="bicycle" size={14} color="#1D4533" />
+              <BootstrapIcon name="bicycle" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
               <Text style={styles.cardTitle}>Motorcycle Specs</Text>
             </View>
             <View style={styles.cardBody}>
@@ -863,13 +896,13 @@ export default function AdminBookingDetailsPanel({
           {/* Card 3: Appointment & Financials */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="calendar3" size={14} color="#1D4533" />
+              <BootstrapIcon name="calendar3" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
               <Text style={styles.cardTitle}>Appointment & Financials</Text>
             </View>
             <View style={styles.cardBody}>
               {/* Subgroup 1: Appointment */}
               <View style={styles.subGroupHeader}>
-                <BootstrapIcon name="calendar-event" size={12} color="#1D4533" />
+                <BootstrapIcon name="calendar-event" size={12} color={isDark ? t.accentBrand : "#1D4533"} />
                 <Text style={styles.subGroupTitle}>Appointment Details</Text>
               </View>
               <View style={styles.twoColumnGrid}>
@@ -908,7 +941,7 @@ export default function AdminBookingDetailsPanel({
 
               {/* Subgroup 2: Financials */}
               <View style={[styles.subGroupHeader, { marginTop: 14 }]}>
-                <BootstrapIcon name="cash-stack" size={12} color="#1D4533" />
+                <BootstrapIcon name="cash-stack" size={12} color={isDark ? t.accentBrand : "#1D4533"} />
                 <Text style={styles.subGroupTitle}>Financial Information</Text>
               </View>
               <View style={styles.twoColumnGrid}>
@@ -951,7 +984,7 @@ export default function AdminBookingDetailsPanel({
           {/* Card 4: Customer Request & Notes */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="chat-square-quote-fill" size={14} color="#1D4533" />
+              <BootstrapIcon name="chat-square-quote-fill" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
               <Text style={styles.cardTitle}>Customer Request & Photos</Text>
             </View>
             <View style={styles.cardBody}>
@@ -998,20 +1031,20 @@ export default function AdminBookingDetailsPanel({
           {/* Current Technician Card */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="person-gear" size={14} color="#1D4533" />
+              <BootstrapIcon name="person-gear" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
               <Text style={styles.cardTitle}>Currently Assigned Technician</Text>
             </View>
             <View style={styles.cardBody}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={styles.avatarCircle}>
-                    <BootstrapIcon name="wrench" size={16} color="#1D4533" />
+                    <BootstrapIcon name="wrench" size={16} color={isDark ? t.accentBrand : "#1D4533"} />
                   </View>
                   <View>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: (isDark ? t.textPrimary : '#0F172A') }}>
                       {booking.mechanic || 'Pending Assignment'}
                     </Text>
-                    <Text style={{ fontSize: 11.5, color: '#64748B' }}>
+                    <Text style={{ fontSize: 11.5, color: (isDark ? t.textMuted : '#64748B') }}>
                       {selectedMech
                         ? `${selectedMech.specialization} · ₱${Number(selectedMech.hourlyRate ?? selectedMech.hourly_rate ?? 150).toLocaleString()}/hr`
                         : 'No technician assigned to this lift bay yet'}
@@ -1024,13 +1057,13 @@ export default function AdminBookingDetailsPanel({
                     onPress={() => assignMechanic({ remove: true })}
                     disabled={busy}
                   >
-                    <BootstrapIcon name="person-dash" size={12} color="#DC2626" />
-                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#DC2626' }}>Unassign</Text>
+                    <BootstrapIcon name="person-dash" size={12} color={isDark ? t.statusDangerText : "#DC2626"} />
+                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: (isDark ? t.statusDangerText : '#DC2626') }}>Unassign</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
-              <View style={{ flexDirection: 'row', gap: 16, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#F1F5F9' }}>
+              <View style={{ flexDirection: 'row', gap: 16, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: (isDark ? t.border : '#F1F5F9') }}>
                 <InfoItem
                   icon="calendar-event"
                   label="Assignment Timestamp"
@@ -1048,16 +1081,16 @@ export default function AdminBookingDetailsPanel({
           {/* Active Mechanics Roster Selector */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="people-fill" size={14} color="#1D4533" />
+              <BootstrapIcon name="people-fill" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
               <Text style={styles.cardTitle}>Select from Technician Roster</Text>
             </View>
             <View style={styles.cardBody}>
-              <Text style={{ fontSize: 12, color: '#64748B', marginBottom: 10 }}>
+              <Text style={{ fontSize: 12, color: (isDark ? t.textMuted : '#64748B'), marginBottom: 10 }}>
                 Choose a certified garage mechanic to assign or reassign to this work order:
               </Text>
               {activeMechanics.length === 0 ? (
-                <View style={{ padding: 14, backgroundColor: '#F8FAFC', borderRadius: 8, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 12, color: '#64748B' }}>
+                <View style={{ padding: 14, backgroundColor: (isDark ? t.bgSub : '#F8FAFC'), borderRadius: 8, alignItems: 'center' }}>
+                  <Text style={{ fontSize: 12, color: (isDark ? t.textMuted : '#64748B') }}>
                     No certified mechanics registered yet. You can add mechanics in the Mechanics tab.
                   </Text>
                 </View>
@@ -1085,20 +1118,20 @@ export default function AdminBookingDetailsPanel({
                           <View
                             style={[
                               styles.rosterAvatar,
-                              isCurrent && { backgroundColor: '#1D4533' },
+                              isCurrent && { backgroundColor: isDark ? '#1F6B52' : '#1D4533' },
                             ]}
                           >
                             <BootstrapIcon
                               name="person-fill"
                               size={14}
-                              color={isCurrent ? '#FFFFFF' : '#1D4533'}
+                              color={isCurrent ? '#FFFFFF' : (isDark ? t.accentBrand : '#1D4533')}
                             />
                           </View>
                           <View>
                             <Text
                               style={[
                                 styles.rosterName,
-                                isCurrent && { color: '#1D4533', fontWeight: '800' },
+                                isCurrent && { color: (isDark ? t.accentBrand : '#1D4533'), fontWeight: '800' },
                               ]}
                             >
                               {m.name}
@@ -1110,11 +1143,11 @@ export default function AdminBookingDetailsPanel({
                         </View>
                         {isCurrent ? (
                           <View style={styles.rosterAssignedPill}>
-                            <BootstrapIcon name="check-circle-fill" size={12} color="#1D4533" />
-                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533' }}>Assigned</Text>
+                            <BootstrapIcon name="check-circle-fill" size={12} color={isDark ? t.accentBrand : "#1D4533"} />
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: (isDark ? t.accentBrand : '#1D4533') }}>Assigned</Text>
                           </View>
                         ) : (
-                          <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#2563EB' }}>
+                          <Text style={{ fontSize: 11.5, fontWeight: '700', color: (isDark ? t.statusInfoText : '#2563EB') }}>
                             Tap to Assign
                           </Text>
                         )}
@@ -1132,7 +1165,7 @@ export default function AdminBookingDetailsPanel({
       {activeTab === 'quotation' && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <BootstrapIcon name="receipt-cutoff" size={14} color="#1D4533" />
+            <BootstrapIcon name="receipt-cutoff" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
             <Text style={styles.cardTitle}>Detailed Quotation & Parts Itemization</Text>
           </View>
           <View style={[styles.cardBody, { padding: 8 }]}>
@@ -1153,7 +1186,7 @@ export default function AdminBookingDetailsPanel({
           {/* Inspection Section */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="search" size={14} color="#1D4533" />
+              <BootstrapIcon name="search" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
               <Text style={styles.cardTitle}>Vehicle Inspection & Diagnostic Findings</Text>
             </View>
             <View style={styles.cardBody}>
@@ -1210,7 +1243,7 @@ export default function AdminBookingDetailsPanel({
           {/* Service Progress Tracking */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="tools" size={14} color="#1D4533" />
+              <BootstrapIcon name="tools" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
               <Text style={styles.cardTitle}>Service Progress & Work Executed</Text>
             </View>
             <View style={styles.cardBody}>
@@ -1247,7 +1280,7 @@ export default function AdminBookingDetailsPanel({
           {/* Pickup QR & Verification */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="qr-code-scan" size={14} color="#1D4533" />
+              <BootstrapIcon name="qr-code-scan" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
               <Text style={styles.cardTitle}>Vehicle Release & QR Verification</Text>
             </View>
             <View style={styles.cardBody}>
@@ -1286,294 +1319,311 @@ export default function AdminBookingDetailsPanel({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { gap: 12 },
-  empty: { padding: 32, alignItems: 'center' },
-  emptyText: { color: '#94A3B8', fontSize: 13 },
+export default function AdminBookingDetailsPanel({ isDarkMode = false, ...props }) {
+  const value = useMemo(() => {
+    const t = getThemeTokens(isDarkMode);
+    return { t, isDark: isDarkMode, styles: createStyles(t, isDarkMode) };
+  }, [isDarkMode]);
+  return (
+    <DetailsThemeContext.Provider value={value}>
+      <AdminBookingDetailsPanelInner {...props} />
+    </DetailsThemeContext.Provider>
+  );
+}
 
-  topStatusStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 4.5,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  statusBadgeText: { fontSize: 12, fontWeight: '800' },
-  paymentPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    paddingHorizontal: 9,
-    paddingVertical: 4.5,
-    borderRadius: 8,
-  },
-  paymentPillText: { fontSize: 11.5, fontWeight: '700', color: '#334155' },
-  dpBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 4.5,
-    borderRadius: 8,
-  },
-  dpBadgePaid: { backgroundColor: '#F0FDF4', borderWidth: 1, borderColor: '#BBF7D0' },
-  dpBadgeCancelled: { backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#FECACA' },
-  dpBadgeText: { fontSize: 11.5, fontWeight: '800' },
+function createStyles(t, isDark) {
+  return StyleSheet.create({
+    wrap: { gap: 12 },
+    empty: { padding: 32, alignItems: 'center' },
+    emptyText: { color: isDark ? t.textMuted : '#94A3B8', fontSize: 13 },
 
-  actionToolbar: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: '#1D4533',
-    backgroundColor: '#FFFFFF',
-  },
-  actionBtnPrimary: { backgroundColor: '#1D4533', borderColor: '#1D4533' },
-  actionBtnDanger: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
-  actionBtnOutline: { borderColor: '#CBD5E1', backgroundColor: '#FFFFFF' },
-  actionBtnDisabled: { opacity: 0.5 },
-  actionBtnText: { fontSize: 12, fontWeight: '800', color: '#1D4533' },
+    topStatusStrip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: isDark ? t.bgSub : '#F8FAFC',
+      borderRadius: 12,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: isDark ? t.border : '#E2E8F0',
+    },
+    statusBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 4.5,
+      borderRadius: 8,
+      borderWidth: 1,
+    },
+    statusBadgeText: { fontSize: 12, fontWeight: '800' },
+    paymentPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+      borderWidth: 1,
+      borderColor: isDark ? t.borderInput : '#CBD5E1',
+      paddingHorizontal: 9,
+      paddingVertical: 4.5,
+      borderRadius: 8,
+    },
+    paymentPillText: { fontSize: 11.5, fontWeight: '700', color: isDark ? t.textSecondary : '#334155' },
+    dpBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 9,
+      paddingVertical: 4.5,
+      borderRadius: 8,
+    },
+    dpBadgePaid: { backgroundColor: isDark ? t.statusSuccessBg : '#F0FDF4', borderWidth: 1, borderColor: isDark ? t.accentBorder : '#BBF7D0' },
+    dpBadgeCancelled: { backgroundColor: isDark ? t.statusDangerBg : '#FEF2F2', borderWidth: 1, borderColor: isDark ? 'rgba(180, 120, 120, 0.28)' : '#FECACA' },
+    dpBadgeText: { fontSize: 11.5, fontWeight: '800' },
 
-  interactiveDrawer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-  },
+    actionToolbar: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    actionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 13,
+      paddingVertical: 8,
+      borderRadius: 8,
+      borderWidth: 1.5,
+      borderColor: isDark ? t.accentBorder : '#1D4533',
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+    },
+    actionBtnPrimary: {
+      backgroundColor: isDark ? '#1F6B52' : '#1D4533',
+      borderColor: isDark ? '#1F6B52' : '#1D4533',
+    },
+    actionBtnDanger: { borderColor: isDark ? 'rgba(180, 120, 120, 0.28)' : '#FECACA', backgroundColor: isDark ? t.statusDangerBg : '#FEF2F2' },
+    actionBtnOutline: { borderColor: isDark ? t.borderInput : '#CBD5E1', backgroundColor: isDark ? t.bgCard : '#FFFFFF' },
+    actionBtnDisabled: { opacity: 0.5 },
+    actionBtnText: { fontSize: 12, fontWeight: '800', color: isDark ? t.accentBrand : '#1D4533' },
 
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 12,
-    padding: 4,
-    gap: 4,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  tabButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    paddingHorizontal: 8,
-    borderRadius: 8,
-  },
-  tabButtonActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  tabButtonText: { fontSize: 12, fontWeight: '700', color: '#64748B' },
-  tabButtonTextActive: { color: '#1D4533', fontWeight: '800' },
+    interactiveDrawer: {
+      backgroundColor: isDark ? t.bgSub : '#F8FAFC',
+      borderRadius: 12,
+      padding: 14,
+      borderWidth: 1.5,
+      borderColor: isDark ? t.borderInput : '#CBD5E1',
+    },
 
-  cardsGrid: {
-    gap: 14,
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  cardTitle: { fontSize: 13.5, fontWeight: '800', color: '#0F172A', letterSpacing: -0.2 },
-  cardBody: { padding: 16, gap: 10 },
+    tabBar: {
+      flexDirection: 'row',
+      backgroundColor: isDark ? t.bgSub : '#F1F5F9',
+      borderRadius: 12,
+      padding: 4,
+      gap: 4,
+      borderWidth: 1,
+      borderColor: isDark ? t.border : '#E2E8F0',
+    },
+    tabButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 9,
+      paddingHorizontal: 8,
+      borderRadius: 8,
+    },
+    tabButtonActive: {
+      backgroundColor: isDark ? t.bgElevated : '#FFFFFF',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.08,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    tabButtonText: { fontSize: 12, fontWeight: '700', color: isDark ? t.textMuted : '#64748B' },
+    tabButtonTextActive: { color: isDark ? t.accentBrand : '#1D4533', fontWeight: '800' },
 
-  twoColumnGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  gridColumn: {
-    flex: 1,
-    minWidth: 240,
-    gap: 10,
-  },
-  gridKvCell: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
-  },
-  gridKvLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  gridKvValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  subGroupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 8,
-    marginTop: 4,
-    paddingBottom: 4,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  subGroupTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  cardHeaderIconWrap: {
-    width: 26,
-    height: 26,
-    borderRadius: 7,
-    backgroundColor: '#E8F0EC',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    cardsGrid: {
+      gap: 14,
+    },
+    card: {
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: isDark ? t.border : '#E2E8F0',
+      overflow: 'hidden',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.03,
+      shadowRadius: 4,
+      elevation: 1,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: isDark ? t.bgSub : '#F8FAFC',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? t.border : '#F1F5F9',
+    },
+    cardTitle: { fontSize: 13.5, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A', letterSpacing: -0.2 },
+    cardBody: { padding: 16, gap: 10 },
 
-  infoItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  infoItemLabel: { fontSize: 12, color: '#64748B', fontWeight: '600' },
-  infoItemValue: { fontSize: 12.5, color: '#0F172A', fontWeight: '600', maxWidth: '60%', textAlign: 'right' },
-  itemBadge: { alignItems: 'flex-end' },
+    twoColumnGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    },
+    gridColumn: {
+      flex: 1,
+      minWidth: 240,
+      gap: 10,
+    },
+    gridKvCell: {
+      backgroundColor: isDark ? t.bgSub : '#F8FAFC',
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      borderWidth: 1,
+      borderColor: isDark ? t.border : '#F1F5F9',
+    },
+    gridKvLabel: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: isDark ? t.textMuted : '#64748B',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    gridKvValue: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: isDark ? t.textPrimary : '#0F172A',
+    },
+    subGroupHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 8,
+      marginTop: 4,
+      paddingBottom: 4,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? t.border : '#F1F5F9',
+    },
+    subGroupTitle: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: isDark ? t.textMuted : '#64748B',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    cardHeaderIconWrap: {
+      width: 26,
+      height: 26,
+      borderRadius: 7,
+      backgroundColor: isDark ? t.accentBg : '#E8F0EC',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  bikePlatePill: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 5,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  bikePlateText: { fontSize: 11, fontWeight: '800', color: '#0F172A' },
+    infoItem: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    infoItemLabel: { fontSize: 12, color: isDark ? t.textMuted : '#64748B', fontWeight: '600' },
+    infoItemValue: { fontSize: 12.5, color: isDark ? t.textPrimary : '#0F172A', fontWeight: '600', maxWidth: '60%', textAlign: 'right' },
+    itemBadge: { alignItems: 'flex-end' },
 
-  quoteBlock: {
-    marginTop: 4,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    padding: 10,
-    borderLeftWidth: 3,
-    borderLeftColor: '#1D4533',
-  },
-  quoteText: { fontSize: 12.5, color: '#334155', fontStyle: 'italic', lineHeight: 18 },
+    bikePlatePill: {
+      backgroundColor: isDark ? t.bgSub : '#F1F5F9',
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 5,
+      borderWidth: 1,
+      borderColor: isDark ? t.borderInput : '#CBD5E1',
+    },
+    bikePlateText: { fontSize: 11, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A' },
 
-  thumb: { width: 88, height: 88, borderRadius: 8, backgroundColor: '#E2E8F0' },
+    quoteBlock: {
+      marginTop: 4,
+      backgroundColor: isDark ? t.bgSub : '#F8FAFC',
+      borderRadius: 8,
+      padding: 10,
+      borderLeftWidth: 3,
+      borderLeftColor: isDark ? t.accentBrand : '#1D4533',
+    },
+    quoteText: { fontSize: 12.5, color: isDark ? t.textSecondary : '#334155', fontStyle: 'italic', lineHeight: 18 },
 
-  avatarCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#FEF3C7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+    thumb: { width: 88, height: 88, borderRadius: 8, backgroundColor: isDark ? t.bgSub : '#E2E8F0' },
 
-  rosterCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 10,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-  },
-  rosterCardSelected: {
-    borderColor: '#1D4533',
-    backgroundColor: '#F0FDF4',
-  },
-  rosterAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rosterName: { fontSize: 12.5, fontWeight: '700', color: '#0F172A' },
-  rosterSub: { fontSize: 11, color: '#64748B' },
-  rosterAssignedPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
+    avatarCircle: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: isDark ? t.statusWarningBg : '#FEF3C7',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
 
-  fieldWrap: { marginBottom: 10 },
-  fieldLabel: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#475569',
-    marginBottom: 4,
-  },
-  input: {
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
-    backgroundColor: '#FFFFFF',
-    outlineStyle: 'none',
-  },
-  inputMultiline: {
-    minHeight: 65,
-    textAlignVertical: 'top',
-  },
-});
+    rosterCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 10,
+      borderRadius: 9,
+      borderWidth: 1.5,
+      borderColor: isDark ? t.border : '#E2E8F0',
+      backgroundColor: isDark ? t.bgCard : '#FFFFFF',
+    },
+    rosterCardSelected: {
+      borderColor: isDark ? t.accentBrand : '#1D4533',
+      backgroundColor: isDark ? t.accentBg : '#F0FDF4',
+    },
+    rosterAvatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: isDark ? t.bgSub : '#F1F5F9',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    rosterName: { fontSize: 12.5, fontWeight: '700', color: isDark ? t.textPrimary : '#0F172A' },
+    rosterSub: { fontSize: 11, color: isDark ? t.textMuted : '#64748B' },
+    rosterAssignedPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: isDark ? t.statusSuccessBg : '#DCFCE7',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+
+    fieldWrap: { marginBottom: 10 },
+    fieldLabel: {
+      fontSize: 11,
+      fontWeight: '800',
+      color: isDark ? t.textSecondary : '#475569',
+      marginBottom: 4,
+    },
+    input: {
+      borderWidth: 1.5,
+      borderColor: isDark ? t.borderInput : '#CBD5E1',
+      borderRadius: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDark ? t.textPrimary : '#0F172A',
+      backgroundColor: isDark ? t.inputBg : '#FFFFFF',
+      outlineStyle: 'none',
+    },
+    inputMultiline: {
+      minHeight: 65,
+      textAlignVertical: 'top',
+    },
+  });
+}

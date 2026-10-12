@@ -77,11 +77,11 @@
 
   /* ─── Minimalist Admin Dashboard UI System ─── */
   .admin-minimal-card {
-    @apply bg-white dark:bg-[#141A18] border border-slate-200/80 dark:border-white/10 rounded-2xl shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
+    @apply bg-white dark:bg-[#151C19] border border-slate-200/80 dark:border-[#26332E] rounded-2xl shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
   }
 
   .admin-stat-card {
-    @apply bg-white dark:bg-[#141A18] rounded-2xl p-5 flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
+    @apply bg-white dark:bg-[#151C19] rounded-2xl p-5 flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
   }
 
   .admin-icon-pill {
@@ -109,11 +109,11 @@
   }
 
   .admin-table-head {
-    @apply bg-[#F0F4FA] dark:bg-[#162032] text-[13px] font-bold text-slate-800 dark:text-slate-100 border-b border-slate-200 dark:border-slate-800;
+    @apply bg-[#F0F4FA] dark:bg-[#121A17] text-[13px] font-bold text-slate-800 dark:text-[#F5F7F6] border-b border-slate-200 dark:border-[#26332E];
   }
 
   .admin-table-row {
-    @apply border-b border-slate-100 dark:border-slate-800/60 hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors duration-150;
+    @apply border-b border-slate-100 dark:border-[#26332E] hover:bg-slate-50/80 dark:hover:bg-[#1E2824] transition-colors duration-150;
   }
 
   .admin-nav-item {
@@ -121,8 +121,56 @@
   }
 
   .admin-nav-item-active {
-    @apply bg-slate-900 text-white dark:bg-slate-800 dark:text-white shadow-sm;
+    @apply bg-slate-900 text-white dark:bg-[#1A2622] dark:text-[#F5F7F6] shadow-sm;
   }
+}
+
+/* Dark mode — charcoal admin chrome (scrollbars, selection, focus) */
+html.dark,
+html.dark body {
+  background-color: #0F1412;
+  color: #F5F7F6;
+  color-scheme: dark;
+}
+
+html.dark ::selection {
+  background: rgba(77, 184, 150, 0.30);
+  color: #F5F7F6;
+}
+
+html.dark ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+html.dark ::-webkit-scrollbar-track {
+  background: #111715;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #2F3F39;
+  border-radius: 8px;
+  border: 2px solid #111715;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #3D524A;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #7E8A86 !important;
+  opacity: 1;
+}
+
+html.dark input:focus,
+html.dark textarea:focus,
+html.dark button:focus-visible,
+html.dark [role='button']:focus-visible {
+  outline: 2px solid rgba(77, 184, 150, 0.50);
+  outline-offset: 2px;
+}
+
+/* Dark mode — table row hover (slightly lighter charcoal) */
+html.dark [data-admin-table-row='true']:hover {
+  background-color: #1E2824 !important;
 }
 
 
@@ -147,4 +195,195 @@
   0% { transform: translateY(0px); }
   50% { transform: translateY(-10px); }
   100% { transform: translateY(0px); }
+}
+
+/* ─── Garage Fleet Dashboard Card Micro-Interactions ─── */
+.garage-fleet-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.garage-fleet-card:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 12px 28px -4px rgba(11, 18, 32, 0.16) !important;
+}
+
+.garage-book-btn {
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease !important;
+}
+.garage-book-btn:hover {
+  background-color: #F8FAFC !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24) !important;
+}
+.garage-book-btn:active {
+  transform: translateY(0px) !important;
+}
+
+.garage-register-btn {
+  transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease !important;
+}
+.garage-register-btn:hover {
+  background-color: #15803D !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.32) !important;
+}
+.garage-register-btn:active {
+  transform: translateY(0px) !important;
+}
+
+.garage-outline-btn {
+  transition: background-color 0.18s ease, border-color 0.18s ease !important;
+}
+.garage-outline-btn:hover {
+  background-color: #F1F5F9 !important;
+  border-color: #CBD5E1 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .garage-fleet-card,
+  .garage-book-btn,
+  .garage-register-btn,
+  .garage-outline-btn,
+  .main-nav-tab {
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* ─── Top Navbar Nav Tabs (Smooth text highlight without box background) ─── */
+.main-nav-tab {
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: opacity 0.15s ease, color 0.15s ease !important;
+}
+
+.main-nav-tab:hover * {
+  color: #FFFFFF !important;
+  opacity: 1 !important;
+}
+
+/* ─── MOTOTRACK Sidebar Modern UI & Micro-Interactions ─── */
+.mototrack-sidebar {
+  transition: width 200ms cubic-bezier(0.4, 0, 0.2, 1), padding 200ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+
+.mototrack-nav-item {
+  position: relative !important;
+  transition: background-color 180ms cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 180ms cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 180ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer !important;
+}
+
+.mototrack-nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+html.dark .mototrack-nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+}
+
+.mototrack-nav-item.mototrack-nav-item-active {
+  background-color: rgba(0, 0, 0, 0.28) !important;
+  border-left-color: #10B981 !important;
+}
+
+html.dark .mototrack-nav-item.mototrack-nav-item-active {
+  background-color: #1E293B !important;
+  border-left-color: #10B981 !important;
+}
+
+.mototrack-nav-item.mototrack-nav-item-active:hover {
+  background-color: rgba(0, 0, 0, 0.36) !important;
+}
+
+/* Icon shift 2px to the right on hover */
+.mototrack-nav-icon {
+  transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1), color 180ms ease !important;
+}
+
+.mototrack-nav-item:hover .mototrack-nav-icon {
+  transform: translateX(2px) !important;
+}
+
+/* Quick edit brand button */
+.mototrack-edit-btn {
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease !important;
+  cursor: pointer !important;
+}
+
+.mototrack-edit-btn:hover {
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+  transform: scale(1.05) !important;
+}
+
+html.dark .mototrack-edit-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+/* Collapse toggle button */
+.mototrack-collapse-btn {
+  transition: background-color 180ms ease, border-color 180ms ease, transform 180ms ease !important;
+  cursor: pointer !important;
+}
+
+.mototrack-collapse-btn:hover {
+  background-color: rgba(255, 255, 255, 0.22) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+  transform: scale(1.05) !important;
+}
+
+html.dark .mototrack-collapse-btn:hover {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Administrator profile card */
+.mototrack-profile-card {
+  transition: background-color 180ms cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 180ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 180ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 180ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer !important;
+}
+
+.mototrack-profile-card:hover {
+  background-color: rgba(255, 255, 255, 0.18) !important;
+  border-color: rgba(255, 255, 255, 0.32) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+html.dark .mototrack-profile-card:hover {
+  background-color: #19231F !important;
+  border-color: #2F4239 !important;
+}
+
+.mototrack-profile-arrow {
+  transition: transform 180ms cubic-bezier(0.4, 0, 0.2, 1), color 180ms ease !important;
+}
+
+.mototrack-profile-card:hover .mototrack-profile-arrow {
+  transform: translateX(3px) !important;
+  color: #FFFFFF !important;
+}
+
+html.dark .mototrack-profile-card:hover .mototrack-profile-arrow {
+  color: #FFFFFF !important;
+}
+
+/* Respect user's reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .mototrack-sidebar,
+  .mototrack-nav-item,
+  .mototrack-nav-icon,
+  .mototrack-edit-btn,
+  .mototrack-collapse-btn,
+  .mototrack-profile-card,
+  .mototrack-profile-arrow {
+    transition: none !important;
+    transform: none !important;
+    animation: none !important;
+  }
 }

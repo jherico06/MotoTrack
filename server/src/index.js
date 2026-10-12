@@ -3,6 +3,7 @@ import express from 'express';
 import cors from 'cors';
 import os from 'os';
 import customizeRouter from './routes/customize.js';
+import staffRouter from './routes/staff.js';
 import { multerErrorHandler } from './middleware/upload.js';
 
 const app = express();
@@ -25,7 +26,15 @@ app.use(
       callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'Accept',
+      'X-User-Id',
+      'X-Mototrack-User-Id',
+      'X-Admin-User-Id',
+      'X-Mototrack-Admin-Id',
+    ],
     maxAge: 86400,
   })
 );
@@ -35,15 +44,20 @@ app.use(express.urlencoded({ extended: true }));
 
 app.get('/', (_req, res) => {
   res.json({
-    name: 'MotoTrack AI Motorcycle Customizer API',
+    name: 'MotoTrack API',
     endpoints: {
       health: 'GET /api/health',
       customize: 'POST /api/customize (multipart: bike, part, customRequest)',
+      staffCreate: 'POST /api/staff/create',
+      staffSendTempCredentials: 'POST /api/staff/send-temp-credentials',
+      staffVerify: 'POST /api/staff/verify',
+      staffList: 'GET /api/staff',
     },
   });
 });
 
 app.use('/api', customizeRouter);
+app.use('/api/staff', staffRouter);
 app.use(multerErrorHandler);
 
 app.use((err, _req, res, _next) => {
@@ -74,5 +88,25 @@ app.listen(PORT, HOST, () => {
   console.log(`Health:  http://127.0.0.1:${PORT}/api/health`);
   if (!process.env.GEMINI_API_KEY) {
     console.warn('WARNING: GEMINI_API_KEY is not set. Copy server/.env.example → server/.env');
+  }
+  const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY);
+  const hasAnon = Boolean(process.env.SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+  if (!hasServiceRole && !hasAnon) {
+    console.warn(
+      'WARNING: Set SUPABASE_SERVICE_ROLE_KEY (preferred) or SUPABASE_ANON_KEY in server/.env for staff APIs.'
+    );
+  } else if (!hasServiceRole) {
+    console.warn(
+      'NOTE: Using SUPABASE_ANON_KEY for staff APIs. For production, set SUPABASE_SERVICE_ROLE_KEY.'
+    );
+  }
+  if (!process.env.RESEND_API_KEY && !process.env.SMTP_USER && !process.env.GMAIL_USER) {
+    if (String(process.env.ALLOW_EMAIL_DEV_FALLBACK || '').toLowerCase() === 'true') {
+      console.warn(
+        'WARNING: No email provider — OTP/temp passwords are printed in THIS console only. Set RESEND_API_KEY or Gmail SMTP to send to Gmail.'
+      );
+    } else {
+      console.warn('WARNING: Set RESEND_API_KEY or SMTP_USER/SMTP_PASS for staff OTP/credential emails.');
+    }
   }
 });

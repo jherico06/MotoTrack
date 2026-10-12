@@ -1,70 +1,150 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
-import OrderDeliveryCalendar from './OrderDeliveryCalendar';
-import { addDaysDateInput, localYmd, formatExpectedDateLabel } from '../../utils/deliveryDate';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import BootstrapIcon from './BootstrapIcon.jsx';
+import OrderDeliveryCalendar from './OrderDeliveryCalendar.jsx';
+import {
+  addDaysDateInput,
+  localYmd,
+  formatExpectedDateLabel,
+  formatExpectedDateRangeLabel,
+  normalizeDateRange,
+} from '../../utils/deliveryDate.js';
 
-const QUICK_OPTIONS = [
+const QUICK_SINGLE = [
   { label: 'Today', days: 0 },
   { label: 'Tomorrow', days: 1 },
   { label: 'In 2 days', days: 2 },
   { label: 'In 3 days', days: 3 },
 ];
 
+const QUICK_RANGE = [
+  { label: 'Today–Tomorrow', startDays: 0, endDays: 1 },
+  { label: '2–3 days', startDays: 2, endDays: 3 },
+  { label: '3–5 days', startDays: 3, endDays: 5 },
+  { label: 'This week', startDays: 0, endDays: 6 },
+];
+
 export default function ExpectedDateField({
   value,
   onChange,
+  startDate,
+  endDate,
+  onRangeChange,
+  mode = 'single',
   minDate,
-  label = 'Expected delivery date',
-  hint = 'Customer tracking will show this date.',
+  label,
+  hint,
   isDarkMode = false,
   defaultOpen = true,
+  showCalendar = true,
 }) {
-  const [showCalendar, setShowCalendar] = useState(defaultOpen);
+  const rangeMode = mode === 'range';
+  const [calendarOpen, setCalendarOpen] = useState(defaultOpen && showCalendar);
   const min = minDate || localYmd(new Date());
 
-  const formattedDisplay = value ? formatExpectedDateLabel(value) : 'Select date';
+  const range = rangeMode
+    ? normalizeDateRange(startDate || value, endDate || startDate || value)
+    : { start: value || '', end: value || '' };
+
+  const formattedDisplay = rangeMode
+    ? formatExpectedDateRangeLabel(range.start, range.end) || 'Select date range'
+    : value
+      ? formatExpectedDateLabel(value)
+      : 'Select date';
+
+  const resolvedLabel =
+    label || (rangeMode ? 'Expected delivery window' : 'Expected delivery date');
+  const resolvedHint =
+    hint ||
+    (rangeMode
+      ? 'Pick a start and end date. Customers see this delivery window.'
+      : 'Customer tracking will show this date.');
+
+  const emitRange = (start, end) => {
+    const next = normalizeDateRange(start, end || start);
+    onRangeChange?.(next);
+    onChange?.(next.start);
+  };
 
   return (
     <View style={styles.container}>
-      {label ? <Text style={[styles.label, isDarkMode && { color: '#CBD5E1' }]}>{label} *</Text> : null}
+      {resolvedLabel ? (
+        <Text style={[styles.label, isDarkMode && { color: '#CBD5E1' }]}>
+          {resolvedLabel} *
+        </Text>
+      ) : null}
 
-      {/* Styled Date Bar with Toggle */}
       <TouchableOpacity
         style={[
           styles.inputWrap,
           isDarkMode && { backgroundColor: '#1C2422', borderColor: '#2D3748' },
         ]}
-        onPress={() => setShowCalendar((prev) => !prev)}
+        onPress={() => {
+          if (showCalendar) setCalendarOpen((prev) => !prev);
+        }}
         activeOpacity={0.8}
+        disabled={!showCalendar}
       >
         <View style={styles.inputLeft}>
           <BootstrapIcon name="calendar-event" size={15} color="#1D4533" />
           <Text style={[styles.dateDisplayText, isDarkMode && { color: '#F8FAFC' }]}>
             {formattedDisplay}
           </Text>
-          {value ? (
+          {range.start ? (
             <View style={styles.selectedPill}>
-              <Text style={styles.selectedPillText}>{value}</Text>
+              <Text style={styles.selectedPillText}>
+                {rangeMode && range.end && range.end !== range.start
+                  ? `${range.start} → ${range.end}`
+                  : range.start}
+              </Text>
             </View>
           ) : null}
         </View>
 
-        <View style={styles.toggleCalendarBtn}>
-          <Text style={styles.toggleCalendarText}>
-            {showCalendar ? 'Hide' : 'Calendar'}
-          </Text>
-          <BootstrapIcon
-            name={showCalendar ? 'chevron-up' : 'chevron-down'}
-            size={11}
-            color="#1D4533"
-          />
-        </View>
+        {showCalendar ? (
+          <View style={styles.toggleCalendarBtn}>
+            <Text style={styles.toggleCalendarText}>
+              {calendarOpen ? 'Hide' : 'Calendar'}
+            </Text>
+            <BootstrapIcon
+              name={calendarOpen ? 'chevron-up' : 'chevron-down'}
+              size={11}
+              color="#1D4533"
+            />
+          </View>
+        ) : null}
       </TouchableOpacity>
 
-      {/* Quick Selection Chips */}
       <View style={styles.chips}>
-        {QUICK_OPTIONS.map((opt) => {
+        {(rangeMode ? QUICK_RANGE : QUICK_SINGLE).map((opt) => {
+          if (rangeMode) {
+            const startVal = addDaysDateInput(opt.startDays);
+            const endVal = addDaysDateInput(opt.endDays);
+            const active = range.start === startVal && range.end === endVal;
+            return (
+              <TouchableOpacity
+                key={opt.label}
+                style={[
+                  styles.chip,
+                  active && styles.chipOn,
+                  isDarkMode && !active && { backgroundColor: '#1C2422', borderColor: '#334155' },
+                ]}
+                onPress={() => emitRange(startVal, endVal)}
+                activeOpacity={0.85}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    active && styles.chipTextOn,
+                    isDarkMode && !active && { color: '#94A3B8' },
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          }
+
           const dateVal = addDaysDateInput(opt.days);
           const active = value === dateVal;
           return (
@@ -75,9 +155,7 @@ export default function ExpectedDateField({
                 active && styles.chipOn,
                 isDarkMode && !active && { backgroundColor: '#1C2422', borderColor: '#334155' },
               ]}
-              onPress={() => {
-                onChange?.(dateVal);
-              }}
+              onPress={() => onChange?.(dateVal)}
               activeOpacity={0.85}
             >
               <Text
@@ -94,19 +172,28 @@ export default function ExpectedDateField({
         })}
       </View>
 
-      {/* Order Calendar UI (inspired by BookingCalendar, scaled compactly for modal) */}
-      {showCalendar && (
+      {showCalendar && calendarOpen ? (
         <OrderDeliveryCalendar
+          mode={rangeMode ? 'range' : 'single'}
           selectedDate={value}
-          onSelectDate={(newDate) => {
-            onChange?.(newDate);
-          }}
+          startDate={range.start}
+          endDate={range.end}
+          onSelectDate={(newDate) => onChange?.(newDate)}
+          onRangeChange={({ start, end }) => emitRange(start, end)}
           minDate={min}
           isDarkMode={isDarkMode}
         />
-      )}
+      ) : null}
 
-      {hint ? <Text style={[styles.hint, isDarkMode && { color: '#64748B' }]}>{hint}</Text> : null}
+      {rangeMode && range.start && !range.end ? (
+        <Text style={[styles.hint, isDarkMode && { color: '#64748B' }]}>
+          Now tap an end date to finish the range.
+        </Text>
+      ) : null}
+
+      {resolvedHint ? (
+        <Text style={[styles.hint, isDarkMode && { color: '#64748B' }]}>{resolvedHint}</Text>
+      ) : null}
     </View>
   );
 }

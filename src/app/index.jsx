@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AuthProvider, CartProvider, WishlistProvider, useAuth, useCart, useWishlist } from '../context';
+import { AuthProvider, CartProvider, WishlistProvider, ThemeProvider, useTheme, useAuth, useCart, useWishlist } from '../context';
 import {
   ShopPage,
   LoginPage,
@@ -15,6 +15,8 @@ import {
   RiderDashboard,
   MechanicDashboard,
   ProductDetailsPage,
+  StaffVerifyEmailPage,
+  ForceChangePasswordPage,
 } from '../pages';
 
 import {
@@ -30,10 +32,20 @@ import {
 } from 'react-native';
 import * as ExpoLinking from 'expo-linking';
 import { BootstrapIcon } from '../components/common';
-import CartModal from '../components/modals/CartModal';
-import ErrorBoundary from '../components/common/ErrorBoundary';
-import { adminSecurityService } from '../services/adminSecurityService';
-import { authService } from '../services/authService';
+import CartModal from '../components/modals/CartModal.jsx';
+import ErrorBoundary from '../components/common/ErrorBoundary.jsx';
+import { adminSecurityService } from '../services/auth/adminSecurityService.js';
+import { authService } from '../services/auth/authService.js';
+import { systemSettingsService } from '../services/system/systemSettingsService.js';
+import { garageService } from '../services/bookings/garageService.js';
+import { APP_ROLES } from '../constants/roles.js';
+import {
+  homeScreenForRole,
+  isAdmin,
+  isMechanic,
+  isRider,
+  mustChangeStaffPassword,
+} from '../utils/permissions.js';
 import {
   useFonts,
   PlusJakartaSans_200ExtraLight,
@@ -85,7 +97,10 @@ try {
 
 // Global Web Font Injection for Plus Jakarta Sans & Bootstrap Icons
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
-  document.title = 'MotoTrack - Motorparts and Accessories';
+  const initSet = systemSettingsService.getSettings();
+  document.title = initSet?.storeName
+    ? `${initSet.storeName}${initSet.storeTagline ? ' - ' + initSet.storeTagline : ''}`
+    : 'MotoTrack - Motorparts and Accessories';
   if (!document.getElementById('bootstrap-icons-cdn')) {
     const bsLink = document.createElement('link');
     bsLink.id = 'bootstrap-icons-cdn';
@@ -152,6 +167,32 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
       ::-webkit-scrollbar-thumb:hover {
         background: rgba(100, 116, 139, 0.6);
       }
+      /* Subtle custom scrollbars for table containers */
+      [data-table-scroll="true"]::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+      }
+      [data-table-scroll="true"]::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.03);
+        border-radius: 9999px;
+      }
+      [data-table-scroll="true"]::-webkit-scrollbar-thumb {
+        background: rgba(148, 163, 184, 0.5);
+        border-radius: 9999px;
+      }
+      [data-table-scroll="true"]::-webkit-scrollbar-thumb:hover {
+        background: rgba(100, 116, 139, 0.7);
+      }
+      /* Utility to hide scrollbar if specifically requested */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+      .no-scrollbar {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -173,6 +214,9 @@ function parsePublicRoute(url) {
     out.screen = params.get('screen') || hashParams.get('screen') || '';
     out.token = params.get('token') || hashParams.get('token') || '';
     if (!out.screen && (hash === 'rider-run' || hash === 'confirm-delivery')) out.screen = hash;
+    if (!out.screen && ['wishlist', 'garage', 'customizer', 'shop', 'profile', 'orders', 'admin', 'login', 'signup'].includes(hash)) {
+      out.screen = hash;
+    }
     return out;
   } catch (_e) {}
   try {
@@ -234,6 +278,36 @@ function MainAppRouter() {
   const { currentUser, logout, adminLogin, redirectReason, setRedirectReason } = useAuth();
   const { addToCart, cartItemCount, cartTotal, showToast } = useCart();
   const { wishlistCount } = useWishlist();
+
+  useEffect(() => {
+    const applyBrandMeta = (s) => {
+      if (Platform.OS === 'web' && typeof document !== 'undefined') {
+        if (s?.storeName) {
+          document.title = `${s.storeName}${s.storeTagline ? ' - ' + s.storeTagline : ''}`;
+        }
+        if (s?.storeLogoUrl) {
+          try {
+            let favicon = document.querySelector("link[rel*='icon']");
+            if (!favicon) {
+              favicon = document.createElement('link');
+              favicon.rel = 'shortcut icon';
+              document.head.appendChild(favicon);
+            }
+            favicon.href = s.storeLogoUrl;
+          } catch (_e) {}
+        }
+      }
+    };
+
+    applyBrandMeta(systemSettingsService.getSettings());
+    systemSettingsService.fetchRemoteSettings();
+    const unsub = systemSettingsService.subscribe(applyBrandMeta);
+    try {
+      // Throttled with cross-tab cache & 15m cooldown to prevent API log flooding
+      garageService.startDownpaymentExpiryWatcher?.(15 * 60 * 1000);
+    } catch (_e) {}
+    return unsub;
+  }, []);
 
   const navigateScreen = (screen, params = null) => {
     if (screen === 'orders') {
@@ -307,21 +381,19 @@ function MainAppRouter() {
   };
 
   const handleAuthSuccess = (user) => {
-    const resolvedRole = user?.role || authService.getCurrentUser()?.role || currentUser?.role;
-    if (resolvedRole === 'admin') {
-      navigateScreen('admin');
-    } else if (resolvedRole === 'rider') {
-      navigateScreen('rider-dashboard');
-    } else {
-      navigateScreen('shop');
+    const resolvedUser = user || authService.getCurrentUser() || currentUser;
+    if (mustChangeStaffPassword(resolvedUser)) {
+      navigateScreen('force-change-password');
+      return;
     }
+    navigateScreen(homeScreenForRole(resolvedUser?.role));
   };
 
   const handleLogout = () => {
     try {
-      adminSecurityService.lockSession();
+      adminSecurityService.lockSession(currentUser);
     } catch (_e) {}
-    const wasRider = currentUser?.role === 'rider';
+    const wasRider = isRider(currentUser);
     logout();
     navigateScreen(wasRider ? 'login' : 'shop');
     showToast('Logged out successfully');
@@ -331,7 +403,7 @@ function MainAppRouter() {
   // 1. Admin accounts can ONLY access the Admin Dashboard
   useEffect(() => {
     if (
-      currentUser?.role === 'admin' &&
+      isAdmin(currentUser) &&
       currentScreen !== 'admin' &&
       currentScreen !== 'confirm-delivery' &&
       currentScreen !== 'rider-run'
@@ -343,7 +415,7 @@ function MainAppRouter() {
 
   useEffect(() => {
     if (
-      currentUser?.role === 'rider' &&
+      isRider(currentUser) &&
       currentScreen !== 'rider-dashboard' &&
       currentScreen !== 'rider-run' &&
       currentScreen !== 'confirm-delivery'
@@ -354,7 +426,7 @@ function MainAppRouter() {
   }, [currentUser, currentScreen]);
 
   useEffect(() => {
-    if (currentUser?.role === 'mechanic' && currentScreen !== 'mechanic-dashboard') {
+    if (isMechanic(currentUser) && currentScreen !== 'mechanic-dashboard') {
       const t = setTimeout(() => navigateScreen('mechanic-dashboard'), 0);
       return () => clearTimeout(t);
     }
@@ -364,14 +436,9 @@ function MainAppRouter() {
   useEffect(() => {
     if (currentUser && (currentScreen === 'login' || currentScreen === 'signup')) {
       const t = setTimeout(() => {
-        if (currentUser.role === 'admin') {
-          navigateScreen('admin');
-        } else if (currentUser.role === 'rider') {
-          navigateScreen('rider-dashboard');
-        } else if (currentUser.role === 'mechanic') {
-          navigateScreen('mechanic-dashboard');
-        } else if (!redirectReason) {
-          navigateScreen('shop');
+        const next = homeScreenForRole(currentUser.role);
+        if (next !== 'shop' || !redirectReason) {
+          navigateScreen(next);
         }
       }, 0);
       return () => clearTimeout(t);
@@ -423,8 +490,26 @@ function MainAppRouter() {
     }
   }, [currentUser, currentScreen]);
 
+  // Staff must change temporary password before accessing role dashboards
+  if (mustChangeStaffPassword(currentUser)) {
+    return (
+      <ForceChangePasswordPage
+        onCompleted={() => {
+          showToast('Password updated. Welcome to MotoTrack.');
+          const role = authService.getCurrentUser()?.role || currentUser.role;
+          if (role === APP_ROLES.RIDER) navigateScreen('rider-dashboard');
+          else navigateScreen('mechanic-dashboard');
+        }}
+        onLogout={() => {
+          logout();
+          navigateScreen('login');
+        }}
+      />
+    );
+  }
+
   // Authenticated rider dashboard
-  if (currentUser?.role === 'rider') {
+  if (isRider(currentUser)) {
     // Packing-label QR deep link opens Confirm Delivery inside the app (not the browser tab alone).
     if (currentScreen === 'confirm-delivery') {
       const parsed = parsePublicRoute();
@@ -450,7 +535,7 @@ function MainAppRouter() {
   }
 
   // Authenticated mechanic dashboard
-  if (currentUser?.role === 'mechanic') {
+  if (isMechanic(currentUser)) {
     return (
       <MechanicDashboard
         onLogout={() => {
@@ -491,19 +576,19 @@ function MainAppRouter() {
   }
 
   // â”€â”€â”€ ADMIN ENVIRONMENT: ADMIN CAN ONLY ACCESS THE ADMIN DASHBOARD â”€â”€â”€
-  if (currentUser?.role === 'admin') {
+  if (isAdmin(currentUser)) {
     return (
       <AdminDashboard
         onNavigateToStore={() => {
           // Admin accounts cannot access the customer storefront.
           // Leaving the admin console signs out the admin session cleanly.
-          adminSecurityService.lockSession();
+          adminSecurityService.lockSession(currentUser);
           logout();
           navigateScreen('shop');
           showToast('Signed out of Admin Console. Switched to Store.');
         }}
         onLogout={() => {
-          adminSecurityService.lockSession();
+          adminSecurityService.lockSession(currentUser);
           logout();
           navigateScreen('shop');
           showToast('Admin logged out successfully');
@@ -631,7 +716,7 @@ function MainAppRouter() {
     }
 
     // Role Check: If user is authenticated but not an admin, they can't access this dashboard.
-    if (currentUser.role !== 'admin') {
+    if (!isAdmin(currentUser)) {
       return (
         <ShopPage
           onNavigateToScreen={(screen, params) => {
@@ -655,11 +740,11 @@ function MainAppRouter() {
     return (
       <AdminDashboard
         onNavigateToStore={() => {
-          adminSecurityService.lockSession();
+          adminSecurityService.lockSession(currentUser);
           navigateScreen('shop');
         }}
         onLogout={() => {
-          adminSecurityService.lockSession();
+          adminSecurityService.lockSession(currentUser);
           logout();
           navigateScreen('shop');
         }}
@@ -673,6 +758,25 @@ function MainAppRouter() {
         onLoginSuccess={handleAuthSuccess}
         onNavigateToSignUp={() => navigateScreen('signup')}
         onNavigateToStore={() => navigateScreen('shop')}
+      />
+    );
+  }
+
+  if (currentScreen === 'staff-verify') {
+    let initialEmail = '';
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      try {
+        initialEmail = window.sessionStorage?.getItem('mototrack_staff_verify_email') || '';
+      } catch (_e) {}
+    }
+    return (
+      <StaffVerifyEmailPage
+        initialEmail={initialEmail}
+        onBackToLogin={() => navigateScreen('login')}
+        onVerified={() => {
+          showToast('Email verified. Check your inbox for temporary login credentials.');
+          navigateScreen('login');
+        }}
       />
     );
   }
@@ -696,10 +800,11 @@ function MainAppRouter() {
         onNavigateToOrders={() => handleNavigateToProfile('orders')}
         onNavigateToGarage={() => navigateScreen('garage')}
         onNavigateToLogin={() => navigateScreen('login')}
-        onNavigateToProfile={(tab) => handleNavigateToProfile(tab)}
+        onNavigateToProfile={(tab) => handleNavigateToProfile(tab || 'profile')}
         onNavigateToCustomizer={() => navigateScreen('customizer')}
         onNavigateToCustomize={() => navigateScreen('customizer')}
         onNavigateToAdmin={() => navigateScreen('admin')}
+        onNavigateToWishlist={() => navigateScreen('wishlist')}
         onNavigateToProductDetails={(product) => navigateScreen('product-details', { product })}
         onNavigateToScreen={(screen, params) => navigateScreen(screen, params)}
         onLogout={handleLogout}
@@ -740,7 +845,7 @@ function MainAppRouter() {
           setRedirectReason('Please sign in to book your garage appointment.');
           navigateScreen('login');
         }}
-        onNavigateToProfile={(tab) => handleNavigateToProfile(tab)}
+        onNavigateToProfile={(tab) => handleNavigateToProfile(tab || 'profile')}
         onNavigateToAdmin={() => navigateScreen('admin')}
         onOpenCart={() => setIsCartOpen(true)}
         onLogout={handleLogout}
@@ -760,7 +865,7 @@ function MainAppRouter() {
           setRedirectReason('Please sign in to book your customized build.');
           navigateScreen('login');
         }}
-        onNavigateToProfile={(tab) => handleNavigateToProfile(tab)}
+        onNavigateToProfile={(tab) => handleNavigateToProfile(tab || 'profile')}
         onNavigateToAdmin={() => navigateScreen('admin')}
         onOpenCart={() => setIsCartOpen(true)}
         onLogout={handleLogout}
@@ -827,6 +932,7 @@ function MainAppRouter() {
   // Default: Main Shop Page (Storefront)
   return (
     <ShopPage
+      onNavigateToWishlist={() => navigateScreen('wishlist')}
       onNavigateToScreen={(screen, params) => {
         if (params?.product) {
           if (screen === 'customizer') {
@@ -836,14 +942,30 @@ function MainAppRouter() {
           }
         }
         if (screen === 'profile') {
-          handleNavigateToProfile(params?.tab || 'overview');
+          handleNavigateToProfile(params?.tab || 'profile');
         } else if (screen === 'orders') {
           handleNavigateToProfile('orders');
+        } else if (screen === 'wishlist') {
+          navigateScreen('wishlist');
         } else {
           navigateScreen(screen, params);
         }
       }}
     />
+  );
+}
+
+function MainAppContainer() {
+  const { isDarkMode } = useTheme();
+  return (
+    <View
+      style={[
+        styles.rootContainer,
+        { backgroundColor: isDarkMode ? '#0F1412' : '#F8FAFC' },
+      ]}
+    >
+      <MainAppRouter />
+    </View>
   );
 }
 
@@ -901,13 +1023,13 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AuthProvider>
-        <WishlistProvider>
-          <CartProvider>
-            <View style={styles.rootContainer}>
-              <MainAppRouter />
-            </View>
-          </CartProvider>
-        </WishlistProvider>
+        <ThemeProvider>
+          <WishlistProvider>
+            <CartProvider>
+              <MainAppContainer />
+            </CartProvider>
+          </WishlistProvider>
+        </ThemeProvider>
       </AuthProvider>
     </ErrorBoundary>
   );

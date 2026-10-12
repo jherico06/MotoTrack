@@ -9,8 +9,9 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
-import { notificationService, stripEmojis } from '../../services/notificationService';
+import BootstrapIcon from './BootstrapIcon.jsx';
+import { notificationService, stripEmojis } from '../../services/notifications/notificationService.js';
+import { getThemeTokens } from '../../styles/theme.js';
 
 function getRelativeTime(dateString) {
   if (!dateString) return 'Just now';
@@ -32,54 +33,54 @@ function getRelativeTime(dateString) {
   });
 }
 
-function getCategoryInfo(item) {
+function getCategoryInfo(item, isDark = false) {
   const cat = String(item.category || item.type || '').toLowerCase();
   
   if (cat.includes('booking') || cat.includes('service') || cat.includes('garage')) {
     return {
       label: 'BOOKING',
       icon: 'calendar-check',
-      bg: '#FEF3C7',
-      color: '#D97706',
+      bg: isDark ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7',
+      color: isDark ? '#FBBF24' : '#D97706',
     };
   }
   if (cat.includes('order') || cat.includes('dispatch') || cat.includes('ship')) {
     return {
       label: 'ORDER',
       icon: 'bag-check-fill',
-      bg: '#E0F2FE',
-      color: '#0284C7',
+      bg: isDark ? 'rgba(56, 189, 248, 0.16)' : '#E0F2FE',
+      color: isDark ? '#7DD3FC' : '#0284C7',
     };
   }
   if (cat.includes('payment') || cat.includes('sales') || cat.includes('spend')) {
     return {
       label: 'PAYMENT',
       icon: 'wallet2',
-      bg: '#DCFCE7',
-      color: '#16A34A',
+      bg: isDark ? 'rgba(16, 185, 129, 0.18)' : '#DCFCE7',
+      color: isDark ? '#6EE7B7' : '#16A34A',
     };
   }
   if (cat.includes('stock') || cat.includes('inventory') || cat.includes('restock')) {
     return {
       label: 'IMPORTANT',
       icon: 'exclamation-triangle-fill',
-      bg: '#FEE2E2',
-      color: '#DC2626',
+      bg: isDark ? 'rgba(239, 68, 68, 0.18)' : '#FEE2E2',
+      color: isDark ? '#F87171' : '#DC2626',
     };
   }
   if (cat.includes('promo') || cat.includes('discount')) {
     return {
       label: 'PROMOTION',
       icon: 'tag-fill',
-      bg: '#F3E8FF',
-      color: '#9333EA',
+      bg: isDark ? 'rgba(167, 139, 250, 0.18)' : '#F3E8FF',
+      color: isDark ? '#C4B5FD' : '#9333EA',
     };
   }
   return {
     label: item.categoryLabel || item.type?.toUpperCase() || 'STUDIO NOTICE',
     icon: 'bell-fill',
-    bg: '#F5F4F0',
-    color: '#856839',
+    bg: isDark ? 'rgba(52, 211, 153, 0.14)' : '#F5F4F0',
+    color: isDark ? '#34D399' : '#856839',
   };
 }
 
@@ -89,6 +90,7 @@ export default function NotificationDropdown({
   onNavigateToScreen,
   currentUser,
   isAdmin: propIsAdmin = false,
+  isDark = false,
 }) {
   const containerRef = useRef(null);
   const { width: windowWidth } = useWindowDimensions();
@@ -226,6 +228,9 @@ export default function NotificationDropdown({
   };
 
   const dropdownWidth = Math.min(410, windowWidth - 24);
+  const t = getThemeTokens(isDark);
+  const accentIcon = isDark ? t.accentBrand : '#856839';
+  const mutedIcon = isDark ? t.textMuted : '#8E8B85';
 
   return (
     <>
@@ -235,16 +240,36 @@ export default function NotificationDropdown({
       </TouchableWithoutFeedback>
 
       {/* Floating Notification Panel */}
-      <View ref={containerRef} style={[styles.dropdownContainer, { width: dropdownWidth }]}>
+      <View
+        ref={containerRef}
+        style={[
+          styles.dropdownContainer,
+          {
+            width: dropdownWidth,
+            backgroundColor: t.bgCard,
+            borderColor: t.border,
+            boxShadow: isDark
+              ? '0 12px 32px -4px rgba(0, 0, 0, 0.45)'
+              : '0 12px 32px -4px rgba(0, 0, 0, 0.14)',
+          },
+        ]}
+      >
         {/* Header */}
         <View style={styles.headerRow}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={styles.headerIconWrap}>
-              <BootstrapIcon name="bell-fill" size={16} color="#856839" />
+            <View
+              style={[
+                styles.headerIconWrap,
+                {
+                  backgroundColor: isDark ? t.accentBg : '#F5F2EB',
+                },
+              ]}
+            >
+              <BootstrapIcon name="bell-fill" size={16} color={accentIcon} />
             </View>
             <View>
-              <Text style={styles.headerTitle}>Notifications</Text>
-              <Text style={styles.headerSubtitle}>
+              <Text style={[styles.headerTitle, { color: t.textPrimary }]}>Notifications</Text>
+              <Text style={[styles.headerSubtitle, { color: t.textMuted }]}>
                 {unreadCount > 0 ? `${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` : 'All caught up'}
               </Text>
             </View>
@@ -257,7 +282,7 @@ export default function NotificationDropdown({
               activeOpacity={0.7}
               title="Clear notifications"
             >
-              <BootstrapIcon name="trash3" size={15} color="#8E8B85" />
+              <BootstrapIcon name="trash3" size={15} color={mutedIcon} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -266,29 +291,53 @@ export default function NotificationDropdown({
               activeOpacity={0.7}
               title="Close panel"
             >
-              <BootstrapIcon name="x-lg" size={14} color="#8E8B85" />
+              <BootstrapIcon name="x-lg" size={14} color={mutedIcon} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Tabs: All (Count) / Unread (Count) */}
-        <View style={styles.tabsRow}>
+        <View style={[styles.tabsRow, { borderBottomColor: t.border }]}>
           <TouchableOpacity
-            style={[styles.tabPill, activeFilter === 'all' && styles.tabPillActive]}
+            style={[
+              styles.tabPill,
+              { backgroundColor: isDark ? t.bgSub : '#F1F5F9' },
+              activeFilter === 'all' && {
+                backgroundColor: isDark ? '#1A2622' : '#0F172A',
+              },
+            ]}
             onPress={() => setActiveFilter('all')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabPillText, activeFilter === 'all' && styles.tabPillTextActive]}>
+            <Text
+              style={[
+                styles.tabPillText,
+                { color: t.textMuted },
+                activeFilter === 'all' && styles.tabPillTextActive,
+              ]}
+            >
               All ({notifications.length})
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabPill, activeFilter === 'unread' && styles.tabPillActive]}
+            style={[
+              styles.tabPill,
+              { backgroundColor: isDark ? t.bgSub : '#F1F5F9' },
+              activeFilter === 'unread' && {
+                backgroundColor: isDark ? '#1A2622' : '#0F172A',
+              },
+            ]}
             onPress={() => setActiveFilter('unread')}
             activeOpacity={0.8}
           >
-            <Text style={[styles.tabPillText, activeFilter === 'unread' && styles.tabPillTextActive]}>
+            <Text
+              style={[
+                styles.tabPillText,
+                { color: t.textMuted },
+                activeFilter === 'unread' && styles.tabPillTextActive,
+              ]}
+            >
               Unread ({unreadCount})
             </Text>
           </TouchableOpacity>
@@ -302,23 +351,37 @@ export default function NotificationDropdown({
         >
           {displayedNotifications.length === 0 ? (
             <View style={styles.emptyState}>
-              <View style={styles.emptyIconWrap}>
-                <BootstrapIcon name="bell" size={24} color="#A19E95" />
+              <View
+                style={[
+                  styles.emptyIconWrap,
+                  { backgroundColor: isDark ? t.bgSub : '#F5F4F0' },
+                ]}
+              >
+                <BootstrapIcon name="bell" size={24} color={mutedIcon} />
               </View>
-              <Text style={styles.emptyTitle}>
+              <Text style={[styles.emptyTitle, { color: t.textPrimary }]}>
                 {activeFilter === 'unread' ? 'No unread notifications' : 'No notifications'}
               </Text>
-              <Text style={styles.emptySub}>You're all caught up.</Text>
+              <Text style={[styles.emptySub, { color: t.textMuted }]}>You're all caught up.</Text>
             </View>
           ) : (
             displayedNotifications.map((item) => {
-              const catInfo = getCategoryInfo(item);
+              const catInfo = getCategoryInfo(item, isDark);
               const isUnread = item.status === 'unread';
 
               return (
                 <TouchableOpacity
                   key={item.id}
-                  style={[styles.itemRow, isUnread && styles.itemRowUnread]}
+                  style={[
+                    styles.itemRow,
+                    {
+                      backgroundColor: t.bgCard,
+                      borderBottomColor: t.border,
+                    },
+                    isUnread && {
+                      backgroundColor: isDark ? t.bgSubtle : '#FAF9F6',
+                    },
+                  ]}
                   onPress={() => handleNotificationPress(item)}
                   activeOpacity={0.8}
                 >
@@ -328,13 +391,22 @@ export default function NotificationDropdown({
 
                   <View style={{ flex: 1, minWidth: 0 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginBottom: 2 }}>
-                      <Text style={[styles.itemTitle, isUnread && styles.itemTitleUnread]} numberOfLines={1}>
+                      <Text
+                        style={[
+                          styles.itemTitle,
+                          { color: t.textSecondary },
+                          isUnread && { fontWeight: '700', color: t.textPrimary },
+                        ]}
+                        numberOfLines={1}
+                      >
                         {stripEmojis(item.title)}
                       </Text>
-                      <Text style={styles.itemTime}>{getRelativeTime(item.created_at)}</Text>
+                      <Text style={[styles.itemTime, { color: t.textMuted }]}>
+                        {getRelativeTime(item.created_at)}
+                      </Text>
                     </View>
 
-                    <Text style={styles.itemMessage} numberOfLines={2}>
+                    <Text style={[styles.itemMessage, { color: t.textMuted }]} numberOfLines={2}>
                       {stripEmojis(item.message)}
                     </Text>
 
@@ -342,7 +414,14 @@ export default function NotificationDropdown({
                       <Text style={[styles.categoryTag, { color: catInfo.color }]}>
                         {catInfo.label}
                       </Text>
-                      {isUnread && <View style={styles.unreadDot} />}
+                      {isUnread && (
+                        <View
+                          style={[
+                            styles.unreadDot,
+                            { backgroundColor: isDark ? t.accentBrand : '#1D4533' },
+                          ]}
+                        />
+                      )}
                     </View>
                   </View>
                 </TouchableOpacity>
@@ -352,7 +431,15 @@ export default function NotificationDropdown({
         </ScrollView>
 
         {/* Footer */}
-        <View style={styles.footerRow}>
+        <View
+          style={[
+            styles.footerRow,
+            {
+              backgroundColor: t.bgCard,
+              borderTopColor: t.border,
+            },
+          ]}
+        >
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
             onPress={() => {
@@ -363,11 +450,13 @@ export default function NotificationDropdown({
             }}
             activeOpacity={0.7}
           >
-            <Text style={styles.viewAllBtnText}>View all notifications</Text>
-            <BootstrapIcon name="arrow-right" size={13} color="#856839" />
+            <Text style={[styles.viewAllBtnText, { color: accentIcon }]}>
+              View all notifications
+            </Text>
+            <BootstrapIcon name="arrow-right" size={13} color={accentIcon} />
           </TouchableOpacity>
 
-          <Text style={styles.hoverNoticeText}>Hover notice to read</Text>
+          <Text style={[styles.hoverNoticeText, { color: t.textSubtle }]}>Hover notice to read</Text>
         </View>
       </View>
     </>

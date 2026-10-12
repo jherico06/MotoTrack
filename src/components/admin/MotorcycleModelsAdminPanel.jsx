@@ -1,7 +1,7 @@
 /**
  * Admin CRUD for motorcycle brand + model catalog.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { BootstrapIcon } from '../common';
-import { compatibilityService } from '../../services/compatibilityService';
+import { compatibilityService } from '../../services/products/compatibilityService.js';
+import { getThemeTokens } from '../../styles/theme.js';
 
-export default function MotorcycleModelsAdminPanel({ onToast, style }) {
+export default function MotorcycleModelsAdminPanel({ onToast, style, isDarkMode = false }) {
+  const t = useMemo(() => getThemeTokens(isDarkMode), [isDarkMode]);
+  const styles = useMemo(() => createStyles(t, isDarkMode), [t, isDarkMode]);
+
   const [models, setModels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [brand, setBrand] = useState('Honda');
@@ -79,7 +83,7 @@ export default function MotorcycleModelsAdminPanel({ onToast, style }) {
           </Text>
         </View>
         <TouchableOpacity style={styles.refresh} onPress={refresh}>
-          <BootstrapIcon name="arrow-clockwise" size={14} color="#0C6258" />
+          <BootstrapIcon name="arrow-clockwise" size={14} color={t.accentBrand} />
         </TouchableOpacity>
       </View>
 
@@ -89,14 +93,14 @@ export default function MotorcycleModelsAdminPanel({ onToast, style }) {
           value={brand}
           onChangeText={setBrand}
           placeholder="Brand (e.g. Honda)"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={t.placeholder}
         />
         <TextInput
           style={[styles.input, { flex: 1.2 }]}
           value={model}
           onChangeText={setModel}
           placeholder="Model (e.g. Click 125)"
-          placeholderTextColor="#94A3B8"
+          placeholderTextColor={t.placeholder}
         />
         <TouchableOpacity style={styles.addBtn} onPress={add} disabled={busy}>
           {busy ? <ActivityIndicator color="#FFF" /> : <Text style={styles.addText}>Add</Text>}
@@ -104,7 +108,7 @@ export default function MotorcycleModelsAdminPanel({ onToast, style }) {
       </View>
 
       {loading ? (
-        <ActivityIndicator color="#0C6258" style={{ marginTop: 16 }} />
+        <ActivityIndicator color={t.accentBrand} style={{ marginTop: 16 }} />
       ) : (
         <ScrollView style={styles.list}>
           {models.map((m) => (
@@ -116,7 +120,7 @@ export default function MotorcycleModelsAdminPanel({ onToast, style }) {
                 <Text style={styles.rowId}>{m.model_id}</Text>
               </View>
               <TouchableOpacity style={styles.delBtn} onPress={() => remove(m)} disabled={busy}>
-                <BootstrapIcon name="trash3" size={14} color="#DC2626" />
+                <BootstrapIcon name="trash3" size={14} color={t.statusDangerText} />
               </TouchableOpacity>
             </View>
           ))}
@@ -129,63 +133,65 @@ export default function MotorcycleModelsAdminPanel({ onToast, style }) {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: {
-    backgroundColor: '#FFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 16,
-  },
-  header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
-  title: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
-  sub: { fontSize: 12, color: '#64748B', marginTop: 4 },
-  refresh: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#E6F8F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  form: { flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
-  input: {
-    minWidth: 120,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: '#0F172A',
-    backgroundColor: '#F8FAFC',
-  },
-  addBtn: {
-    backgroundColor: '#0C6258',
-    borderRadius: 10,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    minWidth: 72,
-    alignItems: 'center',
-  },
-  addText: { color: '#FFF', fontWeight: '700' },
-  list: { maxHeight: 420 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    gap: 8,
-  },
-  rowTitle: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
-  rowId: { fontSize: 11, color: '#94A3B8', marginTop: 2 },
-  delBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#FEF2F2',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  empty: { fontSize: 13, color: '#94A3B8', paddingVertical: 16 },
-});
+function createStyles(t, isDark) {
+  return StyleSheet.create({
+    wrap: {
+      backgroundColor: t.bgCard,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: t.border,
+      padding: 16,
+    },
+    header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
+    title: { fontSize: 16, fontWeight: '800', color: t.textPrimary },
+    sub: { fontSize: 12, color: t.textMuted, marginTop: 4 },
+    refresh: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: isDark ? t.accentBg : '#E6F8F5',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    form: { flexDirection: 'row', gap: 8, marginBottom: 12, flexWrap: 'wrap' },
+    input: {
+      minWidth: 120,
+      borderWidth: 1,
+      borderColor: t.borderInput,
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      color: t.textPrimary,
+      backgroundColor: t.inputBg,
+    },
+    addBtn: {
+      backgroundColor: isDark ? '#1F6B52' : '#0C6258',
+      borderRadius: 10,
+      paddingHorizontal: 16,
+      justifyContent: 'center',
+      minWidth: 72,
+      alignItems: 'center',
+    },
+    addText: { color: '#FFF', fontWeight: '700' },
+    list: { maxHeight: 420 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: t.border,
+      gap: 8,
+    },
+    rowTitle: { fontSize: 14, fontWeight: '700', color: t.textPrimary },
+    rowId: { fontSize: 11, color: t.textMuted, marginTop: 2 },
+    delBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: isDark ? t.statusDangerBg : '#FEF2F2',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    empty: { fontSize: 13, color: t.textMuted, paddingVertical: 16 },
+  });
+}

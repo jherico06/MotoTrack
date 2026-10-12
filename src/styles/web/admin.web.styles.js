@@ -4,7 +4,7 @@ import {
   getAdminStyles,
   getAdminThemeTokens,
   createAdminStyles,
-} from '../admin.styles';
+} from '../admin.styles.js';
 
 export const adminWebStyles = adminStyles;
 export { adminStyles, adminDarkStyles, getAdminStyles, getAdminThemeTokens, createAdminStyles };

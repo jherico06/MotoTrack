@@ -3,7 +3,7 @@
  * Plaintext is shown once to the admin (QR/link); only the SHA-256 hash is stored.
  * Tokens do not time-expire — they stay valid until used, delivered, or invalidated.
  */
-import { sha256Hex, PASSWORD_HASH_PREFIX } from './hash';
+import { sha256Hex, PASSWORD_HASH_PREFIX } from './hash.js';
 import Constants from 'expo-constants';
 
 /** @deprecated Tokens no longer time-expire; kept for API compatibility. */

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Platform } from 'react-native';
-import { getForecastTokens } from '../../styles/forecast.styles';
+import { getForecastTokens } from '../../styles/forecast.styles.js';
 
 /**
  * Figma-matched forecast chart:
@@ -12,11 +12,13 @@ export default function ForecastChart({
   isDark = false,
   height = 280,
   periodType = 'week',
+  confidence = null,
+  forecastSummary = null,
 }) {
   const t = getForecastTokens(isDark);
   const [hover, setHover] = useState(null);
 
-  const { width, points, trendPts, maxY, pad, forecastStartX } = useMemo(() => {
+  const { width, points, trendPts, maxY, pad, forecastStartX, bandPath } = useMemo(() => {
     const n = Math.max(chartPoints.length, 2);
     const w = Math.max(680, n * 72);
     const padLocal = { top: 20, right: 28, bottom: 36, left: 40 };
@@ -26,6 +28,7 @@ export default function ForecastChart({
     const values = [
       ...chartPoints.map((p) => p.actual).filter((v) => v != null),
       ...chartPoints.map((p) => p.forecast).filter((v) => v != null),
+      ...chartPoints.map((p) => p.rangeHigh).filter((v) => v != null),
       ...trendLine.map((p) => p.y),
       1,
     ];
@@ -43,6 +46,8 @@ export default function ForecastChart({
       actualPt: p.actual != null ? toXY(p.x, p.actual) : null,
       forecastPt: p.forecast != null ? toXY(p.x, p.forecast) : null,
       fittedPt: p.fitted != null ? toXY(p.x, p.fitted) : null,
+      rangeLowPt: p.rangeLow != null ? toXY(p.x, p.rangeLow) : null,
+      rangeHighPt: p.rangeHigh != null ? toXY(p.x, p.rangeHigh) : null,
     }));
 
     const firstForecast = mapped.find((p) => p.forecast != null);
@@ -51,6 +56,18 @@ export default function ForecastChart({
       firstForecast?.forecastPt?.x ??
       (lastActual?.actualPt ? lastActual.actualPt.x + 8 : null);
 
+    // Confidence band for forecast points
+    const bandPts = mapped.filter((p) => p.rangeLowPt && p.rangeHighPt);
+    let band = '';
+    if (bandPts.length > 0) {
+      const top = bandPts.map((p) => `${p.rangeHighPt.x},${p.rangeHighPt.y}`).join(' L ');
+      const bottom = [...bandPts]
+        .reverse()
+        .map((p) => `${p.rangeLowPt.x},${p.rangeLowPt.y}`)
+        .join(' L ');
+      band = `M ${top} L ${bottom} Z`;
+    }
+
     return {
       width: w,
       points: mapped,
@@ -58,6 +75,7 @@ export default function ForecastChart({
       maxY: max,
       pad: padLocal,
       forecastStartX: dividerX,
+      bandPath: band,
     };
   }, [chartPoints, trendLine, height]);
 
@@ -95,6 +113,8 @@ export default function ForecastChart({
       actual: actual != null ? Math.round(actual * 100) / 100 : null,
       fitted: fitted != null ? Math.round(fitted * 100) / 100 : null,
       forecast: forecast != null ? Math.round(forecast * 100) / 100 : null,
+      rangeLow: p.rangeLow != null ? p.rangeLow : null,
+      rangeHigh: p.rangeHigh != null ? p.rangeHigh : null,
       isForecastPoint: forecast != null && actual == null,
       x: chartX,
       y: chartY,
@@ -143,6 +163,10 @@ export default function ForecastChart({
           </g>
         );
       })}
+
+      {bandPath ? (
+        <path d={bandPath} fill={t.forecast} opacity={isDark ? 0.18 : 0.12} />
+      ) : null}
 
       {actualPath.length > 1 && (
         <path d={areaPath(actualPath, baselineY)} fill="url(#actualAreaGrad)" />
@@ -314,25 +338,63 @@ export default function ForecastChart({
           )}
 
           {(hover.isForecastPoint || (hover.forecast != null && hover.actual == null)) && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: t.forecast,
-                }}
-              />
-              <Text style={{ color: isDark ? '#C4C6D4' : '#4B5563', fontSize: 12, fontWeight: '500' }}>
-                Forecast:{' '}
-                <Text style={{ fontWeight: '800', color: isDark ? '#E8EAF0' : '#111318' }}>
-                  {formatUnits(hover.forecast)}
+            <View style={{ gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: t.forecast,
+                  }}
+                />
+                <Text style={{ color: isDark ? '#C4C6D4' : '#4B5563', fontSize: 12, fontWeight: '500' }}>
+                  Forecast:{' '}
+                  <Text style={{ fontWeight: '800', color: isDark ? '#E8EAF0' : '#111318' }}>
+                    {formatUnits(hover.forecast)}
+                  </Text>
                 </Text>
-              </Text>
+              </View>
+              {hover.rangeLow != null && hover.rangeHigh != null ? (
+                <Text style={{ color: isDark ? '#C4C6D4' : '#4B5563', fontSize: 11.5, fontWeight: '500', marginLeft: 16 }}>
+                  Range:{' '}
+                  <Text style={{ fontWeight: '800', color: isDark ? '#E8EAF0' : '#111318' }}>
+                    {hover.rangeLow}–{hover.rangeHigh} units
+                  </Text>
+                </Text>
+              ) : null}
             </View>
           )}
         </View>
       )}
+
+      {forecastSummary && Platform.OS === 'web' ? (
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            gap: 16,
+            marginBottom: 10,
+            paddingHorizontal: 4,
+          }}
+        >
+          <Text style={{ fontSize: 12, fontWeight: '700', color: t.foreground || t.mutedForeground }}>
+            Forecast:{' '}
+            <Text style={{ color: t.forecast }}>{forecastSummary.demand ?? '—'} units</Text>
+          </Text>
+          {forecastSummary.rangeLow != null ? (
+            <Text style={{ fontSize: 12, fontWeight: '600', color: t.mutedForeground }}>
+              Expected Range: {forecastSummary.rangeLow}–{forecastSummary.rangeHigh} units
+            </Text>
+          ) : null}
+          {confidence?.score != null ? (
+            <Text style={{ fontSize: 12, fontWeight: '600', color: t.mutedForeground }}>
+              Confidence: {confidence.score}%
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
       <ScrollView horizontal showsHorizontalScrollIndicator style={{ width: '100%' }}>
         {Platform.OS === 'web' ? (
           <div style={{ width, height }}>{svg}</div>

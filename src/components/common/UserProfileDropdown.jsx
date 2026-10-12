@@ -10,10 +10,63 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import BootstrapIcon from './BootstrapIcon';
-import ConfirmModal from '../modals/ConfirmModal';
-import CompanyInfoModal from '../modals/CompanyInfoModal';
-import { ANDROID_TOP_INSET } from '../../utils/safeArea';
+import BootstrapIcon from './BootstrapIcon.jsx';
+import ConfirmModal from '../modals/ConfirmModal.jsx';
+import CompanyInfoModal from '../modals/CompanyInfoModal.jsx';
+import { ANDROID_TOP_INSET } from '../../utils/safeArea.js';
+import { appStorage } from '../../services/system/storageAdapter.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
+import { useWishlist } from '../../context/WishlistContext.jsx';
+
+function ToggleSwitch({
+  value,
+  onToggle,
+  activeTrackColor = '#1D4533',
+  inactiveTrackColor = '#CBD5E1',
+}) {
+  return (
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={(e) => {
+        e?.stopPropagation?.();
+        onToggle?.();
+      }}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      style={{
+        width: 48,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: value ? activeTrackColor : inactiveTrackColor,
+        paddingHorizontal: 3,
+        paddingVertical: 3,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: value ? 'flex-end' : 'flex-start',
+        ...(Platform.OS === 'web'
+          ? {
+              cursor: 'pointer',
+              transition: 'background-color 0.2s ease, all 0.2s ease',
+            }
+          : {}),
+      }}
+    >
+      <View
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: 10,
+          backgroundColor: '#FFFFFF',
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 1.5 },
+          shadowOpacity: 0.25,
+          shadowRadius: 2.5,
+          elevation: 3,
+        }}
+      />
+    </TouchableOpacity>
+  );
+}
 
 export default function UserProfileDropdown({
   currentUser,
@@ -27,14 +80,19 @@ export default function UserProfileDropdown({
   onLogout,
   onNavigateToDashboard,
   onNavigateToOrders,
+  onNavigateToWishlist,
+  onNavigateToScreen,
   isMobile = false,
   align = 'right',
   topOffset,
   currentScreen,
-  showDashboard = false,
+  showDashboard = true,
+  isDark,
+  onToggleDarkMode,
 }) {
   const dropdownRef = useRef(null);
   const [currentView, setCurrentView] = useState('main'); // 'main' | 'settings_privacy'
+  const [isProfileCardHovered, setIsProfileCardHovered] = useState(false);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -46,11 +104,78 @@ export default function UserProfileDropdown({
   const [isPrivacyCheckupOpen, setIsPrivacyCheckupOpen] = useState(false);
   const [isPrivacyCenterOpen, setIsPrivacyCenterOpen] = useState(false);
   const [isContentPrefOpen, setIsContentPrefOpen] = useState(false);
+  const [highLegibility, setHighLegibility] = useState(true);
+
+  // Global Theme Context hook
+  const themeContext = useTheme();
+  let wishlistCount = 0;
+  try {
+    const wlCtx = useWishlist();
+    wishlistCount = wlCtx?.wishlistCount || 0;
+  } catch (_e) {}
+
+  // Internal theme state fallback if isDark is not passed as a controlled prop
+  const [internalDarkMode, setInternalDarkMode] = useState(() => {
+    try {
+      const saved = appStorage.getItem('mototrack_customer_dark_mode') || appStorage.getItem('mototrack_theme_mode');
+      return saved === 'true' || saved === 'dark';
+    } catch (_e) {
+      return false;
+    }
+  });
+
+  const effectiveDarkMode =
+    typeof isDark === 'boolean'
+      ? isDark
+      : themeContext?.isDarkMode !== undefined
+        ? themeContext.isDarkMode
+        : internalDarkMode;
+
+  const handleToggleDarkMode = () => {
+    if (onToggleDarkMode) {
+      onToggleDarkMode();
+    } else if (themeContext?.toggleDarkMode) {
+      themeContext.toggleDarkMode();
+    } else {
+      const next = !effectiveDarkMode;
+      setInternalDarkMode(next);
+      try {
+        appStorage.setItem('mototrack_customer_dark_mode', String(next));
+        appStorage.setItem('mototrack_theme_mode', next ? 'dark' : 'light');
+        if (typeof document !== 'undefined' && document.documentElement) {
+          document.documentElement.classList.toggle('dark', next);
+        }
+      } catch (_e) {}
+    }
+  };
+
+  const theme = {
+    isDark: effectiveDarkMode,
+    bgCard: effectiveDarkMode ? '#151C19' : '#FFFFFF',
+    border: effectiveDarkMode ? '#26332E' : '#CED0D4',
+    bgSub: effectiveDarkMode ? '#1A2320' : '#F0F2F5',
+    bgHover: effectiveDarkMode ? '#1E2824' : '#F0F2F5',
+    iconWrapBg: effectiveDarkMode ? '#1A2320' : '#E4E6EB',
+    iconColor: effectiveDarkMode ? '#F5F7F6' : '#050505',
+    textPrimary: effectiveDarkMode ? '#F5F7F6' : '#050505',
+    textMuted: effectiveDarkMode ? '#AAB4B0' : '#65676B',
+    accentText: effectiveDarkMode ? '#4DB896' : '#1D4533',
+    accentBg: effectiveDarkMode ? 'rgba(77, 184, 150, 0.16)' : '#E8F0EC',
+    accentBorder: effectiveDarkMode ? 'rgba(77, 184, 150, 0.35)' : '#C8DDD3',
+    divider: effectiveDarkMode ? '#26332E' : '#CED0D4',
+    inputBg: effectiveDarkMode ? '#1A2320' : '#F0F2F5',
+    inputBorder: effectiveDarkMode ? '#2F3F39' : '#CED0D4',
+    btnCancelBg: effectiveDarkMode ? '#1A2320' : '#E4E6EB',
+    btnCancelText: effectiveDarkMode ? '#E3E8E6' : '#050505',
+    btnSubmitBg: effectiveDarkMode ? '#1F6B52' : '#1D4533',
+    btnSubmitText: '#FFFFFF',
+  };
 
   // Reset to main view whenever dropdown closes
   useEffect(() => {
     if (!isOpen) {
       setCurrentView('main');
+      setIsProfileCardHovered(false);
     }
   }, [isOpen]);
 
@@ -151,9 +276,11 @@ export default function UserProfileDropdown({
   };
 
   const handleOpenProfile = () => {
-    onClose();
+    onClose?.();
     if (onNavigateToProfile) {
       onNavigateToProfile('profile');
+    } else if (onNavigateToScreen) {
+      onNavigateToScreen('profile', { tab: 'profile' });
     } else if (onNavigateToDashboard) {
       onNavigateToDashboard('profile');
     }
@@ -197,7 +324,7 @@ export default function UserProfileDropdown({
 
   const dropdownContent = currentView === 'settings_privacy' ? (
     /* ═══════════════════════════════════════════════════════
-       SUBMENU: SETTINGS & PRIVACY (LIGHT THEME)
+       SUBMENU: SETTINGS & PRIVACY (THEMED)
        ═══════════════════════════════════════════════════════ */
     <View style={styles.submenuContainer}>
       {/* Top Header with Back Arrow and Title */}
@@ -208,12 +335,12 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
           accessibilityLabel="Back to main menu"
         >
-          <BootstrapIcon name="arrow-left" size={20} color="#050505" />
+          <BootstrapIcon name="arrow-left" size={20} color={theme.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.submenuTitle}>Settings & privacy</Text>
+        <Text style={[styles.submenuTitle, { color: theme.textPrimary }]}>Settings & privacy</Text>
       </View>
 
-      {/* List of 6 Items from Screenshot */}
+      {/* List of 6 Items */}
       <View style={styles.menuList}>
         {/* 1. Settings */}
         <TouchableOpacity
@@ -221,10 +348,10 @@ export default function UserProfileDropdown({
           onPress={handleOpenAccountSettings}
           activeOpacity={0.7}
         >
-          <View style={styles.circularIconWrap}>
-            <BootstrapIcon name="gear-fill" size={19} color="#050505" />
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="gear-fill" size={19} color={theme.iconColor} />
           </View>
-          <Text style={styles.menuTitle}>Settings</Text>
+          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Settings</Text>
         </TouchableOpacity>
 
         {/* 2. Language */}
@@ -233,11 +360,11 @@ export default function UserProfileDropdown({
           onPress={() => setIsLanguageModalOpen(true)}
           activeOpacity={0.7}
         >
-          <View style={styles.circularIconWrap}>
-            <BootstrapIcon name="globe" size={19} color="#050505" />
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="globe" size={19} color={theme.iconColor} />
           </View>
-          <Text style={styles.menuTitle}>Language</Text>
-          <BootstrapIcon name="chevron-right" size={17} color="#65676B" />
+          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Language</Text>
+          <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
         </TouchableOpacity>
 
         {/* 3. Privacy checkup */}
@@ -246,25 +373,25 @@ export default function UserProfileDropdown({
           onPress={() => setIsPrivacyCheckupOpen(true)}
           activeOpacity={0.7}
         >
-          <View style={styles.circularIconWrap}>
-            <BootstrapIcon name="shield-check" size={19} color="#050505" />
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="shield-check" size={19} color={theme.iconColor} />
           </View>
-          <Text style={styles.menuTitle}>Privacy checkup</Text>
+          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Privacy checkup</Text>
         </TouchableOpacity>
 
         {/* 4. Privacy Center */}
         <TouchableOpacity
-          style={[styles.menuItem, styles.menuItemHighlighted]}
+          style={[styles.menuItem, { backgroundColor: theme.bgHover }]}
           onPress={() => {
             onClose();
             setIsPrivacyCenterOpen(true);
           }}
           activeOpacity={0.7}
         >
-          <View style={styles.circularIconWrap}>
-            <BootstrapIcon name="shield-lock-fill" size={19} color="#050505" />
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="shield-lock-fill" size={19} color={theme.iconColor} />
           </View>
-          <Text style={styles.menuTitle}>Privacy Center</Text>
+          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Privacy Center</Text>
         </TouchableOpacity>
 
         {/* 5. Activity log */}
@@ -273,10 +400,10 @@ export default function UserProfileDropdown({
           onPress={handleOpenActivityLog}
           activeOpacity={0.7}
         >
-          <View style={styles.circularIconWrap}>
-            <BootstrapIcon name="list-task" size={19} color="#050505" />
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="list-task" size={19} color={theme.iconColor} />
           </View>
-          <Text style={styles.menuTitle}>Activity log</Text>
+          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Activity log</Text>
         </TouchableOpacity>
 
         {/* 6. Content preferences */}
@@ -285,50 +412,79 @@ export default function UserProfileDropdown({
           onPress={() => setIsContentPrefOpen(true)}
           activeOpacity={0.7}
         >
-          <View style={styles.circularIconWrap}>
-            <BootstrapIcon name="sliders" size={19} color="#050505" />
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="sliders" size={19} color={theme.iconColor} />
           </View>
-          <Text style={styles.menuTitle}>Content preferences</Text>
+          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Content preferences</Text>
         </TouchableOpacity>
       </View>
     </View>
   ) : (
     /* ═══════════════════════════════════════════════════════
-       MAIN MENU VIEW (LIGHT THEME)
+       MAIN MENU VIEW (THEMED)
        ═══════════════════════════════════════════════════════ */
     <>
-      {/* User Quick Header - Profile Link in Light Mode */}
+      {/* User Quick Header - Profile Link */}
       <TouchableOpacity
-        style={styles.userProfileCard}
+        style={[
+          styles.userProfileCard,
+          {
+            backgroundColor: isProfileCardHovered ? theme.bgHover : 'transparent',
+          },
+          Platform.OS === 'web' && {
+            cursor: 'pointer',
+            transition: 'background-color 0.15s ease',
+          },
+        ]}
         onPress={handleOpenProfile}
-        activeOpacity={0.8}
+        activeOpacity={0.75}
+        accessibilityRole="button"
+        accessibilityLabel="Go to customer profile"
+        accessibilityHint="Navigates to your rider and motorcycle profile page"
+        {...(Platform.OS === 'web'
+          ? {
+              onMouseEnter: () => setIsProfileCardHovered(true),
+              onMouseLeave: () => setIsProfileCardHovered(false),
+            }
+          : {})}
       >
         {isUploadedAvatar ? (
           <Image
             source={{ uri: currentUser.avatar || currentUser.photoUri }}
-            style={styles.avatarImg}
+            style={[styles.avatarImg, { borderColor: theme.border, backgroundColor: theme.bgSub }]}
           />
         ) : (
-          <View style={styles.avatarFallback}>
-            <BootstrapIcon name="person-fill" size={24} color="#65676B" />
+          <View style={[styles.avatarFallback, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="person-fill" size={24} color={theme.textMuted} />
           </View>
         )}
         <View style={styles.userInfo}>
-          <Text style={styles.userName} numberOfLines={1}>
+          <Text style={[styles.userName, { color: theme.textPrimary }]} numberOfLines={1}>
             {currentUser.name || currentUser.fullName || 'Rider Account'}
           </Text>
-          <Text style={styles.userSub} numberOfLines={1}>
+          <Text
+            style={[
+              styles.userSub,
+              { color: isProfileCardHovered ? theme.accentText : theme.textMuted },
+            ]}
+            numberOfLines={1}
+          >
             See your profile
           </Text>
         </View>
+        <BootstrapIcon
+          name="chevron-right"
+          size={17}
+          color={isProfileCardHovered ? theme.textPrimary : theme.textMuted}
+        />
       </TouchableOpacity>
 
-      <View style={styles.divider} />
+      <View style={[styles.divider, { backgroundColor: theme.divider }]} />
 
       {/* Main Choices Menu */}
       <View style={styles.menuList}>
-        {/* 0. Dashboard shortcut (Visible when customer is in the shop page) */}
-        {(showDashboard || currentScreen === 'shop') && (
+        {/* 0. Dashboard shortcut (Visible across all customer pages) */}
+        {showDashboard !== false && (
           <TouchableOpacity
             style={styles.menuItem}
             onPress={() => {
@@ -341,13 +497,45 @@ export default function UserProfileDropdown({
             }}
             activeOpacity={0.7}
           >
-            <View style={[styles.circularIconWrap, { backgroundColor: '#E8F0EC' }]}>
-              <BootstrapIcon name="speedometer2" size={18} color="#1D4533" />
+            <View style={[styles.circularIconWrap, { backgroundColor: theme.accentBg }]}>
+              <BootstrapIcon name="speedometer2" size={18} color={theme.accentText} />
             </View>
-            <Text style={[styles.menuTitle, { fontWeight: '700', color: '#1D4533' }]}>Dashboard</Text>
-            <BootstrapIcon name="chevron-right" size={17} color="#65676B" />
+            <Text style={[styles.menuTitle, { fontWeight: '700', color: theme.accentText }]}>Dashboard</Text>
+            <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
           </TouchableOpacity>
         )}
+
+        {/* 0b. My Wishlist Shortcut */}
+        <TouchableOpacity
+          style={styles.menuItem}
+          onPress={() => {
+            onClose?.();
+            if (onNavigateToWishlist) {
+              onNavigateToWishlist();
+            } else if (onNavigateToScreen) {
+              onNavigateToScreen('wishlist');
+            }
+          }}
+          activeOpacity={0.7}
+        >
+          <View
+            style={[
+              styles.circularIconWrap,
+              { backgroundColor: effectiveDarkMode ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2' },
+            ]}
+          >
+            <BootstrapIcon name="heart-fill" size={17} color="#EF4444" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>My Wishlist</Text>
+            {wishlistCount > 0 && (
+              <Text style={[styles.shortcutSub, { color: theme.textMuted }]}>
+                {wishlistCount} {wishlistCount === 1 ? 'saved item' : 'saved items'}
+              </Text>
+            )}
+          </View>
+          <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
+        </TouchableOpacity>
 
         {/* 1. Settings & privacy -> Switches to Settings & privacy submenu */}
         <TouchableOpacity
@@ -355,11 +543,11 @@ export default function UserProfileDropdown({
           onPress={() => setCurrentView('settings_privacy')}
           activeOpacity={0.7}
         >
-          <View style={styles.circularIconWrap}>
-            <BootstrapIcon name="gear-fill" size={19} color="#050505" />
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="gear-fill" size={19} color={theme.iconColor} />
           </View>
-          <Text style={styles.menuTitle}>Settings & privacy</Text>
-          <BootstrapIcon name="chevron-right" size={17} color="#65676B" />
+          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Settings & privacy</Text>
+          <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
         </TouchableOpacity>
 
         {/* 2. Help & support */}
@@ -368,11 +556,11 @@ export default function UserProfileDropdown({
           onPress={handleOpenHelp}
           activeOpacity={0.7}
         >
-          <View style={styles.circularIconWrap}>
-            <BootstrapIcon name="question-circle-fill" size={19} color="#050505" />
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="question-circle-fill" size={19} color={theme.iconColor} />
           </View>
-          <Text style={styles.menuTitle}>Help & support</Text>
-          <BootstrapIcon name="chevron-right" size={17} color="#65676B" />
+          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Help & support</Text>
+          <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
         </TouchableOpacity>
 
         {/* 3. Report a problem (CTRL B) */}
@@ -381,12 +569,12 @@ export default function UserProfileDropdown({
           onPress={handleOpenReport}
           activeOpacity={0.7}
         >
-          <View style={styles.circularIconWrap}>
-            <BootstrapIcon name="chat-square-dots-fill" size={18} color="#050505" />
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="chat-square-dots-fill" size={18} color={theme.iconColor} />
           </View>
           <View style={styles.textWithSubWrap}>
-            <Text style={styles.menuTitle}>Report a problem</Text>
-            <Text style={styles.shortcutSub}>CTRL B</Text>
+            <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Report a problem</Text>
+            <Text style={[styles.shortcutSub, { color: theme.textMuted }]}>CTRL B</Text>
           </View>
         </TouchableOpacity>
 
@@ -396,11 +584,20 @@ export default function UserProfileDropdown({
           onPress={handleOpenDisplay}
           activeOpacity={0.7}
         >
-          <View style={styles.circularIconWrap}>
-            <BootstrapIcon name="moon-fill" size={18} color="#050505" />
+          <View style={[styles.circularIconWrap, { backgroundColor: effectiveDarkMode ? theme.accentBg : theme.iconWrapBg }]}>
+            <BootstrapIcon
+              name={effectiveDarkMode ? "moon-stars-fill" : "moon-fill"}
+              size={18}
+              color={effectiveDarkMode ? theme.accentText : theme.iconColor}
+            />
           </View>
-          <Text style={styles.menuTitle}>Display & accessibility</Text>
-          <BootstrapIcon name="chevron-right" size={17} color="#65676B" />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Display & accessibility</Text>
+            <Text style={[styles.shortcutSub, { color: theme.textMuted }]}>
+              {effectiveDarkMode ? 'Dark theme active' : 'Light theme active'}
+            </Text>
+          </View>
+          <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
         </TouchableOpacity>
 
         {/* 5. Admin Console (Store Administrator Only) */}
@@ -413,11 +610,11 @@ export default function UserProfileDropdown({
             }}
             activeOpacity={0.7}
           >
-            <View style={[styles.circularIconWrap, { backgroundColor: '#E8F0EC' }]}>
-              <BootstrapIcon name="shield-lock-fill" size={18} color="#1D4533" />
+            <View style={[styles.circularIconWrap, { backgroundColor: theme.accentBg }]}>
+              <BootstrapIcon name="shield-lock-fill" size={18} color={theme.accentText} />
             </View>
-            <Text style={styles.menuTitle}>Admin console</Text>
-            <BootstrapIcon name="chevron-right" size={17} color="#65676B" />
+            <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Admin console</Text>
+            <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
           </TouchableOpacity>
         )}
 
@@ -430,10 +627,10 @@ export default function UserProfileDropdown({
           }}
           activeOpacity={0.7}
         >
-          <View style={styles.circularIconWrap}>
-            <BootstrapIcon name="box-arrow-right" size={18} color="#050505" />
+          <View style={[styles.circularIconWrap, { backgroundColor: effectiveDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2' }]}>
+            <BootstrapIcon name="box-arrow-right" size={18} color="#EF4444" />
           </View>
-          <Text style={styles.menuTitle}>Log out</Text>
+          <Text style={[styles.menuTitle, { color: '#EF4444' }]}>Log out</Text>
         </TouchableOpacity>
       </View>
     </>
@@ -465,6 +662,7 @@ export default function UserProfileDropdown({
                   style={[
                     styles.dropdownContainer,
                     styles.dropdownContainerMobile,
+                    { backgroundColor: theme.bgCard, borderColor: theme.border },
                     align === 'left' ? { alignSelf: 'flex-start' } : { alignSelf: 'flex-end' },
                   ]}
                 >
@@ -488,6 +686,7 @@ export default function UserProfileDropdown({
               ref={dropdownRef}
               style={[
                 styles.dropdownContainer,
+                { backgroundColor: theme.bgCard, borderColor: theme.border },
                 align === 'left' ? { left: 0, right: 'auto' } : { right: 0, left: 'auto' },
               ]}
             >
@@ -497,7 +696,7 @@ export default function UserProfileDropdown({
         )
       )}
 
-      {/* Center Log Out Confirmation Modal (Light Mode Compatible) */}
+      {/* Center Log Out Confirmation Modal */}
       <ConfirmModal
         visible={isLogoutConfirmOpen}
         title="Log Out"
@@ -506,7 +705,7 @@ export default function UserProfileDropdown({
         cancelText="Cancel"
         type="danger"
         confirmIcon="box-arrow-right"
-        isDark={false}
+        isDark={effectiveDarkMode}
         onConfirm={() => {
           setIsLogoutConfirmOpen(false);
           onLogout?.();
@@ -540,12 +739,12 @@ export default function UserProfileDropdown({
         <TouchableWithoutFeedback onPress={() => setIsLanguageModalOpen(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
-              <View style={styles.reportCard}>
+              <View style={[styles.reportCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
                 <View style={styles.reportHeader}>
-                  <View style={styles.circularIconWrap}>
-                    <BootstrapIcon name="globe" size={18} color="#050505" />
+                  <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+                    <BootstrapIcon name="globe" size={18} color={theme.iconColor} />
                   </View>
-                  <Text style={styles.reportTitle}>Select Language</Text>
+                  <Text style={[styles.reportTitle, { color: theme.textPrimary }]}>Select Language</Text>
                 </View>
 
                 <View style={{ gap: 8, marginVertical: 12 }}>
@@ -556,16 +755,19 @@ export default function UserProfileDropdown({
                         key={lang}
                         style={[
                           styles.selectionRow,
-                          isSelected && styles.selectionRowActive,
+                          {
+                            backgroundColor: isSelected ? theme.accentBg : theme.bgSub,
+                            borderColor: isSelected ? theme.accentText : theme.border,
+                          },
                         ]}
                         onPress={() => setSelectedLanguage(lang)}
                         activeOpacity={0.7}
                       >
-                        <Text style={[styles.selectionRowText, isSelected && { color: '#1D4533', fontWeight: '700' }]}>
+                        <Text style={[styles.selectionRowText, { color: isSelected ? theme.accentText : theme.textPrimary, fontWeight: isSelected ? '700' : '600' }]}>
                           {lang}
                         </Text>
                         {isSelected && (
-                          <BootstrapIcon name="check-circle-fill" size={17} color="#1D4533" />
+                          <BootstrapIcon name="check-circle-fill" size={17} color={theme.accentText} />
                         )}
                       </TouchableOpacity>
                     );
@@ -573,7 +775,7 @@ export default function UserProfileDropdown({
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.reportSubmitBtn, { alignSelf: 'flex-end', marginTop: 8 }]}
+                  style={[styles.reportSubmitBtn, { alignSelf: 'flex-end', marginTop: 8, backgroundColor: theme.btnSubmitBg }]}
                   onPress={() => setIsLanguageModalOpen(false)}
                 >
                   <Text style={styles.reportSubmitText}>Save Preference</Text>
@@ -594,52 +796,52 @@ export default function UserProfileDropdown({
         <TouchableWithoutFeedback onPress={() => setIsPrivacyCheckupOpen(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
-              <View style={styles.reportCard}>
+              <View style={[styles.reportCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
                 <View style={styles.reportHeader}>
-                  <View style={styles.circularIconWrap}>
-                    <BootstrapIcon name="shield-check" size={18} color="#050505" />
+                  <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+                    <BootstrapIcon name="shield-check" size={18} color={theme.iconColor} />
                   </View>
-                  <Text style={styles.reportTitle}>Privacy checkup</Text>
+                  <Text style={[styles.reportTitle, { color: theme.textPrimary }]}>Privacy checkup</Text>
                 </View>
 
-                <Text style={styles.reportDesc}>
+                <Text style={[styles.reportDesc, { color: theme.textMuted }]}>
                   Your data and rider privacy settings are protected and managed under MotoTrack standards.
                 </Text>
 
                 <View style={{ gap: 12, marginVertical: 10 }}>
-                  <View style={styles.displayRow}>
+                  <View style={[styles.displayRow, { borderBottomColor: theme.divider }]}>
                     <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={styles.displayRowTitle}>Profile & Contact Data</Text>
-                      <Text style={styles.displayRowSub}>Only shared with assigned technician/rider during active orders</Text>
+                      <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>Profile & Contact Data</Text>
+                      <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>Only shared with assigned technician/rider during active orders</Text>
                     </View>
-                    <View style={styles.activeTag}>
-                      <Text style={styles.activeTagText}>Encrypted</Text>
+                    <View style={[styles.activeTag, { backgroundColor: theme.accentBg, borderColor: theme.accentBorder, borderWidth: 1 }]}>
+                      <Text style={[styles.activeTagText, { color: theme.accentText }]}>Encrypted</Text>
                     </View>
                   </View>
 
-                  <View style={styles.displayRow}>
+                  <View style={[styles.displayRow, { borderBottomColor: theme.divider }]}>
                     <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={styles.displayRowTitle}>Garage Fleet Details</Text>
-                      <Text style={styles.displayRowSub}>Motorcycle specifications used solely for parts compatibility</Text>
+                      <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>Garage Fleet Details</Text>
+                      <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>Motorcycle specifications used solely for parts compatibility</Text>
                     </View>
-                    <View style={styles.activeTag}>
-                      <Text style={styles.activeTagText}>Private</Text>
+                    <View style={[styles.activeTag, { backgroundColor: theme.accentBg, borderColor: theme.accentBorder, borderWidth: 1 }]}>
+                      <Text style={[styles.activeTagText, { color: theme.accentText }]}>Private</Text>
                     </View>
                   </View>
 
-                  <View style={styles.displayRow}>
+                  <View style={[styles.displayRow, { borderBottomColor: theme.divider }]}>
                     <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={styles.displayRowTitle}>Order Tracking Location</Text>
-                      <Text style={styles.displayRowSub}>Live GPS tracking expires upon delivery completion</Text>
+                      <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>Order Tracking Location</Text>
+                      <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>Live GPS tracking expires upon delivery completion</Text>
                     </View>
-                    <View style={styles.activeTag}>
-                      <Text style={styles.activeTagText}>Secure</Text>
+                    <View style={[styles.activeTag, { backgroundColor: theme.accentBg, borderColor: theme.accentBorder, borderWidth: 1 }]}>
+                      <Text style={[styles.activeTagText, { color: theme.accentText }]}>Secure</Text>
                     </View>
                   </View>
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.reportSubmitBtn, { alignSelf: 'flex-end', marginTop: 8 }]}
+                  style={[styles.reportSubmitBtn, { alignSelf: 'flex-end', marginTop: 8, backgroundColor: theme.btnSubmitBg }]}
                   onPress={() => setIsPrivacyCheckupOpen(false)}
                 >
                   <Text style={styles.reportSubmitText}>Looks Good</Text>
@@ -660,38 +862,38 @@ export default function UserProfileDropdown({
         <TouchableWithoutFeedback onPress={() => setIsContentPrefOpen(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
-              <View style={styles.reportCard}>
+              <View style={[styles.reportCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
                 <View style={styles.reportHeader}>
-                  <View style={styles.circularIconWrap}>
-                    <BootstrapIcon name="sliders" size={18} color="#050505" />
+                  <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+                    <BootstrapIcon name="sliders" size={18} color={theme.iconColor} />
                   </View>
-                  <Text style={styles.reportTitle}>Content preferences</Text>
+                  <Text style={[styles.reportTitle, { color: theme.textPrimary }]}>Content preferences</Text>
                 </View>
 
                 <View style={{ gap: 12, marginVertical: 10 }}>
-                  <View style={styles.displayRow}>
+                  <View style={[styles.displayRow, { borderBottomColor: theme.divider }]}>
                     <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={styles.displayRowTitle}>Motorcycle Compatibility Feed</Text>
-                      <Text style={styles.displayRowSub}>Prioritize parts compatible with your registered bike</Text>
+                      <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>Motorcycle Compatibility Feed</Text>
+                      <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>Prioritize parts compatible with your registered bike</Text>
                     </View>
-                    <View style={styles.activeTag}>
-                      <Text style={styles.activeTagText}>On</Text>
+                    <View style={[styles.activeTag, { backgroundColor: theme.accentBg, borderColor: theme.accentBorder, borderWidth: 1 }]}>
+                      <Text style={[styles.activeTagText, { color: theme.accentText }]}>On</Text>
                     </View>
                   </View>
 
-                  <View style={styles.displayRow}>
+                  <View style={[styles.displayRow, { borderBottomColor: theme.divider }]}>
                     <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={styles.displayRowTitle}>Restock & Price Drop Alerts</Text>
-                      <Text style={styles.displayRowSub}>Push notifications for wishlist & restocked items</Text>
+                      <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>Restock & Price Drop Alerts</Text>
+                      <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>Push notifications for wishlist & restocked items</Text>
                     </View>
-                    <View style={styles.activeTag}>
-                      <Text style={styles.activeTagText}>On</Text>
+                    <View style={[styles.activeTag, { backgroundColor: theme.accentBg, borderColor: theme.accentBorder, borderWidth: 1 }]}>
+                      <Text style={[styles.activeTagText, { color: theme.accentText }]}>On</Text>
                     </View>
                   </View>
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.reportSubmitBtn, { alignSelf: 'flex-end', marginTop: 8 }]}
+                  style={[styles.reportSubmitBtn, { alignSelf: 'flex-end', marginTop: 8, backgroundColor: theme.btnSubmitBg }]}
                   onPress={() => setIsContentPrefOpen(false)}
                 >
                   <Text style={styles.reportSubmitText}>Done</Text>
@@ -712,32 +914,32 @@ export default function UserProfileDropdown({
         <TouchableWithoutFeedback onPress={() => setIsReportModalOpen(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
-              <View style={styles.reportCard}>
+              <View style={[styles.reportCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
                 <View style={styles.reportHeader}>
-                  <View style={styles.circularIconWrap}>
-                    <BootstrapIcon name="chat-square-dots-fill" size={18} color="#050505" />
+                  <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+                    <BootstrapIcon name="chat-square-dots-fill" size={18} color={theme.iconColor} />
                   </View>
-                  <Text style={styles.reportTitle}>Report a problem</Text>
+                  <Text style={[styles.reportTitle, { color: theme.textPrimary }]}>Report a problem</Text>
                 </View>
 
                 {reportSubmitted ? (
                   <View style={styles.reportSuccessWrap}>
                     <BootstrapIcon name="check-circle-fill" size={40} color="#10B981" />
-                    <Text style={styles.reportSuccessTitle}>Thank you for your feedback!</Text>
-                    <Text style={styles.reportSuccessSub}>
+                    <Text style={[styles.reportSuccessTitle, { color: theme.textPrimary }]}>Thank you for your feedback!</Text>
+                    <Text style={[styles.reportSuccessSub, { color: theme.textMuted }]}>
                       Our technical team has been notified.
                     </Text>
                   </View>
                 ) : (
                   <>
-                    <Text style={styles.reportDesc}>
+                    <Text style={[styles.reportDesc, { color: theme.textMuted }]}>
                       Help us improve MotoTrack by describing the issue you encountered.
                     </Text>
 
                     <TextInput
-                      style={styles.reportInput}
+                      style={[styles.reportInput, { backgroundColor: theme.inputBg, borderColor: theme.inputBorder, color: theme.textPrimary }]}
                       placeholder="Briefly explain what happened or what's not working..."
-                      placeholderTextColor="#8A8D91"
+                      placeholderTextColor={theme.textMuted}
                       multiline
                       numberOfLines={4}
                       value={reportText}
@@ -746,14 +948,15 @@ export default function UserProfileDropdown({
 
                     <View style={styles.reportActions}>
                       <TouchableOpacity
-                        style={styles.reportCancelBtn}
+                        style={[styles.reportCancelBtn, { backgroundColor: theme.btnCancelBg }]}
                         onPress={() => setIsReportModalOpen(false)}
                       >
-                        <Text style={styles.reportCancelText}>Cancel</Text>
+                        <Text style={[styles.reportCancelText, { color: theme.btnCancelText }]}>Cancel</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[
                           styles.reportSubmitBtn,
+                          { backgroundColor: theme.btnSubmitBg },
                           !reportText.trim() && { opacity: 0.5 },
                         ]}
                         onPress={handleSubmitReport}
@@ -770,7 +973,7 @@ export default function UserProfileDropdown({
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* Display & Accessibility Dialog */}
+      {/* Display & Accessibility Dialog (Interactive Theme Selection) */}
       <Modal
         visible={isDisplayModalOpen}
         transparent
@@ -780,41 +983,152 @@ export default function UserProfileDropdown({
         <TouchableWithoutFeedback onPress={() => setIsDisplayModalOpen(false)}>
           <View style={styles.modalOverlay}>
             <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
-              <View style={styles.reportCard}>
-                <View style={styles.reportHeader}>
-                  <View style={styles.circularIconWrap}>
-                    <BootstrapIcon name="moon-fill" size={18} color="#050505" />
+              <View style={[styles.reportCard, { backgroundColor: theme.bgCard, borderColor: theme.border, maxWidth: 440 }]}>
+                {/* Header */}
+                <View style={[styles.reportHeader, { justifyContent: 'space-between', marginBottom: 16 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={[styles.circularIconWrap, { backgroundColor: theme.accentBg }]}>
+                      <BootstrapIcon
+                        name={effectiveDarkMode ? 'moon-stars-fill' : 'brightness-high-fill'}
+                        size={18}
+                        color={theme.accentText}
+                      />
+                    </View>
+                    <View>
+                      <Text style={[styles.reportTitle, { color: theme.textPrimary }]}>Display & accessibility</Text>
+                      <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 1 }}>
+                        Appearance & theme settings
+                      </Text>
+                    </View>
                   </View>
-                  <Text style={styles.reportTitle}>Display & accessibility</Text>
+
+                  <TouchableOpacity
+                    onPress={() => setIsDisplayModalOpen(false)}
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: theme.bgSub,
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <BootstrapIcon name="x-lg" size={13} color={theme.textMuted} />
+                  </TouchableOpacity>
                 </View>
 
-                <View style={{ gap: 14, marginVertical: 12 }}>
-                  <View style={styles.displayRow}>
-                    <View>
-                      <Text style={styles.displayRowTitle}>Light Theme</Text>
-                      <Text style={styles.displayRowSub}>Clean white high-contrast interface</Text>
-                    </View>
-                    <View style={styles.activeTag}>
-                      <Text style={styles.activeTagText}>Active</Text>
-                    </View>
-                  </View>
+                {/* Theme Mode Selection Cards */}
+                <View style={{ gap: 10, marginVertical: 8 }}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '800',
+                      color: theme.textMuted,
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.8,
+                      marginBottom: 2,
+                    }}
+                  >
+                    Theme Mode
+                  </Text>
 
-                  <View style={styles.displayRow}>
-                    <View>
-                      <Text style={styles.displayRowTitle}>High Legibility</Text>
-                      <Text style={styles.displayRowSub}>Enhanced contrast icon badges</Text>
+                  {/* 1. Dark Theme Option with Toggle Switch (matching user uploaded reference) */}
+                  <TouchableOpacity
+                    style={[
+                      styles.themeOptionRow,
+                      {
+                        backgroundColor: effectiveDarkMode ? (theme.isDark ? '#1C2622' : 'rgba(77, 184, 150, 0.12)') : theme.bgSub,
+                        borderColor: effectiveDarkMode ? '#4DB896' : theme.border,
+                      },
+                    ]}
+                    onPress={handleToggleDarkMode}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+                      <View
+                        style={[
+                          styles.themeOptionIconWrap,
+                          {
+                            backgroundColor: effectiveDarkMode ? 'rgba(77, 184, 150, 0.22)' : theme.iconWrapBg,
+                          },
+                        ]}
+                      >
+                        <BootstrapIcon
+                          name="moon-stars-fill"
+                          size={17}
+                          color={effectiveDarkMode ? '#4DB896' : '#64748B'}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>
+                          Dark Theme
+                        </Text>
+                        <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>
+                          Admin charcoal surfaces with road-teal accents
+                        </Text>
+                      </View>
                     </View>
-                    <View style={styles.activeTag}>
-                      <Text style={styles.activeTagText}>On</Text>
+
+                    <ToggleSwitch
+                      value={effectiveDarkMode}
+                      onToggle={handleToggleDarkMode}
+                      activeTrackColor="#1D4533"
+                      inactiveTrackColor="#CBD5E1"
+                    />
+                  </TouchableOpacity>
+
+                  {/* 2. Accessibility: High Legibility */}
+                  <TouchableOpacity
+                    style={[
+                      styles.displayRow,
+                      {
+                        borderBottomWidth: 0,
+                        backgroundColor: theme.bgSub,
+                        borderRadius: 12,
+                        padding: 12,
+                        borderWidth: 1,
+                        borderColor: theme.border,
+                        marginTop: 4,
+                      },
+                    ]}
+                    onPress={() => setHighLegibility((prev) => !prev)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flex: 1, paddingRight: 8 }}>
+                      <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>
+                        High Legibility
+                      </Text>
+                      <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>
+                        Enhanced contrast icon badges and borders
+                      </Text>
                     </View>
-                  </View>
+                    <ToggleSwitch
+                      value={highLegibility}
+                      onToggle={() => setHighLegibility((prev) => !prev)}
+                      activeTrackColor="#1D4533"
+                      inactiveTrackColor="#CBD5E1"
+                    />
+                  </TouchableOpacity>
                 </View>
 
+                {/* Footer Close */}
                 <TouchableOpacity
-                  style={[styles.reportCancelBtn, { marginTop: 8, alignSelf: 'flex-end', minWidth: 90, alignItems: 'center' }]}
+                  style={[
+                    styles.reportCancelBtn,
+                    {
+                      marginTop: 14,
+                      alignSelf: 'flex-end',
+                      minWidth: 96,
+                      alignItems: 'center',
+                      backgroundColor: theme.btnCancelBg,
+                      borderWidth: 1,
+                      borderColor: theme.border,
+                    },
+                  ]}
                   onPress={() => setIsDisplayModalOpen(false)}
                 >
-                  <Text style={styles.reportCancelText}>Close</Text>
+                  <Text style={[styles.reportCancelText, { color: theme.btnCancelText }]}>Done</Text>
                 </TouchableOpacity>
               </View>
             </TouchableWithoutFeedback>
@@ -877,6 +1191,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 10,
     borderRadius: 10,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {}),
   },
   avatarImg: {
     width: 44,
@@ -924,6 +1239,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 8,
     borderRadius: 10,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {}),
   },
   circularIconWrap: {
     width: 36,
@@ -1117,6 +1433,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#050505',
+  },
+  themeOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    cursor: 'pointer',
+  },
+  themeOptionIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
   },
 });
 

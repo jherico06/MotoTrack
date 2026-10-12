@@ -12,8 +12,16 @@ import {
   useWindowDimensions,
   ActivityIndicator,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { adminSecurityService } from '../../services/adminSecurityService';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { adminSecurityService } from '../../services/auth/adminSecurityService.js';
+import { appStorage } from '../../services/system/storageAdapter.js';
+
+const LOCKOUT_STORAGE_KEYS = {
+  LOCKOUT_UNTIL: 'mototrack_admin_pin_lockout_until',
+  ATTEMPTS_LEFT: 'mototrack_admin_pin_attempts_left',
+};
+const MAX_ATTEMPTS = 3;
+const LOCKOUT_SECONDS = 30;
 
 export default function AdminPinLockScreen({
   visible = true,
@@ -29,7 +37,33 @@ export default function AdminPinLockScreen({
   const [showDigits, setShowDigits] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
-  const [attemptsLeft, setAttemptsLeft] = useState(3);
+
+  // 30-Second Lockout State
+  const [lockoutSecondsLeft, setLockoutSecondsLeft] = useState(() => {
+    try {
+      const savedUntil = appStorage.getItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
+      if (savedUntil) {
+        const remaining = Math.max(0, Math.ceil((parseInt(savedUntil, 10) - Date.now()) / 1000));
+        return remaining;
+      }
+    } catch (_e) {}
+    return 0;
+  });
+
+  const [attemptsLeft, setAttemptsLeft] = useState(() => {
+    try {
+      const savedUntil = appStorage.getItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
+      if (savedUntil) {
+        const remaining = Math.max(0, Math.ceil((parseInt(savedUntil, 10) - Date.now()) / 1000));
+        if (remaining > 0) return 0;
+      }
+      const saved = appStorage.getItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT);
+      if (saved !== null && !isNaN(parseInt(saved, 10))) {
+        return Math.max(0, parseInt(saved, 10));
+      }
+    } catch (_e) {}
+    return MAX_ATTEMPTS;
+  });
 
   // Change PIN Modal State (when current PIN is known)
   const [isChangePinOpen, setIsChangePinOpen] = useState(false);
@@ -60,8 +94,62 @@ export default function AdminPinLockScreen({
   // Pulsing animation for shield glow
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
+  // Countdown timer for 30-second lockout
+  useEffect(() => {
+    if (lockoutSecondsLeft <= 0) return;
+
+    const interval = setInterval(() => {
+      try {
+        const savedUntil = appStorage.getItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
+        if (savedUntil) {
+          const remaining = Math.max(0, Math.ceil((parseInt(savedUntil, 10) - Date.now()) / 1000));
+          if (remaining <= 0) {
+            // Lockout period finished: restore attempts and clear lockout
+            appStorage.removeItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
+            appStorage.removeItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT);
+            setLockoutSecondsLeft(0);
+            setAttemptsLeft(MAX_ATTEMPTS);
+            setErrorMessage('');
+            setPin('');
+            setTimeout(() => {
+              inputRef.current?.focus();
+            }, 100);
+            clearInterval(interval);
+          } else {
+            setLockoutSecondsLeft(remaining);
+          }
+        } else {
+          setLockoutSecondsLeft(0);
+          setAttemptsLeft(MAX_ATTEMPTS);
+          clearInterval(interval);
+        }
+      } catch (_e) {
+        setLockoutSecondsLeft((prev) => Math.max(0, prev - 1));
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [lockoutSecondsLeft]);
+
   useEffect(() => {
     if (!visible) return;
+
+    // Refresh lockout state from persistent storage
+    try {
+      const savedUntil = appStorage.getItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
+      if (savedUntil) {
+        const remaining = Math.max(0, Math.ceil((parseInt(savedUntil, 10) - Date.now()) / 1000));
+        if (remaining > 0) {
+          setLockoutSecondsLeft(remaining);
+          setAttemptsLeft(0);
+        } else {
+          appStorage.removeItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
+          appStorage.removeItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT);
+          setLockoutSecondsLeft(0);
+          setAttemptsLeft(MAX_ATTEMPTS);
+        }
+      }
+    } catch (_e) {}
 
     // Refresh PIN from Supabase on popup open
     adminSecurityService.fetchPinFromSupabase(adminUser).catch(() => {});
@@ -73,9 +161,13 @@ export default function AdminPinLockScreen({
       setForgotEmail('admin@mototrack.com');
     }
 
-    // Focus input on mount / popup open
+    // Focus input on mount / popup open if not locked out
     const timer = setTimeout(() => {
-      inputRef.current?.focus();
+      const savedUntil = appStorage.getItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
+      const isLocked = savedUntil && Math.ceil((parseInt(savedUntil, 10) - Date.now()) / 1000) > 0;
+      if (!isLocked) {
+        inputRef.current?.focus();
+      }
     }, 150);
 
     // Continuous subtle pulsing shield animation
@@ -110,59 +202,80 @@ export default function AdminPinLockScreen({
     ]).start();
   };
 
-  const handleFailedAttempt = () => {
-    const nextLeft = attemptsLeft - 1;
-    setAttemptsLeft(nextLeft);
+  const handleFailedAttempt = (serverAttemptsLeft = null, serverError = '') => {
+    const nextLeft = serverAttemptsLeft !== null ? serverAttemptsLeft : attemptsLeft - 1;
     setPin('');
     triggerShake();
 
     if (nextLeft > 0) {
-      setErrorMessage(`Incorrect Security PIN. ${nextLeft} attempt${nextLeft === 1 ? '' : 's'} remaining.`);
+      setAttemptsLeft(nextLeft);
+      try {
+        appStorage.setItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT, String(nextLeft));
+      } catch (_e) {}
+      setErrorMessage(serverError || `Incorrect Security PIN. ${nextLeft} attempt${nextLeft === 1 ? '' : 's'} remaining.`);
       inputRef.current?.focus();
     } else {
-      setErrorMessage(
-        '⛔ 3 incorrect attempts reached. Please use "Forgot PIN" to reset your PIN with your admin password.'
-      );
+      // 3 incorrect attempts reached: trigger 30-second lockout
+      const lockoutUntil = Date.now() + LOCKOUT_SECONDS * 1000;
+      try {
+        appStorage.setItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL, String(lockoutUntil));
+        appStorage.setItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT, '0');
+      } catch (_e) {}
+      setAttemptsLeft(0);
+      setLockoutSecondsLeft(LOCKOUT_SECONDS);
+      setErrorMessage(serverError || `⛔ 3 incorrect attempts reached. Please wait ${LOCKOUT_SECONDS}s before trying again.`);
     }
   };
 
   const checkPinDirect = async (inputPin) => {
-    if (attemptsLeft <= 0) {
-      setErrorMessage(
-        '⛔ Maximum attempts exceeded. Please click "Forgot PIN" below to verify your admin account and reset your PIN.'
-      );
+    if (isVerifying) return;
+    if (lockoutSecondsLeft > 0) {
+      setErrorMessage(`⛔ Security lockout active. Please wait ${lockoutSecondsLeft}s before trying again.`);
       triggerShake();
       return;
     }
 
-    if (adminSecurityService.verifyPinSync(inputPin, adminUser)) {
-      setIsVerifying(true);
-      setTimeout(() => {
-        setIsVerifying(false);
-        setPin('');
-        setAttemptsLeft(3);
-        onUnlockSuccess?.();
-      }, 200);
-      return;
-    }
-
-    // Try async verification with Supabase
     setIsVerifying(true);
-    const res = await adminSecurityService.verifyPin(inputPin, adminUser);
-    setIsVerifying(false);
+    setErrorMessage('');
 
-    if (res.success) {
-      setPin('');
-      setAttemptsLeft(3);
-      onUnlockSuccess?.();
-    } else {
+    try {
+      const res = await adminSecurityService.verifyPin(inputPin, adminUser);
+      if (res.success) {
+        setPin('');
+        try {
+          appStorage.removeItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
+          appStorage.removeItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT);
+        } catch (_e) {}
+        setAttemptsLeft(MAX_ATTEMPTS);
+        setLockoutSecondsLeft(0);
+        onUnlockSuccess?.();
+      } else {
+        if (res.locked) {
+          const lockSec = res.lockoutSeconds || LOCKOUT_SECONDS;
+          const lockoutUntil = Date.now() + lockSec * 1000;
+          try {
+            appStorage.setItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL, String(lockoutUntil));
+            appStorage.setItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT, '0');
+          } catch (_e) {}
+          setAttemptsLeft(0);
+          setLockoutSecondsLeft(lockSec);
+          setErrorMessage(res.error || `⛔ 3 incorrect attempts reached. Please wait ${lockSec}s before trying again.`);
+          triggerShake();
+        } else {
+          handleFailedAttempt(res.attemptsLeft !== undefined ? res.attemptsLeft : null, res.error);
+        }
+      }
+    } catch (_err) {
       handleFailedAttempt();
+    } finally {
+      setIsVerifying(false);
     }
   };
 
   const handleVerify = async () => {
-    if (attemptsLeft <= 0) {
-      setIsForgotPinOpen(true);
+    if (lockoutSecondsLeft > 0) {
+      setErrorMessage(`⛔ Security lockout active. Please wait ${lockoutSecondsLeft}s before trying again.`);
+      triggerShake();
       return;
     }
     if (!pin) {
@@ -236,7 +349,12 @@ export default function AdminPinLockScreen({
 
     if (res.success) {
       setForgotSuccess('Admin PIN successfully reset and verified with Supabase!');
-      setAttemptsLeft(3);
+      try {
+        appStorage.removeItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
+        appStorage.removeItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT);
+      } catch (_e) {}
+      setAttemptsLeft(MAX_ATTEMPTS);
+      setLockoutSecondsLeft(0);
       setErrorMessage('');
       setTimeout(() => {
         setIsForgotPinOpen(false);
@@ -254,7 +372,7 @@ export default function AdminPinLockScreen({
   // 4 Main PIN Display Digits (or up to pin length)
   const pinDisplayLength = Math.max(4, pin.length);
   const pinSlots = Array.from({ length: pinDisplayLength });
-  const isLockedOut = attemptsLeft <= 0;
+  const isLockedOut = lockoutSecondsLeft > 0;
 
   if (!visible) return null;
 
@@ -266,9 +384,9 @@ export default function AdminPinLockScreen({
           ref={inputRef}
           style={styles.hiddenInput}
           value={pin}
-          editable={!isLockedOut}
+          editable={!isLockedOut && !isVerifying}
           onChangeText={(text) => {
-            if (isLockedOut) return;
+            if (isLockedOut || isVerifying) return;
             const clean = text.replace(/[^0-9]/g, '').slice(0, 6);
             setErrorMessage('');
             setPin(clean);
@@ -289,7 +407,7 @@ export default function AdminPinLockScreen({
             <TouchableOpacity
               style={styles.backToStoreBtn}
               onPress={() => {
-                adminSecurityService.lockSession();
+                adminSecurityService.lockSession(adminUser);
                 onNavigateToStore?.();
               }}
               activeOpacity={0.8}
@@ -327,7 +445,7 @@ export default function AdminPinLockScreen({
           <Text style={styles.title}>Admin PIN Verification</Text>
           <Text style={styles.subtitle}>
             {isLockedOut
-              ? 'Security lockout active due to 3 incorrect attempts. Please verify your admin password to reset your PIN.'
+              ? `Security lockout active due to 3 incorrect attempts. Please wait ${lockoutSecondsLeft}s to try again.`
               : 'Enter your authorized 4-digit PIN to access the Store Administrator Dashboard.'}
           </Text>
 
@@ -335,11 +453,15 @@ export default function AdminPinLockScreen({
           {errorMessage.length > 0 && (
             <View style={[styles.errorBox, isLockedOut && styles.errorBoxLocked]}>
               <BootstrapIcon
-                name={isLockedOut ? 'shield-slash-fill' : 'exclamation-circle-fill'}
+                name={isLockedOut ? 'clock-history' : 'exclamation-circle-fill'}
                 size={14}
                 color="#DC2626"
               />
-              <Text style={styles.errorText}>{errorMessage}</Text>
+              <Text style={styles.errorText}>
+                {isLockedOut
+                  ? `⛔ 3 incorrect attempts reached. Cooldown active: ${lockoutSecondsLeft}s remaining.`
+                  : errorMessage}
+              </Text>
             </View>
           )}
 
@@ -394,29 +516,62 @@ export default function AdminPinLockScreen({
           </TouchableOpacity>
 
           {/* Attempts Remaining Badge */}
-          {!isLockedOut && attemptsLeft < 3 && (
+          {!isLockedOut && attemptsLeft < MAX_ATTEMPTS && (
             <View style={styles.attemptsIndicatorRow}>
-              <BootstrapIcon name="shield-exclamation" size={13} color="#1D4533" />
-              <Text style={styles.attemptsIndicatorText}>
-                {attemptsLeft} attempt{attemptsLeft === 1 ? '' : 's'} remaining before lockout
+              <BootstrapIcon name="shield-exclamation" size={13} color="#D97706" />
+              <Text style={[styles.attemptsIndicatorText, { color: '#B45309' }]}>
+                {attemptsLeft} attempt{attemptsLeft === 1 ? '' : 's'} remaining before 30-second lockout
               </Text>
             </View>
           )}
 
-          {/* Primary Action Button: Unlock or Reset */}
+          {/* Primary Action Button: Unlock or 30-Second Countdown */}
           {isLockedOut ? (
-            <TouchableOpacity
-              style={[styles.unlockBtn, { backgroundColor: '#DC2626' }]}
-              onPress={() => {
-                setForgotError('');
-                setForgotSuccess('');
-                setIsForgotPinOpen(true);
-              }}
-              activeOpacity={0.85}
-            >
-              <BootstrapIcon name="key-fill" size={15} color="#FFFFFF" />
-              <Text style={styles.unlockBtnText}>FORGOT PIN? RESET VIA PASSWORD</Text>
-            </TouchableOpacity>
+            <View style={{ width: '100%', gap: 10, marginBottom: 16 }}>
+              <TouchableOpacity
+                style={[
+                  styles.unlockBtn,
+                  {
+                    backgroundColor: '#DC2626',
+                    opacity: 0.9,
+                    marginBottom: 0,
+                    shadowColor: '#DC2626',
+                  },
+                ]}
+                disabled={true}
+                activeOpacity={1}
+              >
+                <BootstrapIcon name="hourglass-split" size={16} color="#FFFFFF" />
+                <Text style={styles.unlockBtnText}>
+                  LOCKED • TRY AGAIN IN {lockoutSecondsLeft}S
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  paddingVertical: 9,
+                  paddingHorizontal: 12,
+                  borderRadius: 12,
+                  backgroundColor: '#FEF2F2',
+                  borderWidth: 1,
+                  borderColor: '#FECACA',
+                }}
+                onPress={() => {
+                  setForgotError('');
+                  setForgotSuccess('');
+                  setIsForgotPinOpen(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <BootstrapIcon name="key-fill" size={13} color="#DC2626" />
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#DC2626' }}>
+                  Can't wait? Reset PIN with Password
+                </Text>
+              </TouchableOpacity>
+            </View>
           ) : (
             <TouchableOpacity
               style={[styles.unlockBtn, isVerifying && { opacity: 0.85 }]}

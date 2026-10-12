@@ -1,0 +1,837 @@
+import React, { useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ScrollView,
+  Platform,
+} from 'react-native';
+import { BootstrapIcon, BrandLogo } from '../common';
+
+/**
+ * MotoTrack Enterprise Admin Sidebar
+ *
+ * Retains MotoTrack's signature dark green (#1D4533) brand identity.
+ * Features:
+ * - Clean, compact visual hierarchy matching modern enterprise dashboards
+ * - 6 distinct navigation groups (Operations, Store Management, Garage & Services, User Management, System & Settings, Quick Links)
+ * - 38-40px menu-item heights with 8-10px rounded corners and 16-18px outline icons
+ * - Darker green surface (#143124) with a slim emerald-green (#10B981) left accent for active state
+ * - Subtle green-tinted hover & focus micro-interactions (150-180ms)
+ * - Compact right-aligned count and warning badges (orange #F97316 for COD / Low Stock)
+ * - Independent scroll area with anchored bottom footer (System Live & Synced + Profile Card)
+ * - Desktop collapsible behavior (240px expanded / 68px collapsed) with icon tooltips
+ * - Mobile slide-out drawer with backdrop overlay
+ */
+export default function AdminSidebar({
+  activeNav,
+  setActiveNav,
+  isDarkMode = false,
+  tokens = {},
+  styles = {},
+  onNavigateToStore,
+  onOpenBrandModal,
+  onOpenProfileModal,
+  currentUser,
+  orders = [],
+  pendingCodCount = 0,
+  invStats = { lowStockCount: 0 },
+  posCart = [],
+  products = [],
+  suppliers = [],
+  garageBookings = [],
+  garageMechanics = [],
+  deliveryRiders = [],
+  auditLogs = [],
+  onBackToStorefront,
+  isCollapsed: externalCollapsed,
+  setIsCollapsed: externalSetIsCollapsed,
+  isMobile = false,
+  isMobileOpen = false,
+  onCloseMobile = () => {},
+}) {
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const isCollapsed = !isMobile && (externalCollapsed !== undefined ? externalCollapsed : internalCollapsed);
+  const setIsCollapsed = externalSetIsCollapsed || setInternalCollapsed;
+
+  const [isCollapseHovered, setIsCollapseHovered] = useState(false);
+  const [isProfileHovered, setIsProfileHovered] = useState(false);
+
+  // ─── Theme Colors: Preserving MotoTrack Dark Green Identity ───
+  const theme = useMemo(() => {
+    if (isDarkMode) {
+      return {
+        bg: '#0F1412',
+        border: '#1F2925',
+        divider: '#1E2824',
+        activeBg: '#182520',
+        activeAccent: '#10B981',
+        activeText: '#FFFFFF',
+        textPrimary: '#FFFFFF',
+        textSecondary: '#94A3B8',
+        sectionLabel: '#6B7C75',
+        hoverBg: 'rgba(255, 255, 255, 0.06)',
+        profileBg: '#151D19',
+        profileHoverBg: '#1B2621',
+        profileBorder: '#23322B',
+        badgeBg: 'rgba(255, 255, 255, 0.08)',
+        badgeActiveBg: 'rgba(255, 255, 255, 0.16)',
+        badgeBorder: 'rgba(255, 255, 255, 0.12)',
+        badgeText: '#CBD5E1',
+        warningBg: '#F97316',
+        dangerBg: '#EF4444',
+      };
+    }
+    return {
+      bg: '#1D4533', // MotoTrack Brand Dark Green
+      border: 'rgba(255, 255, 255, 0.10)',
+      divider: 'rgba(255, 255, 255, 0.10)',
+      activeBg: '#143124', // Darker shade of existing green for active surface
+      activeAccent: '#10B981', // Slim emerald green left accent
+      activeText: '#FFFFFF',
+      textPrimary: '#FFFFFF',
+      textSecondary: '#A7C4B5', // Muted gray-green for secondary text
+      sectionLabel: '#7E9A8E', // Subtle letter-spaced uppercase labels
+      hoverBg: 'rgba(255, 255, 255, 0.08)', // Subtle green-tinted hover
+      profileBg: 'rgba(255, 255, 255, 0.10)', // Slightly lighter shade of green
+      profileHoverBg: 'rgba(255, 255, 255, 0.16)',
+      profileBorder: 'rgba(255, 255, 255, 0.14)',
+      badgeBg: 'rgba(255, 255, 255, 0.14)',
+      badgeActiveBg: 'rgba(255, 255, 255, 0.24)',
+      badgeBorder: 'rgba(255, 255, 255, 0.20)',
+      badgeText: '#FFFFFF',
+      warningBg: '#F97316',
+      dangerBg: '#EF4444',
+    };
+  }, [isDarkMode]);
+
+  // ─── Cleanly Structured Navigation Groups ───
+  const navGroups = [
+    {
+      id: 'operations',
+      heading: 'OPERATIONS',
+      items: [
+        {
+          id: 'overview',
+          label: 'Dashboard',
+          icon: 'grid-1x2',
+        },
+        {
+          id: 'orders',
+          label: 'Orders',
+          icon: 'receipt',
+          badge: orders.length,
+          warningCount: pendingCodCount,
+          warningLabel: 'COD',
+          warningTitle: `${pendingCodCount} Pending COD Orders`,
+        },
+        {
+          id: 'inventory',
+          label: 'Inventory',
+          icon: 'box-seam',
+          warningCount: invStats?.lowStockCount || 0,
+          warningLabel: 'LOW',
+          warningTitle: `${invStats?.lowStockCount || 0} Low Stock Products`,
+        },
+        {
+          id: 'pos',
+          label: 'POS Cashier',
+          icon: 'cart-check',
+          badge: posCart.length > 0 ? posCart.length : null,
+          badgeColor: theme.dangerBg,
+        },
+        {
+          id: 'analytics',
+          label: 'Reports',
+          icon: 'graph-up-arrow',
+        },
+        {
+          id: 'forecast',
+          label: 'Forecast',
+          icon: 'clipboard-data',
+        },
+        {
+          id: 'customizations',
+          label: 'Customizations',
+          icon: 'magic',
+        },
+        {
+          id: 'moto_models',
+          label: 'Moto Models',
+          icon: 'bicycle',
+        },
+      ],
+    },
+    {
+      id: 'store',
+      heading: 'STORE MANAGEMENT',
+      items: [
+        {
+          id: 'products',
+          label: 'Products',
+          icon: 'tag',
+          badge: products.length,
+        },
+        {
+          id: 'promos',
+          label: 'Promos',
+          icon: 'ticket-perforated',
+        },
+        {
+          id: 'suppliers',
+          label: 'Supplier',
+          icon: 'truck',
+          badge: suppliers.length,
+        },
+      ],
+    },
+    {
+      id: 'garage',
+      heading: 'GARAGE & SERVICES',
+      items: [
+        {
+          id: 'garage',
+          label: 'Bookings',
+          icon: 'tools',
+          badge: garageBookings.length,
+        },
+        {
+          id: 'mechanics',
+          label: 'Mechanics',
+          icon: 'person-badge',
+          badge: garageMechanics.length,
+        },
+        {
+          id: 'riders',
+          label: 'Riders',
+          icon: 'bicycle',
+          badge: deliveryRiders.length,
+        },
+      ],
+    },
+    {
+      id: 'users',
+      heading: 'USER MANAGEMENT',
+      items: [
+        {
+          id: 'users',
+          label: 'Users',
+          icon: 'people',
+        },
+        {
+          id: 'profile',
+          label: 'Profile & Logs',
+          icon: 'person-gear',
+        },
+      ],
+    },
+    {
+      id: 'system',
+      heading: 'SYSTEM & SETTINGS',
+      items: [
+        {
+          id: 'supabase',
+          label: 'Database',
+          icon: 'database',
+        },
+        {
+          id: 'audit',
+          label: 'Audit',
+          icon: 'journal-text',
+          badge: auditLogs.length,
+        },
+        {
+          id: 'settings',
+          label: 'Settings',
+          icon: 'gear',
+        },
+      ],
+    },
+    {
+      id: 'quick',
+      heading: 'QUICK LINKS',
+      items: [
+        {
+          id: 'live_store',
+          label: 'Live Storefront',
+          icon: 'shop',
+          isAction: true,
+          onAction: onBackToStorefront,
+          customColor: isDarkMode ? '#34D399' : '#6EE7B7',
+        },
+      ],
+    },
+  ];
+
+  const adminInitial = (currentUser?.name || currentUser?.fullName || 'A').charAt(0).toUpperCase();
+
+  // Navigation Item Click Handler
+  const handleItemPress = (item) => {
+    if (item.isAction) {
+      item.onAction?.();
+    } else {
+      setActiveNav(item.id);
+    }
+    if (isMobile) {
+      onCloseMobile?.();
+    }
+  };
+
+  // ─── Inner Sidebar Content (Shared between Desktop & Mobile Drawer) ───
+  const sidebarContent = (
+    <View
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        height: '100%',
+      }}
+    >
+      {/* ─── 1. HEADER ROW ─── */}
+      <View
+        style={{
+          flexShrink: 0,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: isCollapsed ? 'center' : 'space-between',
+          paddingBottom: 13,
+          marginBottom: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.divider,
+        }}
+      >
+        {!isCollapsed ? (
+          <>
+            {/* Logo and Brand Name */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
+              <BrandLogo
+                size={28}
+                textColor="#FFFFFF"
+                accentColor={isDarkMode ? '#34D399' : '#6EE7B7'}
+              />
+            </View>
+
+            {/* Quick Actions: Collapse/Close */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+
+              {isMobile ? (
+                /* Mobile Close Drawer Button */
+                <TouchableOpacity
+                  onPress={onCloseMobile}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 7,
+                    backgroundColor: 'rgba(255, 255, 255, 0.10)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255, 255, 255, 0.18)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                  activeOpacity={0.8}
+                  title="Close Navigation Drawer"
+                  aria-label="Close Navigation Drawer"
+                >
+                  <BootstrapIcon name="x-lg" size={12} color="#FFFFFF" />
+                </TouchableOpacity>
+              ) : (
+                /* Desktop Collapse Button */
+                <TouchableOpacity
+                  onPress={() => setIsCollapsed(true)}
+                  onMouseEnter={() => setIsCollapseHovered(true)}
+                  onMouseLeave={() => setIsCollapseHovered(false)}
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 7,
+                    backgroundColor: isCollapseHovered ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.08)',
+                    borderWidth: 1,
+                    borderColor: isCollapseHovered ? 'rgba(255, 255, 255, 0.28)' : 'rgba(255, 255, 255, 0.14)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                    transform: [{ scale: isCollapseHovered ? 1.05 : 1 }],
+                    transition: 'all 180ms ease',
+                  }}
+                  activeOpacity={0.8}
+                  title="Collapse Sidebar"
+                  aria-label="Collapse Sidebar"
+                >
+                  <BootstrapIcon
+                    name="chevron-bar-left"
+                    size={13}
+                    color={isCollapseHovered ? '#FFFFFF' : theme.textSecondary}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          </>
+        ) : (
+          /* Collapsed Header: Monogram / Expand Button */
+          <TouchableOpacity
+            onPress={() => setIsCollapsed(false)}
+            onMouseEnter={() => setIsCollapseHovered(true)}
+            onMouseLeave={() => setIsCollapseHovered(false)}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              backgroundColor: isCollapseHovered ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.10)',
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.16)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 180ms ease',
+            }}
+            activeOpacity={0.8}
+            title="Expand Sidebar"
+            aria-label="Expand Sidebar"
+          >
+            <BootstrapIcon name="chevron-bar-right" size={15} color="#FFFFFF" />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* ─── 2. SCROLLABLE NAVIGATION AREA ─── */}
+      <ScrollView
+        style={{
+          flex: 1,
+          marginHorizontal: isCollapsed ? -4 : -8,
+          paddingHorizontal: isCollapsed ? 4 : 8,
+        }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 14 }}
+      >
+        {navGroups.map((group, groupIdx) => (
+          <View key={group.id} style={{ marginBottom: 10 }}>
+            {/* Section Heading or Divider */}
+            {!isCollapsed ? (
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: '800',
+                  letterSpacing: 1.1,
+                  textTransform: 'uppercase',
+                  color: theme.sectionLabel,
+                  marginTop: groupIdx === 0 ? 3 : 13,
+                  marginBottom: 5,
+                  paddingHorizontal: 9,
+                  fontFamily: Platform.select({
+                    web: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
+                    default: undefined,
+                  }),
+                }}
+              >
+                {group.heading}
+              </Text>
+            ) : groupIdx > 0 ? (
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: theme.divider,
+                  marginVertical: 7,
+                  marginHorizontal: 6,
+                }}
+              />
+            ) : null}
+
+            {/* Nav Items List */}
+            <View style={{ gap: 2.5 }}>
+              {group.items.map((item) => {
+                const isActive = activeNav === item.id;
+                const hasWarning = (item.warningCount || 0) > 0;
+
+                return (
+                  <SidebarNavItem
+                    key={item.id}
+                    item={item}
+                    isActive={isActive}
+                    isCollapsed={isCollapsed}
+                    hasWarning={hasWarning}
+                    theme={theme}
+                    onPress={() => handleItemPress(item)}
+                  />
+                );
+              })}
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+
+      {/* ─── 3. ANCHORED STICKY FOOTER ─── */}
+      <View
+        style={{
+          flexShrink: 0,
+          paddingTop: 12,
+          paddingBottom: 2,
+          borderTopWidth: 1,
+          borderTopColor: theme.divider,
+        }}
+      >
+        {/* Administrator Profile Row */}
+        <TouchableOpacity
+          onPress={() => {
+            if (onOpenProfileModal) {
+              onOpenProfileModal();
+            } else {
+              setActiveNav('profile');
+            }
+            if (isMobile) {
+              onCloseMobile?.();
+            }
+          }}
+          onMouseEnter={() => setIsProfileHovered(true)}
+          onMouseLeave={() => setIsProfileHovered(false)}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 12,
+            paddingVertical: 6,
+            paddingHorizontal: isCollapsed ? 0 : 4,
+            borderRadius: 8,
+            backgroundColor: isProfileHovered ? theme.hoverBg : 'transparent',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            cursor: 'pointer',
+            transition: 'background-color 150ms ease',
+          }}
+          activeOpacity={0.85}
+          title={isCollapsed ? 'Administrator - System Manager' : 'View Administrator Profile Settings'}
+          aria-label="View Administrator Profile Settings"
+        >
+          {/* Avatar Circle with Clean Person Icon */}
+          <View
+            style={{
+              width: 34,
+              height: 34,
+              borderRadius: 17,
+              backgroundColor: 'rgba(255, 255, 255, 0.09)',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            <BootstrapIcon
+              name="person"
+              size={17}
+              color="#FFFFFF"
+            />
+          </View>
+
+          {!isCollapsed && (
+            <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+              <Text
+                style={{
+                  color: '#FFFFFF',
+                  fontWeight: '800',
+                  fontSize: 13.5,
+                  letterSpacing: 0.15,
+                  lineHeight: 18,
+                }}
+                numberOfLines={1}
+              >
+                Administrator
+              </Text>
+              <Text
+                style={{
+                  color: theme.textSecondary,
+                  fontSize: 11,
+                  fontWeight: '500',
+                  lineHeight: 15,
+                  marginTop: 1,
+                }}
+                numberOfLines={1}
+              >
+                System Manager
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // ─── 4A. MOBILE DRAWER RENDERING (Slide-out Drawer with Backdrop) ───
+  if (isMobile) {
+    if (!isMobileOpen) return null;
+
+    return (
+      <View
+        style={{
+          position: Platform.OS === 'web' ? 'fixed' : 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 99999,
+          flexDirection: 'row',
+        }}
+      >
+        {/* Backdrop Overlay */}
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            ...(Platform.OS === 'web' ? { backdropFilter: 'blur(3px)' } : {}),
+          }}
+          onPress={onCloseMobile}
+          activeOpacity={1}
+          accessibilityLabel="Close Navigation Drawer"
+        />
+
+        {/* Drawer Content Surface */}
+        <View
+          style={{
+            width: 270,
+            maxWidth: '85%',
+            height: '100%',
+            backgroundColor: theme.bg,
+            zIndex: 100000,
+            display: 'flex',
+            flexDirection: 'column',
+            paddingHorizontal: 12,
+            paddingTop: 16,
+            paddingBottom: 14,
+            boxShadow: '4px 0 24px rgba(0, 0, 0, 0.35)',
+          }}
+          role="navigation"
+          aria-label="Admin Navigation Drawer"
+        >
+          {sidebarContent}
+        </View>
+      </View>
+    );
+  }
+
+  // ─── 4B. DESKTOP SIDEBAR RENDERING ───
+  return (
+    <View
+      className="mototrack-sidebar"
+      style={{
+        width: isCollapsed ? 68 : 240,
+        flexShrink: 0,
+        backgroundColor: theme.bg,
+        borderRightWidth: 1,
+        borderRightColor: theme.border,
+        paddingHorizontal: isCollapsed ? 8 : 12,
+        paddingTop: 16,
+        paddingBottom: 14,
+        height: Platform.OS === 'web' ? '100vh' : '100%',
+        maxHeight: Platform.OS === 'web' ? '100vh' : '100%',
+        position: Platform.OS === 'web' ? 'sticky' : 'relative',
+        top: 0,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        zIndex: 100,
+        transition: 'width 200ms cubic-bezier(0.4, 0, 0.2, 1), padding 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+      }}
+      role="navigation"
+      aria-label="Admin Navigation"
+    >
+      {sidebarContent}
+    </View>
+  );
+}
+
+/**
+ * Individual reusable Navigation Item component with hover & active states.
+ */
+function SidebarNavItem({
+  item,
+  isActive,
+  isCollapsed,
+  hasWarning,
+  theme,
+  onPress,
+}) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <TouchableOpacity
+      className={`mototrack-nav-item ${isActive ? 'mototrack-nav-item-active' : ''}`}
+      onPress={onPress}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      activeOpacity={0.85}
+      style={{
+        minHeight: 38,
+        borderRadius: 8,
+        paddingVertical: 8,
+        paddingHorizontal: isCollapsed ? 6 : 10,
+        backgroundColor: isActive
+          ? theme.activeBg
+          : isHovered
+          ? theme.hoverBg
+          : 'transparent',
+        borderLeftWidth: 3,
+        borderLeftColor: isActive ? theme.activeAccent : 'transparent',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: isCollapsed ? 'center' : 'flex-start',
+        gap: isCollapsed ? 0 : 10,
+        transition: 'all 180ms ease',
+        position: 'relative',
+        cursor: 'pointer',
+      }}
+      title={isCollapsed ? item.label : undefined}
+      accessibilityRole="button"
+      accessibilityState={{ selected: isActive }}
+      accessibilityLabel={item.label}
+    >
+      {/* 16-18px Outline Icon with 2px shift on hover */}
+      <View
+        style={{
+          width: isCollapsed ? '100%' : 20,
+          alignItems: 'center',
+          justifyContent: 'center',
+          transform: [{ translateX: !isActive && isHovered && !isCollapsed ? 2 : 0 }],
+          transition: 'transform 180ms ease',
+        }}
+      >
+        <BootstrapIcon
+          name={item.icon}
+          size={16}
+          color={
+            item.customColor
+              ? item.customColor
+              : isActive || isHovered
+              ? theme.activeText
+              : theme.textSecondary
+          }
+        />
+      </View>
+
+      {/* Item Label (Hidden when collapsed) */}
+      {!isCollapsed && (
+        <Text
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            fontSize: 12.5,
+            fontWeight: isActive ? '700' : '500',
+            color: item.customColor
+              ? item.customColor
+              : isActive || isHovered
+              ? theme.activeText
+              : theme.textSecondary,
+            fontFamily: Platform.select({
+              web: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
+              default: undefined,
+            }),
+            transition: 'color 180ms ease',
+            ...(Platform.OS === 'web' ? { whiteSpace: 'nowrap' } : {}),
+          }}
+        >
+          {item.label}
+        </Text>
+      )}
+
+      {/* Right side indicators (Badges / Warnings / Active dot) */}
+      {!isCollapsed && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 'auto' }}>
+          {/* Warning badge (orange #F97316 for COD / Low Stock alerts) */}
+          {hasWarning && (
+            item.warningLabel === 'COD' ? (
+              <View
+                style={{
+                  backgroundColor: theme.warningBg,
+                  paddingHorizontal: 6,
+                  paddingVertical: 1.5,
+                  borderRadius: 9999,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                }}
+                title={item.warningTitle}
+              >
+                <Text style={{ color: '#FFFFFF', fontSize: 9.5, fontWeight: '800' }}>
+                  {item.warningCount} COD
+                </Text>
+              </View>
+            ) : (
+              /* Glowing Orange Warning Dot */
+              <View
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: 4,
+                  backgroundColor: theme.warningBg,
+                  boxShadow: '0 0 6px rgba(249, 115, 22, 0.65)',
+                }}
+                title={item.warningTitle}
+              />
+            )
+          )}
+
+          {item.badge !== undefined && item.badge !== null && (
+            /* Compact count badge */
+            <View
+              style={{
+                paddingHorizontal: 6.5,
+                paddingVertical: 1,
+                borderRadius: 9999,
+                minWidth: 19,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: item.badgeColor
+                  ? item.badgeColor
+                  : isActive
+                  ? theme.badgeActiveBg
+                  : theme.badgeBg,
+                borderColor: theme.badgeBorder,
+                borderWidth: 1,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: '700',
+                  color: '#FFFFFF',
+                }}
+              >
+                {item.badge}
+              </Text>
+            </View>
+          )}
+
+          {/* Active emerald dot indicator on the right */}
+          {isActive && (
+            <View
+              style={{
+                width: 5,
+                height: 5,
+                borderRadius: 2.5,
+                backgroundColor: theme.activeAccent,
+                marginLeft: hasWarning || item.badge !== undefined ? 5 : 'auto',
+                flexShrink: 0,
+              }}
+            />
+          )}
+        </View>
+      )}
+
+      {/* Collapsed Warning Dot */}
+      {isCollapsed && hasWarning && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 5,
+            right: 10,
+            width: 7,
+            height: 7,
+            borderRadius: 3.5,
+            backgroundColor: theme.warningBg,
+            boxShadow: '0 0 4px rgba(249, 115, 22, 0.65)',
+          }}
+          title={item.warningTitle}
+        />
+      )}
+    </TouchableOpacity>
+  );
+}

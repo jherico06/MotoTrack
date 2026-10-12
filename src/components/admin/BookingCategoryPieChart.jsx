@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { BootstrapIcon } from '../common';
-import { garageService } from '../../services/garageService';
+import { garageService } from '../../services/bookings/garageService.js';
 
 /**
  * BookingCategoryPieChart — Design matching modern donut chart with interactive hover telemetry.
@@ -275,6 +275,33 @@ export default function BookingCategoryPieChart({
     ? leadingCategory
     : null;
 
+  // Smooth counter animation for center percentage (0% -> 100% over 1000ms on load)
+  const targetPercentage = activeItem ? activeItem.percentage : 0;
+  const [displayedPercent, setDisplayedPercent] = useState(0);
+
+  useEffect(() => {
+    let frameId;
+    const startValue = displayedPercent;
+    const endValue = targetPercentage;
+    const duration = 1000;
+    const startTime = typeof performance !== 'undefined' ? performance.now() : Date.now();
+
+    function animate(currentTime) {
+      const elapsed = currentTime - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const ease = 1 - Math.pow(1 - progress, 3);
+      const current = Math.round(startValue + (endValue - startValue) * ease);
+      setDisplayedPercent(current);
+
+      if (progress < 1) {
+        frameId = requestAnimationFrame(animate);
+      }
+    }
+
+    frameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frameId);
+  }, [targetPercentage]);
+
   return (
     <View
       style={[
@@ -283,17 +310,69 @@ export default function BookingCategoryPieChart({
           borderRadius: 16,
           borderWidth: 1,
           borderColor: colors.border,
-          padding: 22,
+          padding: 18,
           marginBottom: 0,
           shadowColor: '#000000',
           shadowOffset: { width: 0, height: 1 },
           shadowOpacity: isDark ? 0.2 : 0.03,
           shadowRadius: 6,
           elevation: 1,
+          animation: 'dashboardCardFadeSlideUp 450ms cubic-bezier(0.16, 1, 0.3, 1) backwards',
+          animationDelay: '0ms',
+          transition: 'transform 180ms ease, box-shadow 180ms ease',
         },
         style,
       ]}
+      onMouseEnter={(e) => {
+        if (e?.currentTarget) e.currentTarget.style.transform = 'translateY(-2px)';
+      }}
+      onMouseLeave={(e) => {
+        if (e?.currentTarget) e.currentTarget.style.transform = 'translateY(0)';
+      }}
     >
+      {/* Keyframe styles for smooth animations */}
+      <style>{`
+        @keyframes dashboardCardFadeSlideUp {
+          0% {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          100% {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes donutDrawSweep {
+          0% {
+            stroke-dashoffset: 452.39;
+          }
+          100% {
+            stroke-dashoffset: 0;
+          }
+        }
+        @keyframes donutSlicePop {
+          0% {
+            opacity: 0;
+            transform: scale(0.92);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        @keyframes reloadSpin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+          }
+        }
+      `}</style>
+
       {/* Header Row */}
       <View
         style={{
@@ -323,10 +402,10 @@ export default function BookingCategoryPieChart({
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 5,
+                gap: 6,
                 backgroundColor: isDark ? 'rgba(16, 185, 129, 0.14)' : '#ECFDF5',
                 paddingHorizontal: 8,
-                paddingVertical: 3,
+                paddingVertical: 3.5,
                 borderRadius: 6,
                 borderWidth: 1,
                 borderColor: isDark ? 'rgba(16, 185, 129, 0.28)' : '#A7F3D0',
@@ -334,9 +413,9 @@ export default function BookingCategoryPieChart({
             >
               <View
                 style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: 3,
+                  width: 7,
+                  height: 7,
+                  borderRadius: 3.5,
                   backgroundColor: '#10B981',
                 }}
               />
@@ -351,7 +430,7 @@ export default function BookingCategoryPieChart({
               </Text>
             </View>
 
-            {/* Sync Refresh Button */}
+            {/* Sync Refresh Button with Hover Spin */}
             <TouchableOpacity
               onPress={handleRefresh}
               disabled={syncing}
@@ -365,6 +444,14 @@ export default function BookingCategoryPieChart({
                 borderWidth: 1,
                 borderColor: isDark ? '#334155' : '#E2E8F0',
                 cursor: 'pointer',
+                transition: 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.2s ease',
+                ...(syncing ? { animation: 'reloadSpin 0.9s linear infinite' } : {}),
+              }}
+              onMouseEnter={(e) => {
+                if (!syncing && e?.currentTarget) e.currentTarget.style.transform = 'rotate(180deg) scale(1.08)';
+              }}
+              onMouseLeave={(e) => {
+                if (!syncing && e?.currentTarget) e.currentTarget.style.transform = 'rotate(0deg) scale(1)';
               }}
               title="Sync with database"
             >
@@ -380,18 +467,41 @@ export default function BookingCategoryPieChart({
           </Text>
         </View>
 
-        {/* Filter Tabs: All / Active / Completed */}
+        {/* Filter Tabs: All / Active / Completed with Smooth Sliding Indicator */}
         <View
           style={{
+            position: 'relative',
             flexDirection: 'row',
             backgroundColor: isDark ? '#1E293B' : '#F1F5F9',
             borderRadius: 8,
             padding: 3,
             borderWidth: 1,
             borderColor: isDark ? '#334155' : '#E2E8F0',
-            gap: 2,
+            width: isDesktop ? 220 : '100%',
           }}
         >
+          {/* Smooth animated active-state indicator */}
+          <View
+            style={{
+              position: 'absolute',
+              top: 3,
+              bottom: 3,
+              left: 3,
+              width: 'calc((100% - 6px) / 3)',
+              backgroundColor: '#0F172A',
+              borderRadius: 6,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+              transition: 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)',
+              transform:
+                filterMode === 'all'
+                  ? 'translateX(0%)'
+                  : filterMode === 'active'
+                  ? 'translateX(100%)'
+                  : 'translateX(200%)',
+              pointerEvents: 'none',
+              zIndex: 0,
+            }}
+          />
           {[
             { key: 'all', label: 'All' },
             { key: 'active', label: 'Active' },
@@ -402,12 +512,14 @@ export default function BookingCategoryPieChart({
               <TouchableOpacity
                 key={tab.key}
                 style={{
-                  paddingHorizontal: 11,
-                  paddingVertical: 4.5,
+                  flex: 1,
+                  paddingVertical: 5,
                   borderRadius: 6,
-                  backgroundColor: active ? (isDark ? '#0F172A' : '#0F172A') : 'transparent',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: 'transparent',
                   cursor: 'pointer',
-                  boxShadow: active ? '0 1px 2px rgba(0,0,0,0.1)' : 'none',
+                  zIndex: 1,
                 }}
                 onPress={() => setFilterMode(tab.key)}
                 activeOpacity={0.85}
@@ -417,6 +529,7 @@ export default function BookingCategoryPieChart({
                     fontSize: 11,
                     fontWeight: '700',
                     color: active ? '#FFFFFF' : colors.textMuted,
+                    transition: 'color 200ms ease',
                   }}
                 >
                   {tab.label}
@@ -442,8 +555,8 @@ export default function BookingCategoryPieChart({
         <View style={{ alignItems: 'center', justifyContent: 'center' }}>
           <View style={{ alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
             <svg
-              width="176"
-              height="176"
+              width={isDesktop ? 180 : 160}
+              height={isDesktop ? 180 : 160}
               viewBox="0 0 200 200"
               style={{ display: 'block', overflow: 'visible' }}
             >
@@ -456,81 +569,110 @@ export default function BookingCategoryPieChart({
                   fill="none"
                   stroke={colors.emptyTrack}
                   strokeWidth="32"
+                  style={{ transition: 'stroke 0.4s ease' }}
                 />
               ) : activeSlices.length === 1 ? (
-                // Single category has 100% of the bookings
+                // Single category has 100% of the bookings — smooth sweep drawing animation
                 <circle
+                  key={`single-${filterMode}-${activeSlices[0].id}`}
                   cx="100"
                   cy="100"
                   r="72"
                   fill="none"
                   stroke={activeSlices[0].color}
                   strokeWidth="32"
-                  style={{ cursor: 'pointer', transition: 'all 0.2s ease' }}
+                  strokeDasharray="452.39"
+                  strokeDashoffset="0"
+                  transform="rotate(-90 100 100)"
+                  style={{
+                    cursor: 'pointer',
+                    animation: 'donutDrawSweep 1s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    transition: 'filter 0.25s ease, stroke 0.3s ease',
+                    filter:
+                      hoveredCategory === activeSlices[0].id
+                        ? 'brightness(1.1) drop-shadow(0 0 10px rgba(37, 99, 235, 0.5))'
+                        : 'none',
+                  }}
                   onMouseEnter={() => setHoveredCategory(activeSlices[0].id)}
                   onMouseLeave={() => setHoveredCategory(null)}
                 />
               ) : (
-                // Multiple slices with separator gaps
-                slices.map((slice) => {
-                  const isHovered = hoveredCategory === slice.id;
-                  return (
-                    <path
-                      key={slice.id}
-                      d={slice.path}
-                      fill={slice.color}
-                      stroke={colors.cardBg}
-                      strokeWidth="3"
-                      strokeLinejoin="round"
-                      opacity={hoveredCategory && !isHovered ? 0.35 : 1}
-                      style={{
-                        cursor: 'pointer',
-                        transition: 'all 0.2s ease',
-                      }}
-                      onMouseEnter={() => setHoveredCategory(slice.id)}
-                      onMouseLeave={() => setHoveredCategory(null)}
-                      onClick={() =>
-                        setHoveredCategory((prev) => (prev === slice.id ? null : slice.id))
-                      }
-                    />
-                  );
-                })
+                // Multiple slices with separator gaps and spring scale on hover
+                <g
+                  key={`multi-${filterMode}-${slices.length}`}
+                  style={{
+                    transformOrigin: '100px 100px',
+                    animation: 'donutSlicePop 0.85s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                  }}
+                >
+                  {slices.map((slice) => {
+                    const isHovered = hoveredCategory === slice.id;
+                    return (
+                      <path
+                        key={slice.id}
+                        d={slice.path}
+                        fill={slice.color}
+                        stroke={colors.cardBg}
+                        strokeWidth="3.5"
+                        strokeLinejoin="round"
+                        opacity={hoveredCategory && !isHovered ? 0.35 : 1}
+                        style={{
+                          cursor: 'pointer',
+                          transformOrigin: '100px 100px',
+                          transform: isHovered ? 'scale(1.045)' : 'scale(1)',
+                          transition:
+                            'transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease, filter 0.25s ease',
+                          filter: isHovered ? `drop-shadow(0 0 8px ${slice.color}66)` : 'none',
+                        }}
+                        onMouseEnter={() => setHoveredCategory(slice.id)}
+                        onMouseLeave={() => setHoveredCategory(null)}
+                        onClick={() =>
+                          setHoveredCategory((prev) => (prev === slice.id ? null : slice.id))
+                        }
+                      />
+                    );
+                  })}
+                </g>
               )}
             </svg>
 
-            {/* Center Hole Telemetry: Big percentage + category name */}
+            {/* Center Hole Telemetry: Animated percentage + category name */}
             <View
               pointerEvents="none"
               style={{
                 position: 'absolute',
                 alignItems: 'center',
                 justifyContent: 'center',
-                width: 104,
-                height: 104,
-                borderRadius: 52,
+                width: isDesktop ? 100 : 90,
+                height: isDesktop ? 100 : 90,
+                borderRadius: isDesktop ? 50 : 45,
+                transition: 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+                transform: hoveredCategory ? 'scale(1.05)' : 'scale(1)',
               }}
             >
               <Text
                 style={{
-                  fontSize: 28,
+                  fontSize: isDesktop ? 26 : 23,
                   fontWeight: '800',
                   color: colors.textPrimary,
-                  letterSpacing: -0.8,
-                  lineHeight: 32,
+                  letterSpacing: -0.6,
+                  lineHeight: isDesktop ? 30 : 27,
                   fontVariant: ['tabular-nums'],
+                  transition: 'color 0.2s ease',
                 }}
               >
-                {activeItem ? `${activeItem.percentage}%` : '0%'}
+                {activeItem ? `${displayedPercent}%` : '0%'}
               </Text>
               <Text
                 numberOfLines={1}
                 style={{
-                  fontSize: 11.5,
-                  fontWeight: '600',
+                  fontSize: isDesktop ? 11.5 : 10.5,
+                  fontWeight: '700',
                   color: colors.textMuted,
-                  marginTop: 3,
+                  marginTop: 2,
                   textAlign: 'center',
                   paddingHorizontal: 4,
+                  transition: 'color 0.2s ease',
                 }}
               >
                 {activeItem ? activeItem.shortLabel || activeItem.label : 'No Bookings'}
@@ -539,7 +681,7 @@ export default function BookingCategoryPieChart({
           </View>
         </View>
 
-        {/* Right Side: Clean Legend List */}
+        {/* Right Side: Clean Legend List with Smooth Interactive Hover */}
         <View
           style={{
             flex: 1,
@@ -571,10 +713,11 @@ export default function BookingCategoryPieChart({
                   borderWidth: 1,
                   borderColor: isHovered ? colors.hoverBorder : 'transparent',
                   cursor: 'pointer',
-                  transition: 'all 0.15s ease',
+                  transition: 'transform 180ms ease, background-color 180ms ease, border-color 180ms ease',
+                  transform: isHovered ? 'translateY(-2px)' : 'translateY(0)',
                 }}
               >
-                {/* 1. Circle Dot */}
+                {/* 1. Circle Dot with Pulse Glow on Hover */}
                 <View
                   style={{
                     width: 10,
@@ -583,6 +726,8 @@ export default function BookingCategoryPieChart({
                     backgroundColor: cat.color,
                     marginRight: 10,
                     flexShrink: 0,
+                    transition: 'transform 180ms ease',
+                    transform: isHovered ? 'scale(1.15)' : 'scale(1)',
                   }}
                 />
 
@@ -594,6 +739,7 @@ export default function BookingCategoryPieChart({
                     fontWeight: isHovered ? '700' : '500',
                     color: colors.textPrimary,
                     flex: 1,
+                    transition: 'color 0.15s ease',
                   }}
                 >
                   {cat.label}
@@ -608,6 +754,8 @@ export default function BookingCategoryPieChart({
                     width: 44,
                     textAlign: 'right',
                     fontVariant: ['tabular-nums'],
+                    transition: 'transform 0.2s ease',
+                    transform: isHovered ? 'scale(1.05)' : 'scale(1)',
                   }}
                 >
                   {formattedPercent}

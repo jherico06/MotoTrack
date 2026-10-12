@@ -10,8 +10,8 @@ import {
   ActivityIndicator,
   useWindowDimensions,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { gcashPaymentService, GCASH_CONFIG } from '../../services/gcashPaymentService';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { gcashPaymentService, GCASH_CONFIG } from '../../services/orders/gcashPaymentService.js';
 
 export default function GCashPaymentModal({
   visible,

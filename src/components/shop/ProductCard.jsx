@@ -1,15 +1,15 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Image, useWindowDimensions } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { shopStyles as styles } from '../../styles/shop.styles';
-import { useWishlist } from '../../context/WishlistContext';
-import { isProductSoldOut } from '../../utils/productSizes';
-import { productHasCustomerRatings } from '../../utils/productCatalog';
-import { getProductCardImageUrl } from '../../utils/imageUrl';
-import CompatibilityBadge from './CompatibilityBadge';
-import { resolveReorderLevel } from '../../utils/inventoryHelpers';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { shopStyles as styles } from '../../styles/shop.styles.js';
+import { useWishlist } from '../../context/WishlistContext.jsx';
+import { isProductSoldOut } from '../../utils/productSizes.js';
+import { productHasCustomerRatings } from '../../utils/productCatalog.js';
+import { getProductCardImageUrl } from '../../utils/imageUrl.js';
+import CompatibilityIndicator from './CompatibilityIndicator.jsx';
+import { resolveReorderLevel } from '../../utils/inventoryHelpers.js';
 
-export default function ProductCard({ product, onPress }) {
+export default function ProductCard({ product, bike, onPress }) {
   const { width } = useWindowDimensions();
   const isTablet = width >= 700 && width < 1024;
   const isDesktop = width >= 1024;
@@ -53,11 +53,18 @@ export default function ProductCard({ product, onPress }) {
           </View>
         )}
 
+        {/* Compatibility Indicator (Top-Left) */}
+        <CompatibilityIndicator
+          status={compatStatus}
+          bike={bike}
+          message={compatMessage}
+        />
+
         {soldOut ? (
           <View
             style={{
               position: 'absolute',
-              left: 8,
+              left: (compatStatus === 'compatible' || compatStatus === 'incompatible') ? 38 : 8,
               top: 8,
               backgroundColor: '#DC2626',
               paddingHorizontal: 8,
@@ -96,10 +103,6 @@ export default function ProductCard({ product, onPress }) {
         <Text style={styles.productTitle} numberOfLines={2}>
           {product.name}
         </Text>
-
-        {compatMessage ? (
-          <CompatibilityBadge status={compatStatus} message={compatMessage} />
-        ) : null}
 
         <View style={styles.priceRow}>
           <Text style={styles.priceMainText}>₱{displayPrice.toFixed(2)}</Text>

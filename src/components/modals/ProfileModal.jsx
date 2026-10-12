@@ -11,11 +11,11 @@ import {
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { shopStyles as styles } from '../../styles/shop.styles';
-import { useAuth } from '../../context/AuthContext';
-import { useWishlist } from '../../context/WishlistContext';
-import { authService } from '../../services/authService';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { shopStyles as styles } from '../../styles/shop.styles.js';
+import { useAuth } from '../../context/AuthContext.jsx';
+import { useWishlist } from '../../context/WishlistContext.jsx';
+import { authService } from '../../services/auth/authService.js';
 
 // Quick Location Presets for City of Naga & Cebu
 const NAGA_ADDRESS_PRESETS = [

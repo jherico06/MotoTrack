@@ -12,10 +12,10 @@ import {
   Platform,
   TouchableWithoutFeedback,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon';
-import { orderService } from '../../services/orderService';
-import { productService } from '../../services/productService';
-import { useCart } from '../../context/CartContext';
+import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { orderService } from '../../services/orders/orderService.js';
+import { productService } from '../../services/products/productService.js';
+import { useCart } from '../../context/CartContext.jsx';
 
 const RATING_LABELS = {
   1: '1.0 - Poor',
