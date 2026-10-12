@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
+    "build": "expo export -p web",
     "start": "expo start",
     "tunnel": "expo start --tunnel",
     "clear": "expo start -c",
