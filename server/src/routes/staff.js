@@ -5,8 +5,11 @@ import { sendStaffCredentialsEmail } from '../services/emailDispatchService.js';
 
 const router = Router();
 
+const MECHANIC_ROLE_RETIRED_ERROR =
+  'Mechanics are roster-only (no login). Only Rider staff accounts can be created.';
+
 /**
- * Admin: email temporary login credentials after creating a Rider/Mechanic.
+ * Admin: email temporary login credentials after creating a Rider.
  * Body: { name, email, role, temporaryPassword }
  * Never returns the password in the response.
  */
@@ -24,8 +27,11 @@ router.post('/send-temp-credentials', requireAdmin, async (req, res) => {
     if (!email || !email.includes('@')) {
       return res.status(400).json({ success: false, error: 'A valid staff email is required.' });
     }
-    if (role !== 'rider' && role !== 'mechanic') {
-      return res.status(400).json({ success: false, error: 'Role must be rider or mechanic.' });
+    if (role === 'mechanic') {
+      return res.status(400).json({ success: false, error: MECHANIC_ROLE_RETIRED_ERROR });
+    }
+    if (role !== 'rider') {
+      return res.status(400).json({ success: false, error: 'Role must be rider.' });
     }
     if (!temporaryPassword || temporaryPassword.length < 6) {
       return res.status(400).json({ success: false, error: 'Temporary password is required.' });
@@ -66,7 +72,7 @@ router.post('/send-temp-credentials', requireAdmin, async (req, res) => {
 });
 
 
-/** Admin: list rider/mechanic accounts */
+/** Admin: list rider accounts (and any legacy mechanic accounts, for cleanup) */
 router.get('/', requireAdmin, async (req, res) => {
   const role = String(req.query.role || '')
     .trim()
@@ -75,9 +81,16 @@ router.get('/', requireAdmin, async (req, res) => {
   return res.status(result.success ? 200 : 400).json(result);
 });
 
-/** Admin: create pending Rider/Mechanic + send OTP email */
+/** Admin: create pending Rider + send OTP email (Mechanic role is retired) */
 router.post('/create', requireAdmin, async (req, res) => {
   const { name, email, phone, role, roster } = req.body || {};
+  if (String(role || '').trim().toLowerCase() === 'mechanic') {
+    return res.status(400).json({
+      success: false,
+      error: MECHANIC_ROLE_RETIRED_ERROR,
+      code: 'ROLE_RETIRED',
+    });
+  }
   const result = await staffAccountService.createStaffAccount(
     { name, email, phone, role, roster },
     req.admin

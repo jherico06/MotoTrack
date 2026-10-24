@@ -4,17 +4,17 @@ import { ANDROID_TOP_INSET } from '../utils/safeArea.js';
 export const loginPageStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
   },
   innerContainer: {
     flex: 1,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
     justifyContent: 'space-between',
   },
 
   // ─── TOP DECORATIVE ART & HERO ───
   topHeroSection: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
     paddingTop: 8,
     paddingHorizontal: 28,
     paddingBottom: 22,
@@ -29,8 +29,8 @@ export const loginPageStyles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#56B9A1',
-    opacity: 0.85,
+    backgroundColor: '#EA580C',
+    opacity: 0.25,
   },
   abstractOrganicShapeInner: {
     position: 'absolute',
@@ -39,7 +39,7 @@ export const loginPageStyles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
   },
 
   heroTitle: {
@@ -73,7 +73,7 @@ export const loginPageStyles = StyleSheet.create({
     left: -14,
     width: 15,
     height: 58,
-    backgroundColor: '#56B9A1',
+    backgroundColor: '#EA580C',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderBottomLeftRadius: 6,
@@ -83,7 +83,7 @@ export const loginPageStyles = StyleSheet.create({
   centerLeaf: {
     width: 18,
     height: 80,
-    backgroundColor: '#74C9B4',
+    backgroundColor: '#EA580C',
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
     borderBottomLeftRadius: 8,
@@ -97,7 +97,7 @@ export const loginPageStyles = StyleSheet.create({
     right: -14,
     width: 15,
     height: 54,
-    backgroundColor: '#48A48D',
+    backgroundColor: '#FB923C',
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderBottomLeftRadius: 6,
@@ -118,7 +118,7 @@ export const loginPageStyles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
     borderWidth: 1.5,
-    borderColor: '#E2ECE9',
+    borderColor: '#E5E7EB',
   },
   plantPotShadow: {
     width: 52,
@@ -142,7 +142,7 @@ export const loginPageStyles = StyleSheet.create({
   cardTitle: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#111827',
     marginBottom: 20,
     letterSpacing: -0.3,
   },
@@ -152,8 +152,8 @@ export const loginPageStyles = StyleSheet.create({
     marginBottom: 14,
   },
   inputPill: {
-    backgroundColor: '#F3F7F6',
-    borderRadius: 25,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
     height: 48,
     paddingHorizontal: 18,
     flexDirection: 'row',
@@ -163,7 +163,7 @@ export const loginPageStyles = StyleSheet.create({
     borderColor: 'transparent',
   },
   inputPillFocused: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#FFFFFF',
   },
   textInput: {
@@ -183,7 +183,7 @@ export const loginPageStyles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: 12.5,
-    color: '#88A9A3',
+    color: '#EA580C',
     fontWeight: '600',
   },
   rememberMeBtn: {
@@ -196,14 +196,14 @@ export const loginPageStyles = StyleSheet.create({
     height: 16,
     borderRadius: 4,
     borderWidth: 1.5,
-    borderColor: '#88A9A3',
+    borderColor: '#CBD5E1',
     backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   rememberCheckboxChecked: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   rememberMeText: {
     fontSize: 12.5,
@@ -213,12 +213,12 @@ export const loginPageStyles = StyleSheet.create({
 
   // ─── PRIMARY BUTTON ───
   primaryPillBtn: {
-    backgroundColor: '#1D4533',
-    borderRadius: 25,
+    backgroundColor: '#EA580C',
+    borderRadius: 10,
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28,
     shadowRadius: 8,
@@ -242,11 +242,11 @@ export const loginPageStyles = StyleSheet.create({
   socialDividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#E8F0EE',
+    backgroundColor: '#E5E7EB',
   },
   socialDividerText: {
     fontSize: 12,
-    color: '#88A9A3',
+    color: '#6B7280',
     fontWeight: '600',
   },
 
@@ -259,10 +259,10 @@ export const loginPageStyles = StyleSheet.create({
   socialIconBtn: {
     width: 48,
     height: 40,
-    borderRadius: 12,
+    borderRadius: 10,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2ECE9',
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -281,12 +281,12 @@ export const loginPageStyles = StyleSheet.create({
   },
   footerSwitchText: {
     fontSize: 13,
-    color: '#88A9A3',
+    color: '#6B7280',
     fontWeight: '600',
   },
   footerSwitchLink: {
     fontSize: 13,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '800',
   },
 
@@ -319,11 +319,11 @@ export const loginPageStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 12,
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
   },
   demoPillText: {
     fontSize: 11.5,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
   },
 

@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Platform, useWindowDimensions } from 'react-native';
 import BootstrapIcon from './BootstrapIcon.jsx';
 import BookingSelect from './BookingSelect.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
+import { appStorage } from '../../services/system/storageAdapter.js';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -56,14 +58,30 @@ export default function BookingCalendar({
   onResetToToday,
   onBlockDate,
   onEnableDate,
-  isDarkMode = false,
+  isDarkMode: propIsDarkMode,
   compact = false,
   showAdminControls = false,
   selectedTime,
   onSelectTime,
   timeSlots = DEFAULT_TIME_SLOTS,
   getTimeSlots,
+  headerBg = '#24272B',
 }) {
+  let themeCtx = null;
+  try {
+    themeCtx = useTheme();
+  } catch (_e) {}
+  const isDark = propIsDarkMode !== undefined
+    ? Boolean(propIsDarkMode)
+    : Boolean(
+        themeCtx?.isDarkMode ||
+        (typeof document !== 'undefined' && document?.documentElement?.classList?.contains('dark')) ||
+        (typeof appStorage !== 'undefined' && (
+          appStorage.getItem('mototrack_admin_dark_mode') === 'true' ||
+          appStorage.getItem('mototrack_customer_dark_mode') === 'true' ||
+          appStorage.getItem('mototrack_theme_mode') === 'dark'
+        ))
+      );
   const { width } = useWindowDimensions();
   const isMobile = compact || width < 768;
 
@@ -78,8 +96,6 @@ export default function BookingCalendar({
     return new Date(today.getFullYear(), today.getMonth(), 1);
   });
 
-  // Schedule View Mode: 'schedule' (clock) | 'offDuty' (coffee)
-  const [activeMode, setActiveMode] = useState('schedule');
   const [dismissedWarningDate, setDismissedWarningDate] = useState(null);
 
   const year = viewDate.getFullYear();
@@ -135,302 +151,278 @@ export default function BookingCalendar({
 
   const handleCellPress = (cell) => {
     if (!cell.isCurrentMonth || !cell.dateStr) return;
-    if (activeMode === 'offDuty' && onToggleOffDuty) {
-      onToggleOffDuty(cell.dateStr);
-    } else {
-      const info = getDayInfo ? getDayInfo(cell.dateStr) : {};
-      onSelectDate?.(cell.dateStr);
+    const info = getDayInfo ? getDayInfo(cell.dateStr) : {};
+    onSelectDate?.(cell.dateStr);
 
-      if (info.isFullyBooked) {
-        setDismissedWarningDate(null);
-        onFullyBookedSelected?.(cell.dateStr);
-      }
+    if (info.isFullyBooked) {
+      setDismissedWarningDate(null);
+      onFullyBookedSelected?.(cell.dateStr);
     }
   };
+
+  const theme = useMemo(() => {
+    if (isDark) {
+      return {
+        cardBg: '#24272B',
+        cardBorder: '#374151',
+        headerTitle: '#F8FAFC',
+        subText: '#94A3B8',
+        weekdayDefaultText: '#94A3B8',
+        weekdayWeekendBg: '#2E2211',
+        weekdayWeekendBorder: '#78350F',
+        weekdayWeekendText: '#FBBF24',
+        cellEmptyBg: '#1E2124',
+        cellEmptyBorder: '#2E3236',
+        cellDefaultBg: '#1E2124',
+        cellDefaultBorder: '#32373D',
+        cellDefaultText: '#F1F5F9',
+        cellPastText: '#64748B',
+        cellPastBorder: '#282C30',
+        cellPastBg: '#181A1D',
+        cellTodayBg: '#122B20',
+        cellTodayBorder: '#10B981',
+        cellTodayText: '#34D399',
+        cellHighlightBg: '#1C2E24',
+        cellHighlightBorder: '#059669',
+        cellHighlightText: '#6EE7B7',
+        cellSelectedBg: '#382215',
+        cellSelectedBorder: '#EA580C',
+        cellSelectedText: '#FFF7ED',
+        cellFullyBookedBg: '#381417',
+        cellFullyBookedBorder: '#991B1B',
+        cellFullyBookedText: '#FCA5A5',
+        cellSpecialBg: '#2A1B3D',
+        cellSpecialBorder: '#7C3AED',
+        cellSpecialText: '#DDD6FE',
+        modeOffDutyBgActive: '#452A08',
+        modeOffDutyBgInactive: '#261D13',
+        modeOffDutyBorder: '#78350F',
+        modeOffDutyText: '#FBBF24',
+        blockBtnBg: '#381417',
+        blockBtnBorder: '#991B1B',
+        workBtnBg: '#382215',
+        workBtnBorder: '#EA580C',
+        resetBtnBg: '#1E2124',
+        resetBtnBorder: '#374151',
+        resetBtnText: '#94A3B8',
+        legendDotsBg: '#1E2124',
+        legendDotsBorder: '#374151',
+        bannerFullBg: '#381417',
+        bannerFullBorder: '#991B1B',
+        bannerFullTitle: '#FCA5A5',
+        bannerFullText: '#F87171',
+        badgeFullBg: '#451417',
+        badgeFullText: '#FCA5A5',
+        badgeOffDutyBg: '#38250C',
+        badgeSpecialBg: '#2F1B45',
+        badgeReservedBg: '#3D280B',
+        badgeReservedText: '#FCD34D',
+        timeSectionBorder: '#374151',
+        timeSectionTitle: '#F8FAFC',
+        timeSelectBg: '#1E2124',
+        timeSelectBorder: '#374151',
+        timeSelectText: '#F8FAFC',
+        timeSelectPlaceholder: '#94A3B8',
+        statusBarBg: '#2B1E14',
+        statusBarBorder: '#7C3712',
+        statusBarText: '#FED7AA',
+      };
+    }
+    return {
+      cardBg: '#FFFFFF',
+      cardBorder: '#E2E8F0',
+      headerTitle: '#0F172A',
+      subText: '#64748B',
+      weekdayDefaultText: '#64748B',
+      weekdayWeekendBg: '#FFFBEB',
+      weekdayWeekendBorder: '#FEF08A',
+      weekdayWeekendText: '#B45309',
+      cellEmptyBg: '#FAFAFA',
+      cellEmptyBorder: '#F3F4F6',
+      cellDefaultBg: '#FFFFFF',
+      cellDefaultBorder: '#E2E8F0',
+      cellDefaultText: '#1E293B',
+      cellPastText: '#CBD5E1',
+      cellPastBorder: '#F1F5F9',
+      cellPastBg: '#FAFAFA',
+      cellTodayBg: '#F0FDF4',
+      cellTodayBorder: '#86EFAC',
+      cellTodayText: '#065F46',
+      cellHighlightBg: '#F0FDF4',
+      cellHighlightBorder: '#86EFAC',
+      cellHighlightText: '#065F46',
+      cellSelectedBg: '#FFF7ED',
+      cellSelectedBorder: '#EA580C',
+      cellSelectedText: '#143325',
+      cellFullyBookedBg: '#FFF1F2',
+      cellFullyBookedBorder: '#FECDD3',
+      cellFullyBookedText: '#9F1239',
+      cellSpecialBg: '#FAF5FF',
+      cellSpecialBorder: '#DDD6FE',
+      cellSpecialText: '#7C3AED',
+      modeOffDutyBgActive: '#FEF3C7',
+      modeOffDutyBgInactive: '#FFFBEB',
+      modeOffDutyBorder: '#FDE68A',
+      modeOffDutyText: '#D97706',
+      blockBtnBg: '#FEF2F2',
+      blockBtnBorder: '#FCA5A5',
+      workBtnBg: '#FFF7ED',
+      workBtnBorder: '#EA580C',
+      resetBtnBg: '#FFFFFF',
+      resetBtnBorder: '#CBD5E1',
+      resetBtnText: '#64748B',
+      legendDotsBg: '#F8FAFC',
+      legendDotsBorder: '#E2E8F0',
+      bannerFullBg: '#FEF2F2',
+      bannerFullBorder: '#FCA5A5',
+      bannerFullTitle: '#991B1B',
+      bannerFullText: '#B91C1C',
+      badgeFullBg: '#FEE2E2',
+      badgeFullText: '#DC2626',
+      badgeOffDutyBg: '#FEF3C7',
+      badgeSpecialBg: '#F3E8FF',
+      badgeReservedBg: '#FEF3C7',
+      badgeReservedText: '#92400E',
+      timeSectionBorder: '#F1F5F9',
+      timeSectionTitle: '#0F172A',
+      timeSelectBg: '#FFFFFF',
+      timeSelectBorder: '#CBD5E1',
+      timeSelectText: '#0F172A',
+      timeSelectPlaceholder: '#64748B',
+      statusBarBg: '#FFF7ED',
+      statusBarBorder: '#FED7AA',
+      statusBarText: '#143325',
+    };
+  }, [isDark]);
 
   const handleResetMonth = () => {
     setViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
     if (onResetToToday) onResetToToday();
   };
 
+  const isCharcoalHeader = !headerBg || headerBg === '#24272B' || headerBg.toLowerCase().includes('24272b') || headerBg.toLowerCase().includes('charcoal');
+
   return (
     <View
       style={{
-        backgroundColor: '#FFFFFF',
+        backgroundColor: theme.cardBg,
         borderRadius: isMobile ? 16 : 24,
         borderWidth: 1.5,
-        borderColor: '#E2E8F0',
-        padding: isMobile ? 12 : 24,
+        borderColor: theme.cardBorder,
         overflow: 'hidden',
-        boxShadow: '0 8px 30px rgba(29, 69, 51, 0.05)',
+        boxShadow: isDark ? '0 8px 30px rgba(0, 0, 0, 0.35)' : '0 8px 30px rgba(0, 0, 0, 0.05)',
       }}
     >
-      {/* ── 1. Top Header Row ── */}
+      {/* ── Calendar Charcoal Header ── */}
       <View
         style={{
-          flexDirection: isMobile && showAdminControls ? 'column' : 'row',
-          alignItems: 'center',
-          justifyContent: showAdminControls ? 'space-between' : 'flex-start',
-          gap: 12,
-          marginBottom: 16,
+          backgroundColor: headerBg,
+          paddingHorizontal: isMobile ? 12 : 24,
+          paddingTop: isMobile ? 14 : 20,
+          paddingBottom: isMobile ? 12 : 16,
+          borderBottomWidth: 1,
+          borderBottomColor: isDark ? '#374151' : '#32373D',
         }}
       >
-        {/* Navigation & Month Title */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: isMobile ? 8 : 12, flexWrap: 'wrap' }}>
-          {/* Prev Month */}
-          <TouchableOpacity
-            onPress={() => setViewDate(new Date(year, month - 1, 1))}
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 17,
-              backgroundColor: '#FFFFFF',
-              borderWidth: 1.2,
-              borderColor: '#E2E8F0',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-            activeOpacity={0.7}
-          >
-            <BootstrapIcon name="chevron-left" size={12} color="#1D4533" />
-          </TouchableOpacity>
-
-          {/* Month & Year Title */}
-          <Text
-            style={{
-              fontSize: isMobile ? 19 : 24,
-              fontWeight: '800',
-              color: '#0F172A',
-              letterSpacing: -0.4,
-              fontFamily: Platform.OS === 'web' ? 'Georgia, "Playfair Display", serif' : undefined,
-            }}
-          >
-            {MONTH_NAMES[month]} {year}
-          </Text>
-
-          {/* Next Month */}
-          <TouchableOpacity
-            onPress={() => setViewDate(new Date(year, month + 1, 1))}
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 17,
-              backgroundColor: '#FFFFFF',
-              borderWidth: 1.2,
-              borderColor: '#E2E8F0',
-              alignItems: 'center',
-              justifyContent: 'center',
-              cursor: 'pointer',
-            }}
-            activeOpacity={0.7}
-          >
-            <BootstrapIcon name="chevron-right" size={12} color="#1D4533" />
-          </TouchableOpacity>
-
-          {/* Mode Toggles (Admin only) */}
-          {showAdminControls && (
-            <>
-              {/* Mode Toggle: Clock (Business / Schedule) */}
-              <TouchableOpacity
-                onPress={() => setActiveMode('schedule')}
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 17,
-                  backgroundColor: activeMode === 'schedule' ? '#1D4533' : '#E8F0EC',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  marginLeft: 4,
-                }}
-                activeOpacity={0.8}
-                title="Business Schedule View"
-              >
-                <BootstrapIcon
-                  name="clock-fill"
-                  size={13}
-                  color={activeMode === 'schedule' ? '#FFFFFF' : '#1D4533'}
-                />
-              </TouchableOpacity>
-
-              {/* Mode Toggle: Coffee (Break / Off-duty) */}
-              <TouchableOpacity
-                onPress={() => setActiveMode('offDuty')}
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 17,
-                  backgroundColor: activeMode === 'offDuty' ? '#FEF3C7' : '#FFFBEB',
-                  borderWidth: 1.2,
-                  borderColor: activeMode === 'offDuty' ? '#F59E0B' : '#FDE68A',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                }}
-                activeOpacity={0.8}
-                title="Toggle Off-Duty Days"
-              >
-                <BootstrapIcon name="cup-hot-fill" size={13} color="#D97706" />
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-
-        {/* Right Side: Quick Action Icons & Status Legend (Admin only) */}
-        {showAdminControls && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, alignSelf: isMobile ? 'flex-end' : 'center' }}>
-            {/* Action: Ban / Block Date */}
-            <TouchableOpacity
-              onPress={() => onBlockDate?.(selectedDate)}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: '#FEF2F2',
-                borderWidth: 1.2,
-                borderColor: '#FCA5A5',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-              activeOpacity={0.7}
-              title="Block date slots"
-            >
-              <BootstrapIcon name="slash-circle" size={13} color="#DC2626" />
-            </TouchableOpacity>
-
-            {/* Action: Briefcase / Work Day */}
-            <TouchableOpacity
-              onPress={() => onEnableDate?.(selectedDate)}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: '#E8F0EC',
-                borderWidth: 1.2,
-                borderColor: '#1D4533',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-              activeOpacity={0.7}
-              title="Mark as active work day"
-            >
-              <BootstrapIcon name="briefcase-fill" size={13} color="#1D4533" />
-            </TouchableOpacity>
-
-            {/* Action: Reload / Reset to Today */}
-            <TouchableOpacity
-              onPress={handleResetMonth}
-              style={{
-                width: 32,
-                height: 32,
-                borderRadius: 16,
-                backgroundColor: '#FFFFFF',
-                borderWidth: 1.2,
-                borderColor: '#CBD5E1',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-              activeOpacity={0.7}
-              title="Reset to today"
-            >
-              <BootstrapIcon name="arrow-counterclockwise" size={13} color="#64748B" />
-            </TouchableOpacity>
-
-            {/* Legend dots pill */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: 8,
-                paddingVertical: 5,
-                backgroundColor: '#F8FAFC',
-                borderRadius: 16,
-                borderWidth: 1,
-                borderColor: '#E2E8F0',
-                marginLeft: 4,
-              }}
-            >
-              {/* Open / Available (Teal) */}
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#1D4533' }} title="Available" />
-              {/* Filling Up (Amber) */}
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#D97706' }} title="Reserved" />
-              {/* Fully Booked (Red) */}
-              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#DC2626' }} title="Fully Booked" />
-              {/* Star (Special/Holiday) */}
-              <View
-                style={{
-                  width: 13,
-                  height: 13,
-                  borderRadius: 3,
-                  backgroundColor: '#8B5CF6',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-                title="Special Event / Holiday"
-              >
-                <BootstrapIcon name="star-fill" size={7} color="#FFFFFF" />
-              </View>
-            </View>
-          </View>
-        )}
-      </View>
-
-      {/* ── Fully Booked In-Calendar Notification Alert ── */}
-      {showFullyBookedBanner && (
+        {/* ── 1. Top Header Row ── */}
         <View
           style={{
-            backgroundColor: '#FEF2F2',
-            borderWidth: 1.5,
-            borderColor: '#FCA5A5',
-            borderRadius: 12,
-            padding: 12,
-            marginBottom: 14,
             flexDirection: 'row',
             alignItems: 'center',
-            justifyContent: 'space-between',
-            gap: 10,
+            justifyContent: 'flex-start',
+            gap: 12,
+            marginBottom: isMobile ? 12 : 16,
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-            <View
+          {/* Navigation & Month Title */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: isMobile ? 8 : 12, flexWrap: 'wrap' }}>
+            {/* Prev Month */}
+            <TouchableOpacity
+              onPress={() => setViewDate(new Date(year, month - 1, 1))}
               style={{
-                width: 28,
-                height: 28,
-                borderRadius: 14,
-                backgroundColor: '#FEE2E2',
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                backgroundColor: isCharcoalHeader ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                borderWidth: isCharcoalHeader ? 1 : 0,
+                borderColor: isCharcoalHeader ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
                 alignItems: 'center',
                 justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+              activeOpacity={0.7}
+            >
+              <BootstrapIcon name="chevron-left" size={12} color="#EA580C" />
+            </TouchableOpacity>
+
+            {/* Month & Year Title */}
+            <Text
+              style={{
+                fontSize: isMobile ? 19 : 24,
+                fontWeight: '800',
+                color: isCharcoalHeader ? '#F8FAFC' : theme.headerTitle,
+                letterSpacing: -0.4,
+                fontFamily: Platform.OS === 'web' ? 'Plus Jakarta Sans, sans-serif' : undefined,
               }}
             >
-              <BootstrapIcon name="exclamation-octagon-fill" size={14} color="#DC2626" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: '#991B1B' }}>
-                Notice: {selectedDate} is FULLY BOOKED!
-              </Text>
-              <Text style={{ fontSize: 11.5, color: '#B91C1C', marginTop: 1 }}>
-                All pit bay slots and technicians are booked for this day. You may select another date or contact the shop.
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            onPress={() => setDismissedWarningDate(selectedDate)}
-            style={{ padding: 4, cursor: 'pointer' }}
-          >
-            <BootstrapIcon name="x-lg" size={12} color="#DC2626" />
-          </TouchableOpacity>
-        </View>
-      )}
+              {MONTH_NAMES[month]} {year}
+            </Text>
 
-      {/* ── 2. Weekday Headers ── */}
-      <View style={{ flexDirection: 'row', gap: isMobile ? 4 : 8, marginBottom: 10 }}>
-        {DAY_HEADERS.map((dh, i) => {
-          if (dh.isWeekend) {
+            {/* Next Month */}
+            <TouchableOpacity
+              onPress={() => setViewDate(new Date(year, month + 1, 1))}
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                backgroundColor: isCharcoalHeader ? 'rgba(255, 255, 255, 0.08)' : 'transparent',
+                borderWidth: isCharcoalHeader ? 1 : 0,
+                borderColor: isCharcoalHeader ? 'rgba(255, 255, 255, 0.12)' : 'transparent',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+              activeOpacity={0.7}
+            >
+              <BootstrapIcon name="chevron-right" size={12} color="#EA580C" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* ── 2. Weekday Headers ── */}
+        <View style={{ flexDirection: 'row', gap: isMobile ? 4 : 8 }}>
+          {DAY_HEADERS.map((dh, i) => {
+            if (dh.isWeekend) {
+              return (
+                <View
+                  key={i}
+                  style={{
+                    flex: 1,
+                    paddingVertical: isMobile ? 6 : 8,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: isCharcoalHeader ? 'rgba(245, 158, 11, 0.16)' : theme.weekdayWeekendBg,
+                    borderWidth: 1.5,
+                    borderColor: isCharcoalHeader ? 'rgba(245, 158, 11, 0.45)' : theme.weekdayWeekendBorder,
+                    borderRadius: 14,
+                  }}
+                >
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: isMobile ? 9 : 11,
+                      fontWeight: '800',
+                      color: isCharcoalHeader ? '#FCD34D' : theme.weekdayWeekendText,
+                      letterSpacing: 0.3,
+                      fontFamily: Platform.OS === 'web' ? 'Plus Jakarta Sans, sans-serif' : undefined,
+                    }}
+                  >
+                    {isMobile ? dh.short : dh.label}
+                  </Text>
+                </View>
+              );
+            }
+
             return (
               <View
                 key={i}
@@ -439,54 +431,76 @@ export default function BookingCalendar({
                   paddingVertical: isMobile ? 6 : 8,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#FFFBEB',
-                  borderWidth: 1.5,
-                  borderColor: '#FEF08A',
-                  borderRadius: 14,
                 }}
               >
                 <Text
-                  numberOfLines={1}
                   style={{
-                    fontSize: isMobile ? 9 : 11,
-                    fontWeight: '800',
-                    color: '#B45309',
-                    letterSpacing: 0.3,
+                    fontSize: isMobile ? 9.5 : 11.5,
+                    fontWeight: '700',
+                    color: isCharcoalHeader ? '#CBD5E1' : theme.weekdayDefaultText,
+                    letterSpacing: 0.4,
+                    fontFamily: Platform.OS === 'web' ? 'Plus Jakarta Sans, sans-serif' : undefined,
                   }}
                 >
-                  {isMobile ? dh.short : dh.label}
+                  {dh.short}
                 </Text>
               </View>
             );
-          }
-
-          return (
-            <View
-              key={i}
-              style={{
-                flex: 1,
-                paddingVertical: isMobile ? 6 : 8,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: isMobile ? 9.5 : 11.5,
-                  fontWeight: '700',
-                  color: '#64748B',
-                  letterSpacing: 0.4,
-                }}
-              >
-                {dh.short}
-              </Text>
-            </View>
-          );
-        })}
+          })}
+        </View>
       </View>
 
-      {/* ── 3. Date Grid ── */}
-      <View style={{ gap: isMobile ? 6 : 8 }}>
+      {/* ── Calendar Body ── */}
+      <View style={{ padding: isMobile ? 12 : 24 }}>
+        {/* ── Fully Booked In-Calendar Notification Alert ── */}
+        {showFullyBookedBanner && (
+          <View
+            style={{
+              backgroundColor: theme.bannerFullBg,
+              borderWidth: 1.5,
+              borderColor: theme.bannerFullBorder,
+              borderRadius: 12,
+              padding: 12,
+              marginBottom: 14,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 10,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <View
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 14,
+                  backgroundColor: isDark ? '#4D1518' : '#FEE2E2',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <BootstrapIcon name="exclamation-octagon-fill" size={14} color="#DC2626" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: '800', color: theme.bannerFullTitle, fontFamily: Platform.OS === 'web' ? 'Plus Jakarta Sans, sans-serif' : undefined }}>
+                  Notice: {selectedDate} is FULLY BOOKED!
+                </Text>
+                <Text style={{ fontSize: 11.5, color: theme.bannerFullText, marginTop: 1, fontFamily: Platform.OS === 'web' ? 'Plus Jakarta Sans, sans-serif' : undefined }}>
+                  All pit bay slots and technicians are booked for this day. You may select another date or contact the shop.
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => setDismissedWarningDate(selectedDate)}
+              style={{ padding: 4, cursor: 'pointer' }}
+            >
+              <BootstrapIcon name="x-lg" size={12} color="#DC2626" />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── 3. Date Grid ── */}
+        <View style={{ gap: isMobile ? 6 : 8 }}>
         {weeks.map((week, wIdx) => (
           <View key={wIdx} style={{ flexDirection: 'row', gap: isMobile ? 4 : 8 }}>
             {week.map((cell, cIdx) => {
@@ -498,9 +512,9 @@ export default function BookingCalendar({
                       flex: 1,
                       minHeight: isMobile ? 54 : 82,
                       borderRadius: isMobile ? 12 : 16,
-                      backgroundColor: '#FAFAFA',
+                      backgroundColor: theme.cellEmptyBg,
                       borderWidth: 1.5,
-                      borderColor: '#F3F4F6',
+                      borderColor: theme.cellEmptyBorder,
                     }}
                   />
                 );
@@ -520,47 +534,48 @@ export default function BookingCalendar({
               const { isSelected, isToday, isPast } = cell;
 
               // Card styling fitting the MotoTrack Road Teal & Danger design system
-              let cardBg = '#FFFFFF';
-              let cardBorder = '#E2E8F0';
+              let cardBg = theme.cellDefaultBg;
+              let cardBorder = theme.cellDefaultBorder;
               let borderWidth = 1.5;
-              let numColor = '#1E293B';
+              let numColor = theme.cellDefaultText;
 
               if (isSelected) {
                 if (isFullyBooked) {
                   // Selected Fully Booked Day: Distinct Red
-                  cardBg = '#FEF2F2';
+                  cardBg = theme.cellFullyBookedBg;
                   cardBorder = '#DC2626';
                   borderWidth = 2;
-                  numColor = '#991B1B';
+                  numColor = theme.cellFullyBookedText;
                 } else {
                   // Selected Available Day: MotoTrack Road Teal
-                  cardBg = '#E8F0EC';
-                  cardBorder = '#1D4533';
+                  cardBg = theme.cellSelectedBg;
+                  cardBorder = theme.cellSelectedBorder;
                   borderWidth = 2;
-                  numColor = '#143325';
+                  numColor = theme.cellSelectedText;
                 }
               } else if (isFullyBooked && !isPast) {
                 // Unselected Fully Booked: Soft Rose Warning Tint
-                cardBg = '#FFF1F2';
-                cardBorder = '#FECDD3';
-                numColor = '#9F1239';
+                cardBg = theme.cellFullyBookedBg;
+                cardBorder = theme.cellFullyBookedBorder;
+                numColor = theme.cellFullyBookedText;
               } else if (isSpecial) {
-                cardBg = '#FAF5FF';
-                cardBorder = '#DDD6FE';
-                numColor = '#7C3AED';
+                cardBg = theme.cellSpecialBg;
+                cardBorder = theme.cellSpecialBorder;
+                numColor = theme.cellSpecialText;
               } else if (isHighlight || (isToday && !isSelected)) {
-                cardBg = '#F0FDF4';
-                cardBorder = '#86EFAC';
-                numColor = '#065F46';
+                cardBg = theme.cellTodayBg;
+                cardBorder = theme.cellTodayBorder;
+                numColor = theme.cellTodayText;
               } else if (isPast) {
-                numColor = '#CBD5E1';
-                cardBorder = '#F1F5F9';
+                cardBg = theme.cellPastBg;
+                cardBorder = theme.cellPastBorder;
+                numColor = theme.cellPastText;
               }
 
               // Status dot color
-              let dotColor = '#1D4533'; // MotoTrack Road Teal for available
+              let dotColor = '#EA580C'; // MotoTrack Road Teal for available
               if (isFullyBooked) dotColor = '#DC2626'; // Red for fully booked
-              else if (bookingCount > 0) dotColor = '#D97706'; // Amber for reserved slots
+              else if (bookingCount > 0) dotColor = isDark ? '#F59E0B' : '#D97706'; // Amber for reserved slots
 
               return (
                 <TouchableOpacity
@@ -608,13 +623,13 @@ export default function BookingCalendar({
                             width: isMobile ? 12 : 15,
                             height: isMobile ? 12 : 15,
                             borderRadius: 4,
-                            backgroundColor: '#FEE2E2',
+                            backgroundColor: theme.badgeFullBg,
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
                           title="Fully Booked"
                         >
-                          <BootstrapIcon name="slash-circle-fill" size={isMobile ? 7 : 8.5} color="#DC2626" />
+                          <BootstrapIcon name="slash-circle-fill" size={isMobile ? 7 : 8.5} color={isDark ? '#FCA5A5' : '#DC2626'} />
                         </View>
                       )}
 
@@ -625,12 +640,12 @@ export default function BookingCalendar({
                             width: isMobile ? 12 : 15,
                             height: isMobile ? 12 : 15,
                             borderRadius: 4,
-                            backgroundColor: '#FEF3C7',
+                            backgroundColor: theme.badgeOffDutyBg,
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
                         >
-                          <BootstrapIcon name="cup-hot-fill" size={isMobile ? 7 : 8.5} color="#D97706" />
+                          <BootstrapIcon name="cup-hot-fill" size={isMobile ? 7 : 8.5} color={theme.modeOffDutyText} />
                         </View>
                       )}
 
@@ -641,12 +656,12 @@ export default function BookingCalendar({
                             width: isMobile ? 12 : 15,
                             height: isMobile ? 12 : 15,
                             borderRadius: 4,
-                            backgroundColor: '#F3E8FF',
+                            backgroundColor: theme.badgeSpecialBg,
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
                         >
-                          <BootstrapIcon name="star-fill" size={isMobile ? 7 : 8.5} color="#7C3AED" />
+                          <BootstrapIcon name="star-fill" size={isMobile ? 7 : 8.5} color={theme.cellSpecialText} />
                         </View>
                       )}
 
@@ -698,7 +713,7 @@ export default function BookingCalendar({
                         /* Selected Available Day: MotoTrack Road Teal Pill */
                         <View
                           style={{
-                            backgroundColor: '#1D4533',
+                            backgroundColor: '#EA580C',
                             borderRadius: isMobile ? 5 : 7,
                             paddingHorizontal: isMobile ? 4 : 7,
                             paddingVertical: isMobile ? 2 : 4,
@@ -727,7 +742,9 @@ export default function BookingCalendar({
                       {!isMobile && (
                         <View
                           style={{
-                            backgroundColor: isFullyBooked ? '#FEE2E2' : '#C8DDD3',
+                            backgroundColor: isFullyBooked
+                              ? (isDark ? '#4D1518' : '#FEE2E2')
+                              : (isDark ? '#432311' : '#FED7AA'),
                             borderRadius: 5,
                             paddingVertical: 3,
                             alignItems: 'center',
@@ -737,7 +754,7 @@ export default function BookingCalendar({
                           <BootstrapIcon
                             name={isFullyBooked ? 'slash-circle' : 'tools'}
                             size={9}
-                            color={isFullyBooked ? '#DC2626' : '#1D4533'}
+                            color={isFullyBooked ? (isDark ? '#F87171' : '#DC2626') : '#EA580C'}
                           />
                         </View>
                       )}
@@ -748,7 +765,7 @@ export default function BookingCalendar({
                   {!isSelected && isFullyBooked && !isPast && (
                     <View
                       style={{
-                        backgroundColor: '#FEE2E2',
+                        backgroundColor: theme.badgeFullBg,
                         borderRadius: 6,
                         paddingHorizontal: 4,
                         paddingVertical: 2,
@@ -760,8 +777,8 @@ export default function BookingCalendar({
                         alignSelf: 'stretch',
                       }}
                     >
-                      <BootstrapIcon name="slash-circle-fill" size={7} color="#DC2626" />
-                      <Text style={{ fontSize: isMobile ? 7.5 : 8.5, fontWeight: '800', color: '#DC2626' }}>
+                      <BootstrapIcon name="slash-circle-fill" size={7} color={isDark ? '#FCA5A5' : '#DC2626'} />
+                      <Text style={{ fontSize: isMobile ? 7.5 : 8.5, fontWeight: '800', color: theme.cellFullyBookedText }}>
                         FULL
                       </Text>
                     </View>
@@ -770,7 +787,7 @@ export default function BookingCalendar({
                   {!isSelected && !isFullyBooked && bookingCount > 0 && !isPast && (
                     <View
                       style={{
-                        backgroundColor: '#FEF3C7',
+                        backgroundColor: theme.badgeReservedBg,
                         borderRadius: 6,
                         paddingHorizontal: 4,
                         paddingVertical: 2,
@@ -782,8 +799,8 @@ export default function BookingCalendar({
                         alignSelf: 'stretch',
                       }}
                     >
-                      <BootstrapIcon name="tools" size={8} color="#92400E" />
-                      <Text style={{ fontSize: 9, fontWeight: '800', color: '#92400E' }}>
+                      <BootstrapIcon name="tools" size={8} color={theme.badgeReservedText} />
+                      <Text style={{ fontSize: 9, fontWeight: '800', color: theme.badgeReservedText }}>
                         {bookingCount}
                       </Text>
                     </View>
@@ -794,7 +811,7 @@ export default function BookingCalendar({
                     <Text
                       style={{
                         fontSize: isMobile ? 8 : 9.5,
-                        color: '#94A3B8',
+                        color: theme.subText,
                         fontWeight: '600',
                         marginTop: 'auto',
                       }}
@@ -816,7 +833,7 @@ export default function BookingCalendar({
             marginTop: 18,
             paddingTop: 16,
             borderTopWidth: 1.5,
-            borderTopColor: '#F1F5F9',
+            borderTopColor: theme.timeSectionBorder,
           }}
         >
           <View
@@ -835,14 +852,14 @@ export default function BookingCalendar({
                   width: 28,
                   height: 28,
                   borderRadius: 14,
-                  backgroundColor: '#E8F0EC',
+                  backgroundColor: isDark ? '#2B1F16' : '#FFF7ED',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <BootstrapIcon name="clock-fill" size={13} color="#1D4533" />
+                <BootstrapIcon name="clock-fill" size={13} color="#EA580C" />
               </View>
-              <Text style={{ fontSize: isMobile ? 13 : 14, fontWeight: '800', color: '#0F172A' }}>
+              <Text style={{ fontSize: isMobile ? 13 : 14, fontWeight: '800', color: theme.timeSectionTitle }}>
                 Select Appointment Time Slot
               </Text>
             </View>
@@ -853,21 +870,21 @@ export default function BookingCalendar({
                   flexDirection: 'row',
                   alignItems: 'center',
                   gap: 5,
-                  backgroundColor: '#E8F0EC',
+                  backgroundColor: isDark ? '#2B1F16' : '#FFF7ED',
                   paddingHorizontal: 10,
                   paddingVertical: 4,
                   borderRadius: 20,
                   borderWidth: 1,
-                  borderColor: '#A7F3D0',
+                  borderColor: isDark ? '#EA580C' : '#A7F3D0',
                 }}
               >
-                <BootstrapIcon name="check-circle-fill" size={12} color="#1D4533" />
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533' }}>
+                <BootstrapIcon name="check-circle-fill" size={12} color="#EA580C" />
+                <Text style={{ fontSize: 11, fontWeight: '800', color: isDark ? '#FB923C' : '#EA580C' }}>
                   {selectedTime}
                 </Text>
               </View>
             ) : (
-              <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#94A3B8' }}>
+              <Text style={{ fontSize: 11.5, fontWeight: '600', color: theme.timeSelectPlaceholder }}>
                 Select a time slot below
               </Text>
             )}
@@ -884,22 +901,22 @@ export default function BookingCalendar({
                   appearance: 'none',
                   WebkitAppearance: 'none',
                   MozAppearance: 'none',
-                  backgroundColor: '#FFFFFF',
-                  border: selectedTime ? '1.5px solid #1D4533' : '1.5px solid #CBD5E1',
+                  backgroundColor: theme.timeSelectBg,
+                  border: selectedTime ? '1.5px solid #EA580C' : `1.5px solid ${theme.timeSelectBorder}`,
                   borderRadius: 12,
                   padding: '12px 38px 12px 14px',
                   fontSize: 13.5,
                   fontWeight: 700,
-                  color: selectedTime ? '#0F172A' : '#64748B',
+                  color: selectedTime ? theme.timeSelectText : theme.timeSelectPlaceholder,
                   fontFamily: 'inherit',
                   outline: 'none',
                   cursor: 'pointer',
-                  boxShadow: selectedTime ? '0 0 0 3px rgba(29, 69, 51, 0.1)' : '0 1px 3px rgba(0, 0, 0, 0.05)',
+                  boxShadow: selectedTime ? '0 0 0 3px rgba(234, 88, 12, 0.2)' : (isDark ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 1px 3px rgba(0, 0, 0, 0.05)'),
                   transition: 'all 0.2s ease',
                 }}
               >
                 {!selectedTime && (
-                  <option value="" disabled>
+                  <option value="" disabled style={{ backgroundColor: theme.timeSelectBg, color: theme.timeSelectPlaceholder }}>
                     Choose an appointment time slot...
                   </option>
                 )}
@@ -912,7 +929,8 @@ export default function BookingCalendar({
                       value={slotStr}
                       disabled={isBooked}
                       style={{
-                        color: isBooked ? '#94A3B8' : '#0F172A',
+                        backgroundColor: theme.timeSelectBg,
+                        color: isBooked ? (isDark ? '#64748B' : '#94A3B8') : theme.timeSelectText,
                         fontWeight: selectedTime === slotStr ? '800' : '600',
                       }}
                     >
@@ -932,7 +950,7 @@ export default function BookingCalendar({
                   alignItems: 'center',
                 }}
               >
-                <BootstrapIcon name="chevron-down" size={13} color="#1D4533" />
+                <BootstrapIcon name="chevron-down" size={13} color="#EA580C" />
               </div>
             </div>
           ) : (
@@ -949,7 +967,8 @@ export default function BookingCalendar({
                 };
               })}
               onChange={(val) => onSelectTime?.(val)}
-              accentColor="#1D4533"
+              accentColor="#EA580C"
+              isDarkMode={isDark}
             />
           )}
         </View>
@@ -959,10 +978,10 @@ export default function BookingCalendar({
       <View
         style={{
           marginTop: 16,
-          backgroundColor: '#F0FDFA',
+          backgroundColor: theme.statusBarBg,
           borderRadius: 14,
           borderWidth: 1,
-          borderColor: '#C8DDD3',
+          borderColor: theme.statusBarBorder,
           paddingHorizontal: isMobile ? 10 : 16,
           paddingVertical: isMobile ? 8 : 10,
           flexDirection: 'row',
@@ -973,16 +992,22 @@ export default function BookingCalendar({
       >
         {/* Info Text */}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
-          <BootstrapIcon name="info-circle-fill" size={13} color="#1D4533" />
+          <BootstrapIcon name="info-circle-fill" size={13} color="#EA580C" />
           <Text
             numberOfLines={2}
             style={{
               fontSize: isMobile ? 10.5 : 12,
-              color: '#143325',
+              color: theme.statusBarText,
               lineHeight: 16,
             }}
           >
-            Hours: <Text style={{ fontWeight: '800', color: '#1D4533' }}>9:00 AM – 6:00 PM</Text> (Mon – Sat). Tap any date to choose or view slot availability.
+            {statusBarText ? (
+              statusBarText
+            ) : (
+              <>
+                Hours: <Text style={{ fontWeight: '800', color: '#EA580C' }}>9:00 AM – 6:00 PM</Text> (Mon – Sat). Tap any date to choose or view slot availability.
+              </>
+            )}
           </Text>
         </View>
 
@@ -993,7 +1018,7 @@ export default function BookingCalendar({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 6,
-              backgroundColor: '#1D4533',
+              backgroundColor: '#EA580C',
               borderRadius: 20,
               paddingHorizontal: isMobile ? 10 : 14,
               paddingVertical: isMobile ? 5 : 7,
@@ -1015,5 +1040,6 @@ export default function BookingCalendar({
         )}
       </View>
     </View>
-  );
+  </View>
+);
 }

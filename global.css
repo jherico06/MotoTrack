@@ -5,22 +5,151 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* MOTOTRACK Typography Tokens: Plus Jakarta Sans is the ONLY approved font family */
+    --font-family-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    
+    /* Font Sizes */
+    --font-size-small-label: 10.5px;
+    --font-size-supporting: 11.5px;
+    --font-size-body: 13px;
+    --font-size-sidebar-nav: 13.5px;
+    --font-size-button: 13px;
+    --font-size-card-title: 14px;
+    --font-size-section-header: 16px;
+    --font-size-page-header: 20px;
+    --font-size-kpi: 30px;
+    --font-size-kpi-lg: 32px;
+
+    /* Font Weights */
+    --font-weight-regular: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-extrabold: 800;
+
+    /* Line Heights */
+    --line-height-small-label: 14px;
+    --line-height-supporting: 16px;
+    --line-height-body: 18px;
+    --line-height-sidebar-nav: 18px;
+    --line-height-button: 18px;
+    --line-height-card-title: 20px;
+    --line-height-section-header: 22px;
+    --line-height-page-header: 26px;
+    --line-height-kpi: 36px;
+  }
+
   *, *::before, *::after {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    font-family: var(--font-family-sans) !important;
   }
   html, body, #root, #__next, [data-reactroot] {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    font-family: var(--font-family-sans) !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
   }
   div, span, p, a, button, input, textarea, select, label, h1, h2, h3, h4, h5, h6,
   [class*="css-text"], [class*="r-fontFamily"], [dir="auto"], [dir] {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    font-family: var(--font-family-sans) !important;
   }
   [class*="r-fontFamily-"] {
-    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif !important;
+    font-family: var(--font-family-sans) !important;
+  }
+
+  /* Disable native browser password reveal eye and clear button (Edge / IE / Chromium) */
+  input::-ms-reveal,
+  input::-ms-clear {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+  input::-webkit-contacts-auto-fill-button,
+  input::-webkit-credentials-auto-fill-button {
+    visibility: hidden !important;
+    display: none !important;
+    pointer-events: none !important;
+    height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
   }
 }
 
 @layer components {
+  /* ─── MOTOTRACK Typography Utility System ─── */
+  .font-mototrack {
+    font-family: var(--font-family-sans) !important;
+  }
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum" 1;
+  }
+  .typography-page-header {
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-page-header);
+    line-height: var(--line-height-page-header);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: -0.02em;
+  }
+  .typography-section-header {
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-section-header);
+    line-height: var(--line-height-section-header);
+    font-weight: var(--font-weight-bold);
+    letter-spacing: -0.015em;
+  }
+  .typography-kpi {
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-kpi);
+    line-height: var(--line-height-kpi);
+    font-weight: var(--font-weight-extrabold);
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+  }
+  .typography-card-title {
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-card-title);
+    line-height: var(--line-height-card-title);
+    font-weight: var(--font-weight-semibold);
+  }
+  .typography-sidebar-nav {
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-sidebar-nav);
+    line-height: var(--line-height-sidebar-nav);
+    font-weight: var(--font-weight-medium);
+  }
+  .typography-sidebar-nav-active {
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-sidebar-nav);
+    line-height: var(--line-height-sidebar-nav);
+    font-weight: var(--font-weight-semibold);
+  }
+  .typography-body {
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-body);
+    line-height: var(--line-height-body);
+    font-weight: var(--font-weight-regular);
+  }
+  .typography-supporting {
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-supporting);
+    line-height: var(--line-height-supporting);
+    font-weight: var(--font-weight-regular);
+  }
+  .typography-small-label {
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-small-label);
+    line-height: var(--line-height-small-label);
+    font-weight: var(--font-weight-medium);
+    letter-spacing: 0.04em;
+  }
+  .typography-btn {
+    font-family: var(--font-family-sans);
+    font-size: var(--font-size-button);
+    line-height: var(--line-height-button);
+    font-weight: var(--font-weight-semibold);
+  }
+
   /* Ultra-Premium Glassmorphism Cards */
   .premium-glass-card {
     @apply bg-white/90 backdrop-blur-2xl border border-white shadow-[0_8px_40px_-12px_rgba(15,23,42,0.06)] rounded-[24px] overflow-hidden;
@@ -32,17 +161,19 @@
   }
 
   /* Vibrant Gradient Text */
-  .text-gradient-teal {
-    @apply bg-clip-text text-transparent bg-gradient-to-br from-teal-700 to-emerald-400;
+  .text-gradient-teal,
+  .text-gradient-orange {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600;
   }
   
   .text-gradient-dark {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-[#24272B] via-slate-800 to-[#24272B];
   }
 
   /* Premium Glowing Icon Wrappers */
-  .icon-glow-teal {
-    @apply relative bg-teal-50/80 backdrop-blur-md rounded-2xl flex items-center justify-center ring-1 ring-inset ring-teal-500/10 shadow-md shadow-teal-500/25;
+  .icon-glow-teal,
+  .icon-glow-orange {
+    @apply relative bg-orange-50/80 backdrop-blur-md rounded-2xl flex items-center justify-center ring-1 ring-inset ring-orange-500/20 shadow-md shadow-orange-500/20;
   }
 
   .icon-glow-amber {
@@ -77,19 +208,20 @@
 
   /* ─── Minimalist Admin Dashboard UI System ─── */
   .admin-minimal-card {
-    @apply bg-white dark:bg-[#151C19] border border-slate-200/80 dark:border-[#26332E] rounded-2xl shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
+    @apply bg-white dark:bg-[#24272B] border border-slate-200/80 dark:border-slate-700/60 rounded-2xl shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
   }
 
   .admin-stat-card {
-    @apply bg-white dark:bg-[#151C19] rounded-2xl p-5 flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
+    @apply bg-white dark:bg-[#24272B] rounded-2xl p-5 flex flex-col justify-between shadow-[0_1px_3px_rgba(15,23,42,0.03)] transition-all duration-200;
   }
 
   .admin-icon-pill {
     @apply w-9 h-9 rounded-xl flex items-center justify-center transition-transform duration-200;
   }
 
-  .admin-icon-pill-teal {
-    @apply bg-teal-50 text-teal-700 dark:bg-teal-950/40 dark:text-teal-400 border border-teal-100 dark:border-teal-800/40;
+  .admin-icon-pill-teal,
+  .admin-icon-pill-orange {
+    @apply bg-orange-50 text-orange-600 dark:bg-orange-950/40 dark:text-orange-400 border border-orange-100 dark:border-orange-800/40;
   }
 
   .admin-icon-pill-blue {
@@ -109,11 +241,11 @@
   }
 
   .admin-table-head {
-    @apply bg-[#F0F4FA] dark:bg-[#121A17] text-[13px] font-bold text-slate-800 dark:text-[#F5F7F6] border-b border-slate-200 dark:border-[#26332E];
+    @apply bg-[#24272B] dark:bg-[#1E2124] text-[13px] font-bold text-white border-b border-slate-700/60;
   }
 
   .admin-table-row {
-    @apply border-b border-slate-100 dark:border-[#26332E] hover:bg-slate-50/80 dark:hover:bg-[#1E2824] transition-colors duration-150;
+    @apply border-b border-slate-100 dark:border-slate-700/60 hover:bg-slate-50/80 dark:hover:bg-[#2D3136] transition-colors duration-150;
   }
 
   .admin-nav-item {
@@ -121,42 +253,72 @@
   }
 
   .admin-nav-item-active {
-    @apply bg-slate-900 text-white dark:bg-[#1A2622] dark:text-[#F5F7F6] shadow-sm;
+    @apply bg-[#F97316] text-white shadow-sm;
   }
 }
 
 /* Dark mode — charcoal admin chrome (scrollbars, selection, focus) */
 html.dark,
 html.dark body {
-  background-color: #0F1412;
-  color: #F5F7F6;
+  background-color: #181A1D;
+  color: #F9FAFB;
   color-scheme: dark;
 }
 
 html.dark ::selection {
-  background: rgba(77, 184, 150, 0.30);
-  color: #F5F7F6;
+  background: rgba(249, 115, 22, 0.35);
+  color: #FFFFFF;
+}
+
+/* Custom sleek orange scrollbar indicator matching user mockup */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #EA580C;
+  border-radius: 9999px;
+  transition: background-color 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #C2410C;
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+html, body, #root, #__next, [data-reactroot], * {
+  scrollbar-width: thin;
+  scrollbar-color: #EA580C transparent;
 }
 
 html.dark ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 6px;
+  height: 6px;
 }
 html.dark ::-webkit-scrollbar-track {
-  background: #111715;
+  background: transparent;
 }
 html.dark ::-webkit-scrollbar-thumb {
-  background: #2F3F39;
-  border-radius: 8px;
-  border: 2px solid #111715;
+  background: #EA580C;
+  border-radius: 9999px;
+  border: none;
 }
 html.dark ::-webkit-scrollbar-thumb:hover {
-  background: #3D524A;
+  background: #C2410C;
 }
 
 html.dark input::placeholder,
 html.dark textarea::placeholder {
-  color: #7E8A86 !important;
+  color: #9CA3AF !important;
   opacity: 1;
 }
 
@@ -164,13 +326,13 @@ html.dark input:focus,
 html.dark textarea:focus,
 html.dark button:focus-visible,
 html.dark [role='button']:focus-visible {
-  outline: 2px solid rgba(77, 184, 150, 0.50);
+  outline: 2px solid rgba(249, 115, 22, 0.60);
   outline-offset: 2px;
 }
 
 /* Dark mode — table row hover (slightly lighter charcoal) */
 html.dark [data-admin-table-row='true']:hover {
-  background-color: #1E2824 !important;
+  background-color: #2D3136 !important;
 }
 
 
@@ -189,6 +351,72 @@ html.dark [data-admin-table-row='true']:hover {
   100% {
     transform: translateX(100%);
   }
+}
+
+@keyframes mototrack-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes mototrack-skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.42;
+  }
+}
+
+.mototrack-skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #E2E8F0 0%,
+    #F8FAFC 50%,
+    #E2E8F0 100%
+  );
+  background-size: 200% 100%;
+  animation: mototrack-skeleton-shimmer 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+html.dark .mototrack-skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #1E2824 0%,
+    #2A3A33 50%,
+    #1E2824 100%
+  );
+  background-size: 200% 100%;
+}
+
+.mototrack-skeleton-pulse {
+  animation: mototrack-skeleton-pulse 1.6s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Sidebar Skeleton Shimmer Calibrated for Signature Green Background */
+.mototrack-sidebar-skeleton [data-testid="skeleton-placeholder"],
+.mototrack-sidebar-skeleton .mototrack-skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.28) 50%,
+    rgba(255, 255, 255, 0.12) 100%
+  );
+  background-size: 200% 100%;
+}
+
+html.dark .mototrack-sidebar-skeleton [data-testid="skeleton-placeholder"],
+html.dark .mototrack-sidebar-skeleton .mototrack-skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    #1E2824 0%,
+    #2B3B34 50%,
+    #1E2824 100%
+  );
+  background-size: 200% 100%;
 }
 
 @keyframes float {
@@ -222,9 +450,9 @@ html.dark [data-admin-table-row='true']:hover {
   transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease !important;
 }
 .garage-register-btn:hover {
-  background-color: #15803D !important;
+  background-color: #EA580C !important;
   transform: translateY(-1px) !important;
-  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.32) !important;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35) !important;
 }
 .garage-register-btn:active {
   transform: translateY(0px) !important;
@@ -281,21 +509,25 @@ html.dark [data-admin-table-row='true']:hover {
 }
 
 html.dark .mototrack-nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.06) !important;
+  background-color: rgba(255, 255, 255, 0.08) !important;
 }
 
 .mototrack-nav-item.mototrack-nav-item-active {
-  background-color: rgba(0, 0, 0, 0.28) !important;
-  border-left-color: #10B981 !important;
+  background-color: #F97316 !important;
+  border-left-color: #EA580C !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.35) !important;
 }
 
 html.dark .mototrack-nav-item.mototrack-nav-item-active {
-  background-color: #1E293B !important;
-  border-left-color: #10B981 !important;
+  background-color: #F97316 !important;
+  border-left-color: #EA580C !important;
+  color: #FFFFFF !important;
+  box-shadow: 0 2px 8px rgba(249, 115, 22, 0.35) !important;
 }
 
 .mototrack-nav-item.mototrack-nav-item-active:hover {
-  background-color: rgba(0, 0, 0, 0.36) !important;
+  background-color: #EA580C !important;
 }
 
 /* Icon shift 2px to the right on hover */
@@ -381,9 +613,12 @@ html.dark .mototrack-profile-card:hover .mototrack-profile-arrow {
   .mototrack-edit-btn,
   .mototrack-collapse-btn,
   .mototrack-profile-card,
-  .mototrack-profile-arrow {
+  .mototrack-profile-arrow,
+  .mototrack-skeleton-shimmer,
+  .mototrack-skeleton-pulse {
     transition: none !important;
     transform: none !important;
     animation: none !important;
+    background-image: none !important;
   }
 }

@@ -4,14 +4,18 @@ export function createWishlistWebStyles(isDark = false) {
   return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: isDark ? '#0F1412' : '#F1F5F9',
+      backgroundColor: isDark ? '#1E2124' : '#F3F4F6',
     },
     headerWrapper: {
-      backgroundColor: isDark ? '#151C19' : '#1D4533',
+      backgroundColor: '#24272B',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
       position: 'sticky',
       top: 0,
+      left: 0,
+      right: 0,
+      width: '100%',
+      alignSelf: 'stretch',
       zIndex: 1000,
       boxShadow: isDark ? '0 4px 16px rgba(0, 0, 0, 0.45)' : '0 4px 16px rgba(0, 0, 0, 0.25)',
       borderBottomWidth: 1,
@@ -39,7 +43,7 @@ export function createWishlistWebStyles(isDark = false) {
       width: 36,
       height: 36,
       borderRadius: 10,
-      backgroundColor: isDark ? '#1C2622' : '#1D4533',
+      backgroundColor: '#EA580C',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -138,7 +142,7 @@ export function createWishlistWebStyles(isDark = false) {
       gap: 6,
       paddingHorizontal: 16,
       paddingVertical: 9,
-      borderRadius: 20,
+      borderRadius: 8,
       backgroundColor: 'transparent',
       borderWidth: 1,
       borderColor: 'rgba(255, 255, 255, 0.5)',
@@ -149,13 +153,16 @@ export function createWishlistWebStyles(isDark = false) {
       color: '#FFFFFF',
     },
     scrollContent: {
-      paddingVertical: 24,
-      paddingHorizontal: 24,
+      paddingTop: 0,
+      paddingBottom: 24,
+      paddingHorizontal: 0,
     },
     maxContainer: {
       maxWidth: 1360,
       marginHorizontal: 'auto',
       width: '100%',
+      paddingHorizontal: 24,
+      paddingTop: 24,
     },
     actionBar: {
       flexDirection: 'row',
@@ -202,7 +209,7 @@ export function createWishlistWebStyles(isDark = false) {
       paddingHorizontal: 18,
       paddingVertical: 9,
       borderRadius: 14,
-      backgroundColor: '#1D4533',
+      backgroundColor: '#EA580C',
     },
     moveAllBtnText: {
       fontSize: 13,
@@ -236,7 +243,7 @@ export function createWishlistWebStyles(isDark = false) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
-      backgroundColor: '#1D4533',
+      backgroundColor: '#EA580C',
       paddingHorizontal: 20,
       paddingVertical: 11,
       borderRadius: 14,
@@ -310,7 +317,7 @@ export function createWishlistWebStyles(isDark = false) {
     priceMainText: {
       fontSize: 15.5,
       fontWeight: '800',
-      color: isDark ? '#4DB896' : '#1D4533',
+      color: '#EA580C',
     },
     tagsRow: {
       flexDirection: 'row',
@@ -373,7 +380,7 @@ export function createWishlistWebStyles(isDark = false) {
       cursor: 'pointer',
     },
     addToCartBtn: {
-      backgroundColor: '#1D4533',
+      backgroundColor: '#EA580C',
       borderRadius: 8,
       paddingVertical: 7.5,
       flexDirection: 'row',

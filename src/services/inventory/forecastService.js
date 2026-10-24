@@ -1263,7 +1263,7 @@ export function scoreForecastAccuracy(historyRows = [], { days = null } = {}) {
     const cutoff = Date.now() - Number(days) * 24 * 60 * 60 * 1000;
     rows = rows.filter((r) => {
       const raw = r.created_at || r.forecast_date;
-      if (!raw) return true;
+      if (!raw) return false;
       const t = new Date(raw).getTime();
       return Number.isFinite(t) ? t >= cutoff : true;
     });

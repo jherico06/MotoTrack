@@ -1,177 +1,210 @@
 /**
- * MotoTrack Road Teal — shared color palette for Shop, Admin, Rider, and web.
- * Prefer importing `colors` or `getThemeTokens()` instead of hardcoding hex.
+ * MotoTrack Charcoal + Racing Orange Design System
+ * 
+ * - Charcoal: #24272B — primary sidebar, dark navigation, headers, and dark UI sections.
+ * - Racing Orange: #EA580C — primary buttons, active navigation, important icons, highlights, and chart accents.
+ * - White: #FFFFFF — cards, modals, tables, and form backgrounds.
+ * - Light Gray: #F3F4F6 — main page background and secondary content areas.
+ * - Dark Text: #111827 — headings, labels, and primary text on light backgrounds.
+ * - Muted Text: #6B7280 — descriptions, timestamps, and secondary information.
+ * - Border Gray: #E5E7EB — card borders, dividers, table borders, and input outlines.
  */
 
 export const colors = {
-  // Brand
-  brand: '#1D4533',
-  brandDark: '#143325',
-  brandLight: '#E8F0EC',
-  brandMuted: '#C8DDD3',
+  // Brand Primary & Accents
+  brand: '#24272B', // Charcoal
+  charcoal: '#24272B',
+  charcoalDark: '#1A1D20',
+  charcoalLight: '#32373D',
+  charcoalNav: '#24272B',
 
-  // Accent (earnings / positive money)
-  accent: '#10B981',
-  accentSoft: '#ECFDF5',
-  accentDark: '#059669',
+  racingOrange: '#EA580C',
+  racingOrangeHover: '#C2410C',
+  brandDark: '#1A1D20',
+  brandLight: '#FFF7ED',
+  brandMuted: '#FED7AA',
+
+  // Accent (action buttons, highlights, selected items)
+  accent: '#EA580C',
+  accentSoft: '#FFF7ED',
+  accentDark: '#C2410C',
 
   // Neutrals — surfaces
-  bg: '#F6F8FA',
-  bgSubtle: '#F1F5F9',
-  bgMainAlt: '#F8FAFC',
-  surface: '#FFFFFF',
-  border: '#E2E8F0',
-  borderStrong: '#CBD5E1',
-  borderSoft: '#E8EEF2',
+  bg: '#F3F4F6', // Light Gray
+  bgSubtle: '#F3F4F6',
+  bgMainAlt: '#F3F4F6',
+  surface: '#FFFFFF', // White
+  border: '#E5E7EB', // Border Gray
+  borderStrong: '#D1D5DB',
+  borderSoft: '#F3F4F6',
 
   // Neutrals — type
-  text: '#0F172A',
-  textSecondary: '#334155',
-  textMuted: '#64748B',
-  textSubtle: '#94A3B8',
-  textChip: '#475569',
+  text: '#111827', // Dark Text
+  textSecondary: '#374151',
+  textMuted: '#6B7280', // Muted Text
+  textSubtle: '#9CA3AF',
+  textChip: '#4B5563',
 
-  // Status
-  success: '#059669',
-  successSoft: '#ECFDF5',
-  successText: '#047857',
+  // Status Colors (Section 6: Distinctive Order & Booking Statuses)
+  // Pending: Amber background with dark amber text.
+  statusPendingBg: '#FEF3C7',
+  statusPendingText: '#92400E',
+  // Approved: Green background with dark green text.
+  statusApprovedBg: '#DCFCE7',
+  statusApprovedText: '#166534',
+  // In Progress: Light blue background with dark blue text.
+  statusInProgressBg: '#E0F2FE',
+  statusInProgressText: '#075985',
+  // Completed: Light green background with dark green text.
+  statusCompletedBg: '#DCFCE7',
+  statusCompletedText: '#166534',
+  // Rejected or Cancelled: Light red background with dark red text.
+  statusCancelledBg: '#FEE2E2',
+  statusCancelledText: '#991B1B',
+
+  success: '#16A34A',
+  successSoft: '#DCFCE7',
+  successText: '#166534',
   warning: '#D97706',
-  warningSoft: '#FFFBEB',
-  warningText: '#B45309',
+  warningSoft: '#FEF3C7',
+  warningText: '#92400E',
   warningSoftAlt: '#FEF3C7',
   danger: '#DC2626',
-  dangerSoft: '#FEF2F2',
-  dangerText: '#B91C1C',
-  info: '#1D4ED8',
-  infoSoft: '#EFF6FF',
+  dangerSoft: '#FEE2E2',
+  dangerText: '#991B1B',
+  info: '#2563EB',
+  infoSoft: '#E0F2FE',
   infoSoftAlt: '#DBEAFE',
-  infoAlt: '#2563EB',
+  infoAlt: '#1D4ED8',
 
   white: '#FFFFFF',
   black: '#000000',
 };
 
 /**
- * Semantic UI tokens for light/dark admin (and future shared dark mode).
- * Maps palette colors into the shape used by admin.styles.js.
- *
- * Dark mode: charcoal / graphite enterprise surfaces (not pure black).
+ * Semantic UI tokens for light/dark admin and shared views.
  */
 export function getThemeTokens(isDark = false) {
   if (isDark) {
     return {
       isDark: true,
       // Surfaces — charcoal hierarchy
-      bgMain: '#0F1412',
-      bgCard: '#151C19',
-      bgSub: '#1A2320',
-      bgSubtle: '#18201D',
-      bgHover: '#1E2824',
-      bgElevated: '#1C2622',
-      border: '#26332E',
-      borderLight: '#1F2A26',
-      borderInput: '#2F3F39',
+      bgMain: '#181A1D',
+      bgCard: '#24272B',
+      bgSub: '#1E2124',
+      bgSubtle: '#1F2225',
+      bgHover: '#2D3136',
+      bgElevated: '#2E3237',
+      border: '#374151',
+      borderLight: '#2D3136',
+      borderInput: '#374151',
       // Type
-      textPrimary: '#F5F7F6',
-      textSecondary: '#E3E8E6',
-      textMuted: '#AAB4B0',
-      textSubtle: '#8A9591',
-      placeholder: '#7E8A86',
+      textPrimary: '#F9FAFB',
+      textSecondary: '#E5E7EB',
+      textMuted: '#9CA3AF',
+      textSubtle: '#6B7280',
+      placeholder: '#6B7280',
       // Chrome
-      sidebarBg: '#111715',
-      topBarBg: '#151C19',
-      inputBg: '#1A2320',
-      modalBg: '#151C19',
-      modalOverlay: 'rgba(8, 12, 10, 0.72)',
+      sidebarBg: '#24272B',
+      topBarBg: '#1E2124',
+      inputBg: '#1E2124',
+      modalBg: '#24272B',
+      modalOverlay: 'rgba(0, 0, 0, 0.75)',
       cardShadow: '#000000',
-      // Brand / accent — charcoal base with clear teal on important UI
-      accent: '#2A8F6E',
-      accentBrand: '#4DB896',
-      accentBg: 'rgba(77, 184, 150, 0.14)',
-      accentBorder: 'rgba(77, 184, 150, 0.38)',
-      ctaBg: '#1F6B52',
-      navActiveBg: '#1A2622',
-      navInactiveIcon: '#AAB4B0',
+      // Brand / accent — Racing Orange
+      accent: '#EA580C',
+      accentBrand: '#EA580C',
+      accentBg: 'rgba(234, 88, 12, 0.18)',
+      accentBorder: 'rgba(234, 88, 12, 0.42)',
+      ctaBg: '#EA580C',
+      ctaHover: '#C2410C',
+      navActiveBg: '#EA580C',
+      navActiveText: '#FFFFFF',
+      navInactiveIcon: '#FFFFFF',
+      navInactiveText: '#FFFFFF',
       // Table
-      tableHeaderBg: '#121A17',
-      tableRowBg: '#151C19',
-      tableRowAlt: '#181F1C',
-      tableRowBorder: '#26332E',
-      tableRowHighlight: 'rgba(245, 158, 11, 0.10)',
-      tableRowDanger: 'rgba(239, 68, 68, 0.10)',
-      // Chips / badges — soft fills, readable tinted labels
-      chipBg: '#1A2320',
-      chipBorder: '#2F3F39',
-      chipText: '#E3E8E6',
-      badgeNeutralBg: '#1A2320',
-      badgeNeutralText: '#C5CEC9',
-      statusSuccessBg: 'rgba(16, 185, 129, 0.16)',
-      statusSuccessText: '#5FBF9A',
-      statusWarningBg: 'rgba(245, 158, 11, 0.14)',
-      statusWarningText: '#E0B35C',
-      statusDangerBg: 'rgba(239, 68, 68, 0.14)',
-      statusDangerText: '#E07A7A',
-      statusInfoBg: 'rgba(56, 189, 248, 0.14)',
-      statusInfoText: '#6BA8D4',
-      statusPurpleBg: 'rgba(167, 139, 250, 0.14)',
-      statusPurpleText: '#A78BDB',
-      focusRing: 'rgba(77, 184, 150, 0.50)',
-      money: '#5FBF9A',
+      tableHeaderBg: '#1E2124',
+      tableRowBg: '#24272B',
+      tableRowAlt: '#1F2225',
+      tableRowBorder: '#374151',
+      tableRowHighlight: 'rgba(245, 158, 11, 0.12)',
+      tableRowDanger: 'rgba(239, 68, 68, 0.12)',
+      // Chips / badges
+      chipBg: '#1E2124',
+      chipBorder: '#374151',
+      chipText: '#E5E7EB',
+      badgeNeutralBg: '#1E2124',
+      badgeNeutralText: '#9CA3AF',
+      statusSuccessBg: 'rgba(22, 163, 74, 0.20)',
+      statusSuccessText: '#4ADE80',
+      statusWarningBg: 'rgba(245, 158, 11, 0.18)',
+      statusWarningText: '#FBBF24',
+      statusDangerBg: 'rgba(239, 68, 68, 0.20)',
+      statusDangerText: '#F87171',
+      statusInfoBg: 'rgba(14, 165, 233, 0.20)',
+      statusInfoText: '#38BDF8',
+      statusPurpleBg: 'rgba(167, 139, 250, 0.18)',
+      statusPurpleText: '#C4B5FD',
+      focusRing: 'rgba(234, 88, 12, 0.50)',
+      money: '#EA580C',
     };
   }
 
   return {
     isDark: false,
-    bgMain: colors.bgMainAlt,
+    bgMain: colors.bg,
     bgCard: colors.surface,
-    bgSub: colors.bgMainAlt,
+    bgSub: colors.bg,
     bgSubtle: colors.bgSubtle,
-    bgHover: '#F1F5F9',
+    bgHover: colors.bg,
     bgElevated: colors.surface,
     border: colors.border,
-    borderLight: colors.bgSubtle,
+    borderLight: colors.border,
     borderInput: colors.border,
     textPrimary: colors.text,
     textSecondary: colors.textSecondary,
     textMuted: colors.textMuted,
     textSubtle: colors.textSubtle,
     placeholder: colors.textSubtle,
-    sidebarBg: '#1D4533',
+    sidebarBg: '#24272B', // Charcoal sidebar
     topBarBg: colors.surface,
     inputBg: colors.surface,
     modalBg: colors.surface,
-    modalOverlay: 'rgba(15, 23, 42, 0.5)',
+    modalOverlay: 'rgba(17, 24, 39, 0.60)',
     cardShadow: colors.text,
-    accent: colors.brand,
-    accentBrand: colors.brand,
+    accent: colors.accent,
+    accentBrand: colors.accent,
     accentBg: colors.brandLight,
     accentBorder: colors.brandMuted,
-    ctaBg: colors.brand,
-    navActiveBg: '#0F172A',
-    navInactiveIcon: '#64748B',
-    tableHeaderBg: '#F8FAF9',
+    ctaBg: colors.accent,
+    ctaHover: colors.accentDark,
+    navActiveBg: '#EA580C', // Racing Orange selected item background
+    navActiveText: '#FFFFFF',
+    navInactiveIcon: '#FFFFFF', // White inactive navigation items
+    navInactiveText: '#FFFFFF',
+    tableHeaderBg: '#24272B', // Charcoal table header
     tableRowBg: colors.surface,
-    tableRowAlt: colors.bgMainAlt,
-    tableRowBorder: '#F0F3F1',
-    tableRowHighlight: colors.warningSoft,
+    tableRowAlt: '#F9FAFB',
+    tableRowBorder: colors.border,
+    tableRowHighlight: colors.statusPendingBg,
     tableRowDanger: colors.dangerSoft,
     chipBg: colors.surface,
     chipBorder: colors.border,
     chipText: colors.textChip,
     badgeNeutralBg: colors.bgSubtle,
     badgeNeutralText: colors.textChip,
-    statusSuccessBg: colors.successSoft,
-    statusSuccessText: colors.success,
-    statusWarningBg: colors.warningSoft,
-    statusWarningText: colors.warning,
-    statusDangerBg: colors.dangerSoft,
-    statusDangerText: colors.danger,
-    statusInfoBg: colors.infoSoft,
-    statusInfoText: colors.infoAlt,
+    statusSuccessBg: colors.statusApprovedBg,
+    statusSuccessText: colors.statusApprovedText,
+    statusWarningBg: colors.statusPendingBg,
+    statusWarningText: colors.statusPendingText,
+    statusDangerBg: colors.statusCancelledBg,
+    statusDangerText: colors.statusCancelledText,
+    statusInfoBg: colors.statusInProgressBg,
+    statusInfoText: colors.statusInProgressText,
     statusPurpleBg: '#F5F3FF',
     statusPurpleText: '#7C3AED',
-    focusRing: 'rgba(29, 69, 51, 0.45)',
-    money: colors.brand,
+    focusRing: 'rgba(234, 88, 12, 0.45)',
+    money: colors.accent,
   };
 }
 
@@ -185,5 +218,14 @@ export const fonts = {
   bold: 'PlusJakartaSans-Bold',
   extraBold: 'PlusJakartaSans-ExtraBold',
 };
+
+export {
+  fontFamily,
+  fontWeights,
+  fontSizes,
+  lineHeights,
+  letterSpacings,
+  typography,
+} from './typography.js';
 
 export default colors;

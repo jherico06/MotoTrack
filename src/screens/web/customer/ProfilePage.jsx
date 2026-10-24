@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   useWindowDimensions,
   Modal,
+  StyleSheet,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { getProfileWebTokens, createProfileWebStyles } from '../../../styles/web/profilePage.web.styles.js';
@@ -21,7 +22,14 @@ import { useWishlist } from '../../../context/WishlistContext.jsx';
 import { useTheme } from '../../../context/ThemeContext.jsx';
 import { garageService } from '../../../services/bookings/garageService.js';
 import { orderService } from '../../../services/orders/orderService.js';
-import { notificationService, stripEmojis } from '../../../services/notifications/notificationService.js';
+import {
+  notificationService,
+  stripEmojis,
+  isOrderNotification,
+  isBookingNotification,
+  isPromoNotification,
+  isSecurityNotification,
+} from '../../../services/notifications/notificationService.js';
 import {
   BootstrapIcon,
   BrandLogo,
@@ -165,20 +173,17 @@ function formatNotifTime(isoString) {
   }
 }
 
-function getNotifTheme(type = '', category = '') {
-  const t = (type || '').toLowerCase();
-  const c = (category || '').toLowerCase();
-
-  if (t === 'order' || c === 'order' || c.includes('delivery')) {
-    return {
-      icon: 'bag-check-fill',
-      color: '#2563EB',
-      bg: '#EFF6FF',
-      badgeBg: '#DBEAFE',
-      label: 'Order',
-    };
-  }
-  if (t === 'booking' || c === 'booking' || c.includes('service') || c.includes('repair')) {
+function getNotifTheme(type = '', category = '', notif = null) {
+  if (
+    notif
+      ? isBookingNotification(notif)
+      : String(type || '').includes('booking') ||
+        String(category || '').includes('booking') ||
+        String(category || '').includes('service') ||
+        String(category || '').includes('garage') ||
+        String(category || '').includes('repair') ||
+        String(category || '').includes('pms')
+  ) {
     return {
       icon: 'tools',
       color: '#D97706',
@@ -187,7 +192,29 @@ function getNotifTheme(type = '', category = '') {
       label: 'Pit Bay',
     };
   }
-  if (t === 'promo' || c === 'promo' || c === 'welcome') {
+  if (
+    notif
+      ? isOrderNotification(notif)
+      : String(type || '').includes('order') ||
+        String(category || '').includes('order') ||
+        String(category || '').includes('delivery')
+  ) {
+    return {
+      icon: 'bag-check-fill',
+      color: '#2563EB',
+      bg: '#EFF6FF',
+      badgeBg: '#DBEAFE',
+      label: 'Order',
+    };
+  }
+  if (
+    notif
+      ? isPromoNotification(notif)
+      : String(type || '').includes('promo') ||
+        String(category || '').includes('promo') ||
+        String(category || '').includes('welcome') ||
+        String(category || '').includes('discount')
+  ) {
     return {
       icon: 'ticket-perforated-fill',
       color: '#EA580C',
@@ -196,7 +223,14 @@ function getNotifTheme(type = '', category = '') {
       label: 'Promotion',
     };
   }
-  if (t === 'security' || t === 'system' || c === 'security') {
+  if (
+    notif
+      ? isSecurityNotification(notif)
+      : String(type || '').includes('security') ||
+        String(category || '').includes('security') ||
+        String(type || '').includes('system') ||
+        String(category || '').includes('system')
+  ) {
     return {
       icon: 'shield-lock-fill',
       color: '#DC2626',
@@ -207,20 +241,18 @@ function getNotifTheme(type = '', category = '') {
   }
   return {
     icon: 'bell-fill',
-    color: '#1D4533',
-    bg: '#E8F0EC',
+    color: '#EA580C',
+    bg: '#FFF7ED',
     badgeBg: '#C8DDD3',
     label: 'Notification',
   };
 }
 
 function getNotifActionLabel(notif) {
-  const t = (notif?.type || '').toLowerCase();
-  const c = (notif?.category || '').toLowerCase();
-  if (t === 'booking' || c === 'booking') return 'View Booking →';
-  if (t === 'order' || c === 'order') return 'Track Order →';
-  if (t === 'promo' || c === 'promo' || c === 'welcome') return 'View Deals →';
-  if (t === 'security') return 'Security Settings →';
+  if (isBookingNotification(notif)) return 'View Booking →';
+  if (isOrderNotification(notif)) return 'Track Order →';
+  if (isPromoNotification(notif)) return 'View Deals →';
+  if (isSecurityNotification(notif)) return 'Security Settings →';
   return 'View Details →';
 }
 
@@ -261,31 +293,34 @@ export default function ProfilePage({
 
   const tokens = useMemo(() => getProfileWebTokens(isDarkMode), [isDarkMode]);
   const styles = useMemo(() => createProfileWebStyles(isDarkMode), [isDarkMode]);
-  const customerHeaderBg = isDarkMode ? '#111715' : '#1D4533';
-  const customerHeaderBorder = isDarkMode ? '#26332E' : '#1D4533';
+  const customerHeaderBg = isDarkMode ? '#1E2226' : '#24272B';
+  const customerHeaderBorder = isDarkMode ? '#374151' : '#24272B';
 
   // ─── ACTIVE NAVIGATION TAB ───
   // ─── ACTIVE NAVIGATION TAB ───
   // 'overview' | 'garage' | 'orders' | 'bookings' | 'profile' | 'notifications' | 'settings'
+  const resolveWebTab = (t) => (t && typeof t === 'object' ? t.tab : t);
   const [activeTab, setActiveTab] = useState(() => {
+    const raw = resolveWebTab(initialTab);
     if (
-      initialTab === 'orders' ||
-      initialTab === 'bookings' ||
-      initialTab === 'garage' ||
-      initialTab === 'settings' ||
-      initialTab === 'notifications' ||
-      initialTab === 'profile'
+      raw === 'orders' ||
+      raw === 'bookings' ||
+      raw === 'garage' ||
+      raw === 'settings' ||
+      raw === 'notifications' ||
+      raw === 'profile'
     ) {
-      return initialTab;
+      return raw;
     }
     return 'overview';
   });
 
   useEffect(() => {
-    if (initialTab === 'wishlist') {
+    const raw = resolveWebTab(initialTab);
+    if (raw === 'wishlist') {
       onNavigateToWishlist?.();
-    } else if (initialTab) {
-      setActiveTab(initialTab);
+    } else if (raw) {
+      setActiveTab(raw);
     }
   }, [initialTab, onNavigateToWishlist]);
 
@@ -354,7 +389,9 @@ export default function ProfilePage({
   const [bookingsPage, setBookingsPage] = useState(1);
   const BOOKINGS_PAGE_SIZE = 6;
   const [orders, setOrders] = useState([]);
-  const [notifications, setNotifications] = useState(() => notificationService.getNotifications(currentUser?.id));
+  const [notifications, setNotifications] = useState(() =>
+    notificationService.getCustomerNotifications(currentUser)
+  );
   const [accountLogs, setAccountLogs] = useState([]);
   const [bookingFilter, setBookingFilter] = useState('All'); // 'All' | 'Active' | 'Completed' | 'Cancelled'
   const [orderFilter, setOrderFilter] = useState('All'); // 'All' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled'
@@ -366,11 +403,13 @@ export default function ProfilePage({
 
   // Real-time notification subscription
   useEffect(() => {
-    const unsub = notificationService.subscribe(() => {
-      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
-    });
+    const updateList = () => {
+      setNotifications(notificationService.getCustomerNotifications(currentUser));
+    };
+    updateList();
+    const unsub = notificationService.subscribe(updateList);
     return () => unsub?.();
-  }, [currentUser?.id]);
+  }, [currentUser?.id, currentUser?.customer_id, currentUser?.email]);
 
   // Live Tracking Modal State
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
@@ -573,7 +612,7 @@ export default function ProfilePage({
     try {
       if (typeof notificationService?.subscribe === 'function') {
         unsubNotif = notificationService.subscribe(() => {
-          setNotifications(notificationService.getNotifications(currentUser?.id) || []);
+          setNotifications(notificationService.getCustomerNotifications(currentUser) || []);
         });
       }
     } catch (_e) {}
@@ -774,40 +813,32 @@ export default function ProfilePage({
   }, [bookings, selectedBookingForModal]);
 
   const orderNotifsCount = useMemo(() => {
-    return (Array.isArray(notifications) ? notifications : []).filter(
-      (n) => (n.type || '').toLowerCase() === 'order' || (n.category || '').toLowerCase() === 'order'
-    ).length;
+    return (Array.isArray(notifications) ? notifications : []).filter(isOrderNotification).length;
   }, [notifications]);
 
   const bookingNotifsCount = useMemo(() => {
-    return (Array.isArray(notifications) ? notifications : []).filter(
-      (n) => (n.type || '').toLowerCase() === 'booking' || (n.category || '').toLowerCase() === 'booking'
-    ).length;
+    return (Array.isArray(notifications) ? notifications : []).filter(isBookingNotification).length;
   }, [notifications]);
 
   const promoNotifsCount = useMemo(() => {
-    return (Array.isArray(notifications) ? notifications : []).filter(
-      (n) => (n.type || '').toLowerCase() === 'promo' || (n.category || '').toLowerCase() === 'promo' || (n.category || '').toLowerCase() === 'welcome'
-    ).length;
+    return (Array.isArray(notifications) ? notifications : []).filter(isPromoNotification).length;
   }, [notifications]);
 
   const securityNotifsCount = useMemo(() => {
-    return (Array.isArray(notifications) ? notifications : []).filter(
-      (n) => (n.type || '').toLowerCase() === 'security' || (n.type || '').toLowerCase() === 'system' || (n.category || '').toLowerCase() === 'security'
-    ).length;
+    return (Array.isArray(notifications) ? notifications : []).filter(isSecurityNotification).length;
   }, [notifications]);
 
   // Filtered Notifications
   const filteredNotifications = useMemo(() => {
     let list = Array.isArray(notifications) ? notifications : [];
     if (notifFilter === 'order') {
-      list = list.filter((n) => (n.type || '').toLowerCase() === 'order' || (n.category || '').toLowerCase() === 'order');
+      list = list.filter(isOrderNotification);
     } else if (notifFilter === 'booking') {
-      list = list.filter((n) => (n.type || '').toLowerCase() === 'booking' || (n.category || '').toLowerCase() === 'booking');
+      list = list.filter(isBookingNotification);
     } else if (notifFilter === 'promo') {
-      list = list.filter((n) => (n.type || '').toLowerCase() === 'promo' || (n.category || '').toLowerCase() === 'promo' || (n.category || '').toLowerCase() === 'welcome');
+      list = list.filter(isPromoNotification);
     } else if (notifFilter === 'security') {
-      list = list.filter((n) => (n.type || '').toLowerCase() === 'security' || (n.type || '').toLowerCase() === 'system' || (n.category || '').toLowerCase() === 'security');
+      list = list.filter(isSecurityNotification);
     } else if (notifFilter === 'unread') {
       list = list.filter((n) => n.status === 'unread');
     }
@@ -903,35 +934,30 @@ export default function ProfilePage({
   }, [filteredNotifications]);
 
   const handleMarkAllNotifsRead = async () => {
-    await notificationService.markAllCustomerAsRead(currentUser?.id);
-    setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+    await notificationService.markAllCustomerAsRead(currentUser);
+    setNotifications(notificationService.getCustomerNotifications(currentUser));
     showToast('✓ All notifications marked as read');
   };
 
   const handleClearReadNotifs = async () => {
-    const unreadOnly = (Array.isArray(notifications) ? notifications : []).filter(
-      (n) => n.status === 'unread'
-    );
-    notificationService.customerNotifications = unreadOnly;
-    await notificationService.persist();
-    notificationService.notify();
-    setNotifications(unreadOnly);
+    await notificationService.clearCustomerReadNotifications(currentUser);
+    setNotifications(notificationService.getCustomerNotifications(currentUser));
     showToast('✓ Cleared read notifications');
   };
 
   const handleMarkSingleNotifRead = async (id) => {
     await notificationService.markCustomerAsRead(id);
-    setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+    setNotifications(notificationService.getCustomerNotifications(currentUser));
   };
 
   const handleMarkSingleNotifUnread = async (id) => {
     await notificationService.markCustomerAsUnread(id);
-    setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+    setNotifications(notificationService.getCustomerNotifications(currentUser));
   };
 
   const handleDeleteNotif = async (id) => {
     await notificationService.deleteCustomerNotification(id);
-    setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+    setNotifications(notificationService.getCustomerNotifications(currentUser));
     showToast('Notification removed');
   };
 
@@ -992,6 +1018,13 @@ export default function ProfilePage({
         showToast('✓ Account profile successfully updated!');
         setIsEditingPersonalInfo(false);
         setIsEditingGarageInfo(false);
+        try {
+          notificationService.notifyCustomerProfileUpdated({
+            userId: currentUser?.id || currentUser?.user_id,
+            customerEmail: currentUser?.email,
+            customerName: combinedName,
+          });
+        } catch (_notifErr) {}
       } else {
         showToast(res?.error || 'Failed to update profile.');
       }
@@ -1014,6 +1047,13 @@ export default function ProfilePage({
       if (payload.country) setCountry(payload.country);
       if (payload.bio) setBio(payload.bio);
       if (payload.deliveryNotes) setDeliveryNotes(payload.deliveryNotes);
+      try {
+        notificationService.notifyCustomerProfileUpdated({
+          userId: currentUser?.id || currentUser?.user_id,
+          customerEmail: currentUser?.email,
+          customerName: payload.name || `${payload.firstName || ''} ${payload.lastName || ''}`.trim() || currentUser?.name,
+        });
+      } catch (_notifErr) {}
       return { success: true };
     }
     return res;
@@ -1040,6 +1080,14 @@ export default function ProfilePage({
         setCurrentPwd('');
         setNewPwd('');
         setConfirmPwd('');
+        try {
+          notificationService.notifyCustomerSecurityAlert({
+            userId: currentUser?.id || currentUser?.user_id,
+            customerEmail: currentUser?.email,
+            title: 'Password Changed Successfully',
+            message: 'Your account password has been updated. If you did not make this change, please contact support immediately.',
+          });
+        } catch (_notifErr) {}
       } else {
         showToast(res?.error || 'Current password incorrect.');
       }
@@ -1064,8 +1112,17 @@ export default function ProfilePage({
       const res = await changeEmail(currentUser?.id, { newEmail: newEmail.trim(), currentPassword: emailPwd });
       if (res?.success) {
         showToast('✓ Account email updated successfully!');
+        const updatedEmail = newEmail.trim();
         setNewEmail('');
         setEmailPwd('');
+        try {
+          notificationService.notifyCustomerSecurityAlert({
+            userId: currentUser?.id || currentUser?.user_id,
+            customerEmail: updatedEmail,
+            title: 'Account Email Updated',
+            message: `Your login email was successfully updated to ${updatedEmail}.`,
+          });
+        } catch (_notifErr) {}
       } else {
         showToast(res?.error || 'Could not update email.');
       }
@@ -1198,7 +1255,7 @@ export default function ProfilePage({
             top: 24,
             right: 24,
             zIndex: 99999,
-            backgroundColor: '#1D4533',
+            backgroundColor: '#EA580C',
             paddingVertical: 12,
             paddingHorizontal: 20,
             borderRadius: 14,
@@ -1213,8 +1270,14 @@ export default function ProfilePage({
         </View>
       ) : null}
 
-      {/* ─── 1. SINGLE TOP GREEN NAVBAR (ONLY NAVBAR) ─── */}
-      <View style={styles.headerWrapper}>
+      {/* ─── FULL-HEIGHT PROFILE SCROLLVIEW (Scrollbar extends through header from top: 0) ─── */}
+      <ScrollView
+        style={{ flex: 1, width: '100%' }}
+        contentContainerStyle={{ flexGrow: 1, width: '100%' }}
+        showsVerticalScrollIndicator={true}
+      >
+        {/* ─── 1. SINGLE TOP GREEN NAVBAR (Pinned at top: 0, does not scroll away) ─── */}
+        <View style={styles.headerWrapper}>
         <View style={[styles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
           {/* LEFT: MotoTrack Logo + Mobile Menu Toggle */}
           <View style={styles.headerLeft}>
@@ -1431,16 +1494,15 @@ export default function ProfilePage({
 
       <View style={styles.adminLayout}>
         <View style={styles.mainContentArea}>
-          {/* Main Scrollable Canvas */}
-          <ScrollView
-            contentContainerStyle={[
+          {/* Main Content Canvas */}
+          <View
+            style={[
               styles.mainScroll,
               { maxWidth: 1360, width: '100%', alignSelf: 'center' },
               isDesktop && { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 60 },
               isTablet && { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 60 },
               isMobile && { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 60 },
             ]}
-            showsVerticalScrollIndicator={true}
           >
             {/* ───────────────────────────────────────────────────────── */}
             {/* TAB 1: OVERVIEW                                           */}
@@ -1556,7 +1618,7 @@ export default function ProfilePage({
                         </View>
                       </View>
                       <TouchableOpacity onPress={() => setActiveTab('orders')} activeOpacity={0.7}>
-                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#1D4533' }}>
+                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#EA580C' }}>
                           View All ({orders.length}) →
                         </Text>
                       </TouchableOpacity>
@@ -1771,7 +1833,7 @@ export default function ProfilePage({
                         </View>
                       </View>
                       <TouchableOpacity onPress={() => setActiveTab('bookings')} activeOpacity={0.7}>
-                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#1D4533' }}>
+                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#EA580C' }}>
                           Manage ({bookings.length}) →
                         </Text>
                       </TouchableOpacity>
@@ -2080,7 +2142,7 @@ export default function ProfilePage({
                             borderColor: customerHeaderBorder,
                             overflow: 'hidden',
                             backgroundColor: customerHeaderBg,
-                            boxShadow: isDarkMode ? '0 4px 18px rgba(0, 0, 0, 0.35)' : '0 4px 18px rgba(29, 69, 51, 0.18)',
+                            boxShadow: isDarkMode ? '0 4px 18px rgba(0, 0, 0, 0.35)' : '0 4px 18px rgba(0, 0, 0, 0.18)',
                             elevation: 4,
                             display: 'flex',
                             flexDirection: 'column',
@@ -2148,7 +2210,7 @@ export default function ProfilePage({
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <View
                                   style={{
-                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.88)' : 'rgba(29, 69, 51, 0.88)',
+                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.88)' : 'rgba(24, 26, 29, 0.92)',
                                     borderWidth: 1,
                                     borderColor: 'rgba(255, 255, 255, 0.2)',
                                     paddingHorizontal: 11,
@@ -2170,7 +2232,7 @@ export default function ProfilePage({
 
                                 <View
                                   style={{
-                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.82)' : 'rgba(29, 69, 51, 0.82)',
+                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.82)' : 'rgba(24, 26, 29, 0.92)',
                                     borderWidth: 1,
                                     borderColor: 'rgba(255, 255, 255, 0.16)',
                                     paddingHorizontal: 10,
@@ -2276,7 +2338,7 @@ export default function ProfilePage({
                             </View>
                           </View>
 
-                          {/* 2. Lower Information Section (Customer Header Color #1D4533) */}
+                          {/* 2. Lower Information Section (Customer Header Color #EA580C) */}
                           <View
                             style={{
                               flex: 1,
@@ -2515,7 +2577,7 @@ export default function ProfilePage({
                           </Text>
                           <View
                             style={{
-                              backgroundColor: '#1D4533',
+                              backgroundColor: '#EA580C',
                               paddingHorizontal: 8,
                               paddingVertical: 2,
                               borderRadius: 10,
@@ -2645,7 +2707,7 @@ export default function ProfilePage({
                                   position: 'absolute',
                                   top: 10,
                                   left: 10,
-                                  backgroundColor: isDarkMode ? '#1D3B2E' : '#1D4533',
+                                  backgroundColor: isDarkMode ? '#24272B' : '#EA580C',
                                   paddingHorizontal: 8,
                                   paddingVertical: 3,
                                   borderRadius: 6,
@@ -2936,7 +2998,7 @@ export default function ProfilePage({
                             borderColor: customerHeaderBorder,
                             overflow: 'hidden',
                             backgroundColor: customerHeaderBg,
-                            boxShadow: isDarkMode ? '0 4px 18px rgba(0, 0, 0, 0.35)' : '0 4px 18px rgba(29, 69, 51, 0.18)',
+                            boxShadow: isDarkMode ? '0 4px 18px rgba(0, 0, 0, 0.35)' : '0 4px 18px rgba(0, 0, 0, 0.18)',
                             elevation: 4,
                             display: 'flex',
                             flexDirection: 'column',
@@ -3004,7 +3066,7 @@ export default function ProfilePage({
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                 <View
                                   style={{
-                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.88)' : 'rgba(29, 69, 51, 0.88)',
+                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.88)' : 'rgba(24, 26, 29, 0.92)',
                                     borderWidth: 1,
                                     borderColor: 'rgba(255, 255, 255, 0.2)',
                                     paddingHorizontal: 11,
@@ -3026,7 +3088,7 @@ export default function ProfilePage({
 
                                 <View
                                   style={{
-                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.82)' : 'rgba(29, 69, 51, 0.82)',
+                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.82)' : 'rgba(24, 26, 29, 0.92)',
                                     borderWidth: 1,
                                     borderColor: 'rgba(255, 255, 255, 0.16)',
                                     paddingHorizontal: 10,
@@ -3086,7 +3148,7 @@ export default function ProfilePage({
                                     paddingVertical: 4.5,
                                     borderRadius: 9999,
                                     borderWidth: 1.5,
-                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.88)' : 'rgba(29, 69, 51, 0.88)',
+                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.88)' : 'rgba(24, 26, 29, 0.92)',
                                     borderColor: 'rgba(255, 255, 255, 0.3)',
                                     cursor: 'pointer',
                                     boxShadow: '0 1px 4px rgba(0, 0, 0, 0.15)',
@@ -3127,7 +3189,7 @@ export default function ProfilePage({
                             </View>
                           </View>
 
-                          {/* 2. Lower Information Section (Customer Header Color #1D4533) */}
+                          {/* 2. Lower Information Section (Customer Header Color #EA580C) */}
                           <View
                             style={{
                               flex: 1,
@@ -3567,7 +3629,7 @@ export default function ProfilePage({
                                         style={{
                                           fontSize: 11,
                                           fontWeight: '800',
-                                          color: isActive ? (isDarkMode ? tokens.brandPrimary : '#1D4533') : tokens.textMuted,
+                                          color: isActive ? (isDarkMode ? tokens.brandPrimary : '#EA580C') : tokens.textMuted,
                                         }}
                                       >
                                         {count}
@@ -3824,7 +3886,7 @@ export default function ProfilePage({
                         paddingVertical: 10,
                         borderRadius: 12,
                         cursor: 'pointer',
-                        boxShadow: '0 4px 14px rgba(29, 69, 51, 0.22)',
+                        boxShadow: '0 4px 14px rgba(0, 0, 0, 0.22)',
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 8,
@@ -3949,29 +4011,61 @@ export default function ProfilePage({
                     </span>
                   </div>
 
-                  {/* Card 4: PIT BAY CAPACITY */}
-                  <div className={`rounded-2xl p-5 border border-sky-200/90 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px] ${
-                    isDarkMode ? 'bg-[#18261F] border-sky-800/60' : 'bg-white'
-                  }`}>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                          Pit Bay Capacity
-                        </span>
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
-                          Active Bays
+                  {/* Card 4: PIT BAY CAPACITY — limited by free technicians */}
+                  {(() => {
+                    const physicalBays = Math.max(
+                      1,
+                      Number(brandSettings?.serviceBayCount) || mechanicsData.totalCount || 6
+                    );
+                    const activeBays = Math.min(
+                      physicalBays,
+                      Number(mechanicsData.availableCount) || 0
+                    );
+                    const bayBadge =
+                      activeBays <= 0 ? 'All Busy' : activeBays >= physicalBays ? 'Full Staff' : 'Active Bays';
+                    const bayFooter =
+                      activeBays <= 0
+                        ? 'No free technicians — all in pit bay'
+                        : `${activeBays} of ${physicalBays} bays open (${mechanicsData.availableCount} techs free)`;
+                    return (
+                      <div
+                        className={`rounded-2xl p-5 border border-sky-200/90 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px] ${
+                          isDarkMode ? 'bg-[#18261F] border-sky-800/60' : 'bg-white'
+                        }`}
+                      >
+                        <div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                              Pit Bay Capacity
+                            </span>
+                            <span
+                              className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
+                                activeBays <= 0
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : 'bg-sky-50 text-sky-700 border border-sky-200'
+                              }`}
+                            >
+                              {bayBadge}
+                            </span>
+                          </div>
+                          <span
+                            className={`text-3xl font-extrabold tracking-tight leading-none block font-mono ${
+                              activeBays <= 0
+                                ? 'text-rose-600'
+                                : isDarkMode
+                                  ? 'text-white'
+                                  : 'text-slate-900'
+                            }`}
+                          >
+                            {activeBays}
+                          </span>
+                        </div>
+                        <span className="text-[11.5px] font-medium text-slate-500 mt-3 block leading-snug">
+                          {bayFooter}
                         </span>
                       </div>
-                      <span className={`text-3xl font-extrabold tracking-tight leading-none block font-mono ${
-                        isDarkMode ? 'text-white' : 'text-slate-900'
-                      }`}>
-                        6
-                      </span>
-                    </div>
-                    <span className="text-[11.5px] font-medium text-slate-500 mt-3 block leading-snug">
-                      Dedicated bays & Dynojet cell
-                    </span>
-                  </div>
+                    );
+                  })()}
                 </div>
 
                 {/* ─── SCHEDULED BOOKING INFORMATION (MAIN VIEW) ─── */}
@@ -4070,7 +4164,7 @@ export default function ProfilePage({
                                 }}
                                 className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
                                   isSel
-                                    ? (isDarkMode ? 'bg-emerald-600 text-white shadow-xs' : 'bg-[#1D4533] text-white shadow-xs')
+                                    ? (isDarkMode ? 'bg-[#EA580C] text-white shadow-xs' : 'bg-[#EA580C] text-white shadow-xs')
                                     : isDarkMode
                                     ? 'bg-transparent text-emerald-200/70 hover:text-white hover:bg-emerald-900/40'
                                     : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
@@ -4091,7 +4185,7 @@ export default function ProfilePage({
                             title="Grid View"
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
                               bookingViewMode === 'grid'
-                                ? (isDarkMode ? 'bg-emerald-600 text-white shadow-xs' : 'bg-[#1D4533] text-white shadow-xs')
+                                ? (isDarkMode ? 'bg-[#EA580C] text-white shadow-xs' : 'bg-[#EA580C] text-white shadow-xs')
                                 : isDarkMode
                                 ? 'bg-transparent text-emerald-200/70 hover:text-white hover:bg-emerald-900/40'
                                 : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
@@ -4109,7 +4203,7 @@ export default function ProfilePage({
                             title="List View"
                             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
                               bookingViewMode === 'list'
-                                ? (isDarkMode ? 'bg-emerald-600 text-white shadow-xs' : 'bg-[#1D4533] text-white shadow-xs')
+                                ? (isDarkMode ? 'bg-[#EA580C] text-white shadow-xs' : 'bg-[#EA580C] text-white shadow-xs')
                                 : isDarkMode
                                 ? 'bg-transparent text-emerald-200/70 hover:text-white hover:bg-emerald-900/40'
                                 : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
@@ -4133,7 +4227,7 @@ export default function ProfilePage({
                         <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${
                           isDarkMode ? 'bg-emerald-950/60 border border-emerald-800/50' : 'bg-emerald-50 border border-emerald-100'
                         }`}>
-                          <BootstrapIcon name="calendar-plus" size={26} color={isDarkMode ? '#4DB896' : '#1D4533'} />
+                          <BootstrapIcon name="calendar-plus" size={26} color={isDarkMode ? '#EA580C' : '#EA580C'} />
                         </div>
                         <h3 className={`text-base font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>No scheduled bookings</h3>
                         <p className="text-xs text-slate-500 max-w-sm mb-5 leading-relaxed">
@@ -4141,7 +4235,7 @@ export default function ProfilePage({
                         </p>
                         <button
                           onClick={onNavigateToGarage}
-                          className={`${isDarkMode ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-[#1D4533] hover:bg-[#153426]'} text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-2`}
+                          className={`${isDarkMode ? 'bg-[#EA580C] hover:bg-[#EA580C]' : 'bg-[#EA580C] hover:bg-[#EA580C]'} text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-2`}
                         >
                           <BootstrapIcon name="tools" size={13} color="#FFFFFF" />
                           Book a Service
@@ -4161,7 +4255,7 @@ export default function ProfilePage({
                             setBookingStatusFilter('ALL');
                             setBookingsPage(1);
                           }}
-                          className={`${isDarkMode ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-[#1D4533] hover:bg-[#153426]'} text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs transition-colors cursor-pointer`}
+                          className={`${isDarkMode ? 'bg-[#EA580C] hover:bg-[#EA580C]' : 'bg-[#EA580C] hover:bg-[#EA580C]'} text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs transition-colors cursor-pointer`}
                         >
                           View All Bookings
                         </button>
@@ -4298,7 +4392,7 @@ export default function ProfilePage({
                           width: 72,
                           height: 72,
                           borderRadius: 36,
-                          backgroundColor: isDarkMode ? '#1E2D27' : '#1D4533',
+                          backgroundColor: isDarkMode ? '#24272B' : '#EA580C',
                           overflow: 'hidden',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -4946,7 +5040,7 @@ export default function ProfilePage({
                                   width: 60,
                                   height: 52,
                                   borderRadius: 8,
-                                  backgroundColor: isDarkMode ? '#1E2824' : '#E8F0EC',
+                                  backgroundColor: isDarkMode ? '#1E2824' : '#FFF7ED',
                                   alignItems: 'center',
                                   justifyContent: 'center',
                                   borderWidth: 1,
@@ -5823,7 +5917,7 @@ export default function ProfilePage({
                               {group.badge && (
                                 <View
                                   style={{
-                                    backgroundColor: isDarkMode ? 'rgba(77, 184, 150, 0.2)' : 'rgba(29, 69, 51, 0.12)',
+                                    backgroundColor: isDarkMode ? 'rgba(77, 184, 150, 0.2)' : 'rgba(0, 0, 0, 0.12)',
                                     paddingHorizontal: 7,
                                     paddingVertical: 2,
                                     borderRadius: 8,
@@ -5842,7 +5936,7 @@ export default function ProfilePage({
                             {group.items.map((n) => {
                               const isUnread = n.status === 'unread';
                               const isExpanded = expandedNotifIds.has(n.id);
-                              const metaTheme = getNotifTheme(n.type, n.category);
+                              const metaTheme = getNotifTheme(n.type, n.category, n);
                               const actionLabel = getNotifActionLabel(n);
 
                               return (
@@ -5850,7 +5944,7 @@ export default function ProfilePage({
                                   key={n.id}
                                   style={{
                                     backgroundColor: isUnread
-                                      ? (isDarkMode ? 'rgba(29, 69, 51, 0.14)' : '#FAF9F6')
+                                      ? (isDarkMode ? 'rgba(0, 0, 0, 0.14)' : '#FAF9F6')
                                       : (isDarkMode ? '#141A18' : '#FFFFFF'),
                                     borderWidth: 1,
                                     borderColor: isUnread ? '#D4D4D8' : tokens.border,
@@ -5923,7 +6017,7 @@ export default function ProfilePage({
                                                 width: 6,
                                                 height: 6,
                                                 borderRadius: 3,
-                                                backgroundColor: '#1D4533',
+                                                backgroundColor: '#EA580C',
                                               }}
                                             />
                                           )}
@@ -5996,7 +6090,7 @@ export default function ProfilePage({
                                           activeOpacity={0.7}
                                           style={{ cursor: 'pointer' }}
                                         >
-                                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4533' }}>
+                                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#EA580C' }}>
                                             {actionLabel} · {metaTheme.label}
                                           </Text>
                                         </TouchableOpacity>
@@ -6583,9 +6677,10 @@ export default function ProfilePage({
                 </View>
               </View>
             )}
-          </ScrollView>
+          </View>
         </View>
       </View>
+      </ScrollView>
 
       {/* ───────────────────────────────────────────────────────────── */}
       {/* MODALS                                                        */}

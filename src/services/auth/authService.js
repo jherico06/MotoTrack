@@ -10,6 +10,8 @@ import { adminSecurityService } from './adminSecurityService.js';
 import { emailService } from '../notifications/emailService.js';
 import { notificationService } from '../notifications/notificationService.js';
 import { APP_CONFIG } from '../../config';
+import { APP_ROLES } from '../../constants/roles.js';
+import { LEGACY_MECHANIC_BLOCKED_MESSAGE } from '../../utils/permissions.js';
 
 const STORAGE_KEYS = {
   CURRENT_USER: 'mototrack_current_session',
@@ -496,6 +498,13 @@ export const authService = {
 
     // 2. Validate user in Supabase public.users
     const res = await userService.authenticate(cleanEmail, cleanPassword, requiredRole);
+    if (res.success && res.user?.role === APP_ROLES.MECHANIC) {
+      // Mechanic is a retired role: legacy accounts can no longer sign in.
+      try {
+        if (supabase) await supabase.auth.signOut();
+      } catch (_e) {}
+      return { success: false, error: LEGACY_MECHANIC_BLOCKED_MESSAGE };
+    }
     if (res.success) {
       if (res.user?.role === 'admin') {
         adminSecurityService.lockSession(res.user);
@@ -520,7 +529,10 @@ export const authService = {
   async loginWithGoogle() {
     const client = supabase || supabaseManager?.getClient();
     if (!client) {
-      return await this.loginWithGoogleSimulated();
+      return {
+        success: false,
+        error: 'Google sign-in is unavailable because the database client is not configured.',
+      };
     }
 
     const redirectUrl = getGoogleRedirectUrl();
@@ -659,8 +671,10 @@ export const authService = {
       }
     }
 
-    // Fallback simulation
-    return await this.loginWithGoogleSimulated();
+    return {
+      success: false,
+      error: 'Google sign-in could not be started on this device.',
+    };
   },
 
   async waitForPendingGoogleCallback(timeoutMs = 2500) {
@@ -826,48 +840,27 @@ export const authService = {
   },
 
   async loginWithGoogleSimulated() {
-    const googleEmail = 'rider.google@gmail.com';
-    let userRecord = null;
-    try {
-      const all = await userService.getAllUsers();
-      userRecord = (all || []).find((u) => (u.email || '').toLowerCase() === googleEmail);
-    } catch (_e) {}
-
-    if (!userRecord) {
-      const createRes = await userService.createUser({
-        name: 'Google Rider',
-        email: googleEmail,
-        phone: '+63 917 888 7766',
-        address: 'BGC, Taguig, Metro Manila',
-        role: 'user',
-        avatar:
-          'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
-        password: 'GoogleOAuth2026!SecureAuth',
-      });
-      if (createRes.success && createRes.user) {
-        userRecord = createRes.user;
-      } else {
-        userRecord = {
-          id: 'usr-google-demo',
-          name: 'Google Rider',
-          email: googleEmail,
-          role: 'user',
-          phone: '+63 917 888 7766',
-          address: 'BGC, Taguig, Metro Manila',
-          avatar:
-            'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80',
-        };
-      }
+    if (!APP_CONFIG.demo.enableDemoLogins) {
+      return {
+        success: false,
+        error: 'Google demo sign-in is disabled. Use email and password, or enable Google in Supabase Authentication.',
+      };
     }
-
-    const { password: _, ...safeUser } = userRecord;
+    const safeUser = {
+      id: 'usr-google-demo',
+      user_id: 'usr-google-demo',
+      name: 'Google Rider',
+      email: 'rider.google@gmail.com',
+      role: 'user',
+      phone: '',
+      address: '',
+      avatar: null,
+      auth_provider: 'google-demo',
+    };
     this.setCurrentUser(safeUser);
-    try {
-      await this.logAccountActivity(safeUser.id, 'oauth_google_login', 'User signed in via Google account');
-    } catch (_e) {}
-
     return {
       success: true,
+      demo: true,
       user: safeUser,
     };
   },

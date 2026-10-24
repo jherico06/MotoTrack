@@ -14,7 +14,12 @@ const OTP_TTL_MS = 5 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 const MAX_VERIFY_ATTEMPTS = 5;
 const MAX_RESENDS_PER_HOUR = 5;
-const STAFF_ROLES = new Set(['rider', 'mechanic']);
+// Only riders can be invited. Mechanics are an admin-managed roster (no accounts).
+// "mechanic" role is kept only so legacy logins can still be listed / disabled.
+const INVITABLE_STAFF_ROLES = new Set(['rider']);
+const LEGACY_LISTABLE_ROLES = ['rider', 'mechanic'];
+const MECHANIC_RETIRED_ERROR =
+  'Mechanics are roster-only (no login). Only Rider staff accounts can be created.';
 const PLACEHOLDER_PASSWORD_PREFIX = 'pending-invite:';
 
 const emailOk = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || '').trim());
@@ -23,7 +28,7 @@ function normalizeRole(role) {
   const r = String(role || '')
     .trim()
     .toLowerCase();
-  return STAFF_ROLES.has(r) ? r : null;
+  return INVITABLE_STAFF_ROLES.has(r) ? r : null;
 }
 
 function publicStaffUser(row) {
@@ -169,65 +174,7 @@ async function ensureRosterLink(supabase, { role, userId, name, email, phone, ro
     return { rosterId: riderId };
   }
 
-  if (role === 'mechanic') {
-    const { data: existing } = await supabase
-      .from('mechanics')
-      .select('id')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    const shortName =
-      String(roster.shortName || roster.short_name || '').trim() || name.split(' ')[0] || name;
-    const hourlyRate = Number(roster.hourlyRate ?? roster.hourly_rate ?? 150) || 150;
-
-    if (existing?.id) {
-      await supabase
-        .from('mechanics')
-        .update({
-          name,
-          short_name: shortName,
-          email,
-          phone: phone || '',
-          specialization: roster.specialization || 'General Service',
-          experience: roster.experience || '',
-          certifications: roster.certifications || '',
-          avatar: roster.avatar || null,
-          status: roster.status || 'Available',
-          hourly_rate: hourlyRate,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', existing.id);
-      return { rosterId: existing.id };
-    }
-
-    const mechId =
-      String(roster.id || '').trim() ||
-      `tech-${Date.now().toString(36)}-${sha256Hex(userId).slice(0, 4)}`;
-    const { error } = await supabase.from('mechanics').insert([
-      {
-        id: mechId,
-        name,
-        short_name: shortName,
-        phone: phone || '',
-        email,
-        user_id: userId,
-        status: roster.status || 'Available',
-        specialization: roster.specialization || 'General Service',
-        experience: roster.experience || '5 Years Pro Tech',
-        certifications: roster.certifications || 'Certified Motorcycle Technician',
-        avatar: roster.avatar || null,
-        hourly_rate: hourlyRate,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-    ]);
-    if (error) {
-      console.warn('[staffAccount] mechanic roster link warning:', error.message);
-      return { rosterWarning: error.message };
-    }
-    return { rosterId: mechId };
-  }
+  // Mechanic roster links are intentionally not created anymore (role retired).
 
   return {};
 }
@@ -252,10 +199,10 @@ export const staffAccountService = {
       .select(
         'user_id, name, email, phone, role, status, email_verified, must_change_password, credentials_sent_at, username, created_at, updated_at'
       )
-      .in('role', ['rider', 'mechanic'])
+      .in('role', LEGACY_LISTABLE_ROLES)
       .order('created_at', { ascending: false });
 
-    if (role && STAFF_ROLES.has(role)) {
+    if (role && LEGACY_LISTABLE_ROLES.includes(role)) {
       query = query.eq('role', role);
     }
 
@@ -277,8 +224,11 @@ export const staffAccountService = {
     if (!emailOk(cleanEmail)) {
       return { success: false, error: 'Please enter a valid email address.' };
     }
+    if (String(role || '').trim().toLowerCase() === 'mechanic') {
+      return { success: false, error: MECHANIC_RETIRED_ERROR, code: 'ROLE_RETIRED' };
+    }
     if (!safeRole) {
-      return { success: false, error: 'Role must be Rider or Mechanic.' };
+      return { success: false, error: 'Role must be Rider.' };
     }
 
     const { data: existing } = await supabase
@@ -316,7 +266,7 @@ export const staffAccountService = {
         status: 'pending_verification',
         email_verified: false,
         must_change_password: false,
-        address: safeRole === 'rider' ? 'MotoTrack Delivery Staff' : 'MotoTrack Garage Staff',
+        address: 'MotoTrack Delivery Staff',
         member_since: new Date().getFullYear().toString(),
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -408,7 +358,7 @@ export const staffAccountService = {
     let query = supabase
       .from('users')
       .select('*')
-      .in('role', ['rider', 'mechanic'])
+      .in('role', ['rider'])
       .eq('status', 'pending_verification');
 
     if (userId) query = query.eq('user_id', String(userId).trim());
@@ -495,7 +445,7 @@ export const staffAccountService = {
       .from('users')
       .select('*')
       .ilike('email', cleanEmail)
-      .in('role', ['rider', 'mechanic'])
+      .in('role', ['rider'])
       .maybeSingle();
 
     if (!user) {
@@ -679,7 +629,7 @@ export const staffAccountService = {
       .from('users')
       .select('*')
       .eq('user_id', id)
-      .in('role', ['rider', 'mechanic'])
+      .in('role', ['rider'])
       .maybeSingle();
 
     if (error) return { success: false, error: error.message };
@@ -762,7 +712,7 @@ export const staffAccountService = {
       .from('users')
       .select('*')
       .eq('user_id', id)
-      .in('role', ['rider', 'mechanic'])
+      .in('role', LEGACY_LISTABLE_ROLES)
       .maybeSingle();
 
     if (!user) return { success: false, error: 'Staff account not found.' };
@@ -804,7 +754,7 @@ export const staffAccountService = {
       .from('users')
       .update({ must_change_password: false, updated_at: new Date().toISOString() })
       .eq('user_id', id)
-      .in('role', ['rider', 'mechanic']);
+      .in('role', ['rider']);
     if (error) return { success: false, error: error.message };
     return { success: true };
   },

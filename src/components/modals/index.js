@@ -23,3 +23,5 @@ export { default as EditBrandModal } from './EditBrandModal.jsx';
 export { default as StaffAccountSettingsModal } from './StaffAccountSettingsModal.jsx';
 export { default as AdminAccountSettingsModal } from './AdminAccountSettingsModal.jsx';
 export { default as AdminOrderDetailsModal } from './AdminOrderDetailsModal.jsx';
+export { default as BookInstallationModal } from './BookInstallationModal.jsx';
+

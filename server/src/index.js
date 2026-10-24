@@ -4,6 +4,7 @@ import cors from 'cors';
 import os from 'os';
 import customizeRouter from './routes/customize.js';
 import staffRouter from './routes/staff.js';
+import notifyRouter from './routes/notify.js';
 import { multerErrorHandler } from './middleware/upload.js';
 
 const app = express();
@@ -52,12 +53,14 @@ app.get('/', (_req, res) => {
       staffSendTempCredentials: 'POST /api/staff/send-temp-credentials',
       staffVerify: 'POST /api/staff/verify',
       staffList: 'GET /api/staff',
+      notifyEmail: 'POST /api/notify/email',
     },
   });
 });
 
 app.use('/api', customizeRouter);
 app.use('/api/staff', staffRouter);
+app.use('/api/notify', notifyRouter);
 app.use(multerErrorHandler);
 
 app.use((err, _req, res, _next) => {

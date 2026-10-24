@@ -58,9 +58,27 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
       <View style={styles.modalOverlay}>
         <View style={styles.modalSheet}>
           <View style={styles.modalHeaderRow}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <BootstrapIcon name="cart-fill" size={16} color="#1D4533" />
-              <Text style={styles.modalTitle}>Your Cart ({cartItemCount} items)</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  backgroundColor: '#FFF7ED',
+                  borderWidth: 1,
+                  borderColor: '#FED7AA',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <BootstrapIcon name="cart-fill" size={16} color="#EA580C" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>Your Cart</Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                  {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'} in your bag
+                </Text>
+              </View>
             </View>
             <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
               <BootstrapIcon name="x-lg" size={14} color="#64748b" />
@@ -101,8 +119,8 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                       height: 22,
                       borderRadius: 6,
                       borderWidth: 1.8,
-                      borderColor: isAllSelected ? '#1D4533' : '#CBD5E1',
-                      backgroundColor: isAllSelected ? '#1D4533' : '#FFFFFF',
+                      borderColor: isAllSelected ? '#EA580C' : '#CBD5E1',
+                      backgroundColor: isAllSelected ? '#EA580C' : '#FFFFFF',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
@@ -117,13 +135,13 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                 {hasSelectedItems ? (
                   <View
                     style={{
-                      backgroundColor: '#E8F0EC',
+                      backgroundColor: '#FFF7ED',
                       paddingHorizontal: 8,
                       paddingVertical: 3,
                       borderRadius: 12,
                     }}
                   >
-                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#1D4533' }}>
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#EA580C' }}>
                       {selectedCartItems.length} selected ({selectedCartItemCount} {selectedCartItemCount === 1 ? 'unit' : 'units'})
                     </Text>
                   </View>
@@ -163,8 +181,8 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                             height: 22,
                             borderRadius: 6,
                             borderWidth: 1.8,
-                            borderColor: isChecked ? '#1D4533' : '#CBD5E1',
-                            backgroundColor: isChecked ? '#1D4533' : '#FFFFFF',
+                            borderColor: isChecked ? '#EA580C' : '#CBD5E1',
+                            backgroundColor: isChecked ? '#EA580C' : '#FFFFFF',
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
@@ -240,8 +258,8 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                             flexDirection: 'row',
                             alignItems: 'center',
                             gap: 5,
-                            backgroundColor: isSelected ? '#1D4533' : '#F1F5F9',
-                            borderColor: isSelected ? '#1D4533' : '#CBD5E1',
+                            backgroundColor: isSelected ? '#EA580C' : '#F1F5F9',
+                            borderColor: isSelected ? '#EA580C' : '#CBD5E1',
                             borderWidth: 1,
                             borderRadius: 12,
                             paddingHorizontal: 9,
@@ -252,7 +270,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                           <BootstrapIcon
                             name={isSelected ? 'check-circle-fill' : 'ticket-perforated-fill'}
                             size={11}
-                            color={isSelected ? '#FFFFFF' : '#1D4533'}
+                            color={isSelected ? '#FFFFFF' : '#EA580C'}
                           />
                           <Text
                             style={{

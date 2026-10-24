@@ -86,7 +86,7 @@ export default function ExpectedDateField({
         disabled={!showCalendar}
       >
         <View style={styles.inputLeft}>
-          <BootstrapIcon name="calendar-event" size={15} color="#1D4533" />
+          <BootstrapIcon name="calendar-event" size={15} color="#EA580C" />
           <Text style={[styles.dateDisplayText, isDarkMode && { color: '#F8FAFC' }]}>
             {formattedDisplay}
           </Text>
@@ -109,7 +109,7 @@ export default function ExpectedDateField({
             <BootstrapIcon
               name={calendarOpen ? 'chevron-up' : 'chevron-down'}
               size={11}
-              color="#1D4533"
+              color="#EA580C"
             />
           </View>
         ) : null}
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 9,
@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
   },
   selectedPill: {
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
   selectedPillText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   toggleCalendarBtn: {
     flexDirection: 'row',
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   toggleCalendarText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   chips: {
     flexDirection: 'row',
@@ -275,8 +275,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   chipOn: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   chipText: {
     fontSize: 11,

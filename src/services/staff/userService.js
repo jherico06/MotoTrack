@@ -2,6 +2,7 @@
 import { supabase } from '../../lib/supabase.js';
 import { appStorage } from '../system/storageAdapter.js';
 import { hashPassword, isHashed, verifyPassword } from '../../utils/hash.js';
+import { APP_CONFIG } from '../../config';
 // Re-exported from central config so the admin secret key is env-driven (.env)
 export { ADMIN_SECRET_KEY } from '../../config';
 
@@ -33,17 +34,15 @@ export const CUSTOMER_USER = {
   role: 'user',
   status: 'active',
   memberSince: '2024',
-  orders: [
-    {
-      id: 'ord-8921',
-      order_id: 'ord-8921',
-      date: 'Aug 10, 2026',
-      total: '1145.00',
-      items: 'Akrapovič Titanium Slip-On Racing Exhaust (x1), Brembo 19RCS (x1)',
-      status: 'Delivered',
-    },
-  ],
+  orders: [],
 };
+
+const SEED_DEMO_USER_IDS = new Set(['usr-admin-01', 'usr-customer-01', 'usr-google-demo']);
+
+function isSeedDemoUser(user) {
+  const id = String(user?.id || user?.user_id || '');
+  return SEED_DEMO_USER_IDS.has(id);
+}
 
 const STORAGE_KEYS = {
   USERS: 'mototrack_users_db',
@@ -58,15 +57,10 @@ class UserService {
   initDatabase() {
     try {
       const existing = appStorage.getItem(STORAGE_KEYS.USERS);
-      if (!existing) {
-        const initialDB = [CUSTOMER_USER, ADMIN_USER];
-        appStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(initialDB));
-      } else {
-        const users = JSON.parse(existing);
-        if (!users.some((u) => u.email?.toLowerCase() === ADMIN_USER.email.toLowerCase())) {
-          users.push(ADMIN_USER);
-          appStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(users));
-        }
+      const users = existing ? JSON.parse(existing) : [];
+      const cleaned = (Array.isArray(users) ? users : []).filter((user) => !isSeedDemoUser(user));
+      if (!existing || cleaned.length !== (Array.isArray(users) ? users.length : 0)) {
+        appStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(cleaned));
       }
     } catch (_e) {}
   }
@@ -74,9 +68,10 @@ class UserService {
   getLocalUsers() {
     try {
       const data = appStorage.getItem(STORAGE_KEYS.USERS);
-      return data ? JSON.parse(data) : [CUSTOMER_USER, ADMIN_USER];
+      const users = data ? JSON.parse(data) : [];
+      return (Array.isArray(users) ? users : []).filter((user) => !isSeedDemoUser(user));
     } catch (e) {
-      return [CUSTOMER_USER, ADMIN_USER];
+      return [];
     }
   }
 
@@ -1146,7 +1141,7 @@ class UserService {
       } catch (_e) {}
     }
 
-    if (!user) {
+    if (!user && APP_CONFIG.demo.enableDemoLogins) {
       if (normalizedEmail === CUSTOMER_USER.email.toLowerCase()) {
         user = CUSTOMER_USER;
       } else if (normalizedEmail === ADMIN_USER.email.toLowerCase()) {

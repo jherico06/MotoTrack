@@ -4,17 +4,17 @@ import { ANDROID_TOP_INSET } from '../utils/safeArea.js';
 export const signUpPageStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
   },
   innerContainer: {
     flex: 1,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
     justifyContent: 'space-between',
   },
 
-  // ─── TOP TEAL HEADER SECTION ───
+  // ─── TOP CHARCOAL HEADER SECTION ───
   topHeroSection: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
     paddingTop: Platform.OS === 'ios' ? 52 : ANDROID_TOP_INSET + 12,
     paddingHorizontal: 28,
     paddingBottom: 20,
@@ -29,8 +29,8 @@ export const signUpPageStyles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#56B9A1',
-    opacity: 0.85,
+    backgroundColor: '#EA580C',
+    opacity: 0.25,
   },
   abstractOrganicShapeInner: {
     position: 'absolute',
@@ -39,7 +39,7 @@ export const signUpPageStyles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
   },
 
   // ─── WHITE CARD CONTAINER SHEET ───
@@ -63,19 +63,19 @@ export const signUpPageStyles = StyleSheet.create({
   backLinkText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#1D4533',
+    color: '#EA580C',
   },
 
   cardTitle: {
     fontSize: 26,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#111827',
     marginBottom: 6,
     letterSpacing: -0.3,
   },
   cardSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: '#6B7280',
     fontWeight: '500',
     marginBottom: 18,
   },
@@ -85,8 +85,8 @@ export const signUpPageStyles = StyleSheet.create({
     marginBottom: 12,
   },
   inputPill: {
-    backgroundColor: '#F3F7F6',
-    borderRadius: 25,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
     height: 48,
     paddingHorizontal: 18,
     flexDirection: 'row',
@@ -96,7 +96,7 @@ export const signUpPageStyles = StyleSheet.create({
     borderColor: 'transparent',
   },
   inputPillFocused: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#FFFFFF',
   },
   textInput: {
@@ -166,7 +166,7 @@ export const signUpPageStyles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
@@ -174,20 +174,20 @@ export const signUpPageStyles = StyleSheet.create({
   otpTitle: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#111827',
     marginBottom: 6,
     textAlign: 'center',
   },
   otpSubtitle: {
     fontSize: 13,
-    color: '#64748B',
+    color: '#6B7280',
     textAlign: 'center',
     lineHeight: 18,
     paddingHorizontal: 12,
   },
   otpTargetEmail: {
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   otpInputsRow: {
     flexDirection: 'row',
@@ -200,19 +200,19 @@ export const signUpPageStyles = StyleSheet.create({
     height: 52,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#CBD5E1',
-    backgroundColor: '#F8FAFC',
+    borderColor: '#E5E7EB',
+    backgroundColor: '#F9FAFB',
     alignItems: 'center',
     justifyContent: 'center',
   },
   otpDigitBoxActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#FFFFFF',
   },
   otpDigitText: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#111827',
     textAlign: 'center',
   },
   otpInstantCodeBanner: {
@@ -247,24 +247,24 @@ export const signUpPageStyles = StyleSheet.create({
   },
   resendText: {
     fontSize: 12.5,
-    color: '#64748B',
+    color: '#6B7280',
     fontWeight: '500',
   },
   resendBtnText: {
     fontSize: 12.5,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '800',
   },
 
   // ─── PRIMARY BUTTON ───
   primaryPillBtn: {
-    backgroundColor: '#1D4533',
-    borderRadius: 25,
+    backgroundColor: '#EA580C',
+    borderRadius: 10,
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 10,
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.28,
     shadowRadius: 8,

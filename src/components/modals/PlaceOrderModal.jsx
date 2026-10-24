@@ -113,7 +113,32 @@ export default function PlaceOrderModal({
       <View style={styles.modalOverlay}>
         <View style={[styles.modalSheet, { maxHeight: '90%' }]}>
           <View style={styles.modalHeaderRow}>
-            <Text style={styles.modalTitle}>{title}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  backgroundColor: '#FFF7ED',
+                  borderWidth: 1,
+                  borderColor: '#FED7AA',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <BootstrapIcon
+                  name={mode === 'buy' ? 'lightning-fill' : 'cart-plus-fill'}
+                  size={16}
+                  color="#EA580C"
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalTitle}>{title}</Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                  Configure color, size, and quantity
+                </Text>
+              </View>
+            </View>
             <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
               <BootstrapIcon name="x-lg" size={14} color="#64748b" />
             </TouchableOpacity>
@@ -179,7 +204,7 @@ export default function PlaceOrderModal({
                             borderRadius: 22,
                             backgroundColor: entry.hex || '#CBD5E1',
                             borderWidth: active ? 3 : 1.5,
-                            borderColor: soldOut ? '#FECACA' : active ? '#1D4533' : '#E2E8F0',
+                            borderColor: soldOut ? '#FECACA' : active ? '#EA580C' : '#E2E8F0',
                             overflow: 'hidden',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -199,7 +224,7 @@ export default function PlaceOrderModal({
                             fontWeight: '800',
                             marginTop: 6,
                             textAlign: 'center',
-                            color: soldOut ? '#991B1B' : active ? '#1D4533' : '#0F172A',
+                            color: soldOut ? '#991B1B' : active ? '#EA580C' : '#0F172A',
                             textDecorationLine: soldOut ? 'line-through' : 'none',
                           }}
                           numberOfLines={2}
@@ -241,8 +266,8 @@ export default function PlaceOrderModal({
                           paddingVertical: 8,
                           borderRadius: 10,
                           borderWidth: 1.5,
-                          borderColor: soldOut ? '#FECACA' : active ? '#1D4533' : '#E2E8F0',
-                          backgroundColor: soldOut ? '#FEF2F2' : active ? '#1D4533' : '#F8FAFC',
+                          borderColor: soldOut ? '#FECACA' : active ? '#EA580C' : '#E2E8F0',
+                          backgroundColor: soldOut ? '#FEF2F2' : active ? '#EA580C' : '#F8FAFC',
                           minWidth: 112,
                           opacity: soldOut ? 0.75 : 1,
                         }}
@@ -263,7 +288,7 @@ export default function PlaceOrderModal({
                             fontSize: 11,
                             fontWeight: '700',
                             marginTop: 2,
-                            color: soldOut ? '#DC2626' : active ? '#CCFBF1' : '#1D4533',
+                            color: soldOut ? '#DC2626' : active ? '#FED7AA' : '#EA580C',
                           }}
                         >
                           {soldOut ? 'Sold Out' : `₱${Number(entry.price || 0).toLocaleString()}`}
@@ -378,7 +403,7 @@ export default function PlaceOrderModal({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 6,
-                  backgroundColor: canConfirm ? '#1D4533' : '#94A3B8',
+                  backgroundColor: canConfirm ? '#EA580C' : '#94A3B8',
                   opacity: canConfirm ? 1 : 0.55,
                 },
               ]}

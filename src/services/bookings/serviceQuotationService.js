@@ -32,6 +32,7 @@ import {
   assertTransition,
 } from '../../utils/bookingWorkflow.js';
 import { bookingTimelineService } from './bookingTimelineService.js';
+import { isPmsFixedBooking } from '../../utils/pmsCcPricing.js';
 
 function newId(prefix) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -354,6 +355,11 @@ export const serviceQuotationService = {
     const sourceId = payload.source_quotation_id || payload.sourceQuotationId || null;
     const hourlyRate = Number(payload.hourly_rate ?? payload.hourlyRate ?? 0);
     const estimatedHours = Number(payload.estimated_labor_hours ?? payload.estimatedLaborHours ?? 0);
+    const fixedServiceRateRaw = payload.fixed_service_rate ?? payload.fixedServiceRate ?? payload.labor_cost;
+    const fixedServiceRate =
+      fixedServiceRateRaw != null && String(fixedServiceRateRaw).trim() !== ''
+        ? Number(fixedServiceRateRaw)
+        : null;
     const quotationId = payload.quotation_id || payload.quotationId || newId('qt');
     const items = buildItemsFromInput(payload.items || [], bookingId, quotationId);
     const partsTotal = roundMoney(
@@ -364,8 +370,10 @@ export const serviceQuotationService = {
         Number(payload.other_charges_total ?? payload.otherChargesTotal ?? 0)
     );
     const totals = calcServiceTotals({
-      hourlyRate,
-      laborHours: estimatedHours,
+      hourlyRate: fixedServiceRate != null && Number.isFinite(fixedServiceRate) ? 0 : hourlyRate,
+      laborHours: fixedServiceRate != null && Number.isFinite(fixedServiceRate) ? 0 : estimatedHours,
+      laborCost:
+        fixedServiceRate != null && Number.isFinite(fixedServiceRate) ? fixedServiceRate : undefined,
       partsTotal,
       otherChargesTotal,
       additionalChargesTotal: Number(payload.additional_charges_total ?? 0),
@@ -424,7 +432,7 @@ export const serviceQuotationService = {
       if (itemErr) return { success: false, error: itemErr.message };
     }
 
-    await patchBooking(bookingId, {
+    const bookingPatch = {
       quoted_hourly_rate: hourlyRate,
       estimated_labor_hours: estimatedHours,
       estimated_labor_cost: totals.laborCost,
@@ -439,7 +447,12 @@ export const serviceQuotationService = {
       remaining_balance: dp.remainingBalance,
       estimated_service_total: totals.totalAmount,
       active_quotation_id: quotationId,
-    });
+    };
+    if (fixedServiceRate != null && Number.isFinite(fixedServiceRate)) {
+      bookingPatch.quoted_service_rate = roundMoney(fixedServiceRate);
+      bookingPatch.package_price = roundMoney(fixedServiceRate);
+    }
+    await patchBooking(bookingId, bookingPatch);
 
     await appendStatusHistory(
       bookingId,
@@ -1195,7 +1208,7 @@ export const serviceQuotationService = {
     const { data: booking } = await c
       .from('bookings')
       .select(
-        'booking_id, customer_id, status, amount_paid, estimated_service_total, final_service_total, actual_labor_cost, actual_labor_hours, quoted_hourly_rate, parts_total, other_charges_total, discount_amount, discount_type, discount_value'
+        'booking_id, customer_id, status, amount_paid, estimated_service_total, final_service_total, actual_labor_cost, actual_labor_hours, quoted_hourly_rate, quoted_service_rate, package_price, booking_mode, pms_service_id, category, service_type, parts_total, other_charges_total, discount_amount, discount_type, discount_value'
       )
       .eq('booking_id', bookingId)
       .maybeSingle();
@@ -1212,10 +1225,12 @@ export const serviceQuotationService = {
       (acceptedExtra || []).reduce((s, r) => s + Number(r.total_amount || 0), 0)
     );
 
-    const rate = Number(booking.quoted_hourly_rate || quotation?.hourly_rate || 0);
-    const actualHours = Number(
+    let finalTotal;
+    let totals;
+    let actualHours = Number(
       booking.actual_labor_hours ?? quotation?.actual_labor_hours ?? quotation?.estimated_labor_hours ?? 0
     );
+
     const partsTotal = Number(quotation?.parts_total ?? booking.parts_total ?? 0);
     const otherChargesTotal = Number(
       quotation?.other_charges_total ?? booking.other_charges_total ?? 0
@@ -1223,17 +1238,39 @@ export const serviceQuotationService = {
     const discountType = quotation?.discount_type ?? booking.discount_type;
     const discountValue = Number(quotation?.discount_value ?? booking.discount_value ?? 0);
 
-    const totals = calcServiceTotals({
-      hourlyRate: rate,
-      laborHours: actualHours,
-      partsTotal,
-      otherChargesTotal,
-      additionalChargesTotal,
-      discountType,
-      discountValue,
-    });
+    if (isPmsFixedBooking(booking)) {
+      // Fixed service rate + optional parts/other from quotation (inventory products)
+      const fixedRate = Number(
+        booking.quoted_service_rate ||
+          booking.package_price ||
+          quotation?.labor_cost ||
+          booking.estimated_service_total ||
+          0
+      );
+      actualHours = 0;
+      totals = calcServiceTotals({
+        laborCost: fixedRate,
+        partsTotal,
+        otherChargesTotal,
+        additionalChargesTotal,
+        discountType,
+        discountValue,
+      });
+      finalTotal = totals.totalAmount;
+    } else {
+      const rate = Number(booking.quoted_hourly_rate || quotation?.hourly_rate || 0);
 
-    const finalTotal = totals.totalAmount;
+      totals = calcServiceTotals({
+        hourlyRate: rate,
+        laborHours: actualHours,
+        partsTotal,
+        otherChargesTotal,
+        additionalChargesTotal,
+        discountType,
+        discountValue,
+      });
+      finalTotal = totals.totalAmount;
+    }
     const paid = roundMoney(Number(booking.amount_paid || 0));
     const remaining = roundMoney(Math.max(0, finalTotal - paid));
 
@@ -1262,6 +1299,9 @@ export const serviceQuotationService = {
       status: remaining > 0 ? FLEX_BOOKING_STATUS.FOR_FINAL_BILLING : nextStatus,
       actual_labor_hours: actualHours,
       actual_labor_cost: totals.laborCost,
+      parts_total: totals.partsTotal,
+      other_charges_total: totals.otherChargesTotal,
+      discount_amount: totals.discountAmount,
       final_service_total: finalTotal,
       remaining_balance: remaining,
       service_completed_at: new Date().toISOString(),
@@ -1330,13 +1370,23 @@ export const serviceQuotationService = {
 
     notifyCustomer(
       booking.customer_id,
-      remaining > 0 ? 'Final Payment Required' : 'Service Completed',
+      remaining > 0 ? 'Final Payment Required' : 'Service Completed — Receipt Ready',
       remaining > 0
-        ? `Service completed. Remaining balance ${formatPhp(remaining)}. Pay at the shop — admin will record payment.`
-        : `Service completed for ${bookingId}. Your motorcycle is ready for pickup.`
+        ? `Service done. Remaining ${formatPhp(remaining)}. Open Garage → this booking to view your official service receipt and pay at the shop.`
+        : `Service completed for ${bookingId}. Your motorcycle is ready for pickup — open Garage to view your official service receipt.`,
+      { link: 'garage', booking_id: bookingId }
     );
     dataCache.invalidate(CacheKeys.bookingQuotation(bookingId));
-    return { success: true, finalTotal, remaining, laborCost: totals.laborCost, additionalChargesTotal };
+    return {
+      success: true,
+      finalTotal,
+      remaining,
+      laborCost: totals.laborCost,
+      partsTotal: totals.partsTotal,
+      otherChargesTotal: totals.otherChargesTotal,
+      additionalChargesTotal,
+      receiptReady: true,
+    };
   },
 
   /** Generate (or return existing) pickup QR when booking is fully paid / ready */

@@ -11,7 +11,6 @@ export { default as NotificationsPage } from '../screens/web/customer/Notificati
 export { default as DeliveryConfirmPage } from '../screens/shared/delivery/DeliveryConfirmPage.jsx';
 export { default as RiderRunPage } from '../screens/mobile/rider/RiderRunPage.jsx';
 export { default as RiderDashboard } from '../screens/web/rider/RiderDashboard.jsx';
-export { default as MechanicDashboard } from '../screens/web/mechanic/MechanicDashboard.jsx';
 export { default as ProductDetailsPage } from '../screens/shared/customer/ProductDetailsPage.jsx';
 export { default as StaffVerifyEmailPage } from '../screens/shared/auth/StaffVerifyEmailPage.jsx';
 export { default as ForceChangePasswordPage } from '../screens/shared/auth/ForceChangePasswordPage.jsx';

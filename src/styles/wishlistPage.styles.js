@@ -8,8 +8,23 @@ export const wishlistStyles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingTop: ANDROID_TOP_INSET,
+    backgroundColor: '#24272B',
+    paddingTop: Platform.OS === 'android' ? ANDROID_TOP_INSET : 0,
+  },
+  appHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#24272B',
+  },
+  appHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
   },
   scrollContent: {
     paddingBottom: 110,
@@ -21,17 +36,17 @@ export const wishlistStyles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
-  // ─── TOP NAVBAR (DESKTOP & TABLET) ───
+  // ─── TOP NAVBAR (CHARCOAL HEADER PALETTE) ───
   navbarWrapper: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#24272B',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#1A1D20',
     paddingVertical: 14,
-    shadowColor: '#0F172A',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.18,
+    shadowRadius: 6,
+    elevation: 4,
     zIndex: 10,
   },
   navbarInner: {
@@ -48,11 +63,11 @@ export const wishlistStyles = StyleSheet.create({
   logoText: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#FFFFFF',
     letterSpacing: -0.5,
   },
   logoAccent: {
-    color: '#1D4533',
+    color: '#EA580C',
   },
   navActionsRight: {
     flexDirection: 'row',
@@ -74,7 +89,7 @@ export const wishlistStyles = StyleSheet.create({
     color: '#334155',
   },
   navBtnPrimary: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   navBtnPrimaryText: {
     color: '#FFFFFF',
@@ -100,7 +115,7 @@ export const wishlistStyles = StyleSheet.create({
     fontWeight: '600',
   },
   breadcrumbActive: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '800',
   },
   titleRow: {
@@ -128,7 +143,7 @@ export const wishlistStyles = StyleSheet.create({
   itemCountBadgeText: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   headerControls: {
     flexDirection: 'row',
@@ -332,7 +347,7 @@ export const wishlistStyles = StyleSheet.create({
   brandText: {
     fontSize: 11.5,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -406,7 +421,7 @@ export const wishlistStyles = StyleSheet.create({
   },
   addToCartBtn: {
     flex: 1,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 10,
     borderRadius: 12,
     flexDirection: 'row',
@@ -469,7 +484,7 @@ export const wishlistStyles = StyleSheet.create({
     marginBottom: 24,
   },
   emptyShopBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 14,
@@ -515,7 +530,7 @@ export const wishlistStyles = StyleSheet.create({
     color: '#0F172A',
   },
   mobileAddAllBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 12,

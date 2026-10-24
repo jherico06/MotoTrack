@@ -1,4 +1,4 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { ANDROID_TOP_INSET } from '../utils/safeArea.js';
 
 export const customizerStyles = StyleSheet.create({
@@ -9,8 +9,68 @@ export const customizerStyles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
-    paddingTop: ANDROID_TOP_INSET,
+    backgroundColor: '#24272B',
+    paddingTop: Platform.OS === 'android' ? ANDROID_TOP_INSET : 0,
+  },
+  appHeaderRow: {
+    paddingTop: 8,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#24272B',
+    gap: 12,
+  },
+  appHeaderTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+  },
+  headerToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    width: '100%',
+  },
+  headerToggleBtn: {
+    flex: 1,
+    height: 42,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+  },
+  headerToggleBtnActive: {
+    backgroundColor: '#EA580C',
+    borderWidth: 1.5,
+    borderColor: '#EA580C',
+    ...Platform.select({
+      web: { boxShadow: '0 2px 8px rgba(234, 88, 12, 0.35)' },
+      default: {
+        shadowColor: '#EA580C',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.35,
+        shadowRadius: 4,
+        elevation: 2,
+      },
+    }),
+  },
+  headerToggleBtnInactive: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.18)',
+  },
+  headerToggleBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: -0.1,
+  },
+  headerToggleBtnTextActive: {
+    color: '#FFFFFF',
+  },
+  headerToggleBtnTextInactive: {
+    color: 'rgba(255, 255, 255, 0.85)',
   },
   scrollContent: {
     paddingBottom: 120, // Generous padding for persistent bottom navigation bar on mobile
@@ -22,11 +82,11 @@ export const customizerStyles = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
-  // ─── 1. MOBILE TOP HEADER (MATCHING APP PALETTE) ───
+  // ─── 1. MOBILE TOP HEADER (CHARCOAL HEADER PALETTE) ───
   headerWrapper: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#24272B',
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#1A1D20',
     paddingVertical: 12,
     zIndex: 100,
   },
@@ -45,10 +105,12 @@ export const customizerStyles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 10,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#1E2124',
+    borderWidth: 1,
+    borderColor: '#363C44',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#1D4533',
+    shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -57,23 +119,23 @@ export const customizerStyles = StyleSheet.create({
   logoTitle: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#FFFFFF',
     letterSpacing: -0.5,
   },
   logoAccent: {
-    color: '#1D4533',
+    color: '#EA580C',
   },
   aiBadgeHeader: {
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
-    borderColor: '#C8DDD3',
+    borderColor: '#FED7AA',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 7,
     marginLeft: 2,
   },
   aiBadgeHeaderText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 9.5,
     fontWeight: '900',
     letterSpacing: 0.8,
@@ -85,26 +147,26 @@ export const customizerStyles = StyleSheet.create({
     paddingHorizontal: 11,
     paddingVertical: 7,
     borderRadius: 12,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#1E2124',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#363C44',
   },
   backBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#334155',
+    color: '#FFFFFF',
   },
 
   // ─── 2. HERO SHOWCASE SECTION ───
   heroSection: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
     borderRadius: 20,
     padding: 20,
     marginTop: 14,
     marginBottom: 18,
     position: 'relative',
     overflow: 'hidden',
-    shadowColor: '#1D4533',
+    shadowColor: '#24272B',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
     shadowRadius: 12,
@@ -217,7 +279,7 @@ export const customizerStyles = StyleSheet.create({
     position: 'absolute',
     bottom: 12,
     right: 12,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
@@ -225,7 +287,7 @@ export const customizerStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     borderWidth: 1,
-    borderColor: '#56B9A1',
+    borderColor: '#EA580C',
   },
   toggleViewBtnText: {
     color: '#FFFFFF',
@@ -247,8 +309,8 @@ export const customizerStyles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     borderWidth: 3,
-    borderColor: '#1D4533',
-    borderTopColor: '#56B9A1',
+    borderColor: '#374151',
+    borderTopColor: '#EA580C',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -262,7 +324,7 @@ export const customizerStyles = StyleSheet.create({
   },
   scanSub: {
     fontSize: 12.5,
-    color: '#74C9B4',
+    color: '#EA580C',
     textAlign: 'center',
     marginBottom: 16,
     fontWeight: '700',
@@ -277,7 +339,7 @@ export const customizerStyles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 4,
   },
   progressPercentText: {
@@ -312,7 +374,7 @@ export const customizerStyles = StyleSheet.create({
   geminiBadge: {
     backgroundColor: '#F3F7F6',
     borderWidth: 1,
-    borderColor: '#C8DDD3',
+    borderColor: '#FED7AA',
     paddingHorizontal: 7,
     paddingVertical: 2,
     borderRadius: 6,
@@ -320,7 +382,7 @@ export const customizerStyles = StyleSheet.create({
   geminiBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   geminiSummary: {
     fontSize: 12,
@@ -388,7 +450,7 @@ export const customizerStyles = StyleSheet.create({
   diagItemVal: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   diagItemSub: {
     fontSize: 10,
@@ -402,7 +464,7 @@ export const customizerStyles = StyleSheet.create({
     gap: 8,
   },
   generateCtaBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 14,
@@ -410,7 +472,7 @@ export const customizerStyles = StyleSheet.create({
     justifyContent: 'center',
     flexDirection: 'row',
     gap: 8,
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -424,7 +486,7 @@ export const customizerStyles = StyleSheet.create({
   bookServiceBtn: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#E5E7EB',
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 14,
@@ -435,7 +497,7 @@ export const customizerStyles = StyleSheet.create({
     marginTop: 8,
   },
   bookServiceBtnText: {
-    color: '#1D4533',
+    color: '#24272B',
     fontSize: 13.5,
     fontWeight: '800',
   },
@@ -486,7 +548,7 @@ export const customizerStyles = StyleSheet.create({
   },
   sectionHeadingSub: {
     fontSize: 11.5,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
   },
 
@@ -503,8 +565,8 @@ export const customizerStyles = StyleSheet.create({
     marginBottom: 14,
   },
   uploadBoxActive: {
-    borderColor: '#1D4533',
-    backgroundColor: '#F3F7F6',
+    borderColor: '#EA580C',
+    backgroundColor: '#FFF7ED',
   },
   uploadIconCircle: {
     width: 44,
@@ -544,9 +606,9 @@ export const customizerStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   presetBikeCardActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     borderWidth: 2,
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
   },
   presetBikeImg: {
     width: '100%',
@@ -563,7 +625,7 @@ export const customizerStyles = StyleSheet.create({
   },
   presetBikeBrand: {
     fontSize: 10,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
     marginTop: 1,
   },
@@ -583,9 +645,9 @@ export const customizerStyles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   themeCardActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     borderWidth: 2,
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
   },
   themeTitle: {
     fontSize: 13,
@@ -624,8 +686,8 @@ export const customizerStyles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   partsCategoryChipActive: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   partsCategoryText: {
     fontSize: 11.5,
@@ -669,9 +731,9 @@ export const customizerStyles = StyleSheet.create({
     marginBottom: 6,
   },
   partItemCardSelected: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     borderWidth: 1.5,
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
   },
   partThumb: {
     width: 46,
@@ -698,7 +760,7 @@ export const customizerStyles = StyleSheet.create({
   partPricePhp: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   partPriceUsd: {
     fontSize: 10,
@@ -715,17 +777,17 @@ export const customizerStyles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   checkboxCircleSelected: {
-    borderColor: '#1D4533',
-    backgroundColor: '#1D4533',
+    borderColor: '#EA580C',
+    backgroundColor: '#EA580C',
   },
 
   // Selected Parts Tray
   selectedTray: {
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
     borderRadius: 14,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#C8DDD3',
+    borderColor: '#FED7AA',
     marginTop: 10,
   },
   selectedTrayHeader: {
@@ -743,7 +805,7 @@ export const customizerStyles = StyleSheet.create({
   selectedTrayTotal: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
 
   // ─── 6. MODALS ───
@@ -813,9 +875,9 @@ export const customizerStyles = StyleSheet.create({
     marginBottom: 6,
   },
   branchBtnActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     borderWidth: 2,
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
   },
   branchText: {
     fontSize: 12.5,
@@ -838,8 +900,8 @@ export const customizerStyles = StyleSheet.create({
     marginBottom: 6,
   },
   slotChipActive: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   slotText: {
     fontSize: 11,
@@ -873,9 +935,9 @@ export const customizerStyles = StyleSheet.create({
     elevation: 2,
   },
   modeTabActive: {
-    borderColor: '#1D4533',
-    backgroundColor: '#F3F7F6',
-    shadowColor: '#1D4533',
+    borderColor: '#EA580C',
+    backgroundColor: '#FFF7ED',
+    shadowColor: '#EA580C',
     shadowOpacity: 0.12,
     shadowRadius: 8,
   },
@@ -894,7 +956,7 @@ export const customizerStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   modeIconWrapActive: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   modeTabBadge: {
     backgroundColor: '#E2E8F0',
@@ -903,7 +965,7 @@ export const customizerStyles = StyleSheet.create({
     borderRadius: 6,
   },
   modeTabBadgeActive: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   modeTabBadgeText: {
     fontSize: 9.5,
@@ -920,7 +982,7 @@ export const customizerStyles = StyleSheet.create({
     marginBottom: 3,
   },
   modeTabTitleActive: {
-    color: '#1D4533',
+    color: '#EA580C',
   },
   modeTabDesc: {
     fontSize: 11,
@@ -970,15 +1032,15 @@ export const customizerStyles = StyleSheet.create({
     marginBottom: 6,
   },
   inspoStylePill: {
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
-    borderColor: '#56B9A1',
+    borderColor: '#FED7AA',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 7,
   },
   inspoStylePillText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 10.5,
     fontWeight: '800',
   },
@@ -1039,7 +1101,7 @@ export const customizerStyles = StyleSheet.create({
     color: '#0F172A',
   },
   matchedPartsCountBadge: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
@@ -1061,8 +1123,8 @@ export const customizerStyles = StyleSheet.create({
     gap: 10,
   },
   matchedPartItemActive: {
-    borderColor: '#1D4533',
-    backgroundColor: '#F3F7F6',
+    borderColor: '#EA580C',
+    backgroundColor: '#FFF7ED',
   },
   matchedPartImg: {
     width: 48,
@@ -1083,7 +1145,7 @@ export const customizerStyles = StyleSheet.create({
   matchedPartPrice: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
     marginTop: 2,
   },
   customPromptInput: {
@@ -1120,8 +1182,8 @@ export const customizerStyles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   bikeSourceTabActive: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   bikeSourceTabText: {
     fontSize: 11,
@@ -1146,9 +1208,9 @@ export const customizerStyles = StyleSheet.create({
     position: 'relative',
   },
   regBikeCardActive: {
-    borderColor: '#1D4533',
-    backgroundColor: '#F3F7F6',
-    shadowColor: '#1D4533',
+    borderColor: '#EA580C',
+    backgroundColor: '#FFF7ED',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 6,
@@ -1245,7 +1307,7 @@ export const customizerStyles = StyleSheet.create({
     gap: 5,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 7,
   },
   emptyRegBikesBtnText: {
@@ -1259,7 +1321,7 @@ export const customizerStyles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderRadius: 14,
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     padding: 12,
     marginTop: 12,
     marginBottom: 12,
@@ -1283,7 +1345,7 @@ export const customizerStyles = StyleSheet.create({
     color: '#0F172A',
   },
   formedPromptBadge: {
-    backgroundColor: '#C8DDD3',
+    backgroundColor: '#FFF7ED',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 5,
@@ -1291,7 +1353,7 @@ export const customizerStyles = StyleSheet.create({
   formedPromptBadgeText: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
     letterSpacing: 0.3,
   },
   formedPromptActions: {
@@ -1349,9 +1411,9 @@ export const customizerStyles = StyleSheet.create({
     borderRadius: 10,
   },
   stepItemActive: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
-    borderColor: '#C8DDD3',
+    borderColor: '#FED7AA',
   },
   stepBadge: {
     width: 24,
@@ -1362,10 +1424,10 @@ export const customizerStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepBadgeActive: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   stepBadgeDone: {
-    backgroundColor: '#10B981',
+    backgroundColor: '#16A34A',
   },
   stepBadgeText: {
     fontSize: 11,
@@ -1399,7 +1461,7 @@ export const customizerStyles = StyleSheet.create({
     minWidth: 8,
   },
   stepConnectorActive: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
 
   // ─── PART DETAILS & PRICE MODAL (MOBILE) ───
@@ -1411,12 +1473,19 @@ export const customizerStyles = StyleSheet.create({
   },
   partModalSheet: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 18,
     maxHeight: '90%',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#F1F5F9',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 20,
   },
   partModalHeader: {
     flexDirection: 'row',
@@ -1441,7 +1510,7 @@ export const customizerStyles = StyleSheet.create({
     position: 'absolute',
     top: 10,
     left: 10,
-    backgroundColor: 'rgba(29, 69, 51, 0.9)',
+    backgroundColor: 'rgba(24, 26, 29, 0.95)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -1478,7 +1547,7 @@ export const customizerStyles = StyleSheet.create({
   partModalPricePhp: {
     fontSize: 20,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   partModalPriceUsd: {
     fontSize: 13,
@@ -1513,10 +1582,10 @@ export const customizerStyles = StyleSheet.create({
   },
   partModalAddBtn: {
     flex: 2,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1532,7 +1601,7 @@ export const customizerStyles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     paddingVertical: 12,
     paddingHorizontal: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -1546,13 +1615,13 @@ export const customizerStyles = StyleSheet.create({
 
   // ─── ADD MORE CUSTOMIZATIONS PROMPT BANNER (MOBILE) ───
   addMorePromptBanner: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#24272B',
     borderRadius: 14,
     padding: 14,
     marginTop: 14,
     marginBottom: 14,
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     gap: 10,
   },
   addMorePromptLeft: {
@@ -1564,7 +1633,7 @@ export const customizerStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1602,7 +1671,7 @@ export const customizerStyles = StyleSheet.create({
   },
   addMoreBtnNo: {
     flex: 1.2,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 9,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -1694,7 +1763,7 @@ export const customizerStyles = StyleSheet.create({
   reviewPartPrice: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   reviewPartRemoveBtn: {
     padding: 5,
@@ -1739,7 +1808,7 @@ export const customizerStyles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: 16,
     borderRadius: 10,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     marginTop: 6,
   },
   reviewActionPrimaryText: {
@@ -1775,12 +1844,12 @@ export const customizerStyles = StyleSheet.create({
     color: '#0F172A',
   },
   totalGrandBox: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: '#FFF7ED',
     padding: 12,
     borderRadius: 12,
     marginTop: 14,
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1788,19 +1857,19 @@ export const customizerStyles = StyleSheet.create({
   totalGrandLabel: {
     fontSize: 13.5,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#111827',
   },
   totalGrandAmount: {
     fontSize: 19,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
     textAlign: 'right',
   },
   dualActionContainer: {
     gap: 12,
   },
   buyPartsCheckoutBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 14,
@@ -1815,7 +1884,7 @@ export const customizerStyles = StyleSheet.create({
     fontWeight: '800',
   },
   bookInstallServiceBtn: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#24272B',
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 14,
@@ -1824,7 +1893,7 @@ export const customizerStyles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     borderWidth: 1.5,
-    borderColor: '#334155',
+    borderColor: '#374151',
   },
   bookInstallServiceText: {
     color: '#F8FAFC',

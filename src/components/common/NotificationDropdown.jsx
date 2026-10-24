@@ -13,6 +13,42 @@ import BootstrapIcon from './BootstrapIcon.jsx';
 import { notificationService, stripEmojis } from '../../services/notifications/notificationService.js';
 import { getThemeTokens } from '../../styles/theme.js';
 
+// Ensure custom orange pill scrollbar indicator styles are injected on web
+if (
+  Platform.OS === 'web' &&
+  typeof document !== 'undefined' &&
+  !document.getElementById('mototrack-orange-scrollbar-style')
+) {
+  const scrollStyle = document.createElement('style');
+  scrollStyle.id = 'mototrack-orange-scrollbar-style';
+  scrollStyle.textContent = `
+    [data-notif-scroll="true"]::-webkit-scrollbar,
+    .mototrack-orange-scroll::-webkit-scrollbar {
+      width: 6px !important;
+      height: 6px !important;
+    }
+    [data-notif-scroll="true"]::-webkit-scrollbar-track,
+    .mototrack-orange-scroll::-webkit-scrollbar-track {
+      background: transparent !important;
+    }
+    [data-notif-scroll="true"]::-webkit-scrollbar-thumb,
+    .mototrack-orange-scroll::-webkit-scrollbar-thumb {
+      background: #EA580C !important;
+      border-radius: 9999px !important;
+    }
+    [data-notif-scroll="true"]::-webkit-scrollbar-thumb:hover,
+    .mototrack-orange-scroll::-webkit-scrollbar-thumb:hover {
+      background: #C2410C !important;
+    }
+    [data-notif-scroll="true"],
+    .mototrack-orange-scroll {
+      scrollbar-width: thin !important;
+      scrollbar-color: #EA580C transparent !important;
+    }
+  `;
+  document.head.appendChild(scrollStyle);
+}
+
 function getRelativeTime(dateString) {
   if (!dateString) return 'Just now';
   const now = Date.now();
@@ -93,28 +129,39 @@ export default function NotificationDropdown({
   isDark = false,
 }) {
   const containerRef = useRef(null);
+  const hoverTimersRef = useRef(new Map());
   const { width: windowWidth } = useWindowDimensions();
   const isAdmin = propIsAdmin || currentUser?.role === 'admin';
 
   const [notifications, setNotifications] = useState(() =>
     isAdmin
       ? notificationService.getAdminNotifications()
-      : notificationService.getCustomerNotifications(currentUser?.id)
+      : notificationService.getCustomerNotifications(currentUser)
   );
   const [activeFilter, setActiveFilter] = useState('all'); // 'all' | 'unread'
 
   useEffect(() => {
-    const unsub = notificationService.subscribe((data) => {
+    const updateList = () => {
       if (isAdmin) {
-        setNotifications(data?.admin || notificationService.getAdminNotifications());
+        setNotifications(notificationService.getAdminNotifications());
       } else {
-        setNotifications(
-          data?.customer || notificationService.getCustomerNotifications(currentUser?.id)
-        );
+        setNotifications(notificationService.getCustomerNotifications(currentUser));
       }
-    });
+    };
+    updateList();
+    const unsub = notificationService.subscribe(updateList);
+    if (isOpen) {
+      notificationService.syncFromDatabase().catch(() => {});
+    }
     return () => unsub?.();
-  }, [isAdmin, currentUser?.id]);
+  }, [isOpen, isAdmin, currentUser?.id, currentUser?.customer_id, currentUser?.email]);
+
+  useEffect(() => {
+    return () => {
+      hoverTimersRef.current.forEach((t) => clearTimeout(t));
+      hoverTimersRef.current.clear();
+    };
+  }, []);
 
   const unreadCount = useMemo(() => {
     return notifications.filter((n) => n.status === 'unread').length;
@@ -180,23 +227,21 @@ export default function NotificationDropdown({
       await notificationService.markAllAdminAsRead();
       setNotifications(notificationService.getAdminNotifications());
     } else {
-      await notificationService.markAllCustomerAsRead(currentUser?.id);
-      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+      await notificationService.markAllCustomerAsRead(currentUser);
+      setNotifications(notificationService.getCustomerNotifications(currentUser));
     }
   };
 
   const handleClearRead = async () => {
-    const unreadOnly = notifications.filter((n) => n.status === 'unread');
     if (isAdmin) {
+      const unreadOnly = notifications.filter((n) => n.status === 'unread');
       notificationService.adminNotifications = unreadOnly;
       await notificationService.persist();
       notificationService.notify();
       setNotifications(unreadOnly);
     } else {
-      notificationService.customerNotifications = unreadOnly;
-      await notificationService.persist();
-      notificationService.notify();
-      setNotifications(unreadOnly);
+      await notificationService.clearCustomerReadNotifications(currentUser);
+      setNotifications(notificationService.getCustomerNotifications(currentUser));
     }
   };
 
@@ -207,7 +252,7 @@ export default function NotificationDropdown({
       setNotifications(notificationService.getAdminNotifications());
     } else {
       await notificationService.deleteCustomerNotification(id);
-      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+      setNotifications(notificationService.getCustomerNotifications(currentUser));
     }
   };
 
@@ -218,16 +263,50 @@ export default function NotificationDropdown({
         setNotifications(notificationService.getAdminNotifications());
       } else {
         await notificationService.markCustomerAsRead(item.id);
-        setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+        setNotifications(notificationService.getCustomerNotifications(currentUser));
       }
     }
     onClose?.();
     if (onNavigateToScreen) {
-      onNavigateToScreen('notifications');
+      const link = (item.link || item.type || '').toLowerCase();
+      if (link.includes('booking') || link.includes('garage')) {
+        onNavigateToScreen('profile', { tab: 'bookings' });
+      } else if (link.includes('order')) {
+        onNavigateToScreen('profile', { tab: 'orders' });
+      } else if (link.includes('customizer')) {
+        onNavigateToScreen('customizer');
+      } else {
+        onNavigateToScreen('notifications');
+      }
     }
   };
 
-  const dropdownWidth = Math.min(410, windowWidth - 24);
+  const handleMouseEnterItem = (item) => {
+    if (item.status !== 'unread') return;
+    if (hoverTimersRef.current.has(item.id)) {
+      clearTimeout(hoverTimersRef.current.get(item.id));
+    }
+    const timer = setTimeout(async () => {
+      if (isAdmin) {
+        await notificationService.markAdminAsRead(item.id);
+        setNotifications(notificationService.getAdminNotifications());
+      } else {
+        await notificationService.markCustomerAsRead(item.id);
+        setNotifications(notificationService.getCustomerNotifications(currentUser));
+      }
+      hoverTimersRef.current.delete(item.id);
+    }, 450);
+    hoverTimersRef.current.set(item.id, timer);
+  };
+
+  const handleMouseLeaveItem = (item) => {
+    if (hoverTimersRef.current.has(item.id)) {
+      clearTimeout(hoverTimersRef.current.get(item.id));
+      hoverTimersRef.current.delete(item.id);
+    }
+  };
+
+  const dropdownWidth = Math.min(335, windowWidth - 24);
   const t = getThemeTokens(isDark);
   const accentIcon = isDark ? t.accentBrand : '#856839';
   const mutedIcon = isDark ? t.textMuted : '#8E8B85';
@@ -256,7 +335,7 @@ export default function NotificationDropdown({
       >
         {/* Header */}
         <View style={styles.headerRow}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
             <View
               style={[
                 styles.headerIconWrap,
@@ -265,7 +344,7 @@ export default function NotificationDropdown({
                 },
               ]}
             >
-              <BootstrapIcon name="bell-fill" size={16} color={accentIcon} />
+              <BootstrapIcon name="bell-fill" size={15} color={accentIcon} />
             </View>
             <View>
               <Text style={[styles.headerTitle, { color: t.textPrimary }]}>Notifications</Text>
@@ -276,13 +355,26 @@ export default function NotificationDropdown({
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {unreadCount > 0 && (
+              <TouchableOpacity
+                style={styles.headerActionBtn}
+                onPress={handleMarkAllRead}
+                activeOpacity={0.7}
+                title="Mark all as read"
+                accessibilityLabel="Mark all as read"
+              >
+                <BootstrapIcon name="check2-all" size={15} color={accentIcon} />
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={styles.headerActionBtn}
               onPress={handleClearRead}
               activeOpacity={0.7}
-              title="Clear notifications"
+              title="Clear read notifications"
+              accessibilityLabel="Clear read notifications"
             >
-              <BootstrapIcon name="trash3" size={15} color={mutedIcon} />
+              <BootstrapIcon name="trash3" size={14} color={mutedIcon} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -290,8 +382,9 @@ export default function NotificationDropdown({
               onPress={onClose}
               activeOpacity={0.7}
               title="Close panel"
+              accessibilityLabel="Close panel"
             >
-              <BootstrapIcon name="x-lg" size={14} color={mutedIcon} />
+              <BootstrapIcon name="x-lg" size={13} color={mutedIcon} />
             </TouchableOpacity>
           </View>
         </View>
@@ -348,6 +441,12 @@ export default function NotificationDropdown({
           style={styles.scrollList}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={true}
+          {...(Platform.OS === 'web'
+            ? {
+                dataSet: { notifScroll: 'true' },
+                className: 'mototrack-orange-scroll',
+              }
+            : {})}
         >
           {displayedNotifications.length === 0 ? (
             <View style={styles.emptyState}>
@@ -383,6 +482,12 @@ export default function NotificationDropdown({
                     },
                   ]}
                   onPress={() => handleNotificationPress(item)}
+                  {...(Platform.OS === 'web'
+                    ? {
+                        onMouseEnter: () => handleMouseEnterItem(item),
+                        onMouseLeave: () => handleMouseLeaveItem(item),
+                      }
+                    : {})}
                   activeOpacity={0.8}
                 >
                   <View style={[styles.itemIconBadge, { backgroundColor: catInfo.bg }]}>
@@ -415,12 +520,29 @@ export default function NotificationDropdown({
                         {catInfo.label}
                       </Text>
                       {isUnread && (
-                        <View
-                          style={[
-                            styles.unreadDot,
-                            { backgroundColor: isDark ? t.accentBrand : '#1D4533' },
-                          ]}
-                        />
+                        <TouchableOpacity
+                          style={{ padding: 4 }}
+                          onPress={async (e) => {
+                            e.stopPropagation?.();
+                            if (isAdmin) {
+                              await notificationService.markAdminAsRead(item.id);
+                              setNotifications(notificationService.getAdminNotifications());
+                            } else {
+                              await notificationService.markCustomerAsRead(item.id);
+                              setNotifications(notificationService.getCustomerNotifications(currentUser));
+                            }
+                          }}
+                          title="Mark as read"
+                          accessibilityLabel="Mark this notification as read"
+                          activeOpacity={0.7}
+                        >
+                          <View
+                            style={[
+                              styles.unreadDot,
+                              { backgroundColor: isDark ? t.accentBrand : '#EA580C' },
+                            ]}
+                          />
+                        </TouchableOpacity>
                       )}
                     </View>
                   </View>
@@ -453,7 +575,7 @@ export default function NotificationDropdown({
             <Text style={[styles.viewAllBtnText, { color: accentIcon }]}>
               View all notifications
             </Text>
-            <BootstrapIcon name="arrow-right" size={13} color={accentIcon} />
+            <BootstrapIcon name="arrow-right" size={12} color={accentIcon} />
           </TouchableOpacity>
 
           <Text style={[styles.hoverNoticeText, { color: t.textSubtle }]}>Hover notice to read</Text>
@@ -477,12 +599,12 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '100%',
     right: 0,
-    marginTop: 8,
+    marginTop: 6,
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: '#EAE8E3',
-    boxShadow: '0 12px 32px -4px rgba(0, 0, 0, 0.14)',
+    boxShadow: '0 16px 36px -8px rgba(0, 0, 0, 0.14), 0 6px 12px -4px rgba(0, 0, 0, 0.05)',
     zIndex: 9999,
     overflow: 'hidden',
   },
@@ -490,73 +612,88 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
+    paddingHorizontal: 13,
+    paddingTop: 13,
+    paddingBottom: 10,
   },
   headerIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     backgroundColor: '#F5F2EB',
     alignItems: 'center',
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1E293B',
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   headerSubtitle: {
-    fontSize: 11.5,
+    fontSize: 11,
     color: '#8E8B85',
     marginTop: 1,
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   headerActionBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
   },
   tabsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 8,
+    paddingHorizontal: 13,
+    paddingBottom: 10,
+    gap: 6,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   tabPill: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 7,
     backgroundColor: '#F1F5F9',
   },
   tabPillActive: {
     backgroundColor: '#0F172A',
   },
   tabPillText: {
-    fontSize: 12,
+    fontSize: 11.5,
     fontWeight: '600',
     color: '#64748B',
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   tabPillTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
   },
   scrollList: {
-    maxHeight: 380,
+    maxHeight: 330,
+    ...(Platform.OS === 'web'
+      ? {
+          scrollbarWidth: 'thin',
+          scrollbarColor: '#EA580C transparent',
+        }
+      : {}),
   },
   scrollContent: {
     paddingVertical: 0,
   },
   itemRow: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 9.5,
+    gap: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
     backgroundColor: '#FFFFFF',
@@ -565,85 +702,109 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAF9F6',
   },
   itemIconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   itemTitle: {
-    fontSize: 13,
+    fontSize: 12.5,
     fontWeight: '600',
     color: '#334155',
     flex: 1,
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   itemTitleUnread: {
     fontWeight: '700',
     color: '#0F172A',
   },
   itemTime: {
-    fontSize: 11,
+    fontSize: 10.5,
     color: '#94A3B8',
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   itemMessage: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#64748B',
-    lineHeight: 17,
+    lineHeight: 16,
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   categoryTag: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: '800',
-    letterSpacing: 0.6,
+    letterSpacing: 0.5,
     textTransform: 'uppercase',
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   unreadDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#1D4533',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#EA580C',
   },
   emptyState: {
-    padding: 32,
+    padding: 24,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#F5F4F0',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
   emptyTitle: {
-    fontSize: 14,
+    fontSize: 13.5,
     fontWeight: '700',
     color: '#1E293B',
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   emptySub: {
-    fontSize: 12,
+    fontSize: 11.5,
     color: '#94A3B8',
     marginTop: 2,
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
     backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
   },
   viewAllBtnText: {
-    fontSize: 12.5,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#856839',
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   hoverNoticeText: {
-    fontSize: 11.5,
+    fontSize: 10.5,
     color: '#A19E95',
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
 });

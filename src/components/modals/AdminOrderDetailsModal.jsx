@@ -20,6 +20,7 @@ import {
   buildOrderActivity,
   canCancelOrder,
   canonicalizeStatus,
+  isCodPaymentMethod,
   ORDER_STATUSES,
 } from '../../utils/orderWorkflow.js';
 
@@ -86,7 +87,7 @@ function WorkflowStepper({ status, tokens, isDark, isDesktop }) {
           ? '#DC2626'
           : done
             ? isDark
-              ? '#4DB896'
+              ? '#EA580C'
               : '#059669'
             : current
               ? getStatusTone(step.status, isDark).color
@@ -149,7 +150,7 @@ function WorkflowStepper({ status, tokens, isDark, isDesktop }) {
                 style={{
                   width: isDesktop ? 18 : 12,
                   height: 2,
-                  backgroundColor: done ? (isDark ? '#4DB896' : '#A7F3D0') : tokens.border,
+                  backgroundColor: done ? (isDark ? '#EA580C' : '#A7F3D0') : tokens.border,
                   marginBottom: 18,
                 }}
               />
@@ -175,6 +176,7 @@ export default function AdminOrderDetailsModal({
   styles,
   onClose,
   onApprove,
+  onRetryEmail,
   onAdvanceStatus,
   onReject,
   onCancel,
@@ -400,7 +402,7 @@ export default function AdminOrderDetailsModal({
 
               {primary?.completeMessage ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <BootstrapIcon name="check-circle-fill" size={16} color={isDarkMode ? '#4DB896' : '#059669'} />
+                  <BootstrapIcon name="check-circle-fill" size={16} color={isDarkMode ? '#EA580C' : '#059669'} />
                   <Text style={{ fontSize: 13.5, fontWeight: '700', color: tokens.textPrimary }}>
                     {primary.completeMessage}
                   </Text>
@@ -435,8 +437,8 @@ export default function AdminOrderDetailsModal({
                     backgroundColor: primary.disabled
                       ? tokens.border
                       : isDarkMode
-                        ? '#1F6B52'
-                        : '#1D4533',
+                        ? '#EA580C'
+                        : '#EA580C',
                     borderRadius: 10,
                     paddingVertical: 13,
                     paddingHorizontal: 16,
@@ -487,6 +489,7 @@ export default function AdminOrderDetailsModal({
             {/* CUSTOMER */}
             <Section title="Customer Information" tokens={tokens} isDark={isDarkMode}>
               <InfoRow icon="person-fill" label="Customer Name" value={order.customer_name || 'Walk-in Customer'} tokens={tokens} isDark={isDarkMode} />
+              <InfoRow icon="envelope-fill" label="Customer Email" value={order.customer_email || 'None provided'} tokens={tokens} isDark={isDarkMode} />
               <InfoRow icon="telephone-fill" label="Contact" value={order.customer_phone || 'None provided'} tokens={tokens} isDark={isDarkMode} />
               <InfoRow
                 icon="geo-alt-fill"
@@ -513,10 +516,85 @@ export default function AdminOrderDetailsModal({
                 </View>
               ) : null}
               {order.cod_change_for ? (
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#4DB896' : '#059669', marginTop: 8 }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#EA580C' : '#059669', marginTop: 8 }}>
                   COD change for: ₱{Number(order.cod_change_for).toLocaleString()}
                 </Text>
               ) : null}
+
+              {/* COD Approval Email Notification Status */}
+              {isCodPaymentMethod(order.payment_method) && (
+                <View
+                  style={{
+                    marginTop: 10,
+                    backgroundColor: order.cod_approval_email_sent
+                      ? (isDarkMode ? 'rgba(22, 101, 52, 0.16)' : '#F0FDF4')
+                      : order.cod_approval_email_status === 'failed'
+                        ? (isDarkMode ? 'rgba(185, 28, 28, 0.16)' : '#FEF2F2')
+                        : (isDarkMode ? '#1E2124' : '#F8FAFC'),
+                    borderWidth: 1,
+                    borderColor: order.cod_approval_email_sent
+                      ? (isDarkMode ? '#15803D' : '#86EFAC')
+                      : order.cod_approval_email_status === 'failed'
+                        ? (isDarkMode ? '#991B1B' : '#FCA5A5')
+                        : tokens.border,
+                    borderRadius: 8,
+                    padding: 10,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+                    <BootstrapIcon
+                      name={
+                        order.cod_approval_email_sent
+                          ? 'envelope-check-fill'
+                          : order.cod_approval_email_status === 'failed'
+                            ? 'envelope-exclamation-fill'
+                            : 'envelope-fill'
+                      }
+                      size={14}
+                      color={
+                        order.cod_approval_email_sent
+                          ? '#16A34A'
+                          : order.cod_approval_email_status === 'failed'
+                            ? '#DC2626'
+                            : tokens.textMuted
+                      }
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 11.5, fontWeight: '800', color: tokens.textPrimary }}>
+                        COD Approval Email: {order.cod_approval_email_sent ? 'Sent' : order.cod_approval_email_status === 'failed' ? 'Failed' : 'Pending Approval'}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: tokens.textMuted, marginTop: 1 }}>
+                        {order.cod_approval_email_sent
+                          ? `Delivered to ${order.cod_approval_email_recipient || order.customer_email || 'customer'}`
+                          : order.cod_approval_email_error
+                            ? order.cod_approval_email_error
+                            : 'Will be sent automatically upon order approval'}
+                      </Text>
+                    </View>
+                  </View>
+                  {status !== ORDER_STATUSES.PENDING_APPROVAL && (
+                    <TouchableOpacity
+                      onPress={() => onRetryEmail?.(orderId)}
+                      disabled={busy}
+                      style={{
+                        backgroundColor: isDarkMode ? '#32373D' : '#E2E8F0',
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, fontWeight: '800', color: tokens.textPrimary }}>
+                        {order.cod_approval_email_sent ? 'Resend' : 'Retry'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
             </Section>
 
             {/* RIDER */}
@@ -533,7 +611,7 @@ export default function AdminOrderDetailsModal({
                         paddingHorizontal: 10,
                         paddingVertical: 5,
                         borderRadius: 8,
-                        backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+                        backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 5,
@@ -558,16 +636,16 @@ export default function AdminOrderDetailsModal({
                       gap: 4,
                     }}
                   >
-                    <Text style={{ fontSize: 13.5, fontWeight: '800', color: isDarkMode ? '#4DB896' : '#065F46' }}>
+                    <Text style={{ fontSize: 13.5, fontWeight: '800', color: isDarkMode ? '#EA580C' : '#065F46' }}>
                       {deliveryDetail?.rider_name || order.rider_name}
                     </Text>
                     {(deliveryDetail?.rider_contact || order.rider_contact) && (
-                      <Text style={{ fontSize: 12, color: isDarkMode ? '#4DB896' : '#047857' }}>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? '#EA580C' : '#047857' }}>
                         Contact: {deliveryDetail?.rider_contact || order.rider_contact}
                       </Text>
                     )}
                     {(deliveryDetail?.vehicle_info || order.vehicle_info) && (
-                      <Text style={{ fontSize: 12, color: isDarkMode ? '#4DB896' : '#047857' }}>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? '#EA580C' : '#047857' }}>
                         Vehicle: {deliveryDetail?.vehicle_info || order.vehicle_info}
                       </Text>
                     )}
@@ -591,8 +669,8 @@ export default function AdminOrderDetailsModal({
                     onPress={() => onAssignRider?.(order)}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
                   >
-                    <BootstrapIcon name="truck" size={12} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                    <BootstrapIcon name="truck" size={12} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                       Update
                     </Text>
                   </TouchableOpacity>
@@ -751,7 +829,7 @@ export default function AdminOrderDetailsModal({
                   label="Discount"
                   value={`-₱${Number(order.discount_amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
                   tokens={tokens}
-                  valueColor={isDarkMode ? '#4DB896' : '#16A34A'}
+                  valueColor={isDarkMode ? '#EA580C' : '#16A34A'}
                 />
               ) : null}
               <View
@@ -765,7 +843,7 @@ export default function AdminOrderDetailsModal({
                 }}
               >
                 <Text style={{ fontSize: 14, fontWeight: '900', color: tokens.textPrimary }}>Total</Text>
-                <Text style={{ fontSize: 16, fontWeight: '900', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                <Text style={{ fontSize: 16, fontWeight: '900', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                   ₱{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
@@ -791,7 +869,7 @@ export default function AdminOrderDetailsModal({
                       {ev.failed ? (
                         <BootstrapIcon name="x-circle-fill" size={14} color="#DC2626" />
                       ) : ev.done ? (
-                        <BootstrapIcon name="check-circle-fill" size={14} color={isDarkMode ? '#4DB896' : '#059669'} />
+                        <BootstrapIcon name="check-circle-fill" size={14} color={isDarkMode ? '#EA580C' : '#059669'} />
                       ) : (
                         <View
                           style={{
@@ -902,7 +980,7 @@ export default function AdminOrderDetailsModal({
                 disabled={busy || primary.disabled}
                 activeOpacity={0.85}
                 style={{
-                  backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+                  backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                   paddingHorizontal: 18,
                   paddingVertical: 11,
                   borderRadius: 9,
@@ -926,7 +1004,7 @@ export default function AdminOrderDetailsModal({
                   backgroundColor: isDarkMode ? 'rgba(16,185,129,0.12)' : '#ECFDF5',
                 }}
               >
-                <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#4DB896' : '#047857' }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#EA580C' : '#047857' }}>
                   {isTerminal ? 'No further workflow actions' : 'See next action above'}
                 </Text>
               </View>

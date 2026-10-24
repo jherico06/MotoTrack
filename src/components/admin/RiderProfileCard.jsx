@@ -19,7 +19,7 @@ import {
   RIDER_AVATAR_PRESETS,
 } from '../../services/staff/riderService.js';
 
-const BRAND_SOFT = '#10B981';
+const BRAND_SOFT = '#EA580C';
 
 function dutyMeta(status) {
   if (status === RIDER_STATUSES.AVAILABLE) {

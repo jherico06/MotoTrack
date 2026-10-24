@@ -1,9 +1,10 @@
 // ─── ADMIN SECURITY PIN & SESSION SERVICE (BACKEND-ENFORCED & SESSION-BASED) ───
 import { appStorage } from '../system/storageAdapter.js';
 import { supabase } from '../../lib/supabase.js';
-import { authService } from './authService.js';
 import { userService } from '../staff/userService.js';
 import { APP_CONFIG } from '../../config';
+// NOTE: do not import authService at top level — authService imports this module
+// (lockSession). Resolve it lazily inside resolveAdminUserId to avoid a require cycle.
 
 const DEFAULT_PIN = APP_CONFIG.admin.defaultPin || '2026';
 const SESSION_DURATION_MS = 2 * 60 * 60 * 1000; // 2 hours expiration window
@@ -30,7 +31,9 @@ class AdminSecurityService {
     if (passedUser?.id) return String(passedUser.id).trim();
 
     try {
-      const activeUser = authService.getCurrentUser();
+      // Lazy require breaks authService ↔ adminSecurityService cycle
+      const { authService } = require('./authService.js');
+      const activeUser = authService?.getCurrentUser?.();
       if (activeUser?.user_id) return String(activeUser.user_id).trim();
       if (activeUser?.id) return String(activeUser.id).trim();
     } catch (_e) {}

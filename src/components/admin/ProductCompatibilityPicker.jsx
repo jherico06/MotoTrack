@@ -266,7 +266,7 @@ function createStyles(t, isDark) {
     addBrand: { flexGrow: 1, flexBasis: 90, minWidth: 90 },
     addModel: { flexGrow: 2, flexBasis: 140, minWidth: 120 },
     addBtn: {
-      backgroundColor: isDark ? '#1F6B52' : '#0C6258',
+      backgroundColor: isDark ? '#EA580C' : '#0C6258',
       borderRadius: 8,
       paddingHorizontal: 14,
       paddingVertical: 9,
@@ -301,7 +301,7 @@ function createStyles(t, isDark) {
     empty: { fontSize: 12, color: t.textMuted, padding: 8 },
     saveBtn: {
       marginTop: 10,
-      backgroundColor: isDark ? '#1F6B52' : '#0C6258',
+      backgroundColor: isDark ? '#EA580C' : '#0C6258',
       borderRadius: 10,
       paddingVertical: 10,
       alignItems: 'center',

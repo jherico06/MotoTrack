@@ -34,7 +34,11 @@ export function calcDiscountAmount(discountType, discountValue, subtotalBeforeDi
 }
 
 export function calcServiceTotals(input = {}) {
-  const laborCost = calcLaborCost(input.hourlyRate, input.laborHours);
+  // Optional laborCost override for fixed service rates (PMS catalog).
+  const laborCost =
+    input.laborCost != null && Number.isFinite(Number(input.laborCost))
+      ? roundMoney(Number(input.laborCost))
+      : calcLaborCost(input.hourlyRate, input.laborHours);
   const partsTotal = roundMoney(input.partsTotal || 0);
   const otherChargesTotal = roundMoney(input.otherChargesTotal || 0);
   const additionalChargesTotal = roundMoney(input.additionalChargesTotal || 0);
@@ -211,8 +215,10 @@ export function normalizeBookingStatus(status) {
 export function isFlexibleBooking(booking) {
   if (!booking) return false;
   if (booking.booking_mode === 'package') return false;
+  if (booking.booking_mode === 'pms_fixed') return false;
   if (booking.booking_mode === 'flexible') return true;
-  return !booking.downpayment_paid && Number(booking.pricePhp || booking.package_price || 0) === 0;
+  // Legacy flexible: no downpayment paid and no fixed package price yet
+  return !booking.downpayment_paid && Number(booking.pricePhp || booking.package_price || booking.quoted_service_rate || 0) === 0;
 }
 
 export function intervalsOverlap(startA, endA, startB, endB) {

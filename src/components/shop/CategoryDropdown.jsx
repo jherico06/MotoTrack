@@ -102,7 +102,7 @@ export default function CategoryDropdown({
             <BootstrapIcon
               name={activeCategoryObj.biIcon || 'grid-fill'}
               size={16}
-              color={isOpen ? '#FFFFFF' : '#1D4533'}
+              color={isOpen ? '#FFFFFF' : '#EA580C'}
             />
           </View>
           <View style={styles.triggerTextColumn}>
@@ -128,7 +128,7 @@ export default function CategoryDropdown({
             <BootstrapIcon
               name={isOpen ? 'chevron-up' : 'chevron-down'}
               size={13}
-              color={isOpen ? '#1D4533' : '#64748B'}
+              color={isOpen ? '#EA580C' : '#64748B'}
             />
           </View>
         </View>
@@ -167,7 +167,7 @@ export default function CategoryDropdown({
                 style={styles.resetLinkBtn}
                 activeOpacity={0.7}
               >
-                <BootstrapIcon name="arrow-counterclockwise" size={11} color="#1D4533" />
+                <BootstrapIcon name="arrow-counterclockwise" size={11} color="#EA580C" />
                 <Text style={styles.resetLinkText}>Reset to All</Text>
               </TouchableOpacity>
             )}
@@ -197,7 +197,7 @@ export default function CategoryDropdown({
                       <BootstrapIcon
                         name={item.biIcon || 'grid-fill'}
                         size={13}
-                        color={isSelected ? '#FFFFFF' : '#1D4533'}
+                        color={isSelected ? '#FFFFFF' : '#EA580C'}
                       />
                     </View>
                     <Text
@@ -214,7 +214,7 @@ export default function CategoryDropdown({
                       </View>
                     )}
                     {isSelected && (
-                      <BootstrapIcon name="check2" size={14} color="#1D4533" style={{ marginLeft: 2 }} />
+                      <BootstrapIcon name="check2" size={14} color="#EA580C" style={{ marginLeft: 2 }} />
                     )}
                   </TouchableOpacity>
                 );
@@ -271,9 +271,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   triggerButtonOpen: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#FFFFFF',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOpacity: 0.15,
     shadowRadius: 10,
     elevation: 5,
@@ -291,12 +291,12 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     alignItems: 'center',
     justifyContent: 'center',
   },
   triggerIconWrapOpen: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   triggerTextColumn: {
     flex: 1,
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   triggerRight: {
     flexDirection: 'row',
@@ -355,8 +355,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   chevronWrapOpen: {
-    backgroundColor: '#E8F0EC',
-    borderColor: '#A7F3D0',
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
   },
   menuCard: {
     marginTop: 6,
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   resetLinkText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   optionsScroll: {
     maxHeight: 280,
@@ -436,19 +436,19 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   categoryOptionActive: {
-    backgroundColor: '#E8F0EC',
-    borderColor: '#1D4533',
+    backgroundColor: '#FFF7ED',
+    borderColor: '#EA580C',
   },
   optionIconBox: {
     width: 24,
     height: 24,
     borderRadius: 7,
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     alignItems: 'center',
     justifyContent: 'center',
   },
   optionIconBoxActive: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   optionLabel: {
     flex: 1,
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   optionLabelActive: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '800',
   },
   optionCountBadge: {
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   optionCountBadgeActive: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   optionCountText: {
     fontSize: 9.5,
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   emptyResetBtnText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   menuFooter: {
     marginTop: 10,

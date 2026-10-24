@@ -55,7 +55,7 @@ export default function ForceChangePasswordPage({ onCompleted, onLogout }) {
     <View style={styles.page}>
       <View style={styles.card}>
         <View style={styles.badge}>
-          <BootstrapIcon name="key-fill" size={22} color="#1D4533" />
+          <BootstrapIcon name="key-fill" size={22} color="#EA580C" />
         </View>
         <Text style={styles.title}>Change Temporary Password</Text>
         <Text style={styles.subtitle}>
@@ -132,7 +132,7 @@ export default function ForceChangePasswordPage({ onCompleted, onLogout }) {
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#0F1F18',
+    backgroundColor: '#181A1D',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
@@ -190,7 +190,7 @@ const styles = StyleSheet.create({
   },
   errorText: { flex: 1, color: '#B91C1C', fontSize: 13, fontWeight: '600' },
   primaryBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',

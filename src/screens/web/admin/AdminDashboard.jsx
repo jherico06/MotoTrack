@@ -30,6 +30,14 @@ import {
   MECHANIC_AVATAR_PRESETS,
   getPackagePricePhp,
 } from '../../../services/bookings/garageService.js';
+import { pmsPricingService } from '../../../services/bookings/pmsPricingService.js';
+import {
+  DEFAULT_PMS_SERVICES,
+  DEFAULT_CC_CATEGORIES,
+  CATALOG_CATEGORIES,
+  CATALOG_CATEGORY_LABELS,
+  formatPhp as formatPmsPhp,
+} from '../../../utils/pmsCcPricing.js';
 import {
   riderService,
   RIDER_STATUSES,
@@ -41,6 +49,7 @@ import { excelService } from '../../../services/inventory/excelService.js';
 
 import { userService } from '../../../services/staff/userService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import { useNetworkStatus } from '../../../hooks/useNetworkStatus.js';
 import { authService } from '../../../services/auth/authService.js';
 import { adminSecurityService } from '../../../services/auth/adminSecurityService.js';
 import { AdminPinLockScreen, ConfirmModal, AdminAccountSettingsModal, AssignDeliveryModal, DeliveryAdminActionModal, DeliveryTokenModal, RiderAccessModal, EditBrandModal, AdminOrderDetailsModal } from '../../../components/modals';
@@ -57,14 +66,20 @@ import {
   formatPhp,
   FLEX_BOOKING_STATUS,
 } from '../../../utils/bookingWorkflow.js';
-import { AdminStatCard, BootstrapIcon, BrandLogo, ExpectedDeliveryEditor, BookingCalendar, NotificationDropdown, UserProfileButton } from '../../../components/common';
+import { AdminStatCard, BootstrapIcon, BrandLogo, ExpectedDeliveryEditor, BookingCalendar, NotificationDropdown, UserProfileButton, Skeleton } from '../../../components/common';
 import { pickImageFromFile } from '../../../utils/imagePickerHelper.js';
 import { usdToPhp } from '../../../utils/currency.js';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import NotificationsPage from '../customer/NotificationsPage.jsx';
 import { auditLogService } from '../../../services/system/auditLogService.js';
-import { AdminSidebar, SalesForecastPanel, SalesAnalyticsPanel, RevenueTrendChart, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, CustomizationsAdminPanel, ServiceQuotationPanel, PickupQrScannerPanel, AdminBookingManager, AdminBookingDetailsPanel, MotorcycleModelsAdminPanel, ProductCompatibilityPicker, AdminSystemSettingsPanel, PromosAdminPanel, RiderProfileCard, DashboardInsightsPanel, AdminProfileLogsPanel, ModernOverviewDashboard } from '../../../components/admin';
-import { buildDashboardInsights } from '../../../services/inventory/dashboardInsightsService.js';
+import { AdminSidebar, SalesForecastPanel, SalesAnalyticsPanel, RevenueTrendChart, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, ServiceQuotationPanel, PickupQrScannerPanel, AdminBookingDetailsPanel, MotorcycleModelsAdminPanel, ProductCompatibilityPicker, AdminSystemSettingsPanel, PromosAdminPanel, RiderProfileCard, DashboardInsightsPanel, AdminProfileLogsPanel, ModernOverviewDashboard } from '../../../components/admin';
+import {
+  buildDashboardInsights,
+  computeInventoryKpis,
+  computeWeeklyKpiSeries,
+  isRecognizedSalesOrder,
+  recognizedOrderAmount,
+} from '../../../services/inventory/dashboardInsightsService.js';
 import { staffAccountApi } from '../../../services/staff/staffAccountApi.js';
 import {
   cartLineKey,
@@ -230,8 +245,8 @@ function AlertOrangeDot({ count, label, title }) {
           width: 12,
           height: 12,
           borderRadius: 6,
-          backgroundColor: '#F97316',
-          boxShadow: hovered ? '0 0 12px #EA580C, 0 0 4px #F97316' : '0 0 6px #F97316',
+          backgroundColor: '#EA580C',
+          boxShadow: hovered ? '0 0 12px #EA580C, 0 0 4px #EA580C' : '0 0 6px #EA580C',
           transform: [{ scale: hovered ? 1.15 : 1 }],
           transition: 'all 0.2s ease',
         }}
@@ -357,11 +372,48 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     });
   };
 
-  // Core Data States
+  // Core Data States & Realtime Network Latency Awareness
+  const {
+    isOnline,
+    isOffline,
+    isLagging,
+    latencyMs,
+    speedTier,
+    isFast,
+    hasEnoughInternet,
+    measureLatency,
+    detectRealtimeSpeed,
+    trackOperationDuration,
+  } = useNetworkStatus();
+  const [isRefreshingWithSkeleton, setIsRefreshingWithSkeleton] = useState(false);
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  const hasLoadedOnceRef = useRef(false);
+  const inFlightLoadRef = useRef(null);
+  const loadRequestIdRef = useRef(0);
+  const [isDashboardLoading, setIsDashboardLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [dashboardError, setDashboardError] = useState(null);
+  const [forceSkeletonPreview, setForceSkeletonPreview] = useState(false);
+
+  // If there is enough internet connection, the skeleton loading animation is NOT triggered.
+  // It is ONLY triggered if the internet is NOT enough (offline, lagging/high latency, poor connection) or during explicit preview.
+  const shouldShowSkeleton = forceSkeletonPreview || (!hasEnoughInternet && ((!hasLoadedOnce && isDashboardLoading) || isLagging || isOffline));
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [promos, setPromos] = useState([]);
   const [garageServices, setGarageServices] = useState([]);
+  const [pmsRateCatalog, setPmsRateCatalog] = useState(() =>
+    DEFAULT_PMS_SERVICES.map((s) => ({
+      no: s.sortOrder,
+      id: s.id,
+      name: s.name,
+      catalogCategory: s.catalogCategory || 'PMS',
+      isActive: true,
+      prices: { ...s.prices },
+    }))
+  );
+  const [pmsCatalogCategoryFilter, setPmsCatalogCategoryFilter] = useState('all');
+  const [pmsCatalogStatusFilter, setPmsCatalogStatusFilter] = useState('active');
   const [usersList, setUsersList] = useState([]);
   const [toastMessage, setToastMessage] = useState('');
   const [isMobileMoreOpen, setIsMobileMoreOpen] = useState(false);
@@ -473,8 +525,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [bookingSearchQuery, setBookingSearchQuery] = useState('');
   const [bookingStatusFilter, setBookingStatusFilter] = useState('All'); // 'All' | 'Confirmed' | 'In Progress' | 'Completed' | 'Cancelled'
   const [isBookingStatusDropdownOpen, setIsBookingStatusDropdownOpen] = useState(false);
-  const [bookingCategoryFilter, setBookingCategoryFilter] = useState('All'); // 'All' | 'PMS' | 'Customization'
-  const [bookingViewMode, setBookingViewMode] = useState('table'); // 'table' | 'calendar' | 'workflow'
+  const [bookingCategoryFilter, setBookingCategoryFilter] = useState('All'); // 'All' | 'Repair' | 'PMS' | 'Installation'
+  const [bookingViewMode, setBookingViewMode] = useState('table'); // 'table' | 'calendar'
   const [bookingDateFilter, setBookingDateFilter] = useState(''); // YYYY-MM-DD or ''
   const [bookingCustomerFilter, setBookingCustomerFilter] = useState(''); // customer name exact or ''
   const [bookingPage, setBookingPage] = useState(1);
@@ -537,6 +589,20 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [servDesc, setServDesc] = useState('');
   const [servInclusions, setServInclusions] = useState('');
 
+  // PMS fixed-rate catalog (by CC) — add / edit
+  const [isAddPmsRateOpen, setIsAddPmsRateOpen] = useState(false);
+  const [editingPmsRate, setEditingPmsRate] = useState(null);
+  const [pmsRateName, setPmsRateName] = useState('');
+  const [pmsRateCatalogCategory, setPmsRateCatalogCategory] = useState(CATALOG_CATEGORIES.PMS);
+  const [pmsRate125, setPmsRate125] = useState('');
+  const [pmsRate150, setPmsRate150] = useState('');
+  const [pmsRateBig, setPmsRateBig] = useState('');
+  const [pmsRate125Na, setPmsRate125Na] = useState(false);
+  const [pmsRate150Na, setPmsRate150Na] = useState(false);
+  const [pmsRateBigNa, setPmsRateBigNa] = useState(false);
+  const [pmsRateSaving, setPmsRateSaving] = useState(false);
+  const [pmsActionMenu, setPmsActionMenu] = useState(null); // { service, coords: { top, right, bottom, left } }
+
   // ─── MECHANICS & TECHNICIANS STATE ───
   const [garageMechanics, setGarageMechanics] = useState(() => garageService.getMechanics());
   const [mechanicSearchQuery, setMechanicSearchQuery] = useState('');
@@ -546,10 +612,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [isAddMechanicModalOpen, setIsAddMechanicModalOpen] = useState(false);
   const [editingMechanic, setEditingMechanic] = useState(null);
 
-  // New / Edit Mechanic Form Fields
+  // New / Edit Mechanic Form Fields (roster only — no login account)
   const [mechName, setMechName] = useState('');
   const [mechShortName, setMechShortName] = useState('');
-  const [mechHourlyRate, setMechHourlyRate] = useState('150');
   const [mechSpecialization, setMechSpecialization] = useState('Engine Overhaul & Diagnostics');
   const [mechExperience, setMechExperience] = useState('5 Years Pro Tech');
   const [mechCertifications, setMechCertifications] = useState('Yamaha YTA Gold • Honda Master');
@@ -557,7 +622,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [mechStatus, setMechStatus] = useState('Available');
   const [mechPhone, setMechPhone] = useState('');
   const [mechEmail, setMechEmail] = useState('');
-  const [mechPassword, setMechPassword] = useState('');
+
 
   // ─── RIDERS / DELIVERY STAFF STATE ───
   const [deliveryRiders, setDeliveryRiders] = useState(() => riderService.getRiders());
@@ -611,15 +676,24 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [isAdminAccountOpen, setIsAdminAccountOpen] = useState(false);
 
   const lowStockAlertProducts = useMemo(() => {
-    return products.filter((p) => Number(p.stock || 0) <= resolveReorderLevel(p, 5));
+    return products.filter((p) => isLowStock(p, 5));
   }, [products]);
 
   const pendingOrdersAlertCount = useMemo(() => {
-    return orders.filter((o) => o.status === 'Processing' || o.status === 'Pending').length;
+    return orders.filter((o) => {
+      const st = String(o.status || '').toLowerCase();
+      return st === 'processing' || st.includes('pending') || st.includes('approval');
+    }).length;
   }, [orders]);
 
   const pendingBookingsAlertCount = useMemo(() => {
-    return garageBookings.filter((b) => b.status === 'Pending' || b.status === 'Confirmed').length;
+    return garageBookings.filter((b) => {
+      const status = normalizeBookingStatus(b.status);
+      return (
+        status === FLEX_BOOKING_STATUS.PENDING_REVIEW ||
+        status === FLEX_BOOKING_STATUS.NEEDS_INFORMATION
+      );
+    }).length;
   }, [garageBookings]);
 
   const unreadNotificationsCount = useMemo(() => {
@@ -645,12 +719,19 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   }, []);
 
   // ─── AUDIT LOGS STATE ───
+  // ─── AUDIT / ACTIVITY LOGS STATE ───
   const [auditLogs, setAuditLogs] = useState(() => auditLogService.getLogs());
   const [auditSearchQuery, setAuditSearchQuery] = useState('');
+  const [auditDateRangeFilter, setAuditDateRangeFilter] = useState('7d'); // 'all' | 'today' | '7d' | '30d' | 'month'
+  const [isDateRangeDropdownOpen, setIsDateRangeDropdownOpen] = useState(false);
   const [auditCategoryFilter, setAuditCategoryFilter] = useState('All'); // 'All' | 'orders' | 'inventory' | 'garage' | 'users' | 'promos' | 'security' | 'system'
   const [isAuditCategoryDropdownOpen, setIsAuditCategoryDropdownOpen] = useState(false);
   const [auditSeverityFilter, setAuditSeverityFilter] = useState('All'); // 'All' | 'SUCCESS' | 'INFO' | 'WARNING' | 'CRITICAL'
+  const [isAuditSeverityDropdownOpen, setIsAuditSeverityDropdownOpen] = useState(false);
   const [selectedAuditLogForModal, setSelectedAuditLogForModal] = useState(null);
+  const [hoveredAuditRowId, setHoveredAuditRowId] = useState(null);
+  const [auditCurrentPage, setAuditCurrentPage] = useState(1);
+  const auditItemsPerPage = 5;
 
   useEffect(() => {
     const unsubAudit = auditLogService.subscribe((freshLogs) => {
@@ -659,8 +740,65 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     return () => unsubAudit?.();
   }, []);
 
-  const filteredAuditLogs = useMemo(() => {
+  const DATE_RANGE_OPTIONS = [
+    { id: 'all', label: 'All Time' },
+    { id: 'today', label: 'Today' },
+    { id: '7d', label: 'Last 7 days' },
+    { id: '30d', label: 'Last 30 days' },
+    { id: 'month', label: 'This Month' },
+  ];
+
+  const AUDIT_CATEGORIES = [
+    { id: 'All', label: 'All categories', icon: 'grid' },
+    { id: 'orders', label: 'Orders', icon: 'box-seam' },
+    { id: 'inventory', label: 'Inventory', icon: 'boxes' },
+    { id: 'garage', label: 'Garage', icon: 'wrench' },
+    { id: 'users', label: 'Users', icon: 'people' },
+    { id: 'promos', label: 'Promos', icon: 'ticket-perforated' },
+    { id: 'security', label: 'Security', icon: 'shield-lock' },
+    { id: 'system', label: 'System', icon: 'gear' },
+  ];
+
+  const AUDIT_SEVERITIES = [
+    { id: 'All', label: 'All severities' },
+    { id: 'SUCCESS', label: 'SUCCESS', color: '#059669', dotColor: '#10B981', bg: '#ECFDF5' },
+    { id: 'INFO', label: 'INFO', color: '#2563EB', dotColor: '#3B82F6', bg: '#EFF6FF' },
+    { id: 'WARNING', label: 'WARNING', color: '#D97706', dotColor: '#F59E0B', bg: '#FFFBEB' },
+    { id: 'CRITICAL', label: 'CRITICAL', color: '#DC2626', dotColor: '#EF4444', bg: '#FEF2F2' },
+  ];
+
+  // Logs filtered by selected date range period for KPI counts and table feed
+  const periodAuditLogs = useMemo(() => {
     return auditLogs.filter((log) => {
+      if (auditDateRangeFilter === 'all') return true;
+      const t = new Date(log.timestamp).getTime();
+      if (isNaN(t)) return true;
+      const now = Date.now();
+      if (auditDateRangeFilter === 'today') {
+        const todayStart = new Date().setHours(0, 0, 0, 0);
+        return t >= todayStart;
+      }
+      if (auditDateRangeFilter === '7d') {
+        return t >= now - 7 * 24 * 60 * 60 * 1000;
+      }
+      if (auditDateRangeFilter === '30d') {
+        return t >= now - 30 * 24 * 60 * 60 * 1000;
+      }
+      if (auditDateRangeFilter === 'month') {
+        const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+        return t >= monthStart;
+      }
+      return true;
+    });
+  }, [auditLogs, auditDateRangeFilter]);
+
+  const totalEventsCount = periodAuditLogs.length;
+  const successfulEventsCount = periodAuditLogs.filter((l) => (l.severity || '').toUpperCase() === 'SUCCESS').length;
+  const warningEventsCount = periodAuditLogs.filter((l) => (l.severity || '').toUpperCase() === 'WARNING').length;
+  const criticalEventsCount = periodAuditLogs.filter((l) => (l.severity || '').toUpperCase() === 'CRITICAL').length;
+
+  const filteredAuditLogs = useMemo(() => {
+    return periodAuditLogs.filter((log) => {
       if (auditCategoryFilter !== 'All' && (log.category || '').toLowerCase() !== auditCategoryFilter.toLowerCase()) {
         return false;
       }
@@ -668,36 +806,53 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         return false;
       }
       if (auditSearchQuery.trim()) {
-        const q = auditSearchQuery.toLowerCase();
-        const text = `${log.action} ${log.target} ${log.details} ${log.admin_name} ${JSON.stringify(log.metadata || {})}`.toLowerCase();
+        const q = auditSearchQuery.trim().toLowerCase();
+        const text = `${log.action} ${log.target} ${log.details} ${log.admin_name} ${log.ip_address || ''} ${JSON.stringify(log.metadata || {})}`.toLowerCase();
         return text.includes(q);
       }
       return true;
     });
-  }, [auditLogs, auditCategoryFilter, auditSeverityFilter, auditSearchQuery]);
+  }, [periodAuditLogs, auditCategoryFilter, auditSeverityFilter, auditSearchQuery]);
+
+  const totalAuditPages = Math.max(1, Math.ceil(filteredAuditLogs.length / auditItemsPerPage));
+
+  useEffect(() => {
+    if (auditCurrentPage > totalAuditPages) {
+      setAuditCurrentPage(1);
+    }
+  }, [totalAuditPages, auditCurrentPage]);
+
+  const paginatedAuditLogs = useMemo(() => {
+    const start = (auditCurrentPage - 1) * auditItemsPerPage;
+    return filteredAuditLogs.slice(start, start + auditItemsPerPage);
+  }, [filteredAuditLogs, auditCurrentPage, auditItemsPerPage]);
+
+  const handleResetAuditFilters = () => {
+    setAuditSearchQuery('');
+    setAuditDateRangeFilter('7d');
+    setAuditCategoryFilter('All');
+    setAuditSeverityFilter('All');
+    setAuditCurrentPage(1);
+    setIsDateRangeDropdownOpen(false);
+    setIsAuditCategoryDropdownOpen(false);
+    setIsAuditSeverityDropdownOpen(false);
+    setHoveredAuditRowId(null);
+  };
+
+  const hasActiveAuditFilters = Boolean(
+    auditSearchQuery.trim() ||
+    auditDateRangeFilter !== '7d' ||
+    auditCategoryFilter !== 'All' ||
+    auditSeverityFilter !== 'All'
+  );
 
   const handleExportAuditLogs = () => {
     try {
       auditLogService.exportToCSV(filteredAuditLogs);
-      showToast('✓ Audit logs exported to CSV successfully!');
+      showToast('✓ Activity logs exported to CSV successfully!');
     } catch (_err) {
-      showToast('⚠️ Failed to export audit logs');
+      showToast('⚠️ Failed to export activity logs');
     }
-  };
-
-  const handleClearAuditLogs = () => {
-    showConfirm({
-      title: 'Purge Audit Logs History?',
-      message: 'Are you sure you want to clear the entire administrative audit history? This action cannot be undone.',
-      confirmText: 'Purge All Logs',
-      cancelText: 'Cancel',
-      type: 'danger',
-      confirmIcon: 'trash',
-      onConfirm: async () => {
-        await auditLogService.clearLogs();
-        showToast('✓ Audit logs purged successfully.');
-      },
-    });
   };
 
   const getCategoryIcon = (catName) => {
@@ -707,17 +862,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     );
     return found?.biIcon || 'tag-fill';
   };
-
-  const AUDIT_CATEGORIES = [
-    { id: 'All', label: 'All Categories', icon: 'layers' },
-    { id: 'orders', label: 'Orders', icon: 'box-seam' },
-    { id: 'inventory', label: 'Inventory', icon: 'boxes' },
-    { id: 'garage', label: 'Garage', icon: 'wrench' },
-    { id: 'users', label: 'Users', icon: 'people' },
-    { id: 'promos', label: 'Promos', icon: 'ticket-perforated' },
-    { id: 'security', label: 'Security', icon: 'shield-lock' },
-    { id: 'system', label: 'System', icon: 'gear' },
-  ];
 
   const handleUpdateSettingField = (field, value) => {
     setSetForm((prev) => ({ ...prev, [field]: value }));
@@ -899,63 +1043,159 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     });
   };
 
-  // ─── LOAD DATA ───
-  const loadData = async () => {
-    const prods = await productService.getProducts();
-    setProducts(prods);
-
-    const ords = await orderService.getAllOrders();
-    setOrders(ords || []);
-
-    const prm = await promoService.getPromos();
-    setPromos(prm);
-
-    const usrs = await userService.getAllUsers();
-    setUsersList(usrs);
-
-    try {
-      const srvs = await garageService.fetchServices();
-      setGarageServices(srvs || []);
-    } catch (e) {
-      setGarageServices(garageService.getServices());
+  // ─── LOAD DATA (Parallelized, Latency-Optimized, and Deduplicated) ───
+  const loadData = useCallback(async ({ isBackground = false, forceRefresh = false } = {}) => {
+    // If a load request is already running, avoid duplicate concurrent fetching
+    if (inFlightLoadRef.current && !forceRefresh) {
+      return inFlightLoadRef.current;
     }
 
-    try {
-      const bks = await garageService.getAllBookings();
-      setGarageBookings(bks || []);
-    } catch (e) {
-      setGarageBookings(garageService.getLocalBookings());
-    }
+    const reqId = ++loadRequestIdRef.current;
+    const startTime = performance?.now ? performance.now() : Date.now();
 
-    try {
-      const mechs = await garageService.fetchMechanics();
-      setGarageMechanics(mechs || []);
-    } catch (_e) {
-      setGarageMechanics(garageService.getMechanics());
+    // Only activate full initial skeleton if no data has been loaded yet, or brief skeleton on force refresh
+    if (!hasLoadedOnceRef.current) {
+      setIsDashboardLoading(true);
+    } else if (forceRefresh) {
+      setIsRefreshing(true);
+      setIsRefreshingWithSkeleton(true);
+    } else {
+      setIsRefreshing(true);
     }
+    setDashboardError(null);
 
-    try {
-      const riders = await riderService.fetchRiders();
-      setDeliveryRiders(riders || []);
-    } catch (_e) {
-      setDeliveryRiders(riderService.getRiders());
-    }
+    // Concurrently probe real-time connection speed (zero delay on data fetching)
+    const speedProbePromise = detectRealtimeSpeed
+      ? detectRealtimeSpeed().catch(() => ({ tier: 'fast', latencyMs: 65, minLoadingMs: 100, isFast: true }))
+      : Promise.resolve({ tier: 'fast', latencyMs: 65, minLoadingMs: 100, isFast: true });
 
-    try {
-      setIsSuppliersLoading(true);
-      appStorage.removeItem('mototrack_suppliers_catalog');
-      const sups = await supplierService.fetchSuppliers();
-      setSuppliers(sups || []);
-    } catch (_e) {
-      setSuppliers(supplierService.getSuppliers());
-    } finally {
-      setIsSuppliersLoading(false);
-    }
+    const loadPromise = (async () => {
+      try {
+        await trackOperationDuration(async () => {
+          // If offline, read cached data immediately without hanging on network timeouts
+          if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            const cachedProducts = productService.getProducts ? await productService.getProducts() : [];
+            if (cachedProducts?.length) setProducts(cachedProducts);
+            const cachedOrders = orderService.getOrders ? orderService.getOrders() : [];
+            if (cachedOrders?.length) setOrders(cachedOrders);
+            setGarageBookings(garageService.getLocalBookings());
+            setGarageMechanics(garageService.getMechanics());
+            setDeliveryRiders(riderService.getRiders());
+            setSuppliers(supplierService.getSuppliers());
+            hasLoadedOnceRef.current = true;
+            setHasLoadedOnce(true);
+            return;
+          }
 
-    const creds = supabaseManager.getCredentials();
-    setSupabaseUrl(creds.url);
-    setSupabaseKey(creds.key);
-  };
+          // Execute all independent service requests in parallel
+          const [
+            prodRes,
+            orderRes,
+            promoRes,
+            userRes,
+            servRes,
+            catalogRes,
+            bkRes,
+            mechRes,
+            riderRes,
+            supRes,
+          ] = await Promise.allSettled([
+            productService.getProducts(),
+            orderService.getAllOrders(),
+            promoService.getPromos(),
+            userService.getAllUsers(),
+            garageService.fetchServices().catch(() => garageService.getServices()),
+            pmsPricingService.loadCatalog({ forceRefresh, includeInactive: true }).catch(() => null),
+            garageService.getAllBookings().catch(() => garageService.getLocalBookings()),
+            garageService.fetchMechanics().catch(() => garageService.getMechanics()),
+            riderService.fetchRiders().catch(() => riderService.getRiders()),
+            supplierService.fetchSuppliers().catch(() => supplierService.getSuppliers()),
+          ]);
+
+          // Prevent race conditions: check if this is still the active request
+          if (reqId !== loadRequestIdRef.current) return;
+
+          if (prodRes.status === 'fulfilled' && prodRes.value) {
+            setProducts(Array.isArray(prodRes.value) ? prodRes.value : []);
+          }
+          if (orderRes.status === 'fulfilled' && orderRes.value) {
+            setOrders(Array.isArray(orderRes.value) ? orderRes.value : []);
+          }
+          if (promoRes.status === 'fulfilled' && promoRes.value) {
+            setPromos(Array.isArray(promoRes.value) ? promoRes.value : []);
+          }
+          if (userRes.status === 'fulfilled' && userRes.value) {
+            setUsersList(Array.isArray(userRes.value) ? userRes.value : []);
+          }
+          if (servRes.status === 'fulfilled' && servRes.value) {
+            setGarageServices(Array.isArray(servRes.value) ? servRes.value : []);
+          }
+
+          if (catalogRes.status === 'fulfilled' && catalogRes.value) {
+            const catalog = catalogRes.value;
+            const services = (catalog?.services?.length ? catalog.services : DEFAULT_PMS_SERVICES).map((s) => ({
+              no: s.sortOrder ?? s.sort_order ?? 0,
+              id: s.id,
+              name: s.name,
+              catalogCategory: s.catalogCategory || 'PMS',
+              isActive: s.isActive !== false,
+              prices: { ...(s.prices || {}) },
+            }));
+            services.sort((a, b) => a.no - b.no);
+            setPmsRateCatalog(services);
+          } else {
+            setPmsRateCatalog(
+              DEFAULT_PMS_SERVICES.map((s) => ({
+                no: s.sortOrder,
+                id: s.id,
+                name: s.name,
+                catalogCategory: s.catalogCategory || 'PMS',
+                isActive: true,
+                prices: { ...s.prices },
+              }))
+            );
+          }
+
+          if (bkRes.status === 'fulfilled' && bkRes.value) {
+            setGarageBookings(Array.isArray(bkRes.value) ? bkRes.value : garageService.getLocalBookings());
+          }
+          if (mechRes.status === 'fulfilled' && mechRes.value) {
+            setGarageMechanics(Array.isArray(mechRes.value) ? mechRes.value : garageService.getMechanics());
+          }
+          if (riderRes.status === 'fulfilled' && riderRes.value) {
+            setDeliveryRiders(Array.isArray(riderRes.value) ? riderRes.value : riderService.getRiders());
+          }
+          if (supRes.status === 'fulfilled' && supRes.value) {
+            setSuppliers(Array.isArray(supRes.value) ? supRes.value : supplierService.getSuppliers());
+          }
+
+          const creds = supabaseManager.getCredentials();
+          setSupabaseUrl(creds.url);
+          setSupabaseKey(creds.key);
+
+          // Mark that data has successfully loaded at least once
+          hasLoadedOnceRef.current = true;
+          setHasLoadedOnce(true);
+        });
+      } catch (err) {
+        console.error('[AdminDashboard] Data loading error:', err);
+        // Only show fatal error banner if initial load had zero cached data
+        if (!hasLoadedOnceRef.current) {
+          setDashboardError('Unable to connect to live database. Please check your connection and retry.');
+        }
+      } finally {
+        inFlightLoadRef.current = null;
+        if (reqId === loadRequestIdRef.current) {
+          setIsDashboardLoading(false);
+          setIsRefreshing(false);
+          setIsRefreshingWithSkeleton(false);
+        }
+      }
+    })();
+
+    inFlightLoadRef.current = loadPromise;
+    return loadPromise;
+  }, [detectRealtimeSpeed, trackOperationDuration]);
 
   useEffect(() => {
     if (!currentUser || currentUser.role !== 'admin') return;
@@ -1036,16 +1276,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   }, [currentUser]);
 
   // ─── INVENTORY COMPUTATIONS & ACTIONS ───
-  const invStats = useMemo(() => {
-    const totalSkus = products.length;
-    const inStockCount = products.filter((p) => (p.stock || 0) > resolveReorderLevel(p, 5)).length;
-    const lowStockCount = products.filter((p) => isLowStock(p, 5)).length;
-    const outOfStockCount = products.filter((p) => !p.stock || p.stock <= 0).length;
-    const totalValue = products.reduce((sum, p) => sum + (p.price || 0) * (p.stock || 0), 0);
-    const totalUnits = products.reduce((sum, p) => sum + (p.stock || 0), 0);
-
-    return { totalSkus, inStockCount, lowStockCount, outOfStockCount, totalValue, totalUnits };
-  }, [products]);
+  const invStats = useMemo(() => computeInventoryKpis(products), [products]);
 
   // Cost & profit summary for Overview (catalog + sales + supplier purchases)
   const profitOverview = useMemo(() => {
@@ -1055,33 +1286,25 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       if (id) productMap[id] = p;
     });
 
-    let inventoryCost = 0;
-    let inventorySellValue = 0;
-    let catalogProfit = 0;
-    products.forEach((p) => {
-      const cost = Number(p.unit_cost ?? p.unitCost ?? 0);
-      const price = Number(p.price || 0);
-      const stock = Number(p.stock || 0);
-      inventoryCost += cost * stock;
-      inventorySellValue += price * stock;
-      catalogProfit += (price - cost) * stock;
-    });
+    const inventoryKpis = computeInventoryKpis(products);
+    const inventoryCost = inventoryKpis.totalValue;
+    const inventorySellValue = inventoryKpis.retailValue;
+    const catalogProfit = inventorySellValue - inventoryCost;
 
-    const cancelled = new Set(['cancelled', 'canceled', 'refunded', 'returned', 'declined', 'rejected']);
     let soldRevenue = 0;
     let soldCost = 0;
     (orders || []).forEach((o) => {
-      const status = String(o.status || '').toLowerCase();
-      if (cancelled.has(status)) return;
-      soldRevenue += Number(o.grand_total ?? o.total_amount ?? 0);
+      if (!isRecognizedSalesOrder(o)) return;
+      soldRevenue += recognizedOrderAmount(o);
       const items = Array.isArray(o.items) ? o.items : [];
       items.forEach((it) => {
         const qty = Number(it.quantity || 1);
         const pid = it.product_id || it.id;
-        const lineCost =
+        const recorded =
           it.unit_cost != null && it.unit_cost !== ''
             ? Number(it.unit_cost)
-            : Number(productMap[pid]?.unit_cost ?? productMap[pid]?.unitCost ?? 0);
+            : Number(productMap[pid]?.unit_cost ?? productMap[pid]?.unitCost ?? productMap[pid]?.cost_price ?? 0);
+        const lineCost = Number.isFinite(recorded) ? recorded : 0;
         soldCost += lineCost * qty;
       });
     });
@@ -1581,24 +1804,16 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   // ─── ANALYTICS DATA COMPUTATIONS ───
   const analyticsData = useMemo(() => {
     const allOrders = orders || [];
-    const posOrders = allOrders.filter((o) => o.channel === 'POS (In-Store)');
-    const onlineOrders = allOrders.filter((o) => o.channel !== 'POS (In-Store)');
+    const recognizedOrders = allOrders.filter(isRecognizedSalesOrder);
+    const posOrders = recognizedOrders.filter((o) => o.channel === 'POS (In-Store)');
+    const onlineOrders = recognizedOrders.filter((o) => o.channel !== 'POS (In-Store)');
 
-    const totalRevenue = allOrders.reduce(
-      (sum, o) => sum + (Number(o.grand_total) || Number(o.total_amount) || 0),
-      0
-    );
-    const posRevenue = posOrders.reduce(
-      (sum, o) => sum + (Number(o.grand_total) || Number(o.total_amount) || 0),
-      0
-    );
-    const onlineRevenue = onlineOrders.reduce(
-      (sum, o) => sum + (Number(o.grand_total) || Number(o.total_amount) || 0),
-      0
-    );
+    const totalRevenue = recognizedOrders.reduce((sum, o) => sum + recognizedOrderAmount(o), 0);
+    const posRevenue = posOrders.reduce((sum, o) => sum + recognizedOrderAmount(o), 0);
+    const onlineRevenue = onlineOrders.reduce((sum, o) => sum + recognizedOrderAmount(o), 0);
 
-    const aov = allOrders.length > 0 ? totalRevenue / allOrders.length : 0;
-    const totalItemsSold = allOrders.reduce(
+    const aov = recognizedOrders.length > 0 ? totalRevenue / recognizedOrders.length : 0;
+    const totalItemsSold = recognizedOrders.reduce(
       (sum, o) => sum + (Number(o.items_count) || (Array.isArray(o.items) ? o.items.length : 1)),
       0
     );
@@ -1609,7 +1824,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       categoryTotals[cat] = 0;
     });
 
-    allOrders.forEach((o) => {
+    recognizedOrders.forEach((o) => {
       if (Array.isArray(o.items)) {
         o.items.forEach((it) => {
           const cat = it.category || 'Accessories';
@@ -1631,7 +1846,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
     // Payment Methods breakdown
     const paymentBreakdown = { Cash: 0, GCash: 0 };
-    allOrders.forEach((o) => {
+    recognizedOrders.forEach((o) => {
       const pm = (o.payment_method || '').toLowerCase();
       if (pm.includes('gcash') || pm.includes('wallet')) paymentBreakdown.GCash += 1;
       else paymentBreakdown.Cash += 1;
@@ -1639,7 +1854,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
     // Top Selling Products
     const productSales = {};
-    allOrders.forEach((o) => {
+    recognizedOrders.forEach((o) => {
       if (Array.isArray(o.items)) {
         o.items.forEach((it) => {
           const key = it.name || 'Motorcycle Part';
@@ -1667,45 +1882,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
          return { ...tp, image_url: match ? match.image_url : null };
       });
 
-    // Real weekly revenue bars from orders (not fabricated)
     let periodsCount = 12;
     if (analyticsPeriod === '4W') periodsCount = 4;
     else if (analyticsPeriod === '24W') periodsCount = 24;
 
-    const weekBuckets = new Map();
-    const now = new Date();
-    for (let i = periodsCount - 1; i >= 0; i -= 1) {
-      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i * 7));
-      const day = d.getUTCDay();
-      const diff = day === 0 ? -6 : 1 - day;
-      d.setUTCDate(d.getUTCDate() + diff);
-      const key = `${d.getUTCFullYear()}-W${String(
-        Math.floor((d - new Date(Date.UTC(d.getUTCFullYear(), 0, 1))) / (7 * 24 * 60 * 60 * 1000)) + 1
-      ).padStart(2, '0')}`;
-      weekBuckets.set(key, 0);
-    }
-    allOrders.forEach((o) => {
-      const raw = o.created_at || o.order_date;
-      if (!raw) return;
-      const dt = new Date(raw);
-      if (Number.isNaN(dt.getTime())) return;
-      const day = dt.getUTCDay();
-      const monday = new Date(Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate()));
-      const diff = day === 0 ? -6 : 1 - day;
-      monday.setUTCDate(monday.getUTCDate() + diff);
-      const key = `${monday.getUTCFullYear()}-W${String(
-        Math.floor(
-          (monday - new Date(Date.UTC(monday.getUTCFullYear(), 0, 1))) / (7 * 24 * 60 * 60 * 1000)
-        ) + 1
-      ).padStart(2, '0')}`;
-      if (!weekBuckets.has(key)) return;
-      const rev = Number(o.grand_total) || Number(o.total_amount) || 0;
-      weekBuckets.set(key, (weekBuckets.get(key) || 0) + rev);
-    });
-    const trendBars = Array.from(weekBuckets.entries()).map(([key, revenue], i) => ({
-      label: `W${i + 1}`,
-      weekKey: key,
-      revenue: Math.round(revenue),
+    const trendBars = computeWeeklyKpiSeries(allOrders, periodsCount).map((bucket, index) => ({
+      label: `W${index + 1}`,
+      weekKey: bucket.key,
+      revenue: Math.round(bucket.revenue),
     }));
     const hasRealTrend = trendBars.some((b) => b.revenue > 0);
     const maxBarRevenue = hasRealTrend
@@ -1977,7 +2161,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         bookingCategoryFilter === 'All' ||
         bCategory === catLower ||
         (catLower === 'repair' && (bCategory.includes('repair') || (b.service_id && String(b.service_id).includes('repair')))) ||
-        (catLower === 'pms' && (bCategory.includes('pms') || (b.service_id && String(b.service_id).includes('pms'))));
+        (catLower === 'pms' && (bCategory.includes('pms') || (b.service_id && String(b.service_id).includes('pms')))) ||
+        (catLower === 'installation' &&
+          (bCategory.includes('installation') ||
+            bCategory.includes('customization') ||
+            bCategory.includes('tuning') ||
+            (b.service_id &&
+              (String(b.service_id).includes('install') ||
+                String(b.service_id).includes('custom')))));
 
       const dateVal = b.preferred_date || b.appointment_date || b.date || '';
       const matchDate = !bookingDateFilter || String(dateVal).startsWith(bookingDateFilter);
@@ -2005,7 +2196,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
   const bookingTotalPages = Math.max(1, Math.ceil(filteredBookings.length / BOOKING_PAGE_SIZE));
 
-  // ─── MECHANICS & TECHNICIANS COMPUTATIONS ───
   const mechanicsStats = useMemo(() => {
     const total = garageMechanics.length;
     const activeBookings = garageBookings.filter(
@@ -2071,6 +2261,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       return matchQ && matchStatus;
     });
   }, [garageMechanics, mechanicSearchQuery, mechanicFilterStatus, mechanicsStats]);
+
 
   const filteredRiders = useMemo(() => {
     return deliveryRiders.filter((r) => {
@@ -2401,7 +2592,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       appointment_date: newBkDate || '',
       preferred_time: newBkTimeSlot || '',
       time_slot: newBkTimeSlot || '',
-      branch: newBkBranch || 'MotoTrack Flagship Central Hub - Quezon City',
+      branch: newBkBranch || 'MotoTrack Flagship Central Hub & Pit Bays',
       mechanic: newBkMechanic && !String(newBkMechanic).toLowerCase().includes('pending')
         ? newBkMechanic
         : 'Pending Assignment',
@@ -2485,6 +2676,140 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     setEditingGarageService(null);
   };
 
+  const resetPmsRateForm = () => {
+    setEditingPmsRate(null);
+    setPmsRateName('');
+    setPmsRateCatalogCategory(CATALOG_CATEGORIES.PMS);
+    setPmsRate125('');
+    setPmsRate150('');
+    setPmsRateBig('');
+    setPmsRate125Na(false);
+    setPmsRate150Na(false);
+    setPmsRateBigNa(false);
+  };
+
+  const openAddPmsRateModal = () => {
+    resetPmsRateForm();
+    setIsAddPmsRateOpen(true);
+  };
+
+  const openEditPmsRateModal = (srv) => {
+    setEditingPmsRate(srv);
+    setPmsRateName(srv.name || '');
+    setPmsRateCatalogCategory(srv.catalogCategory === 'Repair' ? CATALOG_CATEGORIES.REPAIR : CATALOG_CATEGORIES.PMS);
+    const p125 = srv.prices?.['cc-125-below'];
+    const p150 = srv.prices?.['cc-150-160'];
+    const pBig = srv.prices?.['cc-big-bikes'];
+    setPmsRate125Na(p125 == null);
+    setPmsRate150Na(p150 == null);
+    setPmsRateBigNa(pBig == null);
+    setPmsRate125(p125 == null ? '' : String(p125));
+    setPmsRate150(p150 == null ? '' : String(p150));
+    setPmsRateBig(pBig == null ? '' : String(pBig));
+    setIsAddPmsRateOpen(true);
+  };
+
+  const syncPmsRateCatalogFromResult = (catalog) => {
+    const services = (catalog?.services || []).map((s) => ({
+      no: s.sortOrder ?? s.sort_order ?? 0,
+      id: s.id,
+      name: s.name,
+      catalogCategory: s.catalogCategory || 'PMS',
+      isActive: s.isActive !== false,
+      prices: { ...(s.prices || {}) },
+    }));
+    services.sort((a, b) => a.no - b.no);
+    setPmsRateCatalog(services);
+  };
+
+  const handleSavePmsFixedRate = async () => {
+    if (!pmsRateName.trim()) {
+      showAlert('Required Field', 'Please enter a service description.');
+      return;
+    }
+    if (!pmsRate125Na && !String(pmsRate125).trim()) {
+      showAlert('Required Field', 'Enter a Tier 1 price or mark Price not configured.');
+      return;
+    }
+    if (!pmsRate150Na && !String(pmsRate150).trim()) {
+      showAlert('Required Field', 'Enter a Tier 2 price or mark Price not configured.');
+      return;
+    }
+    if (!pmsRateBigNa && !String(pmsRateBig).trim()) {
+      showAlert('Required Field', 'Enter a Tier 3 price or mark Price not configured.');
+      return;
+    }
+
+    const pricesByCategory = {
+      'cc-125-below': pmsRate125Na ? null : pmsRate125,
+      'cc-150-160': pmsRate150Na ? null : pmsRate150,
+      'cc-big-bikes': pmsRateBigNa ? null : pmsRateBig,
+    };
+
+    setPmsRateSaving(true);
+    try {
+      const result = editingPmsRate
+        ? await pmsPricingService.updateFixedRateService(editingPmsRate.id, {
+            name: pmsRateName.trim(),
+            catalogCategory: pmsRateCatalogCategory,
+            pricesByCategory,
+          })
+        : await pmsPricingService.createFixedRateService({
+            name: pmsRateName.trim(),
+            catalogCategory: pmsRateCatalogCategory,
+            pricesByCategory,
+          });
+
+      if (!result?.success) {
+        showAlert('Could not save', result?.error || 'Failed to save fixed rate.');
+        return;
+      }
+
+      if (result.catalog) {
+        syncPmsRateCatalogFromResult(result.catalog);
+      } else {
+        const catalog = await pmsPricingService.loadCatalog({ forceRefresh: true, includeInactive: true });
+        syncPmsRateCatalogFromResult(catalog);
+      }
+
+      showToast(
+        editingPmsRate
+          ? `Service "${pmsRateName.trim()}" updated.`
+          : `Service "${pmsRateName.trim()}" added to catalog.`
+      );
+      setIsAddPmsRateOpen(false);
+      resetPmsRateForm();
+    } catch (err) {
+      showAlert('Could not save', err?.message || 'Unexpected error while saving fixed rate.');
+    } finally {
+      setPmsRateSaving(false);
+    }
+  };
+
+  const handleTogglePmsServiceActive = (srv) => {
+    const nextActive = srv.isActive === false;
+    showConfirm({
+      title: nextActive ? 'Activate Service' : 'Archive Service',
+      message: nextActive
+        ? 'This service will become bookable again for customers (when prices are configured).'
+        : 'Archived services stay in history but cannot be selected for new bookings.',
+      itemName: srv.name,
+      confirmText: nextActive ? 'Activate' : 'Archive',
+      cancelText: 'Cancel',
+      type: nextActive ? 'info' : 'danger',
+      confirmIcon: nextActive ? 'check2-circle' : 'archive',
+      onConfirm: async () => {
+        const result = await pmsPricingService.setServiceActive(srv.id, nextActive);
+        if (!result?.success) {
+          showAlert('Could not update', result?.error || 'Failed to update service status.');
+          return;
+        }
+        if (result.catalog) syncPmsRateCatalogFromResult(result.catalog);
+        showToast(nextActive ? `"${srv.name}" activated.` : `"${srv.name}" archived.`);
+      },
+    });
+  };
+
   const handleDeleteGarageService = (serviceId, name) => {
     showConfirm({
       title: 'Delete Garage Service Package',
@@ -2502,20 +2827,18 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     });
   };
 
-  // ─── MECHANIC & TECHNICIAN ACTIONS ───
+  // ─── MECHANIC & TECHNICIAN ACTIONS (admin roster only — no login accounts) ───
   const handleOpenAddMechanic = () => {
     setEditingMechanic(null);
     setMechName('');
     setMechShortName('');
-    setMechHourlyRate('150');
     setMechSpecialization('');
     setMechExperience('');
     setMechCertifications('');
-    setMechAvatar(''); // Starts empty for new technician
+    setMechAvatar('');
     setMechStatus('Available');
     setMechPhone('');
     setMechEmail('');
-    setMechPassword('');
     setIsAddMechanicModalOpen(true);
   };
 
@@ -2523,7 +2846,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     setEditingMechanic(mech);
     setMechName(mech.name || '');
     setMechShortName(mech.shortName || '');
-    setMechHourlyRate(String(mech.hourlyRate ?? mech.hourly_rate ?? 150));
     setMechSpecialization(mech.specialization || 'Engine Overhaul & Diagnostics');
     setMechExperience(mech.experience || '5 Years Pro Tech');
     setMechCertifications(mech.certifications || 'Certified Motorcycle Technician');
@@ -2531,7 +2853,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     setMechStatus(mech.status || 'Available');
     setMechPhone(mech.phone || '');
     setMechEmail(mech.email || '');
-    setMechPassword('');
     setIsAddMechanicModalOpen(true);
   };
 
@@ -2541,20 +2862,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       return;
     }
 
+    const payload = {
+      name: mechName.trim(),
+      shortName: mechShortName.trim() || mechName.trim().split('(')[0].trim(),
+      specialization: mechSpecialization.trim() || 'General Superbike Tuning',
+      experience: mechExperience.trim() || '5 Years Pro Tech',
+      certifications: mechCertifications.trim() || 'Certified Motorcycle Technician',
+      avatar: mechAvatar.trim() || MECHANIC_AVATAR_PRESETS[0],
+      status: mechStatus || 'Available',
+      phone: mechPhone.trim(),
+      email: mechEmail.trim().toLowerCase(),
+      isActive: true,
+      is_active: true,
+    };
+
     if (editingMechanic) {
-      // Admin may edit roster/profile only — not login credentials
-      const payload = {
-        name: mechName.trim(),
-        shortName: mechShortName.trim() || mechName.trim().split('(')[0].trim(),
-        specialization: mechSpecialization.trim() || 'General Superbike Tuning',
-        experience: mechExperience.trim() || '5 Years Pro Tech',
-        certifications: mechCertifications.trim() || 'Certified Motorcycle Technician',
-        avatar: mechAvatar.trim() || MECHANIC_AVATAR_PRESETS[0],
-        status: mechStatus || 'Available',
-        phone: mechPhone.trim(),
-        hourlyRate: Number(mechHourlyRate || 150),
-        hourly_rate: Number(mechHourlyRate || 150),
-      };
       const res = await garageService.updateMechanic(editingMechanic.id, payload);
       if (res.success) {
         setGarageMechanics(garageService.getMechanics());
@@ -2567,56 +2889,16 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       return;
     }
 
-    const cleanEmail = mechEmail.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      showAlert('Required Field', 'A valid mechanic email is required for OTP verification.');
-      return;
-    }
-
-    const res = await staffAccountApi.createStaffAccount({
-      name: mechName.trim(),
-      email: cleanEmail,
-      phone: mechPhone.trim(),
-      role: 'mechanic',
-      roster: {
-        shortName: mechShortName.trim() || mechName.trim().split('(')[0].trim(),
-        specialization: mechSpecialization.trim() || 'General Superbike Tuning',
-        experience: mechExperience.trim() || '5 Years Pro Tech',
-        certifications: mechCertifications.trim() || 'Certified Motorcycle Technician',
-        avatar: mechAvatar.trim() || MECHANIC_AVATAR_PRESETS[0],
-        status: mechStatus || 'Available',
-        hourlyRate: Number(mechHourlyRate || 150),
-      },
-    });
-
+    const res = await garageService.addMechanic(payload);
     if (res.success) {
       try {
         await garageService.fetchMechanics?.({ force: true });
       } catch (_e) {}
       setGarageMechanics(garageService.getMechanics());
       setIsAddMechanicModalOpen(false);
-      if (res.partial || res.emailError) {
-        showAlert(
-          'OTP email issue',
-          res.emailError ||
-            res.message ||
-            'Account is pending. OTP email failed — ask the mechanic to use Staff email verification → Resend Code, or configure RESEND_API_KEY / Gmail SMTP in server/.env.'
-        );
-      } else if (res.warning) {
-        showToast(`✓ Mechanic invited (dev OTP — check server console)`);
-        showAlert(
-          'OTP in server console',
-          `Account created for ${cleanEmail}, but email is not configured yet.\n\nCopy the OTP from the API terminal, then open Login → Staff email verification.\nAfter verify, the temporary password is also printed/emailed.\n\nTo send real Gmail: set RESEND_API_KEY or Gmail SMTP in server/.env and restart the server.`
-        );
-      } else {
-        showToast(`✓ Mechanic invited. OTP sent to ${cleanEmail}`);
-        showAlert(
-          'Verify email',
-          `A 6-digit OTP was sent to ${cleanEmail}. After the mechanic verifies, a temporary password will be emailed automatically.`
-        );
-      }
+      showToast(`✓ Added ${payload.shortName || payload.name} to the pit bay roster`);
     } else {
-      showAlert('Error', res.error || 'Failed to create mechanic account.');
+      showAlert('Error', res.error || 'Failed to add mechanic to roster.');
     }
   };
 
@@ -2913,15 +3195,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
   // ─── USER ACTIONS ───
   const handleToggleUserRole = async (userId, currentRole) => {
-    // Cycle: user → mechanic → admin → user
-    const order = ['user', 'mechanic', 'admin'];
-    const idx = order.indexOf(currentRole === 'rider' ? 'user' : currentRole);
+    // Cycle: user → admin → user (mechanic role is retired)
+    const order = ['user', 'admin'];
+    const idx = order.indexOf(currentRole === 'rider' || currentRole === 'mechanic' ? 'user' : currentRole);
     const newRole = order[(idx + 1) % order.length];
     await userService.updateUserRole(userId, newRole);
     await loadData();
     const labels = {
       admin: 'Store Administrator',
-      mechanic: 'Mechanic',
       user: 'Customer',
     };
     showToast(`Updated user role to ${labels[newRole] || newRole}`);
@@ -3135,8 +3416,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     ).length;
     const cancelled = targetList.filter((o) => (o.status || '').toLowerCase() === 'cancelled').length;
     const totalRevenue = targetList
-      .filter((o) => (o.status || '').toLowerCase() !== 'cancelled')
-      .reduce((sum, o) => sum + (Number(o.grand_total) || Number(o.total_amount) || 0), 0);
+      .filter(isRecognizedSalesOrder)
+      .reduce((sum, o) => sum + recognizedOrderAmount(o), 0);
 
     return {
       total,
@@ -3175,8 +3456,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     ).length;
     const cancelled = orders.filter((o) => (o.status || '').toLowerCase() === 'cancelled').length;
     const totalRevenue = orders
-      .filter((o) => (o.status || '').toLowerCase() !== 'cancelled')
-      .reduce((sum, o) => sum + (Number(o.grand_total) || Number(o.total_amount) || 0), 0);
+      .filter(isRecognizedSalesOrder)
+      .reduce((sum, o) => sum + recognizedOrderAmount(o), 0);
 
     return {
       total,
@@ -3283,7 +3564,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         badge: invStats.lowStockCount > 0 ? `${invStats.lowStockCount} Reorder Alerts` : 'Stock Healthy',
         badgeType: invStats.lowStockCount > 0 ? 'warning' : 'success',
         metrics: [
-          { label: 'Stock Valuation', value: `₱${invStats.totalValue.toLocaleString()}` },
+          { label: 'Inventory cost', value: `₱${invStats.totalValue.toLocaleString()}` },
           { label: 'Total Units', value: invStats.totalUnits.toLocaleString() },
           { label: 'Low Stock', value: invStats.lowStockCount, color: invStats.lowStockCount > 0 ? '#D97706' : undefined },
           { label: 'Out of Stock', value: invStats.outOfStockCount, color: invStats.outOfStockCount > 0 ? '#DC2626' : undefined },
@@ -3306,8 +3587,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         badge: `${orders.length} Total Orders`,
         badgeType: 'neutral',
         metrics: [
-          { label: 'Gross Revenue', value: `₱${analyticsData.totalRevenue.toLocaleString()}` },
-          { label: 'Avg Order Value', value: `₱${Math.round(analyticsData.avgOrderValue || 0).toLocaleString()}` },
+          { label: 'Recognized revenue', value: `₱${analyticsData.totalRevenue.toLocaleString()}` },
+          { label: 'Avg Order Value', value: `₱${Math.round(analyticsData.aov || 0).toLocaleString()}` },
           { label: 'Delivered', value: orderStats.delivered, color: isDarkMode ? tokens.statusSuccessText : '#10B981' },
           { label: 'Active Orders', value: orderStats.processing + orderStats.shipped + orderStats.ready },
         ],
@@ -3480,7 +3761,19 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           ? { ...prev, ...(res.order || {}), status: 'Processing' }
           : prev
       );
-      showToast(`Approved Order #${String(orderId).slice(0, 10)}! Moved to Packing.`);
+      if (isCod) {
+        if (res.emailSent) {
+          showToast('COD order approved successfully. Customer email notification sent.');
+        } else {
+          showToast(
+            `COD order approved successfully, but the email notification could not be sent.${
+              res.emailError ? ` (${res.emailError})` : ''
+            }`
+          );
+        }
+      } else {
+        showToast(`Approved Order #${String(orderId).slice(0, 10)}! Moved to Packing.`);
+      }
     } else {
       showToast(res.error || 'Approval failed');
     }
@@ -3488,11 +3781,42 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
   const handleApproveAllPendingCOD = async () => {
     if (pendingCodOrders.length === 0) return;
+    let emailsSent = 0;
+    let emailsFailed = 0;
     for (const ord of pendingCodOrders) {
-      await orderService.approveCODOrder(ord.order_id || ord.id);
+      const res = await orderService.approveCODOrder(ord.order_id || ord.id);
+      if (res?.emailSent) emailsSent++;
+      else emailsFailed++;
     }
     await loadData();
-    showToast(`Approved all ${pendingCodOrders.length} pending COD orders!`);
+    if (emailsFailed === 0) {
+      showToast(`Approved all ${pendingCodOrders.length} pending COD orders. Customer email notifications sent.`);
+    } else {
+      showToast(
+        `Approved all ${pendingCodOrders.length} pending COD orders. (${emailsSent} emails sent, ${emailsFailed} notifications could not be sent).`
+      );
+    }
+  };
+
+  const handleRetryCodApprovalEmail = async (orderId) => {
+    const res = await orderService.retryCodApprovalEmail(orderId);
+    if (res.success && res.emailSent) {
+      showToast(`Customer email notification sent to ${res.recipient || 'customer'}.`);
+      await loadData();
+      setSelectedOrderForModal((prev) => {
+        if (!prev || (prev.order_id !== orderId && prev.id !== orderId)) return prev;
+        return {
+          ...prev,
+          cod_approval_email_sent: true,
+          cod_approval_email_status: 'sent',
+          cod_approval_email_at: new Date().toISOString(),
+          cod_approval_email_recipient: res.recipient,
+          cod_approval_email_error: null,
+        };
+      });
+    } else {
+      showToast(res.error || res.emailError || 'Failed to dispatch email.');
+    }
   };
 
   const handleUpdateOrderStatus = async (orderId, newStatus, notes = '') => {
@@ -3715,13 +4039,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     promos: 'Promo Vouchers & Discounts',
     suppliers: 'Suppliers & Parts Vendors',
     garage: 'Garage & Service Appointments Management',
-    mechanics: 'Certified Mechanics & Pit Crew',
     riders: 'Riders',
     users: 'Users Management',
     supabase: 'Supabase Database Settings',
+    audit: 'Activity Logs',
     notifications: 'Notifications & Alerts Center',
     settings: 'System & Platform Settings',
-    profile: 'Profile & Activity Logs',
+    profile: 'Profile & Account Settings',
   };
 
   const navIcons = {
@@ -3735,10 +4059,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     promos: 'ticket-perforated-fill',
     suppliers: 'truck',
     garage: 'tools',
-    mechanics: 'person-badge-fill',
     riders: 'bicycle',
     users: 'people-fill',
     supabase: 'database-fill-gear',
+    audit: 'journal-text',
     notifications: 'bell-fill',
     settings: 'gear-fill',
     profile: 'person-gear',
@@ -3810,7 +4134,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           </Text>
           <TouchableOpacity
             style={{
-              backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+              backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
               paddingVertical: 14,
               paddingHorizontal: 24,
               borderRadius: 14,
@@ -3912,7 +4236,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             position: 'absolute',
             top: 20,
             alignSelf: 'center',
-            backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+            backgroundColor: '#24272B',
             paddingHorizontal: 22,
             paddingVertical: 12,
             borderRadius: 9999,
@@ -3932,6 +4256,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         {/* ─── 1A. LEFT SIDEBAR (DESKTOP) ─── */}
         {isDesktop && (
           <AdminSidebar
+            isLoading={shouldShowSkeleton}
+            isOffline={isOffline}
+            isLagging={isLagging}
             activeNav={activeNav}
             setActiveNav={setActiveNav}
             isDarkMode={isDarkMode}
@@ -3958,6 +4285,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         {/* ─── 1B. LEFT SIDEBAR (MOBILE DRAWER WITH BACKDROP) ─── */}
         {!isDesktop && (
           <AdminSidebar
+            isLoading={shouldShowSkeleton}
+            isOffline={isOffline}
+            isLagging={isLagging}
             activeNav={activeNav}
             setActiveNav={(nav) => {
               setActiveNav(nav);
@@ -4028,37 +4358,40 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <BootstrapIcon
                     name="list"
                     size={18}
-                    color={isDarkMode ? (tokens.textPrimary || '#F8FAFC') : '#1D4533'}
+                    color={isDarkMode ? (tokens.textPrimary || '#F8FAFC') : '#EA580C'}
                   />
                 </TouchableOpacity>
               )}
-              <View
-                style={{
-                  width: 34,
-                  height: 34,
-                  borderRadius: 9,
-                  backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#F0FDFA',
-                  borderWidth: 1,
-                  borderColor: isDarkMode ? 'rgba(29, 69, 51, 0.45)' : '#CCFBF1',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <BootstrapIcon
-                  name={navIcons[activeNav] || 'speedometer2'}
-                  size={15}
-                  color={isDarkMode ? tokens.accentBrand : '#1D4533'}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.pageBreadcrumbTitle,
-                  { color: isDarkMode ? (tokens.textPrimary || '#F8FAFC') : '#1D4533' },
-                  !isDesktop && { fontSize: 16 },
-                ]}
-              >
-                {navTitles[activeNav] || 'Admin Console'}
-              </Text>
+              {shouldShowSkeleton ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Skeleton width={20} height={20} borderRadius={4} />
+                  <Skeleton width={120} height={20} borderRadius={6} />
+                </View>
+              ) : (
+                <>
+                  <View
+                    style={{
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <BootstrapIcon
+                      name={navIcons[activeNav] || 'speedometer2'}
+                      size={18}
+                      color={isDarkMode ? tokens.accentBrand : '#EA580C'}
+                    />
+                  </View>
+                  <Text
+                    style={[
+                      styles.pageBreadcrumbTitle,
+                      { color: isDarkMode ? (tokens.textPrimary || '#F8FAFC') : '#24272B' },
+                      !isDesktop && { fontSize: 16 },
+                    ]}
+                  >
+                    {navTitles[activeNav] || 'Admin Console'}
+                  </Text>
+                </>
+              )}
             </View>
 
             <View
@@ -4070,7 +4403,15 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 },
               ]}
             >
-              {/* Dark Mode Toggle Button */}
+              {shouldShowSkeleton ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <Skeleton circle width={38} height={38} />
+                  <Skeleton circle width={38} height={38} />
+                  <Skeleton circle width={38} height={38} />
+                </View>
+              ) : (
+                <>
+                  {/* Dark Mode Toggle Button */}
               <TouchableOpacity
                 style={{
                   width: 38,
@@ -4093,6 +4434,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   color={isDarkMode ? (tokens.statusWarningText || '#F59E0B') : '#475569'}
                 />
               </TouchableOpacity>
+
+
+
+
 
               {/* ─── NOTIFICATION BELL & DROPDOWN POPOVER ─── */}
               <View style={{ position: 'relative', zIndex: 1001 }} data-notification-button="true">
@@ -4121,7 +4466,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     size={18}
                     color={
                       isNotificationDropdownOpen || activeNav === 'notifications'
-                        ? (isDarkMode ? tokens.accentBrand : '#1D4533')
+                        ? (isDarkMode ? tokens.accentBrand : '#EA580C')
                         : (isDarkMode ? '#F8FAFC' : '#475569')
                     }
                   />
@@ -4221,7 +4566,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               width: 44,
                               height: 44,
                               borderRadius: 22,
-                              backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+                              backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                               alignItems: 'center',
                               justifyContent: 'center',
                             }}
@@ -4269,7 +4614,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <BootstrapIcon
                           name="shield-lock-fill"
                           size={11}
-                          color={isDarkMode ? tokens.accentBrand : '#1D4533'}
+                          color={isDarkMode ? tokens.accentBrand : '#EA580C'}
                         />
                         <Text
                           style={{
@@ -4304,7 +4649,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <BootstrapIcon
                           name="shield-lock-fill"
                           size={16}
-                          color={isDarkMode ? tokens.accentBrand : '#1D4533'}
+                          color={isDarkMode ? tokens.accentBrand : '#EA580C'}
                         />
                         <Text
                           style={{
@@ -4336,7 +4681,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <BootstrapIcon
                           name="person-gear"
                           size={16}
-                          color={isDarkMode ? tokens.accentBrand : '#1D4533'}
+                          color={isDarkMode ? tokens.accentBrand : '#EA580C'}
                         />
                         <Text
                           style={{
@@ -4345,7 +4690,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             color: isDarkMode ? tokens.textPrimary : '#1E293B',
                           }}
                         >
-                          Profile & Activity Logs
+                          Administrator Profile
                         </Text>
                       </TouchableOpacity>
 
@@ -4396,7 +4741,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <BootstrapIcon
                           name="gear-fill"
                           size={16}
-                          color={isDarkMode ? tokens.accentBrand : '#1D4533'}
+                          color={isDarkMode ? tokens.accentBrand : '#EA580C'}
                         />
                         <Text
                           style={{
@@ -4498,6 +4843,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   activeOpacity={1}
                 />
               )}
+                </>
+              )}
+
+
             </View>
           </View>
 
@@ -4508,9 +4857,69 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               !isDesktop && { paddingBottom: 110, paddingHorizontal: 12 },
             ]}
           >
+
+
+            {/* ─── INITIAL LOAD ERROR STATE WITH RETRY ─── */}
+            {!hasLoadedOnce && dashboardError && (
+              <View
+                style={{
+                  padding: 28,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: isDarkMode ? '#1E1919' : '#FFFFFF',
+                  borderRadius: 16,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? '#7F1D1D' : '#FCA5A5',
+                  marginVertical: 24,
+                  gap: 12,
+                  maxWidth: 520,
+                  alignSelf: 'center',
+                  width: '100%',
+                }}
+              >
+                <View
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 26,
+                    backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.2)' : '#FEF2F2',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BootstrapIcon name="exclamation-triangle-fill" size={24} color="#EF4444" />
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#0F172A', textAlign: 'center' }}>
+                  Unable to Load Dashboard Data
+                </Text>
+                <Text style={{ fontSize: 13, color: isDarkMode ? '#94A3B8' : '#64748B', textAlign: 'center', lineHeight: 18 }}>
+                  {dashboardError}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => loadData({ forceRefresh: true })}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
+                    paddingHorizontal: 18,
+                    paddingVertical: 10,
+                    borderRadius: 9,
+                    marginTop: 4,
+                    cursor: 'pointer',
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <BootstrapIcon name="arrow-clockwise" size={15} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>Retry Connection</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             {/* ─── TAB 1: OVERVIEW ─── */}
             {activeNav === 'overview' && (
               <ModernOverviewDashboard
+                isLoading={shouldShowSkeleton}
                 orders={orders}
                 products={products}
                 garageBookings={garageBookings}
@@ -4563,7 +4972,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           : '#D97706'
                         : isDarkMode
                           ? tokens.accentBrand
-                          : '#1D4533'
+                          : '#EA580C'
                     }
                     sub="Requires Admin action"
                     isDark={isDarkMode}
@@ -4671,7 +5080,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   >
                     {(() => {
                       const orderStatusOptions = [
-                        { key: 'All', label: 'All Orders', count: periodOrderStats.total, icon: 'list-check', color: isDarkMode ? tokens.accentBrand : '#1D4533' },
+                        { key: 'All', label: 'All Orders', count: periodOrderStats.total, icon: 'list-check', color: isDarkMode ? tokens.accentBrand : '#EA580C' },
                         {
                           key: 'Pending Approval',
                           label: 'Pending COD',
@@ -4683,7 +5092,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         { key: 'Processing', label: 'Processing', count: periodOrderStats.processing, icon: 'gear-wide-connected', color: isDarkMode ? tokens.statusInfoText : '#0284C7' },
                         { key: 'Ready for Delivery', label: 'Ready', count: periodOrderStats.ready, icon: 'box-seam', color: '#0EA5E9' },
                         { key: 'Out for Delivery', label: 'Out for Delivery', count: periodOrderStats.shipped, icon: 'truck', color: '#6366F1' },
-                        { key: 'Delivery Reported', label: 'Reported', count: periodOrderStats.reported, icon: 'clipboard-check', color: isDarkMode ? tokens.accentBrand : '#1D4533' },
+                        { key: 'Delivery Reported', label: 'Reported', count: periodOrderStats.reported, icon: 'clipboard-check', color: isDarkMode ? tokens.accentBrand : '#EA580C' },
                         { key: 'Delivery Issue', label: 'Issue', count: periodOrderStats.failed, icon: 'exclamation-triangle', color: isDarkMode ? tokens.statusDangerText : '#DC2626' },
                         { key: 'Rescheduled', label: 'Rescheduled', count: periodOrderStats.rescheduled, icon: 'arrow-repeat', color: isDarkMode ? tokens.statusWarningText : '#D97706' },
                         { key: 'Delivered', label: 'Delivered', count: periodOrderStats.delivered, icon: 'check-circle-fill', color: isDarkMode ? tokens.statusSuccessText : '#16A34A' },
@@ -4704,7 +5113,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               borderColor: isOrderStatusDropdownOpen
                                 ? isDarkMode
                                   ? tokens.accentBorder
-                                  : '#1D4533'
+                                  : '#EA580C'
                                 : activeOpt.highlight
                                   ? isDarkMode
                                     ? 'rgba(180, 160, 120, 0.45)'
@@ -4712,7 +5121,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   : orderStatusFilter !== 'All'
                                     ? isDarkMode
                                       ? tokens.accentBorder
-                                      : '#1D4533'
+                                      : '#EA580C'
                                     : isDarkMode
                                       ? tokens.borderInput
                                       : '#E2E8F0',
@@ -4724,7 +5133,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               boxShadow: isOrderStatusDropdownOpen
                                 ? isDarkMode
                                   ? '0 6px 16px -2px rgba(0, 0, 0, 0.35)'
-                                  : '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                                  : '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                                 : '0 1px 3px rgba(0, 0, 0, 0.04)',
                             }}
                             onPress={() => {
@@ -4744,7 +5153,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       ? tokens.statusWarningText
                                       : '#D97706'
                                     : orderStatusFilter !== 'All'
-                                      ? isDarkMode && activeOpt.color === '#1D4533'
+                                      ? isDarkMode && activeOpt.color === '#EA580C'
                                         ? tokens.accentBrand
                                         : activeOpt.color
                                       : isDarkMode
@@ -4764,7 +5173,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       : orderStatusFilter !== 'All'
                                         ? isDarkMode
                                           ? tokens.accentBrand
-                                          : '#1D4533'
+                                          : '#EA580C'
                                         : isDarkMode
                                           ? tokens.textPrimary
                                           : '#0F172A',
@@ -4782,7 +5191,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       : orderStatusFilter !== 'All'
                                         ? isDarkMode
                                           ? 'rgba(16, 185, 129, 0.22)'
-                                          : '#1D4533'
+                                          : '#EA580C'
                                         : isDarkMode
                                           ? tokens.bgSub
                                           : '#E2E8F0',
@@ -4821,7 +5230,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 isOrderStatusDropdownOpen
                                   ? isDarkMode
                                     ? tokens.accentBrand
-                                    : '#1D4533'
+                                    : '#EA580C'
                                   : isDarkMode
                                     ? tokens.textMuted
                                     : '#64748B'
@@ -4895,7 +5304,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       <BootstrapIcon
                                         name={option.icon}
                                         size={14}
-                                        color={isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
+                                        color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
                                       />
                                       <Text
                                         style={{
@@ -4904,7 +5313,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                           color: isSelected
                                             ? isDarkMode
                                               ? tokens.accentBrand
-                                              : '#1D4533'
+                                              : '#EA580C'
                                             : isDarkMode
                                               ? tokens.textSecondary
                                               : '#334155',
@@ -4923,7 +5332,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                             : isSelected
                                               ? isDarkMode
                                                 ? 'rgba(16, 185, 129, 0.22)'
-                                                : '#1D4533'
+                                                : '#EA580C'
                                               : isDarkMode
                                                 ? tokens.bgSub
                                                 : '#E2E8F0',
@@ -4952,7 +5361,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                           {option.count}
                                         </Text>
                                       </View>
-                                      {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />}
+                                      {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />}
                                     </View>
                                   </TouchableOpacity>
                                 );
@@ -4982,11 +5391,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           borderColor: isPaymentDropdownOpen
                             ? isDarkMode
                               ? tokens.accentBorder
-                              : '#1D4533'
+                              : '#EA580C'
                             : orderPaymentFilter !== 'All'
                               ? isDarkMode
                                 ? tokens.accentBorder
-                                : '#1D4533'
+                                : '#EA580C'
                               : isDarkMode
                                 ? tokens.borderInput
                                 : '#E2E8F0',
@@ -4998,7 +5407,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           boxShadow: isPaymentDropdownOpen
                             ? isDarkMode
                               ? '0 6px 20px -2px rgba(16, 185, 129, 0.18)'
-                              : '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                              : '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                             : '0 1px 3px rgba(0, 0, 0, 0.04)',
                         }}
                         onPress={() => {
@@ -5026,7 +5435,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               orderPaymentFilter !== 'All'
                                 ? isDarkMode
                                   ? tokens.accentBrand
-                                  : '#1D4533'
+                                  : '#EA580C'
                                 : isDarkMode
                                   ? tokens.textMuted
                                   : '#64748B'
@@ -5040,7 +5449,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 orderPaymentFilter !== 'All'
                                   ? isDarkMode
                                     ? tokens.accentBrand
-                                    : '#1D4533'
+                                    : '#EA580C'
                                   : isDarkMode
                                     ? tokens.textPrimary
                                     : '#0F172A',
@@ -5064,7 +5473,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             isPaymentDropdownOpen
                               ? isDarkMode
                                 ? tokens.accentBrand
-                                : '#1D4533'
+                                : '#EA580C'
                               : isDarkMode
                                 ? tokens.textMuted
                                 : '#64748B'
@@ -5142,7 +5551,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   <BootstrapIcon
                                     name={option.icon}
                                     size={14}
-                                    color={isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                                    color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : (isDarkMode ? tokens.textMuted : '#64748B')}
                                   />
                                   <Text
                                     style={{
@@ -5151,7 +5560,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       color: isSelected
                                         ? isDarkMode
                                           ? tokens.accentBrand
-                                          : '#1D4533'
+                                          : '#EA580C'
                                         : isDarkMode
                                           ? tokens.textSecondary
                                           : '#334155',
@@ -5160,7 +5569,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     {option.label}
                                   </Text>
                                 </View>
-                                {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />}
+                                {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />}
                               </TouchableOpacity>
                             );
                           })}
@@ -5186,11 +5595,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           borderColor: isOrderDateDropdownOpen
                             ? isDarkMode
                               ? tokens.accentBorder
-                              : '#1D4533'
+                              : '#EA580C'
                             : isOrderDateFiltered
                               ? isDarkMode
                                 ? tokens.accentBorder
-                                : '#1D4533'
+                                : '#EA580C'
                               : isDarkMode
                                 ? tokens.borderInput
                                 : '#E2E8F0',
@@ -5202,7 +5611,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           boxShadow: isOrderDateDropdownOpen
                             ? isDarkMode
                               ? '0 6px 20px -2px rgba(16, 185, 129, 0.18)'
-                              : '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                              : '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                             : '0 1px 3px rgba(0, 0, 0, 0.04)',
                         }}
                         onPress={() => {
@@ -5220,7 +5629,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               isOrderDateFiltered
                                 ? isDarkMode
                                   ? tokens.accentBrand
-                                  : '#1D4533'
+                                  : '#EA580C'
                                 : isDarkMode
                                   ? tokens.textMuted
                                   : '#64748B'
@@ -5234,7 +5643,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 isOrderDateFiltered
                                   ? isDarkMode
                                     ? tokens.accentBrand
-                                    : '#1D4533'
+                                    : '#EA580C'
                                   : isDarkMode
                                     ? tokens.textPrimary
                                     : '#0F172A',
@@ -5247,7 +5656,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               style={{
                                 backgroundColor: isDarkMode
                                   ? 'rgba(16, 185, 129, 0.22)'
-                                  : '#1D4533',
+                                  : '#EA580C',
                                 paddingHorizontal: 6,
                                 paddingVertical: 1,
                                 borderRadius: 8,
@@ -5273,7 +5682,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             isOrderDateDropdownOpen
                               ? isDarkMode
                                 ? tokens.accentBrand
-                                : '#1D4533'
+                                : '#EA580C'
                               : isDarkMode
                                 ? tokens.textMuted
                                 : '#64748B'
@@ -5321,7 +5730,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           {/* Header with Reset */}
                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                              <BootstrapIcon name="calendar-event" size={13} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />
+                              <BootstrapIcon name="calendar-event" size={13} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
                               <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                                 Filter by Month & Year
                               </Text>
@@ -5335,7 +5744,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 }}
                                 style={{ cursor: 'pointer' }}
                               >
-                                <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                                <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                                   Reset All
                                 </Text>
                               </TouchableOpacity>
@@ -5355,7 +5764,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   : (isDarkMode ? tokens.bgSub : '#F1F5F9'),
                                 borderWidth: 1,
                                 borderColor: (orderYearFilter === 'All' && orderMonthFilter === 'All')
-                                  ? (isDarkMode ? tokens.accentBorder : '#1D4533')
+                                  ? (isDarkMode ? tokens.accentBorder : '#EA580C')
                                   : 'transparent',
                                 alignItems: 'center',
                                 cursor: 'pointer',
@@ -5370,7 +5779,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 fontSize: 11,
                                 fontWeight: (orderYearFilter === 'All' && orderMonthFilter === 'All') ? '800' : '600',
                                 color: (orderYearFilter === 'All' && orderMonthFilter === 'All')
-                                  ? (isDarkMode ? tokens.accentBrand : '#1D4533')
+                                  ? (isDarkMode ? tokens.accentBrand : '#EA580C')
                                   : (isDarkMode ? tokens.textMuted : '#64748B'),
                               }}>
                                 All Time
@@ -5388,7 +5797,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   : (isDarkMode ? tokens.bgSub : '#F1F5F9'),
                                 borderWidth: 1,
                                 borderColor: (orderYearFilter === new Date().getFullYear() && orderMonthFilter === new Date().getMonth())
-                                  ? (isDarkMode ? tokens.accentBorder : '#1D4533')
+                                  ? (isDarkMode ? tokens.accentBorder : '#EA580C')
                                   : 'transparent',
                                 alignItems: 'center',
                                 cursor: 'pointer',
@@ -5404,7 +5813,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 fontSize: 11,
                                 fontWeight: (orderYearFilter === new Date().getFullYear() && orderMonthFilter === new Date().getMonth()) ? '800' : '600',
                                 color: (orderYearFilter === new Date().getFullYear() && orderMonthFilter === new Date().getMonth())
-                                  ? (isDarkMode ? tokens.accentBrand : '#1D4533')
+                                  ? (isDarkMode ? tokens.accentBrand : '#EA580C')
                                   : (isDarkMode ? tokens.textMuted : '#64748B'),
                               }}>
                                 This Month
@@ -5430,7 +5839,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   const lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
                                   return (orderYearFilter === lm.getFullYear() && orderMonthFilter === lm.getMonth());
                                 })()
-                                  ? (isDarkMode ? tokens.accentBorder : '#1D4533')
+                                  ? (isDarkMode ? tokens.accentBorder : '#EA580C')
                                   : 'transparent',
                                 alignItems: 'center',
                                 cursor: 'pointer',
@@ -5469,7 +5878,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
                                   borderWidth: 1,
                                   borderColor: orderYearFilter === 'All'
-                                    ? (isDarkMode ? tokens.accentBorder : '#1D4533')
+                                    ? (isDarkMode ? tokens.accentBorder : '#EA580C')
                                     : (isDarkMode ? tokens.borderInput : '#E2E8F0'),
                                   cursor: 'pointer',
                                 }}
@@ -5479,7 +5888,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   fontSize: 11.5,
                                   fontWeight: orderYearFilter === 'All' ? '800' : '600',
                                   color: orderYearFilter === 'All'
-                                    ? (isDarkMode ? tokens.accentBrand : '#1D4533')
+                                    ? (isDarkMode ? tokens.accentBrand : '#EA580C')
                                     : (isDarkMode ? tokens.textSecondary : '#475569'),
                                 }}>
                                   All Years
@@ -5504,7 +5913,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                         : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
                                       borderWidth: 1,
                                       borderColor: isYrSelected
-                                        ? (isDarkMode ? tokens.accentBorder : '#1D4533')
+                                        ? (isDarkMode ? tokens.accentBorder : '#EA580C')
                                         : (isDarkMode ? tokens.borderInput : '#E2E8F0'),
                                       cursor: 'pointer',
                                     }}
@@ -5514,7 +5923,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       fontSize: 11.5,
                                       fontWeight: isYrSelected ? '800' : '600',
                                       color: isYrSelected
-                                        ? (isDarkMode ? tokens.accentBrand : '#1D4533')
+                                        ? (isDarkMode ? tokens.accentBrand : '#EA580C')
                                         : (isDarkMode ? tokens.textSecondary : '#475569'),
                                     }}>
                                       {yr}
@@ -5524,7 +5933,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                         fontSize: 10,
                                         fontWeight: '700',
                                         color: isYrSelected
-                                          ? (isDarkMode ? tokens.accentBrand : '#1D4533')
+                                          ? (isDarkMode ? tokens.accentBrand : '#EA580C')
                                           : (isDarkMode ? tokens.textMuted : '#94A3B8'),
                                       }}>
                                         ({yrCount})
@@ -5544,7 +5953,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               </Text>
                               {orderMonthFilter !== 'All' && (
                                 <TouchableOpacity onPress={() => setOrderMonthFilter('All')} style={{ cursor: 'pointer' }}>
-                                  <Text style={{ fontSize: 10.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                                  <Text style={{ fontSize: 10.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                                     All Months
                                   </Text>
                                 </TouchableOpacity>
@@ -5573,7 +5982,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                         : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
                                       borderWidth: 1.5,
                                       borderColor: isMSelected
-                                        ? (isDarkMode ? tokens.accentBorder : '#1D4533')
+                                        ? (isDarkMode ? tokens.accentBorder : '#EA580C')
                                         : (isDarkMode ? tokens.borderInput : '#E2E8F0'),
                                       alignItems: 'center',
                                       justifyContent: 'center',
@@ -5591,7 +6000,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       fontSize: 12,
                                       fontWeight: isMSelected ? '800' : '600',
                                       color: isMSelected
-                                        ? (isDarkMode ? tokens.accentBrand : '#1D4533')
+                                        ? (isDarkMode ? tokens.accentBrand : '#EA580C')
                                         : (isDarkMode ? tokens.textPrimary : '#1E293B'),
                                     }}>
                                       {mName}
@@ -5601,7 +6010,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                         fontSize: 9.5,
                                         fontWeight: '800',
                                         color: isMSelected
-                                          ? (isDarkMode ? tokens.accentBrand : '#1D4533')
+                                          ? (isDarkMode ? tokens.accentBrand : '#EA580C')
                                           : (isDarkMode ? tokens.statusSuccessText : '#16A34A'),
                                         marginTop: 1,
                                       }}>
@@ -5624,7 +6033,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 6,
-                        backgroundColor: isDarkMode ? '#1F6B52' : '#107C41',
+                        backgroundColor: isDarkMode ? '#EA580C' : '#107C41',
                         paddingHorizontal: 14,
                         paddingVertical: 10,
                         borderRadius: 12,
@@ -5685,7 +6094,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#F0FDF4',
+                      backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#F0FDF4',
                       borderColor: isDarkMode ? tokens.accentBorder : '#86EFAC',
                       borderWidth: 1,
                       borderRadius: 12,
@@ -5751,43 +6160,64 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <View style={styles.tableCard}>
                   <View
                     style={{
-                      paddingHorizontal: 18,
+                      paddingHorizontal: 20,
                       paddingVertical: 14,
+                      backgroundColor: '#24272B',
                       borderBottomWidth: 1,
-                      borderBottomColor: isDarkMode ? tokens.border : '#E2E8F0',
+                      borderBottomColor: isDarkMode ? '#374151' : '#32373D',
                       flexDirection: 'row',
                       justifyContent: 'space-between',
                       alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: 12,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: 15,
-                        fontWeight: '900',
-                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                      }}
-                    >
-                      Orders Ledger ({filteredOrdersList.length} shown)
-                    </Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                    <View>
+                      <Text
+                        style={{
+                          fontSize: 16,
+                          fontWeight: '800',
+                          color: '#FFFFFF',
+                          letterSpacing: -0.2,
+                        }}
+                      >
+                        Orders Ledger ({filteredOrdersList.length} shown)
+                      </Text>
+                      <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>
+                        Transactions across online store and cashier POS, newest first
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <TouchableOpacity
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                          borderWidth: 1,
+                          borderColor: 'rgba(239, 68, 68, 0.25)',
+                          cursor: 'pointer',
+                        }}
                         onPress={() => {
                           orderService.clearLocalOrders();
                           loadData();
                           showToast('Local offline orders cache cleared!');
                         }}
+                        activeOpacity={0.8}
                       >
                         <BootstrapIcon
                           name="trash3"
-                          size={13}
-                          color={isDarkMode ? tokens.statusDangerText : '#DC2626'}
+                          size={12}
+                          color="#F87171"
                         />
                         <Text
                           style={{
                             fontSize: 12,
                             fontWeight: '700',
-                            color: isDarkMode ? tokens.statusDangerText : '#DC2626',
+                            color: '#F87171',
                           }}
                         >
                           Clear Local Cache
@@ -5795,19 +6225,31 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       </TouchableOpacity>
 
                       <TouchableOpacity
-                        style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          backgroundColor: 'rgba(234, 88, 12, 0.14)',
+                          borderWidth: 1,
+                          borderColor: 'rgba(234, 88, 12, 0.3)',
+                          cursor: 'pointer',
+                        }}
                         onPress={loadData}
+                        activeOpacity={0.8}
                       >
                         <BootstrapIcon
                           name="arrow-repeat"
-                          size={13}
-                          color={isDarkMode ? tokens.accentBrand : '#1D4533'}
+                          size={12}
+                          color="#EA580C"
                         />
                         <Text
                           style={{
                             fontSize: 12,
                             fontWeight: '700',
-                            color: isDarkMode ? tokens.accentBrand : '#1D4533',
+                            color: '#EA580C',
                           }}
                         >
                           Refresh
@@ -5915,7 +6357,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             statusBg = isDarkMode ? 'rgba(167, 139, 250, 0.16)' : '#EDE9FE';
                             statusFg = isDarkMode ? '#C4B5FD' : '#6D28D9';
                           } else if (isDelivered) {
-                            statusBg = '#1D4533';
+                            statusBg = '#EA580C';
                             statusFg = '#FFFFFF';
                             statusSolid = true;
                           } else if (isFailed || isCancelled) {
@@ -6021,7 +6463,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 <Text
                                   style={[
                                     styles.tableTitle,
-                                    { color: isDarkMode ? tokens.money : '#1D4533' },
+                                    { color: isDarkMode ? tokens.money : '#EA580C' },
                                   ]}
                                   numberOfLines={1}
                                 >
@@ -6125,7 +6567,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     accent="teal"
                     label="Total Inventory Value"
                     value={`₱${invStats.totalValue.toLocaleString()}`}
-                    sub={`Across ${invStats.totalUnits} items`}
+                    sub={`At unit cost · ${invStats.totalUnits} units`}
                     isDark={isDarkMode}
                   />
                   <AdminStatCard
@@ -6133,7 +6575,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     accent="blue"
                     label="In Stock SKUs"
                     value={invStats.inStockCount}
-                    valueColor={isDarkMode ? tokens.accentBrand : "#1D4533"}
+                    valueColor={isDarkMode ? tokens.accentBrand : "#EA580C"}
                     sub="Above reorder level"
                     isDark={isDarkMode}
                   />
@@ -6143,7 +6585,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     label="Low Stock Alert"
                     value={invStats.lowStockCount}
                     valueColor={invStats.lowStockCount > 0 ? '#D97706' : undefined}
-                    sub="1 - 4 units remaining"
+                    sub="At or below reorder level"
                     isDark={isDarkMode}
                   />
                   <AdminStatCard
@@ -6151,7 +6593,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     accent="amber"
                     label="Out of Stock"
                     value={invStats.outOfStockCount}
-                    valueColor={invStats.outOfStockCount > 0 ? '#DC2626' : '#1D4533'}
+                    valueColor={invStats.outOfStockCount > 0 ? '#DC2626' : '#EA580C'}
                     sub="0 units available"
                     isDark={isDarkMode}
                   />
@@ -6226,9 +6668,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
                         borderWidth: 1.5,
                         borderColor: isInvCategoryDropdownOpen
-                          ? '#1D4533'
+                          ? '#EA580C'
                           : invCategoryFilter !== 'All'
-                            ? '#1D4533'
+                            ? '#EA580C'
                             : isDarkMode ? tokens.borderInput : '#E2E8F0',
                         borderRadius: 12,
                         paddingHorizontal: 14,
@@ -6236,7 +6678,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         minWidth: 160,
                         cursor: 'pointer',
                         boxShadow: isInvCategoryDropdownOpen
-                          ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                          ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                           : '0 1px 3px rgba(0, 0, 0, 0.04)',
                       }}
                       onPress={() => {
@@ -6249,13 +6691,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <BootstrapIcon
                           name={getCategoryIcon(invCategoryFilter)}
                           size={13}
-                          color={invCategoryFilter !== 'All' ? '#1D4533' : '#64748B'}
+                          color={invCategoryFilter !== 'All' ? '#EA580C' : '#64748B'}
                         />
                         <Text
                           style={{
                             fontSize: 13,
                             fontWeight: '700',
-                            color: invCategoryFilter !== 'All' ? '#1D4533' : isDarkMode ? tokens.textPrimary : '#0F172A',
+                            color: invCategoryFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#0F172A',
                           }}
                         >
                           {invCategoryFilter === 'All' ? 'All Categories' : invCategoryFilter}
@@ -6264,7 +6706,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       <BootstrapIcon
                         name={isInvCategoryDropdownOpen ? 'chevron-up' : 'chevron-down'}
                         size={12}
-                        color={isInvCategoryDropdownOpen ? '#1D4533' : '#64748B'}
+                        color={isInvCategoryDropdownOpen ? '#EA580C' : '#64748B'}
                       />
                     </TouchableOpacity>
 
@@ -6334,7 +6776,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 <BootstrapIcon
                                   name={getCategoryIcon(cat)}
                                   size={14}
-                                  color={isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                                  color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : (isDarkMode ? tokens.textMuted : '#64748B')}
                                 />
                                 <Text
                                   style={{
@@ -6343,7 +6785,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     color: isSelected
                                       ? isDarkMode
                                         ? tokens.accentBrand
-                                        : '#1D4533'
+                                        : '#EA580C'
                                       : isDarkMode
                                         ? tokens.textSecondary
                                         : '#334155',
@@ -6353,7 +6795,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 </Text>
                               </View>
                               {isSelected && (
-                                <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />
+                                <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
                               )}
                             </TouchableOpacity>
                           );
@@ -6378,9 +6820,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
                         borderWidth: 1.5,
                         borderColor: isInvStockDropdownOpen
-                          ? '#1D4533'
+                          ? '#EA580C'
                           : invStockFilter !== 'All'
-                            ? '#1D4533'
+                            ? '#EA580C'
                             : isDarkMode ? tokens.borderInput : '#E2E8F0',
                         borderRadius: 12,
                         paddingHorizontal: 14,
@@ -6388,7 +6830,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         minWidth: 145,
                         cursor: 'pointer',
                         boxShadow: isInvStockDropdownOpen
-                          ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                          ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                           : '0 1px 3px rgba(0, 0, 0, 0.04)',
                       }}
                       onPress={() => {
@@ -6403,13 +6845,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             (STOCK_FILTER_OPTIONS.find((opt) => opt.key === invStockFilter) || STOCK_FILTER_OPTIONS[0]).icon
                           }
                           size={13}
-                          color={invStockFilter !== 'All' ? '#1D4533' : '#64748B'}
+                          color={invStockFilter !== 'All' ? '#EA580C' : '#64748B'}
                         />
                         <Text
                           style={{
                             fontSize: 13,
                             fontWeight: '700',
-                            color: invStockFilter !== 'All' ? '#1D4533' : isDarkMode ? tokens.textPrimary : '#0F172A',
+                            color: invStockFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#0F172A',
                           }}
                         >
                           {(STOCK_FILTER_OPTIONS.find((opt) => opt.key === invStockFilter) || STOCK_FILTER_OPTIONS[0]).label}
@@ -6418,7 +6860,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       <BootstrapIcon
                         name={isInvStockDropdownOpen ? 'chevron-up' : 'chevron-down'}
                         size={12}
-                        color={isInvStockDropdownOpen ? '#1D4533' : '#64748B'}
+                        color={isInvStockDropdownOpen ? '#EA580C' : '#64748B'}
                       />
                     </TouchableOpacity>
 
@@ -6486,7 +6928,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 <BootstrapIcon
                                   name={f.icon}
                                   size={13}
-                                  color={isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                                  color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : (isDarkMode ? tokens.textMuted : '#64748B')}
                                 />
                                 <Text
                                   style={{
@@ -6495,7 +6937,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     color: isSelected
                                       ? isDarkMode
                                         ? tokens.accentBrand
-                                        : '#1D4533'
+                                        : '#EA580C'
                                       : isDarkMode
                                         ? tokens.textSecondary
                                         : '#334155',
@@ -6505,7 +6947,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 </Text>
                               </View>
                               {isSelected && (
-                                <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />
+                                <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
                               )}
                             </TouchableOpacity>
                           );
@@ -6521,7 +6963,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 7,
-                        backgroundColor: isDarkMode ? '#1F6B52' : '#107C41',
+                        backgroundColor: isDarkMode ? '#EA580C' : '#107C41',
                         paddingHorizontal: 15,
                         paddingVertical: 10,
                         borderRadius: 12,
@@ -6776,9 +7218,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
                           borderWidth: 1.5,
                           borderColor: isPosCategoryDropdownOpen
-                            ? '#1D4533'
+                            ? '#EA580C'
                             : posCategoryFilter !== 'All'
-                              ? '#1D4533'
+                              ? '#EA580C'
                               : isDarkMode ? tokens.borderInput : '#E2E8F0',
                           borderRadius: 12,
                           paddingHorizontal: 14,
@@ -6786,7 +7228,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           minWidth: 160,
                           cursor: 'pointer',
                           boxShadow: isPosCategoryDropdownOpen
-                            ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                            ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                             : '0 1px 3px rgba(0, 0, 0, 0.04)',
                         }}
                         onPress={() => setIsPosCategoryDropdownOpen((prev) => !prev)}
@@ -6796,13 +7238,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           <BootstrapIcon
                             name={getCategoryIcon(posCategoryFilter)}
                             size={13}
-                            color={posCategoryFilter !== 'All' ? '#1D4533' : '#64748B'}
+                            color={posCategoryFilter !== 'All' ? '#EA580C' : '#64748B'}
                           />
                           <Text
                             style={{
                               fontSize: 13,
                               fontWeight: '700',
-                              color: posCategoryFilter !== 'All' ? '#1D4533' : isDarkMode ? tokens.textPrimary : '#0F172A',
+                              color: posCategoryFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#0F172A',
                             }}
                           >
                             {posCategoryFilter === 'All' ? 'All Categories' : posCategoryFilter}
@@ -6811,7 +7253,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <BootstrapIcon
                           name={isPosCategoryDropdownOpen ? 'chevron-up' : 'chevron-down'}
                           size={12}
-                          color={isPosCategoryDropdownOpen ? '#1D4533' : '#64748B'}
+                          color={isPosCategoryDropdownOpen ? '#EA580C' : '#64748B'}
                         />
                       </TouchableOpacity>
 
@@ -6881,7 +7323,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   <BootstrapIcon
                                     name={getCategoryIcon(cat)}
                                     size={14}
-                                    color={isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                                    color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : (isDarkMode ? tokens.textMuted : '#64748B')}
                                   />
                                   <Text
                                     style={{
@@ -6890,7 +7332,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       color: isSelected
                                         ? isDarkMode
                                           ? tokens.accentBrand
-                                          : '#1D4533'
+                                          : '#EA580C'
                                         : isDarkMode
                                           ? tokens.textSecondary
                                           : '#334155',
@@ -6900,7 +7342,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   </Text>
                                 </View>
                                 {isSelected && (
-                                  <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />
+                                  <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
                                 )}
                               </TouchableOpacity>
                             );
@@ -6971,7 +7413,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   <View style={[styles.posRegisterCard, isDesktop && { height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }]}>
                     <View style={styles.posRegisterHeader}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <BootstrapIcon name="cart3" size={18} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                        <BootstrapIcon name="cart3" size={18} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                         <Text style={styles.posRegisterTitle}>POS Cashier Register</Text>
                       </View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -7000,7 +7442,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             borderRadius: 8,
                           }}
                         >
-                          <Text style={{ color: isDarkMode ? tokens.accentBrand : '#1D4533', fontSize: 11, fontWeight: '800' }}>
+                          <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontSize: 11, fontWeight: '800' }}>
                             {posCart.reduce((acc, item) => acc + item.quantity, 0)} Item(s)
                           </Text>
                         </View>
@@ -7015,7 +7457,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         onPress={() => setPosCustomerDropdownOpen(!posCustomerDropdownOpen)}
                       >
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="person-circle" size={16} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                          <BootstrapIcon name="person-circle" size={16} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                           <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
                             {posSelectedCustomer.name}
                           </Text>
@@ -7050,7 +7492,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 setPosCustomerDropdownOpen(false);
                               }}
                             >
-                              <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                              <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                                 Walk-in Customer
                               </Text>
                             </TouchableOpacity>
@@ -7155,7 +7597,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             </View>
 
                             <View style={{ minWidth: 62, alignItems: 'flex-end', marginLeft: 8 }}>
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                              <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                                 ₱{(item.price * item.quantity).toLocaleString()}
                               </Text>
                             </View>
@@ -7192,7 +7634,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         }}
                         onPress={handlePOSApplyDiscount}
                       >
-                        <Text style={{ color: isDarkMode ? tokens.accentBrand : '#1D4533', fontWeight: '800', fontSize: 12.5 }}>Apply</Text>
+                        <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '800', fontSize: 12.5 }}>Apply</Text>
                       </TouchableOpacity>
                     </View>
 
@@ -7258,7 +7700,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <TextInput
                           style={[
                             styles.formInput,
-                            { fontSize: 16, fontWeight: '900', color: isDarkMode ? tokens.accentBrand : '#1D4533', marginTop: 4 },
+                            { fontSize: 16, fontWeight: '900', color: isDarkMode ? tokens.accentBrand : '#EA580C', marginTop: 4 },
                           ]}
                           keyboardType="numeric"
                           placeholder="Enter amount given by customer..."
@@ -7353,10 +7795,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               />
             )}
 
-            {activeNav === 'customizations' && (
-              <CustomizationsAdminPanel isDarkMode={isDarkMode} />
-            )}
-
             {activeNav === 'moto_models' && (
               <MotorcycleModelsAdminPanel onToast={showToast} isDarkMode={isDarkMode} />
             )}
@@ -7407,9 +7845,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
                         borderWidth: 1.5,
                         borderColor: isProdCategoryDropdownOpen
-                          ? '#1D4533'
+                          ? '#EA580C'
                           : selectedCategory !== 'All'
-                            ? '#1D4533'
+                            ? '#EA580C'
                             : isDarkMode ? tokens.borderInput : '#E2E8F0',
                         borderRadius: 12,
                         paddingHorizontal: 14,
@@ -7417,7 +7855,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         minWidth: 160,
                         cursor: 'pointer',
                         boxShadow: isProdCategoryDropdownOpen
-                          ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                          ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                           : '0 1px 3px rgba(0, 0, 0, 0.04)',
                       }}
                       onPress={() => setIsProdCategoryDropdownOpen((prev) => !prev)}
@@ -7427,13 +7865,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <BootstrapIcon
                           name={getCategoryIcon(selectedCategory)}
                           size={13}
-                          color={selectedCategory !== 'All' ? '#1D4533' : '#64748B'}
+                          color={selectedCategory !== 'All' ? '#EA580C' : '#64748B'}
                         />
                         <Text
                           style={{
                             fontSize: 13,
                             fontWeight: '700',
-                            color: selectedCategory !== 'All' ? '#1D4533' : isDarkMode ? tokens.textPrimary : '#0F172A',
+                            color: selectedCategory !== 'All' ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#0F172A',
                           }}
                         >
                           {selectedCategory === 'All' ? 'All Categories' : selectedCategory}
@@ -7442,7 +7880,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       <BootstrapIcon
                         name={isProdCategoryDropdownOpen ? 'chevron-up' : 'chevron-down'}
                         size={12}
-                        color={isProdCategoryDropdownOpen ? '#1D4533' : '#64748B'}
+                        color={isProdCategoryDropdownOpen ? '#EA580C' : '#64748B'}
                       />
                     </TouchableOpacity>
 
@@ -7512,7 +7950,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 <BootstrapIcon
                                   name={getCategoryIcon(cat)}
                                   size={14}
-                                  color={isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                                  color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : (isDarkMode ? tokens.textMuted : '#64748B')}
                                 />
                                 <Text
                                   style={{
@@ -7521,7 +7959,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     color: isSelected
                                       ? isDarkMode
                                         ? tokens.accentBrand
-                                        : '#1D4533'
+                                        : '#EA580C'
                                       : isDarkMode
                                         ? tokens.textSecondary
                                         : '#334155',
@@ -7531,7 +7969,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 </Text>
                               </View>
                               {isSelected && (
-                                <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />
+                                <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
                               )}
                             </TouchableOpacity>
                           );
@@ -7547,7 +7985,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 7,
-                        backgroundColor: isDarkMode ? '#1F6B52' : '#107C41',
+                        backgroundColor: isDarkMode ? '#EA580C' : '#107C41',
                         paddingHorizontal: 15,
                         paddingVertical: 10,
                         borderRadius: 12,
@@ -7646,60 +8084,36 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           </View>
 
                           {/* COST */}
-                          <View style={{ flex: 1.2, minWidth: 100, alignItems: 'center' }}>
-                            <View
-                              style={[
-                                styles.tableInputInline,
-                                {
-                                  minWidth: 80,
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  paddingVertical: 7,
-                                  backgroundColor: isDarkMode ? tokens.bgElevated : '#F8FAFC',
-                                },
-                              ]}
+                          <View style={{ flex: 1.2, minWidth: 100, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: '700',
+                                color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                                textAlign: 'center',
+                                fontVariant: ['tabular-nums'],
+                              }}
+                              numberOfLines={1}
                             >
-                              <Text
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: '700',
-                                  color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                                  textAlign: 'center',
-                                }}
-                                numberOfLines={1}
-                              >
-                                {cost.toLocaleString()}
-                              </Text>
-                            </View>
+                              {cost.toLocaleString()}
+                            </Text>
                             <Text style={styles.tableSub}>Unit cost</Text>
                           </View>
 
                           {/* PRICE */}
-                          <View style={{ flex: 1.2, minWidth: 100, alignItems: 'center' }}>
-                            <View
-                              style={[
-                                styles.tableInputInline,
-                                {
-                                  minWidth: 80,
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  paddingVertical: 7,
-                                  backgroundColor: isDarkMode ? tokens.bgElevated : '#F8FAFC',
-                                },
-                              ]}
+                          <View style={{ flex: 1.2, minWidth: 100, alignItems: 'center', justifyContent: 'center' }}>
+                            <Text
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: '700',
+                                color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                                textAlign: 'center',
+                                fontVariant: ['tabular-nums'],
+                              }}
+                              numberOfLines={1}
                             >
-                              <Text
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: '700',
-                                  color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                                  textAlign: 'center',
-                                }}
-                                numberOfLines={1}
-                              >
-                                {price.toLocaleString()}
-                              </Text>
-                            </View>
+                              {price.toLocaleString()}
+                            </Text>
                             <Text style={styles.tableSub}>Sell price</Text>
                           </View>
 
@@ -7794,27 +8208,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   }}
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <BootstrapIcon name="tools" size={15} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: '800',
-                          color: isDarkMode ? tokens.textMuted : '#475569',
-                          textTransform: 'uppercase',
-                          letterSpacing: 0.8,
-                        }}
-                      >
-                        Garage Workspace View
-                      </Text>
-                    </View>
-
                     <TouchableOpacity
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 6,
-                        backgroundColor: isDarkMode ? '#1F6B52' : '#107C41',
+                        backgroundColor: isDarkMode ? '#EA580C' : '#107C41',
                         paddingHorizontal: 12,
                         paddingVertical: 7,
                         borderRadius: 10,
@@ -7856,13 +8255,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         justifyContent: 'space-between',
                         backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
                         borderWidth: 1.5,
-                        borderColor: isGarageSubTabDropdownOpen ? '#1D4533' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                        borderColor: isGarageSubTabDropdownOpen ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
                         borderRadius: 12,
                         paddingHorizontal: 14,
                         paddingVertical: 10,
                         cursor: 'pointer',
                         boxShadow: isGarageSubTabDropdownOpen
-                          ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                          ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                           : '0 2px 6px rgba(0, 0, 0, 0.04)',
                       }}
                       onPress={() => setIsGarageSubTabDropdownOpen((prev) => !prev)}
@@ -7879,10 +8278,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           },
                           {
                             id: 'services',
-                            label: 'Service Packages Catalog',
+                            label: 'PMS Fixed-Rate Catalog (by CC)',
                             icon: 'tools',
-                            count: garageServices.length,
-                            desc: 'Maintenance packages & service tiers',
+                            count: pmsRateCatalog.length,
+                            desc: '125cc · 150–160cc · 200cc above rates',
                           },
                         ];
                         const activeObj = garageTabs.find((t) => t.id === garageSubTab) || garageTabs[0];
@@ -7898,7 +8297,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 justifyContent: 'center',
                               }}
                             >
-                              <BootstrapIcon name={activeObj.icon} size={15} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                              <BootstrapIcon name={activeObj.icon} size={15} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                             </View>
                             <View style={{ flex: 1, minWidth: 0 }}>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -7914,7 +8313,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 </Text>
                                 <View
                                   style={{
-                                    backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+                                    backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                                     paddingHorizontal: 7,
                                     paddingVertical: 1,
                                     borderRadius: 10,
@@ -8008,10 +8407,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           },
                           {
                             id: 'services',
-                            label: 'Service Packages Catalog',
+                            label: 'PMS Fixed-Rate Catalog (by CC)',
                             icon: 'tools',
-                            count: garageServices.length,
-                            desc: 'Maintenance packages & service tiers',
+                            count: pmsRateCatalog.length,
+                            desc: '125cc · 150–160cc · 200cc above rates',
                           },
                         ].map((tab) => {
                           const isSelected = garageSubTab === tab.id;
@@ -8041,7 +8440,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   height: 32,
                                   borderRadius: 8,
                                   backgroundColor: isSelected
-                                    ? '#1D4533'
+                                    ? '#EA580C'
                                     : isDarkMode ? '#0F172A' : '#F1F5F9',
                                   alignItems: 'center',
                                   justifyContent: 'center',
@@ -8050,7 +8449,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 <BootstrapIcon
                                   name={tab.icon}
                                   size={15}
-                                  color={isSelected ? '#FFFFFF' : '#1D4533'}
+                                  color={isSelected ? '#FFFFFF' : '#EA580C'}
                                 />
                               </View>
                               <View style={{ flex: 1, minWidth: 0 }}>
@@ -8061,7 +8460,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       fontSize: 13,
                                       fontWeight: isSelected ? '800' : '600',
                                       color: isSelected
-                                        ? '#1D4533'
+                                        ? '#EA580C'
                                         : isDarkMode ? tokens.textPrimary : '#1E293B',
                                     }}
                                   >
@@ -8070,7 +8469,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   <View
                                     style={{
                                       backgroundColor: isSelected
-                                        ? '#1D4533'
+                                        ? '#EA580C'
                                         : isDarkMode ? tokens.borderInput : '#E2E8F0',
                                       paddingHorizontal: 7,
                                       paddingVertical: 1,
@@ -8103,7 +8502,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               </View>
 
                               {isSelected && (
-                                <BootstrapIcon name="check2" size={16} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                                <BootstrapIcon name="check2" size={16} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                               )}
                             </TouchableOpacity>
                           );
@@ -8170,7 +8569,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           bookingStats.readyForPickup > 0
                             ? isDarkMode
                               ? tokens.statusSuccessText
-                              : '#1D4533'
+                              : '#EA580C'
                             : undefined
                         }
                         sub="Ready to claim"
@@ -8236,7 +8635,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       </View>
 
                       <TouchableOpacity
-                        style={[styles.addBtnPrimary, { backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533' }]}
+                        style={[styles.addBtnPrimary, { backgroundColor: isDarkMode ? '#EA580C' : '#EA580C' }]}
                         onPress={() => {
                           setNewBkCustomerName('');
                           setNewBkCustomerPhone('');
@@ -8266,8 +8665,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         zIndex: isBookingStatusDropdownOpen ? 99999 : 10,
                       }}
                     >
-                      {/* Booking Status Filter Dropdown — classic table/calendar only */}
-                      {bookingViewMode !== 'workflow' ? (
+                      {/* Booking Status Filter Dropdown */}
                       <View
                         style={{
                           position: 'relative',
@@ -8276,7 +8674,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       >
                         {(() => {
                           const bookingStatusOptions = [
-                            { key: 'All', label: 'All Bookings', count: bookingStats.total, icon: 'grid-fill', color: isDarkMode ? tokens.accentBrand : '#1D4533' },
+                            { key: 'All', label: 'All Bookings', count: bookingStats.total, icon: 'grid-fill', color: isDarkMode ? tokens.accentBrand : '#EA580C' },
                             { key: 'Pending', label: 'Pending Review', count: bookingStats.pending, icon: 'hourglass-split', color: isDarkMode ? tokens.statusWarningText : '#D97706', highlight: bookingStats.pending > 0 },
                             { key: 'Confirmed', label: 'Confirmed', count: bookingStats.confirmed, icon: 'clock-fill', color: isDarkMode ? tokens.statusInfoText : '#0284C7' },
                             { key: 'Inspection', label: 'Inspection', count: bookingStats.inspection, icon: 'search', color: isDarkMode ? tokens.statusPurpleText : '#8B5CF6' },
@@ -8298,11 +8696,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
                                   borderWidth: 1.5,
                                   borderColor: isBookingStatusDropdownOpen
-                                    ? '#1D4533'
+                                    ? '#EA580C'
                                     : activeOpt.highlight
                                       ? '#F59E0B'
                                       : bookingStatusFilter !== 'All'
-                                        ? '#1D4533'
+                                        ? '#EA580C'
                                         : isDarkMode ? tokens.borderInput : '#E2E8F0',
                                   borderRadius: 12,
                                   paddingHorizontal: 14,
@@ -8310,7 +8708,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   minWidth: 180,
                                   cursor: 'pointer',
                                   boxShadow: isBookingStatusDropdownOpen
-                                    ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                                    ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                                     : '0 1px 3px rgba(0, 0, 0, 0.04)',
                                 }}
                                 onPress={() => setIsBookingStatusDropdownOpen((prev) => !prev)}
@@ -8336,7 +8734,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                         activeOpt.highlight
                                           ? '#B45309'
                                           : bookingStatusFilter !== 'All'
-                                            ? '#1D4533'
+                                            ? '#EA580C'
                                             : isDarkMode ? tokens.textPrimary : '#0F172A',
                                     }}
                                   >
@@ -8348,7 +8746,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                         activeOpt.highlight
                                           ? '#FEF3C7'
                                           : bookingStatusFilter !== 'All'
-                                            ? '#1D4533'
+                                            ? '#EA580C'
                                             : isDarkMode ? tokens.borderInput : '#E2E8F0',
                                       paddingHorizontal: 6,
                                       paddingVertical: 1,
@@ -8375,7 +8773,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 <BootstrapIcon
                                   name={isBookingStatusDropdownOpen ? 'chevron-up' : 'chevron-down'}
                                   size={12}
-                                  color={isBookingStatusDropdownOpen ? '#1D4533' : '#64748B'}
+                                  color={isBookingStatusDropdownOpen ? '#EA580C' : '#64748B'}
                                 />
                               </TouchableOpacity>
 
@@ -8446,14 +8844,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                           <BootstrapIcon
                                             name={option.icon}
                                             size={14}
-                                            color={isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
+                                            color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
                                           />
                                           <Text
                                             style={{
                                               fontSize: 13,
                                               fontWeight: isSelected ? '800' : '600',
                                               color: isSelected
-                                                ? '#1D4533'
+                                                ? '#EA580C'
                                                 : isDarkMode ? '#E2E8F0' : '#334155',
                                             }}
                                           >
@@ -8466,7 +8864,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                               backgroundColor: option.highlight
                                                 ? '#FEF3C7'
                                                 : isSelected
-                                                  ? '#1D4533'
+                                                  ? '#EA580C'
                                                   : isDarkMode ? tokens.borderInput : '#E2E8F0',
                                               paddingHorizontal: 6,
                                               paddingVertical: 1,
@@ -8487,7 +8885,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                               {option.count}
                                             </Text>
                                           </View>
-                                          {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />}
+                                          {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />}
                                         </View>
                                       </TouchableOpacity>
                                     );
@@ -8498,135 +8896,145 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           );
                         })()}
                       </View>
-                      ) : (
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                          Workflow desk — filter by stage below
-                        </Text>
-                      )}
 
                       <View style={{ flexDirection: 'row', gap: 6, marginLeft: 'auto', alignItems: 'center' }}>
-                        {bookingViewMode !== 'workflow' &&
-                          ['All', 'Repair', 'PMS', 'Customization'].map((cat) => (
+                        {/* Segmented Category Filter: All Types | Repair | PMS | Installation */}
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                            borderRadius: 8,
+                            padding: 3,
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                          }}
+                        >
+                          {['All', 'Repair', 'PMS', 'Installation'].map((cat) => {
+                            const isSelected = bookingCategoryFilter === cat;
+                            return (
+                              <TouchableOpacity
+                                key={cat}
+                                style={{
+                                  paddingVertical: 5,
+                                  paddingHorizontal: 12,
+                                  borderRadius: 6,
+                                  backgroundColor: isSelected ? '#EA580C' : 'transparent',
+                                  boxShadow: isSelected ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                onPress={() => {
+                                  setBookingCategoryFilter(cat);
+                                  setBookingPage(1);
+                                }}
+                                activeOpacity={0.85}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? '700' : '600',
+                                    color: isSelected ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
+                                    transition: 'color 0.15s ease',
+                                  }}
+                                >
+                                  {cat === 'All' ? 'All Types' : cat}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+
+                        {/* View Mode Toggle: Table / Calendar */}
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            marginLeft: 8,
+                            backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                            padding: 3,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                          }}
+                        >
                           <TouchableOpacity
-                            key={cat}
-                            style={[
-                              styles.orderFilterTab,
-                              bookingCategoryFilter === cat && {
-                                backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
-                                borderColor: isDarkMode ? tokens.accentBorder : '#1D4533',
-                              },
-                            ]}
-                            onPress={() => {
-                              setBookingCategoryFilter(cat);
-                              setBookingPage(1);
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 5,
+                              paddingVertical: 5,
+                              paddingHorizontal: 10,
+                              borderRadius: 6,
+                              backgroundColor: bookingViewMode === 'table' ? '#EA580C' : 'transparent',
+                              boxShadow: bookingViewMode === 'table' ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
                             }}
+                            onPress={() => setBookingViewMode('table')}
+                            activeOpacity={0.85}
                           >
+                            <BootstrapIcon
+                              name="table"
+                              size={12}
+                              color={bookingViewMode === 'table' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B'}
+                            />
                             <Text
-                              style={[
-                                styles.orderFilterTabText,
-                                bookingCategoryFilter === cat && { color: '#FFFFFF', fontWeight: '800' },
-                              ]}
+                              style={{
+                                fontSize: 12,
+                                fontWeight: bookingViewMode === 'table' ? '700' : '600',
+                                color: bookingViewMode === 'table' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
+                                transition: 'color 0.15s ease',
+                              }}
                             >
-                              {cat === 'All' ? 'All Types' : cat}
+                              Table
                             </Text>
                           </TouchableOpacity>
-                        ))}
-
-                        {/* View Mode Toggle: Table / Calendar / Workflow */}
-                        <View style={{ flexDirection: 'row', gap: 4, marginLeft: 8, backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9', padding: 3, borderRadius: 10 }}>
-                          <TouchableOpacity
-                            style={[
-                              styles.orderFilterTab,
-                              { paddingVertical: 4, paddingHorizontal: 10, borderWidth: 0, borderRadius: 7 },
-                              bookingViewMode === 'table' && {
-                                backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
-                              },
-                            ]}
-                            onPress={() => setBookingViewMode('table')}
-                          >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                              <BootstrapIcon name="table" size={12} color={bookingViewMode === 'table' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'} />
-                              <Text
-                                style={[
-                                  styles.orderFilterTabText,
-                                  bookingViewMode === 'table' && { color: '#FFFFFF', fontWeight: '800' },
-                                ]}
-                              >
-                                Table
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
 
                           <TouchableOpacity
-                            style={[
-                              styles.orderFilterTab,
-                              { paddingVertical: 4, paddingHorizontal: 10, borderWidth: 0, borderRadius: 7 },
-                              bookingViewMode === 'calendar' && {
-                                backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
-                              },
-                            ]}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 5,
+                              paddingVertical: 5,
+                              paddingHorizontal: 10,
+                              borderRadius: 6,
+                              backgroundColor: bookingViewMode === 'calendar' ? '#EA580C' : 'transparent',
+                              boxShadow: bookingViewMode === 'calendar' ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
                             onPress={() => setBookingViewMode('calendar')}
+                            activeOpacity={0.85}
                           >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                              <BootstrapIcon
-                                name="calendar-week"
-                                size={12}
-                                color={bookingViewMode === 'calendar' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
-                              />
-                              <Text
-                                style={[
-                                  styles.orderFilterTabText,
-                                  bookingViewMode === 'calendar' && { color: '#FFFFFF', fontWeight: '800' },
-                                ]}
-                              >
-                                Calendar
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={[
-                              styles.orderFilterTab,
-                              { paddingVertical: 4, paddingHorizontal: 10, borderWidth: 0, borderRadius: 7 },
-                              bookingViewMode === 'workflow' && {
-                                backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
-                              },
-                            ]}
-                            onPress={() => setBookingViewMode('workflow')}
-                          >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                              <BootstrapIcon name="list-task" size={12} color={bookingViewMode === 'workflow' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'} />
-                              <Text
-                                style={[
-                                  styles.orderFilterTabText,
-                                  bookingViewMode === 'workflow' && { color: '#FFFFFF', fontWeight: '800' },
-                                ]}
-                              >
-                                Workflow
-                              </Text>
-                            </View>
+                            <BootstrapIcon
+                              name="calendar-week"
+                              size={12}
+                              color={bookingViewMode === 'calendar' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B'}
+                            />
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: bookingViewMode === 'calendar' ? '700' : '600',
+                                color: bookingViewMode === 'calendar' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
+                                transition: 'color 0.15s ease',
+                              }}
+                            >
+                              Calendar
+                            </Text>
                           </TouchableOpacity>
                         </View>
                       </View>
                     </View>
 
-                    {/* Bookings View: Workflow Desk / Calendar / Table */}
-                    {bookingViewMode === 'workflow' ? (
-                      <AdminBookingManager
-                        bookings={garageBookings}
-                        mechanics={garageMechanics}
-                        onToast={showToast}
-                        onRefresh={(list) => {
-                          if (Array.isArray(list)) setGarageBookings(list);
-                        }}
-                        onOpenLegacyModal={handleOpenBookingModal}
-                        styles={styles}
-                        isDarkMode={isDarkMode}
-                      />
-                    ) : bookingViewMode === 'calendar' ? (
+                    {/* Bookings View: Calendar / Table */}
+                    {bookingViewMode === 'calendar' ? (
                       <View style={{ gap: 16, marginBottom: 20 }}>
                         <BookingCalendar
-                          showAdminControls={true}
+                          headerBg="#24272B"
+                          isDarkMode={isDarkMode}
                           selectedDate={calendarSelectedDate}
                           onSelectDate={(dateStr) => setCalendarSelectedDate(dateStr)}
                           onFullyBookedSelected={(dateStr) => {
@@ -8698,7 +9106,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 }}
                               >
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                  <BootstrapIcon name="calendar-check-fill" size={16} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                                  <BootstrapIcon name="calendar-check-fill" size={16} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                                   <Text style={{ fontSize: 15, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
                                     Appointments for {calendarSelectedDate}
                                   </Text>
@@ -8710,14 +9118,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       paddingVertical: 2,
                                     }}
                                   >
-                                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                                       {dateAppointments.length} Booked
                                     </Text>
                                   </View>
                                 </View>
 
                                 <TouchableOpacity
-                                  style={[styles.addBtnPrimary, { backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533', paddingVertical: 6, paddingHorizontal: 12 }]}
+                                  style={[styles.addBtnPrimary, { backgroundColor: isDarkMode ? '#EA580C' : '#EA580C', paddingVertical: 6, paddingHorizontal: 12 }]}
                                   onPress={() => {
                                     setEditBkDate(calendarSelectedDate);
                                     setNewBkCustomerName('');
@@ -8761,7 +9169,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     >
                                       <View style={{ flex: 1 }}>
                                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                          <Text style={{ fontSize: 12.5, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                                          <Text style={{ fontSize: 12.5, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                                             {bk.booking_id || bk.id}
                                           </Text>
                                           <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#1E293B' }}>
@@ -8794,7 +9202,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                           onPress={() => handleOpenBookingDetail(bk)}
                                           activeOpacity={0.8}
                                         >
-                                          <BootstrapIcon name="eye-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                                          <BootstrapIcon name="eye-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                                         </TouchableOpacity>
                                       </View>
                                     </View>
@@ -9185,7 +9593,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               >
                                 <Text style={styles.quickStoreBtnText}>Prev</Text>
                               </TouchableOpacity>
-                              <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                              <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                                 {bookingPage}/{bookingTotalPages}
                               </Text>
                               <TouchableOpacity
@@ -9206,7 +9614,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </View>
                 )}
 
-                {/* ── SUB-VIEW B: SERVICE PACKAGES CATALOG ── */}
+                {/* ── SUB-VIEW B: PMS / REPAIR FIXED-RATE CATALOG (BY CC) ── */}
                 {garageSubTab === 'services' && (
                   <View>
                     <View style={styles.toolbarRow}>
@@ -9214,52 +9622,144 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <BootstrapIcon name="search" size={14} color={isDarkMode ? tokens.textMuted : "#64748B"} style={{ marginRight: 8 }} />
                         <TextInput
                           style={styles.searchInput}
-                          placeholder="Search service catalog by title or category..."
+                          placeholder="Search service by name..."
                           placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
                           value={garageSearchQuery}
                           onChangeText={setGarageSearchQuery}
                         />
                       </View>
-
                       <TouchableOpacity
                         style={styles.addBtnPrimary}
-                        onPress={() => {
-                          setEditingGarageService(null);
-                          setServTitle('');
-                          setServSubtitle('');
-                          setServCategory('PMS');
-                          setServPrice('3750');
-                          setServDuration('60 mins');
-                          setServBadge('Popular');
-                          setServImage(
-                            'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80'
-                          );
-                          setServDesc('');
-                          setServInclusions('');
-                          setIsAddGarageOpen(true);
-                        }}
+                        onPress={openAddPmsRateModal}
                         activeOpacity={0.85}
                       >
                         <BootstrapIcon name="plus-lg" size={14} color="#FFFFFF" />
-                        <Text style={styles.addBtnPrimaryText}>+ Add Service Package</Text>
+                        <Text style={styles.addBtnPrimaryText}>+ Add Service</Text>
                       </TouchableOpacity>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+                      {[
+                        { key: 'all', label: 'All categories' },
+                        { key: 'pms', label: 'PMS' },
+                        { key: 'repair', label: 'Repair' },
+                      ].map((chip) => {
+                        const active = pmsCatalogCategoryFilter === chip.key;
+                        return (
+                          <TouchableOpacity
+                            key={chip.key}
+                            onPress={() => setPmsCatalogCategoryFilter(chip.key)}
+                            style={{
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 999,
+                              borderWidth: 1,
+                              borderColor: active
+                                ? isDarkMode
+                                  ? tokens.accentBrand
+                                  : '#EA580C'
+                                : isDarkMode
+                                  ? tokens.borderInput
+                                  : '#E2E8F0',
+                              backgroundColor: active
+                                ? isDarkMode
+                                  ? '#132A26'
+                                  : '#EA580C'
+                                : isDarkMode
+                                  ? tokens.bgElevated
+                                  : '#FFFFFF',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: '800',
+                                color: active ? '#FFFFFF' : isDarkMode ? tokens.textMuted : '#475569',
+                              }}
+                            >
+                              {chip.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                      {[
+                        { key: 'active', label: 'Active' },
+                        { key: 'archived', label: 'Archived' },
+                        { key: 'all', label: 'Any status' },
+                      ].map((chip) => {
+                        const active = pmsCatalogStatusFilter === chip.key;
+                        return (
+                          <TouchableOpacity
+                            key={`st-${chip.key}`}
+                            onPress={() => setPmsCatalogStatusFilter(chip.key)}
+                            style={{
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 999,
+                              borderWidth: 1,
+                              borderColor: active
+                                ? isDarkMode
+                                  ? tokens.accentBrand
+                                  : '#EA580C'
+                                : isDarkMode
+                                  ? tokens.borderInput
+                                  : '#E2E8F0',
+                              backgroundColor: active
+                                ? isDarkMode
+                                  ? '#132A26'
+                                  : '#E8F0EC'
+                                : isDarkMode
+                                  ? tokens.bgElevated
+                                  : '#FFFFFF',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: '800',
+                                color: active
+                                  ? isDarkMode
+                                    ? '#FFFFFF'
+                                    : '#EA580C'
+                                  : isDarkMode
+                                    ? tokens.textMuted
+                                    : '#475569',
+                              }}
+                            >
+                              {chip.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
                     </View>
 
                     <View style={styles.tableCard}>
                       <ScrollView
                         horizontal
-                        showsHorizontalScrollIndicator={false}
+                        showsHorizontalScrollIndicator={Platform.OS !== 'web'}
                         showsVerticalScrollIndicator={false}
                         dataSet={{ tableScroll: 'true' }}
-                        style={{ width: '100%', ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}) }}
+                        style={{ width: '100%', ...(Platform.OS === 'web' ? { scrollbarWidth: 'thin' } : {}) }}
                         contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
                       >
-                        <View style={{ width: '100%', minWidth: 840, flexGrow: 1 }}>
+                        <View style={{ width: '100%', minWidth: 1180, flexGrow: 1 }}>
                           <View style={styles.tableHeaderRow}>
-                            <Text style={[styles.tableHeaderCell, { flex: 2.4, minWidth: 200 }]}>Service & Detail</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 120 }]}>Category & Duration</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110 }]}>Price</Text>
-                            <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 120, textAlign: 'center' }]}>
+                            <Text style={[styles.tableHeaderCell, { flex: 0.4, minWidth: 40, textAlign: 'center' }]}>No.</Text>
+                            <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 180 }]}>Service</Text>
+                            <Text style={[styles.tableHeaderCell, { flex: 0.85, minWidth: 90 }]}>Category</Text>
+                            <Text style={[styles.tableHeaderCell, { flex: 1.05, minWidth: 110, textAlign: 'right' }]}>
+                              Tier 1 (≤125)
+                            </Text>
+                            <Text style={[styles.tableHeaderCell, { flex: 1.05, minWidth: 110, textAlign: 'right' }]}>
+                              Tier 2 (150–160)
+                            </Text>
+                            <Text style={[styles.tableHeaderCell, { flex: 1.05, minWidth: 110, textAlign: 'right' }]}>
+                              Tier 3 (200+)
+                            </Text>
+                            <Text style={[styles.tableHeaderCell, { flex: 0.7, minWidth: 80, textAlign: 'center' }]}>
+                              Status
+                            </Text>
+                            <Text style={[styles.tableHeaderCell, { flex: 1.2, minWidth: 130, textAlign: 'center' }]}>
                               Actions
                             </Text>
                           </View>
@@ -9276,94 +9776,336 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             }}
                             contentContainerStyle={{ flexGrow: 1 }}
                           >
-                          {garageServices
-                            .filter(
-                              (srv) =>
-                                !garageSearchQuery ||
-                                srv.title?.toLowerCase().includes(garageSearchQuery.toLowerCase()) ||
-                                srv.category?.toLowerCase().includes(garageSearchQuery.toLowerCase())
-                            )
-                            .map((srv) => (
-                              <View key={srv.id} style={styles.tableRow}>
-                                <View style={{ flex: 2.4, minWidth: 200, flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 8 }}>
-                                  <Image source={{ uri: srv.image }} style={styles.productThumb} />
-                                  <View style={{ flex: 1 }}>
-                                    <Text style={styles.tableTitle} numberOfLines={1}>
-                                      {srv.title}
+                            {pmsRateCatalog
+                              .filter((srv) => {
+                                const q = garageSearchQuery.trim().toLowerCase();
+                                if (q && !String(srv.name || '').toLowerCase().includes(q)) return false;
+                                if (pmsCatalogCategoryFilter === 'pms' && srv.catalogCategory !== 'PMS') return false;
+                                if (pmsCatalogCategoryFilter === 'repair' && srv.catalogCategory !== 'Repair') return false;
+                                if (pmsCatalogStatusFilter === 'active' && srv.isActive === false) return false;
+                                if (pmsCatalogStatusFilter === 'archived' && srv.isActive !== false) return false;
+                                return true;
+                              })
+                              .map((srv) => {
+                                const renderRate = (categoryId) => {
+                                  const raw = srv.prices?.[categoryId];
+                                  if (raw == null) {
+                                    return (
+                                      <Text
+                                        style={[
+                                          styles.tableSub,
+                                          {
+                                            textAlign: 'right',
+                                            fontWeight: '700',
+                                            color: isDarkMode ? tokens.statusDangerText : '#B91C1C',
+                                          },
+                                        ]}
+                                        numberOfLines={2}
+                                      >
+                                        Price not configured
+                                      </Text>
+                                    );
+                                  }
+                                  return (
+                                    <Text
+                                      style={[
+                                        styles.tableTitle,
+                                        {
+                                          textAlign: 'right',
+                                          color: isDarkMode ? tokens.money : '#EA580C',
+                                        },
+                                      ]}
+                                      numberOfLines={1}
+                                    >
+                                      {formatPmsPhp(raw)}
                                     </Text>
-                                    <Text style={styles.tableSub} numberOfLines={1}>
-                                      {srv.subtitle || srv.badge || 'Service package'}
-                                    </Text>
-                                  </View>
-                                </View>
-                                <View style={{ flex: 1.4, minWidth: 120, paddingRight: 8 }}>
-                                  <Text style={styles.tableTitle} numberOfLines={1}>
-                                    {srv.category || 'General'}
-                                  </Text>
-                                  <Text style={styles.tableSub} numberOfLines={1}>
-                                    {srv.duration || '60 mins'}
-                                  </Text>
-                                </View>
-                                <View style={{ flex: 1.3, minWidth: 110, paddingRight: 8 }}>
-                                  <Text
-                                    style={[
-                                      styles.tableTitle,
-                                      { color: isDarkMode ? tokens.money : '#1D4533' },
-                                    ]}
-                                    numberOfLines={1}
-                                  >
-                                    ₱{(srv.pricePhp || usdToPhp(srv.price) || 0).toLocaleString()}
-                                  </Text>
-                                  <Text style={styles.tableSub} numberOfLines={1}>
-                                    Package rate
-                                  </Text>
-                                </View>
-                                <View
-                                  style={{ flex: 1.3, minWidth: 120, flexDirection: 'row', justifyContent: 'center', gap: 8 }}
-                                >
-                                  <TouchableOpacity
-                                    style={styles.tableOutlineBtn}
-                                    onPress={() => {
-                                      setEditingGarageService(srv);
-                                      setServTitle(srv.title);
-                                      setServCategory(srv.category);
-                                      setServSubtitle(srv.subtitle || '');
-                                      setServPrice(String(srv.pricePhp || usdToPhp(srv.price) || 0));
-                                      setServDuration(srv.duration || '60 mins');
-                                      setServBadge(srv.badge || 'Popular');
-                                      setServImage(srv.image);
-                                      setServDesc(srv.description || '');
-                                      setServInclusions(
-                                        Array.isArray(srv.inclusions)
-                                          ? srv.inclusions.join('\n')
-                                          : srv.inclusions || ''
-                                      );
-                                      setIsAddGarageOpen(true);
-                                    }}
-                                    activeOpacity={0.8}
-                                  >
-                                    <Text style={styles.tableOutlineBtnText}>Edit</Text>
-                                  </TouchableOpacity>
+                                  );
+                                };
 
-                                  <TouchableOpacity
-                                    style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
-                                    onPress={() => handleDeleteGarageService(srv.id, srv.title)}
-                                  >
-                                    <BootstrapIcon name="trash3" size={14} color={isDarkMode ? tokens.statusDangerText : '#EF4444'} />
-                                  </TouchableOpacity>
-                                </View>
-                              </View>
-                            ))}
+                                const active = srv.isActive !== false;
+                                return (
+                                  <View key={srv.id} style={[styles.tableRow, !active && { opacity: 0.55 }]}>
+                                    <View style={{ flex: 0.4, minWidth: 40, justifyContent: 'center', paddingRight: 6 }}>
+                                      <Text style={[styles.tableTitle, { textAlign: 'center' }]}>{srv.no}</Text>
+                                    </View>
+                                    <View style={{ flex: 2.0, minWidth: 180, paddingRight: 10, justifyContent: 'center' }}>
+                                      <Text style={styles.tableTitle} numberOfLines={2}>
+                                        {srv.name}
+                                      </Text>
+                                      <Text style={styles.tableSub} numberOfLines={1}>
+                                        Labor only · parts separate
+                                      </Text>
+                                    </View>
+                                    <View style={{ flex: 0.85, minWidth: 90, justifyContent: 'center', paddingRight: 6 }}>
+                                      <Text style={[styles.tableSub, { fontWeight: '800' }]} numberOfLines={1}>
+                                        {srv.catalogCategory === 'Repair' ? 'Repair' : 'PMS'}
+                                      </Text>
+                                    </View>
+                                    <View style={{ flex: 1.05, minWidth: 110, paddingRight: 8, justifyContent: 'center' }}>
+                                      {renderRate('cc-125-below')}
+                                    </View>
+                                    <View style={{ flex: 1.05, minWidth: 110, paddingRight: 8, justifyContent: 'center' }}>
+                                      {renderRate('cc-150-160')}
+                                    </View>
+                                    <View style={{ flex: 1.05, minWidth: 110, paddingRight: 8, justifyContent: 'center' }}>
+                                      {renderRate('cc-big-bikes')}
+                                    </View>
+                                    <View style={{ flex: 0.7, minWidth: 80, justifyContent: 'center', alignItems: 'center' }}>
+                                      <Text
+                                        style={{
+                                          fontSize: 11,
+                                          fontWeight: '800',
+                                          color: active
+                                            ? isDarkMode
+                                              ? tokens.accentBrand
+                                              : '#166534'
+                                            : isDarkMode
+                                              ? tokens.textMuted
+                                              : '#94A3B8',
+                                        }}
+                                      >
+                                        {active ? 'Active' : 'Archived'}
+                                      </Text>
+                                    </View>
+                                    <View
+                                      style={{
+                                        flex: 1.2,
+                                        minWidth: 130,
+                                        flexDirection: 'row',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                      }}
+                                    >
+                                      <TouchableOpacity
+                                        style={[
+                                          styles.tableOutlineBtn,
+                                          pmsActionMenu?.service?.id === srv.id && {
+                                            borderColor: isDarkMode ? tokens.accentBrand : '#EA580C',
+                                            backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.12)' : '#FFF7ED',
+                                          },
+                                        ]}
+                                        onPress={(e) => {
+                                          if (pmsActionMenu?.service?.id === srv.id) {
+                                            setPmsActionMenu(null);
+                                            return;
+                                          }
+                                          const target = e?.currentTarget;
+                                          if (target && typeof target.getBoundingClientRect === 'function') {
+                                            const rect = target.getBoundingClientRect();
+                                            setPmsActionMenu({
+                                              service: srv,
+                                              coords: {
+                                                top: rect.bottom,
+                                                right: rect.right,
+                                                bottom: rect.bottom,
+                                                left: rect.left,
+                                              },
+                                            });
+                                          } else {
+                                            setPmsActionMenu({ service: srv, coords: null });
+                                          }
+                                        }}
+                                        activeOpacity={0.8}
+                                      >
+                                        <Text
+                                          style={[
+                                            styles.tableOutlineBtnText,
+                                            pmsActionMenu?.service?.id === srv.id && {
+                                              color: isDarkMode ? tokens.accentBrand : '#EA580C',
+                                              fontWeight: '700',
+                                            },
+                                          ]}
+                                        >
+                                          Manage
+                                        </Text>
+                                        <BootstrapIcon
+                                          name={pmsActionMenu?.service?.id === srv.id ? 'chevron-up' : 'chevron-down'}
+                                          size={11}
+                                          color={
+                                            pmsActionMenu?.service?.id === srv.id
+                                              ? (isDarkMode ? tokens.accentBrand : '#EA580C')
+                                              : (isDarkMode ? tokens.textMuted : '#64748B')
+                                          }
+                                        />
+                                      </TouchableOpacity>
+                                    </View>
+                                  </View>
+                                );
+                              })}
                           </ScrollView>
+
+                          {/* ─── Manage Action Dropdown Menu (Rendered via Portal) ─── */}
+                          {typeof document !== 'undefined' && pmsActionMenu && createPortal(
+                            <View
+                              style={{
+                                position: 'fixed',
+                                top: 0,
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                zIndex: 999999,
+                              }}
+                            >
+                              {/* Transparent Backdrop to close dropdown on click outside */}
+                              <TouchableOpacity
+                                activeOpacity={1}
+                                onPress={() => setPmsActionMenu(null)}
+                                style={{
+                                  position: 'absolute',
+                                  top: 0,
+                                  left: 0,
+                                  right: 0,
+                                  bottom: 0,
+                                  cursor: 'default',
+                                }}
+                              />
+
+                              {/* Floating Menu Card */}
+                              <View
+                                style={{
+                                  position: 'absolute',
+                                  top: (pmsActionMenu.coords?.top || 100) + 4,
+                                  left: Math.max(12, (pmsActionMenu.coords?.right || 160) - 150),
+                                  width: 150,
+                                  backgroundColor: isDarkMode ? '#1E2124' : '#FFFFFF',
+                                  borderRadius: 10,
+                                  borderWidth: 1,
+                                  borderColor: isDarkMode ? '#374151' : '#E2E8F0',
+                                  padding: 5,
+                                  shadowColor: '#000000',
+                                  shadowOffset: { width: 0, height: 4 },
+                                  shadowOpacity: isDarkMode ? 0.45 : 0.12,
+                                  shadowRadius: 12,
+                                  elevation: 8,
+                                  gap: 3,
+                                  ...(Platform.OS === 'web'
+                                    ? {
+                                        boxShadow: isDarkMode
+                                          ? '0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4)'
+                                          : '0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 8px 10px -6px rgba(15, 23, 42, 0.05)',
+                                      }
+                                    : {}),
+                                }}
+                              >
+                                {/* Edit Option */}
+                                <TouchableOpacity
+                                  style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    paddingVertical: 8,
+                                    paddingHorizontal: 10,
+                                    borderRadius: 6,
+                                    cursor: 'pointer',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (Platform.OS === 'web' && e?.currentTarget) {
+                                      e.currentTarget.style.backgroundColor = isDarkMode
+                                        ? 'rgba(255, 255, 255, 0.06)'
+                                        : '#F1F5F9';
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (Platform.OS === 'web' && e?.currentTarget) {
+                                      e.currentTarget.style.backgroundColor = 'transparent';
+                                    }
+                                  }}
+                                  onPress={() => {
+                                    const srv = pmsActionMenu.service;
+                                    setPmsActionMenu(null);
+                                    openEditPmsRateModal(srv);
+                                  }}
+                                  activeOpacity={0.7}
+                                >
+                                  <BootstrapIcon name="pencil-square" size={13} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+                                  <Text
+                                    style={{
+                                      fontSize: 12.5,
+                                      fontWeight: '600',
+                                      color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                                    }}
+                                  >
+                                    Edit
+                                  </Text>
+                                </TouchableOpacity>
+
+                                {/* Archive / Activate Option */}
+                                <TouchableOpacity
+                                  style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    paddingVertical: 8,
+                                    paddingHorizontal: 10,
+                                    borderRadius: 6,
+                                    cursor: 'pointer',
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (Platform.OS === 'web' && e?.currentTarget) {
+                                      e.currentTarget.style.backgroundColor = isDarkMode
+                                        ? 'rgba(255, 255, 255, 0.06)'
+                                        : (pmsActionMenu.service?.isActive === false ? '#F0FDF4' : '#FEF2F2');
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (Platform.OS === 'web' && e?.currentTarget) {
+                                      e.currentTarget.style.backgroundColor = 'transparent';
+                                    }
+                                  }}
+                                  onPress={() => {
+                                    const srv = pmsActionMenu.service;
+                                    setPmsActionMenu(null);
+                                    handleTogglePmsServiceActive(srv);
+                                  }}
+                                  activeOpacity={0.7}
+                                >
+                                  <BootstrapIcon
+                                    name={pmsActionMenu.service?.isActive === false ? 'check2-circle' : 'archive'}
+                                    size={13}
+                                    color={
+                                      pmsActionMenu.service?.isActive === false
+                                        ? (isDarkMode ? '#4ADE80' : '#16A34A')
+                                        : (isDarkMode ? '#F87171' : '#DC2626')
+                                    }
+                                  />
+                                  <Text
+                                    style={{
+                                      fontSize: 12.5,
+                                      fontWeight: '600',
+                                      color:
+                                        pmsActionMenu.service?.isActive === false
+                                          ? (isDarkMode ? '#4ADE80' : '#16A34A')
+                                          : (isDarkMode ? '#F87171' : '#DC2626'),
+                                    }}
+                                  >
+                                    {pmsActionMenu.service?.isActive === false ? 'Activate' : 'Archive'}
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
+                            </View>,
+                            document.body
+                          )}
                         </View>
                       </ScrollView>
+                      <View
+                        style={{
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          borderTopWidth: 1,
+                          borderTopColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+                          {DEFAULT_CC_CATEGORIES.map((c) => c.name).join(' · ')}
+                          {' · '}Labor rates use the motorcycle’s registered engine CC. Unconfigured prices cannot be booked.
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 )}
               </View>
             )}
 
-            {/* ─── TAB: CERTIFIED MECHANICS & PIT CREW ─── */}
             {activeNav === 'mechanics' && (
               <View>
                 {/* Technician Stats Cards */}
@@ -9381,7 +10123,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     accent="blue"
                     label="On-Duty & Available"
                     value={mechanicsStats.available}
-                    valueColor={isDarkMode ? tokens.accentBrand : "#1D4533"}
+                    valueColor={isDarkMode ? tokens.accentBrand : "#EA580C"}
                     sub="Ready for Bay Assignment"
                     isDark={isDarkMode}
                   />
@@ -9459,7 +10201,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   >
                     {(() => {
                       const mechanicStatusOptions = [
-                        { id: 'All', label: 'All Technicians', count: mechanicsStats.total, icon: 'people-fill', color: isDarkMode ? tokens.accentBrand : '#1D4533' },
+                        { id: 'All', label: 'All Technicians', count: mechanicsStats.total, icon: 'people-fill', color: isDarkMode ? tokens.accentBrand : '#EA580C' },
                         { id: 'Available', label: 'Available on Duty', count: mechanicsStats.available, icon: 'check-circle-fill', color: isDarkMode ? tokens.statusSuccessText : '#16A34A' },
                         { id: 'In Pit Bay', label: 'Busy in Pit Bay', count: mechanicsStats.busy, icon: 'tools', color: isDarkMode ? tokens.statusWarningText : '#D97706' },
                       ];
@@ -9476,9 +10218,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
                               borderWidth: 1.5,
                               borderColor: isMechanicFilterDropdownOpen
-                                ? '#1D4533'
+                                ? '#EA580C'
                                 : mechanicFilterStatus !== 'All'
-                                  ? '#1D4533'
+                                  ? '#EA580C'
                                   : isDarkMode ? tokens.borderInput : '#E2E8F0',
                               borderRadius: 12,
                               paddingHorizontal: 14,
@@ -9486,7 +10228,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               minWidth: 195,
                               cursor: 'pointer',
                               boxShadow: isMechanicFilterDropdownOpen
-                                ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                                ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                                 : '0 1px 3px rgba(0, 0, 0, 0.04)',
                             }}
                             onPress={() => setIsMechanicFilterDropdownOpen((prev) => !prev)}
@@ -9502,14 +10244,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 style={{
                                   fontSize: 13,
                                   fontWeight: '700',
-                                  color: mechanicFilterStatus !== 'All' ? '#1D4533' : isDarkMode ? tokens.textPrimary : '#0F172A',
+                                  color: mechanicFilterStatus !== 'All' ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#0F172A',
                                 }}
                               >
                                 {activeOpt.label}
                               </Text>
                               <View
                                 style={{
-                                  backgroundColor: mechanicFilterStatus !== 'All' ? '#1D4533' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                                  backgroundColor: mechanicFilterStatus !== 'All' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
                                   paddingHorizontal: 6,
                                   paddingVertical: 1,
                                   borderRadius: 8,
@@ -9530,7 +10272,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             <BootstrapIcon
                               name={isMechanicFilterDropdownOpen ? 'chevron-up' : 'chevron-down'}
                               size={12}
-                              color={isMechanicFilterDropdownOpen ? '#1D4533' : '#64748B'}
+                              color={isMechanicFilterDropdownOpen ? '#EA580C' : '#64748B'}
                             />
                           </TouchableOpacity>
 
@@ -9600,7 +10342,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       <BootstrapIcon
                                         name={option.icon}
                                         size={14}
-                                        color={isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
+                                        color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
                                       />
                                       <Text
                                         style={{
@@ -9609,7 +10351,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                           color: isSelected
                                             ? isDarkMode
                                               ? tokens.accentBrand
-                                              : '#1D4533'
+                                              : '#EA580C'
                                             : isDarkMode
                                               ? tokens.textSecondary
                                               : '#334155',
@@ -9622,7 +10364,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       <View
                                         style={{
                                           backgroundColor: isSelected
-                                            ? '#1D4533'
+                                            ? '#EA580C'
                                             : isDarkMode ? tokens.borderInput : '#E2E8F0',
                                           paddingHorizontal: 6,
                                           paddingVertical: 1,
@@ -9639,7 +10381,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                           {option.count}
                                         </Text>
                                       </View>
-                                      {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />}
+                                      {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />}
                                     </View>
                                   </TouchableOpacity>
                                 );
@@ -9671,7 +10413,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         paddingHorizontal: 10,
                         paddingVertical: 5,
                         borderRadius: 6,
-                        backgroundColor: mechanicViewMode === 'list' ? '#1D4533' : 'transparent',
+                        backgroundColor: mechanicViewMode === 'list' ? '#EA580C' : 'transparent',
                       }}
                       onPress={() => setMechanicViewMode('list')}
                     >
@@ -9699,7 +10441,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         paddingHorizontal: 10,
                         paddingVertical: 5,
                         borderRadius: 6,
-                        backgroundColor: mechanicViewMode === 'grid' ? '#1D4533' : 'transparent',
+                        backgroundColor: mechanicViewMode === 'grid' ? '#EA580C' : 'transparent',
                       }}
                       onPress={() => setMechanicViewMode('grid')}
                     >
@@ -9815,7 +10557,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     height: 38,
                                     borderRadius: 19,
                                     borderWidth: 1.5,
-                                    borderColor: isDarkMode ? tokens.accentBorder : '#1D4533',
+                                    borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
                                     backgroundColor: '#E2E8F0',
                                   }}
                                 />
@@ -10162,7 +10904,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}`}
-                    valueColor={isDarkMode ? tokens.accentBrand : "#1D4533"}
+                    valueColor={isDarkMode ? tokens.accentBrand : "#EA580C"}
                     sub="Shipping fee revenue pool"
                     isDark={isDarkMode}
                   />
@@ -10217,7 +10959,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   >
                     {(() => {
                       const riderCategoryOptions = [
-                        { id: 'All', label: 'All Riders', count: riderStats.total, icon: 'people-fill', color: isDarkMode ? tokens.accentBrand : '#1D4533' },
+                        { id: 'All', label: 'All Riders', count: riderStats.total, icon: 'people-fill', color: isDarkMode ? tokens.accentBrand : '#EA580C' },
                         { id: RIDER_ACCOUNT_STATUSES.ACTIVE, label: 'Active Fleet', count: riderStats.active, icon: 'shield-check', color: isDarkMode ? tokens.statusSuccessText : '#10B981' },
                         { id: RIDER_ACCOUNT_STATUSES.INACTIVE, label: 'Inactive Riders', count: riderStats.inactive, icon: 'shield-slash', color: isDarkMode ? tokens.textMuted : '#64748B' },
                         { id: RIDER_STATUSES.AVAILABLE, label: 'Available on Duty', count: riderStats.available, icon: 'check-circle-fill', color: isDarkMode ? tokens.statusSuccessText : '#16A34A' },
@@ -10237,9 +10979,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
                               borderWidth: 1.5,
                               borderColor: isRiderFilterDropdownOpen
-                                ? '#1D4533'
+                                ? '#EA580C'
                                 : riderFilterStatus !== 'All'
-                                  ? '#1D4533'
+                                  ? '#EA580C'
                                   : isDarkMode ? tokens.borderInput : '#E2E8F0',
                               borderRadius: 12,
                               paddingHorizontal: 14,
@@ -10247,7 +10989,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               minWidth: 210,
                               cursor: 'pointer',
                               boxShadow: isRiderFilterDropdownOpen
-                                ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                                ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                                 : '0 1px 3px rgba(0, 0, 0, 0.04)',
                             }}
                             onPress={() => setIsRiderFilterDropdownOpen((prev) => !prev)}
@@ -10263,14 +11005,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 style={{
                                   fontSize: 13,
                                   fontWeight: '700',
-                                  color: riderFilterStatus !== 'All' ? '#1D4533' : isDarkMode ? tokens.textPrimary : '#0F172A',
+                                  color: riderFilterStatus !== 'All' ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#0F172A',
                                 }}
                               >
                                 {activeOpt.label}
                               </Text>
                               <View
                                 style={{
-                                  backgroundColor: riderFilterStatus !== 'All' ? '#1D4533' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                                  backgroundColor: riderFilterStatus !== 'All' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
                                   paddingHorizontal: 6,
                                   paddingVertical: 1,
                                   borderRadius: 8,
@@ -10290,7 +11032,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             <BootstrapIcon
                               name={isRiderFilterDropdownOpen ? 'chevron-up' : 'chevron-down'}
                               size={12}
-                              color={isRiderFilterDropdownOpen ? '#1D4533' : '#64748B'}
+                              color={isRiderFilterDropdownOpen ? '#EA580C' : '#64748B'}
                             />
                           </TouchableOpacity>
 
@@ -10360,7 +11102,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       <BootstrapIcon
                                         name={option.icon}
                                         size={14}
-                                        color={isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
+                                        color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
                                       />
                                       <Text
                                         style={{
@@ -10369,7 +11111,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                           color: isSelected
                                             ? isDarkMode
                                               ? tokens.accentBrand
-                                              : '#1D4533'
+                                              : '#EA580C'
                                             : isDarkMode
                                               ? tokens.textSecondary
                                               : '#334155',
@@ -10382,7 +11124,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       <View
                                         style={{
                                           backgroundColor: isSelected
-                                            ? '#1D4533'
+                                            ? '#EA580C'
                                             : isDarkMode ? tokens.borderInput : '#E2E8F0',
                                           paddingHorizontal: 6,
                                           paddingVertical: 1,
@@ -10399,7 +11141,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                           {option.count}
                                         </Text>
                                       </View>
-                                      {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />}
+                                      {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />}
                                     </View>
                                   </TouchableOpacity>
                                 );
@@ -10431,7 +11173,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         paddingHorizontal: 10,
                         paddingVertical: 5,
                         borderRadius: 6,
-                        backgroundColor: riderViewMode === 'list' ? '#1D4533' : 'transparent',
+                        backgroundColor: riderViewMode === 'list' ? '#EA580C' : 'transparent',
                         cursor: 'pointer',
                       }}
                       onPress={() => setRiderViewMode('list')}
@@ -10460,7 +11202,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         paddingHorizontal: 10,
                         paddingVertical: 5,
                         borderRadius: 6,
-                        backgroundColor: riderViewMode === 'grid' ? '#1D4533' : 'transparent',
+                        backgroundColor: riderViewMode === 'grid' ? '#EA580C' : 'transparent',
                         cursor: 'pointer',
                       }}
                       onPress={() => setRiderViewMode('grid')}
@@ -10561,7 +11303,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     height: 40,
                                     borderRadius: 20,
                                     borderWidth: 1.5,
-                                    borderColor: isDarkMode ? tokens.accentBorder : '#1D4533',
+                                    borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
                                     backgroundColor: '#E2E8F0',
                                   }}
                                 />
@@ -10632,7 +11374,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               <Text
                                 style={[
                                   styles.tableTitle,
-                                  { color: isDarkMode ? tokens.money : '#1D4533' },
+                                  { color: isDarkMode ? tokens.money : '#EA580C' },
                                 ]}
                                 numberOfLines={1}
                               >
@@ -10663,7 +11405,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   })
                                 }
                               >
-                                <BootstrapIcon name="geo-alt-fill" size={13} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />
+                                <BootstrapIcon name="geo-alt-fill" size={13} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
                               </TouchableOpacity>
                               <TouchableOpacity
                                 style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
@@ -10721,7 +11463,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         width: 8,
                         height: 8,
                         borderRadius: 4,
-                        backgroundColor: isDarkMode ? '#1F6B52' : '#10B981',
+                        backgroundColor: isDarkMode ? '#EA580C' : '#10B981',
                       }}
                     />
                     <Text
@@ -10742,7 +11484,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       paddingHorizontal: 10,
                       paddingVertical: 5,
                       borderRadius: 6,
-                      backgroundColor: isDarkMode ? '#134E48' : '#CCFBF1',
+                      backgroundColor: isDarkMode ? '#134E48' : '#FED7AA',
                     }}
                     onPress={async () => {
                       try {
@@ -10784,7 +11526,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     accent="blue"
                     label="Active Sourcing"
                     value={supplierStats.active}
-                    valueColor={isDarkMode ? tokens.accentBrand : "#1D4533"}
+                    valueColor={isDarkMode ? tokens.accentBrand : "#EA580C"}
                     sub="Fulfilling Purchase Orders"
                     isDark={isDarkMode}
                   />
@@ -10862,7 +11604,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   >
                     {(() => {
                       const supplierStatusOptions = [
-                        { id: 'All', label: 'All Suppliers', count: supplierStats.total, icon: 'building', color: isDarkMode ? tokens.accentBrand : '#1D4533' },
+                        { id: 'All', label: 'All Suppliers', count: supplierStats.total, icon: 'building', color: isDarkMode ? tokens.accentBrand : '#EA580C' },
                         { id: 'Active', label: 'Active Partners', count: supplierStats.active, icon: 'check-circle-fill', color: isDarkMode ? tokens.statusSuccessText : '#16A34A' },
                         { id: 'Pending', label: 'Pending Review', count: supplierStats.pending, icon: 'hourglass-split', color: isDarkMode ? tokens.statusWarningText : '#D97706', highlight: supplierStats.pending > 0 },
                         { id: 'Inactive', label: 'Inactive / On Hold', count: supplierStats.inactive, icon: 'pause-circle-fill', color: isDarkMode ? tokens.textMuted : '#64748B' },
@@ -10880,11 +11622,11 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
                               borderWidth: 1.5,
                               borderColor: isSupplierFilterDropdownOpen
-                                ? '#1D4533'
+                                ? '#EA580C'
                                 : activeOpt.highlight
                                   ? '#F59E0B'
                                   : supplierFilterStatus !== 'All'
-                                    ? '#1D4533'
+                                    ? '#EA580C'
                                     : isDarkMode ? tokens.borderInput : '#E2E8F0',
                               borderRadius: 12,
                               paddingHorizontal: 14,
@@ -10892,7 +11634,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               minWidth: 185,
                               cursor: 'pointer',
                               boxShadow: isSupplierFilterDropdownOpen
-                                ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
+                                ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
                                 : '0 1px 3px rgba(0, 0, 0, 0.04)',
                             }}
                             onPress={() => setIsSupplierFilterDropdownOpen((prev) => !prev)}
@@ -10918,7 +11660,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     activeOpt.highlight
                                       ? '#B45309'
                                       : supplierFilterStatus !== 'All'
-                                        ? '#1D4533'
+                                        ? '#EA580C'
                                         : isDarkMode ? tokens.textPrimary : '#0F172A',
                                 }}
                               >
@@ -10930,7 +11672,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     activeOpt.highlight
                                       ? '#FEF3C7'
                                       : supplierFilterStatus !== 'All'
-                                        ? '#1D4533'
+                                        ? '#EA580C'
                                         : isDarkMode ? tokens.borderInput : '#E2E8F0',
                                   paddingHorizontal: 6,
                                   paddingVertical: 1,
@@ -10957,7 +11699,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             <BootstrapIcon
                               name={isSupplierFilterDropdownOpen ? 'chevron-up' : 'chevron-down'}
                               size={12}
-                              color={isSupplierFilterDropdownOpen ? '#1D4533' : '#64748B'}
+                              color={isSupplierFilterDropdownOpen ? '#EA580C' : '#64748B'}
                             />
                           </TouchableOpacity>
 
@@ -11027,7 +11769,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                       <BootstrapIcon
                                         name={option.icon}
                                         size={14}
-                                        color={isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
+                                        color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
                                       />
                                       <Text
                                         style={{
@@ -11036,7 +11778,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                           color: isSelected
                                             ? isDarkMode
                                               ? tokens.accentBrand
-                                              : '#1D4533'
+                                              : '#EA580C'
                                             : isDarkMode
                                               ? tokens.textSecondary
                                               : '#334155',
@@ -11055,7 +11797,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                             : isSelected
                                               ? isDarkMode
                                                 ? 'rgba(16, 185, 129, 0.22)'
-                                                : '#1D4533'
+                                                : '#EA580C'
                                               : isDarkMode
                                                 ? tokens.bgSub
                                                 : '#E2E8F0',
@@ -11084,7 +11826,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                           {option.count}
                                         </Text>
                                       </View>
-                                      {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />}
+                                      {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />}
                                     </View>
                                   </TouchableOpacity>
                                 );
@@ -11116,7 +11858,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         paddingHorizontal: 10,
                         paddingVertical: 5,
                         borderRadius: 6,
-                        backgroundColor: supplierViewMode === 'list' ? '#1D4533' : 'transparent',
+                        backgroundColor: supplierViewMode === 'list' ? '#EA580C' : 'transparent',
                       }}
                       onPress={() => setSupplierViewMode('list')}
                     >
@@ -11144,7 +11886,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         paddingHorizontal: 10,
                         paddingVertical: 5,
                         borderRadius: 6,
-                        backgroundColor: supplierViewMode === 'grid' ? '#1D4533' : 'transparent',
+                        backgroundColor: supplierViewMode === 'grid' ? '#EA580C' : 'transparent',
                       }}
                       onPress={() => setSupplierViewMode('grid')}
                     >
@@ -11168,36 +11910,51 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
                 {/* Loading State or Empty State */}
                 {isSuppliersLoading ? (
-                  <View
-                    style={{
-                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                      borderRadius: 14,
-                      padding: 48,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                      gap: 12,
-                    }}
-                  >
-                    <ActivityIndicator size="large" color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: '800',
-                        color: isDarkMode ? '#F1F5F9' : '#0F172A',
-                      }}
-                    >
-                      Loading Suppliers from Database...
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        color: isDarkMode ? tokens.textMuted : '#64748B',
-                      }}
-                    >
-                      Querying live records from Supabase public.suppliers table
-                    </Text>
+                  <View style={styles.tableCard}>
+                    <View style={styles.tableHeaderRow}>
+                      <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 190 }]}>Supplier & Contact</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130 }]}>Category & Lead Time</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 170 }]}>Contact & Address</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 120, textAlign: 'center' }]}>Status</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 120, textAlign: 'center' }]}>Actions</Text>
+                    </View>
+                    {[1, 2, 3, 4, 5].map((k) => (
+                      <View
+                        key={k}
+                        style={[
+                          styles.tableRow,
+                          {
+                            borderBottomColor: isDarkMode ? tokens.borderLight : '#F1F5F9',
+                            paddingVertical: 14,
+                            paddingHorizontal: 16,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                          },
+                        ]}
+                      >
+                        <View style={{ flex: 2.2, minWidth: 190, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                          <Skeleton circle size={36} />
+                          <View style={{ flex: 1, gap: 6 }}>
+                            <Skeleton width="75%" height={14} borderRadius={4} />
+                            <Skeleton width="45%" height={10} borderRadius={3} />
+                          </View>
+                        </View>
+                        <View style={{ flex: 1.5, minWidth: 130, gap: 4 }}>
+                          <Skeleton width={80} height={20} borderRadius={6} />
+                          <Skeleton width={50} height={10} borderRadius={3} />
+                        </View>
+                        <View style={{ flex: 2.0, minWidth: 170, gap: 4 }}>
+                          <Skeleton width="85%" height={12} borderRadius={3} />
+                          <Skeleton width="60%" height={10} borderRadius={3} />
+                        </View>
+                        <View style={{ flex: 1.4, minWidth: 120, alignItems: 'center' }}>
+                          <Skeleton width={70} height={22} borderRadius={6} />
+                        </View>
+                        <View style={{ flex: 1.3, minWidth: 120, alignItems: 'center' }}>
+                          <Skeleton width={56} height={26} borderRadius={6} />
+                        </View>
+                      </View>
+                    ))}
                   </View>
                 ) : filteredSuppliers.length === 0 ? (
                   <View
@@ -11289,14 +12046,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     width: 38,
                                     height: 38,
                                     borderRadius: 10,
-                                    backgroundColor: isDarkMode ? '#1E293B' : '#F0FDFA',
+                                    backgroundColor: isDarkMode ? '#1E293B' : '#FFF7ED',
                                     borderWidth: 1.5,
-                                    borderColor: isDarkMode ? tokens.accentBorder : '#1D4533',
+                                    borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                   }}
                                 >
-                                  <BootstrapIcon name="building" size={18} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />
+                                  <BootstrapIcon name="building" size={18} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
                                 </View>
                                 <View style={{ flex: 1 }}>
                                   <Text style={styles.tableTitle} numberOfLines={1}>
@@ -11427,14 +12184,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 width: 44,
                                 height: 44,
                                 borderRadius: 12,
-                                backgroundColor: isDarkMode ? '#1E293B' : '#F0FDFA',
+                                backgroundColor: isDarkMode ? '#1E293B' : '#FFF7ED',
                                 borderWidth: 1.5,
-                                borderColor: isDarkMode ? tokens.accentBorder : '#1D4533',
+                                borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
                                 alignItems: 'center',
                                 justifyContent: 'center',
                               }}
                             >
-                              <BootstrapIcon name="truck" size={20} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                              <BootstrapIcon name="truck" size={20} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                             </View>
                             <View style={styles.mechanicHeaderInfo}>
                               <View
@@ -11512,7 +12269,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           >
                             <View
                               style={{
-                                backgroundColor: isDarkMode ? 'rgba(29, 69, 51,0.2)' : '#E8F0EC',
+                                backgroundColor: isDarkMode ? 'rgba(234, 88, 12,0.2)' : '#E8F0EC',
                                 paddingHorizontal: 9,
                                 paddingVertical: 4,
                                 borderRadius: 6,
@@ -11523,7 +12280,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 style={{
                                   fontSize: 11,
                                   fontWeight: '700',
-                                  color: isDarkMode ? '#5EEAD4' : '#1D4533',
+                                  color: isDarkMode ? '#5EEAD4' : '#EA580C',
                                 }}
                                 numberOfLines={1}
                               >
@@ -11558,20 +12315,20 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
                           {/* Contact Details */}
                           <View style={styles.mechanicInfoRow}>
-                            <BootstrapIcon name="envelope-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                            <BootstrapIcon name="envelope-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                             <Text style={styles.mechanicInfoText} numberOfLines={1}>
                               {sup.email || 'No email provided'}
                             </Text>
                           </View>
                           <View style={styles.mechanicInfoRow}>
-                            <BootstrapIcon name="telephone-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                            <BootstrapIcon name="telephone-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                             <Text style={styles.mechanicInfoText} numberOfLines={1}>
                               {sup.phone || 'No phone number'}
                             </Text>
                           </View>
                           {sup.address ? (
                             <View style={styles.mechanicInfoRow}>
-                              <BootstrapIcon name="geo-alt-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                              <BootstrapIcon name="geo-alt-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                               <Text style={styles.mechanicInfoText} numberOfLines={1}>
                                 {sup.address}
                               </Text>
@@ -11718,7 +12475,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   : 'Store account';
                           const avatarBg =
                             u.role === 'admin'
-                              ? '#1D4533'
+                              ? '#EA580C'
                               : u.role === 'rider'
                                 ? '#0F766E'
                                 : u.role === 'mechanic'
@@ -11885,7 +12642,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         justifyContent: 'center',
                       }}
                     >
-                      <BootstrapIcon name="database-fill-check" size={20} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                      <BootstrapIcon name="database-fill-check" size={20} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                     </View>
                     <Text style={{ fontSize: 18, fontWeight: '900', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
                       Cloud Database Connection (Supabase)
@@ -11908,7 +12665,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   />
                   <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 3, marginBottom: 14 }}>
                     Correct format:{' '}
-                    <Text style={{ color: isDarkMode ? tokens.accentBrand : '#1D4533', fontWeight: '600' }}>
+                    <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '600' }}>
                       https://vtbdmurblidtdghaotne.supabase.co
                     </Text>
                   </Text>
@@ -11947,7 +12704,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     <TouchableOpacity
                       style={[
                         styles.addBtnPrimary,
-                        { backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7', borderWidth: 1, borderColor: isDarkMode ? tokens.accentBorder : '#1D4533' },
+                        { backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7', borderWidth: 1, borderColor: isDarkMode ? tokens.accentBorder : '#EA580C' },
                       ]}
                       onPress={async () => {
                         const defs = supabaseManager.resetToDefaults();
@@ -11959,8 +12716,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       }}
                       activeOpacity={0.85}
                     >
-                      <BootstrapIcon name="arrow-counterclockwise" size={14} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
-                      <Text style={[styles.addBtnPrimaryText, { color: isDarkMode ? tokens.accentBrand : '#1D4533' }]}>
+                      <BootstrapIcon name="arrow-counterclockwise" size={14} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
+                      <Text style={[styles.addBtnPrimaryText, { color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}>
                         Restore Default Project Credentials
                       </Text>
                     </TouchableOpacity>
@@ -12031,20 +12788,43 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               />
             )}
 
-            {/* ─── TAB 12: AUDIT & GOVERNANCE LOGS ─── */}
+            {/* ─── TAB 12: ACTIVITY LOGS & AUDIT DASHBOARD ─── */}
             {activeNav === 'audit' && (
               <View>
-                {/* ─── 1. Header Card with Actions & Clean Subtitle ─── */}
+                {/* Click-outside backdrop for open dropdowns */}
+                {(isDateRangeDropdownOpen || isAuditCategoryDropdownOpen || isAuditSeverityDropdownOpen) && (
+                  <TouchableOpacity
+                    style={{
+                      position: 'fixed',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      zIndex: 99998,
+                      backgroundColor: 'transparent',
+                      cursor: 'default',
+                    }}
+                    onPress={() => {
+                      setIsDateRangeDropdownOpen(false);
+                      setIsAuditCategoryDropdownOpen(false);
+                      setIsAuditSeverityDropdownOpen(false);
+                    }}
+                    activeOpacity={1}
+                  />
+                )}
+
+                {/* ─── 1. Page Header Card ─── */}
                 <View
                   style={[
                     styles.tableCard,
                     {
-                      padding: 22,
-                      marginBottom: 18,
-                      borderRadius: 16,
+                      padding: 20,
+                      marginBottom: 16,
+                      borderRadius: 14,
                       borderWidth: 1,
                       borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
-                      boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.05)',
+                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                      boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
                     },
                   ]}
                 >
@@ -12054,9 +12834,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       alignItems: isDesktop ? 'center' : 'flex-start',
                       justifyContent: 'space-between',
                       gap: 14,
-                      paddingBottom: 18,
-                      borderBottomWidth: 1,
-                      borderBottomColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
                     }}
                   >
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -12065,28 +12842,28 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           width: 42,
                           height: 42,
                           borderRadius: 10,
-                          backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                          backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
                           alignItems: 'center',
                           justifyContent: 'center',
                         }}
                       >
-                        <BootstrapIcon name="journal-text" size={20} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                        <BootstrapIcon name="journal-text" size={20} color={isDarkMode ? tokens.accentBrand : '#059669'} />
                       </View>
                       <View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                           <Text
                             style={{
-                              fontSize: 18,
+                              fontSize: 19,
                               fontWeight: '800',
                               color: isDarkMode ? tokens.textPrimary : '#0F172A',
                               letterSpacing: -0.3,
                             }}
                           >
-                            Audit Trail
+                            Activity Logs
                           </Text>
                           <View
                             style={{
-                              backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                              backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
                               paddingHorizontal: 7,
                               paddingVertical: 2,
                               borderRadius: 6,
@@ -12096,7 +12873,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               style={{
                                 fontSize: 10,
                                 fontWeight: '700',
-                                color: isDarkMode ? tokens.accentBrand : '#1D4533',
+                                color: isDarkMode ? tokens.accentBrand : '#059669',
                                 letterSpacing: 0.3,
                               }}
                             >
@@ -12108,226 +12885,215 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           style={{
                             fontSize: 12.5,
                             color: isDarkMode ? tokens.textMuted : '#64748B',
-                            marginTop: 2,
+                            marginTop: 3,
                           }}
                         >
-                          Administrative actions, approvals, inventory restocks, and security events
+                          Track administrative actions, inventory changes, approvals, and security events.
                         </Text>
                       </View>
                     </View>
 
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <TouchableOpacity
-                        style={[
-                          styles.addBtnOutline,
-                          {
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                            paddingHorizontal: 12,
-                            paddingVertical: 7,
-                            borderRadius: 8,
-                            borderColor: isDarkMode ? tokens.accentBorder : '#1D4533',
-                            backgroundColor: isDarkMode ? '#132A26' : '#FFFFFF',
-                          },
-                        ]}
-                        onPress={handleExportAuditLogs}
-                        activeOpacity={0.8}
-                      >
-                        <BootstrapIcon name="download" size={13} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
-                        <Text style={{ color: isDarkMode ? tokens.accentBrand : '#1D4533', fontWeight: '700', fontSize: 12 }}>
-                          Export CSV
-                        </Text>
-                      </TouchableOpacity>
-
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                       <TouchableOpacity
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
                           gap: 6,
-                          paddingHorizontal: 12,
-                          paddingVertical: 7,
+                          paddingHorizontal: 14,
+                          paddingVertical: 8,
                           borderRadius: 8,
-                          backgroundColor: isDarkMode ? 'rgba(220, 38, 38, 0.15)' : '#FEE2E2',
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
+                          backgroundColor: isDarkMode ? '#132A26' : '#FFFFFF',
+                          cursor: 'pointer',
                         }}
-                        onPress={handleClearAuditLogs}
+                        onPress={handleExportAuditLogs}
                         activeOpacity={0.8}
                       >
-                        <BootstrapIcon name="trash3" size={13} color={isDarkMode ? tokens.statusDangerText : "#DC2626"} />
-                        <Text style={{ color: isDarkMode ? tokens.statusDangerText : '#DC2626', fontWeight: '700', fontSize: 12 }}>
-                          Clear Logs
+                        <BootstrapIcon name="download" size={13} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+                        <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '700', fontSize: 12.5 }}>
+                          Export CSV
                         </Text>
                       </TouchableOpacity>
                     </View>
                   </View>
+                </View>
 
-                  {/* ─── 4 Streamlined Summary Metrics ─── */}
+                {/* ─── 2. Four KPI Summary Cards ─── */}
+                <View
+                  style={{
+                    flexDirection: isDesktop ? 'row' : 'column',
+                    gap: 12,
+                    marginBottom: 16,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  {/* 1. Total Events */}
                   <View
                     style={{
-                      flexDirection: isDesktop ? 'row' : 'column',
-                      gap: 12,
-                      marginTop: 16,
-                      flexWrap: 'wrap',
+                      flex: 1,
+                      minWidth: 160,
+                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                      padding: 16,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                     }}
                   >
-                    {/* 1. Total */}
-                    <View
-                      style={{
-                        flex: 1,
-                        minWidth: 160,
-                        backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                        padding: 14,
-                        borderRadius: 10,
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 10,
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 8,
-                          backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <BootstrapIcon name="journal-bookmark-fill" size={16} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
-                      </View>
-                      <View>
-                        <Text style={{ fontSize: 18, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                          {auditLogs.length}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
-                          Total Operations
-                        </Text>
-                      </View>
+                    <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 24, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        {totalEventsCount}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
+                        Total Events
+                      </Text>
                     </View>
-
-                    {/* 2. Warnings & Critical */}
                     <View
                       style={{
-                        flex: 1,
-                        minWidth: 160,
-                        backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                        padding: 14,
+                        width: 40,
+                        height: 40,
                         borderRadius: 10,
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                        flexDirection: 'row',
+                        backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
                         alignItems: 'center',
-                        gap: 10,
+                        justifyContent: 'center',
                       }}
                     >
-                      <View
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 8,
-                          backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <BootstrapIcon name="exclamation-triangle-fill" size={16} color={isDarkMode ? tokens.statusWarningText : "#D97706"} />
-                      </View>
-                      <View>
-                        <Text style={{ fontSize: 18, fontWeight: '800', color: isDarkMode ? tokens.statusWarningText : '#D97706' }}>
-                          {auditLogs.filter((l) => l.severity === 'WARNING' || l.severity === 'CRITICAL').length}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
-                          Alerts & Warnings
-                        </Text>
-                      </View>
+                      <BootstrapIcon name="file-earmark-text" size={18} color={isDarkMode ? '#94A3B8' : '#475569'} />
                     </View>
+                  </View>
 
-                    {/* 3. Orders & Inventory */}
-                    <View
-                      style={{
-                        flex: 1,
-                        minWidth: 160,
-                        backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                        padding: 14,
-                        borderRadius: 10,
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 10,
-                      }}
-                    >
-                      <View
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 8,
-                          backgroundColor: isDarkMode ? '#1E293B' : '#DBEAFE',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <BootstrapIcon name="box-seam-fill" size={16} color={isDarkMode ? tokens.statusInfoText : "#2563EB"} />
-                      </View>
-                      <View>
-                        <Text style={{ fontSize: 18, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                          {auditLogs.filter((l) => l.category === 'orders' || l.category === 'inventory').length}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
-                          Orders & Inventory
-                        </Text>
-                      </View>
+                  {/* 2. Successful */}
+                  <View
+                    style={{
+                      flex: 1,
+                      minWidth: 160,
+                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                      padding: 16,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                    }}
+                  >
+                    <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 24, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        {successfulEventsCount}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
+                        Successful
+                      </Text>
                     </View>
-
-                    {/* 4. Garage & Security */}
                     <View
                       style={{
-                        flex: 1,
-                        minWidth: 160,
-                        backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                        padding: 14,
-                        borderRadius: 10,
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                        flexDirection: 'row',
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
                         alignItems: 'center',
-                        gap: 10,
+                        justifyContent: 'center',
                       }}
                     >
-                      <View
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 8,
-                          backgroundColor: isDarkMode ? '#132A26' : '#C8DDD3',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <BootstrapIcon name="shield-check" size={16} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
-                      </View>
-                      <View>
-                        <Text style={{ fontSize: 18, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                          {auditLogs.filter((l) => l.category === 'garage' || l.category === 'security' || l.category === 'system').length}
-                        </Text>
-                        <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
-                          Garage & Security
-                        </Text>
-                      </View>
+                      <BootstrapIcon name="check2-circle" size={18} color="#059669" />
+                    </View>
+                  </View>
+
+                  {/* 3. Warnings */}
+                  <View
+                    style={{
+                      flex: 1,
+                      minWidth: 160,
+                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                      padding: 16,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                    }}
+                  >
+                    <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 24, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        {warningEventsCount}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
+                        Warnings
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 10,
+                        backgroundColor: isDarkMode ? '#2D2012' : '#FFFBEB',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <BootstrapIcon name="exclamation-triangle-fill" size={18} color="#D97706" />
+                    </View>
+                  </View>
+
+                  {/* 4. Critical */}
+                  <View
+                    style={{
+                      flex: 1,
+                      minWidth: 160,
+                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                      padding: 16,
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                    }}
+                  >
+                    <View style={{ gap: 4 }}>
+                      <Text style={{ fontSize: 24, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        {criticalEventsCount}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
+                        Critical
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 10,
+                        backgroundColor: isDarkMode ? '#341515' : '#FEF2F2',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <BootstrapIcon name="shield-fill-x" size={18} color="#DC2626" />
                     </View>
                   </View>
                 </View>
 
-                {/* ─── 2. Search & Clean Filter Controls ─── */}
+                {/* ─── 3. Search & Filtering Toolbar ─── */}
                 <View
                   style={{
-                    gap: 10,
+                    backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                    padding: 12,
                     marginBottom: 16,
                     position: 'relative',
-                    zIndex: isAuditCategoryDropdownOpen ? 99999 : 10,
-                    elevation: isAuditCategoryDropdownOpen ? 99999 : 1,
+                    zIndex: isDateRangeDropdownOpen || isAuditCategoryDropdownOpen || isAuditSeverityDropdownOpen ? 99999 : 10,
+                    elevation: 2,
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                   }}
                 >
                   <View
@@ -12335,9 +13101,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       flexDirection: isDesktop ? 'row' : 'column',
                       alignItems: isDesktop ? 'center' : 'stretch',
                       gap: 10,
-                      position: 'relative',
-                      zIndex: isAuditCategoryDropdownOpen ? 99999 : 10,
-                      elevation: isAuditCategoryDropdownOpen ? 99999 : 1,
                     }}
                   >
                     {/* Search Field */}
@@ -12347,15 +13110,15 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 10,
-                        backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                        backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
                         borderWidth: 1,
                         borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                        borderRadius: 10,
-                        paddingHorizontal: 14,
-                        paddingVertical: 9,
+                        borderRadius: 9,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
                       }}
                     >
-                      <BootstrapIcon name="search" size={13} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+                      <BootstrapIcon name="search" size={13} color={isDarkMode ? tokens.textMuted : '#64748B'} />
                       <TextInput
                         style={{
                           flex: 1,
@@ -12363,306 +13126,446 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           color: isDarkMode ? tokens.textPrimary : '#0F172A',
                           outlineStyle: 'none',
                         }}
-                        placeholder="Search logs by action, admin name, target resource, details..."
+                        placeholder="Search action, admin, target, or details..."
                         value={auditSearchQuery}
-                        onChangeText={setAuditSearchQuery}
-                        placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                        onChangeText={(txt) => {
+                          setAuditSearchQuery(txt);
+                          setAuditCurrentPage(1);
+                        }}
+                        placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
                       />
                       {Boolean(auditSearchQuery) && (
                         <TouchableOpacity onPress={() => setAuditSearchQuery('')}>
-                          <BootstrapIcon name="x-circle-fill" size={13} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
+                          <BootstrapIcon name="x-circle-fill" size={13} color={isDarkMode ? tokens.textMuted : '#94A3B8'} />
                         </TouchableOpacity>
                       )}
                     </View>
 
-                    {/* Audit Category Dropdown Filter */}
-                    <View
-                      style={{
-                        position: 'relative',
-                        zIndex: isAuditCategoryDropdownOpen ? 99999 : 10,
-                      }}
-                    >
-                      <TouchableOpacity
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 8,
-                          backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                          borderWidth: 1.5,
-                          borderColor: isAuditCategoryDropdownOpen
-                            ? '#1D4533'
-                            : auditCategoryFilter !== 'All'
-                              ? '#1D4533'
-                              : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                          borderRadius: 12,
-                          paddingHorizontal: 14,
-                          paddingVertical: 9,
-                          minWidth: 160,
-                          cursor: 'pointer',
-                          boxShadow: isAuditCategoryDropdownOpen
-                            ? '0 6px 20px -2px rgba(29, 69, 51, 0.2)'
-                            : '0 1px 3px rgba(0, 0, 0, 0.04)',
-                        }}
-                        onPress={() => setIsAuditCategoryDropdownOpen((prev) => !prev)}
-                        activeOpacity={0.85}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                          <BootstrapIcon
-                            name={
-                              AUDIT_CATEGORIES.find((c) => c.id.toLowerCase() === auditCategoryFilter.toLowerCase())?.icon || 'layers'
-                            }
-                            size={13}
-                            color={auditCategoryFilter !== 'All' ? '#1D4533' : '#64748B'}
-                          />
-                          <Text
-                            style={{
-                              fontSize: 13,
-                              fontWeight: '700',
-                              color: auditCategoryFilter !== 'All' ? '#1D4533' : isDarkMode ? tokens.textPrimary : '#0F172A',
-                            }}
-                          >
-                            {AUDIT_CATEGORIES.find((c) => c.id.toLowerCase() === auditCategoryFilter.toLowerCase())?.label || 'All Categories'}
-                          </Text>
-                        </View>
-                        <BootstrapIcon
-                          name={isAuditCategoryDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                          size={12}
-                          color={isAuditCategoryDropdownOpen ? '#1D4533' : '#64748B'}
-                        />
-                      </TouchableOpacity>
-
-                      {/* Transparent backdrop for click-outside dismissal */}
-                      {isAuditCategoryDropdownOpen && (
+                    {/* Filter Controls Row */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      {/* Date Range Dropdown */}
+                      <View style={{ position: 'relative', zIndex: isDateRangeDropdownOpen ? 99999 : 10 }}>
                         <TouchableOpacity
                           style={{
-                            position: 'fixed',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            bottom: 0,
-                            zIndex: 99998,
-                            backgroundColor: 'transparent',
-                            cursor: 'default',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                            backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: auditDateRangeFilter !== '7d' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                            borderRadius: 9,
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            cursor: 'pointer',
                           }}
-                          onPress={() => setIsAuditCategoryDropdownOpen(false)}
-                          activeOpacity={1}
-                        />
-                      )}
-
-                      {/* Floating Dropdown Menu */}
-                      {isAuditCategoryDropdownOpen && (
-                        <View
-                          style={{
-                            position: 'absolute',
-                            top: '100%',
-                            left: 0,
-                            marginTop: 6,
-                            minWidth: 215,
-                            backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                            borderRadius: 14,
-                            borderWidth: 1.5,
-                            borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                            boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
-                            zIndex: 99999,
-                            padding: 6,
-                            gap: 3,
-                            maxHeight: 320,
-                            overflowY: 'auto',
+                          onPress={() => {
+                            setIsDateRangeDropdownOpen((prev) => !prev);
+                            setIsAuditCategoryDropdownOpen(false);
+                            setIsAuditSeverityDropdownOpen(false);
                           }}
+                          activeOpacity={0.8}
                         >
-                          {AUDIT_CATEGORIES.map((cat) => {
-                            const isSelected = auditCategoryFilter.toLowerCase() === cat.id.toLowerCase();
-                            return (
+                          <BootstrapIcon name="calendar3" size={12} color="#64748B" />
+                          <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                            {DATE_RANGE_OPTIONS.find((d) => d.id === auditDateRangeFilter)?.label || 'Last 7 days'}
+                          </Text>
+                          <BootstrapIcon name="chevron-down" size={10} color="#64748B" />
+                        </TouchableOpacity>
+
+                        {isDateRangeDropdownOpen && (
+                          <View
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              marginTop: 6,
+                              minWidth: 160,
+                              backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                              borderRadius: 10,
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                              boxShadow: '0 10px 25px -4px rgba(0,0,0,0.15)',
+                              zIndex: 99999,
+                              padding: 4,
+                            }}
+                          >
+                            {DATE_RANGE_OPTIONS.map((opt) => (
+                              <TouchableOpacity
+                                key={opt.id}
+                                style={{
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 7,
+                                  borderRadius: 6,
+                                  backgroundColor: auditDateRangeFilter === opt.id ? (isDarkMode ? '#132A26' : '#ECFDF5') : 'transparent',
+                                  cursor: 'pointer',
+                                }}
+                                onPress={() => {
+                                  setAuditDateRangeFilter(opt.id);
+                                  setAuditCurrentPage(1);
+                                  setIsDateRangeDropdownOpen(false);
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 12.5,
+                                    fontWeight: auditDateRangeFilter === opt.id ? '700' : '500',
+                                    color: auditDateRangeFilter === opt.id ? '#059669' : isDarkMode ? tokens.textPrimary : '#334155',
+                                  }}
+                                >
+                                  {opt.label}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Category Dropdown */}
+                      <View style={{ position: 'relative', zIndex: isAuditCategoryDropdownOpen ? 99999 : 10 }}>
+                        <TouchableOpacity
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                            backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: auditCategoryFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                            borderRadius: 9,
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            cursor: 'pointer',
+                          }}
+                          onPress={() => {
+                            setIsAuditCategoryDropdownOpen((prev) => !prev);
+                            setIsDateRangeDropdownOpen(false);
+                            setIsAuditSeverityDropdownOpen(false);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <BootstrapIcon name="grid" size={12} color="#64748B" />
+                          <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                            {AUDIT_CATEGORIES.find((c) => c.id.toLowerCase() === auditCategoryFilter.toLowerCase())?.label || 'All categories'}
+                          </Text>
+                          <BootstrapIcon name="chevron-down" size={10} color="#64748B" />
+                        </TouchableOpacity>
+
+                        {isAuditCategoryDropdownOpen && (
+                          <View
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              marginTop: 6,
+                              minWidth: 175,
+                              backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                              borderRadius: 10,
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                              boxShadow: '0 10px 25px -4px rgba(0,0,0,0.15)',
+                              zIndex: 99999,
+                              padding: 4,
+                            }}
+                          >
+                            {AUDIT_CATEGORIES.map((cat) => (
                               <TouchableOpacity
                                 key={cat.id}
                                 style={{
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  paddingHorizontal: 12,
-                                  paddingVertical: 9,
-                                  borderRadius: 9,
-                                  backgroundColor: isSelected
-                                    ? isDarkMode ? '#132A26' : '#E8F0EC'
-                                    : 'transparent',
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 7,
+                                  borderRadius: 6,
+                                  backgroundColor: auditCategoryFilter.toLowerCase() === cat.id.toLowerCase() ? (isDarkMode ? '#132A26' : '#ECFDF5') : 'transparent',
                                   cursor: 'pointer',
                                 }}
                                 onPress={() => {
                                   setAuditCategoryFilter(cat.id);
+                                  setAuditCurrentPage(1);
                                   setIsAuditCategoryDropdownOpen(false);
                                 }}
-                                activeOpacity={0.8}
                               >
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                  <BootstrapIcon
-                                    name={cat.icon}
-                                    size={14}
-                                    color={isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : (isDarkMode ? tokens.textMuted : '#64748B')}
-                                  />
-                                  <Text
-                                    style={{
-                                      fontSize: 13,
-                                      fontWeight: isSelected ? '800' : '600',
-                                      color: isSelected
-                                        ? isDarkMode
-                                          ? tokens.accentBrand
-                                          : '#1D4533'
-                                        : isDarkMode
-                                          ? tokens.textSecondary
-                                          : '#334155',
-                                    }}
-                                  >
-                                    {cat.label}
-                                  </Text>
-                                </View>
-                                {isSelected && (
-                                  <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />
-                                )}
+                                <Text
+                                  style={{
+                                    fontSize: 12.5,
+                                    fontWeight: auditCategoryFilter.toLowerCase() === cat.id.toLowerCase() ? '700' : '500',
+                                    color: auditCategoryFilter.toLowerCase() === cat.id.toLowerCase() ? '#059669' : isDarkMode ? tokens.textPrimary : '#334155',
+                                  }}
+                                >
+                                  {cat.label}
+                                </Text>
                               </TouchableOpacity>
-                            );
-                          })}
-                        </View>
-                      )}
-                    </View>
+                            ))}
+                          </View>
+                        )}
+                      </View>
 
-                    {/* Severity Segmented Filter */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                      {['All', 'SUCCESS', 'INFO', 'WARNING', 'CRITICAL'].map((sev) => {
-                        const active = auditSeverityFilter.toUpperCase() === sev.toUpperCase();
-                        const displayLabel = sev === 'All' ? 'All Severities' : sev;
-                        return (
-                          <TouchableOpacity
-                            key={sev}
+                      {/* Severity Dropdown */}
+                      <View style={{ position: 'relative', zIndex: isAuditSeverityDropdownOpen ? 99999 : 10 }}>
+                        <TouchableOpacity
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                            backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: auditSeverityFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                            borderRadius: 9,
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            cursor: 'pointer',
+                          }}
+                          onPress={() => {
+                            setIsAuditSeverityDropdownOpen((prev) => !prev);
+                            setIsDateRangeDropdownOpen(false);
+                            setIsAuditCategoryDropdownOpen(false);
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <BootstrapIcon name="shield-check" size={12} color="#64748B" />
+                          <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                            {auditSeverityFilter === 'All' ? 'All severities' : auditSeverityFilter}
+                          </Text>
+                          <BootstrapIcon name="chevron-down" size={10} color="#64748B" />
+                        </TouchableOpacity>
+
+                        {isAuditSeverityDropdownOpen && (
+                          <View
                             style={{
-                              paddingHorizontal: 10,
-                              paddingVertical: 6,
-                              borderRadius: 8,
-                              backgroundColor: active
-                                ? '#1D4533'
-                                : isDarkMode ? '#1E293B' : '#FFFFFF',
+                              position: 'absolute',
+                              top: '100%',
+                              left: 0,
+                              marginTop: 6,
+                              minWidth: 160,
+                              backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                              borderRadius: 10,
                               borderWidth: 1,
-                              borderColor: active
-                                ? '#1D4533'
-                                : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                              borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                              boxShadow: '0 10px 25px -4px rgba(0,0,0,0.15)',
+                              zIndex: 99999,
+                              padding: 4,
                             }}
-                            onPress={() => setAuditSeverityFilter(sev)}
-                            activeOpacity={0.8}
                           >
-                            <Text
-                              style={{
-                                fontSize: 11,
-                                fontWeight: active ? '700' : '600',
-                                color: active
-                                  ? '#FFFFFF'
-                                  : isDarkMode ? tokens.textMuted : '#475569',
-                              }}
-                            >
-                              {displayLabel}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
+                            {AUDIT_SEVERITIES.map((sev) => (
+                              <TouchableOpacity
+                                key={sev.id}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 7,
+                                  borderRadius: 6,
+                                  backgroundColor: auditSeverityFilter === sev.id ? (isDarkMode ? '#132A26' : '#ECFDF5') : 'transparent',
+                                  cursor: 'pointer',
+                                }}
+                                onPress={() => {
+                                  setAuditSeverityFilter(sev.id);
+                                  setAuditCurrentPage(1);
+                                  setIsAuditSeverityDropdownOpen(false);
+                                }}
+                              >
+                                {sev.dotColor && (
+                                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sev.dotColor }} />
+                                )}
+                                <Text
+                                  style={{
+                                    fontSize: 12.5,
+                                    fontWeight: auditSeverityFilter === sev.id ? '700' : '500',
+                                    color: auditSeverityFilter === sev.id ? '#059669' : isDarkMode ? tokens.textPrimary : '#334155',
+                                  }}
+                                >
+                                  {sev.label}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Filter / Reset Action Button */}
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          backgroundColor: hasActiveAuditFilters ? (isDarkMode ? '#2D1616' : '#FEF2F2') : isDarkMode ? tokens.bgMain : '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: hasActiveAuditFilters ? '#F87171' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                          borderRadius: 9,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          cursor: 'pointer',
+                        }}
+                        onPress={hasActiveAuditFilters ? handleResetAuditFilters : undefined}
+                        activeOpacity={hasActiveAuditFilters ? 0.75 : 1}
+                      >
+                        <BootstrapIcon
+                          name={hasActiveAuditFilters ? 'arrow-counterclockwise' : 'funnel'}
+                          size={12}
+                          color={hasActiveAuditFilters ? '#DC2626' : '#64748B'}
+                        />
+                        <Text
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: '600',
+                            color: hasActiveAuditFilters ? '#DC2626' : isDarkMode ? tokens.textPrimary : '#334155',
+                          }}
+                        >
+                          {hasActiveAuditFilters ? 'Reset' : 'Filter'}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
                 </View>
 
-                {/* ─── 3. Audit Logs Feed (Clear, Professional, High Scannability) ─── */}
+                {/* ─── 4. Activity Logs Table / List Container ─── */}
                 <View
-                  style={[
-                    styles.feedCard,
-                    {
-                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                      borderRadius: 14,
-                      position: 'relative',
-                      zIndex: 1,
-                    },
-                  ]}
+                  style={{
+                    backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                    borderRadius: 14,
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                    position: 'relative',
+                  }}
                 >
-                  {filteredAuditLogs.length === 0 ? (
-                    <View style={styles.emptyState}>
-                      <View
-                        style={[
-                          styles.emptyIconCircle,
-                          { backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9', width: 56, height: 56, borderRadius: 28 },
-                        ]}
-                      >
-                        <BootstrapIcon name="journal-check" size={26} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                      </View>
-                      <Text style={[styles.emptyTitle, { color: isDarkMode ? tokens.textPrimary : '#1E293B', fontSize: 15 }]}>
-                        No Audit Log Entries
+                  {/* Table Column Headers (Desktop) */}
+                  {isDesktop && (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 20,
+                        paddingVertical: 12,
+                        backgroundColor: '#24272B',
+                        borderTopLeftRadius: 13,
+                        borderTopRightRadius: 13,
+                        borderBottomWidth: 1,
+                        borderBottomColor: isDarkMode ? '#374151' : '#32373D',
+                      }}
+                    >
+                      <Text style={{ flex: 2.2, fontSize: 11, fontWeight: '800', color: '#CBD5E1', letterSpacing: 0.5 }}>
+                        EVENT
                       </Text>
-                      <Text style={[styles.emptySubtitle, { color: isDarkMode ? tokens.textMuted : '#64748B', fontSize: 12.5 }]}>
-                        {auditSearchQuery
-                          ? 'No audit entries match your current search.'
-                          : 'No recorded actions found for this filter.'}
+                      <Text style={{ flex: 1.7, fontSize: 11, fontWeight: '800', color: '#CBD5E1', letterSpacing: 0.5 }}>
+                        ACTOR / TARGET
+                      </Text>
+                      <Text style={{ flex: 1.1, fontSize: 11, fontWeight: '800', color: '#CBD5E1', letterSpacing: 0.5 }}>
+                        IP ADDRESS
+                      </Text>
+                      <Text style={{ flex: 0.9, fontSize: 11, fontWeight: '800', color: '#CBD5E1', letterSpacing: 0.5 }}>
+                        TIME
+                      </Text>
+                      <Text style={{ flex: 0.9, fontSize: 11, fontWeight: '800', color: '#CBD5E1', letterSpacing: 0.5 }}>
+                        STATUS
+                      </Text>
+                      <Text style={{ width: 110, textAlign: 'right', fontSize: 11, fontWeight: '800', color: '#CBD5E1', letterSpacing: 0.5, paddingRight: 6 }}>
+                        ACTION
                       </Text>
                     </View>
+                  )}
+
+                  {/* Empty State */}
+                  {filteredAuditLogs.length === 0 ? (
+                    <View style={{ padding: 48, alignItems: 'center', justifyContent: 'center' }}>
+                      <View
+                        style={{
+                          width: 56,
+                          height: 56,
+                          borderRadius: 28,
+                          backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginBottom: 12,
+                        }}
+                      >
+                        <BootstrapIcon name="journal-check" size={26} color={isDarkMode ? tokens.textMuted : '#94A3B8'} />
+                      </View>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#1E293B' }}>
+                        No Activity Log Entries
+                      </Text>
+                      <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 4, textAlign: 'center' }}>
+                        {auditSearchQuery || hasActiveAuditFilters
+                          ? 'No activity log entries match your current search and filters.'
+                          : 'No recorded actions found for this period.'}
+                      </Text>
+                      {hasActiveAuditFilters && (
+                        <TouchableOpacity
+                          style={{
+                            marginTop: 14,
+                            paddingHorizontal: 14,
+                            paddingVertical: 7,
+                            borderRadius: 8,
+                            backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? tokens.accentBorder : '#A7F3D0',
+                          }}
+                          onPress={handleResetAuditFilters}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#059669' }}>
+                            Reset All Filters
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
                   ) : (
-                    filteredAuditLogs.map((log, index) => {
+                    /* Table / Cards Body */
+                    paginatedAuditLogs.map((log, index) => {
+                      const isLast = index === paginatedAuditLogs.length - 1;
                       const sev = (log.severity || 'INFO').toUpperCase();
-                      const sevColor =
-                        sev === 'CRITICAL'
-                          ? '#DC2626'
-                          : sev === 'WARNING'
-                            ? '#D97706'
-                            : sev === 'SUCCESS'
-                              ? '#059669'
-                              : '#2563EB';
 
-                      const sevBg =
-                        sev === 'CRITICAL'
-                          ? isDarkMode ? '#341515' : '#FEE2E2'
-                          : sev === 'WARNING'
-                            ? isDarkMode ? '#2D2012' : '#FEF3C7'
-                            : sev === 'SUCCESS'
-                              ? isDarkMode ? '#132A26' : '#D1FAE5'
-                              : isDarkMode ? '#1E293B' : '#DBEAFE';
+                      // Status Badge Colors
+                      const statusMeta = {
+                        CRITICAL: { label: 'CRITICAL', color: '#DC2626', dot: '#EF4444', bg: isDarkMode ? '#341515' : '#FEF2F2' },
+                        WARNING: { label: 'WARNING', color: '#D97706', dot: '#F59E0B', bg: isDarkMode ? '#2D2012' : '#FFFBEB' },
+                        SUCCESS: { label: 'SUCCESS', color: '#059669', dot: '#10B981', bg: isDarkMode ? '#132A26' : '#ECFDF5' },
+                        INFO: { label: 'INFO', color: '#2563EB', dot: '#3B82F6', bg: isDarkMode ? '#1E293B' : '#EFF6FF' },
+                      }[sev] || { label: sev, color: '#475569', dot: '#94A3B8', bg: isDarkMode ? '#1E293B' : '#F1F5F9' };
 
-                      // Human-friendly title and icon
-                      const getActionPresentation = (action) => {
+                      // Action Title & Icon presentation
+                      const getPresentation = (action) => {
                         switch (action) {
+                          case 'ORDER_APPROVED':
                           case 'COD_ORDER_APPROVED':
-                            return { title: 'Approved COD Order', icon: 'bag-check-fill', color: '#059669', bg: isDarkMode ? '#132A26' : '#D1FAE5' };
-                          case 'ORDER_STATUS_CHANGED':
-                            return { title: 'Updated Order Status', icon: 'truck', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#DBEAFE' };
-                          case 'ORDER_CANCELLED':
-                            return { title: 'Cancelled Order', icon: 'x-circle-fill', color: '#DC2626', bg: isDarkMode ? '#341515' : '#FEE2E2' };
+                            return { title: 'Order Approved', icon: 'check2', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
+                          case 'INVENTORY_RESTOCKED':
                           case 'STOCK_REPLENISHED':
-                            return { title: 'Replenished Inventory', icon: 'boxes', color: isDarkMode ? tokens.accentBrand : '#1D4533', bg: isDarkMode ? tokens.accentBg : '#E8F0EC' };
-                          case 'PRICE_OVERRIDE':
-                            return { title: 'Price Override', icon: 'tag-fill', color: '#D97706', bg: isDarkMode ? '#2D2012' : '#FEF3C7' };
-                          case 'BOOKING_CREATED':
-                            return { title: 'Scheduled Pit Bay Service', icon: 'wrench', color: isDarkMode ? tokens.accentBrand : '#1D4533', bg: isDarkMode ? tokens.accentBg : '#C8DDD3' };
+                            return { title: 'Inventory Restocked', icon: 'box-seam', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
+                          case 'BOOKING_BAY_UPDATED':
                           case 'BOOKING_STATUS_CHANGED':
-                            return { title: 'Updated Bay Status', icon: 'wrench-adjustable', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#DBEAFE' };
-                          case 'SERVICE_COMPLETED':
-                            return { title: 'Completed Service in Bay', icon: 'check-circle-fill', color: '#059669', bg: isDarkMode ? '#132A26' : '#D1FAE5' };
-                          case 'BOOKING_CANCELLED':
-                            return { title: 'Cancelled Bay Booking', icon: 'calendar-x-fill', color: '#DC2626', bg: isDarkMode ? '#341515' : '#FEE2E2' };
-                          case 'CUSTOMER_REGISTERED':
-                            return { title: 'New Customer Registered', icon: 'person-plus-fill', color: '#4F46E5', bg: isDarkMode ? '#1E1B4B' : '#EEF2FF' };
-                          case 'STAFF_PERMISSION_CHANGED':
-                            return { title: 'Modified Staff Permissions', icon: 'shield-lock-fill', color: '#7C3AED', bg: isDarkMode ? '#281A42' : '#EDE9FE' };
+                            return { title: 'Booking Bay Updated', icon: 'calendar-check', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
+                          case 'SECURITY_PIN_VERIFIED':
+                            return { title: 'Security PIN Verified', icon: 'shield-lock', color: '#D97706', bg: isDarkMode ? '#2D2012' : '#FFFBEB' };
+                          case 'FAILED_LOGIN_ATTEMPT':
+                            return { title: 'Failed Login Attempt', icon: 'shield-x', color: '#DC2626', bg: isDarkMode ? '#341515' : '#FEF2F2' };
+                          case 'ORDER_STATUS_CHANGED':
+                            return { title: 'Order Status Changed', icon: 'truck', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
+                          case 'PROMO_CREATED':
+                            return { title: 'Promo Code Published', icon: 'ticket-perforated', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
+                          case 'SYSTEM_SETTINGS_UPDATED':
                           case 'SYSTEM_SETTINGS_SAVED':
-                            return { title: 'Updated System Settings', icon: 'sliders', color: isDarkMode ? tokens.accentBrand : '#1D4533', bg: isDarkMode ? tokens.accentBg : '#E8F0EC' };
-                          case 'AI_RESTOCK_RECOMMENDED':
-                            return { title: 'AI Restock Advice', icon: 'cpu-fill', color: '#7C3AED', bg: isDarkMode ? '#281A42' : '#EDE9FE' };
+                            return { title: 'System Settings Updated', icon: 'sliders', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
+                          case 'SUPPLIER_PO_SIGNED':
+                            return { title: 'Supplier PO Signed', icon: 'file-earmark-check', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
+                          case 'DATABASE_BACKUP_EXPORTED':
+                            return { title: 'Database Backup Exported', icon: 'database', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
+                          case 'USER_PERMISSIONS_MODIFIED':
+                            return { title: 'User Permissions Modified', icon: 'person-gear', color: '#D97706', bg: isDarkMode ? '#2D2012' : '#FFFBEB' };
                           default: {
                             const readable = (action || 'Operation')
                               .replace(/_/g, ' ')
                               .toLowerCase()
                               .replace(/\b\w/g, (c) => c.toUpperCase());
-                            return { title: readable, icon: 'journal-check', color: isDarkMode ? tokens.accentBrand : '#1D4533', bg: isDarkMode ? tokens.accentBg : '#E8F0EC' };
+                            if (sev === 'CRITICAL') return { title: readable, icon: 'shield-x', color: '#DC2626', bg: isDarkMode ? '#341515' : '#FEF2F2' };
+                            if (sev === 'WARNING') return { title: readable, icon: 'shield-lock', color: '#D97706', bg: isDarkMode ? '#2D2012' : '#FFFBEB' };
+                            if (sev === 'SUCCESS') return { title: readable, icon: 'check2', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
+                            return { title: readable, icon: 'info-circle', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
                           }
                         }
                       };
 
-                      const actionMeta = getActionPresentation(log.action);
+                      const meta = getPresentation(log.action);
 
-                      // Relative timestamp
-                      const formatTimeAgo = (iso) => {
+                      // Relative timestamp formatter
+                      const formatTime = (iso) => {
                         if (!iso) return 'Just now';
                         try {
                           const diff = Date.now() - new Date(iso).getTime();
@@ -12670,184 +13573,468 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           const h = Math.floor(m / 60);
                           const d = Math.floor(h / 24);
                           if (m < 1) return 'Just now';
-                          if (m < 60) return `${m}m ago`;
-                          if (h < 24) return `${h}h ago`;
+                          if (m === 1) return '1 min ago';
+                          if (m < 60) return `${m} min ago`;
+                          if (h === 1) return '1 hour ago';
+                          if (h < 24) return `${h} hours ago`;
                           if (d === 1) return 'Yesterday';
-                          return `${d}d ago`;
+                          return `${d} days ago`;
                         } catch (_e) {
                           return 'Recent';
                         }
                       };
 
-                      return (
-                        <View
-                          key={log.id || index}
-                          style={{
-                            flexDirection: 'row',
-                            padding: 16,
-                            borderBottomWidth: index === filteredAuditLogs.length - 1 ? 0 : 1,
-                            borderBottomColor: isDarkMode ? tokens.borderInput : '#F1F5F9',
-                            gap: 14,
-                            alignItems: 'flex-start',
-                          }}
-                        >
-                          {/* Left Action Icon */}
-                          <View
-                            style={{
-                              width: 36,
-                              height: 36,
-                              borderRadius: 10,
-                              backgroundColor: actionMeta.bg,
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              marginTop: 2,
-                            }}
-                          >
-                            <BootstrapIcon name={actionMeta.icon} size={16} color={actionMeta.color} />
-                          </View>
+                      const isHovered = hoveredAuditRowId === (log.id || index);
 
-                          {/* Content Body */}
-                          <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
-                            {/* Header: Action Title + Severity + Category + Time */}
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                flexWrap: 'wrap',
-                                gap: 8,
-                              }}
-                            >
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                      if (!isDesktop) {
+                        /* ─── Mobile Card View ─── */
+                        return (
+                          <TouchableOpacity
+                            key={log.id || index}
+                            style={{
+                              padding: 16,
+                              borderBottomWidth: isLast ? 0 : 1,
+                              borderBottomColor: isHovered
+                                ? (isDarkMode ? '#10B98133' : '#05966928')
+                                : (isDarkMode ? tokens.borderInput : '#F1F5F9'),
+                              borderLeftWidth: 5,
+                              borderLeftColor: isHovered ? (isDarkMode ? '#10B981' : '#059669') : 'transparent',
+                              backgroundColor: isHovered
+                                ? (isDarkMode ? '#1C4434' : '#E2EFE7')
+                                : (isDarkMode ? 'transparent' : '#FFFFFF'),
+                              gap: 10,
+                              cursor: 'pointer',
+                              boxShadow: isHovered
+                                ? (isDarkMode ? '0 4px 16px rgba(0,0,0,0.45)' : '0 4px 14px rgba(234, 88, 12, 0.12)')
+                                : 'none',
+                              transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
+                            }}
+                            onMouseEnter={() => setHoveredAuditRowId(log.id || index)}
+                            onMouseLeave={() => setHoveredAuditRowId(null)}
+                            onPress={() => setSelectedAuditLogForModal(log)}
+                            activeOpacity={0.75}
+                          >
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                                <View
+                                  style={{
+                                    width: 32,
+                                    height: 32,
+                                    borderRadius: 16,
+                                    backgroundColor: isHovered ? (isDarkMode ? '#132A26' : '#DCFCE7') : meta.bg,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
+                                  }}
+                                >
+                                  <BootstrapIcon name={meta.icon} size={15} color={meta.color} />
+                                </View>
                                 <Text
                                   style={{
-                                    fontSize: 13.5,
-                                    fontWeight: '700',
-                                    color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                                    fontSize: 14,
+                                    fontWeight: isHovered ? '800' : '700',
+                                    color: isHovered
+                                      ? (isDarkMode ? '#34D399' : '#0F442A')
+                                      : (isDarkMode ? tokens.textPrimary : '#0F172A'),
                                   }}
                                 >
-                                  {actionMeta.title}
+                                  {meta.title}
                                 </Text>
-
-                                <View
-                                  style={{
-                                    backgroundColor: sevBg,
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 1.5,
-                                    borderRadius: 5,
-                                  }}
-                                >
-                                  <Text style={{ fontSize: 9.5, fontWeight: '800', color: sevColor }}>
-                                    {sev}
-                                  </Text>
-                                </View>
-
-                                <View
-                                  style={{
-                                    backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 1.5,
-                                    borderRadius: 5,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 9.5,
-                                      fontWeight: '700',
-                                      color: isDarkMode ? tokens.textMuted : '#64748B',
-                                      textTransform: 'uppercase',
-                                    }}
-                                  >
-                                    {log.category}
-                                  </Text>
-                                </View>
                               </View>
 
-                              <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
-                                {formatTimeAgo(log.timestamp)}
-                              </Text>
-                            </View>
-
-                            {/* Details sentence */}
-                            <Text
-                              style={{
-                                fontSize: 12.5,
-                                color: isDarkMode ? '#CBD5E1' : '#334155',
-                                lineHeight: 18,
-                              }}
-                            >
-                              {log.details}
-                            </Text>
-
-                            {/* Target & Context Pill */}
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 2 }}>
+                              {/* Status Pill */}
                               <View
                                 style={{
                                   flexDirection: 'row',
                                   alignItems: 'center',
-                                  gap: 4,
-                                  backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
-                                  borderWidth: 1,
-                                  borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                                  paddingHorizontal: 7,
-                                  paddingVertical: 2,
-                                  borderRadius: 6,
+                                  gap: 5,
+                                  backgroundColor: statusMeta.bg,
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 3,
+                                  borderRadius: 9999,
                                 }}
                               >
-                                <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B' }}>TARGET:</Text>
-                                <Text
+                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusMeta.dot }} />
+                                <Text style={{ fontSize: 10, fontWeight: '800', color: statusMeta.color }}>
+                                  {statusMeta.label}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <Text style={{ fontSize: 12.5, color: isDarkMode ? '#CBD5E1' : '#475569', lineHeight: 18 }}>
+                              {log.details}
+                            </Text>
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                                <BootstrapIcon name="person" size={12} color="#64748B" />
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                                  {log.admin_name}
+                                </Text>
+                                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
+                                  • {log.target}
+                                </Text>
+                              </View>
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
+                                  {formatTime(log.timestamp)}
+                                </Text>
+                                <View
                                   style={{
-                                    fontSize: 11,
-                                    fontWeight: '700',
-                                    color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                    backgroundColor: isHovered
+                                      ? (isDarkMode ? '#10B981' : '#EA580C')
+                                      : (isDarkMode ? '#1E293B' : '#F1F5F9'),
+                                    paddingHorizontal: 8,
+                                    paddingVertical: 4,
+                                    borderRadius: 6,
+                                    boxShadow: isHovered
+                                      ? (isDarkMode ? '0 2px 8px rgba(16,185,129,0.35)' : '0 2px 8px rgba(234, 88, 12,0.22)')
+                                      : 'none',
+                                    transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
                                   }}
                                 >
-                                  {log.target}
-                                </Text>
+                                  <BootstrapIcon
+                                    name="eye"
+                                    size={11}
+                                    color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                                  />
+                                  <Text
+                                    style={{
+                                      fontSize: 10.5,
+                                      fontWeight: '700',
+                                      color: isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B'),
+                                    }}
+                                  >
+                                    Details
+                                  </Text>
+                                  <BootstrapIcon
+                                    name="arrow-right"
+                                    size={10}
+                                    color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                                  />
+                                </View>
                               </View>
-
-                              {/* Operator info inline */}
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                                <BootstrapIcon name="person" size={11} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                                  {log.admin_name} ({log.admin_role || 'Admin'})
-                                </Text>
-                              </View>
-
-                              {Boolean(log.ip_address) && (
-                                <Text style={{ fontSize: 10.5, color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
-                                  • IP {log.ip_address}
-                                </Text>
-                              )}
                             </View>
+                          </TouchableOpacity>
+                        );
+                      }
 
-                            {/* Action inspect trigger */}
-                            <View style={{ alignSelf: 'flex-start', marginTop: 4 }}>
-                              <TouchableOpacity
+                      /* ─── Desktop Table Row View ─── */
+                      return (
+                        <TouchableOpacity
+                          key={log.id || index}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            paddingHorizontal: 20,
+                            paddingLeft: 16,
+                            paddingVertical: 14,
+                            borderBottomWidth: isLast ? 0 : 1,
+                            borderBottomColor: isHovered
+                              ? (isDarkMode ? '#10B98133' : '#05966928')
+                              : (isDarkMode ? tokens.borderInput : '#F1F5F9'),
+                            borderLeftWidth: 5,
+                            borderLeftColor: isHovered ? (isDarkMode ? '#10B981' : '#059669') : 'transparent',
+                            backgroundColor: isHovered
+                              ? (isDarkMode ? '#1C4434' : '#E2EFE7')
+                              : (isDarkMode ? 'transparent' : '#FFFFFF'),
+                            cursor: 'pointer',
+                            boxShadow: isHovered
+                              ? (isDarkMode ? '0 4px 16px rgba(0,0,0,0.45)' : '0 4px 14px rgba(234, 88, 12, 0.12)')
+                              : 'none',
+                            transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
+                          }}
+                          onMouseEnter={() => setHoveredAuditRowId(log.id || index)}
+                          onMouseLeave={() => setHoveredAuditRowId(null)}
+                          onPress={() => setSelectedAuditLogForModal(log)}
+                          activeOpacity={0.75}
+                        >
+                          {/* Column 1: EVENT */}
+                          <View style={{ flex: 2.2, flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 10 }}>
+                            <View
+                              style={{
+                                width: 34,
+                                height: 34,
+                                borderRadius: 17,
+                                backgroundColor: isHovered ? (isDarkMode ? '#132A26' : '#DCFCE7') : meta.bg,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                                transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
+                              }}
+                            >
+                              <BootstrapIcon name={meta.icon} size={15} color={meta.color} />
+                            </View>
+                            <View style={{ minWidth: 0, flex: 1 }}>
+                              <Text
+                                numberOfLines={1}
                                 style={{
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  gap: 4,
-                                  paddingVertical: 2,
+                                  fontSize: 13.5,
+                                  fontWeight: isHovered ? '800' : '700',
+                                  color: isHovered
+                                    ? isDarkMode ? '#34D399' : '#0F442A'
+                                    : isDarkMode ? tokens.textPrimary : '#0F172A',
+                                  transition: Platform.OS === 'web' ? 'color 0.15s ease' : undefined,
                                 }}
-                                onPress={() => setSelectedAuditLogForModal(log)}
-                                activeOpacity={0.75}
                               >
-                                <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
-                                  Inspect record →
-                                </Text>
-                              </TouchableOpacity>
+                                {meta.title}
+                              </Text>
+                              <Text
+                                numberOfLines={1}
+                                style={{
+                                  fontSize: 12,
+                                  color: isDarkMode ? tokens.textMuted : '#64748B',
+                                  marginTop: 2,
+                                }}
+                              >
+                                {log.details}
+                              </Text>
                             </View>
                           </View>
-                        </View>
+
+                          {/* Column 2: ACTOR / TARGET */}
+                          <View style={{ flex: 1.7, paddingRight: 10 }}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                              <BootstrapIcon name="person" size={12} color="#64748B" />
+                              <Text
+                                numberOfLines={1}
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: '600',
+                                  color: isHovered
+                                    ? isDarkMode ? tokens.textPrimary : '#0F172A'
+                                    : isDarkMode ? tokens.textPrimary : '#1E293B',
+                                }}
+                              >
+                                {log.admin_name}
+                              </Text>
+                            </View>
+                            <Text
+                              numberOfLines={1}
+                              style={{
+                                fontSize: 11.5,
+                                color: isDarkMode ? tokens.textMuted : '#64748B',
+                                marginTop: 2,
+                              }}
+                            >
+                              {log.target}
+                            </Text>
+                          </View>
+
+                          {/* Column 3: IP ADDRESS */}
+                          <View style={{ flex: 1.1, paddingRight: 10 }}>
+                            <Text
+                              style={{
+                                fontSize: 12.5,
+                                color: isDarkMode ? tokens.textMuted : '#475569',
+                                fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+                              }}
+                            >
+                              {log.ip_address || '192.168.1.104'}
+                            </Text>
+                          </View>
+
+                          {/* Column 4: TIME */}
+                          <View style={{ flex: 0.9, paddingRight: 10 }}>
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                color: isDarkMode ? tokens.textMuted : '#64748B',
+                              }}
+                            >
+                              {formatTime(log.timestamp)}
+                            </Text>
+                          </View>
+
+                          {/* Column 5: STATUS */}
+                          <View style={{ flex: 0.9, paddingRight: 10 }}>
+                            <View
+                              style={{
+                                alignSelf: 'flex-start',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 5,
+                                backgroundColor: statusMeta.bg,
+                                paddingHorizontal: 9,
+                                paddingVertical: 3.5,
+                                borderRadius: 9999,
+                              }}
+                            >
+                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusMeta.dot }} />
+                              <Text
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: '800',
+                                  color: statusMeta.color,
+                                  letterSpacing: 0.2,
+                                }}
+                              >
+                                {statusMeta.label}
+                              </Text>
+                            </View>
+                          </View>
+
+                          {/* Column 6: ACTION / VIEW DETAILS */}
+                          <View style={{ width: 110, alignItems: 'flex-end', paddingRight: 6 }}>
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 6,
+                                backgroundColor: isHovered
+                                  ? (isDarkMode ? '#10B981' : '#EA580C')
+                                  : (isDarkMode ? '#1E293B' : '#F1F5F9'),
+                                borderWidth: 1,
+                                borderColor: isHovered
+                                  ? (isDarkMode ? '#34D399' : '#EA580C')
+                                  : (isDarkMode ? tokens.borderInput : '#E2E8F0'),
+                                paddingHorizontal: 10,
+                                paddingVertical: 5,
+                                borderRadius: 7,
+                                boxShadow: isHovered
+                                  ? (isDarkMode ? '0 2px 8px rgba(16,185,129,0.35)' : '0 2px 8px rgba(234, 88, 12,0.22)')
+                                  : 'none',
+                                transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
+                              }}
+                            >
+                              <BootstrapIcon
+                                name="eye"
+                                size={12}
+                                color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 11.5,
+                                  fontWeight: '700',
+                                  color: isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#475569'),
+                                  letterSpacing: 0.2,
+                                }}
+                              >
+                                Details
+                              </Text>
+                              <BootstrapIcon
+                                name="arrow-right"
+                                size={11}
+                                color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                              />
+                            </View>
+                          </View>
+                        </TouchableOpacity>
                       );
                     })
                   )}
+
+                  {/* ─── 5. Table Pagination Footer ─── */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingHorizontal: 20,
+                      paddingVertical: 14,
+                      borderTopWidth: 1,
+                      borderTopColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                      flexWrap: 'wrap',
+                      gap: 12,
+                    }}
+                  >
+                    <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+                      {filteredAuditLogs.length === 0
+                        ? 'Showing 0 of 0 events'
+                        : `Showing ${(auditCurrentPage - 1) * auditItemsPerPage + 1}–${Math.min(auditCurrentPage * auditItemsPerPage, filteredAuditLogs.length)} of ${filteredAuditLogs.length} events`}
+                    </Text>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      {/* Previous Button */}
+                      <TouchableOpacity
+                        disabled={auditCurrentPage <= 1}
+                        onPress={() => setAuditCurrentPage((prev) => Math.max(1, prev - 1))}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 7,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                          backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                          opacity: auditCurrentPage <= 1 ? 0.45 : 1,
+                          cursor: auditCurrentPage <= 1 ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        <BootstrapIcon name="chevron-left" size={10} color={isDarkMode ? tokens.textPrimary : '#334155'} />
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                          Previous
+                        </Text>
+                      </TouchableOpacity>
+
+                      {/* Numbered Page Buttons */}
+                      {Array.from({ length: totalAuditPages }, (_, i) => i + 1).map((pageNum) => {
+                        const isActive = pageNum === auditCurrentPage;
+                        return (
+                          <TouchableOpacity
+                            key={pageNum}
+                            onPress={() => setAuditCurrentPage(pageNum)}
+                            style={{
+                              minWidth: 32,
+                              height: 32,
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              borderRadius: 7,
+                              backgroundColor: isActive ? '#EA580C' : isDarkMode ? '#1E293B' : '#FFFFFF',
+                              borderWidth: 1,
+                              borderColor: isActive ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontWeight: isActive ? '800' : '600',
+                                color: isActive ? '#FFFFFF' : isDarkMode ? tokens.textPrimary : '#334155',
+                              }}
+                            >
+                              {pageNum}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+
+                      {/* Next Button */}
+                      <TouchableOpacity
+                        disabled={auditCurrentPage >= totalAuditPages}
+                        onPress={() => setAuditCurrentPage((prev) => Math.min(totalAuditPages, prev + 1))}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          paddingHorizontal: 10,
+                          paddingVertical: 6,
+                          borderRadius: 7,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                          backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                          opacity: auditCurrentPage >= totalAuditPages ? 0.45 : 1,
+                          cursor: auditCurrentPage >= totalAuditPages ? 'not-allowed' : 'pointer',
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                          Next
+                        </Text>
+                        <BootstrapIcon name="chevron-right" size={10} color={isDarkMode ? tokens.textPrimary : '#334155'} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 </View>
               </View>
             )}
 
-            {/* ─── TAB 13: PROFILE & ACTIVITY LOGS ─── */}
+            {/* ─── TAB 13: ADMINISTRATOR PROFILE ─── */}
             {activeNav === 'profile' && (
               <AdminProfileLogsPanel
                 isDarkMode={isDarkMode}
@@ -12905,29 +14092,56 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                 <View
                   style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 9,
-                    backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  <BootstrapIcon name="journal-text" size={17} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                  <BootstrapIcon name="journal-text" size={18} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                 </View>
                 <View>
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      fontWeight: '800',
-                      color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                    }}
-                  >
-                    Audit Log Entry
-                  </Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
-                    Record: {selectedAuditLogForModal?.id}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: '800',
+                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      }}
+                    >
+                      Activity Log Details
+                    </Text>
+                    <View
+                      style={{
+                        backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
+                        paddingHorizontal: 6,
+                        paddingVertical: 2,
+                        borderRadius: 4,
+                      }}
+                    >
+                      <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#059669', letterSpacing: 0.3 }}>
+                        IMMUTABLE
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                    <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8', fontFamily: Platform.OS === 'web' ? 'monospace' : undefined }}>
+                      ID: {selectedAuditLogForModal?.id}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (selectedAuditLogForModal?.id && typeof navigator !== 'undefined' && navigator.clipboard) {
+                          navigator.clipboard.writeText(selectedAuditLogForModal.id);
+                          showToast('✓ Event ID copied to clipboard');
+                        }
+                      }}
+                      style={{ padding: 2 }}
+                    >
+                      <BootstrapIcon name="clipboard" size={11} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
 
@@ -12945,7 +14159,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
             {/* Modal Content */}
             {selectedAuditLogForModal && (
-              <ScrollView style={{ maxHeight: 460 }}>
+              <ScrollView style={{ maxHeight: 480 }}>
                 <View style={{ gap: 12 }}>
                   {/* Action & Status Card */}
                   <View
@@ -12966,7 +14180,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
                         Action Event
                       </Text>
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A', marginTop: 2 }}>
+                      <Text style={{ fontSize: 14.5, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A', marginTop: 2 }}>
                         {selectedAuditLogForModal.action}
                       </Text>
                     </View>
@@ -13042,7 +14256,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B', textTransform: 'uppercase' }}>
                         Target Resource:
                       </Text>
-                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                         {selectedAuditLogForModal.target}
                       </Text>
                     </View>
@@ -13065,21 +14279,34 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   >
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
-                        Operator
+                        Actor / Operator
                       </Text>
                       <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A', marginTop: 2 }}>
-                        {selectedAuditLogForModal.admin_name} ({selectedAuditLogForModal.admin_role || 'Admin'})
+                        {selectedAuditLogForModal.admin_name}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 1 }}>
+                        Role: {selectedAuditLogForModal.admin_role || 'Administrator'}
                       </Text>
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
                         Network Telemetry
                       </Text>
-                      <Text style={{ fontSize: 11.5, color: isDarkMode ? '#CBD5E1' : '#475569', marginTop: 2 }}>
-                        IP: {selectedAuditLogForModal.ip_address || '127.0.0.1'} • {selectedAuditLogForModal.client || 'Admin Dashboard'}
+                      <Text
+                        style={{
+                          fontSize: 11.5,
+                          color: isDarkMode ? '#CBD5E1' : '#475569',
+                          marginTop: 2,
+                          fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+                        }}
+                      >
+                        IP: {selectedAuditLogForModal.ip_address || '127.0.0.1'}
+                      </Text>
+                      <Text style={{ fontSize: 10.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 1 }}>
+                        {selectedAuditLogForModal.client || 'Admin Dashboard'}
                       </Text>
                     </View>
-                    <View style={{ flex: 1 }}>
+                    <View style={{ flex: 1.1 }}>
                       <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
                         Timestamp
                       </Text>
@@ -13090,37 +14317,50 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           year: 'numeric',
                           hour: '2-digit',
                           minute: '2-digit',
+                          second: '2-digit',
                         })}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: isDarkMode ? tokens.textMuted : '#94A3B8',
+                          marginTop: 1,
+                          fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+                        }}
+                      >
+                        {selectedAuditLogForModal.timestamp}
                       </Text>
                     </View>
                   </View>
 
-                  {/* JSON Metadata Payload */}
-                  <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B', textTransform: 'uppercase' }}>
-                      Payload Metadata
-                    </Text>
-                    <View
-                      style={{
-                        backgroundColor: isDarkMode ? '#0A0F1D' : '#F1F5F9',
-                        padding: 12,
-                        borderRadius: 8,
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                      }}
-                    >
-                      <Text
+                  {/* JSON Metadata Payload (if present) */}
+                  {Boolean(selectedAuditLogForModal.metadata && Object.keys(selectedAuditLogForModal.metadata).length > 0) && (
+                    <View style={{ gap: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B', textTransform: 'uppercase' }}>
+                        Payload Metadata
+                      </Text>
+                      <View
                         style={{
-                          fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
-                          fontSize: 11,
-                          color: isDarkMode ? '#38BDF8' : '#0369A1',
-                          lineHeight: 17,
+                          backgroundColor: isDarkMode ? '#0A0F1D' : '#F1F5F9',
+                          padding: 12,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
                         }}
                       >
-                        {JSON.stringify(selectedAuditLogForModal.metadata || {}, null, 2)}
-                      </Text>
+                        <Text
+                          style={{
+                            fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+                            fontSize: 11,
+                            color: isDarkMode ? '#38BDF8' : '#0369A1',
+                            lineHeight: 17,
+                          }}
+                        >
+                          {JSON.stringify(selectedAuditLogForModal.metadata, null, 2)}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
+                  )}
                 </View>
               </ScrollView>
             )}
@@ -13130,18 +14370,27 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                justifyContent: 'flex-end',
+                justifyContent: 'space-between',
                 paddingTop: 12,
                 borderTopWidth: 1,
                 borderTopColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                flexWrap: 'wrap',
+                gap: 8,
               }}
             >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <BootstrapIcon name="shield-lock-fill" size={13} color="#059669" />
+                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '500' }}>
+                  Immutable Audit Ledger • Tamper-evident record
+                </Text>
+              </View>
+
               <TouchableOpacity
                 style={{
                   paddingHorizontal: 16,
                   paddingVertical: 8,
                   borderRadius: 8,
-                  backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+                  backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                 }}
                 onPress={() => setSelectedAuditLogForModal(null)}
               >
@@ -13302,7 +14551,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 8,
-                      backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+                      backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                       paddingVertical: 10,
                       paddingHorizontal: 14,
                       borderRadius: 10,
@@ -13512,7 +14761,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         alignItems: 'center',
                         justifyContent: 'center',
                         gap: 8,
-                        backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+                        backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                         paddingVertical: 10,
                         paddingHorizontal: 14,
                         borderRadius: 10,
@@ -13632,7 +14881,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             borderBottomColor: tokens.border,
                             backgroundColor:
                               restockModalProduct?.id === p.id
-                                ? (isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#F0FDFA')
+                                ? (isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#FFF7ED')
                                 : (isDarkMode ? '#141A18' : '#FFFFFF'),
                           }}
                           onPress={() => selectRestockProduct(p)}
@@ -13654,7 +14903,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               {p.brand} · Stock {p.stock || 0} · ₱{Number(p.price || 0).toLocaleString()}
                             </Text>
                           </View>
-                          <BootstrapIcon name="plus-circle" size={16} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />
+                          <BootstrapIcon name="plus-circle" size={16} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
                         </TouchableOpacity>
                       ))}
                   </ScrollView>
@@ -13699,7 +14948,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
                         {restockModalProduct.brand} · {restockModalProduct.category}
                       </Text>
-                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.accentBrand : '#1D4533', fontWeight: '700', marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '700', marginTop: 4 }}>
                         Current stock: {restockModalProduct.stock || 0} · Cost ₱
                         {Number(
                           restockModalProduct.unit_cost ?? restockModalProduct.unitCost ?? 0
@@ -13796,9 +15045,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     paddingVertical: 7,
                                     paddingHorizontal: 12,
                                     borderRadius: 10,
-                                    borderColor: isSelected ? '#1D4533' : tokens.borderInput,
+                                    borderColor: isSelected ? '#EA580C' : tokens.borderInput,
                                     borderWidth: 1.5,
-                                    backgroundColor: isSelected ? '#1D4533' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
+                                    backgroundColor: isSelected ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
                                   },
                                 ]}
                                 onPress={() => {
@@ -13849,9 +15098,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 paddingVertical: 7,
                                 paddingHorizontal: 12,
                                 borderRadius: 10,
-                                borderColor: restockSelectedSize === 'all' ? '#1D4533' : tokens.borderInput,
+                                borderColor: restockSelectedSize === 'all' ? '#EA580C' : tokens.borderInput,
                                 borderWidth: 1.5,
-                                backgroundColor: restockSelectedSize === 'all' ? '#1D4533' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
+                                backgroundColor: restockSelectedSize === 'all' ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
                               },
                             ]}
                             onPress={() => setRestockSelectedSize('all')}
@@ -13887,9 +15136,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 paddingHorizontal: 12,
                                 paddingVertical: 8,
                                 borderRadius: 8,
-                                backgroundColor: '#F0FDFA',
+                                backgroundColor: '#FFF7ED',
                                 borderWidth: 1,
-                                borderColor: '#CCFBF1',
+                                borderColor: '#FED7AA',
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
@@ -13942,9 +15191,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     paddingVertical: 7,
                                     paddingHorizontal: 12,
                                     borderRadius: 10,
-                                    borderColor: isSelected ? '#1D4533' : tokens.borderInput,
+                                    borderColor: isSelected ? '#EA580C' : tokens.borderInput,
                                     borderWidth: 1.5,
-                                    backgroundColor: isSelected ? '#1D4533' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
+                                    backgroundColor: isSelected ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
                                   },
                                 ]}
                                 onPress={() => setRestockSelectedColor(c.label)}
@@ -14016,9 +15265,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 paddingVertical: 7,
                                 paddingHorizontal: 12,
                                 borderRadius: 10,
-                                borderColor: restockSelectedColor === 'all' ? '#1D4533' : tokens.borderInput,
+                                borderColor: restockSelectedColor === 'all' ? '#EA580C' : tokens.borderInput,
                                 borderWidth: 1.5,
-                                backgroundColor: restockSelectedColor === 'all' ? '#1D4533' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
+                                backgroundColor: restockSelectedColor === 'all' ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
                               },
                             ]}
                             onPress={() => setRestockSelectedColor('all')}
@@ -14054,9 +15303,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 paddingHorizontal: 12,
                                 paddingVertical: 8,
                                 borderRadius: 8,
-                                backgroundColor: '#F0FDFA',
+                                backgroundColor: '#FFF7ED',
                                 borderWidth: 1,
-                                borderColor: '#CCFBF1',
+                                borderColor: '#FED7AA',
                                 flexDirection: 'row',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
@@ -14145,7 +15394,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   )
                                 }
                               >
-                                <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                                   +{qty} all
                                 </Text>
                               </TouchableOpacity>
@@ -14213,7 +15462,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   )
                                 }
                               >
-                                <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                                <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                                   +{qty} all
                                 </Text>
                               </TouchableOpacity>
@@ -14227,7 +15476,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       <>
                         <Text style={styles.formLabel}>Quantity purchased</Text>
                         <TextInput
-                          style={[styles.formInput, { fontSize: 16, fontWeight: '900', color: isDarkMode ? tokens.accentBrand : '#1D4533' }]}
+                          style={[styles.formInput, { fontSize: 16, fontWeight: '900', color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}
                           keyboardType="numeric"
                           value={restockAmount}
                           onChangeText={setRestockAmount}
@@ -14249,7 +15498,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               }}
                               onPress={() => setRestockAmount(String(qty))}
                             >
-                              <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                              <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                                 +{qty}
                               </Text>
                             </TouchableOpacity>
@@ -14314,7 +15563,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           marginBottom: 8,
                           padding: 12,
                           borderRadius: 12,
-                          backgroundColor: '#F0FDFA',
+                          backgroundColor: '#FFF7ED',
                           borderWidth: 1,
                           borderColor: '#99F6E4',
                           gap: 6,
@@ -14409,8 +15658,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           paddingVertical: 8,
                           borderRadius: 10,
                           borderWidth: 1.5,
-                          borderColor: soldOut ? (isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#FECACA') : active ? '#1D4533' : tokens.border,
-                          backgroundColor: soldOut ? (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2') : active ? '#1D4533' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
+                          borderColor: soldOut ? (isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#FECACA') : active ? '#EA580C' : tokens.border,
+                          backgroundColor: soldOut ? (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2') : active ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
                           minWidth: 110,
                           opacity: soldOut ? 0.7 : 1,
                         }}
@@ -14431,7 +15680,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             fontSize: 11,
                             fontWeight: '700',
                             marginTop: 2,
-                            color: soldOut ? '#DC2626' : active ? '#CCFBF1' : '#1D4533',
+                            color: soldOut ? '#DC2626' : active ? '#FED7AA' : '#EA580C',
                           }}
                         >
                           {soldOut ? 'Sold Out' : `₱${Number(entry.price || 0).toLocaleString()}`}
@@ -14531,7 +15780,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
               <View style={[styles.receiptRow, { marginTop: 4 }]}>
                 <Text style={[styles.receiptTextBold, { fontSize: 14 }]}>TOTAL PAID:</Text>
-                <Text style={[styles.receiptTextBold, { fontSize: 16, color: isDarkMode ? tokens.accentBrand : '#1D4533' }]}>
+                <Text style={[styles.receiptTextBold, { fontSize: 16, color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}>
                   ₱{posReceiptOrder.grand_total?.toLocaleString()}
                 </Text>
               </View>
@@ -14776,7 +16025,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     paddingHorizontal: 20,
                     paddingVertical: 10,
                     borderRadius: 10,
-                    backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+                    backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                     alignItems: 'center',
                     cursor: 'pointer',
                   }}
@@ -14812,7 +16061,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     alignItems: 'center',
                   }}
                 >
-                  <BootstrapIcon name="calendar-plus-fill" size={18} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                  <BootstrapIcon name="calendar-plus-fill" size={18} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                 </View>
                 <View>
                   <Text style={styles.modalTitle}>Book Walk-in / Phone-in Service</Text>
@@ -14829,54 +16078,88 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               {/* Category selector */}
               <Text style={styles.formLabel}>Service Type</Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                  borderRadius: 8,
+                  padding: 3,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                  marginBottom: 12,
+                }}
+              >
                 {[
                   { key: 'Repair', label: 'Mechanical Repair' },
                   { key: 'PMS', label: 'Preventive Maintenance (PMS)' },
-                  { key: 'Customization', label: 'Customization & Tuning' },
-                ].map((c) => (
-                  <TouchableOpacity
-                    key={c.key}
-                    style={[
-                      styles.orderFilterTab,
-                      { flex: 1, alignItems: 'center', paddingVertical: 10 },
-                      newBkCategory === c.key && { backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533', borderColor: isDarkMode ? tokens.accentBorder : '#1D4533' },
-                    ]}
-                    onPress={() => {
-                      setNewBkCategory(c.key);
-                      const match = garageServices.find((pkg) => pkg.category === c.key);
-                      if (match) {
-                        setNewBkServiceTitle(match.title);
-                        setNewBkPrice(String(getPackagePricePhp(match) || match.pricePhp || ''));
-                      } else if (c.key === 'Repair') {
-                        setNewBkServiceTitle('Track Diagnostic & Mechanical Repair');
-                        setNewBkPrice('1500');
-                      } else if (c.key === 'PMS') {
-                        setNewBkServiceTitle('Pro Performance Full PMS');
-                        setNewBkPrice('3750');
-                      } else {
-                        setNewBkServiceTitle('Full System Exhaust Fitting & Dyno Tuning');
-                        setNewBkPrice('6000');
-                      }
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.orderFilterTabText,
-                        newBkCategory === c.key && { color: '#FFFFFF', fontWeight: '800' },
-                      ]}
+                  { key: 'Installation', label: 'Installation' },
+                ].map((c) => {
+                  const isSelected = newBkCategory === c.key;
+                  return (
+                    <TouchableOpacity
+                      key={c.key}
+                      style={{
+                        flex: 1,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        paddingVertical: 7,
+                        borderRadius: 6,
+                        backgroundColor: isSelected ? '#EA580C' : 'transparent',
+                        boxShadow: isSelected ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      onPress={() => {
+                        setNewBkCategory(c.key);
+                        const match = garageServices.find((pkg) => pkg.category === c.key);
+                        if (match) {
+                          setNewBkServiceTitle(match.title);
+                          setNewBkPrice(String(getPackagePricePhp(match) || match.pricePhp || ''));
+                        } else if (c.key === 'Repair') {
+                          setNewBkServiceTitle('Track Diagnostic & Mechanical Repair');
+                          setNewBkPrice('1500');
+                        } else if (c.key === 'PMS') {
+                          setNewBkServiceTitle('Pro Performance Full PMS');
+                          setNewBkPrice('3750');
+                        } else {
+                          setNewBkServiceTitle('Parts / Accessory Installation');
+                          setNewBkPrice('1500');
+                        }
+                      }}
+                      activeOpacity={0.85}
                     >
-                      {c.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: isSelected ? '700' : '600',
+                          color: isSelected ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
+                          transition: 'color 0.15s ease',
+                        }}
+                      >
+                        {c.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
               {/* Service Title & Price */}
               <Text style={styles.formLabel}>Shop Service Package</Text>
               <View style={{ gap: 8, marginBottom: 12 }}>
                 {garageServices
-                  .filter((pkg) => !newBkCategory || pkg.category === newBkCategory)
+                  .filter((pkg) => {
+                    if (!newBkCategory) return true;
+                    if (pkg.category === newBkCategory) return true;
+                    // Legacy packages labeled Customization map to Installation
+                    if (
+                      newBkCategory === 'Installation' &&
+                      /customization|tuning|install/i.test(String(pkg.category || ''))
+                    ) {
+                      return true;
+                    }
+                    return false;
+                  })
                   .map((pkg) => {
                     const selected = newBkServiceTitle === pkg.title;
                     const price = getPackagePricePhp(pkg);
@@ -14886,21 +16169,26 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         onPress={() => {
                           setNewBkServiceTitle(pkg.title);
                           setNewBkPrice(String(price));
-                          setNewBkCategory(pkg.category || newBkCategory);
+                          const pkgCat = pkg.category || newBkCategory;
+                          setNewBkCategory(
+                            /customization|tuning/i.test(String(pkgCat || ''))
+                              ? 'Installation'
+                              : pkgCat
+                          );
                         }}
                         style={{
                           padding: 10,
                           borderRadius: 10,
                           borderWidth: 1.5,
-                          borderColor: selected ? '#1D4533' : tokens.border,
-                          backgroundColor: selected ? (isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#F0FDF4') : (isDarkMode ? tokens.bgSub : '#FFFFFF'),
+                          borderColor: selected ? '#EA580C' : tokens.border,
+                          backgroundColor: selected ? (isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#F0FDF4') : (isDarkMode ? tokens.bgSub : '#FFFFFF'),
                         }}
                       >
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: selected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : tokens.textPrimary, flex: 1 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: selected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : tokens.textPrimary, flex: 1 }}>
                             {pkg.title}
                           </Text>
-                          <Text style={{ fontSize: 13, fontWeight: '900', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>₱{price.toLocaleString()}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '900', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>₱{price.toLocaleString()}</Text>
                         </View>
                         <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
                           {pkg.category} • {pkg.duration || '60 mins'}
@@ -15043,7 +16331,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 style={styles.formInput}
                 value={newBkBranch}
                 onChangeText={setNewBkBranch}
-                placeholder="MotoTrack Flagship Central Hub - Quezon City"
+                placeholder="MotoTrack Flagship Central Hub & Pit Bays"
                 placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
               />
 
@@ -15089,6 +16377,240 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <TouchableOpacity style={styles.addBtnPrimary} onPress={handleCreateAdminBooking}>
                 <BootstrapIcon name="check2-circle" size={14} color="#FFFFFF" />
                 <Text style={styles.addBtnPrimaryText}>Confirm & Book Service</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── MODAL: ADD / EDIT PMS FIXED RATE (BY CC) ─── */}
+      <Modal
+        visible={isAddPmsRateOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (pmsRateSaving) return;
+          setIsAddPmsRateOpen(false);
+          resetPmsRateForm();
+        }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalSheet, { maxWidth: 520, maxHeight: '90%' }]}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingPmsRate ? 'Edit Service' : 'Add Service'}
+              </Text>
+              <TouchableOpacity
+                disabled={pmsRateSaving}
+                onPress={() => {
+                  setIsAddPmsRateOpen(false);
+                  resetPmsRateForm();
+                }}
+              >
+                <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : '#64748B'} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+              <Text style={styles.formLabel}>Service name *</Text>
+              <TextInput
+                style={styles.formInput}
+                value={pmsRateName}
+                onChangeText={setPmsRateName}
+                placeholder="e.g. Replace Clutch Cable"
+                placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+              />
+
+              <Text style={styles.formLabel}>Category *</Text>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                {[
+                  { key: CATALOG_CATEGORIES.PMS, label: 'PMS' },
+                  { key: CATALOG_CATEGORIES.REPAIR, label: 'Repair Services' },
+                ].map((opt) => {
+                  const active = pmsRateCatalogCategory === opt.key;
+                  return (
+                    <TouchableOpacity
+                      key={opt.key}
+                      onPress={() => setPmsRateCatalogCategory(opt.key)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 10,
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: active
+                          ? isDarkMode
+                            ? tokens.accentBrand
+                            : '#EA580C'
+                          : isDarkMode
+                            ? tokens.borderInput
+                            : '#E2E8F0',
+                        backgroundColor: active
+                          ? isDarkMode
+                            ? '#132A26'
+                            : '#E8F0EC'
+                          : isDarkMode
+                            ? tokens.bgElevated
+                            : '#FFFFFF',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: '800',
+                          color: active
+                            ? isDarkMode
+                              ? tokens.accentBrand
+                              : '#EA580C'
+                            : isDarkMode
+                              ? tokens.textMuted
+                              : '#64748B',
+                        }}
+                      >
+                        {opt.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 12 }}>
+                {CATALOG_CATEGORY_LABELS[pmsRateCatalogCategory] || pmsRateCatalogCategory}. Category is for browsing — shops may reclassify services like cable/fork/chain work.
+              </Text>
+
+              <Text style={[styles.formLabel, { marginTop: 4 }]}>
+                Labor prices by motorcycle tier (₱)
+              </Text>
+              <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 10 }}>
+                Mark a tier as Price not configured when it does not apply. Never use ₱0 for missing prices — those bookings will be blocked.
+              </Text>
+
+              {[
+                {
+                  key: '125',
+                  label: 'Tier 1 · 125cc and Below',
+                  value: pmsRate125,
+                  setValue: setPmsRate125,
+                  na: pmsRate125Na,
+                  setNa: setPmsRate125Na,
+                },
+                {
+                  key: '150',
+                  label: 'Tier 2 · 150cc–160cc',
+                  value: pmsRate150,
+                  setValue: setPmsRate150,
+                  na: pmsRate150Na,
+                  setNa: setPmsRate150Na,
+                },
+                {
+                  key: 'big',
+                  label: 'Tier 3 · Big bikes (200cc+)',
+                  value: pmsRateBig,
+                  setValue: setPmsRateBig,
+                  na: pmsRateBigNa,
+                  setNa: setPmsRateBigNa,
+                },
+              ].map((row) => (
+                <View
+                  key={row.key}
+                  style={{
+                    marginBottom: 12,
+                    padding: 12,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                    backgroundColor: isDarkMode ? tokens.bgElevated : '#F8FAFC',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                      {row.label}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        const next = !row.na;
+                        row.setNa(next);
+                        if (next) row.setValue('');
+                      }}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderRadius: 999,
+                        backgroundColor: row.na
+                          ? isDarkMode
+                            ? '#3F1D1D'
+                            : '#FEE2E2'
+                          : isDarkMode
+                            ? '#132A26'
+                            : '#E8F0EC',
+                        borderWidth: 1,
+                        borderColor: row.na
+                          ? isDarkMode
+                            ? '#7F1D1D'
+                            : '#FECACA'
+                          : isDarkMode
+                            ? tokens.borderInput
+                            : '#C8DDD3',
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: '800',
+                          color: row.na
+                            ? isDarkMode
+                              ? tokens.statusDangerText
+                              : '#B91C1C'
+                            : isDarkMode
+                              ? tokens.accentBrand
+                              : '#EA580C',
+                        }}
+                      >
+                        {row.na ? 'Price not configured' : 'Configured'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <TextInput
+                    style={[
+                      styles.formInput,
+                      row.na && { opacity: 0.45 },
+                      { marginBottom: 0 },
+                    ]}
+                    keyboardType="numeric"
+                    editable={!row.na && !pmsRateSaving}
+                    value={row.value}
+                    onChangeText={row.setValue}
+                    placeholder={row.na ? 'Price not configured' : 'e.g. 450'}
+                    placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+                  />
+                </View>
+              ))}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <TouchableOpacity
+                style={styles.btnSecondary}
+                disabled={pmsRateSaving}
+                onPress={() => {
+                  setIsAddPmsRateOpen(false);
+                  resetPmsRateForm();
+                }}
+              >
+                <Text style={styles.btnSecondaryText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnPrimary, pmsRateSaving && { opacity: 0.7 }]}
+                disabled={pmsRateSaving}
+                onPress={handleSavePmsFixedRate}
+                activeOpacity={0.85}
+              >
+                {pmsRateSaving ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.btnPrimaryText}>
+                    {editingPmsRate ? 'Save Changes' : 'Add Service'}
+                  </Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -15143,27 +16665,49 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.formLabel}>Category</Text>
-                  <View style={{ flexDirection: 'row', gap: 6 }}>
-                    {['PMS', 'Repair', 'Customization'].map((cat) => (
-                      <TouchableOpacity
-                        key={cat}
-                        style={[
-                          styles.orderFilterTab,
-                          { flex: 1, alignItems: 'center' },
-                          servCategory === cat && { backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533', borderColor: isDarkMode ? tokens.accentBorder : '#1D4533' },
-                        ]}
-                        onPress={() => setServCategory(cat)}
-                      >
-                        <Text
-                          style={[
-                            styles.orderFilterTabText,
-                            servCategory === cat && { color: '#FFFFFF', fontWeight: '800' },
-                          ]}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                      borderRadius: 8,
+                      padding: 3,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                    }}
+                  >
+                    {['PMS', 'Repair', 'Installation'].map((cat) => {
+                      const isSelected = servCategory === cat;
+                      return (
+                        <TouchableOpacity
+                          key={cat}
+                          style={{
+                            flex: 1,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            paddingVertical: 7,
+                            borderRadius: 6,
+                            backgroundColor: isSelected ? '#EA580C' : 'transparent',
+                            boxShadow: isSelected ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                          onPress={() => setServCategory(cat)}
+                          activeOpacity={0.85}
                         >
-                          {cat}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+                          <Text
+                            style={{
+                              fontSize: 12,
+                              fontWeight: isSelected ? '700' : '600',
+                              color: isSelected ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
+                              transition: 'color 0.15s ease',
+                            }}
+                          >
+                            {cat}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
                   </View>
                 </View>
 
@@ -15238,7 +16782,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 6,
-                      backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+                      backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                       paddingVertical: 8,
                       paddingHorizontal: 12,
                       borderRadius: 8,
@@ -15324,10 +16868,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             <View style={styles.modalHeader}>
               <View>
                 <Text style={styles.modalTitle}>
-                  {editingMechanic ? 'Edit Mechanic Account' : 'Invite Mechanic Account'}
+                  {editingMechanic ? 'Edit Mechanic' : 'Add Mechanic to Roster'}
                 </Text>
                 <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
-                  Create a login account with email and password (same as normal sign in)
+                  Admin-managed pit bay roster only — technicians do not get a login account
                 </Text>
               </View>
               <TouchableOpacity
@@ -15348,7 +16892,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             >
               {/* SECTION 1 — TECHNICIAN PHOTO */}
               <View style={{ gap: 10 }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533', letterSpacing: 0.6 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#EA580C', letterSpacing: 0.6 }}>
                   TECHNICIAN PHOTO
                 </Text>
 
@@ -15363,7 +16907,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           height: 72,
                           borderRadius: 16,
                           borderWidth: 2,
-                          borderColor: isDarkMode ? tokens.accentBorder : '#1D4533',
+                          borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
                           backgroundColor: isDarkMode ? tokens.bgSub : '#F1F5F9',
                         }}
                       />
@@ -15416,7 +16960,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 8,
-                        backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+                        backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                         paddingVertical: 8,
                         paddingHorizontal: 14,
                         borderRadius: 8,
@@ -15454,7 +16998,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
               {/* SECTION 2 — TECHNICIAN INFORMATION */}
               <View style={{ gap: 10 }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533', letterSpacing: 0.6 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#EA580C', letterSpacing: 0.6 }}>
                   TECHNICIAN INFORMATION
                 </Text>
 
@@ -15498,85 +17042,26 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   keyboardType="phone-pad"
                 />
 
-                {editingMechanic ? (
-                  <>
-                    <Text style={styles.formLabel}>Login email</Text>
-                    <TextInput
-                      style={[styles.formInput, { backgroundColor: isDarkMode ? tokens.bgSub : '#F1F5F9' }]}
-                      value={mechEmail}
-                      editable={false}
-                    />
-                    <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                      Login credentials (email, username, password) can only be changed by the mechanic in My Account.
-                    </Text>
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.formLabel}>Email *</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={mechEmail}
-                      onChangeText={setMechEmail}
-                      placeholder="mechanic@store.com"
-                      placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
-                      autoCapitalize="none"
-                      keyboardType="email-address"
-                    />
-                    <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                      We email a 6-digit OTP to this address. After the mechanic verifies, a temporary password is emailed automatically.
-                    </Text>
-                  </>
-                )}
-              </View>
-
-              <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 2 }} />
-
-              {/* SECTION 3 — HOURLY LABOR RATE */}
-              <View style={{ gap: 6 }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533', letterSpacing: 0.6 }}>
-                  HOURLY LABOR RATE
-                </Text>
-                <Text style={styles.formLabel}>Hourly Labor Rate (₱/Hour) *</Text>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    borderWidth: 1.5,
-                    borderColor: tokens.borderInput,
-                    borderRadius: 8,
-                    backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF',
-                    paddingHorizontal: 12,
-                  }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533', marginRight: 8 }}>
-                    ₱
-                  </Text>
-                  <TextInput
-                    style={{
-                      flex: 1,
-                      paddingVertical: 10,
-                      fontSize: 14,
-                      fontWeight: '700',
-                      color: tokens.textPrimary,
-                      outline: 'none',
-                    }}
-                    keyboardType="decimal-pad"
-                    value={mechHourlyRate}
-                    onChangeText={setMechHourlyRate}
-                    placeholder="150.00"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
-                  Used for dynamic quotations. Changing this rate does not alter past quotation snapshots.
+                <Text style={styles.formLabel}>Contact email (optional)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={mechEmail}
+                  onChangeText={setMechEmail}
+                  placeholder="shop-contact@example.com"
+                  placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                />
+                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+                  Contact only. Mechanics cannot sign in — only admins manage the roster and bookings.
                 </Text>
               </View>
 
               <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 2 }} />
 
-              {/* SECTION 4 — CERTIFICATIONS & SPECIALIZATIONS */}
+              {/* SECTION 3 — CERTIFICATIONS & SPECIALIZATIONS */}
               <View style={{ gap: 10 }}>
-                <Text style={{ fontSize: 11, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533', letterSpacing: 0.6 }}>
+                <Text style={{ fontSize: 11, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#EA580C', letterSpacing: 0.6 }}>
                   CERTIFICATIONS & SPECIALIZATIONS
                 </Text>
 
@@ -15604,13 +17089,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           paddingVertical: 9,
                           borderRadius: 8,
                           backgroundColor: isMatch
-                            ? '#1D4533'
+                            ? '#EA580C'
                             : isDarkMode
                               ? '#1E293B'
                               : '#F8FAFC',
                           borderWidth: 1.5,
                           borderColor: isMatch
-                            ? '#1D4533'
+                            ? '#EA580C'
                             : isDarkMode
                               ? '#334155'
                               : '#CBD5E1',
@@ -15703,8 +17188,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           padding: 10,
                           borderRadius: 8,
                           borderWidth: 1.5,
-                          borderColor: isSelected ? '#1D4533' : tokens.borderInput,
-                          backgroundColor: isSelected ? (isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#F3F7F6') : (isDarkMode ? tokens.bgSub : '#FFFFFF'),
+                          borderColor: isSelected ? '#EA580C' : tokens.borderInput,
+                          backgroundColor: isSelected ? (isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#F3F7F6') : (isDarkMode ? tokens.bgSub : '#FFFFFF'),
                         }}
                         onPress={() => setMechStatus(st.id)}
                       >
@@ -15712,7 +17197,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           style={{
                             fontSize: 12,
                             fontWeight: '800',
-                            color: isSelected ? (isDarkMode ? tokens.accentBrand : '#1D4533') : tokens.textPrimary,
+                            color: isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : tokens.textPrimary,
                             marginBottom: 2,
                           }}
                         >
@@ -15744,7 +17229,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   color="#FFFFFF"
                 />
                 <Text style={styles.addBtnPrimaryText}>
-                  {editingMechanic ? 'Save Changes' : 'Send OTP Invite'}
+                  {editingMechanic ? 'Save Changes' : 'Add to Roster'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -15793,7 +17278,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       height: 56,
                       borderRadius: 28,
                       borderWidth: 2,
-                      borderColor: isDarkMode ? tokens.accentBorder : '#1D4533',
+                      borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
                       backgroundColor: isDarkMode ? tokens.bgSub : '#F1F5F9',
                     }}
                   />
@@ -15821,7 +17306,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: 6,
-                      backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+                      backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                       paddingVertical: 7,
                       paddingHorizontal: 12,
                       borderRadius: 8,
@@ -15939,8 +17424,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         paddingVertical: 9,
                         borderRadius: 8,
                         borderWidth: 1.5,
-                        borderColor: isSelected ? '#1D4533' : isDarkMode ? '#334155' : '#CBD5E1',
-                        backgroundColor: isSelected ? '#1D4533' : isDarkMode ? '#1E293B' : '#F8FAFC',
+                        borderColor: isSelected ? '#EA580C' : isDarkMode ? '#334155' : '#CBD5E1',
+                        backgroundColor: isSelected ? '#EA580C' : isDarkMode ? '#1E293B' : '#F8FAFC',
                         flexDirection: 'row',
                         alignItems: 'center',
                         justifyContent: 'space-between',
@@ -16014,8 +17499,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         paddingVertical: 9,
                         borderRadius: 8,
                         borderWidth: 1.5,
-                        borderColor: isSelected ? '#1D4533' : isDarkMode ? '#334155' : '#CBD5E1',
-                        backgroundColor: isSelected ? '#1D4533' : isDarkMode ? '#1E293B' : '#F8FAFC',
+                        borderColor: isSelected ? '#EA580C' : isDarkMode ? '#334155' : '#CBD5E1',
+                        backgroundColor: isSelected ? '#EA580C' : isDarkMode ? '#1E293B' : '#F8FAFC',
                         flexDirection: 'row',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -16266,13 +17751,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         paddingVertical: 9,
                         borderRadius: 8,
                         backgroundColor: isSelected
-                          ? '#1D4533'
+                          ? '#EA580C'
                           : isDarkMode
                             ? '#1E293B'
                             : '#F8FAFC',
                         borderWidth: 1.5,
                         borderColor: isSelected
-                          ? '#1D4533'
+                          ? '#EA580C'
                           : isDarkMode
                             ? '#334155'
                             : '#CBD5E1',
@@ -16377,14 +17862,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         justifyContent: 'center',
                         backgroundColor: selected
                           ? isDarkMode
-                            ? 'rgba(29, 69, 51,0.3)'
+                            ? 'rgba(234, 88, 12,0.3)'
                             : '#E8F0EC'
                           : isDarkMode
                             ? '#1E293B'
                             : '#F8FAFC',
                         borderWidth: 1.5,
                         borderColor: selected
-                          ? '#1D4533'
+                          ? '#EA580C'
                           : isDarkMode
                             ? '#334155'
                             : '#E2E8F0',
@@ -16405,7 +17890,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             fontSize: 11,
                             fontWeight: selected ? '800' : '600',
                             color: selected
-                              ? '#1D4533'
+                              ? '#EA580C'
                               : isDarkMode
                                 ? '#94A3B8'
                                 : '#475569',
@@ -16483,7 +17968,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     alignItems: 'center',
                   }}
                 >
-                  <BootstrapIcon name="grid-fill" size={16} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                  <BootstrapIcon name="grid-fill" size={16} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                 </View>
                 <Text style={styles.modalTitle}>Admin Management Menu</Text>
               </View>
@@ -16504,7 +17989,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="tag-fill"
                   size={20}
-                  color={activeNav === 'products' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'products' ? '#EA580C' : '#475569'}
                 />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Products</Text>
@@ -16523,7 +18008,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="receipt"
                   size={20}
-                  color={activeNav === 'orders' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'orders' ? '#EA580C' : '#475569'}
                 />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Orders & COD</Text>
@@ -16550,7 +18035,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="ticket-perforated-fill"
                   size={20}
-                  color={activeNav === 'promos' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'promos' ? '#EA580C' : '#475569'}
                 />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Promo Codes</Text>
@@ -16569,7 +18054,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="truck"
                   size={20}
-                  color={activeNav === 'suppliers' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'suppliers' ? '#EA580C' : '#475569'}
                 />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Supplier</Text>
@@ -16588,7 +18073,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="tools"
                   size={20}
-                  color={activeNav === 'garage' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'garage' ? '#EA580C' : '#475569'}
                 />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Pitstop Services</Text>
@@ -16607,7 +18092,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="person-badge-fill"
                   size={20}
-                  color={activeNav === 'mechanics' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'mechanics' ? '#EA580C' : '#475569'}
                 />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Mechanics & Crew</Text>
@@ -16626,7 +18111,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="bicycle"
                   size={20}
-                  color={activeNav === 'riders' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'riders' ? '#EA580C' : '#475569'}
                 />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Riders</Text>
@@ -16645,7 +18130,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="people-fill"
                   size={20}
-                  color={activeNav === 'users' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'users' ? '#EA580C' : '#475569'}
                 />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>User Accounts</Text>
@@ -16664,7 +18149,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="database-fill-gear"
                   size={20}
-                  color={activeNav === 'supabase' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'supabase' ? '#EA580C' : '#475569'}
                 />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Supabase DB</Text>
@@ -16683,7 +18168,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="clipboard-data"
                   size={20}
-                  color={activeNav === 'forecast' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'forecast' ? '#EA580C' : '#475569'}
                 />
                 <View>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Forecast & Stock</Text>
@@ -16691,7 +18176,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 </View>
               </TouchableOpacity>
 
-              {/* Audit Logs */}
+              {/* Activity Logs */}
               <TouchableOpacity
                 style={[styles.mobileMoreCard, activeNav === 'audit' && styles.mobileMoreCardActive]}
                 onPress={() => {
@@ -16702,10 +18187,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="journal-text"
                   size={20}
-                  color={activeNav === 'audit' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'audit' ? '#EA580C' : '#475569'}
                 />
                 <View>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Audit Logs</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Activity Logs</Text>
                   <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{auditLogs.length} tracked records</Text>
                 </View>
               </TouchableOpacity>
@@ -16721,7 +18206,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="bell-fill"
                   size={20}
-                  color={activeNav === 'notifications' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'notifications' ? '#EA580C' : '#475569'}
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Notifications</Text>
@@ -16756,7 +18241,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 <BootstrapIcon
                   name="gear-fill"
                   size={20}
-                  color={activeNav === 'settings' ? '#1D4533' : '#475569'}
+                  color={activeNav === 'settings' ? '#EA580C' : '#475569'}
                 />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>System Settings</Text>
@@ -16775,12 +18260,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   setIsAdminAccountOpen(true);
                 }}
               >
-                <BootstrapIcon name="shield-lock-fill" size={20} color={isDarkMode ? tokens.accentBrand : '#1D4533'} />
+                <BootstrapIcon name="shield-lock-fill" size={20} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
                 <View>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                     My Account
                   </Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>
+                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                     Change password & PIN
                   </Text>
                 </View>
@@ -16826,10 +18311,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   onNavigateToStore?.();
                 }}
               >
-                <BootstrapIcon name="shop" size={20} color={isDarkMode ? tokens.accentBrand : "#1D4533"} />
+                <BootstrapIcon name="shop" size={20} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
                 <View>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>Live Storefront</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.accentBrand : '#1D4533' }}>View Store</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>Live Storefront</Text>
+                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>View Store</Text>
                 </View>
               </TouchableOpacity>
 
@@ -16874,6 +18359,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         showConfirm={showConfirm}
         onClose={() => setIsOrderModalOpen(false)}
         onApprove={handleApproveCOD}
+        onRetryEmail={handleRetryCodApprovalEmail}
         onAdvanceStatus={handleAdvanceOrderStatus}
         onReject={handleRejectOrder}
         onCancel={handleCancelOrder}
@@ -16918,7 +18404,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <BootstrapIcon
                 name="grid-1x2-fill"
                 size={17}
-                color={activeNav === 'overview' ? '#1D4533' : '#64748B'}
+                color={activeNav === 'overview' ? '#EA580C' : '#64748B'}
               />
             </View>
             <Text style={[styles.bottomNavLabel, activeNav === 'overview' && styles.bottomNavLabelActive]}>
@@ -16944,7 +18430,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <BootstrapIcon
                 name="box-seam-fill"
                 size={17}
-                color={activeNav === 'inventory' ? '#1D4533' : '#64748B'}
+                color={activeNav === 'inventory' ? '#EA580C' : '#64748B'}
               />
               {invStats.lowStockCount > 0 && (
                 <View style={styles.bottomNavBadge}>
@@ -16975,7 +18461,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <BootstrapIcon
                 name="cart-check-fill"
                 size={17}
-                color={activeNav === 'pos' ? '#1D4533' : '#64748B'}
+                color={activeNav === 'pos' ? '#EA580C' : '#64748B'}
               />
               {posCart.length > 0 && (
                 <View style={styles.bottomNavBadge}>
@@ -17003,7 +18489,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <BootstrapIcon
                 name="graph-up-arrow"
                 size={17}
-                color={activeNav === 'analytics' ? '#1D4533' : '#64748B'}
+                color={activeNav === 'analytics' ? '#EA580C' : '#64748B'}
               />
             </View>
             <Text style={[styles.bottomNavLabel, activeNav === 'analytics' && styles.bottomNavLabelActive]}>
@@ -17026,7 +18512,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               <BootstrapIcon
                 name="receipt"
                 size={17}
-                color={activeNav === 'orders' ? '#1D4533' : '#64748B'}
+                color={activeNav === 'orders' ? '#EA580C' : '#64748B'}
               />
               {pendingCodCount > 0 && (
                 <View style={styles.bottomNavBadge}>
@@ -17057,7 +18543,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 size={18}
                 color={
                   ['products', 'orders', 'promos', 'garage', 'users', 'supabase', 'forecast', 'audit'].includes(activeNav)
-                    ? '#1D4533'
+                    ? '#EA580C'
                     : '#64748B'
                 }
               />

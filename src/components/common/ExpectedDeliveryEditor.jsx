@@ -30,7 +30,7 @@ export default function ExpectedDeliveryEditor({
           isDarkMode && { backgroundColor: '#1C2422', borderColor: '#2D3748' },
         ]}
       >
-        <BootstrapIcon name="calendar-range" size={15} color={isDarkMode ? '#5FBF9A' : '#1D4533'} />
+        <BootstrapIcon name="calendar-range" size={15} color={isDarkMode ? '#5FBF9A' : '#EA580C'} />
         <View style={{ flex: 1 }}>
           <Text style={[styles.primary, isDarkMode && { color: '#F8FAFC' }]} numberOfLines={2}>
             {label || 'Not set yet'}

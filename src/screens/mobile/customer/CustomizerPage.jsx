@@ -18,7 +18,7 @@ import { productService } from '../../../services/products/productService.js';
 import { GARAGE_BRANCHES, TIME_SLOTS } from '../../../services/bookings/garageService.js';
 import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../../../services/products/motorcycleService.js';
 import { BootstrapIcon, BottomNavBar, ToastNotification, BrandLogo } from '../../../components/common';
-import { RegisterMotorcycleModal, CheckoutModal, CartModal } from '../../../components/modals';
+import { RegisterMotorcycleModal, CheckoutModal, CartModal, BookInstallationModal } from '../../../components/modals';
 import CustomizationWorkspace from '../../../components/customizer/CustomizationWorkspace.jsx';
 import AiMotorcycleInstallStudio from '../../../components/customizer/AiMotorcycleInstallStudio.jsx';
 import { useCustomizationBuilder } from '../../../hooks/useCustomizationBuilder.js';
@@ -26,6 +26,7 @@ import { pickImageFromFile } from '../../../utils/imagePickerHelper.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useCart } from '../../../context/CartContext.jsx';
 import { useWishlist } from '../../../context/WishlistContext.jsx';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 
 export default function CustomizerPage({
   onNavigateToStore,
@@ -41,9 +42,11 @@ export default function CustomizerPage({
   const { currentUser, setRedirectReason } = useAuth();
   const { addToCart, showToast, toastMessage, cartItemCount } = useCart();
   const { wishlistCount, addToWishlist } = useWishlist();
+  const { isDarkMode = false } = useTheme?.() || {};
 
   // Parts Builder | Install Studio (Express Gemini/Imagen) | legacy AI Studio
   const [studioMode, setStudioMode] = useState('install'); // 'builder' | 'install' | 'studio'
+  const [studioTab, setStudioTab] = useState('preview'); // 'preview' | 'selection'
   const customizationBuilder = useCustomizationBuilder({
     currentUser,
     initialProduct: initialSelectedProduct,
@@ -225,6 +228,7 @@ export default function CustomizerPage({
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
   const [bookingBranch, setBookingBranch] = useState(GARAGE_BRANCHES[0].name);
   const [bookingDate, setBookingDate] = useState('Tomorrow, 10:30 AM');
   const [bookingTimeSlot, setBookingTimeSlot] = useState(TIME_SLOTS[1]);
@@ -414,32 +418,40 @@ export default function CustomizerPage({
       return;
     }
 
-    const customizationPayload = generationResult || {
-      customizationId: 'AI-CUST-' + Math.floor(10000 + Math.random() * 90000),
-      bikeName: currentBikeTitle,
-      bikeBrand: activeMotorcycle?.brand || 'MotoTrack',
-      selectedParts,
-      partsTotalUsd,
-      partsTotalPhp,
-      generatedImage: currentBasePhoto,
-      diagnostics: liveDiagnostics,
-    };
+    setIsBookingSubmitting(true);
+    try {
+      const customizationPayload = generationResult || {
+        customizationId: 'AI-CUST-' + Math.floor(10000 + Math.random() * 90000),
+        bikeName: currentBikeTitle,
+        bikeBrand: activeMotorcycle?.brand || 'MotoTrack',
+        selectedParts,
+        partsTotalUsd,
+        partsTotalPhp,
+        generatedImage: currentBasePhoto,
+        diagnostics: liveDiagnostics,
+      };
 
-    const booking = await aiCustomizerService.bookCustomizationService({
-      customizationData: customizationPayload,
-      branchName: bookingBranch,
-      appointmentDate: bookingDate,
-      timeSlot: bookingTimeSlot,
-      customerName: riderName || currentUser?.name || 'Rider',
-      customerPhone: riderPhone,
-      plateNumber: bikePlate || activeMotorcycle?.plate_number || 'Custom Project',
-      notes: bookingNotes,
-      currentUser,
-    });
+      const booking = await aiCustomizerService.bookCustomizationService({
+        customizationData: customizationPayload,
+        branchName: bookingBranch,
+        appointmentDate: bookingDate,
+        timeSlot: bookingTimeSlot,
+        customerName: riderName || currentUser?.name || 'Rider',
+        customerPhone: riderPhone,
+        plateNumber: bikePlate || activeMotorcycle?.plate_number || 'Custom Project',
+        notes: bookingNotes,
+        currentUser,
+      });
 
-    setIsBookingModalOpen(false);
-    showToast(`🏁 Pitstop installation booked! Ticket #${booking.id}`);
-    onNavigateToGarage?.();
+      setIsBookingModalOpen(false);
+      showToast(`🏁 Pitstop installation booked! Ticket #${booking.id}`);
+      onNavigateToGarage?.();
+    } catch (err) {
+      console.error('[CustomizerPageMobile] Booking error:', err);
+      showToast(err?.message || 'Could not complete installation booking');
+    } finally {
+      setIsBookingSubmitting(false);
+    }
   };
 
   const handleCopyPrompt = () => {
@@ -464,56 +476,68 @@ export default function CustomizerPage({
     generationResult && activeViewMode === 'generated' ? generationResult.generatedImage : currentBasePhoto;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" translucent backgroundColor="transparent" />
+    <SafeAreaView style={[styles.safeArea, isDarkMode && { backgroundColor: '#24272B' }]}>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── 1. TOP HEADER ─── */}
-      <View style={styles.headerWrapper}>
-        <View style={[styles.maxContainer, styles.headerInner]}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => onNavigateToStore?.()} activeOpacity={0.8}>
-            <BootstrapIcon name="arrow-left" size={15} color="#334155" />
-            <Text style={styles.backBtnText}>Store</Text>
+      {/* ─── 1. NATIVE MOBILE APP HEADER ─── */}
+      <View style={[styles.appHeaderRow, isDarkMode && { backgroundColor: '#24272B' }]}>
+        <View style={styles.headerToggleRow}>
+          <TouchableOpacity
+            style={[
+              styles.headerToggleBtn,
+              studioTab === 'selection' ? styles.headerToggleBtnActive : styles.headerToggleBtnInactive,
+            ]}
+            onPress={() => setStudioTab('selection')}
+            activeOpacity={0.85}
+            accessibilityLabel="Motorcycle & Part Selector"
+          >
+            <BootstrapIcon
+              name="sliders"
+              size={14}
+              color={studioTab === 'selection' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.85)'}
+            />
+            <Text
+              style={[
+                styles.headerToggleBtnText,
+                studioTab === 'selection' ? styles.headerToggleBtnTextActive : styles.headerToggleBtnTextInactive,
+              ]}
+              numberOfLines={1}
+            >
+              Motorcycle & Part Selector
+            </Text>
           </TouchableOpacity>
 
-          <View style={styles.logoRow}>
-            <View style={styles.logoIconBadge}>
-              <BootstrapIcon name="magic" size={16} color="#FFFFFF" />
-            </View>
-            <Text style={styles.logoTitle}>
-              Moto<Text style={styles.logoAccent}>Custom</Text>
+          <TouchableOpacity
+            style={[
+              styles.headerToggleBtn,
+              studioTab === 'preview' ? styles.headerToggleBtnActive : styles.headerToggleBtnInactive,
+            ]}
+            onPress={() => setStudioTab('preview')}
+            activeOpacity={0.85}
+            accessibilityLabel="AI Preview Canvas"
+          >
+            <BootstrapIcon
+              name="eye-fill"
+              size={14}
+              color={studioTab === 'preview' ? '#FFFFFF' : 'rgba(255, 255, 255, 0.85)'}
+            />
+            <Text
+              style={[
+                styles.headerToggleBtnText,
+                studioTab === 'preview' ? styles.headerToggleBtnTextActive : styles.headerToggleBtnTextInactive,
+              ]}
+              numberOfLines={1}
+            >
+              AI Preview Canvas
             </Text>
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <TouchableOpacity
-              style={styles.backBtn}
-              onPress={() => onNavigateToWishlist?.()}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name="heart" size={14} color="#334155" />
-              {wishlistCount > 0 && (
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#1D4533' }}>{wishlistCount}</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.backBtn, { backgroundColor: '#1D4533', borderColor: '#1D4533' }]}
-              onPress={() => setIsCartModalOpen(true)}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name="cart3" size={14} color="#FFFFFF" />
-              {cartItemCount > 0 && (
-                <Text style={{ fontSize: 11, fontWeight: '800', color: '#FFFFFF' }}>{cartItemCount}</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
       {/* ─── MAIN SCROLL CONTENT ─── */}
       <ScrollView
-        style={styles.container}
+        style={[styles.container, isDarkMode && { backgroundColor: '#121518' }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
       >
@@ -524,6 +548,11 @@ export default function CustomizerPage({
               setRedirectReason?.('ai-install');
               onNavigateToLogin?.();
             }}
+            onNavigateToGarage={onNavigateToGarage}
+            onNavigateToWishlist={onNavigateToWishlist}
+            mobileTab={studioTab}
+            onMobileTabChange={setStudioTab}
+            hideMobileToolbar={true}
           />
         </View>
       </ScrollView>
@@ -533,15 +562,53 @@ export default function CustomizerPage({
         <View style={styles.partModalOverlay}>
           {viewingPartDetails && (
             <View style={styles.partModalSheet}>
-              <View style={styles.partModalHeader}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <BootstrapIcon name="info-circle-fill" size={16} color="#1D4533" />
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>
-                    Part Details & Price
-                  </Text>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingBottom: 14,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#F1F5F9',
+                  marginBottom: 14,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                  <View
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 12,
+                      backgroundColor: '#FFF7ED',
+                      borderWidth: 1,
+                      borderColor: '#FED7AA',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <BootstrapIcon name="info-circle-fill" size={17} color="#EA580C" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16.5, fontWeight: '800', color: '#0F172A' }}>
+                      Part Details & Price
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                      Specifications & Compatibility
+                    </Text>
+                  </View>
                 </View>
-                <TouchableOpacity onPress={() => setViewingPartDetails(null)}>
-                  <BootstrapIcon name="x" size={20} color="#64748B" />
+                <TouchableOpacity
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 17,
+                    backgroundColor: '#F1F5F9',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                  onPress={() => setViewingPartDetails(null)}
+                >
+                  <BootstrapIcon name="x-lg" size={14} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
@@ -572,7 +639,7 @@ export default function CustomizerPage({
 
               <View style={styles.partModalSpecsRow}>
                 <View style={styles.partModalSpecChip}>
-                  <BootstrapIcon name="check-circle" size={11} color="#1D4533" />
+                  <BootstrapIcon name="check-circle" size={11} color="#EA580C" />
                   <Text style={styles.partModalSpecText}>
                     Fits {activeMotorcycle?.brand} {activeMotorcycle?.model}
                   </Text>
@@ -628,93 +695,31 @@ export default function CustomizerPage({
       />
 
       {/* ─── BOOKING MODAL (PITSTOP SERVICE) ─── */}
-      <Modal visible={isBookingModalOpen} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <BootstrapIcon name="calendar-check-fill" size={16} color="#1D4533" />
-                <Text style={styles.modalTitle}>Book Installation Pitstop</Text>
-              </View>
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsBookingModalOpen(false)}>
-                <BootstrapIcon name="x" size={18} color="#CBD5E1" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={{ maxHeight: 380 }} showsVerticalScrollIndicator={true}>
-              <Text style={styles.formLabel}>Selected Motorcycle</Text>
-              <View
-                style={{
-                  backgroundColor: '#F1F5F9',
-                  padding: 8,
-                  borderRadius: 8,
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ fontWeight: '700', color: '#0F172A', fontSize: 12 }}>{currentBikeTitle}</Text>
-                <Text style={{ fontSize: 10.5, color: '#64748B' }}>
-                  {selectedParts.length} Custom Parts to be Installed
-                </Text>
-              </View>
-
-              <Text style={styles.formLabel}>Select Pitstop Bay Location *</Text>
-              {GARAGE_BRANCHES.map((b) => (
-                <TouchableOpacity
-                  key={b.name}
-                  style={[styles.branchBtn, bookingBranch === b.name && styles.branchBtnActive]}
-                  onPress={() => setBookingBranch(b.name)}
-                >
-                  <Text style={styles.branchText}>{b.name}</Text>
-                  <Text style={styles.branchSub}>{b.address}</Text>
-                </TouchableOpacity>
-              ))}
-
-              <Text style={[styles.formLabel, { marginTop: 8 }]}>Preferred Time Slot *</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                {TIME_SLOTS.map((slot) => (
-                  <TouchableOpacity
-                    key={slot}
-                    style={[styles.slotChip, bookingTimeSlot === slot && styles.slotChipActive]}
-                    onPress={() => setBookingTimeSlot(slot)}
-                  >
-                    <Text style={[styles.slotText, bookingTimeSlot === slot && styles.slotTextActive]}>
-                      {slot}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={[styles.formLabel, { marginTop: 8 }]}>Contact Phone Number *</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="+63 9XX XXX XXXX"
-                placeholderTextColor="#64748B"
-                value={riderPhone}
-                onChangeText={setRiderPhone}
-              />
-
-              <Text style={styles.formLabel}>Fitting Notes</Text>
-              <TextInput
-                style={[styles.formInput, { height: 50 }]}
-                placeholder="Mechanic notes..."
-                placeholderTextColor="#64748B"
-                multiline
-                value={bookingNotes}
-                onChangeText={setBookingNotes}
-              />
-            </ScrollView>
-
-            <TouchableOpacity
-              style={[styles.generateCtaBtn, { marginTop: 12 }]}
-              onPress={handleConfirmCustomBooking}
-              activeOpacity={0.9}
-            >
-              <BootstrapIcon name="check-circle-fill" size={15} color="#FFFFFF" />
-              <Text style={styles.generateCtaText}>Confirm Pitstop Booking</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <BookInstallationModal
+        visible={isBookingModalOpen}
+        onClose={() => !isBookingSubmitting && setIsBookingModalOpen(false)}
+        previewImageUri={currentBasePhoto || null}
+        motorcycle={activeMotorcycle}
+        bikeTitle={currentBikeTitle}
+        serviceName={
+          selectedParts.length > 0
+            ? `${selectedParts.length} Custom Parts Installation`
+            : 'Custom Parts Installation'
+        }
+        laborFeePhp={3250}
+        branches={GARAGE_BRANCHES}
+        selectedBranch={bookingBranch}
+        onSelectBranch={setBookingBranch}
+        timeSlots={TIME_SLOTS}
+        selectedTimeSlot={bookingTimeSlot}
+        onSelectTimeSlot={setBookingTimeSlot}
+        phone={riderPhone}
+        onChangePhone={setRiderPhone}
+        notes={bookingNotes}
+        onChangeNotes={setBookingNotes}
+        onConfirm={handleConfirmCustomBooking}
+        busy={isBookingSubmitting}
+      />
 
       {/* ─── REGISTER MOTORCYCLE MODAL ─── */}
       <RegisterMotorcycleModal
@@ -728,8 +733,12 @@ export default function CustomizerPage({
         activeTab="Customize"
         onTabChange={(tab) => {
           if (tab === 'Home') onNavigateToStore?.();
-          else if (tab === 'Garage') onNavigateToGarage?.();
-          else if (tab === 'Orders') onNavigateToOrders?.();
+          else if (tab === 'Services') onNavigateToGarage?.();
+          else if (tab === 'Customize') {
+            // Already on Customizer
+          } else if (tab === 'Garage') {
+            onNavigateToProfile?.('garage');
+          } else if (tab === 'Orders') onNavigateToOrders?.();
           else if (tab === 'Wishlist' || tab === 'Favorites') onNavigateToWishlist?.();
           else if (tab === 'More') {
             if (!currentUser) {

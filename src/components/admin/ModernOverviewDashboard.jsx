@@ -7,9 +7,25 @@ import {
   Platform,
   Image,
 } from 'react-native';
-import { BootstrapIcon } from '../common';
+import { BootstrapIcon, Skeleton } from '../common';
 import BookingCategoryPieChart from './BookingCategoryPieChart.jsx';
-import { aggregateSalesTrend, computeSalesPerformance } from '../../services/inventory/dashboardInsightsService.js';
+import {
+  aggregateSalesTrend,
+  computeProductPerformance,
+  computeSalesByChannel,
+  computeSalesPerformance,
+  computeWeeklyKpiSeries,
+  computeWeeklyProfitSeries,
+  sparklinePath,
+} from '../../services/inventory/dashboardInsightsService.js';
+import { canonicalizeStatus, ORDER_STATUSES } from '../../services/orders/orderService.js';
+import { isLowStock, isOutOfStock } from '../../utils/inventoryHelpers.js';
+import {
+  bookingPaymentStatus,
+  bookingQuotationTotal,
+  FLEX_BOOKING_STATUS,
+  normalizeBookingStatus,
+} from '../../utils/bookingWorkflow.js';
 
 // Helper to format currency
 function formatPhp(amount) {
@@ -23,6 +39,63 @@ function formatCompactPhp(amount) {
   if (num >= 1000000) return `₱${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `₱${(num / 1000).toFixed(1)}k`;
   return `₱${Math.round(num)}`;
+}
+
+const PIPELINE_NEW = new Set([ORDER_STATUSES.PENDING_APPROVAL]);
+const PIPELINE_PACKING = new Set([ORDER_STATUSES.PROCESSING, ORDER_STATUSES.READY]);
+const PIPELINE_SHIPPED = new Set([
+  ORDER_STATUSES.OUT,
+  ORDER_STATUSES.REPORTED,
+  ORDER_STATUSES.FAILED,
+  ORDER_STATUSES.RESCHEDULED,
+]);
+const PIPELINE_DELIVERED = new Set([ORDER_STATUSES.DELIVERED, ORDER_STATUSES.RETURN_REQUESTED]);
+const PIPELINE_EXCLUDED = new Set([ORDER_STATUSES.CANCELLED, ORDER_STATUSES.REFUNDED]);
+
+const BOOKING_REVENUE_EXCLUDED = new Set([
+  FLEX_BOOKING_STATUS.CANCELLED,
+  FLEX_BOOKING_STATUS.REJECTED,
+  FLEX_BOOKING_STATUS.CUSTOMER_DECLINED,
+  FLEX_BOOKING_STATUS.BOOKING_EXPIRED,
+]);
+const BOOKING_REVENUE_SETTLED = new Set([
+  FLEX_BOOKING_STATUS.COMPLETED,
+  FLEX_BOOKING_STATUS.FULLY_PAID,
+  FLEX_BOOKING_STATUS.READY_FOR_PICKUP,
+]);
+
+function bookingBill(booking) {
+  const quoted = bookingQuotationTotal(booking);
+  if (quoted > 0) return quoted;
+  return Number(booking?.total_amount) || 0;
+}
+
+/** Cash collected, or the closed job total when a finished booking has no amount_paid. */
+function recognizedBookingRevenue(booking) {
+  const status = normalizeBookingStatus(booking?.status);
+  const paid = Number(booking?.amount_paid) || 0;
+  const downpayment =
+    booking?.downpayment_status === 'Paid' || booking?.downpayment_paid
+      ? Number(booking?.downpayment_amount) || 0
+      : 0;
+  const collected = Math.max(paid, downpayment);
+  if (BOOKING_REVENUE_EXCLUDED.has(status)) return collected;
+  const payment = String(bookingPaymentStatus(booking) || '')
+    .toUpperCase()
+    .replace(/\s+/g, '_');
+  const settled =
+    payment === 'FULLY_PAID' ||
+    payment === 'PAID' ||
+    payment === 'COMPLETED' ||
+    BOOKING_REVENUE_SETTLED.has(status);
+  if (settled) return Math.max(collected, bookingBill(booking));
+  return collected;
+}
+
+function sharePct(value, maxVal) {
+  const amount = Number(value) || 0;
+  if (amount <= 0 || maxVal <= 0) return 0;
+  return Math.min(100, Math.max(6, (amount / maxVal) * 100));
 }
 
 // Compute monotone cubic spline paths for smooth SVG chart
@@ -92,6 +165,7 @@ function computeSplinePaths(pts, padding, gH, baseline) {
 }
 
 export default function ModernOverviewDashboard({
+  isLoading = false,
   orders = [],
   products = [],
   garageBookings = [],
@@ -117,60 +191,69 @@ export default function ModernOverviewDashboard({
   const [hoveredIndex, setHoveredIndex] = useState(null);
   // Table channel filter: 'all' | 'online' | 'pos' | 'pending'
   const [tableFilter, setTableFilter] = useState('all');
+  const [tableFilterLayouts, setTableFilterLayouts] = useState({});
 
   // Brand Green Theme Palette
   const theme = useMemo(() => {
     if (isDarkMode) {
       return {
-        bg: '#0F1412',
-        cardBg: '#151D19',
-        cardBorder: '#23322B',
-        textPrimary: '#F8FAFC',
-        textMuted: '#94A3B8',
+        bg: '#1E2124',
+        cardBg: '#24272B',
+        cardBorder: '#374151',
+        textPrimary: '#F9FAFB',
+        textMuted: '#9CA3AF',
         textSecondary: '#CBD5E1',
-        brandGreen: '#10B981',
-        brandDarkGreen: '#1D4533',
-        pillBg: '#1E2923',
-        pillActiveBg: '#10B981',
+        brandGreen: '#EA580C',
+        brandDarkGreen: '#24272B',
+        pillBg: '#374151',
+        pillActiveBg: '#EA580C',
         pillActiveText: '#FFFFFF',
-        chartStroke: '#10B981',
-        chartGradStart: '#10B981',
-        chartGradEnd: '#10B981',
-        avgLineColor: '#4ADE80',
-        sparklineStroke: '#10B981',
-        borderSubtle: '#1E2824',
-        tableRowHover: '#1B2621',
-        badgeGreenBg: 'rgba(16, 185, 129, 0.16)',
+        chartStroke: '#EA580C',
+        chartGradStart: '#EA580C',
+        chartGradEnd: 'rgba(234, 88, 12, 0.05)',
+        avgLineColor: '#9CA3AF',
+        sparklineStroke: '#EA580C',
+        borderSubtle: '#374151',
+        tableRowHover: '#2E3236',
+        badgeGreenBg: 'rgba(34, 197, 94, 0.16)',
         badgeGreenText: '#4ADE80',
       };
     }
     return {
-      bg: '#F8FAF9',
+      bg: '#F3F4F6',
       cardBg: '#FFFFFF',
-      cardBorder: '#E5E8E5',
-      textPrimary: '#14231C',
-      textMuted: '#687A71',
-      textSecondary: '#2C3E35',
-      brandGreen: '#107C41',
-      brandDarkGreen: '#1D4533',
-      pillBg: '#EDF2EE',
-      pillActiveBg: '#1D4533', // Signature brand dark green
+      cardBorder: '#E5E7EB',
+      textPrimary: '#111827',
+      textMuted: '#6B7280',
+      textSecondary: '#374151',
+      brandGreen: '#EA580C',
+      brandDarkGreen: '#24272B',
+      pillBg: '#F3F4F6',
+      pillActiveBg: '#EA580C',
       pillActiveText: '#FFFFFF',
-      chartStroke: '#1D4533',
-      chartGradStart: '#10B981',
-      chartGradEnd: '#107C41',
-      avgLineColor: '#107C41',
-      sparklineStroke: '#107C41',
-      borderSubtle: '#F0F3F1',
-      tableRowHover: '#F4F7F5',
+      chartStroke: '#EA580C',
+      chartGradStart: '#EA580C',
+      chartGradEnd: 'rgba(234, 88, 12, 0.05)',
+      avgLineColor: '#9CA3AF',
+      sparklineStroke: '#EA580C',
+      borderSubtle: '#E5E7EB',
+      tableRowHover: '#F9FAFB',
       badgeGreenBg: '#DCFCE7',
-      badgeGreenText: '#065F46',
+      badgeGreenText: '#166534',
     };
   }, [isDarkMode]);
 
   // Total sales
-  const totalRevenue = analyticsData.totalRevenue || 0;
-  const aov = analyticsData.aov || (orderStats.total > 0 ? totalRevenue / orderStats.total : 0);
+  const totalRevenue = Number(analyticsData.totalRevenue) || 0;
+  const aov = Number.isFinite(Number(analyticsData.aov)) ? Number(analyticsData.aov) : 0;
+  const weeklyKpis = useMemo(() => computeWeeklyKpiSeries(orders, 8), [orders]);
+  const weeklyProfit = useMemo(
+    () => computeWeeklyProfitSeries(orders, products, 8),
+    [orders, products]
+  );
+  const orderSparkline = sparklinePath(weeklyKpis.map((bucket) => bucket.orders));
+  const aovSparkline = sparklinePath(weeklyKpis.map((bucket) => bucket.aov));
+  const profitSparkline = sparklinePath(weeklyProfit.map((bucket) => bucket.profit));
 
   // Sales Performance metrics
   const salesPerformance = useMemo(() => {
@@ -255,99 +338,86 @@ export default function ModernOverviewDashboard({
     };
   }, [trendBuckets]);
 
-  // Order Pipeline stage breakdown
+  // Order Pipeline stage breakdown from canonical order statuses.
   const orderPipeline = useMemo(() => {
     let newCount = 0;
     let packingCount = 0;
     let shippedCount = 0;
     let deliveredCount = 0;
 
-    orders.forEach((o) => {
-      const st = String(o.status || '').toLowerCase();
-      if (st.includes('pending') || st.includes('approval') || st.includes('created')) {
-        newCount++;
-      } else if (st.includes('processing') || st.includes('ready') || st.includes('packing')) {
-        packingCount++;
-      } else if (st.includes('shipped') || st.includes('transit') || st.includes('out for delivery')) {
-        shippedCount++;
-      } else if (st.includes('delivered') || st.includes('completed')) {
-        deliveredCount++;
-      } else {
-        newCount++;
-      }
+    (orders || []).forEach((o) => {
+      const status = canonicalizeStatus(o.status);
+      if (PIPELINE_EXCLUDED.has(status)) return;
+      if (PIPELINE_NEW.has(status)) newCount += 1;
+      else if (PIPELINE_PACKING.has(status)) packingCount += 1;
+      else if (PIPELINE_SHIPPED.has(status)) shippedCount += 1;
+      else if (PIPELINE_DELIVERED.has(status)) deliveredCount += 1;
     });
 
-    const total = Math.max(1, newCount + packingCount + shippedCount + deliveredCount);
+    const total = newCount + packingCount + shippedCount + deliveredCount;
+    const share = (count) => (total > 0 ? (count / total) * 100 : 0);
 
     return {
       newCount,
       packingCount,
       shippedCount,
       deliveredCount,
-      pctNew: (newCount / total) * 100,
-      pctPacking: (packingCount / total) * 100,
-      pctShipped: (shippedCount / total) * 100,
-      pctDelivered: (deliveredCount / total) * 100,
+      total,
+      pctNew: share(newCount),
+      pctPacking: share(packingCount),
+      pctShipped: share(shippedCount),
+      pctDelivered: share(deliveredCount),
     };
   }, [orders]);
 
-  // Revenue by Channel breakdown
+  // Revenue by channel from paid orders and collected/closed service bookings.
   const channelBreakdown = useMemo(() => {
-    const online = Number(analyticsData.onlineRevenue) || 0;
-    const pos = Number(analyticsData.posRevenue) || 0;
-    const bookings = garageBookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0);
-    const marketplace = Math.max(0, totalRevenue - (online + pos));
+    const byChannel = dashboardInsights?.salesByChannel || computeSalesByChannel(orders);
+    const garage = (garageBookings || []).reduce((sum, booking) => sum + recognizedBookingRevenue(booking), 0);
 
     const channels = [
-      { key: 'webshop', label: 'Online Store', value: online > 0 ? online : totalRevenue * 0.45 },
-      { key: 'pos', label: 'POS (In-Store Cashier)', value: pos > 0 ? pos : totalRevenue * 0.35 },
-      { key: 'garage', label: 'Garage & Services', value: bookings > 0 ? bookings : totalRevenue * 0.15 },
-      { key: 'marketplace', label: 'Parts & Accessories', value: marketplace > 0 ? marketplace : totalRevenue * 0.05 },
+      { key: 'webshop', label: 'Online Store', value: Number(byChannel.online) || 0 },
+      { key: 'pos', label: 'POS (In-Store Cashier)', value: Number(byChannel.pos) || 0 },
+      { key: 'garage', label: 'Garage & Services', value: garage },
     ];
 
-    const maxVal = Math.max(1, ...channels.map((c) => c.value));
+    const maxVal = Math.max(0, ...channels.map((c) => c.value));
     return channels.map((c) => ({
       ...c,
-      pct: Math.min(100, Math.max(8, (c.value / maxVal) * 100)),
+      pct: sharePct(c.value, maxVal),
     }));
-  }, [analyticsData, garageBookings, totalRevenue]);
+  }, [dashboardInsights, orders, garageBookings]);
 
-  // Top Sellers list (ranked 1-5)
+  // Top sellers ranked by units actually sold on non-cancelled orders.
   const topSellersList = useMemo(() => {
-    if (analyticsData.topProducts && analyticsData.topProducts.length > 0) {
-      const maxUnits = Math.max(1, ...analyticsData.topProducts.map((p) => p.unitsSold || 1));
-      return analyticsData.topProducts.slice(0, 5).map((p, idx) => ({
-        rank: idx + 1,
-        name: p.name,
-        image_url: p.image_url,
-        unitsSold: p.unitsSold || 0,
-        revenue: p.revenue || 0,
-        pct: Math.min(100, Math.max(12, ((p.unitsSold || 1) / maxUnits) * 100)),
-      }));
-    }
+    const { bestSelling } = computeProductPerformance(orders, products, { topLimit: 200 });
+    const catalogNames = new Set(
+      (products || []).map((p) => String(p.name || '').trim().toLowerCase()).filter(Boolean)
+    );
+    const ranked = bestSelling
+      .filter((p) => catalogNames.size === 0 || catalogNames.has(String(p.name || '').trim().toLowerCase()))
+      .sort((a, b) => (b.unitsSold || 0) - (a.unitsSold || 0) || (b.revenue || 0) - (a.revenue || 0))
+      .slice(0, 5);
+    const maxUnits = Math.max(0, ...ranked.map((p) => Number(p.unitsSold) || 0));
 
-    return products.slice(0, 5).map((p, idx) => ({
+    return ranked.map((p, idx) => ({
       rank: idx + 1,
-      name: p.name || `Motorcycle Part ${idx + 1}`,
+      name: p.name,
       image_url: p.image_url,
-      unitsSold: Math.max(12, 120 - idx * 22),
-      revenue: (Number(p.price) || 850) * Math.max(12, 120 - idx * 22),
-      pct: 100 - idx * 16,
+      unitsSold: Number(p.unitsSold) || 0,
+      revenue: Number(p.revenue) || 0,
+      pct: sharePct(p.unitsSold, maxUnits),
     }));
-  }, [analyticsData, products]);
+  }, [orders, products]);
 
-  // Low stock products preview
+  // Same rule as the inventory page: low stock is above zero and at or below reorder level.
   const runningLowItems = useMemo(() => {
-    const list = products.filter((p) => {
-      const qty = Number(p.stock_quantity ?? p.stock ?? 0);
-      const reorder = Number(p.reorder_point ?? p.reorder_level ?? 10);
-      return qty <= reorder;
-    });
+    const list = (products || []).filter((p) => isOutOfStock(p) || isLowStock(p, 5));
 
     return list.slice(0, 3).map((p) => {
       const qty = Number(p.stock_quantity ?? p.stock ?? 0);
       return {
-        id: p.id,
+        id: p.id || p.product_id,
         name: p.name,
         isOut: qty <= 0,
         qty,
@@ -373,8 +443,18 @@ export default function ModernOverviewDashboard({
 
   const activeHoverPoint = hoveredIndex != null ? chartTelemetry.points[hoveredIndex] : null;
 
+  if (isLoading) {
+    return <ModernOverviewDashboardSkeleton isDarkMode={isDarkMode} isDesktop={isDesktop} />;
+  }
+
   return (
-    <View style={{ width: '100%', gap: 20 }}>
+    <View
+      style={[
+        { width: '100%', gap: 20 },
+        Platform.OS === 'web' && { animation: 'mototrack-fade-in 0.22s cubic-bezier(0.16, 1, 0.3, 1)' },
+      ]}
+      className={Platform.OS === 'web' ? 'mototrack-content-fade-in' : undefined}
+    >
       {/* ─── 2. TOP SECTION: REVENUE GREEN GRADIENT CHART (LEFT) & 4 KPI CARDS (RIGHT) ─── */}
       <View
         style={{
@@ -415,7 +495,7 @@ export default function ModernOverviewDashboard({
                   width: 32,
                   height: 32,
                   borderRadius: 8,
-                  backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : 'rgba(29, 69, 51, 0.08)',
+                  backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : 'rgba(234, 88, 12, 0.12)',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -423,7 +503,7 @@ export default function ModernOverviewDashboard({
                 <BootstrapIcon
                   name="graph-up"
                   size={15}
-                  color={isDarkMode ? '#4ADE80' : '#1D4533'}
+                  color={theme.brandGreen}
                 />
               </View>
               <View>
@@ -473,13 +553,36 @@ export default function ModernOverviewDashboard({
               {/* Capsule: Daily | Weekly | Monthly */}
               <View
                 style={{
+                  position: 'relative',
                   flexDirection: 'row',
                   backgroundColor: theme.pillBg,
                   borderRadius: 8,
                   padding: 3,
-                  gap: 2,
+                  width: 220,
                 }}
               >
+                {/* Smooth animated active-state sliding indicator */}
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 3,
+                    bottom: 3,
+                    left: 3,
+                    width: 'calc((100% - 6px) / 3)',
+                    backgroundColor: theme.pillActiveBg || '#EA580C',
+                    borderRadius: 6,
+                    boxShadow: '0 1px 4px rgba(234, 88, 12, 0.35)',
+                    transition: 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)',
+                    transform:
+                      granularity === 'daily'
+                        ? 'translateX(0%)'
+                        : granularity === 'weekly'
+                        ? 'translateX(100%)'
+                        : 'translateX(200%)',
+                    pointerEvents: 'none',
+                    zIndex: 0,
+                  }}
+                />
                 {[
                   { key: 'daily', label: 'Daily' },
                   { key: 'weekly', label: 'Weekly' },
@@ -490,13 +593,16 @@ export default function ModernOverviewDashboard({
                     <TouchableOpacity
                       key={item.key}
                       onPress={() => setGranularity(item.key)}
-                      activeOpacity={0.8}
+                      activeOpacity={0.85}
                       style={{
-                        paddingHorizontal: 12,
+                        flex: 1,
                         paddingVertical: 5,
                         borderRadius: 6,
-                        backgroundColor: isActive ? theme.pillActiveBg : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: 'transparent',
                         cursor: 'pointer',
+                        zIndex: 1,
                       }}
                     >
                       <Text
@@ -504,6 +610,7 @@ export default function ModernOverviewDashboard({
                           fontSize: 12,
                           fontWeight: isActive ? '700' : '600',
                           color: isActive ? theme.pillActiveText : theme.textMuted,
+                          transition: 'color 200ms ease',
                         }}
                       >
                         {item.label}
@@ -531,11 +638,11 @@ export default function ModernOverviewDashboard({
             <Text
               style={{
                 fontSize: 12.5,
-                fontWeight: '700',
-                color: '#16A34A',
+                fontWeight: '600',
+                color: theme.textMuted,
               }}
             >
-              ↑ Live telemetry
+              Recognized sales
             </Text>
           </View>
 
@@ -674,7 +781,7 @@ export default function ModernOverviewDashboard({
                           cx={pt.x}
                           cy={pt.y}
                           r={isHovered ? 5 : 3.5}
-                          fill={isHovered ? theme.chartStroke : (isDarkMode ? '#10B981' : '#1D4533')}
+                          fill={theme.chartStroke}
                           stroke={isHovered ? '#FFFFFF' : theme.cardBg}
                           strokeWidth={2}
                           style={{ pointerEvents: 'none' }}
@@ -720,7 +827,7 @@ export default function ModernOverviewDashboard({
                             width={ttW}
                             height={ttH}
                             rx="7"
-                            fill={isDarkMode ? '#0F172A' : '#1D4533'}
+                            fill={isDarkMode ? '#1E2124' : '#24272B'}
                           />
                           <text
                             x={ttX + ttW / 2}
@@ -865,11 +972,11 @@ export default function ModernOverviewDashboard({
             </View>
 
             <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontSize: 28, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5 }}>
+              <Text style={{ fontSize: 28, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
                 {orderStats.total ? orderStats.total.toLocaleString() : orders.length.toLocaleString()}
               </Text>
-              <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>
-                <Text style={{ color: '#16A34A', fontWeight: '700' }}>↑ {orderStats.delivered || 0} delivered</Text> vs. last month
+              <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
+                {orderStats.delivered || 0} delivered
               </Text>
             </View>
 
@@ -877,13 +984,15 @@ export default function ModernOverviewDashboard({
             <View style={{ width: '100%', height: 20 }}>
               {Platform.OS === 'web' && (
                 <svg width="100%" height="20" viewBox="0 0 100 20">
-                  <path
-                    d="M 2,16 Q 24,18 48,10 T 80,4 T 98,12"
-                    fill="none"
-                    stroke={theme.sparklineStroke}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
+                  {orderSparkline ? (
+                    <path
+                      d={orderSparkline}
+                      fill="none"
+                      stroke={theme.sparklineStroke}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  ) : null}
                 </svg>
               )}
             </View>
@@ -926,25 +1035,27 @@ export default function ModernOverviewDashboard({
             </View>
 
             <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontSize: 26, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5 }}>
+              <Text style={{ fontSize: 28, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
                 ₱{(profitOverview.soldProfit || 0).toLocaleString()}
               </Text>
-              <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>
+              <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
                 <Text style={{ color: '#16A34A', fontWeight: '700' }}>{(profitOverview.soldMargin || 0).toFixed(1)}%</Text> margin
               </Text>
             </View>
 
-            {/* Green Sparkline */}
             <View style={{ width: '100%', height: 20 }}>
               {Platform.OS === 'web' && (
                 <svg width="100%" height="20" viewBox="0 0 100 20">
-                  <path
-                    d="M 2,14 Q 28,6 52,14 T 82,6 T 98,8"
-                    fill="none"
-                    stroke={theme.sparklineStroke}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
+                  {profitSparkline ? (
+                    <path
+                      d={profitSparkline}
+                      fill="none"
+                      stroke={theme.sparklineStroke}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  ) : null}
                 </svg>
               )}
             </View>
@@ -954,7 +1065,9 @@ export default function ModernOverviewDashboard({
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => {
-              setInvStockFilter('lowStock');
+              if ((invStats.lowStockCount || 0) > 0) setInvStockFilter('lowStock');
+              else if ((invStats.outOfStockCount || 0) > 0) setInvStockFilter('outOfStock');
+              else setInvStockFilter('All');
               setActiveNav('inventory');
             }}
             style={{
@@ -990,10 +1103,10 @@ export default function ModernOverviewDashboard({
             </View>
 
             <View style={{ marginVertical: 6 }}>
-              <Text style={{ fontSize: 24, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5 }}>
-                {Math.max(1, (invStats.lowStockCount || 0) + (invStats.outOfStockCount || 0))}
+              <Text style={{ fontSize: 28, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
+                {(invStats.lowStockCount || 0) + (invStats.outOfStockCount || 0)}
               </Text>
-              <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 1 }}>
+              <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 1 }}>
                 {invStats.outOfStockCount || 0} out of stock, {invStats.lowStockCount || 0} below par
               </Text>
             </View>
@@ -1063,11 +1176,11 @@ export default function ModernOverviewDashboard({
             </View>
 
             <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontSize: 26, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5 }}>
+              <Text style={{ fontSize: 28, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
                 {formatPhp(aov)}
               </Text>
-              <Text style={{ fontSize: 11, color: theme.textMuted, marginTop: 2 }}>
-                <Text style={{ color: '#16A34A', fontWeight: '700' }}>↑ Live</Text> across all channels
+              <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
+                Recognized sales average
               </Text>
             </View>
 
@@ -1075,13 +1188,15 @@ export default function ModernOverviewDashboard({
             <View style={{ width: '100%', height: 20 }}>
               {Platform.OS === 'web' && (
                 <svg width="100%" height="20" viewBox="0 0 100 20">
-                  <path
-                    d="M 2,16 Q 26,12 50,14 T 80,6 T 98,10"
-                    fill="none"
-                    stroke={theme.sparklineStroke}
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                  />
+                  {aovSparkline ? (
+                    <path
+                      d={aovSparkline}
+                      fill="none"
+                      stroke={theme.sparklineStroke}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  ) : null}
                 </svg>
               )}
             </View>
@@ -1129,9 +1244,9 @@ export default function ModernOverviewDashboard({
             style={{
               padding: 14,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#1E2923' : '#F6F9F7',
+              backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
               borderWidth: 1,
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E9F0EC',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -1164,9 +1279,9 @@ export default function ModernOverviewDashboard({
             style={{
               padding: 14,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#1E2923' : '#F6F9F7',
+              backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
               borderWidth: 1,
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E9F0EC',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -1199,9 +1314,9 @@ export default function ModernOverviewDashboard({
             style={{
               padding: 14,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#1E2923' : '#F6F9F7',
+              backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
               borderWidth: 1,
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E9F0EC',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -1234,9 +1349,9 @@ export default function ModernOverviewDashboard({
             style={{
               padding: 14,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#1E2923' : '#F6F9F7',
+              backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
               borderWidth: 1,
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E9F0EC',
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
@@ -1297,17 +1412,26 @@ export default function ModernOverviewDashboard({
               style={{
                 height: 10,
                 borderRadius: 5,
-                backgroundColor: isDarkMode ? '#1E2824' : '#EFEFED',
+                backgroundColor: isDarkMode ? '#1F2225' : '#E5E7EB',
                 flexDirection: 'row',
                 overflow: 'hidden',
                 marginVertical: 18,
                 gap: 2,
               }}
             >
-              <View style={{ height: '100%', width: `${orderPipeline.pctNew}%`, backgroundColor: '#F59E0B' }} />
-              <View style={{ height: '100%', width: `${orderPipeline.pctPacking}%`, backgroundColor: isDarkMode ? '#475569' : '#1D4533' }} />
-              <View style={{ height: '100%', width: `${orderPipeline.pctShipped}%`, backgroundColor: '#3B82F6' }} />
-              <View style={{ height: '100%', width: `${orderPipeline.pctDelivered}%`, backgroundColor: '#10B981' }} />
+              {[
+                { key: 'new', pct: orderPipeline.pctNew, color: '#F59E0B' },
+                { key: 'packing', pct: orderPipeline.pctPacking, color: isDarkMode ? '#9CA3AF' : '#24272B' },
+                { key: 'shipped', pct: orderPipeline.pctShipped, color: '#3B82F6' },
+                { key: 'delivered', pct: orderPipeline.pctDelivered, color: '#EA580C' },
+              ]
+                .filter((segment) => segment.pct > 0)
+                .map((segment) => (
+                  <View
+                    key={segment.key}
+                    style={{ height: '100%', width: `${segment.pct}%`, backgroundColor: segment.color }}
+                  />
+                ))}
             </View>
 
             {/* 2x2 Grid of Statuses */}
@@ -1317,17 +1441,17 @@ export default function ModernOverviewDashboard({
                   <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: '#F59E0B' }} />
                   <Text style={{ fontSize: 12, color: theme.textSecondary }}>New</Text>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
                   {orderPipeline.newCount}
                 </Text>
               </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: isDarkMode ? '#475569' : '#1D4533' }} />
+                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: isDarkMode ? '#9CA3AF' : '#24272B' }} />
                   <Text style={{ fontSize: 12, color: theme.textSecondary }}>Packing</Text>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
                   {orderPipeline.packingCount}
                 </Text>
               </View>
@@ -1337,17 +1461,17 @@ export default function ModernOverviewDashboard({
                   <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: '#3B82F6' }} />
                   <Text style={{ fontSize: 12, color: theme.textSecondary }}>Shipped</Text>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
                   {orderPipeline.shippedCount}
                 </Text>
               </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: '#10B981' }} />
+                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: '#EA580C' }} />
                   <Text style={{ fontSize: 12, color: theme.textSecondary }}>Delivered</Text>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
                   {orderPipeline.deliveredCount}
                 </Text>
               </View>
@@ -1355,7 +1479,11 @@ export default function ModernOverviewDashboard({
           </View>
 
           <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 18 }}>
-            {orderPipeline.newCount > 0 ? `${orderPipeline.newCount} pending confirmation` : 'All pipeline orders up to date'}
+            {orderPipeline.total === 0
+              ? 'No orders in the pipeline'
+              : orderPipeline.newCount > 0
+                ? `${orderPipeline.newCount} pending confirmation`
+                : 'All pipeline orders up to date'}
           </Text>
         </View>
 
@@ -1383,13 +1511,13 @@ export default function ModernOverviewDashboard({
               </TouchableOpacity>
             </View>
 
-            {/* Channels List with Green Progress Bars */}
+            {/* Channels List with Racing Orange Progress Bars */}
             <View style={{ gap: 14 }}>
               {channelBreakdown.map((ch) => (
                 <View key={ch.key}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <Text style={{ fontSize: 12.5, color: theme.textSecondary }}>{ch.label}</Text>
-                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.textPrimary }}>
+                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
                       {formatCompactPhp(ch.value)}
                     </Text>
                   </View>
@@ -1397,7 +1525,7 @@ export default function ModernOverviewDashboard({
                     style={{
                       height: 5,
                       borderRadius: 2.5,
-                      backgroundColor: isDarkMode ? '#1E2824' : '#EFEFED',
+                      backgroundColor: isDarkMode ? '#1F2225' : '#E5E7EB',
                       overflow: 'hidden',
                     }}
                   >
@@ -1405,7 +1533,7 @@ export default function ModernOverviewDashboard({
                       style={{
                         height: '100%',
                         width: `${ch.pct}%`,
-                        backgroundColor: '#10B981',
+                        backgroundColor: '#EA580C',
                         borderRadius: 2.5,
                       }}
                     />
@@ -1442,18 +1570,23 @@ export default function ModernOverviewDashboard({
               </TouchableOpacity>
             </View>
 
-            {/* Numbered Ranked List with Green Progress Bars */}
+            {/* Numbered Ranked List with Racing Orange Progress Bars */}
             <View style={{ gap: 10 }}>
+              {topSellersList.length === 0 ? (
+                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 4 }}>
+                  No catalog units sold yet
+                </Text>
+              ) : null}
               {topSellersList.map((tp) => (
-                <View key={tp.rank}>
+                <View key={`${tp.rank}-${tp.name}`}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, paddingRight: 8 }}>
-                      <Text style={{ fontSize: 11.5, color: theme.textMuted, width: 14 }}>{tp.rank}</Text>
+                      <Text style={{ fontSize: 11.5, color: theme.textMuted, width: 14, fontVariant: ['tabular-nums'] }}>{tp.rank}</Text>
                       <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '600', color: theme.textPrimary, flex: 1 }}>
                         {tp.name}
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textPrimary }}>
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
                       {tp.unitsSold.toLocaleString()}
                     </Text>
                   </View>
@@ -1461,7 +1594,7 @@ export default function ModernOverviewDashboard({
                     style={{
                       height: 4,
                       borderRadius: 2,
-                      backgroundColor: isDarkMode ? '#1E2824' : '#EFEFED',
+                      backgroundColor: isDarkMode ? '#1F2225' : '#E5E7EB',
                       overflow: 'hidden',
                       marginLeft: 22,
                     }}
@@ -1470,7 +1603,7 @@ export default function ModernOverviewDashboard({
                       style={{
                         height: '100%',
                         width: `${tp.pct}%`,
-                        backgroundColor: '#10B981',
+                        backgroundColor: '#EA580C',
                         borderRadius: 2,
                       }}
                     />
@@ -1554,9 +1687,9 @@ export default function ModernOverviewDashboard({
                   justifyContent: 'space-between',
                   padding: 12,
                   borderRadius: 10,
-                  backgroundColor: isDarkMode ? '#1E2923' : '#F6F9F7',
+                  backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
                   borderWidth: 1,
-                  borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E9F0EC',
+                  borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1580,9 +1713,9 @@ export default function ModernOverviewDashboard({
                   justifyContent: 'space-between',
                   padding: 12,
                   borderRadius: 10,
-                  backgroundColor: isDarkMode ? '#1E2923' : '#F6F9F7',
+                  backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
                   borderWidth: 1,
-                  borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E9F0EC',
+                  borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1606,9 +1739,9 @@ export default function ModernOverviewDashboard({
                   justifyContent: 'space-between',
                   padding: 12,
                   borderRadius: 10,
-                  backgroundColor: isDarkMode ? '#1E2923' : '#F6F9F7',
+                  backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
                   borderWidth: 1,
-                  borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E9F0EC',
+                  borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -1644,8 +1777,9 @@ export default function ModernOverviewDashboard({
           style={{
             paddingHorizontal: 20,
             paddingVertical: 16,
+            backgroundColor: '#24272B',
             borderBottomWidth: 1,
-            borderBottomColor: theme.cardBorder,
+            borderBottomColor: isDarkMode ? '#374151' : '#32373D',
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -1654,10 +1788,10 @@ export default function ModernOverviewDashboard({
           }}
         >
           <View>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.2 }}>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.2 }}>
               Recent Orders & POS Sales
             </Text>
-            <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
+            <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>
               Transactions across online store and cashier POS, newest first
             </Text>
           </View>
@@ -1666,13 +1800,35 @@ export default function ModernOverviewDashboard({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <View
               style={{
+                position: 'relative',
                 flexDirection: 'row',
-                backgroundColor: theme.pillBg,
+                backgroundColor: isDarkMode ? '#1E2124' : '#1A1D20',
                 borderRadius: 8,
                 padding: 3,
                 gap: 2,
+                borderWidth: 1,
+                borderColor: isDarkMode ? '#374151' : '#32373D',
               }}
             >
+              {/* Smooth animated active-state sliding indicator matching exact button dimensions */}
+              {tableFilterLayouts[tableFilter] && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    top: 3,
+                    bottom: 3,
+                    left: tableFilterLayouts[tableFilter].x,
+                    width: tableFilterLayouts[tableFilter].width,
+                    backgroundColor: '#EA580C',
+                    borderRadius: 6,
+                    boxShadow: '0 1px 4px rgba(234, 88, 12, 0.35)',
+                    transition:
+                      'left 220ms cubic-bezier(0.4, 0, 0.2, 1), width 220ms cubic-bezier(0.4, 0, 0.2, 1)',
+                    pointerEvents: 'none',
+                    zIndex: 0,
+                  }}
+                />
+              )}
               {[
                 { key: 'all', label: 'All' },
                 { key: 'online', label: 'Online Store' },
@@ -1680,24 +1836,38 @@ export default function ModernOverviewDashboard({
                 { key: 'pending', label: 'Pending' },
               ].map((f) => {
                 const isActive = tableFilter === f.key;
+                const hasLayout = Boolean(tableFilterLayouts[tableFilter]);
                 return (
                   <TouchableOpacity
                     key={f.key}
                     onPress={() => setTableFilter(f.key)}
-                    activeOpacity={0.8}
+                    onLayout={(e) => {
+                      const { x, width } = e.nativeEvent.layout;
+                      setTableFilterLayouts((prev) => {
+                        if (prev[f.key]?.x === x && prev[f.key]?.width === width) return prev;
+                        return { ...prev, [f.key]: { x, width } };
+                      });
+                    }}
+                    activeOpacity={0.85}
                     style={{
                       paddingHorizontal: 12,
                       paddingVertical: 5,
                       borderRadius: 6,
-                      backgroundColor: isActive ? theme.pillActiveBg : 'transparent',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      backgroundColor: !hasLayout && isActive ? '#EA580C' : 'transparent',
                       cursor: 'pointer',
+                      zIndex: 1,
                     }}
                   >
                     <Text
+                      numberOfLines={1}
                       style={{
                         fontSize: 12,
                         fontWeight: isActive ? '700' : '600',
-                        color: isActive ? theme.pillActiveText : theme.textMuted,
+                        color: isActive ? '#FFFFFF' : '#CBD5E1',
+                        whiteSpace: 'nowrap',
+                        transition: 'color 200ms ease',
                       }}
                     >
                       {f.label}
@@ -1715,7 +1885,7 @@ export default function ModernOverviewDashboard({
                 cursor: 'pointer',
               }}
             >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.brandGreen }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#EA580C' }}>
                 View All ({orders.length}) →
               </Text>
             </TouchableOpacity>
@@ -1747,16 +1917,16 @@ export default function ModernOverviewDashboard({
                   flexDirection: 'row',
                   paddingHorizontal: 20,
                   paddingVertical: 11,
-                  backgroundColor: isDarkMode ? '#101713' : '#FBFDFB',
+                  backgroundColor: '#24272B',
                   borderBottomWidth: 1,
-                  borderBottomColor: theme.cardBorder,
+                  borderBottomColor: isDarkMode ? '#374151' : '#32373D',
                 }}
               >
-                <Text style={{ flex: 1.8, fontSize: 11.5, fontWeight: '700', color: theme.textMuted }}>Customer & Order</Text>
-                <Text style={{ flex: 2.2, fontSize: 11.5, fontWeight: '700', color: theme.textMuted }}>Items & Qty</Text>
-                <Text style={{ flex: 1.2, fontSize: 11.5, fontWeight: '700', color: theme.textMuted }}>Channel</Text>
-                <Text style={{ flex: 1.3, fontSize: 11.5, fontWeight: '700', color: theme.textMuted }}>Payment & Total</Text>
-                <Text style={{ flex: 1.3, fontSize: 11.5, fontWeight: '700', color: theme.textMuted, textAlign: 'center' }}>
+                <Text style={{ flex: 1.8, fontSize: 11.5, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.5, textTransform: 'uppercase' }}>Customer & Order</Text>
+                <Text style={{ flex: 2.2, fontSize: 11.5, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.5, textTransform: 'uppercase' }}>Items & Qty</Text>
+                <Text style={{ flex: 1.2, fontSize: 11.5, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.5, textTransform: 'uppercase' }}>Channel</Text>
+                <Text style={{ flex: 1.3, fontSize: 11.5, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.5, textTransform: 'uppercase' }}>Payment & Total</Text>
+                <Text style={{ flex: 1.3, fontSize: 11.5, fontWeight: '700', color: '#CBD5E1', textAlign: 'center', letterSpacing: 0.5, textTransform: 'uppercase' }}>
                   Status
                 </Text>
               </View>
@@ -1785,7 +1955,8 @@ export default function ModernOverviewDashboard({
                 const isReady = st === 'ready for delivery';
                 const isShipped = st === 'shipped' || st === 'in transit' || st === 'out for delivery';
                 const isDelivered = st === 'delivered' || st === 'completed';
-                const isFailed = st === 'delivery failed' || st === 'delivery issue' || st === 'cancelled';
+                const isCancelled = st === 'cancelled' || st === 'canceled';
+                const isFailed = st === 'delivery failed' || st === 'delivery issue' || st === 'failed';
                 const isCOD =
                   (o.payment_method || '').toLowerCase().includes('cash') ||
                   (o.payment_method || '').includes('COD');
@@ -1800,8 +1971,10 @@ export default function ModernOverviewDashboard({
                   ? 'Out for Delivery'
                   : isDelivered
                   ? 'Delivered'
-                  : isFailed
+                  : isCancelled
                   ? 'Cancelled'
+                  : isFailed
+                  ? 'Delivery failed'
                   : 'Processing';
 
                 let statusBg = isDarkMode ? '#1E2923' : '#F1F5F9';
@@ -1816,9 +1989,9 @@ export default function ModernOverviewDashboard({
                   statusBg = isDarkMode ? 'rgba(167, 139, 250, 0.16)' : '#EDE9FE';
                   statusFg = isDarkMode ? '#C4B5FD' : '#6D28D9';
                 } else if (isDelivered) {
-                  statusBg = '#107C41';
-                  statusFg = '#FFFFFF';
-                } else if (isFailed) {
+                  statusBg = isDarkMode ? 'rgba(34, 197, 94, 0.16)' : '#DCFCE7';
+                  statusFg = isDarkMode ? '#4ADE80' : '#166534';
+                } else if (isFailed || isCancelled) {
                   statusBg = isDarkMode ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2';
                   statusFg = isDarkMode ? '#FCA5A5' : '#B91C1C';
                 }
@@ -1951,3 +2124,213 @@ export default function ModernOverviewDashboard({
     </View>
   );
 }
+
+/**
+ * ModernOverviewDashboardSkeleton
+ * Full-fidelity shimmer skeleton placeholder for the Modern Overview Dashboard.
+ * Matches exact geometry of the live overview cards, charts, and recent orders table.
+ */
+export function ModernOverviewDashboardSkeleton({ isDarkMode = false, isDesktop = true }) {
+  const baseColor = isDarkMode ? '#1E2824' : '#E2E8F0';
+  const highlightColor = isDarkMode ? '#2A3A33' : '#F1F5F9';
+  const cardBg = isDarkMode ? '#151D19' : '#FFFFFF';
+  const cardBorder = isDarkMode ? '#23322B' : '#E5E8E5';
+
+  return (
+    <View style={{ width: '100%', gap: 20 }} role="status" aria-label="Loading dashboard metrics">
+      {/* 1. TOP SECTION: Chart (Left) + 4 Stat Cards (Right) */}
+      <View
+        style={{
+          flexDirection: isDesktop ? 'row' : 'column',
+          gap: 18,
+          alignItems: 'stretch',
+        }}
+      >
+        {/* Left: Revenue Chart Card Skeleton */}
+        <View
+          style={{
+            flex: isDesktop ? 1.55 : 1,
+            backgroundColor: cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: cardBorder,
+            padding: 22,
+            gap: 16,
+          }}
+        >
+          {/* Header */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <Skeleton circle size={32} baseColor={baseColor} highlightColor={highlightColor} />
+              <View style={{ gap: 4 }}>
+                <Skeleton width={120} height={16} baseColor={baseColor} highlightColor={highlightColor} />
+                <Skeleton width={160} height={12} baseColor={baseColor} highlightColor={highlightColor} />
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <Skeleton width={52} height={26} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
+              <Skeleton width={52} height={26} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
+              <Skeleton width={52} height={26} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
+            </View>
+          </View>
+
+          {/* Big Revenue Stat */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 }}>
+            <Skeleton width={180} height={34} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
+            <Skeleton width={70} height={22} borderRadius={11} baseColor={baseColor} highlightColor={highlightColor} />
+          </View>
+
+          {/* Chart Shimmer Canvas */}
+          <View style={{ height: 230, width: '100%', justifyContent: 'flex-end', paddingBottom: 10 }}>
+            <Skeleton height={200} borderRadius={10} baseColor={baseColor} highlightColor={highlightColor} />
+          </View>
+
+          {/* Chart Footer Stats */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: cardBorder, paddingTop: 14 }}>
+            {[1, 2, 3].map((k) => (
+              <View key={k} style={{ gap: 4 }}>
+                <Skeleton width={70} height={12} baseColor={baseColor} highlightColor={highlightColor} />
+                <Skeleton width={90} height={18} baseColor={baseColor} highlightColor={highlightColor} />
+              </View>
+            ))}
+          </View>
+        </View>
+
+        {/* Right: 4 KPI Cards Grid */}
+        <View
+          style={{
+            flex: 1,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(2, 1fr)',
+            gap: 14,
+          }}
+        >
+          {[1, 2, 3, 4].map((k) => (
+            <View
+              key={k}
+              style={{
+                backgroundColor: cardBg,
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: cardBorder,
+                padding: 16,
+                justifyContent: 'space-between',
+                minHeight: 150,
+                gap: 12,
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Skeleton width={80} height={14} baseColor={baseColor} highlightColor={highlightColor} />
+                <Skeleton circle size={28} baseColor={baseColor} highlightColor={highlightColor} />
+              </View>
+              <Skeleton width={110} height={26} baseColor={baseColor} highlightColor={highlightColor} />
+              <View style={{ height: 32, width: '100%' }}>
+                <Skeleton height={28} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
+              </View>
+              <Skeleton width={90} height={12} baseColor={baseColor} highlightColor={highlightColor} />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* 2. MIDDLE SECTION: 2 Column Analytics Cards */}
+      <View
+        style={{
+          flexDirection: isDesktop ? 'row' : 'column',
+          gap: 18,
+          alignItems: 'stretch',
+        }}
+      >
+        {/* Left: Top Products */}
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: cardBorder,
+            padding: 20,
+            gap: 14,
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Skeleton width={140} height={18} baseColor={baseColor} highlightColor={highlightColor} />
+            <Skeleton width={70} height={14} baseColor={baseColor} highlightColor={highlightColor} />
+          </View>
+          {[1, 2, 3, 4, 5].map((k) => (
+            <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 }}>
+              <Skeleton width={20} height={16} baseColor={baseColor} highlightColor={highlightColor} />
+              <Skeleton width={38} height={38} borderRadius={8} baseColor={baseColor} highlightColor={highlightColor} />
+              <View style={{ flex: 1, gap: 5 }}>
+                <Skeleton width="65%" height={14} baseColor={baseColor} highlightColor={highlightColor} />
+                <Skeleton width="40%" height={10} baseColor={baseColor} highlightColor={highlightColor} />
+              </View>
+              <Skeleton width={60} height={16} baseColor={baseColor} highlightColor={highlightColor} />
+            </View>
+          ))}
+        </View>
+
+        {/* Right: Revenue Breakdown by Channel */}
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: cardBorder,
+            padding: 20,
+            gap: 16,
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Skeleton width={160} height={18} baseColor={baseColor} highlightColor={highlightColor} />
+            <Skeleton circle size={28} baseColor={baseColor} highlightColor={highlightColor} />
+          </View>
+          {[1, 2, 3, 4].map((k) => (
+            <View key={k} style={{ gap: 6 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Skeleton width={110} height={14} baseColor={baseColor} highlightColor={highlightColor} />
+                <Skeleton width={75} height={14} baseColor={baseColor} highlightColor={highlightColor} />
+              </View>
+              <Skeleton width="100%" height={10} borderRadius={5} baseColor={baseColor} highlightColor={highlightColor} />
+            </View>
+          ))}
+        </View>
+      </View>
+
+      {/* 3. BOTTOM SECTION: Recent Orders Table Skeleton */}
+      <View
+        style={{
+          backgroundColor: cardBg,
+          borderRadius: 16,
+          borderWidth: 1,
+          borderColor: cardBorder,
+          padding: 20,
+          gap: 16,
+        }}
+      >
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View style={{ gap: 4 }}>
+            <Skeleton width={150} height={18} baseColor={baseColor} highlightColor={highlightColor} />
+            <Skeleton width={200} height={12} baseColor={baseColor} highlightColor={highlightColor} />
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <Skeleton width={65} height={28} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
+            <Skeleton width={65} height={28} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
+          </View>
+        </View>
+
+        <Skeleton.Table
+          rows={6}
+          columns={5}
+          showHeader
+          baseColor={baseColor}
+          highlightColor={highlightColor}
+        />
+      </View>
+    </View>
+  );
+}
+
+ModernOverviewDashboard.Skeleton = ModernOverviewDashboardSkeleton;
+

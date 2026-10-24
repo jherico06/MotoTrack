@@ -10,28 +10,17 @@ import {
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { CATEGORY_PILLS } from '../../data/motorParts.js';
-
-const RATING_OPTIONS = [
-  { id: 'all', label: 'All Ratings', desc: 'Show all catalog items', icon: 'grid-fill', color: '#1D4533', bgColor: '#ECFDF5', borderColor: '#A7F3D0' },
-  { id: '5', label: '5.0 Stars Only', desc: 'Highest rated rider gear', icon: 'star-fill', color: '#B45309', bgColor: '#FEF3C7', borderColor: '#FDE68A' },
-  { id: '4.5', label: '4.5 Stars & Above', desc: 'Top tier customer reviews', icon: 'star-half', color: '#B45309', bgColor: '#FEF3C7', borderColor: '#FDE68A' },
-  { id: '4', label: '4.0 Stars & Above', desc: 'Popular community selections', icon: 'star-half', color: '#B45309', bgColor: '#FEF3C7', borderColor: '#FDE68A' },
-  { id: 'sort-rating', label: 'Sort: Highest Rated', desc: 'Order products from 5.0 down', icon: 'sort-numeric-down-alt', color: '#4338CA', bgColor: '#E0E7FF', borderColor: '#C7D2FE' },
-];
-
-const PRICE_OPTIONS = [
-  { id: 'all', label: 'All Prices', desc: 'Products of any price tier', icon: 'grid-fill', color: '#1D4533', bgColor: '#ECFDF5', borderColor: '#A7F3D0' },
-  { id: 'price-low', label: 'Price: Low to High', desc: 'Most affordable items first', icon: 'sort-numeric-down', color: '#0284C7', bgColor: '#E0F2FE', borderColor: '#BAE6FD' },
-  { id: 'price-high', label: 'Price: High to Low', desc: 'Premium performance items first', icon: 'sort-numeric-up-alt', color: '#0284C7', bgColor: '#E0F2FE', borderColor: '#BAE6FD' },
-  { id: 'under-1000', label: 'Under ₱1,000', desc: 'Affordable maintenance, oils & parts', icon: 'cash', color: '#16A34A', bgColor: '#DCFCE7', borderColor: '#BBF7D0' },
-  { id: '1000-5000', label: '₱1,000 - ₱5,000', desc: 'Mid-range accessories, chains & pads', icon: 'cash-stack', color: '#16A34A', bgColor: '#DCFCE7', borderColor: '#BBF7D0' },
-  { id: 'above-5000', label: 'Above ₱5,000', desc: 'Exhausts, high-end shocks & helmets', icon: 'gem', color: '#7C3AED', bgColor: '#F3E8FF', borderColor: '#DDD6FE' },
-];
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 export default function FilterChips({
   selectedCategory = 'All',
   onSelectCategory = () => {},
   productsList = [],
+  activeBike = null,
+  onOpenBikeModal = () => {},
+  compatOnly = false,
+  onToggleCompatOnly = () => {},
+  // Optional backwards-compat props:
   filterSort = 'default',
   onSetFilterSort = () => {},
   ratingFilter = 'all',
@@ -40,10 +29,8 @@ export default function FilterChips({
   onSetPriceFilter = () => {},
   onResetFilters = () => {},
 }) {
+  const { isDarkMode = false } = useTheme?.() || {};
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
-  const [isPriceModalOpen, setIsPriceModalOpen] = useState(false);
-  const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
   // Compute category counts
   const categoryCounts = useMemo(() => {
@@ -97,41 +84,18 @@ export default function FilterChips({
   }, [allCategories, selectedCategory]);
 
   const isCategoryActive = selectedCategory !== 'All';
-  const isRatingActive = ratingFilter !== 'all';
-  const isPriceActive = priceFilter !== 'all' || (filterSort && filterSort.startsWith('price'));
-  const isAnyFilterActive = isCategoryActive || isRatingActive || isPriceActive;
-
-  // Rating button display label
-  const ratingChipLabel = useMemo(() => {
-    if (ratingFilter === '5') return '★ 5.0 ⌵';
-    if (ratingFilter === '4.5') return '★ 4.5+ ⌵';
-    if (ratingFilter === '4') return '★ 4.0+ ⌵';
-    if (ratingFilter === 'sort-rating') return '★ Top ⌵';
-    return 'Rating ⌵';
-  }, [ratingFilter]);
-
-  // Price button display label
-  const priceChipLabel = useMemo(() => {
-    if (priceFilter === 'price-low') return '₱ Low ⌵';
-    if (priceFilter === 'price-high') return '₱ High ⌵';
-    if (priceFilter === 'under-1000') return '< ₱1k ⌵';
-    if (priceFilter === '1000-5000') return '₱1k-5k ⌵';
-    if (priceFilter === 'above-5000') return '> ₱5k ⌵';
-    return 'Price ⌵';
-  }, [priceFilter]);
 
   return (
     <>
-      {/* ─── FILTER CHIPS ROW (HORIZONTAL SCROLLABLE FOR MAXIMUM MOBILE RESPONSIVENESS) ─── */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterChipsScroll}
-        style={styles.filterChipsScrollView}
-      >
+      {/* ─── FILTER CHIPS ROW: CATEGORY & COMPATIBILITY ALIGNED (SINGLE-LINE NO SCROLL) ─── */}
+      <View style={styles.filterChipsRow}>
         {/* 1. Category Dropdown Button */}
         <TouchableOpacity
-          style={[styles.chipBtn, isCategoryActive && styles.chipBtnActive]}
+          style={[
+            styles.chipBtn,
+            isCategoryActive && styles.chipBtnActive,
+            !isCategoryActive && isDarkMode && { backgroundColor: '#1C1F23', borderColor: '#2B3035' },
+          ]}
           onPress={() => setIsCategoryModalOpen(true)}
           activeOpacity={0.8}
           accessibilityRole="button"
@@ -139,72 +103,85 @@ export default function FilterChips({
         >
           <BootstrapIcon
             name={activeCategoryObj.biIcon || 'grid-fill'}
-            size={11.5}
-            color={isCategoryActive ? '#FFFFFF' : '#1D4533'}
+            size={11}
+            color={isCategoryActive ? '#FFFFFF' : '#EA580C'}
           />
           <Text
-            style={[styles.chipBtnText, isCategoryActive && styles.chipBtnTextActive]}
+            style={[
+              styles.chipBtnText,
+              isCategoryActive && styles.chipBtnTextActive,
+              !isCategoryActive && isDarkMode && { color: '#E2E8F0' },
+            ]}
             numberOfLines={1}
+            ellipsizeMode="tail"
           >
             {isCategoryActive ? `${activeCategoryObj.name} ⌵` : 'Category ⌵'}
           </Text>
         </TouchableOpacity>
 
-        {/* 2. Rating Dropdown Button */}
+        {/* 2. Motorcycle Selector Button (Compatibility Filter) */}
         <TouchableOpacity
-          style={[styles.chipBtn, isRatingActive && styles.chipBtnActive]}
-          onPress={() => setIsRatingModalOpen(true)}
+          style={[
+            styles.chipBtn,
+            Boolean(activeBike) && styles.chipBtnBikeActive,
+            !activeBike && isDarkMode && { backgroundColor: '#1C1F23', borderColor: '#2B3035' },
+          ]}
+          onPress={onOpenBikeModal}
           activeOpacity={0.8}
           accessibilityRole="button"
-          accessibilityLabel="Rating dropdown filter"
-        >
-          <Text
-            style={[styles.chipBtnText, isRatingActive && styles.chipBtnTextActive]}
-            numberOfLines={1}
-          >
-            {ratingChipLabel}
-          </Text>
-        </TouchableOpacity>
-
-        {/* 3. Price Dropdown Button */}
-        <TouchableOpacity
-          style={[styles.chipBtn, isPriceActive && styles.chipBtnActive]}
-          onPress={() => setIsPriceModalOpen(true)}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Price dropdown filter"
-        >
-          <Text
-            style={[styles.chipBtnText, isPriceActive && styles.chipBtnTextActive]}
-            numberOfLines={1}
-          >
-            {priceChipLabel}
-          </Text>
-        </TouchableOpacity>
-
-        {/* 4. Reset Dropdown Button */}
-        <TouchableOpacity
-          style={[styles.chipBtn, styles.resetChip, isAnyFilterActive && styles.resetChipActive]}
-          onPress={() => setIsResetModalOpen(true)}
-          activeOpacity={0.8}
-          accessibilityRole="button"
-          accessibilityLabel="Reset filters dropdown"
+          accessibilityLabel="Select Motorcycle"
         >
           <BootstrapIcon
-            name="arrow-counterclockwise"
-            size={11}
-            color={isAnyFilterActive ? '#1D4533' : '#64748B'}
+            name="scooter"
+            size={12}
+            color={activeBike ? '#EA580C' : (isDarkMode ? '#94A3B8' : '#64748B')}
           />
           <Text
-            style={[styles.chipBtnText, isAnyFilterActive && styles.resetChipTextActive]}
+            style={[
+              styles.chipBtnText,
+              Boolean(activeBike) && styles.chipBtnBikeTextActive,
+              !activeBike && isDarkMode && { color: '#E2E8F0' },
+            ]}
             numberOfLines={1}
+            ellipsizeMode="tail"
           >
-            Reset ⌵
+            {activeBike ? `${activeBike.brand} ${activeBike.model} ⌵` : 'My Motorcycle ⌵'}
           </Text>
         </TouchableOpacity>
-      </ScrollView>
 
-      {/* ─── 1. CATEGORY SELECTION BOTTOM SHEET MODAL ─── */}
+        {/* 3. Compatible Only Filter Button */}
+        <TouchableOpacity
+          style={[
+            styles.chipBtn,
+            compatOnly && styles.chipBtnActive,
+            !compatOnly && isDarkMode && { backgroundColor: '#1C1F23', borderColor: '#2B3035' },
+          ]}
+          onPress={onToggleCompatOnly}
+          activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel="Compatible parts only filter"
+        >
+          <BootstrapIcon
+            name={compatOnly ? 'check-circle-fill' : 'shield-check'}
+            size={11}
+            color={compatOnly ? '#FFFFFF' : activeBike ? '#EA580C' : (isDarkMode ? '#94A3B8' : '#64748B')}
+          />
+          <Text
+            style={[
+              styles.chipBtnText,
+              compatOnly && styles.chipBtnTextActive,
+              Boolean(activeBike && !compatOnly) && { color: isDarkMode ? '#CBD5E1' : '#334155' },
+              !compatOnly && isDarkMode && { color: '#E2E8F0' },
+            ]}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            Compatible Only
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ─── CATEGORY SELECTION BOTTOM SHEET MODAL ─── */}
       <Modal
         visible={isCategoryModalOpen}
         transparent={true}
@@ -214,25 +191,25 @@ export default function FilterChips({
         <TouchableWithoutFeedback onPress={() => setIsCategoryModalOpen(false)}>
           <View style={chipModalStyles.backdrop}>
             <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={chipModalStyles.sheetCard}>
-                <View style={chipModalStyles.sheetHeader}>
+              <View style={[chipModalStyles.sheetCard, isDarkMode && { backgroundColor: '#1C1F23' }]}>
+                <View style={[chipModalStyles.sheetHeader, isDarkMode && { borderBottomColor: '#2B3035' }]}>
                   <View style={chipModalStyles.headerLeft}>
-                    <View style={chipModalStyles.headerIconWrap}>
-                      <BootstrapIcon name="grid-fill" size={16} color="#1D4533" />
+                    <View style={[chipModalStyles.headerIconWrap, isDarkMode && { backgroundColor: '#2B1A0A', borderColor: '#43230A' }]}>
+                      <BootstrapIcon name="grid-fill" size={16} color="#EA580C" />
                     </View>
                     <View>
-                      <Text style={chipModalStyles.sheetTitle}>Select Category</Text>
-                      <Text style={chipModalStyles.sheetSub}>
+                      <Text style={[chipModalStyles.sheetTitle, isDarkMode && { color: '#F9FAFB' }]}>Select Category</Text>
+                      <Text style={[chipModalStyles.sheetSub, isDarkMode && { color: '#94A3B8' }]}>
                         Filter by motorcycle part type ({allCategories.length} categories)
                       </Text>
                     </View>
                   </View>
                   <TouchableOpacity
-                    style={chipModalStyles.closeBtn}
+                    style={[chipModalStyles.closeBtn, isDarkMode && { backgroundColor: '#23272B' }]}
                     onPress={() => setIsCategoryModalOpen(false)}
                     activeOpacity={0.7}
                   >
-                    <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+                    <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#94A3B8' : '#64748B'} />
                   </TouchableOpacity>
                 </View>
 
@@ -252,10 +229,11 @@ export default function FilterChips({
 
                     return (
                       <TouchableOpacity
-                        key={item.id}
+                        key={item.id || item.category}
                         style={[
                           chipModalStyles.optionRow,
                           isSelected && chipModalStyles.optionRowSelected,
+                          !isSelected && isDarkMode && { backgroundColor: '#23272B', borderColor: '#2B3035' },
                         ]}
                         onPress={() => {
                           onSelectCategory(item.category);
@@ -267,12 +245,13 @@ export default function FilterChips({
                           style={[
                             chipModalStyles.itemIconWrap,
                             isSelected && chipModalStyles.itemIconWrapSelected,
+                            !isSelected && isDarkMode && { backgroundColor: '#1C1F23' },
                           ]}
                         >
                           <BootstrapIcon
                             name={item.biIcon || 'grid-fill'}
                             size={14}
-                            color={isSelected ? '#FFFFFF' : '#1D4533'}
+                            color={isSelected ? '#FFFFFF' : '#EA580C'}
                           />
                         </View>
                         <View style={chipModalStyles.itemTextWrap}>
@@ -280,9 +259,15 @@ export default function FilterChips({
                             style={[
                               chipModalStyles.itemTitle,
                               isSelected && chipModalStyles.itemTitleSelected,
+                              !isSelected && isDarkMode && { color: '#F9FAFB' },
                             ]}
                           >
-                            {item.name}
+                            {item.name || item.category}
+                          </Text>
+                          <Text style={[chipModalStyles.itemSubtitle, isDarkMode && { color: '#94A3B8' }]}>
+                            {item.category === 'All'
+                              ? 'Browse full store collection'
+                              : `Explore ${item.name || item.category} products`}
                           </Text>
                         </View>
                         {count > 0 && (
@@ -290,12 +275,14 @@ export default function FilterChips({
                             style={[
                               chipModalStyles.itemCountPill,
                               isSelected && chipModalStyles.itemCountPillSelected,
+                              !isSelected && isDarkMode && { backgroundColor: '#33383F' },
                             ]}
                           >
                             <Text
                               style={[
                                 chipModalStyles.itemCountText,
                                 isSelected && chipModalStyles.itemCountTextSelected,
+                                !isSelected && isDarkMode && { color: '#CBD5E1' },
                               ]}
                             >
                               {count} {count === 1 ? 'item' : 'items'}
@@ -306,7 +293,7 @@ export default function FilterChips({
                           <BootstrapIcon
                             name="check-circle-fill"
                             size={16}
-                            color="#1D4533"
+                            color="#EA580C"
                             style={{ marginLeft: 6 }}
                           />
                         )}
@@ -315,18 +302,18 @@ export default function FilterChips({
                   })}
                 </ScrollView>
 
-                <View style={chipModalStyles.sheetFooter}>
+                <View style={[chipModalStyles.sheetFooter, isDarkMode && { borderTopColor: '#2B3035' }]}>
                   {selectedCategory !== 'All' && (
                     <TouchableOpacity
-                      style={chipModalStyles.resetFooterBtn}
+                      style={[chipModalStyles.resetFooterBtn, isDarkMode && { backgroundColor: '#23272B', borderColor: '#2B3035' }]}
                       onPress={() => {
                         onSelectCategory('All');
                         setIsCategoryModalOpen(false);
                       }}
                       activeOpacity={0.8}
                     >
-                      <BootstrapIcon name="arrow-counterclockwise" size={13} color="#1D4533" />
-                      <Text style={chipModalStyles.resetFooterBtnText}>Reset to All</Text>
+                      <BootstrapIcon name="arrow-counterclockwise" size={13} color="#EA580C" />
+                      <Text style={[chipModalStyles.resetFooterBtnText, isDarkMode && { color: '#E2E8F0' }]}>Reset to All</Text>
                     </TouchableOpacity>
                   )}
                   <TouchableOpacity
@@ -342,405 +329,32 @@ export default function FilterChips({
           </View>
         </TouchableWithoutFeedback>
       </Modal>
-
-      {/* ─── 2. RATING SELECTION BOTTOM SHEET MODAL ─── */}
-      <Modal
-        visible={isRatingModalOpen}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsRatingModalOpen(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setIsRatingModalOpen(false)}>
-          <View style={chipModalStyles.backdrop}>
-            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={chipModalStyles.sheetCard}>
-                <View style={chipModalStyles.sheetHeader}>
-                  <View style={chipModalStyles.headerLeft}>
-                    <View style={[chipModalStyles.headerIconWrap, { backgroundColor: '#FEF3C7' }]}>
-                      <BootstrapIcon name="star-fill" size={16} color="#B45309" />
-                    </View>
-                    <View>
-                      <Text style={chipModalStyles.sheetTitle}>Filter by Rating</Text>
-                      <Text style={chipModalStyles.sheetSub}>
-                        Show products matching customer ratings
-                      </Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={chipModalStyles.closeBtn}
-                    onPress={() => setIsRatingModalOpen(false)}
-                    activeOpacity={0.7}
-                  >
-                    <BootstrapIcon name="x-lg" size={14} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView
-                  style={chipModalStyles.listContainer}
-                  showsVerticalScrollIndicator={true}
-                  contentContainerStyle={{ paddingVertical: 6 }}
-                >
-                  {RATING_OPTIONS.map((opt) => {
-                    const isSelected = ratingFilter === opt.id;
-                    return (
-                      <TouchableOpacity
-                        key={opt.id}
-                        style={[
-                          chipModalStyles.optionRow,
-                          isSelected && chipModalStyles.optionRowSelected,
-                        ]}
-                        onPress={() => {
-                          onSetRatingFilter(opt.id);
-                          setIsRatingModalOpen(false);
-                        }}
-                        activeOpacity={0.75}
-                      >
-                        <View
-                          style={[
-                            chipModalStyles.itemIconWrap,
-                            { backgroundColor: opt.bgColor, borderColor: opt.borderColor },
-                            isSelected && { backgroundColor: '#1D4533', borderColor: '#1D4533' },
-                          ]}
-                        >
-                          <BootstrapIcon
-                            name={opt.icon}
-                            size={14}
-                            color={isSelected ? '#FFFFFF' : opt.color}
-                          />
-                        </View>
-                        <View style={chipModalStyles.itemTextWrap}>
-                          <Text
-                            style={[
-                              chipModalStyles.itemTitle,
-                              isSelected && chipModalStyles.itemTitleSelected,
-                            ]}
-                          >
-                            {opt.label}
-                          </Text>
-                          <Text style={chipModalStyles.itemSubtitle}>{opt.desc}</Text>
-                        </View>
-                        {isSelected && (
-                          <BootstrapIcon
-                            name="check-circle-fill"
-                            size={16}
-                            color="#1D4533"
-                            style={{ marginLeft: 6 }}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-
-                <View style={chipModalStyles.sheetFooter}>
-                  {ratingFilter !== 'all' && (
-                    <TouchableOpacity
-                      style={chipModalStyles.resetFooterBtn}
-                      onPress={() => {
-                        onSetRatingFilter('all');
-                        setIsRatingModalOpen(false);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <BootstrapIcon name="arrow-counterclockwise" size={13} color="#1D4533" />
-                      <Text style={chipModalStyles.resetFooterBtnText}>Reset Rating</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    style={chipModalStyles.doneFooterBtn}
-                    onPress={() => setIsRatingModalOpen(false)}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={chipModalStyles.doneFooterBtnText}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* ─── 3. PRICE SELECTION BOTTOM SHEET MODAL ─── */}
-      <Modal
-        visible={isPriceModalOpen}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsPriceModalOpen(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setIsPriceModalOpen(false)}>
-          <View style={chipModalStyles.backdrop}>
-            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={chipModalStyles.sheetCard}>
-                <View style={chipModalStyles.sheetHeader}>
-                  <View style={chipModalStyles.headerLeft}>
-                    <View style={[chipModalStyles.headerIconWrap, { backgroundColor: '#E0F2FE' }]}>
-                      <BootstrapIcon name="tag-fill" size={16} color="#0284C7" />
-                    </View>
-                    <View>
-                      <Text style={chipModalStyles.sheetTitle}>Filter by Price</Text>
-                      <Text style={chipModalStyles.sheetSub}>
-                        Choose budget range or price sorting
-                      </Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={chipModalStyles.closeBtn}
-                    onPress={() => setIsPriceModalOpen(false)}
-                    activeOpacity={0.7}
-                  >
-                    <BootstrapIcon name="x-lg" size={14} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView
-                  style={chipModalStyles.listContainer}
-                  showsVerticalScrollIndicator={true}
-                  contentContainerStyle={{ paddingVertical: 6 }}
-                >
-                  {PRICE_OPTIONS.map((opt) => {
-                    const isSelected = priceFilter === opt.id;
-                    return (
-                      <TouchableOpacity
-                        key={opt.id}
-                        style={[
-                          chipModalStyles.optionRow,
-                          isSelected && chipModalStyles.optionRowSelected,
-                        ]}
-                        onPress={() => {
-                          onSetPriceFilter(opt.id);
-                          setIsPriceModalOpen(false);
-                        }}
-                        activeOpacity={0.75}
-                      >
-                        <View
-                          style={[
-                            chipModalStyles.itemIconWrap,
-                            { backgroundColor: opt.bgColor, borderColor: opt.borderColor },
-                            isSelected && { backgroundColor: '#1D4533', borderColor: '#1D4533' },
-                          ]}
-                        >
-                          <BootstrapIcon
-                            name={opt.icon}
-                            size={14}
-                            color={isSelected ? '#FFFFFF' : opt.color}
-                          />
-                        </View>
-                        <View style={chipModalStyles.itemTextWrap}>
-                          <Text
-                            style={[
-                              chipModalStyles.itemTitle,
-                              isSelected && chipModalStyles.itemTitleSelected,
-                            ]}
-                          >
-                            {opt.label}
-                          </Text>
-                          <Text style={chipModalStyles.itemSubtitle}>{opt.desc}</Text>
-                        </View>
-                        {isSelected && (
-                          <BootstrapIcon
-                            name="check-circle-fill"
-                            size={16}
-                            color="#1D4533"
-                            style={{ marginLeft: 6 }}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-
-                <View style={chipModalStyles.sheetFooter}>
-                  {priceFilter !== 'all' && (
-                    <TouchableOpacity
-                      style={chipModalStyles.resetFooterBtn}
-                      onPress={() => {
-                        onSetPriceFilter('all');
-                        setIsPriceModalOpen(false);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <BootstrapIcon name="arrow-counterclockwise" size={13} color="#1D4533" />
-                      <Text style={chipModalStyles.resetFooterBtnText}>Reset Price</Text>
-                    </TouchableOpacity>
-                  )}
-                  <TouchableOpacity
-                    style={chipModalStyles.doneFooterBtn}
-                    onPress={() => setIsPriceModalOpen(false)}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={chipModalStyles.doneFooterBtnText}>Done</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* ─── 4. RESET FILTERS BOTTOM SHEET MODAL ─── */}
-      <Modal
-        visible={isResetModalOpen}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setIsResetModalOpen(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setIsResetModalOpen(false)}>
-          <View style={chipModalStyles.backdrop}>
-            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={chipModalStyles.sheetCard}>
-                <View style={chipModalStyles.sheetHeader}>
-                  <View style={chipModalStyles.headerLeft}>
-                    <View style={[chipModalStyles.headerIconWrap, { backgroundColor: '#F0FDFA' }]}>
-                      <BootstrapIcon name="arrow-counterclockwise" size={16} color="#1D4533" />
-                    </View>
-                    <View>
-                      <Text style={chipModalStyles.sheetTitle}>Reset Filters</Text>
-                      <Text style={chipModalStyles.sheetSub}>
-                        {isAnyFilterActive
-                          ? 'Choose which filters you want to clear'
-                          : 'No active filters are currently applied'}
-                      </Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity
-                    style={chipModalStyles.closeBtn}
-                    onPress={() => setIsResetModalOpen(false)}
-                    activeOpacity={0.7}
-                  >
-                    <BootstrapIcon name="x-lg" size={14} color="#64748B" />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={{ marginVertical: 14 }}>
-                  {/* Reset All Option */}
-                  <TouchableOpacity
-                    style={[chipModalStyles.optionRow, { borderColor: '#CCFBF1', backgroundColor: '#F0FDFA' }]}
-                    onPress={() => {
-                      onResetFilters();
-                      setIsResetModalOpen(false);
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <View style={[chipModalStyles.itemIconWrap, { backgroundColor: '#1D4533' }]}>
-                      <BootstrapIcon name="arrow-counterclockwise" size={14} color="#FFFFFF" />
-                    </View>
-                    <View style={chipModalStyles.itemTextWrap}>
-                      <Text style={[chipModalStyles.itemTitle, { color: '#1D4533', fontWeight: '800' }]}>
-                        Reset All Filters
-                      </Text>
-                      <Text style={chipModalStyles.itemSubtitle}>
-                        Clear Category, Rating, Price and Search query
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  {/* Clear Category Only */}
-                  {isCategoryActive && (
-                    <TouchableOpacity
-                      style={chipModalStyles.optionRow}
-                      onPress={() => {
-                        onSelectCategory('All');
-                        setIsResetModalOpen(false);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[chipModalStyles.itemIconWrap, { backgroundColor: '#E2E8F0' }]}>
-                        <BootstrapIcon name="x-circle" size={14} color="#475569" />
-                      </View>
-                      <View style={chipModalStyles.itemTextWrap}>
-                        <Text style={chipModalStyles.itemTitle}>Clear Category</Text>
-                        <Text style={chipModalStyles.itemSubtitle}>
-                          Currently set to: {activeCategoryObj.name}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-
-                  {/* Clear Rating Only */}
-                  {isRatingActive && (
-                    <TouchableOpacity
-                      style={chipModalStyles.optionRow}
-                      onPress={() => {
-                        onSetRatingFilter('all');
-                        setIsResetModalOpen(false);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[chipModalStyles.itemIconWrap, { backgroundColor: '#FEF3C7' }]}>
-                        <BootstrapIcon name="x-circle" size={14} color="#B45309" />
-                      </View>
-                      <View style={chipModalStyles.itemTextWrap}>
-                        <Text style={chipModalStyles.itemTitle}>Clear Rating</Text>
-                        <Text style={chipModalStyles.itemSubtitle}>
-                          Currently set to: {ratingChipLabel.replace(' ⌵', '')}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-
-                  {/* Clear Price Only */}
-                  {isPriceActive && (
-                    <TouchableOpacity
-                      style={chipModalStyles.optionRow}
-                      onPress={() => {
-                        onSetPriceFilter('all');
-                        setIsResetModalOpen(false);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <View style={[chipModalStyles.itemIconWrap, { backgroundColor: '#E0F2FE' }]}>
-                        <BootstrapIcon name="x-circle" size={14} color="#0284C7" />
-                      </View>
-                      <View style={chipModalStyles.itemTextWrap}>
-                        <Text style={chipModalStyles.itemTitle}>Clear Price</Text>
-                        <Text style={chipModalStyles.itemSubtitle}>
-                          Currently set to: {priceChipLabel.replace(' ⌵', '')}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                </View>
-
-                <View style={chipModalStyles.sheetFooter}>
-                  <TouchableOpacity
-                    style={[chipModalStyles.doneFooterBtn, { width: '100%' }]}
-                    onPress={() => setIsResetModalOpen(false)}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={chipModalStyles.doneFooterBtnText}>Close</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
     </>
   );
 }
 
 const styles = StyleSheet.create({
-  filterChipsScrollView: {
-    marginVertical: 8,
-  },
-  filterChipsScroll: {
+  filterChipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    paddingVertical: 2,
-    paddingHorizontal: 2,
+    justifyContent: 'space-between',
+    width: '100%',
+    marginVertical: 8,
+    gap: 6,
   },
   chipBtn: {
+    flex: 1,
+    minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 36,
+    height: 34,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    gap: 5,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+    gap: 4,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.03,
@@ -748,25 +362,26 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   chipBtnActive: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   chipBtnText: {
-    fontSize: 11.5,
-    fontWeight: '500',
+    fontSize: 10.5,
+    fontWeight: '600',
     color: '#475569',
     textAlign: 'center',
+    flexShrink: 1,
   },
   chipBtnTextActive: {
     color: '#FFFFFF',
     fontWeight: '700',
   },
-  resetChipActive: {
-    borderColor: '#1D4533',
-    backgroundColor: '#F0FDFA',
+  chipBtnBikeActive: {
+    backgroundColor: '#FFF7ED',
+    borderColor: '#EA580C',
   },
-  resetChipTextActive: {
-    color: '#1D4533',
+  chipBtnBikeTextActive: {
+    color: '#EA580C',
     fontWeight: '700',
   },
 });
@@ -809,7 +424,7 @@ const chipModalStyles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -846,23 +461,23 @@ const chipModalStyles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   optionRowSelected: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#86EFAC',
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
   },
   itemIconWrap: {
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: '#CCFBF1',
+    borderColor: '#E5E7EB',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   itemIconWrapSelected: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   itemTextWrap: {
     flex: 1,
@@ -873,7 +488,7 @@ const chipModalStyles = StyleSheet.create({
     color: '#1E293B',
   },
   itemTitleSelected: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '800',
   },
   itemSubtitle: {
@@ -888,7 +503,7 @@ const chipModalStyles = StyleSheet.create({
     borderRadius: 10,
   },
   itemCountPillSelected: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: '#FFF7ED',
   },
   itemCountText: {
     fontSize: 11,
@@ -896,7 +511,7 @@ const chipModalStyles = StyleSheet.create({
     color: '#475569',
   },
   itemCountTextSelected: {
-    color: '#15803D',
+    color: '#EA580C',
   },
   sheetFooter: {
     flexDirection: 'row',
@@ -914,20 +529,20 @@ const chipModalStyles = StyleSheet.create({
     gap: 6,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: '#F0FDFA',
+    backgroundColor: '#F3F4F6',
     borderWidth: 1,
-    borderColor: '#CCFBF1',
+    borderColor: '#E5E7EB',
   },
   resetFooterBtnText: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#1D4533',
+    fontWeight: '700',
+    color: '#24272B',
   },
   doneFooterBtn: {
     flex: 1,
     paddingVertical: 12,
     borderRadius: 12,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     alignItems: 'center',
     justifyContent: 'center',
   },

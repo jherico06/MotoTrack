@@ -4,12 +4,12 @@ export const customizerWebStyles = StyleSheet.create({
   // ─── BASE CANVAS & SCROLL CONTAINER ───
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F3F4F6',
     minHeight: Platform.OS === 'web' ? '100vh' : '100%',
   },
   scrollContent: {
-    paddingTop: 20,
-    paddingHorizontal: 24,
+    paddingTop: 0,
+    paddingHorizontal: 0,
     paddingBottom: 120,
   },
   maxContainer: {
@@ -17,15 +17,21 @@ export const customizerWebStyles = StyleSheet.create({
     maxWidth: 1360,
     alignSelf: 'center',
     marginHorizontal: 'auto',
+    paddingHorizontal: 24,
+    paddingTop: 20,
   },
 
   // ─── 1. FULL-WIDTH DESKTOP STICKY NAVBAR (MATCHING APP PALETTE) ───
   headerWrapper: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
     position: 'sticky',
     top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    alignSelf: 'stretch',
     zIndex: 1000,
     boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
     borderBottomWidth: 1,
@@ -54,10 +60,10 @@ export const customizerWebStyles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 11,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.3,
     shadowRadius: 6,
@@ -70,7 +76,7 @@ export const customizerWebStyles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   logoAccent: {
-    color: '#1D4533',
+    color: '#EA580C',
   },
   logoSubText: {
     fontSize: 10.5,
@@ -177,7 +183,7 @@ export const customizerWebStyles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 16,
     paddingVertical: 9,
-    borderRadius: 20,
+    borderRadius: 8,
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.5)',
@@ -190,13 +196,13 @@ export const customizerWebStyles = StyleSheet.create({
 
   // ─── 2. HERO SHOWCASE SECTION (MATCHING APP BRAND HERO) ───
   heroSection: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 24,
     padding: 30,
     marginBottom: 24,
     position: 'relative',
     overflow: 'hidden',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.25,
     shadowRadius: 16,
@@ -309,7 +315,7 @@ export const customizerWebStyles = StyleSheet.create({
     fontWeight: '800',
   },
   toggleViewBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 12,
@@ -317,9 +323,9 @@ export const customizerWebStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     borderWidth: 1,
-    borderColor: '#56B9A1',
+    borderColor: '#EA580C',
     cursor: 'pointer',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.4,
     shadowRadius: 6,
@@ -344,8 +350,8 @@ export const customizerWebStyles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 3.5,
-    borderColor: '#1D4533',
-    borderTopColor: '#56B9A1',
+    borderColor: '#EA580C',
+    borderTopColor: '#EA580C',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -359,7 +365,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   scanSub: {
     fontSize: 14,
-    color: '#74C9B4',
+    color: '#EA580C',
     textAlign: 'center',
     marginBottom: 20,
     fontWeight: '700',
@@ -375,7 +381,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 5,
   },
   progressPercentText: {
@@ -418,7 +424,7 @@ export const customizerWebStyles = StyleSheet.create({
   geminiBadgeText: {
     fontSize: 10.5,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   geminiSummary: {
     fontSize: 12.5,
@@ -486,7 +492,7 @@ export const customizerWebStyles = StyleSheet.create({
   diagItemVal: {
     fontSize: 17,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   diagItemSub: {
     fontSize: 11,
@@ -500,7 +506,7 @@ export const customizerWebStyles = StyleSheet.create({
     gap: 10,
   },
   generateCtaBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 16,
@@ -509,7 +515,7 @@ export const customizerWebStyles = StyleSheet.create({
     flexDirection: 'row',
     gap: 10,
     cursor: 'pointer',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 14,
@@ -524,7 +530,7 @@ export const customizerWebStyles = StyleSheet.create({
   bookServiceBtn: {
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     paddingVertical: 14,
     paddingHorizontal: 20,
     borderRadius: 16,
@@ -535,7 +541,7 @@ export const customizerWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   bookServiceBtnText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 14,
     fontWeight: '800',
   },
@@ -586,7 +592,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   sectionHeadingSub: {
     fontSize: 12,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
     cursor: 'pointer',
   },
@@ -605,7 +611,7 @@ export const customizerWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   uploadBoxActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#F3F7F6',
   },
   uploadIconCircle: {
@@ -655,7 +661,7 @@ export const customizerWebStyles = StyleSheet.create({
     shadowRadius: 4,
   },
   presetBikeCardActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     borderWidth: 2,
     backgroundColor: '#F3F7F6',
   },
@@ -674,7 +680,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   presetBikeBrand: {
     fontSize: 10.5,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
     marginTop: 1,
   },
@@ -695,7 +701,7 @@ export const customizerWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   themeCardActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     borderWidth: 2,
     backgroundColor: '#F3F7F6',
   },
@@ -737,8 +743,8 @@ export const customizerWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   partsCategoryChipActive: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   partsCategoryText: {
     fontSize: 12,
@@ -784,7 +790,7 @@ export const customizerWebStyles = StyleSheet.create({
     marginBottom: 8,
   },
   partItemCardSelected: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     borderWidth: 1.5,
     backgroundColor: '#F3F7F6',
   },
@@ -813,7 +819,7 @@ export const customizerWebStyles = StyleSheet.create({
   partPricePhp: {
     fontSize: 13.5,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   partPriceUsd: {
     fontSize: 10.5,
@@ -830,8 +836,8 @@ export const customizerWebStyles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   checkboxCircleSelected: {
-    borderColor: '#1D4533',
-    backgroundColor: '#1D4533',
+    borderColor: '#EA580C',
+    backgroundColor: '#EA580C',
   },
 
   // Selected Parts Tray
@@ -859,7 +865,7 @@ export const customizerWebStyles = StyleSheet.create({
   selectedTrayTotal: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
 
   // ─── 6. MODALS (WHITE & EMERALD) ───
@@ -935,7 +941,7 @@ export const customizerWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   branchBtnActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     borderWidth: 2,
     backgroundColor: '#F3F7F6',
   },
@@ -961,8 +967,8 @@ export const customizerWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   slotChipActive: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   slotText: {
     fontSize: 12,
@@ -997,9 +1003,9 @@ export const customizerWebStyles = StyleSheet.create({
     transition: 'all 0.2s ease',
   },
   modeTabActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#F3F7F6',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOpacity: 0.12,
     shadowRadius: 12,
   },
@@ -1018,7 +1024,7 @@ export const customizerWebStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   modeIconWrapActive: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   modeTabBadge: {
     backgroundColor: '#E2E8F0',
@@ -1027,7 +1033,7 @@ export const customizerWebStyles = StyleSheet.create({
     borderRadius: 6,
   },
   modeTabBadgeActive: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   modeTabBadgeText: {
     fontSize: 10,
@@ -1044,7 +1050,7 @@ export const customizerWebStyles = StyleSheet.create({
     marginBottom: 4,
   },
   modeTabTitleActive: {
-    color: '#1D4533',
+    color: '#EA580C',
   },
   modeTabDesc: {
     fontSize: 12,
@@ -1093,15 +1099,15 @@ export const customizerWebStyles = StyleSheet.create({
     marginBottom: 8,
   },
   inspoStylePill: {
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
-    borderColor: '#56B9A1',
+    borderColor: '#FED7AA',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
   inspoStylePillText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 11,
     fontWeight: '800',
   },
@@ -1162,7 +1168,7 @@ export const customizerWebStyles = StyleSheet.create({
     color: '#0F172A',
   },
   matchedPartsCountBadge: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -1185,7 +1191,7 @@ export const customizerWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   matchedPartItemActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#F3F7F6',
   },
   matchedPartImg: {
@@ -1207,7 +1213,7 @@ export const customizerWebStyles = StyleSheet.create({
   matchedPartPrice: {
     fontSize: 13.5,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
     marginTop: 2,
   },
   customPromptInput: {
@@ -1245,8 +1251,8 @@ export const customizerWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   bikeSourceTabActive: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   bikeSourceTabText: {
     fontSize: 12,
@@ -1272,9 +1278,9 @@ export const customizerWebStyles = StyleSheet.create({
     position: 'relative',
   },
   regBikeCardActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#F3F7F6',
-    boxShadow: '0 4px 14px rgba(29, 69, 51, 0.12)',
+    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.12)',
   },
   regBikeThumb: {
     width: '100%',
@@ -1367,7 +1373,7 @@ export const customizerWebStyles = StyleSheet.create({
     gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 7,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 8,
   },
   emptyRegBikesBtnText: {
@@ -1381,11 +1387,11 @@ export const customizerWebStyles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderRadius: 16,
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     padding: 16,
     marginTop: 14,
     marginBottom: 14,
-    boxShadow: '0 4px 16px rgba(29, 69, 51, 0.08)',
+    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.08)',
   },
   formedPromptHeader: {
     flexDirection: 'row',
@@ -1414,7 +1420,7 @@ export const customizerWebStyles = StyleSheet.create({
   formedPromptBadgeText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
     letterSpacing: 0.3,
   },
   formedPromptActions: {
@@ -1490,7 +1496,7 @@ export const customizerWebStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepBadgeActive: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   stepBadgeDone: {
     backgroundColor: '#10B981',
@@ -1527,7 +1533,7 @@ export const customizerWebStyles = StyleSheet.create({
     minWidth: 16,
   },
   stepConnectorActive: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
 
   // ─── PART DETAILS & PRICE MODAL ───
@@ -1573,7 +1579,7 @@ export const customizerWebStyles = StyleSheet.create({
     position: 'absolute',
     top: 12,
     left: 12,
-    backgroundColor: 'rgba(29, 69, 51, 0.9)',
+    backgroundColor: 'rgba(24, 26, 29, 0.95)',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -1610,7 +1616,7 @@ export const customizerWebStyles = StyleSheet.create({
   partModalPricePhp: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   partModalPriceUsd: {
     fontSize: 14,
@@ -1644,7 +1650,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   partModalAddBtn: {
     flex: 2,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 13,
     paddingHorizontal: 18,
     borderRadius: 14,
@@ -1685,13 +1691,13 @@ export const customizerWebStyles = StyleSheet.create({
     marginTop: 16,
     marginBottom: 16,
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: 12,
-    boxShadow: '0 8px 24px rgba(29, 69, 51, 0.2)',
+    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.2)',
   },
   addMorePromptLeft: {
     flexDirection: 'row',
@@ -1704,7 +1710,7 @@ export const customizerWebStyles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1741,7 +1747,7 @@ export const customizerWebStyles = StyleSheet.create({
     fontWeight: '700',
   },
   addMoreBtnNo: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 9,
     paddingHorizontal: 16,
     borderRadius: 10,
@@ -1833,7 +1839,7 @@ export const customizerWebStyles = StyleSheet.create({
   reviewPartPrice: {
     fontSize: 13.5,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   reviewPartRemoveBtn: {
     padding: 6,
@@ -1881,7 +1887,7 @@ export const customizerWebStyles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 20,
     borderRadius: 12,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     cursor: 'pointer',
   },
   reviewActionPrimaryText: {
@@ -1923,7 +1929,7 @@ export const customizerWebStyles = StyleSheet.create({
     borderRadius: 14,
     marginTop: 16,
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -1931,12 +1937,12 @@ export const customizerWebStyles = StyleSheet.create({
   totalGrandLabel: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   totalGrandAmount: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
     textAlign: 'right',
   },
   dualActionContainer: {
@@ -1948,7 +1954,7 @@ export const customizerWebStyles = StyleSheet.create({
   buyPartsCheckoutBtn: {
     flex: 1,
     minWidth: 240,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 15,
     paddingHorizontal: 20,
     borderRadius: 16,
@@ -1956,7 +1962,7 @@ export const customizerWebStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    boxShadow: '0 6px 20px rgba(29, 69, 51, 0.3)',
+    boxShadow: '0 6px 20px rgba(0, 0, 0, 0.3)',
     cursor: 'pointer',
   },
   buyPartsCheckoutText: {

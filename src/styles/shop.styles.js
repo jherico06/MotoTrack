@@ -1,5 +1,6 @@
 import { StyleSheet, Platform } from 'react-native';
 import { ANDROID_TOP_INSET } from '../utils/safeArea.js';
+import { fontFamily } from './typography.js';
 
 export const shopStyles = StyleSheet.create({
   // ─── BASE CONTAINER ───
@@ -9,10 +10,11 @@ export const shopStyles = StyleSheet.create({
   },
   safeArea: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
-    paddingTop: ANDROID_TOP_INSET,
+    backgroundColor: '#24272B',
+    paddingTop: Platform.OS === 'android' ? ANDROID_TOP_INSET : 0,
   },
   scrollContent: {
+    paddingTop: 10,
     paddingBottom: 115,
   },
   maxContainer: {
@@ -47,11 +49,33 @@ export const shopStyles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // ─── MOBILE TOP HEADER ───
+  // ─── MOBILE TOP HEADER (STICKY CHARCOAL HEADER) ───
+  mobileHeaderRoot: {
+    backgroundColor: '#24272B',
+    borderBottomWidth: 1,
+    borderBottomColor: '#1A1D20',
+    zIndex: 1000,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 4px 16px rgba(0, 0, 0, 0.22)' }
+      : {
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 3 },
+          shadowOpacity: 0.22,
+          shadowRadius: 5,
+        }),
+    elevation: 8,
+  },
+  mobileHeaderInner: {
+    width: '100%',
+    maxWidth: 1320,
+    alignSelf: 'center',
+    paddingTop: Platform.OS === 'web' ? 10 : 4,
+    paddingBottom: 10,
+  },
   headerWrapper: {
-    backgroundColor: '#F8FAFC',
-    paddingTop: Platform.OS === 'web' ? 14 : 4,
-    paddingBottom: 8,
+    backgroundColor: 'transparent',
+    paddingTop: 2,
+    paddingBottom: 6,
   },
   headerRow: {
     flexDirection: 'row',
@@ -68,9 +92,9 @@ export const shopStyles = StyleSheet.create({
     height: 38,
     borderRadius: 19,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#E2E8F0',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.25)',
+    backgroundColor: '#32373D',
   },
   avatarImg: {
     width: '100%',
@@ -81,8 +105,9 @@ export const shopStyles = StyleSheet.create({
   },
   greetingSub: {
     fontSize: 11,
-    color: '#64748B',
+    color: '#94A3B8',
     fontWeight: '400',
+    fontFamily: fontFamily.sans,
   },
   greetingNameRow: {
     flexDirection: 'row',
@@ -93,8 +118,9 @@ export const shopStyles = StyleSheet.create({
   userName: {
     fontSize: 14.5,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#FFFFFF',
     letterSpacing: -0.2,
+    fontFamily: fontFamily.sans,
   },
   verifiedBadge: {
     fontSize: 12,
@@ -108,51 +134,53 @@ export const shopStyles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderWidth: 0,
+    borderColor: 'transparent',
     position: 'relative',
   },
   adminIconBtn: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderColor: 'transparent',
   },
   cartBadgeDot: {
     position: 'absolute',
-    top: 2,
-    right: 2,
-    backgroundColor: '#0F172A',
+    top: -2,
+    right: -2,
+    backgroundColor: '#EF4444',
     borderRadius: 9,
-    minWidth: 15,
-    height: 15,
+    minWidth: 16,
+    height: 16,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 3,
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#24272B',
   },
   cartBadgeDotText: {
     color: '#FFFFFF',
     fontSize: 8.5,
     fontWeight: '700',
+    fontFamily: fontFamily.sans,
   },
 
   // ─── 3. SEARCH & FILTER BAR (MOBILE) ───
   searchSection: {
     marginTop: 6,
-    marginBottom: 8,
+    marginBottom: 2,
   },
   searchBarPill: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'transparent',
     borderRadius: 12,
     height: 44,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: 'rgba(255, 255, 255, 0.18)',
   },
   searchIcon: {
     fontSize: 15,
@@ -161,8 +189,9 @@ export const shopStyles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 13.5,
-    color: '#0F172A',
+    color: '#FFFFFF',
     fontWeight: '400',
+    fontFamily: fontFamily.sans,
     paddingVertical: 0,
     ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
   },
@@ -170,7 +199,9 @@ export const shopStyles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 8,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 6,
@@ -201,9 +232,9 @@ export const shopStyles = StyleSheet.create({
     elevation: 1,
   },
   categoryPillActive: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
-    shadowColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
+    shadowColor: '#EA580C',
     shadowOpacity: 0.25,
     shadowRadius: 6,
     elevation: 4,
@@ -221,91 +252,213 @@ export const shopStyles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // ─── 5. HERO PROMO BANNER (RESPONSIVE) ───
+  // ─── 5. HERO PROMO BANNER (INSPIRATION GEOMETRIC REDESIGN) ───
   heroBannerWrap: {
     marginBottom: 24,
   },
   heroBannerCard: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#20242B',
     borderRadius: 16,
-    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    justifyContent: 'space-between',
+    minHeight: 180,
+    position: 'relative',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 4,
+  },
+  heroBannerCardDesktop: {
+    minHeight: 250,
+  },
+  heroBannerLeft: {
+    width: '58%',
+    padding: 24,
+    justifyContent: 'space-between',
+    zIndex: 5,
+    position: 'relative',
+  },
+  heroBannerLeftMobile: {
+    width: '60%',
+    padding: 14,
+  },
+  heroBrandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    minHeight: 150,
-    position: 'relative',
-    overflow: 'hidden',
-    shadowColor: '#1D4533',
+    marginBottom: 6,
+  },
+  heroBrandBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  heroBrandDiamond: {
+    width: 11,
+    height: 11,
+    backgroundColor: '#EA580C',
+    borderRadius: 2,
+    transform: [{ rotate: '45deg' }],
+  },
+  heroBrandText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  heroFloatingCrossOrange: {
+    color: '#EA580C',
+    fontSize: 13,
+    fontWeight: '900',
+    opacity: 0.85,
+    marginRight: 10,
+  },
+  heroFloatingCrossWhite: {
+    position: 'absolute',
+    right: 18,
+    top: '48%',
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '800',
+    opacity: 0.6,
+  },
+  heroBannerHeading: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    lineHeight: 28,
+    letterSpacing: -0.4,
+    marginTop: 2,
+    marginBottom: 6,
+  },
+  heroBannerHeadingDesktop: {
+    fontSize: 28,
+    lineHeight: 34,
+    letterSpacing: -0.6,
+  },
+  heroBannerHeadingMobile: {
+    fontSize: 17,
+    lineHeight: 22,
+    marginBottom: 4,
+  },
+  heroHeadingWhite: {
+    color: '#FFFFFF',
+    fontWeight: '900',
+  },
+  heroHeadingHighlight: {
+    color: '#EA580C',
+    fontWeight: '900',
+  },
+  heroBannerSub: {
+    fontSize: 12,
+    color: '#94A3B8',
+    lineHeight: 17,
+    marginBottom: 12,
+    fontWeight: '500',
+    maxWidth: 420,
+  },
+  heroActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    flexWrap: 'wrap',
+    marginBottom: 14,
+  },
+  heroPrimaryBtn: {
+    backgroundColor: '#EA580C',
+    borderRadius: 8,
+    paddingHorizontal: 20,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 3,
   },
-  heroBannerCardDesktop: {
-    minHeight: 190,
-    padding: 32,
-  },
-  heroBannerBgShape: {
-    position: 'absolute',
-    right: -40,
-    top: -40,
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  heroBannerLeft: {
-    flex: 1.3,
-    zIndex: 2,
-  },
-  heroBannerHeading: {
-    fontSize: 20,
-    fontWeight: '800',
+  heroPrimaryBtnText: {
     color: '#FFFFFF',
-    lineHeight: 26,
-    letterSpacing: -0.3,
+    fontWeight: '800',
+    fontSize: 13,
+    letterSpacing: 0.2,
   },
-  heroBannerHeadingDesktop: {
-    fontSize: 26,
-    lineHeight: 32,
-  },
-  heroBannerSub: {
-    fontSize: 12.5,
-    color: '#C8DDD3',
-    marginTop: 6,
-    marginBottom: 14,
-    fontWeight: '400',
-  },
-  heroShopBtn: {
-    backgroundColor: '#FFFFFF',
+  heroSecondaryBtn: {
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    paddingHorizontal: 14,
+    paddingVertical: 8.5,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  heroShopBtnText: {
-    color: '#1D4533',
+  heroSecondaryBtnText: {
+    color: '#FFFFFF',
     fontWeight: '700',
-    fontSize: 12.5,
+    fontSize: 12,
   },
-  heroBannerRight: {
-    flex: 0.9,
+  heroFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  heroWebsiteText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    letterSpacing: 0.3,
+  },
+  heroFeatureBadges: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  heroFeatureBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#EA580C',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 2,
+  },
+  dotMatrixGrid: {
+    position: 'absolute',
+    right: 20,
+    bottom: 20,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    width: 50,
+    gap: 5,
+    opacity: 0.85,
+  },
+  matrixDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#EA580C',
+  },
+  heroRightPhotoWrap: {
+    position: 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: '46%',
+    overflow: 'hidden',
+    zIndex: 1,
   },
   heroProductImg: {
-    width: 120,
-    height: 120,
-    borderRadius: 12,
-    resizeMode: 'contain',
-  },
-  heroProductImgDesktop: {
-    width: 160,
-    height: 160,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
   },
   paginationDotsRow: {
     flexDirection: 'row',
@@ -318,7 +471,7 @@ export const shopStyles = StyleSheet.create({
     width: 16,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   dotInactive: {
     width: 5,
@@ -356,9 +509,9 @@ export const shopStyles = StyleSheet.create({
     marginBottom: 6,
   },
   squircleBoxActive: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
-    shadowColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
+    shadowColor: '#EA580C',
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,
@@ -373,7 +526,7 @@ export const shopStyles = StyleSheet.create({
     textAlign: 'center',
   },
   squircleLabelActive: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '800',
   },
 
@@ -397,8 +550,8 @@ export const shopStyles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   filterChipActive: {
-    backgroundColor: '#F3F7F6',
-    borderColor: '#A7F3D0',
+    backgroundColor: '#FFF7ED',
+    borderColor: '#FED7AA',
   },
   filterChipText: {
     fontSize: 12,
@@ -406,7 +559,7 @@ export const shopStyles = StyleSheet.create({
     color: '#475569',
   },
   filterChipTextActive: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
   },
 
@@ -533,7 +686,7 @@ export const shopStyles = StyleSheet.create({
   priceMainText: {
     fontSize: 15,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   priceOldText: {
     fontSize: 10.5,
@@ -626,7 +779,7 @@ export const shopStyles = StyleSheet.create({
     justifyContent: 'center',
   },
   addToCartBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 8,
     paddingVertical: 7.5,
     flexDirection: 'row',
@@ -655,7 +808,7 @@ export const shopStyles = StyleSheet.create({
   },
   buyNowBtn: {
     flex: 1,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 8,
     paddingVertical: 7.5,
     flexDirection: 'row',
@@ -663,7 +816,7 @@ export const shopStyles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
   },
   buyNowBtnText: {
     fontSize: 11,
@@ -679,7 +832,7 @@ export const shopStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
   },
 
   // ─── 10. FLOATING BOTTOM CART BAR (MOBILE) ───
@@ -692,7 +845,7 @@ export const shopStyles = StyleSheet.create({
     zIndex: 900,
   },
   floatingCartBar: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 28,
     height: 52,
     width: '92%',
@@ -701,7 +854,7 @@ export const shopStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 18,
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 12,
@@ -724,7 +877,7 @@ export const shopStyles = StyleSheet.create({
     paddingVertical: 2,
   },
   floatingCartQtyText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 11.5,
     fontWeight: '900',
   },
@@ -765,7 +918,7 @@ export const shopStyles = StyleSheet.create({
     width: 5,
     height: 5,
     borderRadius: 2.5,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     marginBottom: 3,
   },
   bottomNavActiveDotHidden: {
@@ -785,7 +938,7 @@ export const shopStyles = StyleSheet.create({
     marginTop: 2,
   },
   bottomNavLabelActive: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '800',
   },
 
@@ -814,7 +967,7 @@ export const shopStyles = StyleSheet.create({
     borderColor: '#C8DDD3',
   },
   footerBadgeText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -903,7 +1056,7 @@ export const shopStyles = StyleSheet.create({
   cartItemPrice: {
     fontSize: 13.5,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   cartQtyControls: {
     flexDirection: 'row',
@@ -966,16 +1119,16 @@ export const shopStyles = StyleSheet.create({
   cartTotalValue: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   checkoutBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 18,
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: 14,
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1014,7 +1167,7 @@ export const shopStyles = StyleSheet.create({
     borderRadius: 8,
   },
   specBrandText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 12,
     fontWeight: '700',
   },
@@ -1027,7 +1180,7 @@ export const shopStyles = StyleSheet.create({
   specPriceMain: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   specPriceOld: {
     fontSize: 15,
@@ -1084,8 +1237,8 @@ export const shopStyles = StyleSheet.create({
     marginBottom: 10,
   },
   paymentOptionCardActive: {
-    backgroundColor: '#F3F7F6',
-    borderColor: '#1D4533',
+    backgroundColor: '#FFF7ED',
+    borderColor: '#EA580C',
   },
   paymentOptionCardHeader: {
     flexDirection: 'row',
@@ -1103,8 +1256,8 @@ export const shopStyles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   paymentRadioDotActive: {
-    borderColor: '#1D4533',
-    backgroundColor: '#1D4533',
+    borderColor: '#EA580C',
+    backgroundColor: '#EA580C',
   },
   paymentRadioInner: {
     width: 6,

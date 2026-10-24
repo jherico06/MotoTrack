@@ -7,6 +7,8 @@ export const ANDROID_TOP_INSET =
     ? Math.max(Number(StatusBar.currentHeight) || 0, Number(Constants.statusBarHeight) || 0, 24)
     : 0;
 
+export const ANDROID_STATUS_BAR_HEIGHT = ANDROID_TOP_INSET;
+
 /** Android gesture bar or 3-button navigation bar clearance inset */
 export const ANDROID_BOTTOM_INSET = Platform.OS === 'android' ? 12 : 0;
 

@@ -165,7 +165,7 @@ function createStyles(t, isDark) {
       backgroundColor: t.inputBg,
     },
     addBtn: {
-      backgroundColor: isDark ? '#1F6B52' : '#0C6258',
+      backgroundColor: isDark ? '#EA580C' : '#0C6258',
       borderRadius: 10,
       paddingHorizontal: 16,
       justifyContent: 'center',

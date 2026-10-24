@@ -77,7 +77,7 @@ export default function PickupQrScannerPanel({ onToast, onCompleted, style, veri
         style={styles.input}
         placeholder="Paste pickup QR token (MT-PKP-…)"
         placeholderTextColor={isDarkMode ? t.placeholder : '#94A3B8'}
-        selectionColor={isDarkMode ? t.accentBrand : '#1D4533'}
+        selectionColor={isDarkMode ? t.accentBrand : '#EA580C'}
         underlineColorAndroid="transparent"
         value={token}
         onChangeText={(v) => {
@@ -148,13 +148,13 @@ function createStyles(t, isDark) {
       outlineStyle: 'none',
     },
     btn: {
-      backgroundColor: isDark ? '#1F6B52' : '#1D4533',
+      backgroundColor: isDark ? '#EA580C' : '#EA580C',
       paddingVertical: 12,
       borderRadius: 10,
       alignItems: 'center',
     },
     confirmBtn: {
-      backgroundColor: isDark ? '#1F6B52' : '#059669',
+      backgroundColor: isDark ? '#EA580C' : '#059669',
       paddingVertical: 12,
       borderRadius: 10,
       alignItems: 'center',

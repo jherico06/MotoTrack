@@ -18,13 +18,15 @@ import { getThemeTokens } from '../../styles/theme.js';
 import ServiceQuotationPanel from './ServiceQuotationPanel.jsx';
 import PickupQrScannerPanel from './PickupQrScannerPanel.jsx';
 import { garageService } from '../../services/bookings/garageService.js';
+import { serviceQuotationService } from '../../services/bookings/serviceQuotationService.js';
+import { isPmsFixedBooking } from '../../utils/pmsCcPricing.js';
 import {
   FLEX_BOOKING_STATUS,
   normalizeBookingStatus,
   formatPhp,
 } from '../../utils/serviceQuotation.js';
 
-/** Workflow stages for admin (grouped, actionable) — payment after approve */
+/** Workflow stages for admin (grouped, actionable) â€” payment after approve */
 export const BOOKING_PIPELINE = [
   {
     id: 'review',
@@ -46,16 +48,16 @@ export const BOOKING_PIPELINE = [
   },
   {
     id: 'schedule',
-    label: 'Schedule & Assign',
-    icon: 'person-plus',
+    label: 'Schedule',
+    icon: 'calendar-check',
     color: '#0284C7',
     bg: '#E0F2FE',
     statuses: [FLEX_BOOKING_STATUS.CONFIRMED],
-    nextHint: 'Assign mechanic & bay',
+    nextHint: 'Confirm the appointment',
   },
   {
     id: 'inspect',
-    label: 'Inspect & Quote',
+    label: 'Scheduled / Quote',
     icon: 'search',
     color: '#7C3AED',
     bg: '#EDE9FE',
@@ -66,7 +68,7 @@ export const BOOKING_PIPELINE = [
       'Confirmed',
       'Inspection',
     ],
-    nextHint: 'Mechanic inspects → quotation',
+    nextHint: 'Start service (PMS) or inspect â†’ quotation (Repair)',
   },
   {
     id: 'waiting_customer',
@@ -86,7 +88,7 @@ export const BOOKING_PIPELINE = [
     id: 'service',
     label: 'In Service',
     icon: 'tools',
-    color: '#1D4533',
+    color: '#EA580C',
     bg: '#C8DDD3',
     statuses: [FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS, 'In Progress'],
     nextHint: 'Track work / actual hours',
@@ -165,6 +167,24 @@ function statusLabel(status) {
   return String(status || 'Unknown').replace(/_/g, ' ');
 }
 
+/** Multi-service summary for list cards: count, truncated names, labor subtotal. */
+function serviceSummary(booking) {
+  const items = Array.isArray(booking?.service_line_items) ? booking.service_line_items : [];
+  const ids = Array.isArray(booking?.service_ids)
+    ? booking.service_ids
+    : Array.isArray(booking?.selected_service_ids)
+      ? booking.selected_service_ids
+      : [];
+  const names = items.map((i) => i?.serviceName || i?.service_name).filter(Boolean);
+  const count = items.length || ids.length || (booking?.service_title || booking?.package_name ? 1 : 0);
+  let label = names.length
+    ? names.slice(0, 2).join(', ') + (names.length > 2 ? ` +${names.length - 2} more` : '')
+    : String(booking?.service_title || booking?.package_name || '');
+  if (label.length > 60) label = `${label.slice(0, 57)}...`;
+  const labor = Number(booking?.labor_subtotal ?? booking?.quoted_service_rate ?? 0) || 0;
+  return { count, label, labor };
+}
+
 function primaryAction(booking) {
   const s = normalizeBookingStatus(booking?.status);
   const raw = String(booking?.status || '');
@@ -175,13 +195,16 @@ function primaryAction(booking) {
     return { id: 'finalize', label: 'Record Downpayment', icon: 'cash-coin' };
   }
   if (s === FLEX_BOOKING_STATUS.CONFIRMED) {
-    return { id: 'assign', label: 'Assign Mechanic', icon: 'person-plus' };
+    return { id: 'schedule', label: 'Confirm Appointment', icon: 'calendar-check' };
   }
   if (s === FLEX_BOOKING_STATUS.SCHEDULED) {
-    return { id: 'open', label: 'Awaiting Inspection', icon: 'wrench' };
+    // PMS fixed-rate is already quoted â†’ go straight to service; Repair is inspected + quoted first.
+    return isPmsFixedBooking(booking)
+      ? { id: 'start', label: 'Start Service', icon: 'play-fill' }
+      : { id: 'inspect', label: 'Start Inspection', icon: 'search' };
   }
   if (s === FLEX_BOOKING_STATUS.UNDER_INSPECTION || raw === 'Inspection') {
-    return { id: 'open', label: 'Mechanic Inspecting', icon: 'search' };
+    return { id: 'open', label: 'Inspect & Quote', icon: 'search' };
   }
   if (s === FLEX_BOOKING_STATUS.ESTIMATE_SUBMITTED) {
     return { id: 'quote', label: 'Review Quotation', icon: 'receipt' };
@@ -193,7 +216,7 @@ function primaryAction(booking) {
     return { id: 'open', label: 'Waiting Customer', icon: 'hourglass-split' };
   }
   if (s === FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS || raw === 'In Progress') {
-    return { id: 'open', label: 'In Service', icon: 'tools' };
+    return { id: 'complete', label: 'Complete Service', icon: 'flag' };
   }
   if (s === FLEX_BOOKING_STATUS.ADDITIONAL_APPROVAL_REQUIRED) {
     return { id: 'open', label: 'Waiting Extra Approval', icon: 'exclamation-triangle' };
@@ -217,7 +240,7 @@ function primaryAction(booking) {
 
 export default function AdminBookingManager({
   bookings = [],
-  mechanics = [],
+  // `mechanics` prop is ignored (admin-only workflow); kept so existing callers don't break.
   onRefresh,
   onToast,
   onOpenLegacyModal,
@@ -232,7 +255,6 @@ export default function AdminBookingManager({
   const [busyId, setBusyId] = useState(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
-  const [mechanicPick, setMechanicPick] = useState('');
   const [showPickup, setShowPickup] = useState(false);
 
   const toast = (m) => onToast?.(m);
@@ -271,7 +293,12 @@ export default function AdminBookingManager({
           b.bikePlate,
           b.service_title,
           b.status,
-          b.mechanic,
+          // PMS fixed-rate fields (CC category / selected service) are searchable
+          b.cc_category_name,
+          b.cc_category_id,
+          b.pms_service_name,
+          b.pms_service_id,
+          b.motorcycle_cc,
         ]
           .filter(Boolean)
           .join(' ')
@@ -293,11 +320,6 @@ export default function AdminBookingManager({
     [bookings, selectedId]
   );
 
-  const activeMechanics = useMemo(
-    () => (mechanics || []).filter((m) => m.isActive !== false && m.is_active !== false),
-    [mechanics]
-  );
-
   const refresh = async () => {
     const list = await garageService.fetchBookings();
     onRefresh?.(list);
@@ -308,28 +330,34 @@ export default function AdminBookingManager({
     setBusyId(id);
     try {
       if (actionId === 'approve') {
-        await garageService.approveBooking(id, 'Pending Assignment', {
+        // No mechanic required. PMS fixed bookings use their already-quoted rate.
+        const pmsRate = isPmsFixedBooking(booking)
+          ? Number(
+              booking.labor_subtotal ??
+                booking.quoted_service_rate ??
+                booking.estimated_service_total ??
+                booking.package_price ??
+                0
+            )
+          : Number(booking.labor_subtotal ?? booking.quoted_service_rate ?? 0) || 0;
+        await garageService.approveBooking(id, null, {
           flexible: true,
-          mechanicId: null,
           approvedBy: 'admin',
+          ...(pmsRate > 0 ? { estimatedServiceCost: pmsRate, estimated_service_total: pmsRate } : {}),
         });
-        toast(`Approved #${id} — assign a mechanic next`);
+        toast(`Approved #${id} â€” awaiting downpayment`);
         setSelectedId(id);
       } else if (actionId === 'reject') {
         setRejectOpen(true);
         setSelectedId(id);
         return;
-      } else if (actionId === 'assign') {
-        const mech =
-          activeMechanics.find((m) => m.id === mechanicPick) ||
-          activeMechanics[0];
-        if (!mech) {
-          toast('No active mechanic available — open details to assign');
-          setSelectedId(id);
-          return;
-        }
-        await garageService.assignMechanicToBooking(id, mech, { schedule: true });
-        toast(`Assigned ${mech.shortName || mech.name} • Status → Scheduled`);
+      } else if (actionId === 'schedule') {
+        await garageService.scheduleAppointment(id, {
+          preferredDate: booking.preferred_date || booking.appointment_date,
+          preferredTime: booking.preferred_time || booking.time_slot,
+          scheduledBy: 'admin',
+        });
+        toast(`Appointment confirmed for #${id} â€¢ Status â†’ Scheduled`);
         setSelectedId(id);
       } else if (actionId === 'inspect') {
         await garageService.updateBooking(id, {
@@ -342,8 +370,16 @@ export default function AdminBookingManager({
       } else if (actionId === 'start') {
         await garageService.startService(id);
         toast(`Service started for #${id}`);
+      } else if (actionId === 'complete') {
+        const fin = await serviceQuotationService.finalizeBilling(id);
+        if (!fin?.success) throw new Error(fin?.error || 'Finalize failed');
+        toast(
+          fin.remaining > 0
+            ? `Service completed â€¢ Remaining balance ${formatPhp(fin.remaining)}`
+            : 'Service completed â€¢ Ready for pickup'
+        );
+        setSelectedId(id);
       } else if (
-        actionId === 'complete' ||
         actionId === 'finalize' ||
         actionId === 'quote' ||
         actionId === 'open'
@@ -363,9 +399,13 @@ export default function AdminBookingManager({
 
   const confirmReject = async () => {
     if (!selectedId) return;
+    if (!rejectReason.trim()) {
+      toast('Please enter a rejection reason');
+      return;
+    }
     setBusyId(selectedId);
     try {
-      await garageService.rejectBooking(selectedId, rejectReason || 'Declined by advisor');
+      await garageService.rejectBooking(selectedId, rejectReason.trim());
       toast(`Rejected #${selectedId}`);
       setRejectOpen(false);
       setRejectReason('');
@@ -384,11 +424,11 @@ export default function AdminBookingManager({
           <Text style={s.heroSub}>
             {attentionCount > 0
               ? `${attentionCount} booking${attentionCount === 1 ? '' : 's'} need your attention`
-              : 'Queue is clear — no urgent actions'}
+              : 'Queue is clear â€” no urgent actions'}
           </Text>
         </View>
         <TouchableOpacity style={s.refreshBtn} onPress={refresh} activeOpacity={0.85}>
-          <BootstrapIcon name="arrow-clockwise" size={14} color={isDarkMode ? t.accentBrand : '#1D4533'} />
+          <BootstrapIcon name="arrow-clockwise" size={14} color={isDarkMode ? t.accentBrand : '#EA580C'} />
           <Text style={s.refreshText}>Refresh</Text>
         </TouchableOpacity>
       </View>
@@ -436,7 +476,7 @@ export default function AdminBookingManager({
         <BootstrapIcon name="search" size={14} color={isDarkMode ? t.textMuted : '#64748B'} />
         <TextInput
           style={s.searchInput}
-          placeholder="Search booking ID, customer, plate, bike…"
+          placeholder="Search booking ID, customer, plate, bikeâ€¦"
           placeholderTextColor={isDarkMode ? t.placeholder : '#94A3B8'}
           value={search}
           onChangeText={setSearch}
@@ -488,12 +528,23 @@ export default function AdminBookingManager({
                     {[b.bike_brand || b.bikeBrand, b.bike_model || b.bikeModel]
                       .filter(Boolean)
                       .join(' ') || 'Motorcycle'}{' '}
-                    · {b.plate_number || b.bikePlate || '—'}
+                    Â· {b.plate_number || b.bikePlate || 'â€”'}
                   </Text>
                   <Text style={s.meta} numberOfLines={1}>
-                    {b.appointment_date || b.preferred_date || b.date || '—'} ·{' '}
-                    {b.time_slot || b.preferred_time || b.time || '—'}
+                    {b.appointment_date || b.preferred_date || b.date || 'â€”'} Â·{' '}
+                    {b.time_slot || b.preferred_time || b.time || 'â€”'}
                   </Text>
+                  {(() => {
+                    const sum = serviceSummary(b);
+                    if (!sum.count && !sum.label) return null;
+                    return (
+                      <Text style={s.meta} numberOfLines={2}>
+                        {sum.count > 0 ? `${sum.count} service${sum.count === 1 ? '' : 's'}` : 'Services'}
+                        {sum.label ? ` · ${sum.label}` : ''}
+                        {sum.labor > 0 ? ` · Labor ${formatPhp(sum.labor)}` : ''}
+                      </Text>
+                    );
+                  })()}
                   {b.current_stage ? (
                     <Text style={s.stageLine} numberOfLines={2}>
                       {b.current_stage}
@@ -501,7 +552,7 @@ export default function AdminBookingManager({
                   ) : null}
                   <View style={s.cardActions}>
                     <TouchableOpacity
-                      style={[s.primaryBtn, { backgroundColor: isDarkMode ? '#1F6B52' : stage.color }]}
+                      style={[s.primaryBtn, { backgroundColor: isDarkMode ? '#EA580C' : stage.color }]}
                       onPress={() => runAction(b, action.id)}
                       disabled={!!isBusy}
                     >
@@ -537,7 +588,7 @@ export default function AdminBookingManager({
               <BootstrapIcon name="grid-1x2-fill" size={32} color={isDarkMode ? t.textSubtle : '#CBD5E1'} />
               <Text style={s.emptyTitle}>Select a booking</Text>
               <Text style={s.emptySub}>
-                Choose a card on the left to review, assign a mechanic, build a quotation, or verify pickup.
+                Choose a card on the left to review, schedule, build a quotation, or verify pickup.
               </Text>
             </View>
           ) : (
@@ -549,7 +600,7 @@ export default function AdminBookingManager({
                     {selected.customer_name || selected.userName}
                   </Text>
                   <Text style={s.meta}>
-                    {statusLabel(selected.status)} · {stageForBooking(selected).nextHint}
+                    {statusLabel(selected.status)} Â· {stageForBooking(selected).nextHint}
                   </Text>
                 </View>
                 {onOpenLegacyModal && (
@@ -557,7 +608,7 @@ export default function AdminBookingManager({
                     style={s.legacyBtn}
                     onPress={() => onOpenLegacyModal(selected)}
                   >
-                    <BootstrapIcon name="pencil-square" size={13} color={isDarkMode ? t.accentBrand : '#1D4533'} />
+                    <BootstrapIcon name="pencil-square" size={13} color={isDarkMode ? t.accentBrand : '#EA580C'} />
                     <Text style={s.legacyBtnText}>Full form</Text>
                   </TouchableOpacity>
                 )}
@@ -566,16 +617,52 @@ export default function AdminBookingManager({
               <View style={s.infoGrid}>
                 <InfoRow s={s}
                   label="Motorcycle"
-                  value={`${selected.bike_brand || selected.bikeBrand || ''} ${selected.bike_model || selected.bikeModel || ''}`.trim() || '—'}
+                  value={`${selected.bike_brand || selected.bikeBrand || ''} ${selected.bike_model || selected.bikeModel || ''}`.trim() || 'â€”'}
                 />
-                <InfoRow s={s} label="Plate" value={selected.plate_number || selected.bikePlate || '—'} />
+                <InfoRow s={s} label="Plate" value={selected.plate_number || selected.bikePlate || 'â€”'} />
                 <InfoRow s={s}
                   label="Schedule"
-                  value={`${selected.appointment_date || selected.preferred_date || selected.date || '—'} · ${selected.time_slot || selected.preferred_time || selected.time || '—'}`}
+                  value={`${selected.appointment_date || selected.preferred_date || selected.date || 'â€”'} Â· ${selected.time_slot || selected.preferred_time || selected.time || 'â€”'}`}
                 />
-                <InfoRow s={s} label="Phone" value={selected.customer_phone || selected.userPhone || '—'} />
-                <InfoRow s={s} label="Service" value={selected.service_title || selected.serviceName || selected.category || '—'} />
-                <InfoRow s={s} label="Mechanic" value={selected.mechanic || 'Unassigned'} />
+                <InfoRow s={s} label="Phone" value={selected.customer_phone || selected.userPhone || 'â€”'} />
+                <InfoRow s={s} label="Service" value={selected.service_title || selected.serviceName || selected.category || 'â€”'} />
+                {!isPmsFixedBooking(selected) && serviceSummary(selected).labor > 0 && (
+                  <InfoRow s={s} label="Labor Subtotal" value={formatPhp(serviceSummary(selected).labor)} />
+                )}
+                {selected.rejection_reason && /reject/i.test(String(selected.status || '')) ? (
+                  <InfoRow s={s} label="Rejection Reason" value={selected.rejection_reason} />
+                ) : null}
+                {isPmsFixedBooking(selected) && (
+                  <>
+                    <InfoRow s={s} label="Booking Type" value="PMS Â· Fixed Rate" />
+                    <InfoRow
+                      s={s}
+                      label="Motorcycle CC"
+                      value={
+                        selected.motorcycle_cc ?? selected.engine_cc ?? selected.cc
+                          ? `${selected.motorcycle_cc ?? selected.engine_cc ?? selected.cc} cc`
+                          : 'â€”'
+                      }
+                    />
+                    <InfoRow
+                      s={s}
+                      label="CC Category"
+                      value={selected.cc_category_name || selected.cc_category || selected.cc_category_id || 'â€”'}
+                    />
+                    <InfoRow
+                      s={s}
+                      label="PMS Service"
+                      value={selected.pms_service_name || selected.service_title || selected.pms_service_id || 'â€”'}
+                    />
+                    <InfoRow
+                      s={s}
+                      label="Quoted Fixed Rate"
+                      value={formatPhp(
+                        selected.labor_subtotal ?? selected.quoted_service_rate ?? selected.estimated_service_total ?? selected.package_price ?? 0
+                      )}
+                    />
+                  </>
+                )}
                 {(selected.estimated_service_total > 0 || selected.final_service_total > 0) && (
                   <InfoRow s={s}
                     label="Quoted / Final"
@@ -594,31 +681,13 @@ export default function AdminBookingManager({
               {(normalizeBookingStatus(selected.status) === FLEX_BOOKING_STATUS.PENDING_REVIEW ||
                 selected.status === 'Pending') && (
                 <View style={s.actionBlock}>
-                  <Text style={s.blockTitle}>1. Assign mechanic & approve</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                    {activeMechanics.map((m) => (
-                      <TouchableOpacity
-                        key={m.id}
-                        style={[
-                          s.mechChip,
-                          mechanicPick === m.id && s.mechChipOn,
-                        ]}
-                        onPress={() => setMechanicPick(m.id)}
-                      >
-                        <Text
-                          style={[
-                            s.mechChipText,
-                            mechanicPick === m.id && { color: '#FFF' },
-                          ]}
-                        >
-                          {m.shortName || m.name} · {formatPhp(m.hourlyRate ?? m.hourly_rate ?? 150)}/hr
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
+                  <Text style={s.blockTitle}>1. Review & approve</Text>
+                  <Text style={s.meta}>
+                    No mechanic assignment needed - the admin handles scheduling, service, and billing.
+                  </Text>
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
                     <TouchableOpacity
-                      style={[s.primaryBtn, { flex: 1, backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533' }]}
+                      style={[s.primaryBtn, { flex: 1, backgroundColor: isDarkMode ? '#EA580C' : '#EA580C' }]}
                       onPress={() => runAction(selected, 'approve')}
                     >
                       <Text style={s.primaryBtnText}>Approve Booking</Text>
@@ -642,7 +711,7 @@ export default function AdminBookingManager({
                     style={s.input}
                     value={rejectReason}
                     onChangeText={setRejectReason}
-                    placeholder="Schedule conflict, incomplete info…"
+                    placeholder="Schedule conflict, incomplete infoâ€¦"
                     placeholderTextColor={isDarkMode ? t.placeholder : undefined}
                   />
                   <TouchableOpacity style={[s.primaryBtn, { backgroundColor: isDarkMode ? '#5A3A3A' : '#DC2626' }]} onPress={confirmReject}>
@@ -651,18 +720,29 @@ export default function AdminBookingManager({
                 </View>
               )}
 
-              {/* Quotation / billing */}
-              <View style={s.actionBlock}>
-                <Text style={s.blockTitle}>2. Quotation, labor & billing</Text>
-                <ServiceQuotationPanel
-                  booking={selected}
-                  isDarkMode={isDarkMode}
-                  onToast={toast}
-                  onUpdated={async () => {
-                    await refresh();
-                  }}
-                />
-              </View>
+              {/* Quotation / billing — PMS fixed-rate bookings are already quoted, so skip it */}
+              {isPmsFixedBooking(selected) ? (
+                <View style={s.actionBlock}>
+                  <Text style={s.blockTitle}>2. Fixed-rate quote</Text>
+                  <Text style={s.meta}>
+                    Quoted at {formatPhp(
+                      selected.quoted_service_rate ?? selected.estimated_service_total ?? selected.package_price ?? 0
+                    )} — no inspection or quotation required.
+                  </Text>
+                </View>
+              ) : (
+                <View style={s.actionBlock}>
+                  <Text style={s.blockTitle}>2. Quotation, labor & billing</Text>
+                  <ServiceQuotationPanel
+                    booking={selected}
+                    isDarkMode={isDarkMode}
+                    onToast={toast}
+                    onUpdated={async () => {
+                      await refresh();
+                    }}
+                  />
+                </View>
+              )}
 
               {/* Pickup */}
               <View style={s.actionBlock}>
@@ -722,10 +802,10 @@ function createStyles(t, isDark) {
       paddingVertical: 8,
       borderRadius: 10,
       borderWidth: 1,
-      borderColor: isDark ? t.accentBorder : '#1D4533',
+      borderColor: isDark ? t.accentBorder : '#EA580C',
       backgroundColor: isDark ? t.bgCard : '#FFFFFF',
     },
-    refreshText: { color: isDark ? t.accentBrand : '#1D4533', fontWeight: '700', fontSize: 12 },
+    refreshText: { color: isDark ? t.accentBrand : '#EA580C', fontWeight: '700', fontSize: 12 },
     pipelineScroll: { flexGrow: 0, marginBottom: 10 },
     pipeChip: {
       flexDirection: 'row',
@@ -740,8 +820,8 @@ function createStyles(t, isDark) {
       marginRight: 8,
     },
     pipeChipOn: isDark
-      ? { backgroundColor: '#1F6B52', borderColor: t.accentBorder }
-      : { backgroundColor: '#1D4533', borderColor: '#1D4533' },
+      ? { backgroundColor: '#EA580C', borderColor: t.accentBorder }
+      : { backgroundColor: '#EA580C', borderColor: '#EA580C' },
     pipeChipText: { fontSize: 12, fontWeight: '700', color: isDark ? t.chipText : '#475569' },
     pipeChipTextOn: { color: isDark ? t.textPrimary : '#FFFFFF' },
     badge: {
@@ -796,16 +876,16 @@ function createStyles(t, isDark) {
       marginBottom: 10,
     },
     cardSelected: {
-      borderColor: isDark ? t.accentBrand : '#1D4533',
-      backgroundColor: isDark ? t.accentBg : '#F0FDFA',
+      borderColor: isDark ? t.accentBrand : '#EA580C',
+      backgroundColor: isDark ? t.accentBg : '#FFF7ED',
     },
     cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    ref: { fontSize: 12, fontWeight: '800', color: isDark ? t.accentBrand : '#1D4533' },
+    ref: { fontSize: 12, fontWeight: '800', color: isDark ? t.accentBrand : '#EA580C' },
     statusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
     statusPillText: { fontSize: 10, fontWeight: '800' },
     customer: { fontSize: 15, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A', marginTop: 6 },
     meta: { fontSize: 12, color: isDark ? t.textMuted : '#64748B', marginTop: 2 },
-    stageLine: { fontSize: 11, color: isDark ? t.accentBrand : '#1D4533', marginTop: 6, fontWeight: '600' },
+    stageLine: { fontSize: 11, color: isDark ? t.accentBrand : '#EA580C', marginTop: 6, fontWeight: '600' },
     cardActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
     primaryBtn: {
       flexDirection: 'row',
@@ -832,7 +912,7 @@ function createStyles(t, isDark) {
     emptyTitle: { fontSize: 15, fontWeight: '800', color: isDark ? t.textSecondary : '#475569', marginTop: 8 },
     emptySub: { fontSize: 12, color: isDark ? t.textMuted : '#94A3B8', marginTop: 4, textAlign: 'center' },
     detailHeader: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-    detailRef: { fontSize: 13, fontWeight: '800', color: isDark ? t.accentBrand : '#1D4533' },
+    detailRef: { fontSize: 13, fontWeight: '800', color: isDark ? t.accentBrand : '#EA580C' },
     detailCustomer: { fontSize: 18, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A' },
     legacyBtn: {
       flexDirection: 'row',
@@ -845,7 +925,7 @@ function createStyles(t, isDark) {
       borderColor: isDark ? t.accentBorder : '#C8DDD3',
       height: 36,
     },
-    legacyBtnText: { fontSize: 12, fontWeight: '700', color: isDark ? t.accentBrand : '#1D4533' },
+    legacyBtnText: { fontSize: 12, fontWeight: '700', color: isDark ? t.accentBrand : '#EA580C' },
     infoGrid: {
       backgroundColor: isDark ? t.bgSub : '#F8FAFC',
       borderRadius: 10,
@@ -865,7 +945,7 @@ function createStyles(t, isDark) {
     blockTitle: {
       fontSize: 12,
       fontWeight: '800',
-      color: isDark ? t.accentBrand : '#1D4533',
+      color: isDark ? t.accentBrand : '#EA580C',
       textTransform: 'uppercase',
       marginBottom: 8,
       letterSpacing: 0.3,
@@ -877,7 +957,7 @@ function createStyles(t, isDark) {
       backgroundColor: isDark ? t.bgSub : '#F1F5F9',
       marginRight: 8,
     },
-    mechChipOn: { backgroundColor: isDark ? '#1F6B52' : '#1D4533' },
+    mechChipOn: { backgroundColor: isDark ? '#EA580C' : '#EA580C' },
     mechChipText: { fontSize: 12, fontWeight: '700', color: isDark ? t.textSecondary : '#334155' },
     input: {
       borderWidth: 1,
@@ -890,12 +970,12 @@ function createStyles(t, isDark) {
     },
     secondaryBtn: {
       borderWidth: 1,
-      borderColor: isDark ? t.accentBorder : '#1D4533',
+      borderColor: isDark ? t.accentBorder : '#EA580C',
       borderRadius: 9,
       paddingVertical: 10,
       alignItems: 'center',
       marginBottom: 8,
     },
-    secondaryBtnText: { color: isDark ? t.accentBrand : '#1D4533', fontWeight: '700', fontSize: 13 },
+    secondaryBtnText: { color: isDark ? t.accentBrand : '#EA580C', fontWeight: '700', fontSize: 13 },
   });
 }

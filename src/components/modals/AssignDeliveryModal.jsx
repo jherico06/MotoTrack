@@ -241,7 +241,7 @@ export default function AssignDeliveryModal({
                 />
               </View>
             ) : loadingRiders ? (
-              <ActivityIndicator color="#1D4533" style={{ marginVertical: 12 }} />
+              <ActivityIndicator color="#EA580C" style={{ marginVertical: 12 }} />
             ) : riders.length === 0 ? (
               <Text style={styles.emptyHint}>
                 No riders on roster. Toggle “Record rider name & contact” above, or add staff under
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  meta: { fontSize: 13, fontWeight: '700', color: '#1D4533', marginBottom: 4 },
+  meta: { fontSize: 13, fontWeight: '700', color: '#EA580C', marginBottom: 4 },
   address: { fontSize: 12, color: '#64748B', marginBottom: 12 },
   label: { fontSize: 12, fontWeight: '700', color: '#334155', marginBottom: 6, marginTop: 8 },
   input: {
@@ -447,13 +447,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
   },
   riderCardActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#ECFDF5',
   },
   riderAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E2E8F0' },
   riderName: { fontSize: 13.5, fontWeight: '800', color: '#0F172A' },
   riderSub: { fontSize: 11.5, color: '#64748B', marginTop: 2 },
-  riderStatus: { fontSize: 10.5, fontWeight: '700', color: '#1D4533', marginTop: 2 },
+  riderStatus: { fontSize: 10.5, fontWeight: '700', color: '#EA580C', marginTop: 2 },
   summaryBox: {
     backgroundColor: '#F1F5F9',
     borderRadius: 10,
@@ -473,12 +473,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxOn: { backgroundColor: '#1D4533', borderColor: '#1D4533' },
+  checkboxOn: { backgroundColor: '#EA580C', borderColor: '#EA580C' },
   checkText: { flex: 1, fontSize: 12.5, color: '#334155', fontWeight: '600' },
   hint: { fontSize: 11, color: '#94A3B8', marginTop: 12, lineHeight: 16 },
   primaryBtn: {
     marginTop: 14,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 12,
     height: 46,
     alignItems: 'center',

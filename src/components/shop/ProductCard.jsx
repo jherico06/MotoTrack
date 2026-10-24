@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, Image, useWindowDimensions } from 'react-
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { shopStyles as styles } from '../../styles/shop.styles.js';
 import { useWishlist } from '../../context/WishlistContext.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import { isProductSoldOut } from '../../utils/productSizes.js';
 import { productHasCustomerRatings } from '../../utils/productCatalog.js';
 import { getProductCardImageUrl } from '../../utils/imageUrl.js';
@@ -11,6 +12,7 @@ import { resolveReorderLevel } from '../../utils/inventoryHelpers.js';
 
 export default function ProductCard({ product, bike, onPress }) {
   const { width } = useWindowDimensions();
+  const { isDarkMode = false } = useTheme?.() || {};
   const isTablet = width >= 700 && width < 1024;
   const isDesktop = width >= 1024;
   const isMobile = width < 700;
@@ -40,16 +42,20 @@ export default function ProductCard({ product, bike, onPress }) {
         isMobile && { width: mobileCardWidth },
         isTablet && styles.productCardTablet,
         isDesktop && styles.productCardDesktop,
+        isDarkMode && {
+          backgroundColor: '#1C1F23',
+          borderColor: '#2B3035',
+        },
       ]}
       onPress={() => onPress?.(product)}
       activeOpacity={0.92}
     >
-      <View style={styles.productImageContainer}>
+      <View style={[styles.productImageContainer, isDarkMode && { backgroundColor: '#14171A' }]}>
         {imageUri ? (
           <Image source={{ uri: imageUri }} style={styles.productImg} />
         ) : (
-          <View style={{ flex: 1, width: '100%', height: 160, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F8FAFC' }}>
-            <BootstrapIcon name="box-seam" size={36} color="#CBD5E1" />
+          <View style={{ flex: 1, width: '100%', height: 160, alignItems: 'center', justifyContent: 'center', backgroundColor: isDarkMode ? '#14171A' : '#F8FAFC' }}>
+            <BootstrapIcon name="box-seam" size={36} color={isDarkMode ? '#475569' : '#CBD5E1'} />
           </View>
         )}
 
@@ -78,7 +84,10 @@ export default function ProductCard({ product, bike, onPress }) {
         ) : null}
 
         <TouchableOpacity
-          style={styles.wishlistToggleBtn}
+          style={[
+            styles.wishlistToggleBtn,
+            isDarkMode && { backgroundColor: 'rgba(30, 34, 38, 0.9)', borderColor: '#2B3035' },
+          ]}
           onPress={(e) => {
             e.stopPropagation?.();
             toggleWishlist(product.id);
@@ -88,19 +97,19 @@ export default function ProductCard({ product, bike, onPress }) {
           <BootstrapIcon
             name={isFav ? 'heart-fill' : 'heart'}
             size={13}
-            color={isFav ? '#EF4444' : '#64748B'}
+            color={isFav ? '#EF4444' : (isDarkMode ? '#94A3B8' : '#64748B')}
           />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.productCardDetails}>
+      <View style={[styles.productCardDetails, isDarkMode && { backgroundColor: '#1C1F23' }]}>
         {product.brand ? (
-          <Text style={styles.productBrandText} numberOfLines={1}>
+          <Text style={[styles.productBrandText, isDarkMode && { color: '#94A3B8' }]} numberOfLines={1}>
             {product.brand.toUpperCase()}
           </Text>
         ) : null}
 
-        <Text style={styles.productTitle} numberOfLines={2}>
+        <Text style={[styles.productTitle, isDarkMode && { color: '#F9FAFB' }]} numberOfLines={2}>
           {product.name}
         </Text>
 
@@ -112,17 +121,17 @@ export default function ProductCard({ product, bike, onPress }) {
           {hasRatings ? (
             <View style={styles.ratingMinimal}>
               <BootstrapIcon name="star-fill" size={9.5} color="#F59E0B" />
-              <Text style={styles.ratingValText}>{Number(product.rating).toFixed(1)}</Text>
-              <Text style={styles.reviewCountText}>({product.reviews})</Text>
+              <Text style={[styles.ratingValText, isDarkMode && { color: '#CBD5E1' }]}>{Number(product.rating).toFixed(1)}</Text>
+              <Text style={[styles.reviewCountText, isDarkMode && { color: '#94A3B8' }]}>({product.reviews})</Text>
             </View>
           ) : (
             <View style={styles.ratingMinimal}>
-              <BootstrapIcon name="star" size={9.5} color="#94A3B8" />
-              <Text style={styles.unratedMinimalText}>No ratings yet</Text>
+              <BootstrapIcon name="star" size={9.5} color={isDarkMode ? '#64748B' : '#94A3B8'} />
+              <Text style={[styles.unratedMinimalText, isDarkMode && { color: '#94A3B8' }]}>No ratings yet</Text>
             </View>
           )}
-          <Text style={styles.metaDotDivider}>•</Text>
-          <Text style={styles.stockMinimalText}>
+          <Text style={[styles.metaDotDivider, isDarkMode && { color: '#475569' }]}>•</Text>
+          <Text style={[styles.stockMinimalText, isDarkMode && { color: '#94A3B8' }]}>
             {soldOut
               ? 'Sold out'
               : lowStock

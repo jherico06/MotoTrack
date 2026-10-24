@@ -36,7 +36,7 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
     html, body, #map { height: 100%; width: 100%; margin: 0; padding: 0; background: #E8EEF2; }
     .leaflet-control-attribution { font-size: 9px !important; }
     .pin-store {
-      background: #1D4533; color: #fff; border-radius: 50%; width: 30px; height: 30px;
+      background: #EA580C; color: #fff; border-radius: 50%; width: 30px; height: 30px;
       display: flex; align-items: center; justify-content: center; font-size: 15px;
       border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35);
     }
@@ -141,7 +141,7 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
         routeLine.setLatLngs(latLngs);
       } else {
         routeLine = L.polyline(latLngs, {
-          color: '#1D4533',
+          color: '#EA580C',
           weight: 5,
           opacity: 0.9,
           lineJoin: 'round',
@@ -388,7 +388,7 @@ export default function LiveDeliveryMap({
     <View style={[styles.wrap, { height }, style]}>
       {loading ? (
         <View style={styles.loading}>
-          <ActivityIndicator color="#1D4533" />
+          <ActivityIndicator color="#EA580C" />
           <Text style={styles.loadingText}>Loading map…</Text>
         </View>
       ) : null}

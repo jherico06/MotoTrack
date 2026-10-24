@@ -13,7 +13,6 @@ import {
 import { StatusBar } from 'expo-status-bar';
 
 // ─── SERVICES & DATA ────────────────────────────────────────────────────────
-import { MOTOR_PARTS } from '../../../data/motorParts.js';
 import { productService } from '../../../services/products/productService.js';
 import { databaseService } from '../../../services/system/databaseService.js';
 import { orderService } from '../../../services/orders/orderService.js';
@@ -48,6 +47,7 @@ import {
   UserProfileButton,
   BrandLogo,
   NotificationDropdown,
+  ProductCardSkeleton,
 } from '../../../components/common';
 import HeroBanner from '../../../components/shop/HeroBanner.jsx';
 import CompatibilityIndicator from '../../../components/shop/CompatibilityIndicator.jsx';
@@ -89,6 +89,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
 
   // Products & Filter state
   const [productsList, setProductsList] = useState([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -118,7 +119,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
   const [pendingGcashOrderData, setPendingGcashOrderData] = useState(null);
   const [buyNowItems, setBuyNowItems] = useState(null);
   const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
-    currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
+    currentUser ? notificationService.getUnreadCount(currentUser) : 0
   );
   const [isCompanyInfoOpen, setIsCompanyInfoOpen] = useState(false);
   const [companyInfoTab, setCompanyInfoTab] = useState('about');
@@ -186,21 +187,33 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
       setUnreadNotifCount(
-        currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
+        currentUser ? notificationService.getUnreadCount(currentUser) : 0
       );
     });
     return () => unsub?.();
-  }, [currentUser]);
+  }, [currentUser?.id, currentUser?.customer_id, currentUser?.email]);
 
   // Load products & subscribe to real-time inventory
   useEffect(() => {
-    productService.getProducts().then((data) => {
-      if (Array.isArray(data)) setProductsList(data);
-    });
+    let alive = true;
+    productService
+      .getProducts()
+      .then((data) => {
+        if (alive && Array.isArray(data)) setProductsList(data);
+      })
+      .finally(() => {
+        if (alive) setIsLoadingProducts(false);
+      });
     const unsubscribe = productService.subscribe((updated) => {
-      if (Array.isArray(updated)) setProductsList(updated);
+      if (alive && Array.isArray(updated)) {
+        setProductsList(updated);
+        setIsLoadingProducts(false);
+      }
     });
-    return () => unsubscribe();
+    return () => {
+      alive = false;
+      unsubscribe?.();
+    };
   }, []);
 
   // One cached compatibility matrix and customer motorcycles list for the whole shop
@@ -428,6 +441,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         customerId: currentUser?.customer_id || currentUser?.user_id || currentUser?.id || null,
         customerName,
         customerPhone,
+        customerEmail: currentUser?.email || null,
         customerAddress,
         deliveryNotes,
         paymentMethod,
@@ -495,8 +509,14 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── 1. FULL-WIDTH RESPONSIVE STICKY NAVBAR ─── */}
-      <View style={webStyles.headerWrapper}>
+      {/* ─── FULL-HEIGHT STOREFRONT SCROLLVIEW (Scrollbar extends through header from top: 0) ─── */}
+      <ScrollView
+        style={{ flex: 1, width: '100%' }}
+        contentContainerStyle={[webStyles.scrollContent, windowWidth < 768 && { paddingBottom: 100 }]}
+        showsVerticalScrollIndicator={true}
+      >
+        {/* ─── 1. FULL-WIDTH RESPONSIVE STICKY NAVBAR (Pinned at top: 0, does not scroll away) ─── */}
+        <View style={webStyles.headerWrapper}>
         <View style={[webStyles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
           {/* Left: Logo + Desktop Search */}
           <View style={webStyles.headerLeft}>
@@ -697,11 +717,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
       </View>
 
       {/* ─── 2. MAIN STOREFRONT CONTENT ─── */}
-      <ScrollView
-        contentContainerStyle={[webStyles.scrollContent, windowWidth < 768 && { paddingBottom: 100 }]}
-        showsVerticalScrollIndicator={true}
-      >
-        <View style={webStyles.maxContainer}>
+      <View style={webStyles.maxContainer}>
           <HeroBanner onSelectCategory={setSelectedCategory} showToast={showToast} />
 
           {/* ─── CATEGORY, MOTORCYCLE SELECTOR & SORTING TOOLBAR ─── */}
@@ -726,7 +742,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   <BootstrapIcon
                     name="grid-fill"
                     size={13}
-                    color={selectedCategory !== 'All' ? '#1D4533' : '#64748B'}
+                    color={selectedCategory !== 'All' ? '#EA580C' : '#64748B'}
                   />
                   <Text
                     style={[
@@ -739,7 +755,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   <BootstrapIcon
                     name={isCategoryDropdownOpen ? 'chevron-up' : 'chevron-down'}
                     size={12}
-                    color={selectedCategory !== 'All' ? '#1D4533' : '#94A3B8'}
+                    color={selectedCategory !== 'All' ? '#EA580C' : '#94A3B8'}
                   />
                 </TouchableOpacity>
 
@@ -777,7 +793,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                             >
                               <View style={webStyles.categoryDropdownItemLeft}>
                                 {isActive ? (
-                                  <BootstrapIcon name="check-circle-fill" size={13} color="#1D4533" />
+                                  <BootstrapIcon name="check-circle-fill" size={13} color="#EA580C" />
                                 ) : (
                                   <BootstrapIcon name="circle" size={9} color="#CBD5E1" />
                                 )}
@@ -824,7 +840,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   <BootstrapIcon
                     name="scooter"
                     size={14}
-                    color={activeBike ? '#1D4533' : '#64748B'}
+                    color={activeBike ? '#EA580C' : '#64748B'}
                   />
                   <Text
                     style={[
@@ -838,7 +854,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   <BootstrapIcon
                     name={isBikeDropdownOpen ? 'chevron-up' : 'chevron-down'}
                     size={12}
-                    color={activeBike ? '#1D4533' : '#94A3B8'}
+                    color={activeBike ? '#EA580C' : '#94A3B8'}
                   />
                 </TouchableOpacity>
 
@@ -883,7 +899,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                         >
                           <View style={webStyles.categoryDropdownItemLeft}>
                             {!activeBike ? (
-                              <BootstrapIcon name="check-circle-fill" size={13} color="#1D4533" />
+                              <BootstrapIcon name="check-circle-fill" size={13} color="#EA580C" />
                             ) : (
                               <BootstrapIcon name="circle" size={9} color="#CBD5E1" />
                             )}
@@ -939,7 +955,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                                     <BootstrapIcon
                                       name="check-circle-fill"
                                       size={13}
-                                      color="#1D4533"
+                                      color="#EA580C"
                                     />
                                   ) : (
                                     <BootstrapIcon name="circle" size={9} color="#CBD5E1" />
@@ -987,8 +1003,8 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   style={[
                     webStyles.categoryDropdownBtn,
                     compatOnly && {
-                      backgroundColor: '#1D4533',
-                      borderColor: '#1D4533',
+                      backgroundColor: '#EA580C',
+                      borderColor: '#EA580C',
                     },
                   ]}
                   onPress={() => setCompatOnly((v) => !v)}
@@ -997,7 +1013,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   <BootstrapIcon
                     name={compatOnly ? 'check-circle-fill' : 'shield-check'}
                     size={13}
-                    color={compatOnly ? '#FFFFFF' : '#1D4533'}
+                    color={compatOnly ? '#FFFFFF' : '#EA580C'}
                   />
                   <Text
                     style={[
@@ -1029,7 +1045,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   <BootstrapIcon
                     name="sort-down"
                     size={13}
-                    color={filterSort !== 'all' ? '#1D4533' : '#64748B'}
+                    color={filterSort !== 'all' ? '#EA580C' : '#64748B'}
                   />
                   <Text
                     style={[
@@ -1048,7 +1064,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   <BootstrapIcon
                     name={isSortDropdownOpen ? 'chevron-up' : 'chevron-down'}
                     size={12}
-                    color={filterSort !== 'all' ? '#1D4533' : '#94A3B8'}
+                    color={filterSort !== 'all' ? '#EA580C' : '#94A3B8'}
                   />
                 </TouchableOpacity>
 
@@ -1085,7 +1101,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                               <BootstrapIcon
                                 name={option.icon}
                                 size={12}
-                                color={isActive ? '#1D4533' : '#64748B'}
+                                color={isActive ? '#EA580C' : '#64748B'}
                               />
                               <Text
                                 style={[
@@ -1096,7 +1112,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                                 {option.label}
                               </Text>
                             </View>
-                            {isActive && <BootstrapIcon name="check" size={14} color="#1D4533" />}
+                            {isActive && <BootstrapIcon name="check" size={14} color="#EA580C" />}
                           </TouchableOpacity>
                         );
                       })}
@@ -1113,13 +1129,47 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               <Text style={webStyles.catalogTitle}>
                 {selectedCategory === 'All' ? 'Featured Products' : `${selectedCategory} Collection`}
               </Text>
-              <Text style={webStyles.catalogSub}>{filteredProducts.length} items available</Text>
+              <Text style={webStyles.catalogSub}>
+                {isLoadingProducts ? 'Loading catalog items...' : `${filteredProducts.length} items available`}
+              </Text>
             </View>
           </View>
 
           {/* Product Multi-Column Grid */}
           <View style={webStyles.productGrid}>
-            {filteredProducts.map((product) => {
+            {isLoadingProducts ? (
+              [1, 2, 3, 4, 5, 6, 7, 8].map((k) => (
+                <ProductCardSkeleton key={k} width={cardWidth} />
+              ))
+            ) : filteredProducts.length === 0 ? (
+              <View style={{ width: '100%', padding: 48, alignItems: 'center', justifyContent: 'center' }}>
+                <BootstrapIcon name="box-seam" size={38} color={isDarkMode ? '#AAB4B0' : '#94A3B8'} />
+                <Text
+                  style={{
+                    marginTop: 12,
+                    fontSize: 15,
+                    fontWeight: '700',
+                    color: isDarkMode ? '#F5F7F6' : '#0F172A',
+                  }}
+                >
+                  No Products Found
+                </Text>
+                <Text
+                  style={{
+                    marginTop: 4,
+                    fontSize: 13,
+                    color: isDarkMode ? '#AAB4B0' : '#64748B',
+                    textAlign: 'center',
+                    maxWidth: 420,
+                  }}
+                >
+                  {searchQuery
+                    ? `No products found matching "${searchQuery}". Try adjusting your keywords.`
+                    : 'No products are currently available in this category.'}
+                </Text>
+              </View>
+            ) : (
+              filteredProducts.map((product) => {
               const isFav = isWishlisted(product.id);
               return (
                 <TouchableOpacity
@@ -1187,7 +1237,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                     <View style={webStyles.priceRow} className="flex flex-row items-baseline gap-1.5 mb-1.5">
                       <Text
                         style={webStyles.priceMainText}
-                        className={`text-[15px] font-extrabold ${isDarkMode ? 'text-[#4DB896]' : 'text-[#1D4533]'}`}
+                        className={`text-[15px] font-extrabold ${isDarkMode ? 'text-[#EA580C]' : 'text-[#EA580C]'}`}
                       >
                         ₱{product.price?.toFixed(2)}
                       </Text>
@@ -1255,21 +1305,36 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   </View>
                 </TouchableOpacity>
               );
-            })}
-          </View>
+            })
+          )}
+        </View>
+        </View>
 
-          {/* Desktop Footer Matching Design Reference */}
-          <View style={webStyles.desktopFooter}>
+        {/* ─── FULL-WIDTH FOOTER (Flush: No Space Left/Right/Bottom, No Radius) ─── */}
+        <View style={[webStyles.desktopFooter, windowWidth < 768 && { paddingBottom: 88 }]}>
+          <View style={webStyles.footerInner}>
             <View style={webStyles.footerColumnsRow}>
-              {/* Column 1: CONTACT INFORMATION */}
-              <View style={[webStyles.footerCol, { flex: 1.2, minWidth: 220 }]}>
-                <Text style={webStyles.footerColTitle}>CONTACT INFORMATION</Text>
+              {/* Column 1: Brand Info, Contact & Social Links */}
+              <View style={webStyles.footerBrandCol}>
+                <TouchableOpacity
+                  style={{ alignSelf: 'flex-start', marginBottom: 20 }}
+                  onPress={() => {
+                    setSelectedCategory('All');
+                    setSearchQuery('');
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <BrandLogo size={36} textColor="#FFFFFF" />
+                </TouchableOpacity>
 
+                {/* Contact: Email */}
                 <TouchableOpacity
                   style={webStyles.footerContactRow}
                   activeOpacity={0.7}
                   onPress={() => {
-                    const email = brandSettings?.contactEmail || `support@${(brandSettings?.storeName || 'mototrack').toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
+                    const email =
+                      brandSettings?.contactEmail ||
+                      `support@${(brandSettings?.storeName || 'mototrack').toLowerCase().replace(/[^a-z0-9]/g, '')}.com`;
                     try {
                       if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
                         navigator.clipboard.writeText(email);
@@ -1278,12 +1343,14 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                     showToast?.(`Copied ${email} to clipboard`);
                   }}
                 >
-                  <BootstrapIcon name="envelope-fill" size={17} color="#10B981" />
+                  <BootstrapIcon name="envelope-fill" size={15} color="#EA580C" />
                   <Text style={webStyles.footerContactText}>
-                    {brandSettings?.contactEmail || `support@${(brandSettings?.storeName || 'mototrack').toLowerCase().replace(/[^a-z0-9]/g, '')}.com`}
+                    {brandSettings?.contactEmail ||
+                      `support@${(brandSettings?.storeName || 'mototrack').toLowerCase().replace(/[^a-z0-9]/g, '')}.com`}
                   </Text>
                 </TouchableOpacity>
 
+                {/* Contact: Phone */}
                 <TouchableOpacity
                   style={webStyles.footerContactRow}
                   activeOpacity={0.7}
@@ -1297,53 +1364,97 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                     showToast?.(`Copied hotline ${phone} to clipboard`);
                   }}
                 >
-                  <BootstrapIcon name="telephone-fill" size={17} color="#10B981" />
+                  <BootstrapIcon name="telephone-fill" size={15} color="#EA580C" />
                   <Text style={webStyles.footerContactText}>
                     {brandSettings?.contactPhone || '1800-3232-8686'}
                   </Text>
                 </TouchableOpacity>
+
+                {/* Social media icons underneath */}
+                <View style={webStyles.footerSocialRow}>
+                  <TouchableOpacity
+                    style={webStyles.footerSocialBtn}
+                    activeOpacity={0.75}
+                    onPress={() => showToast?.(`Opening ${brandSettings?.storeName || 'MotoTrack'} Facebook`)}
+                  >
+                    <BootstrapIcon name="facebook" size={16} color="#EA580C" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={webStyles.footerSocialBtn}
+                    activeOpacity={0.75}
+                    onPress={() => showToast?.(`Opening ${brandSettings?.storeName || 'MotoTrack'} Instagram`)}
+                  >
+                    <BootstrapIcon name="instagram" size={16} color="#EA580C" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={webStyles.footerSocialBtn}
+                    activeOpacity={0.75}
+                    onPress={() => showToast?.(`Opening ${brandSettings?.storeName || 'MotoTrack'} YouTube`)}
+                  >
+                    <BootstrapIcon name="youtube" size={16} color="#EA580C" />
+                  </TouchableOpacity>
+                </View>
               </View>
 
-              {/* Column 2: COMPANY */}
-              <View style={[webStyles.footerCol, { flex: 1, minWidth: 140 }]}>
-                <Text style={webStyles.footerColTitle}>COMPANY</Text>
+              {/* Column 2: PRODUCTS */}
+              <View style={webStyles.footerCol}>
+                <View style={webStyles.footerColTitleRow}>
+                  <BootstrapIcon name="box-seam" size={14} color="#EA580C" style={webStyles.footerColIcon} />
+                  <Text style={webStyles.footerColTitle}>PRODUCTS</Text>
+                </View>
 
                 <TouchableOpacity
                   style={webStyles.footerLinkItem}
                   activeOpacity={0.7}
-                  onPress={() => onNavigateToScreen?.('garage')}
+                  onPress={() => {
+                    setSelectedCategory('All');
+                    setSearchQuery('');
+                  }}
                 >
-                  <Text style={webStyles.footerLinkText}>Features</Text>
+                  <Text style={webStyles.footerLinkText}>All Parts</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={webStyles.footerLinkItem}
                   activeOpacity={0.7}
-                  onPress={() => handleOpenCompanyInfo('about')}
+                  onPress={() => setSelectedCategory('Brakes')}
                 >
-                  <Text style={webStyles.footerLinkText}>About Us</Text>
+                  <Text style={webStyles.footerLinkText}>Brake Systems</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={webStyles.footerLinkItem}
                   activeOpacity={0.7}
-                  onPress={() => handleOpenCompanyInfo('contact')}
+                  onPress={() => setSelectedCategory('Engine')}
                 >
-                  <Text style={webStyles.footerLinkText}>Contact</Text>
+                  <Text style={webStyles.footerLinkText}>Engine & Exhaust</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={webStyles.footerLinkItem}
                   activeOpacity={0.7}
-                  onPress={() => onNavigateToScreen?.('garage')}
+                  onPress={() => setSelectedCategory('Tires')}
                 >
-                  <Text style={webStyles.footerLinkText}>Pricing</Text>
+                  <Text style={webStyles.footerLinkText}>Tires & Wheels</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={webStyles.footerLinkItem}
+                  activeOpacity={0.7}
+                  onPress={() => setSelectedCategory('Helmets')}
+                >
+                  <Text style={webStyles.footerLinkText}>Rider Gear</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Column 3: SERVICES */}
-              <View style={[webStyles.footerCol, { flex: 1, minWidth: 140 }]}>
-                <Text style={webStyles.footerColTitle}>SERVICES</Text>
+              <View style={webStyles.footerCol}>
+                <View style={webStyles.footerColTitleRow}>
+                  <BootstrapIcon name="tools" size={14} color="#EA580C" style={webStyles.footerColIcon} />
+                  <Text style={webStyles.footerColTitle}>SERVICES</Text>
+                </View>
 
                 <TouchableOpacity
                   style={webStyles.footerLinkItem}
@@ -1374,13 +1485,32 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   activeOpacity={0.7}
                   onPress={() => onNavigateToScreen?.('customizer')}
                 >
-                  <Text style={webStyles.footerLinkText}>AI Customizer</Text>
+                  <Text style={webStyles.footerLinkText}>AI Customizer Studio</Text>
                 </TouchableOpacity>
               </View>
 
-              {/* Column 4: HELP */}
-              <View style={[webStyles.footerCol, { flex: 1, minWidth: 140 }]}>
-                <Text style={webStyles.footerColTitle}>HELP</Text>
+              {/* Column 4: COMPANY & HELP */}
+              <View style={webStyles.footerCol}>
+                <View style={webStyles.footerColTitleRow}>
+                  <BootstrapIcon name="building" size={14} color="#EA580C" style={webStyles.footerColIcon} />
+                  <Text style={webStyles.footerColTitle}>COMPANY</Text>
+                </View>
+
+                <TouchableOpacity
+                  style={webStyles.footerLinkItem}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenCompanyInfo('about')}
+                >
+                  <Text style={webStyles.footerLinkText}>About Us</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={webStyles.footerLinkItem}
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenCompanyInfo('contact')}
+                >
+                  <Text style={webStyles.footerLinkText}>Contact Us</Text>
+                </TouchableOpacity>
 
                 <TouchableOpacity
                   style={webStyles.footerLinkItem}
@@ -1401,41 +1531,10 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                 <TouchableOpacity
                   style={webStyles.footerLinkItem}
                   activeOpacity={0.7}
-                  onPress={() => handleOpenCompanyInfo('contact')}
+                  onPress={() => onNavigateToScreen?.('orders')}
                 >
-                  <Text style={webStyles.footerLinkText}>Support</Text>
+                  <Text style={webStyles.footerLinkText}>Track Order</Text>
                 </TouchableOpacity>
-              </View>
-
-              {/* Column 5: FOLLOW US */}
-              <View style={[webStyles.footerCol, { flex: 1, minWidth: 160 }]}>
-                <Text style={webStyles.footerColTitle}>FOLLOW US</Text>
-
-                <View style={webStyles.footerSocialRow}>
-                  <TouchableOpacity
-                    style={webStyles.footerSocialBtn}
-                    activeOpacity={0.75}
-                    onPress={() => showToast?.(`Opening ${brandSettings?.storeName || 'MotoTrack'} Facebook`)}
-                  >
-                    <BootstrapIcon name="facebook" size={17} color="#111827" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={webStyles.footerSocialBtn}
-                    activeOpacity={0.75}
-                    onPress={() => showToast?.(`Opening ${brandSettings?.storeName || 'MotoTrack'} Instagram`)}
-                  >
-                    <BootstrapIcon name="instagram" size={17} color="#111827" />
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={webStyles.footerSocialBtn}
-                    activeOpacity={0.75}
-                    onPress={() => showToast?.(`Opening ${brandSettings?.storeName || 'MotoTrack'} YouTube`)}
-                  >
-                    <BootstrapIcon name="youtube" size={17} color="#111827" />
-                  </TouchableOpacity>
-                </View>
               </View>
             </View>
 
@@ -1445,7 +1544,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
             {/* Bottom Row */}
             <View style={webStyles.footerBottomRow}>
               <Text style={webStyles.footerCopyrightText}>
-                © 2026 {brandSettings.storeName || 'MotoTrack'}. All Rights Reserved.
+                © 2026 {brandSettings?.storeName || 'MotoTrack'}. All Rights Reserved.
               </Text>
 
               <View style={webStyles.footerLegalLinksRow}>
@@ -1453,14 +1552,21 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   activeOpacity={0.7}
                   onPress={() => handleOpenCompanyInfo('privacy')}
                 >
-                  <Text style={webStyles.footerLegalLinkText}>Privacy</Text>
+                  <Text style={webStyles.footerLegalLinkText}>Privacy Policy</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => handleOpenCompanyInfo('terms')}
                 >
-                  <Text style={webStyles.footerLegalLinkText}>Terms & condition</Text>
+                  <Text style={webStyles.footerLegalLinkText}>Terms of Service</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenCompanyInfo('privacy')}
+                >
+                  <Text style={webStyles.footerLegalLinkText}>Cookie Policy</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1558,10 +1664,17 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
             if (tab === 'Home') {
               setSelectedCategory('All');
               setSearchQuery('');
+            } else if (tab === 'Services') {
+              onNavigateToScreen?.('garage');
             } else if (tab === 'Customize') {
               onNavigateToScreen?.('customizer');
             } else if (tab === 'Garage') {
-              onNavigateToScreen?.('garage');
+              if (!currentUser) {
+                setRedirectReason?.('Please sign in to access your motorcycle garage fleet.');
+                onNavigateToScreen?.('login');
+              } else {
+                onNavigateToScreen?.('profile', { tab: 'garage' });
+              }
             } else if (tab === 'Orders') {
               onNavigateToScreen?.('orders');
             } else if (tab === 'Wishlist' || tab === 'Favorites') {

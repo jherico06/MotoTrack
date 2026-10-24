@@ -188,14 +188,14 @@ export default function ProductSizesEditor({
           paddingHorizontal: 12,
           borderRadius: 10,
           borderWidth: 1.5,
-          borderColor: '#1D4533',
-          backgroundColor: '#F0FDFA',
+          borderColor: '#EA580C',
+          backgroundColor: '#FFF7ED',
           marginTop: 2,
         }}
         activeOpacity={0.85}
       >
-        <BootstrapIcon name="plus-lg" size={12} color="#1D4533" />
-        <Text style={{ fontSize: 12, fontWeight: '800', color: '#1D4533' }}>Add Size</Text>
+        <BootstrapIcon name="plus-lg" size={12} color="#EA580C" />
+        <Text style={{ fontSize: 12, fontWeight: '800', color: '#EA580C' }}>Add Size</Text>
       </TouchableOpacity>
     </View>
   );

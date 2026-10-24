@@ -11,8 +11,8 @@ export const variantModalStyles = StyleSheet.create({
   },
   modalSheet: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     maxHeight: '88%',
     minHeight: 440,
     overflow: 'hidden',
@@ -85,18 +85,18 @@ export const variantModalStyles = StyleSheet.create({
   priceCurrency: {
     fontSize: 14,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   priceInteger: {
     fontSize: 24,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
     letterSpacing: -0.5,
   },
   priceDecimal: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   priceOriginal: {
     fontSize: 13,
@@ -116,13 +116,13 @@ export const variantModalStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#E6F4F1',
+    backgroundColor: '#FFF7ED',
     paddingHorizontal: 6,
     paddingVertical: 2.5,
     borderRadius: 5,
   },
   freeShippingBadgeText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 10.5,
     fontWeight: '800',
   },
@@ -146,9 +146,9 @@ export const variantModalStyles = StyleSheet.create({
     fontWeight: '600',
   },
   closeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
@@ -175,7 +175,7 @@ export const variantModalStyles = StyleSheet.create({
   },
   sectionSub: {
     fontSize: 12,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
   },
   sizeGuideLink: {
@@ -185,7 +185,7 @@ export const variantModalStyles = StyleSheet.create({
   },
   sizeGuideText: {
     fontSize: 12,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
   },
 
@@ -208,8 +208,8 @@ export const variantModalStyles = StyleSheet.create({
     height: 128,
   },
   colorCardSelected: {
-    borderColor: '#1D4533',
-    backgroundColor: '#F0FDFA',
+    borderColor: '#EA580C',
+    backgroundColor: '#FFF7ED',
   },
   colorCardSoldOut: {
     borderColor: '#F1F5F9',
@@ -244,7 +244,7 @@ export const variantModalStyles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -255,7 +255,7 @@ export const variantModalStyles = StyleSheet.create({
     alignItems: 'center',
   },
   colorCardFooterSelected: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   colorCardLabel: {
     color: '#FFFFFF',
@@ -287,8 +287,8 @@ export const variantModalStyles = StyleSheet.create({
     alignItems: 'center',
   },
   sizeChipSelected: {
-    borderColor: '#1D4533',
-    backgroundColor: '#1D4533',
+    borderColor: '#EA580C',
+    backgroundColor: '#EA580C',
   },
   sizeChipSoldOut: {
     borderColor: '#F1F5F9',
@@ -310,7 +310,7 @@ export const variantModalStyles = StyleSheet.create({
     marginTop: 2,
   },
   sizeChipPriceSelected: {
-    color: '#99F6E4',
+    color: '#FED7AA',
   },
 
   // ─── QUANTITY ROW ───
@@ -375,12 +375,12 @@ export const variantModalStyles = StyleSheet.create({
   },
   confirmBtn: {
     height: 50,
-    borderRadius: 25,
-    backgroundColor: '#1D4533',
+    borderRadius: 14,
+    backgroundColor: '#EA580C',
     justifyContent: 'center',
     alignItems: 'center',
     flexDirection: 'column',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -398,7 +398,7 @@ export const variantModalStyles = StyleSheet.create({
     letterSpacing: 0.2,
   },
   confirmBtnSub: {
-    color: '#CCFBF1',
+    color: '#FED7AA',
     fontSize: 11,
     fontWeight: '700',
     marginTop: 1,

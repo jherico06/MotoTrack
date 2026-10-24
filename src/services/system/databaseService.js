@@ -278,37 +278,63 @@ export const databaseService = {
 
   // ─── 7. TABLE METRICS / DASHBOARD STATS ───
   async getStats() {
+    const empty = {
+      totalProducts: 0,
+      totalOrders: 0,
+      totalUsers: 0,
+      adminCount: 0,
+      customerCount: 0,
+      totalRevenue: 0,
+      lowStockCount: 0,
+      totalPromos: 0,
+      totalCustomers: 0,
+      totalServices: 0,
+      error: true,
+    };
     try {
+      if (!supabase) return { ...empty, error: 'Supabase client is not configured' };
+
       const [prodsRes, ordersRes, usersRes, promosRes, custsRes, srvRes] = await Promise.all([
         supabase
-          ? supabase.from('products').select('product_id, price, stock', { count: 'exact' })
-          : { data: [], count: 0 },
-        supabase
-          ? supabase.from('orders').select('order_id, grand_total, status', { count: 'exact' })
-          : { data: [], count: 0 },
-        supabase
-          ? supabase.from('users').select('user_id, role', { count: 'exact' })
-          : { data: [], count: 0 },
-        supabase ? supabase.from('promos').select('promo_id', { count: 'exact' }) : { data: [], count: 0 },
-        supabase
-          ? supabase.from('customers').select('customer_id', { count: 'exact' })
-          : { data: [], count: 0 },
-        supabase
-          ? supabase.from('services').select('service_id', { count: 'exact' })
-          : { data: [], count: 0 },
+          .from('products')
+          .select('product_id, status, inventory(stock_quantity, reorder_level)', { count: 'exact' }),
+        supabase.from('orders').select('order_id, grand_total, total_amount, status', { count: 'exact' }),
+        supabase.from('users').select('user_id, role', { count: 'exact' }),
+        supabase.from('promos').select('promo_id', { count: 'exact' }),
+        supabase.from('customers').select('customer_id', { count: 'exact' }),
+        supabase.from('services').select('service_id', { count: 'exact' }),
       ]);
 
-      const products = prodsRes.data || [];
+      if (prodsRes.error || ordersRes.error) {
+        return { ...empty, error: prodsRes.error?.message || ordersRes.error?.message };
+      }
+
+      const products = (prodsRes.data || []).filter((product) => {
+        const status = String(product.status || 'active').toLowerCase();
+        return status !== 'archived' && status !== 'deleted' && status !== 'inactive';
+      });
       const orders = ordersRes.data || [];
       const users = usersRes.data || [];
+      const excluded = new Set(['cancelled', 'canceled', 'refunded']);
 
-      const totalRevenue = orders.reduce((sum, o) => sum + Number(o.grand_total || 0), 0);
-      const lowStockCount = products.filter((p) => Number(p.stock || 0) <= 5).length;
-      const adminCount = users.filter((u) => u.role === 'admin').length;
-      const customerCount = users.filter((u) => u.role !== 'admin').length;
+      const totalRevenue = orders.reduce((sum, order) => {
+        const status = String(order.status || '').toLowerCase();
+        if (excluded.has(status)) return sum;
+        return sum + (Number(order.grand_total) || Number(order.total_amount) || 0);
+      }, 0);
+      const lowStockCount = products.filter((product) => {
+        const inventory = Array.isArray(product.inventory) ? product.inventory[0] : product.inventory;
+        const stock = Number(inventory?.stock_quantity ?? 0);
+        const reorder = Number(inventory?.reorder_level);
+        const level = Number.isFinite(reorder) && reorder >= 0 ? reorder : 5;
+        return stock > 0 && stock <= level;
+      }).length;
+      const staffRoles = new Set(['admin', 'staff', 'mechanic', 'rider']);
+      const adminCount = users.filter((user) => String(user.role || '').toLowerCase() === 'admin').length;
+      const customerCount = users.filter((user) => !staffRoles.has(String(user.role || '').toLowerCase())).length;
 
       return {
-        totalProducts: prodsRes.count || products.length,
+        totalProducts: products.length,
         totalOrders: ordersRes.count || orders.length,
         totalUsers: usersRes.count || users.length,
         adminCount,
@@ -316,22 +342,12 @@ export const databaseService = {
         totalRevenue,
         lowStockCount,
         totalPromos: promosRes.count || 0,
-        totalCustomers: custsRes.count || 0,
+        totalCustomers: custsRes.count || customerCount,
         totalServices: srvRes.count || 0,
+        error: false,
       };
     } catch (e) {
-      return {
-        totalProducts: 8,
-        totalOrders: 1,
-        totalUsers: 2,
-        adminCount: 1,
-        customerCount: 1,
-        totalRevenue: 1095.0,
-        lowStockCount: 2,
-        totalPromos: 4,
-        totalCustomers: 1,
-        totalServices: 4,
-      };
+      return { ...empty, error: e?.message || 'Stats request failed' };
     }
   },
 };

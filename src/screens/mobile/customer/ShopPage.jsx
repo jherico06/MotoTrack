@@ -1,16 +1,18 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
-import { View, Text, ScrollView, SafeAreaView, RefreshControl, useWindowDimensions, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, ScrollView, SafeAreaView, RefreshControl, useWindowDimensions, TouchableOpacity, Modal, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 // ─── STYLES & DATA ──────────────────────────────────────────────────────────
 import { shopStyles as styles } from '../../../styles/shop.styles.js';
 import { productService } from '../../../services/products/productService.js';
 import { orderService } from '../../../services/orders/orderService.js';
+import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 
 // ─── CONTEXTS ───────────────────────────────────────────────────────────────
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useCart } from '../../../context/CartContext.jsx';
 import { useWishlist } from '../../../context/WishlistContext.jsx';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { productNeedsSizes, withSelectedSize, isSizeSoldOut } from '../../../utils/productSizes.js';
 import { getRatedScore } from '../../../utils/productCatalog.js';
 
@@ -36,6 +38,7 @@ import {
   compatibilityService,
   COMPAT_STATUS,
 } from '../../../services/products/compatibilityService.js';
+import { motorcycleService } from '../../../services/products/motorcycleService.js';
 
 export default function ShopPage({ onNavigateToScreen }) {
   // Contexts
@@ -63,12 +66,19 @@ export default function ShopPage({ onNavigateToScreen }) {
     showToast,
   } = useCart();
   const { wishlistCount } = useWishlist();
+  const { isDarkMode = false } = useTheme?.() || {};
 
   const { width } = useWindowDimensions();
   const isSmallMobile = width < 380;
 
   // Local state
   const [productsList, setProductsList] = useState([]);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [brandSettings, setBrandSettings] = useState(() =>
+    typeof systemSettingsService?.getSettings === 'function'
+      ? systemSettingsService.getSettings()
+      : {}
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [filterSort, setFilterSort] = useState('default');
@@ -155,9 +165,14 @@ export default function ShopPage({ onNavigateToScreen }) {
 
   // Load products from DB or fallback
   const refreshProducts = useCallback(async () => {
-    const data = await productService.getProducts();
-    if (Array.isArray(data)) {
-      setProductsList(data);
+    setIsLoadingProducts(true);
+    try {
+      const data = await productService.getProducts();
+      if (Array.isArray(data)) {
+        setProductsList(data);
+      }
+    } finally {
+      setIsLoadingProducts(false);
     }
   }, []);
 
@@ -169,36 +184,117 @@ export default function ShopPage({ onNavigateToScreen }) {
   };
 
   useEffect(() => {
-    productService.getProducts().then((data) => {
-      if (Array.isArray(data)) {
-        setProductsList(data);
-      }
-    });
+    let alive = true;
+    productService
+      .getProducts()
+      .then((data) => {
+        if (alive && Array.isArray(data)) {
+          setProductsList(data);
+        }
+      })
+      .finally(() => {
+        if (alive) setIsLoadingProducts(false);
+      });
     const unsubscribe = productService.subscribe((updated) => {
-      if (Array.isArray(updated)) {
+      if (alive && Array.isArray(updated)) {
         setProductsList(updated);
+        setIsLoadingProducts(false);
       }
     });
-    return () => unsubscribe();
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
   }, []);
+
+  useEffect(() => {
+    if (typeof systemSettingsService?.subscribe === 'function') {
+      const unsub = systemSettingsService.subscribe((settings) => {
+        if (settings) setBrandSettings(settings);
+      });
+      return () => unsub?.();
+    }
+  }, []);
+
+  const loadUserBikes = useCallback(async () => {
+    const userId = currentUser?.id || currentUser?.user_id || currentUser?.customer_id;
+    const customerEmail = currentUser?.email || '';
+
+    try {
+      if (userId) {
+        await motorcycleService.syncFromSupabase?.(userId, customerEmail);
+      }
+    } catch (_e) {}
+
+    let bikes = [];
+    if (userId || customerEmail) {
+      bikes =
+        motorcycleService.getMotorcycles(
+          userId,
+          currentUser?.customerId || currentUser?.customer_id,
+          customerEmail
+        ) || [];
+    } else {
+      bikes = motorcycleService.getMotorcycles() || [];
+    }
+
+    let validBikes = Array.isArray(bikes) ? bikes.filter((m) => m && m.brand && m.model) : [];
+
+    // Fallback: If currentUser has bikeBrand & bikeModel on profile but not in customer_motorcycles
+    if (currentUser?.bikeBrand && currentUser?.bikeModel) {
+      const alreadyHas = validBikes.some(
+        (b) =>
+          b.brand?.toLowerCase() === currentUser.bikeBrand.toLowerCase() &&
+          b.model?.toLowerCase() === currentUser.bikeModel.toLowerCase()
+      );
+      if (!alreadyHas) {
+        validBikes.unshift({
+          motorcycle_id: 'profile-moto',
+          id: 'profile-moto',
+          brand: currentUser.bikeBrand,
+          model: currentUser.bikeModel,
+          plate_number: currentUser.bikePlate || 'N/A',
+          is_primary: true,
+          nickname: 'Registered Motorcycle',
+        });
+      }
+    }
+
+    setUserBikes(validBikes);
+
+    // Pick active bike: keep current if valid, else pick primary or first registered
+    setActiveBike((prev) => {
+      if (
+        prev &&
+        validBikes.some(
+          (b) =>
+            (b.motorcycle_id && b.motorcycle_id === prev.motorcycle_id) ||
+            (b.brand === prev.brand && b.model === prev.model)
+        )
+      ) {
+        return prev;
+      }
+      return validBikes.find((b) => b.is_primary) || validBikes[0] || null;
+    });
+  }, [currentUser]);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       const map = await compatibilityService.getCompatibilityMap();
       if (alive) setCompatMap(map);
-      const userId = currentUser?.id || currentUser?.customer_id;
-      if (userId) {
-        const bike = await compatibilityService.getActiveMotorcycle(userId);
-        if (alive) setActiveBike(bike);
-      } else if (alive) {
-        setActiveBike(null);
-      }
+      await loadUserBikes();
     })();
+
+    const unsub = motorcycleService.subscribe(() => {
+      if (alive) loadUserBikes();
+    });
+
     return () => {
       alive = false;
+      unsub?.();
     };
-  }, [currentUser?.id, currentUser?.customer_id]);
+  }, [loadUserBikes]);
 
   // Filtered & Sorted products list
   const filteredProducts = useMemo(() => {
@@ -412,6 +508,7 @@ export default function ShopPage({ onNavigateToScreen }) {
         customerId: currentUser?.customer_id || currentUser?.user_id || currentUser?.id || null,
         customerName,
         customerPhone,
+        customerEmail: currentUser?.email || null,
         customerAddress,
         deliveryNotes,
         paymentMethod,
@@ -469,181 +566,264 @@ export default function ShopPage({ onNavigateToScreen }) {
     }
   };
 
+  const handleSelectBike = (bike) => {
+    setActiveBike(bike);
+    if (!bike) {
+      setCompatOnly(false);
+    }
+    setIsBikeModalOpen(false);
+    showToast(bike ? `Selected ${bike.brand} ${bike.model}` : 'Cleared motorcycle filter');
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" translucent backgroundColor="transparent" />
+      <StatusBar style="light" translucent backgroundColor="transparent" />
 
       {/* Toast Notification */}
       <ToastNotification message={toastMessage} />
 
+      {/* Fixed Sticky Mobile Header (Charcoal Background) */}
+      <MobileHeader
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        filterSort={filterSort}
+        onCycleFilterSort={() => {
+          setFilterSort((prev) =>
+            prev === 'all' ? 'price-low' : prev === 'price-low' ? 'rating' : 'all'
+          );
+        }}
+        onOpenCart={() => {
+          if (!currentUser) {
+            setRedirectReason('Please sign in to view and manage your shopping cart.');
+            onNavigateToScreen?.('login');
+          } else {
+            setIsCartOpen(true);
+          }
+        }}
+        onOpenProfile={() => {
+          if (!currentUser) {
+            setRedirectReason('Please sign in to access your account.');
+            onNavigateToScreen?.('login');
+          } else {
+            onNavigateToScreen?.('profile', { tab: 'menu' });
+          }
+        }}
+        onNavigateToLogin={() => {
+          setRedirectReason('');
+          onNavigateToScreen?.('login');
+        }}
+        onNavigateToNotifications={() => onNavigateToScreen?.('notifications')}
+        onNavigateToWishlist={() => onNavigateToScreen?.('wishlist')}
+        onNavigateToAdmin={() => {
+          if (currentUser?.role === 'admin') {
+            onNavigateToScreen?.('admin');
+          } else {
+            setIsAccessDeniedModalOpen(true);
+          }
+        }}
+      />
+
       <ScrollView
+        style={[styles.container, isDarkMode && { backgroundColor: '#121518' }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handlePullRefresh}
-            colors={['#1D4533']}
-            tintColor="#1D4533"
+            colors={['#EA580C']}
+            tintColor="#EA580C"
           />
         }
       >
         <View style={[styles.maxContainer, { paddingHorizontal: isSmallMobile ? 12 : 14 }]}>
-          {/* Mobile Top Header */}
-          <MobileHeader
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-            filterSort={filterSort}
-            onCycleFilterSort={() => {
-              setFilterSort((prev) =>
-                prev === 'all' ? 'price-low' : prev === 'price-low' ? 'rating' : 'all'
-              );
-            }}
-            onOpenCart={() => {
-              if (!currentUser) {
-                setRedirectReason('Please sign in to view and manage your shopping cart.');
-                onNavigateToScreen?.('login');
-              } else {
-                setIsCartOpen(true);
-              }
-            }}
-            onOpenProfile={() => {
-              if (!currentUser) {
-                setRedirectReason('Please sign in to access your account.');
-                onNavigateToScreen?.('login');
-              } else {
-                onNavigateToScreen?.('profile', { tab: 'menu' });
-              }
-            }}
-            onNavigateToLogin={() => {
-              setRedirectReason('');
-              onNavigateToScreen?.('login');
-            }}
-            onNavigateToNotifications={() => onNavigateToScreen?.('notifications')}
-            onNavigateToWishlist={() => onNavigateToScreen?.('wishlist')}
-            onNavigateToAdmin={() => {
-              if (currentUser?.role === 'admin') {
-                onNavigateToScreen?.('admin');
-              } else {
-                setIsAccessDeniedModalOpen(true);
-              }
-            }}
-          />
-
           {/* Hero Promo Banner */}
           <HeroBanner onSelectCategory={(cat) => setSelectedCategory(cat)} showToast={showToast} />
 
-          {/* Motorcycle Selector Pill Row (Aligned with Filters) */}
-          <View style={{ paddingHorizontal: isSmallMobile ? 12 : 14, marginTop: 10, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <TouchableOpacity
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                backgroundColor: activeBike ? '#F3F7F6' : '#FFFFFF',
-                borderWidth: 1,
-                borderColor: activeBike ? '#1D4533' : '#E2E8F0',
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                borderRadius: 12,
-              }}
-              onPress={() => setIsBikeModalOpen(true)}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name="scooter" size={13} color={activeBike ? '#1D4533' : '#64748B'} />
-              <Text style={{ fontSize: 12, fontWeight: '700', color: activeBike ? '#1D4533' : '#334155' }}>
-                {activeBike ? `${activeBike.brand} ${activeBike.model}` : 'My Motorcycle ⌵'}
-              </Text>
-            </TouchableOpacity>
-
-            {activeBike && (
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  backgroundColor: compatOnly ? '#1D4533' : '#F1F5F9',
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 12,
-                }}
-                onPress={() => setCompatOnly((v) => !v)}
-                activeOpacity={0.8}
-              >
-                <BootstrapIcon
-                  name={compatOnly ? 'check-circle-fill' : 'shield-check'}
-                  size={12}
-                  color={compatOnly ? '#FFF' : '#1D4533'}
-                />
-                <Text style={{ fontSize: 12, fontWeight: '700', color: compatOnly ? '#FFF' : '#334155' }}>
-                  Compatible Only
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+          {/* Filter Chips Row: Category, Motorcycle Selector & Compatibility Filter Aligned */}
+          <FilterChips
+            selectedCategory={selectedCategory}
+            onSelectCategory={setSelectedCategory}
+            productsList={productsList}
+            activeBike={activeBike}
+            onOpenBikeModal={() => setIsBikeModalOpen(true)}
+            compatOnly={compatOnly}
+            onToggleCompatOnly={() => {
+              if (!activeBike) {
+                showToast('Select a motorcycle to filter compatible parts');
+                setIsBikeModalOpen(true);
+              } else {
+                setCompatOnly((v) => !v);
+              }
+            }}
+          />
 
           {/* Motorcycle Selection Bottom Sheet Modal (Mobile) */}
           <Modal
             visible={isBikeModalOpen}
             transparent={true}
-            animationType="fade"
+            animationType="slide"
             onRequestClose={() => setIsBikeModalOpen(false)}
           >
             <TouchableOpacity
-              style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.6)', justifyContent: 'flex-end' }}
+              style={{ flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.65)', justifyContent: 'flex-end' }}
               activeOpacity={1}
               onPress={() => setIsBikeModalOpen(false)}
             >
               <TouchableOpacity
                 activeOpacity={1}
                 style={{
-                  backgroundColor: '#FFFFFF',
-                  borderTopLeftRadius: 20,
-                  borderTopRightRadius: 20,
-                  padding: 16,
-                  maxHeight: '65%',
+                  backgroundColor: isDarkMode ? '#1C1F23' : '#FFFFFF',
+                  borderTopLeftRadius: 28,
+                  borderTopRightRadius: 28,
+                  paddingHorizontal: 16,
+                  paddingTop: 16,
+                  paddingBottom: Platform.OS === 'ios' ? 28 : 16,
+                  maxHeight: '75%',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: -4 },
+                  shadowOpacity: 0.15,
+                  shadowRadius: 16,
+                  elevation: 20,
                 }}
               >
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>Select Active Motorcycle</Text>
-                  <TouchableOpacity onPress={() => setIsBikeModalOpen(false)} style={{ padding: 4 }}>
-                    <BootstrapIcon name="x-lg" size={16} color="#64748B" />
+                {/* ─── MODAL HEADER ─── */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingBottom: 14,
+                    borderBottomWidth: 1,
+                    borderBottomColor: isDarkMode ? '#2B3035' : '#F1F5F9',
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                    <View
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 12,
+                        backgroundColor: isDarkMode ? '#2B1A0A' : '#FFF7ED',
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? '#43230A' : '#FED7AA',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <BootstrapIcon name="scooter" size={16} color="#EA580C" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 16.5, fontWeight: '800', color: isDarkMode ? '#F9FAFB' : '#0F172A' }}>
+                        Select Active Motorcycle
+                      </Text>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 1 }}>
+                        Filter parts by your registered motorcycle ({userBikes.length} registered)
+                      </Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setIsBikeModalOpen(false)}
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 17,
+                      backgroundColor: isDarkMode ? '#23272B' : '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#94A3B8' : '#64748B'} />
                   </TouchableOpacity>
                 </View>
 
-                <ScrollView showsVerticalScrollIndicator={false}>
+                {/* ─── LIST OF MOTORCYCLES ─── */}
+                <ScrollView showsVerticalScrollIndicator={false} style={{ marginVertical: 10 }}>
+                  {/* Option: All Motorcycles (No Filter) */}
                   <TouchableOpacity
                     style={{
                       flexDirection: 'row',
                       alignItems: 'center',
-                      gap: 10,
-                      paddingVertical: 12,
-                      borderBottomWidth: 1,
-                      borderBottomColor: '#F1F5F9',
+                      paddingVertical: 11,
+                      paddingHorizontal: 12,
+                      borderRadius: 14,
+                      marginBottom: 8,
+                      backgroundColor: !activeBike ? (isDarkMode ? '#2B1A0A' : '#FFF7ED') : (isDarkMode ? '#23272B' : '#F8FAFC'),
+                      borderWidth: 1,
+                      borderColor: !activeBike ? '#EA580C' : (isDarkMode ? '#2B3035' : '#E2E8F0'),
                     }}
                     onPress={() => handleSelectBike(null)}
+                    activeOpacity={0.75}
                   >
-                    <BootstrapIcon
-                      name={!activeBike ? 'check-circle-fill' : 'circle'}
-                      size={14}
-                      color={!activeBike ? '#1D4533' : '#CBD5E1'}
-                    />
-                    <Text style={{ fontSize: 13.5, fontWeight: !activeBike ? '800' : '600', color: !activeBike ? '#1D4533' : '#334155' }}>
-                      All Motorcycles (No Filter)
-                    </Text>
+                    <View
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 10,
+                        backgroundColor: !activeBike ? '#EA580C' : (isDarkMode ? '#1C1F23' : '#F3F4F6'),
+                        borderWidth: 1,
+                        borderColor: !activeBike ? '#EA580C' : (isDarkMode ? '#2B3035' : '#E5E7EB'),
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 10,
+                      }}
+                    >
+                      <BootstrapIcon
+                        name="grid-fill"
+                        size={14}
+                        color={!activeBike ? '#FFFFFF' : (isDarkMode ? '#94A3B8' : '#64748B')}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 13.5,
+                          fontWeight: !activeBike ? '800' : '700',
+                          color: !activeBike ? '#EA580C' : (isDarkMode ? '#F9FAFB' : '#1E293B'),
+                        }}
+                      >
+                        All Motorcycles (No Filter)
+                      </Text>
+                      <Text style={{ fontSize: 11, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 1 }}>
+                        Browse entire catalog without compatibility restrictions
+                      </Text>
+                    </View>
+                    {!activeBike && (
+                      <BootstrapIcon name="check-circle-fill" size={16} color="#EA580C" />
+                    )}
                   </TouchableOpacity>
 
                   {userBikes.length === 0 ? (
-                    <View style={{ padding: 20, alignItems: 'center' }}>
+                    <View style={{ padding: 24, alignItems: 'center' }}>
                       <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center' }}>
                         {currentUser
                           ? 'No motorcycles found in your garage.'
                           : 'Sign in to select your registered motorcycle.'}
                       </Text>
                       {currentUser && (
-                        <Text style={{ fontSize: 12, color: '#059669', fontWeight: '700', marginTop: 4 }}>
-                          Add bikes in your Customer Garage
-                        </Text>
+                        <TouchableOpacity
+                          style={{
+                            marginTop: 12,
+                            backgroundColor: '#EA580C',
+                            paddingHorizontal: 16,
+                            paddingVertical: 10,
+                            borderRadius: 12,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                          onPress={() => {
+                            setIsBikeModalOpen(false);
+                            onNavigateToScreen?.('profile', { tab: 'garage' });
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <BootstrapIcon name="plus-lg" size={13} color="#FFFFFF" />
+                          <Text style={{ fontSize: 12.5, color: '#FFFFFF', fontWeight: '800' }}>
+                            Register Motorcycle in Garage
+                          </Text>
+                        </TouchableOpacity>
                       )}
                     </View>
                   ) : (
@@ -658,87 +838,188 @@ export default function ShopPage({ onNavigateToScreen }) {
                           style={{
                             flexDirection: 'row',
                             alignItems: 'center',
-                            justifyContent: 'space-between',
-                            paddingVertical: 12,
-                            borderBottomWidth: 1,
-                            borderBottomColor: '#F1F5F9',
+                            paddingVertical: 11,
+                            paddingHorizontal: 12,
+                            borderRadius: 14,
+                            marginBottom: 8,
+                            backgroundColor: isSelected ? (isDarkMode ? '#2B1A0A' : '#FFF7ED') : (isDarkMode ? '#23272B' : '#F8FAFC'),
+                            borderWidth: 1,
+                            borderColor: isSelected ? '#EA580C' : (isDarkMode ? '#2B3035' : '#E2E8F0'),
                           }}
                           onPress={() => handleSelectBike(b)}
+                          activeOpacity={0.75}
                         >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                          <View
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 10,
+                              backgroundColor: isSelected ? '#EA580C' : (isDarkMode ? '#1C1F23' : '#F3F4F6'),
+                              borderWidth: 1,
+                              borderColor: isSelected ? '#EA580C' : (isDarkMode ? '#2B3035' : '#E5E7EB'),
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              marginRight: 10,
+                            }}
+                          >
                             <BootstrapIcon
-                              name={isSelected ? 'check-circle-fill' : 'circle'}
-                              size={14}
-                              color={isSelected ? '#1D4533' : '#CBD5E1'}
+                              name="scooter"
+                              size={15}
+                              color={isSelected ? '#FFFFFF' : (isDarkMode ? '#94A3B8' : '#64748B')}
                             />
-                            <View>
-                              <Text style={{ fontSize: 13.5, fontWeight: isSelected ? '800' : '600', color: isSelected ? '#1D4533' : '#334155' }}>
-                                {b.brand} {b.model}
-                              </Text>
-                              {b.nickname ? (
-                                <Text style={{ fontSize: 11, color: '#94A3B8' }}>{b.nickname}</Text>
-                              ) : null}
-                            </View>
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={{
+                                fontSize: 13.5,
+                                fontWeight: isSelected ? '800' : '700',
+                                color: isSelected ? '#EA580C' : (isDarkMode ? '#F9FAFB' : '#1E293B'),
+                              }}
+                            >
+                              {b.brand} {b.model} {b.year ? `(${b.year})` : ''}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 1 }}>
+                              {b.nickname ? `"${b.nickname}" • ` : ''}
+                              {b.engine_displacement ? `${b.engine_displacement}cc` : 'Verified Bike'}
+                            </Text>
                           </View>
                           {b.is_primary ? (
-                            <View style={{ backgroundColor: '#DCFCE7', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
-                              <Text style={{ fontSize: 10, fontWeight: '800', color: '#1D4533' }}>Default</Text>
+                            <View
+                              style={{
+                                backgroundColor: isSelected ? (isDarkMode ? '#43230A' : '#FFEDD5') : (isDarkMode ? '#064E3B' : '#DCFCE7'),
+                                paddingHorizontal: 8,
+                                paddingVertical: 2.5,
+                                borderRadius: 8,
+                                marginRight: 6,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: '800',
+                                  color: isSelected ? '#EA580C' : (isDarkMode ? '#34D399' : '#15803D'),
+                                }}
+                              >
+                                Primary
+                              </Text>
                             </View>
                           ) : null}
+                          {isSelected && (
+                            <BootstrapIcon name="check-circle-fill" size={16} color="#EA580C" />
+                          )}
                         </TouchableOpacity>
                       );
                     })
                   )}
                 </ScrollView>
+
+                {/* ─── FOOTER ACTIONS ─── */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    paddingTop: 12,
+                    borderTopWidth: 1,
+                    borderTopColor: isDarkMode ? '#2B3035' : '#F1F5F9',
+                  }}
+                >
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderRadius: 14,
+                      backgroundColor: isDarkMode ? '#23272B' : '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onPress={() => {
+                      setIsBikeModalOpen(false);
+                      onNavigateToScreen?.('profile', { tab: 'garage' });
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? '#E2E8F0' : '#334155' }}>
+                      Manage Garage
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      paddingVertical: 12,
+                      borderRadius: 14,
+                      backgroundColor: '#EA580C',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    onPress={() => setIsBikeModalOpen(false)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+                      Apply Filter
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </TouchableOpacity>
             </TouchableOpacity>
           </Modal>
 
-          {/* Filter Chips Row with Category, Rating, Price, and Reset Dropdowns */}
-          <FilterChips
-            selectedCategory={selectedCategory}
-            onSelectCategory={setSelectedCategory}
-            productsList={productsList}
-            filterSort={filterSort}
-            onSetFilterSort={setFilterSort}
-            ratingFilter={ratingFilter}
-            onSetRatingFilter={setRatingFilter}
-            priceFilter={priceFilter}
-            onSetPriceFilter={setPriceFilter}
-            onResetFilters={() => {
-              setSelectedCategory('All');
-              setSearchQuery('');
-              setFilterSort('default');
-              setRatingFilter('all');
-              setPriceFilter('all');
-              setCompatOnly(false);
-              showToast('Reset all filters');
-            }}
-          />
-
           {/* Section Title */}
           <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Featured Products</Text>
-            <Text style={styles.sectionCount}>{filteredProducts.length} items available</Text>
+            <Text style={[styles.sectionTitle, isDarkMode && { color: '#F9FAFB' }]}>
+              {selectedCategory === 'All' ? 'Featured Products' : `${selectedCategory} Collection`}
+            </Text>
+            <Text style={[styles.sectionCount, isDarkMode && { color: '#94A3B8' }]}>
+              {isLoadingProducts ? 'Loading catalog items...' : `${filteredProducts.length} items available`}
+            </Text>
           </View>
 
           {/* Multi-Column Product Grid */}
           <View style={styles.productGrid}>
-            {filteredProducts.map((product, pIdx) => (
-              <ProductCard
-                key={product.id ? `prod-${product.id}` : `prod-${pIdx}`}
-                product={product}
-                bike={activeBike}
-                onPress={(prod) => {
-                  if (onNavigateToScreen) {
-                    onNavigateToScreen('product-details', { product: prod });
-                  } else {
-                    setSelectedProduct(prod);
-                    setIsSpecsOpen(true);
-                  }
-                }}
-              />
-            ))}
+            {filteredProducts.length === 0 && !isLoadingProducts ? (
+              <View style={{ width: '100%', paddingVertical: 40, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' }}>
+                <BootstrapIcon name="box-seam" size={38} color={isDarkMode ? '#64748B' : '#94A3B8'} />
+                <Text
+                  style={{
+                    marginTop: 12,
+                    fontSize: 15,
+                    fontWeight: '700',
+                    color: isDarkMode ? '#F9FAFB' : '#0F172A',
+                  }}
+                >
+                  No Products Found
+                </Text>
+                <Text
+                  style={{
+                    marginTop: 4,
+                    fontSize: 13,
+                    color: isDarkMode ? '#94A3B8' : '#64748B',
+                    textAlign: 'center',
+                    maxWidth: 320,
+                  }}
+                >
+                  {searchQuery
+                    ? `No products found matching "${searchQuery}". Try adjusting your keywords.`
+                    : 'No products are currently available in this category.'}
+                </Text>
+              </View>
+            ) : (
+              filteredProducts.map((product, pIdx) => (
+                <ProductCard
+                  key={product.id ? `prod-${product.id}` : `prod-${pIdx}`}
+                  product={product}
+                  bike={activeBike}
+                  onPress={(prod) => {
+                    if (onNavigateToScreen) {
+                      onNavigateToScreen('product-details', { product: prod });
+                    } else {
+                      setSelectedProduct(prod);
+                      setIsSpecsOpen(true);
+                    }
+                  }}
+                />
+              ))
+            )}
           </View>
 
           {/* Mobile Footer with Company Links & Copyright */}
@@ -761,7 +1042,7 @@ export default function ShopPage({ onNavigateToScreen }) {
               </TouchableOpacity>
             </View>
             <Text style={{ fontSize: 11, color: '#94A3B8', textAlign: 'center' }}>
-              © 2026 MotoTrack Motorparts & Accessories. Official Performance Network.
+              © 2026 {brandSettings?.storeName || 'MotoTrack Motorparts & Accessories'}. Official Performance Network.
             </Text>
           </View>
         </View>
@@ -816,10 +1097,12 @@ export default function ShopPage({ onNavigateToScreen }) {
             } else {
               onNavigateToScreen?.('profile', { tab: 'profile' });
             }
+          } else if (tab === 'Services') {
+            onNavigateToScreen?.('garage');
           } else if (tab === 'Customize') {
             onNavigateToScreen?.('customizer');
           } else if (tab === 'Garage') {
-            onNavigateToScreen?.('garage');
+            onNavigateToScreen?.('profile', { tab: 'garage' });
           } else if (tab === 'Orders') {
             onNavigateToScreen?.('orders');
           } else if (tab === 'Admin') {

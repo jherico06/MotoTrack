@@ -328,7 +328,7 @@ export default function RiderRunPage({ token: tokenProp }) {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator color="#1D4533" />
+          <ActivityIndicator color="#EA580C" />
           <Text style={styles.muted}>Loading your deliveries…</Text>
         </View>
       </SafeAreaView>
@@ -372,7 +372,7 @@ export default function RiderRunPage({ token: tokenProp }) {
         {groups.map(([area, stops]) => (
           <View key={area} style={styles.areaBlock}>
             <View style={styles.areaHead}>
-              <BootstrapIcon name="geo-alt-fill" size={14} color="#1D4533" />
+              <BootstrapIcon name="geo-alt-fill" size={14} color="#EA580C" />
               <Text style={styles.areaTitle}>{area}</Text>
               <Text style={styles.areaCount}>{stops.length}</Text>
             </View>
@@ -470,7 +470,7 @@ export default function RiderRunPage({ token: tokenProp }) {
                     onPress={() => handleStatus(detail, 'Out for Delivery')}
                   >
                     {busyId === detail.orderId ? (
-                      <ActivityIndicator color="#1D4533" />
+                      <ActivityIndicator color="#EA580C" />
                     ) : (
                       <Text style={styles.secondaryBtnText}>Mark on the way</Text>
                     )}
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
   body: { padding: 16, paddingBottom: 40 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   hero: { flex: 1, padding: 24, justifyContent: 'center', gap: 10 },
-  brand: { fontSize: 12, fontWeight: '800', color: '#1D4533', letterSpacing: 0.6, textTransform: 'uppercase' },
+  brand: { fontSize: 12, fontWeight: '800', color: '#EA580C', letterSpacing: 0.6, textTransform: 'uppercase' },
   title: { fontSize: 22, fontWeight: '800', color: '#0F172A', marginTop: 4 },
   sub: { fontSize: 14, color: '#475569', marginTop: 4, lineHeight: 20 },
   muted: { fontSize: 12, color: '#94A3B8', marginTop: 6, lineHeight: 18 },
@@ -527,7 +527,7 @@ const styles = StyleSheet.create({
   areaBlock: { marginTop: 18 },
   areaHead: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
   areaTitle: { flex: 1, fontSize: 13, fontWeight: '800', color: '#0F172A' },
-  areaCount: { fontSize: 11, fontWeight: '800', color: '#1D4533', backgroundColor: '#CCFBF1', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
+  areaCount: { fontSize: 11, fontWeight: '800', color: '#EA580C', backgroundColor: '#FED7AA', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 999 },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
@@ -537,12 +537,12 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderId: { fontSize: 13, fontWeight: '800', color: '#1D4533' },
+  orderId: { fontSize: 13, fontWeight: '800', color: '#EA580C' },
   badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { fontSize: 11, fontWeight: '800' },
   customer: { fontSize: 16, fontWeight: '800', color: '#0F172A', marginTop: 6 },
   address: { fontSize: 13, color: '#334155', marginTop: 4, lineHeight: 18 },
-  landmark: { fontSize: 12, color: '#1D4533', marginTop: 4, fontWeight: '600' },
+  landmark: { fontSize: 12, color: '#EA580C', marginTop: 4, fontWeight: '600' },
   phone: { fontSize: 13, color: '#1D4ED8', marginTop: 4, fontWeight: '700' },
   coords: { fontSize: 11, color: '#64748B', marginTop: 6, fontVariant: ['tabular-nums'] },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
@@ -550,7 +550,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 12,
     paddingHorizontal: 14,
     height: 42,
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
   ghostBtnText: { color: '#334155', fontWeight: '700', fontSize: 13 },
   primaryBtn: {
     marginTop: 12,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 12,
     height: 48,
     alignItems: 'center',
@@ -578,13 +578,13 @@ const styles = StyleSheet.create({
   secondaryBtn: {
     marginTop: 12,
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     borderRadius: 12,
     height: 46,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryBtnText: { color: '#1D4533', fontWeight: '800', fontSize: 14 },
+  secondaryBtnText: { color: '#24272B', fontWeight: '800', fontSize: 14 },
   issueBtn: {
     marginTop: 8,
     backgroundColor: '#FEF2F2',

@@ -315,7 +315,7 @@ export default function MechanicDashboard({ onLogout }) {
   if (loading && !mechanic) {
     return (
       <SafeAreaView style={styles.root}>
-        <ActivityIndicator color="#1D4533" style={{ marginTop: 40 }} />
+        <ActivityIndicator color="#EA580C" style={{ marginTop: 40 }} />
       </SafeAreaView>
     );
   }
@@ -338,22 +338,17 @@ export default function MechanicDashboard({ onLogout }) {
   }
 
   return (
-    <SafeAreaView style={styles.root}>
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="light" translucent backgroundColor="transparent" />
       <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerEyebrow}>MECHANIC DASHBOARD</Text>
-          <Text style={styles.headerTitle}>{mechanic.shortName || mechanic.name}</Text>
-          <Text style={styles.headerSub}>
-            {mechanic.bay || 'Pit Bay'} · {formatPhp(rate)}/hr
-          </Text>
-        </View>
+        <Text style={styles.headerTitle}>{mechanic.shortName || mechanic.name || 'Mechanic Dashboard'}</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <TouchableOpacity style={styles.logoutBtn} onPress={() => setAccountOpen(true)}>
-            <BootstrapIcon name="gear" size={14} color="#1D4533" />
+            <BootstrapIcon name="gear" size={14} color="#EA580C" />
             <Text style={styles.logoutText}>Account</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.logoutBtn} onPress={onLogout}>
-            <BootstrapIcon name="box-arrow-right" size={14} color="#1D4533" />
+            <BootstrapIcon name="box-arrow-right" size={14} color="#EA580C" />
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
@@ -385,7 +380,7 @@ export default function MechanicDashboard({ onLogout }) {
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 40 }}
-        refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor="#1D4533" />}
+        refreshControl={<RefreshControl refreshing={loading} onRefresh={reload} tintColor="#EA580C" />}
       >
         <Text style={styles.sectionLabel}>Today&apos;s Jobs · {filtered.length}</Text>
 
@@ -719,18 +714,19 @@ export default function MechanicDashboard({ onLogout }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F8FAFC' },
+  safeArea: { flex: 1, backgroundColor: '#24272B', paddingTop: Platform.OS === 'android' ? ANDROID_TOP_INSET : 0 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    paddingTop: 8,
+    paddingBottom: 12,
+    backgroundColor: '#24272B',
   },
-  headerEyebrow: { fontSize: 10, fontWeight: '800', color: '#059669', letterSpacing: 0.8 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
-  headerSub: { fontSize: 12, color: '#64748B', marginTop: 2 },
+  headerEyebrow: { fontSize: 10, fontWeight: '800', color: '#10B981', letterSpacing: 0.8 },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.3 },
+  headerSub: { fontSize: 12, color: '#94A3B8', marginTop: 2 },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -739,14 +735,14 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#C8DDD3',
-    backgroundColor: '#F0FDF4',
+    borderColor: '#363C44',
+    backgroundColor: '#1E2124',
   },
-  logoutText: { fontSize: 12, fontWeight: '700', color: '#1D4533' },
+  logoutText: { fontSize: 12, fontWeight: '700', color: '#EA580C' },
   toast: {
     marginHorizontal: 16,
     marginTop: 8,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 10,
     padding: 10,
   },
@@ -760,7 +756,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  chipOn: { backgroundColor: '#1D4533', borderColor: '#1D4533' },
+  chipOn: { backgroundColor: '#EA580C', borderColor: '#EA580C' },
   chipText: { fontSize: 12, fontWeight: '700', color: '#64748B' },
   chipTextOn: { color: '#FFFFFF' },
   sectionLabel: { fontSize: 13, fontWeight: '800', color: '#334155', marginBottom: 4 },
@@ -775,7 +771,7 @@ const styles = StyleSheet.create({
   cardId: { fontSize: 13, fontWeight: '800', color: '#0F172A' },
   pill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   pillText: { fontSize: 10, fontWeight: '800' },
-  cardBike: { fontSize: 14, fontWeight: '700', color: '#1D4533', marginTop: 6 },
+  cardBike: { fontSize: 14, fontWeight: '700', color: '#EA580C', marginTop: 6 },
   cardMeta: { fontSize: 12, color: '#64748B', marginTop: 2 },
   cardProblem: { fontSize: 12.5, color: '#475569', marginTop: 6 },
   detail: {
@@ -799,10 +795,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFF',
   },
   row: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  calcHint: { fontSize: 12, fontWeight: '700', color: '#1D4533', flex: 1 },
+  calcHint: { fontSize: 12, fontWeight: '700', color: '#EA580C', flex: 1 },
   primaryBtn: {
     marginTop: 8,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
@@ -815,7 +811,7 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     alignItems: 'center',
   },
-  secondaryBtnText: { color: '#1D4533', fontWeight: '800', fontSize: 12.5 },
+  secondaryBtnText: { color: '#24272B', fontWeight: '800', fontSize: 12.5 },
   emptyBox: { alignItems: 'center', padding: 28, gap: 8 },
   emptyTitle: { fontSize: 15, fontWeight: '800', color: '#334155' },
   emptySub: { fontSize: 13, color: '#64748B', textAlign: 'center' },
@@ -836,7 +832,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     backgroundColor: '#F8FAFC',
   },
-  checkChipOn: { backgroundColor: '#1D4533', borderColor: '#1D4533' },
+  checkChipOn: { backgroundColor: '#EA580C', borderColor: '#EA580C' },
   checkChipText: { fontSize: 11, fontWeight: '700', color: '#64748B' },
   checkChipTextOn: { color: '#FFFFFF' },
   progressStepRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 4 },
@@ -849,8 +845,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   progressDotDone: { backgroundColor: '#059669', borderColor: '#059669' },
-  progressDotCurrent: { backgroundColor: '#1D4533', borderColor: '#1D4533' },
+  progressDotCurrent: { backgroundColor: '#EA580C', borderColor: '#EA580C' },
   progressStepText: { fontSize: 13, color: '#94A3B8', fontWeight: '600' },
   progressStepDone: { color: '#059669' },
-  progressStepCurrent: { color: '#1D4533', fontWeight: '800' },
+  progressStepCurrent: { color: '#EA580C', fontWeight: '800' },
 });

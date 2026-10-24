@@ -1,0 +1,1309 @@
+{
+  "users": {
+    "codeReferences": [
+      "src/components/admin/AdminSidebar.jsx",
+      "src/components/admin/SalesAnalyticsPanel.jsx",
+      "src/lib/supabase.js",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/screens/web/customer/GaragePage.jsx",
+      "src/services/auth/authService.js",
+      "src/services/inventory/excelService.js",
+      "src/services/notifications/emailService.js",
+      "src/services/notifications/notificationService.js",
+      "src/services/staff/riderService.js",
+      "src/services/staff/userService.js",
+      "src/services/system/auditLogService.js",
+      "src/services/system/databaseService.js",
+      "src/services/system/systemSettingsService.js",
+      "server/src/middleware/requireAdmin.js",
+      "server/src/services/aiRateLimitService.js",
+      "server/src/services/staffAccountService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/002_orders_enhancements.sql",
+      "supabase/migrations/003_account_logs.sql",
+      "supabase/migrations/004_customer_motorcycles.sql",
+      "supabase/migrations/006_mechanics.sql",
+      "supabase/migrations/009_normalize_schema.sql",
+      "supabase/migrations/20260918052118_rider_login_accounts.sql",
+      "supabase/migrations/20260918061003_riders_require_database_sync.sql",
+      "supabase/migrations/20260922000000_storage_anon_delete_lock.sql",
+      "supabase/migrations/20260929210000_atomic_inventory_forecast.sql",
+      "supabase/migrations/20261001004946_garage_booking_workflow_v2.sql",
+      "supabase/migrations/20261003020000_delivery_locations_gps.sql",
+      "supabase/migrations/20261004152937_staff_account_otp_verification.sql",
+      "supabase/migrations/20261009120000_secure_admin_pin_sessions.sql",
+      "supabase/migrations/20261014022201_remove_mechanic_add_pms_cc_pricing.sql",
+      "supabase/migrations/20261014123017_restore_mechanic_roster_no_login.sql"
+    ],
+    "fromCalls": [
+      "src/lib/supabase.js",
+      "src/services/auth/authService.js",
+      "src/services/notifications/emailService.js",
+      "src/services/staff/userService.js",
+      "src/services/system/databaseService.js",
+      "server/src/middleware/requireAdmin.js",
+      "server/src/services/aiRateLimitService.js",
+      "server/src/services/staffAccountService.js"
+    ]
+  },
+  "customers": {
+    "codeReferences": [
+      "src/app/index.jsx",
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/admin/PromosAdminPanel.jsx",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/services/bookings/customizationService.js",
+      "src/services/bookings/garageService.js",
+      "src/services/inventory/excelService.js",
+      "src/services/orders/orderService.js",
+      "src/services/staff/userService.js",
+      "src/services/system/databaseService.js",
+      "src/services/system/systemSettingsService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/002_orders_enhancements.sql",
+      "supabase/migrations/009_normalize_schema.sql",
+      "supabase/migrations/20261003020000_delivery_locations_gps.sql",
+      "supabase/migrations/20261014022201_remove_mechanic_add_pms_cc_pricing.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/garageService.js",
+      "src/services/orders/orderService.js",
+      "src/services/staff/userService.js",
+      "src/services/system/databaseService.js"
+    ]
+  },
+  "addresses": {
+    "codeReferences": [
+      "src/components/modals/CompanyInfoModal.jsx",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/services/staff/userService.js",
+      "src/utils/deliveryPackingSlip.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/20260918045712_rider_access_dashboard.sql"
+    ],
+    "fromCalls": [
+      "src/services/staff/userService.js"
+    ]
+  },
+  "notifications": {
+    "codeReferences": [
+      "src/app/index.jsx",
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/common/BookingCalendar.jsx",
+      "src/components/common/BootstrapIcon.jsx",
+      "src/components/common/NotificationDropdown.jsx",
+      "src/components/common/UserProfileDropdown.jsx",
+      "src/components/mobile/customer/MobileHeader.jsx",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/mobile/customer/CustomizerPage.jsx",
+      "src/screens/mobile/customer/GaragePage.jsx",
+      "src/screens/mobile/customer/NotificationsPage.jsx",
+      "src/screens/mobile/customer/ProfilePage.jsx",
+      "src/screens/mobile/customer/ShopPage.jsx",
+      "src/screens/mobile/customer/WishlistPage.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/screens/web/customer/CustomizerPage.jsx",
+      "src/screens/web/customer/GaragePage.jsx",
+      "src/screens/web/customer/NotificationsPage.jsx",
+      "src/screens/web/customer/ProfilePage.jsx",
+      "src/screens/web/customer/ShopPage.jsx",
+      "src/screens/web/customer/WishlistPage.jsx",
+      "src/services/auth/authService.js",
+      "src/services/bookings/garageService.js",
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/serviceQuotationService.js",
+      "src/services/delivery/deliveryService.js",
+      "src/services/delivery/riderAccessService.js",
+      "src/services/index.js",
+      "src/services/notifications/emailService.js",
+      "src/services/orders/orderService.js",
+      "src/services/products/productService.js",
+      "src/services/staff/userService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/20261015123000_orders_customer_email.sql"
+    ],
+    "fromCalls": [
+      "src/services/notifications/emailService.js",
+      "src/services/staff/userService.js"
+    ]
+  },
+  "suppliers": {
+    "codeReferences": [
+      "src/components/admin/AdminSidebar.jsx",
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/admin/ModernOverviewDashboard.jsx",
+      "src/components/admin/SalesAnalyticsPanel.jsx",
+      "src/components/admin/SalesForecastPanel.jsx",
+      "src/components/common/Skeleton.jsx",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/services/inventory/dashboardInsightsService.js",
+      "src/services/inventory/excelService.js",
+      "src/services/inventory/supplierService.js",
+      "src/services/notifications/notificationService.js",
+      "src/services/system/databaseService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/005_suppliers_enhancements.sql",
+      "supabase/migrations/20260921002000_products_inventory_write_rls.sql",
+      "supabase/migrations/20260929210000_atomic_inventory_forecast.sql"
+    ],
+    "fromCalls": [
+      "src/services/inventory/supplierService.js"
+    ]
+  },
+  "categories": {
+    "codeReferences": [
+      "src/components/admin/BookingCategoryPieChart.jsx",
+      "src/components/admin/SalesForecastPanel.jsx",
+      "src/components/customizer/AiMotorcycleInstallStudio.jsx",
+      "src/components/customizer/CustomizationWorkspace.jsx",
+      "src/components/shop/CategoryDropdown.jsx",
+      "src/components/shop/FilterChips.jsx",
+      "src/data/motorcycleCatalog.js",
+      "src/hooks/useCustomizationBuilder.js",
+      "src/lib/supabase.js",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/screens/web/customer/ShopPage.jsx",
+      "src/services/bookings/pmsPricingService.js",
+      "src/services/inventory/dashboardInsightsService.js",
+      "src/services/inventory/forecastService.js",
+      "src/services/inventory/supplierService.js",
+      "src/services/orders/orderService.js",
+      "src/services/products/productService.js",
+      "src/services/system/databaseService.js",
+      "src/utils/installStudioLogic.js",
+      "src/utils/pmsCcPricing.js",
+      "src/utils/__tests__/pmsCcPricing.test.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/005_suppliers_enhancements.sql",
+      "supabase/migrations/009_normalize_schema.sql",
+      "supabase/migrations/20261014022201_remove_mechanic_add_pms_cc_pricing.sql",
+      "supabase/migrations/20261014115203_booking_multi_service_line_items.sql",
+      "supabase/migrations/20261015074236_pms_repair_catalog_category.sql"
+    ],
+    "fromCalls": [
+      "src/lib/supabase.js",
+      "src/services/system/databaseService.js"
+    ]
+  },
+  "products": {
+    "codeReferences": [
+      "src/components/admin/AdminSidebar.jsx",
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/admin/DashboardInsightsPanel.jsx",
+      "src/components/admin/ModernOverviewDashboard.jsx",
+      "src/components/admin/MotorcycleModelsAdminPanel.jsx",
+      "src/components/admin/ProductCompatibilityPicker.jsx",
+      "src/components/admin/PromosAdminPanel.jsx",
+      "src/components/admin/SalesAnalyticsPanel.jsx",
+      "src/components/admin/SalesForecastPanel.jsx",
+      "src/components/admin/ServiceQuotationPanel.jsx",
+      "src/components/common/CustomerServiceBookingCard.jsx",
+      "src/components/common/MyMotorcyclePanel.jsx",
+      "src/components/customizer/AiMotorcycleInstallStudio.jsx",
+      "src/components/customizer/CustomizationWorkspace.jsx",
+      "src/components/modals/AccessDeniedModal.jsx",
+      "src/components/modals/CartModal.jsx",
+      "src/components/modals/ProductSpecsModal.jsx",
+      "src/components/modals/RateDeliveredOrderModal.jsx",
+      "src/components/modals/RegisterMotorcycleModal.jsx",
+      "src/components/shop/CategoryDropdown.jsx",
+      "src/components/shop/CompatibilityBadge.jsx",
+      "src/components/shop/CompatibilityIndicator.jsx",
+      "src/components/shop/FilterChips.jsx",
+      "src/components/shop/HeroBanner.jsx",
+      "src/context/CartContext.jsx",
+      "src/context/WishlistContext.jsx",
+      "src/data/motorcycleCatalog.js",
+      "src/data/motorParts.js",
+      "src/hooks/useCustomizationBuilder.js",
+      "src/lib/supabase.js",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/mobile/customer/CustomizerPage.jsx",
+      "src/screens/mobile/customer/GaragePage.jsx",
+      "src/screens/mobile/customer/ProfilePage.jsx",
+      "src/screens/mobile/customer/ShopPage.jsx",
+      "src/screens/mobile/customer/WishlistPage.jsx",
+      "src/screens/shared/customer/ProductDetailsPage.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/screens/web/customer/CustomizerPage.jsx",
+      "src/screens/web/customer/GaragePage.jsx",
+      "src/screens/web/customer/ProfilePage.jsx",
+      "src/screens/web/customer/ShopPage.jsx",
+      "src/screens/web/customer/WishlistPage.jsx",
+      "src/services/ai/aiCustomizerService.js",
+      "src/services/ai/geminiService.js",
+      "src/services/bookings/customizationService.js",
+      "src/services/bookings/serviceQuotationService.js",
+      "src/services/cache/cacheKeys.js",
+      "src/services/delivery/deliveryService.js",
+      "src/services/index.js",
+      "src/services/inventory/dashboardInsightsService.js",
+      "src/services/inventory/excelService.js",
+      "src/services/inventory/forecastService.js",
+      "src/services/notifications/notificationService.js",
+      "src/services/orders/orderService.js",
+      "src/services/products/compatibilityService.js",
+      "src/services/products/productService.js",
+      "src/services/products/promoService.js",
+      "src/services/products/wishlistService.js",
+      "src/services/system/databaseService.js",
+      "src/services/system/systemSettingsService.js",
+      "src/utils/__tests__/kpiFormulas.test.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/009_normalize_schema.sql",
+      "supabase/migrations/014_delivery_confirm_preview_order_details.sql",
+      "supabase/migrations/016_egress_query_indexes.sql",
+      "supabase/migrations/20260919153000_forecast_history.sql",
+      "supabase/migrations/20260920170000_financial_management.sql",
+      "supabase/migrations/20260920230000_product_sizes.sql",
+      "supabase/migrations/20260921001000_product_colors.sql",
+      "supabase/migrations/20260921002000_products_inventory_write_rls.sql",
+      "supabase/migrations/20260921103000_product_customizations.sql",
+      "supabase/migrations/20260921184112_fix_fake_ratings_promos_and_oil_sizes.sql",
+      "supabase/migrations/20260922000000_storage_anon_delete_lock.sql",
+      "supabase/migrations/20260929210000_atomic_inventory_forecast.sql",
+      "supabase/migrations/20261005103000_promo_management_enhancements.sql",
+      "supabase/migrations/20261015015018_wishlist_ai_install_free_installation.sql"
+    ],
+    "fromCalls": [
+      "src/lib/supabase.js",
+      "src/services/products/productService.js",
+      "src/services/system/databaseService.js"
+    ]
+  },
+  "inventory": {
+    "codeReferences": [
+      "src/app/index.jsx",
+      "src/components/admin/AdminSidebar.jsx",
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/admin/DashboardInsightsPanel.jsx",
+      "src/components/admin/ModernOverviewDashboard.jsx",
+      "src/components/admin/RevenueTrendChart.jsx",
+      "src/components/admin/SalesAnalyticsPanel.jsx",
+      "src/components/admin/SalesForecastPanel.jsx",
+      "src/components/admin/ServiceQuotationPanel.jsx",
+      "src/components/common/AdminStatCard.jsx",
+      "src/components/common/NotificationDropdown.jsx",
+      "src/components/modals/AccessDeniedModal.jsx",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/screens/web/customer/NotificationsPage.jsx",
+      "src/screens/web/customer/ShopPage.jsx",
+      "src/services/bookings/customizationService.js",
+      "src/services/bookings/serviceQuotationService.js",
+      "src/services/index.js",
+      "src/services/inventory/dashboardInsightsService.js",
+      "src/services/inventory/excelService.js",
+      "src/services/inventory/forecastService.js",
+      "src/services/notifications/notificationService.js",
+      "src/services/orders/orderService.js",
+      "src/services/orders/reservationService.js",
+      "src/services/products/productService.js",
+      "src/services/system/auditLogService.js",
+      "src/services/system/databaseService.js",
+      "src/utils/inventoryHelpers.js",
+      "src/utils/__tests__/kpiFormulas.test.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/009_normalize_schema.sql",
+      "supabase/migrations/20260921002000_products_inventory_write_rls.sql",
+      "supabase/migrations/20260929210000_atomic_inventory_forecast.sql",
+      "supabase/migrations/20260929213000_inventory_housekeeping.sql",
+      "supabase/migrations/20261014022201_remove_mechanic_add_pms_cc_pricing.sql"
+    ],
+    "fromCalls": [
+      "src/services/products/productService.js",
+      "src/services/system/databaseService.js"
+    ]
+  },
+  "discounts": {
+    "codeReferences": [],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql"
+    ],
+    "fromCalls": []
+  },
+  "promos": {
+    "codeReferences": [
+      "src/components/admin/AdminSidebar.jsx",
+      "src/components/admin/PromosAdminPanel.jsx",
+      "src/components/shop/HeroBanner.jsx",
+      "src/context/CartContext.jsx",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/mobile/customer/NotificationsPage.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/services/orders/orderService.js",
+      "src/services/products/promoService.js",
+      "src/services/system/auditLogService.js",
+      "src/services/system/databaseService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/20261005103000_promo_management_enhancements.sql",
+      "supabase/migrations/20261015015018_wishlist_ai_install_free_installation.sql",
+      "supabase/migrations/20261016100000_add_image_url_to_promos.sql"
+    ],
+    "fromCalls": [
+      "src/services/products/promoService.js",
+      "src/services/system/databaseService.js"
+    ]
+  },
+  "orders": {
+    "codeReferences": [
+      "src/app/index.jsx",
+      "src/components/admin/AdminSidebar.jsx",
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/admin/DashboardInsightsPanel.jsx",
+      "src/components/admin/ModernOverviewDashboard.jsx",
+      "src/components/admin/PromosAdminPanel.jsx",
+      "src/components/admin/RevenueTrendChart.jsx",
+      "src/components/admin/SalesAnalyticsPanel.jsx",
+      "src/components/admin/SalesForecastPanel.jsx",
+      "src/components/common/BottomNavBar.jsx",
+      "src/components/common/Skeleton.jsx",
+      "src/components/common/UserProfileDropdown.jsx",
+      "src/components/modals/AccessDeniedModal.jsx",
+      "src/components/modals/AssignDeliveryModal.jsx",
+      "src/components/modals/CheckoutModal.jsx",
+      "src/components/modals/GCashPaymentModal.jsx",
+      "src/components/modals/LiveOrderTrackingMapModal.jsx",
+      "src/components/modals/RateDeliveredOrderModal.jsx",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/mobile/customer/CustomizerPage.jsx",
+      "src/screens/mobile/customer/GaragePage.jsx",
+      "src/screens/mobile/customer/NotificationsPage.jsx",
+      "src/screens/mobile/customer/OrderPage.jsx",
+      "src/screens/mobile/customer/ProfilePage.jsx",
+      "src/screens/mobile/customer/ShopPage.jsx",
+      "src/screens/shared/customer/ProductDetailsPage.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/screens/web/customer/CustomizerPage.jsx",
+      "src/screens/web/customer/GaragePage.jsx",
+      "src/screens/web/customer/OrderPage.jsx",
+      "src/screens/web/customer/ProfilePage.jsx",
+      "src/screens/web/customer/ShopPage.jsx",
+      "src/screens/web/customer/WishlistPage.jsx",
+      "src/services/delivery/deliveryService.js",
+      "src/services/index.js",
+      "src/services/inventory/dashboardInsightsService.js",
+      "src/services/inventory/excelService.js",
+      "src/services/inventory/forecastService.js",
+      "src/services/notifications/emailService.js",
+      "src/services/notifications/notificationService.js",
+      "src/services/orders/orderService.js",
+      "src/services/staff/userService.js",
+      "src/services/system/auditLogService.js",
+      "src/services/system/databaseService.js",
+      "src/services/system/systemSettingsService.js",
+      "src/utils/orderWorkflow.js",
+      "src/utils/__tests__/kpiFormulas.test.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/002_orders_enhancements.sql",
+      "supabase/migrations/007_delivery_management.sql",
+      "supabase/migrations/008_riders.sql",
+      "supabase/migrations/009_normalize_schema.sql",
+      "supabase/migrations/011_delivery_confirmation_tokens.sql",
+      "supabase/migrations/013_rider_shipping_earnings.sql",
+      "supabase/migrations/014_delivery_confirm_preview_order_details.sql",
+      "supabase/migrations/016_egress_query_indexes.sql",
+      "supabase/migrations/20260918045712_rider_access_dashboard.sql",
+      "supabase/migrations/20260918052118_rider_login_accounts.sql",
+      "supabase/migrations/20260918065729_delivery_realtime_sync.sql",
+      "supabase/migrations/20260922000000_storage_anon_delete_lock.sql",
+      "supabase/migrations/20261003020000_delivery_locations_gps.sql",
+      "supabase/migrations/20261004100000_confirm_delivery_ofd_check_delivery_status.sql",
+      "supabase/migrations/20261015123000_orders_customer_email.sql"
+    ],
+    "fromCalls": [
+      "src/services/delivery/deliveryService.js",
+      "src/services/orders/orderService.js",
+      "src/services/system/databaseService.js"
+    ]
+  },
+  "order_items": {
+    "codeReferences": [
+      "src/services/delivery/deliveryService.js",
+      "src/services/notifications/notificationService.js",
+      "src/services/orders/orderService.js",
+      "src/services/products/productService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/011_delivery_confirmation_tokens.sql",
+      "supabase/migrations/014_delivery_confirm_preview_order_details.sql",
+      "supabase/migrations/20260920170000_financial_management.sql",
+      "supabase/migrations/20260920230000_product_sizes.sql"
+    ],
+    "fromCalls": [
+      "src/services/orders/orderService.js"
+    ]
+  },
+  "payments": {
+    "codeReferences": [
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/admin/ServiceQuotationPanel.jsx",
+      "src/components/common/CustomerServiceBookingCard.jsx",
+      "src/components/modals/ServiceReceiptModal.jsx",
+      "src/screens/mobile/mechanic/MechanicDashboard.jsx",
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/serviceQuotationService.js",
+      "src/services/cache/cacheKeys.js",
+      "src/services/orders/gcashPaymentService.js",
+      "src/services/orders/orderService.js",
+      "src/services/products/productService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/20260920170000_financial_management.sql",
+      "supabase/migrations/20260925061023_flexible_service_booking.sql",
+      "supabase/migrations/20261001004946_garage_booking_workflow_v2.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/serviceQuotationService.js",
+      "src/services/orders/orderService.js"
+    ]
+  },
+  "sales": {
+    "codeReferences": [
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/admin/DashboardInsightsPanel.jsx",
+      "src/components/admin/ModernOverviewDashboard.jsx",
+      "src/components/admin/SalesAnalyticsPanel.jsx",
+      "src/components/admin/SalesForecastPanel.jsx",
+      "src/components/common/AdminStatCard.jsx",
+      "src/components/common/NotificationDropdown.jsx",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/services/inventory/dashboardInsightsService.js",
+      "src/services/inventory/excelService.js",
+      "src/services/inventory/forecastService.js",
+      "src/services/notifications/notificationService.js",
+      "src/services/orders/orderService.js",
+      "src/services/products/productService.js",
+      "src/utils/linearRegression.js",
+      "src/utils/__tests__/kpiFormulas.test.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql"
+    ],
+    "fromCalls": [
+      "src/services/orders/orderService.js"
+    ]
+  },
+  "sale_items": {
+    "codeReferences": [
+      "src/services/products/productService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql"
+    ],
+    "fromCalls": []
+  },
+  "carts": {
+    "codeReferences": [
+      "src/services/staff/userService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql"
+    ],
+    "fromCalls": [
+      "src/services/staff/userService.js"
+    ]
+  },
+  "cart_items": {
+    "codeReferences": [
+      "src/services/products/productService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql"
+    ],
+    "fromCalls": [
+      "src/services/products/productService.js"
+    ]
+  },
+  "services": {
+    "codeReferences": [
+      "src/app/index.jsx",
+      "src/components/admin/AdminBookingDetailsPanel.jsx",
+      "src/components/admin/AdminBookingManager.jsx",
+      "src/components/admin/AdminProfileLogsPanel.jsx",
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/admin/BookingCategoryPieChart.jsx",
+      "src/components/admin/CustomizationsAdminPanel.jsx",
+      "src/components/admin/DashboardInsightsPanel.jsx",
+      "src/components/admin/ModernOverviewDashboard.jsx",
+      "src/components/admin/MotorcycleModelsAdminPanel.jsx",
+      "src/components/admin/PickupQrScannerPanel.jsx",
+      "src/components/admin/ProductCompatibilityPicker.jsx",
+      "src/components/admin/PromosAdminPanel.jsx",
+      "src/components/admin/RevenueTrendChart.jsx",
+      "src/components/admin/RiderProfileCard.jsx",
+      "src/components/admin/SalesAnalyticsPanel.jsx",
+      "src/components/admin/SalesForecastPanel.jsx",
+      "src/components/admin/ServiceQuotationPanel.jsx",
+      "src/components/common/BookingCalendar.jsx",
+      "src/components/common/BookingSelect.jsx",
+      "src/components/common/BrandLogo.jsx",
+      "src/components/common/CustomerServiceBookingCard.jsx",
+      "src/components/common/MyMotorcyclePanel.jsx",
+      "src/components/common/NotificationDropdown.jsx",
+      "src/components/common/OrderDeliveryCalendar.jsx",
+      "src/components/common/UserProfileDropdown.jsx",
+      "src/components/customizer/AiMotorcycleInstallStudio.jsx",
+      "src/components/mobile/customer/MobileHeader.jsx",
+      "src/components/modals/AdminAccountSettingsModal.jsx",
+      "src/components/modals/AdminPinLockScreen.jsx",
+      "src/components/modals/AssignDeliveryModal.jsx",
+      "src/components/modals/BookInstallationModal.jsx",
+      "src/components/modals/CartModal.jsx",
+      "src/components/modals/CompanyInfoModal.jsx",
+      "src/components/modals/DeliveryAdminActionModal.jsx",
+      "src/components/modals/DeliveryTokenModal.jsx",
+      "src/components/modals/EditBrandModal.jsx",
+      "src/components/modals/GCashPaymentModal.jsx",
+      "src/components/modals/LiveOrderTrackingMapModal.jsx",
+      "src/components/modals/ProductSpecsModal.jsx",
+      "src/components/modals/ProfileModal.jsx",
+      "src/components/modals/RateDeliveredOrderModal.jsx",
+      "src/components/modals/RegisterMotorcycleModal.jsx",
+      "src/components/modals/RiderAccessModal.jsx",
+      "src/components/shop/CompatibilityBadge.jsx",
+      "src/components/shop/CompatibilityIndicator.jsx",
+      "src/components/shop/HeroBanner.jsx",
+      "src/constants/statuses.js",
+      "src/context/AuthContext.jsx",
+      "src/context/CartContext.jsx",
+      "src/context/ThemeContext.jsx",
+      "src/context/WishlistContext.jsx",
+      "src/hooks/useCustomizationBuilder.js",
+      "src/hooks/useDeliveryLocation.js",
+      "src/lib/api.js",
+      "src/lib/supabase.js",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/mobile/auth/LoginPage.jsx",
+      "src/screens/mobile/customer/CustomizerPage.jsx",
+      "src/screens/mobile/customer/GaragePage.jsx",
+      "src/screens/mobile/customer/NotificationsPage.jsx",
+      "src/screens/mobile/customer/ProfilePage.jsx",
+      "src/screens/mobile/customer/ShopPage.jsx",
+      "src/screens/mobile/customer/WishlistPage.jsx",
+      "src/screens/mobile/mechanic/MechanicDashboard.jsx",
+      "src/screens/mobile/rider/RiderDashboard.jsx",
+      "src/screens/mobile/rider/RiderRunPage.jsx",
+      "src/screens/shared/auth/StaffVerifyEmailPage.jsx",
+      "src/screens/shared/customer/ProductDetailsPage.jsx",
+      "src/screens/shared/delivery/DeliveryConfirmPage.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/screens/web/auth/LoginPage.jsx",
+      "src/screens/web/customer/CustomizerPage.jsx",
+      "src/screens/web/customer/GaragePage.jsx",
+      "src/screens/web/customer/NotificationsPage.jsx",
+      "src/screens/web/customer/ProfilePage.jsx",
+      "src/screens/web/customer/ShopPage.jsx",
+      "src/screens/web/customer/WishlistPage.jsx",
+      "src/services/bookings/garageService.js",
+      "src/services/bookings/pmsPricingService.js",
+      "src/services/inventory/excelService.js",
+      "src/services/products/promoService.js",
+      "src/services/system/databaseService.js",
+      "src/utils/currency.js",
+      "src/utils/deliveryPackingSlip.js",
+      "src/utils/installStudioLogic.js",
+      "src/utils/installStudioSession.js",
+      "src/utils/orderWorkflow.js",
+      "src/utils/pmsCcPricing.js",
+      "src/utils/__tests__/kpiFormulas.test.js",
+      "src/utils/__tests__/pmsCcPricing.test.js",
+      "server/src/middleware/requireAdmin.js",
+      "server/src/routes/customize.js",
+      "server/src/routes/notify.js",
+      "server/src/routes/staff.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/20260919040000_booking_packages_and_approval.sql",
+      "supabase/migrations/20260920170000_financial_management.sql",
+      "supabase/migrations/20260922000000_storage_anon_delete_lock.sql",
+      "supabase/migrations/20261014022201_remove_mechanic_add_pms_cc_pricing.sql",
+      "supabase/migrations/20261015074236_pms_repair_catalog_category.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/garageService.js",
+      "src/services/system/databaseService.js"
+    ]
+  },
+  "bookings": {
+    "codeReferences": [
+      "src/app/index.jsx",
+      "src/components/admin/AdminBookingDetailsPanel.jsx",
+      "src/components/admin/AdminBookingManager.jsx",
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/admin/BookingCategoryPieChart.jsx",
+      "src/components/admin/CustomizationsAdminPanel.jsx",
+      "src/components/admin/ModernOverviewDashboard.jsx",
+      "src/components/admin/PickupQrScannerPanel.jsx",
+      "src/components/admin/SalesAnalyticsPanel.jsx",
+      "src/components/admin/ServiceQuotationPanel.jsx",
+      "src/components/common/BookingCalendar.jsx",
+      "src/components/common/CustomerServiceBookingCard.jsx",
+      "src/components/common/Skeleton.jsx",
+      "src/components/customizer/AiMotorcycleInstallStudio.jsx",
+      "src/components/modals/AccessDeniedModal.jsx",
+      "src/components/modals/BookInstallationModal.jsx",
+      "src/components/modals/ServiceReceiptModal.jsx",
+      "src/hooks/useCustomizationBuilder.js",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/mobile/customer/CustomizerPage.jsx",
+      "src/screens/mobile/customer/GaragePage.jsx",
+      "src/screens/mobile/customer/NotificationsPage.jsx",
+      "src/screens/mobile/customer/ProfilePage.jsx",
+      "src/screens/mobile/customer/ShopPage.jsx",
+      "src/screens/mobile/customer/WishlistPage.jsx",
+      "src/screens/mobile/mechanic/MechanicDashboard.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/screens/web/customer/CustomizerPage.jsx",
+      "src/screens/web/customer/GaragePage.jsx",
+      "src/screens/web/customer/ProfilePage.jsx",
+      "src/screens/web/customer/ShopPage.jsx",
+      "src/screens/web/customer/WishlistPage.jsx",
+      "src/screens/web/mechanic/MechanicDashboard.jsx",
+      "src/services/ai/aiCustomizerService.js",
+      "src/services/auth/authService.js",
+      "src/services/bookings/garageService.js",
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/pmsPricingService.js",
+      "src/services/bookings/serviceQuotationService.js",
+      "src/services/cache/cacheKeys.js",
+      "src/services/index.js",
+      "src/services/inventory/excelService.js",
+      "src/services/notifications/emailService.js",
+      "src/services/notifications/notificationService.js",
+      "src/services/system/databaseService.js",
+      "src/services/system/systemSettingsService.js",
+      "src/utils/bookingWorkflow.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/004_customer_motorcycles.sql",
+      "supabase/migrations/006_mechanics.sql",
+      "supabase/migrations/009_normalize_schema.sql",
+      "supabase/migrations/016_egress_query_indexes.sql",
+      "supabase/migrations/20260919040000_booking_packages_and_approval.sql",
+      "supabase/migrations/20260920170000_financial_management.sql",
+      "supabase/migrations/20260925061023_flexible_service_booking.sql",
+      "supabase/migrations/20260925100000_booking_admin_meta_columns.sql",
+      "supabase/migrations/20261001004946_garage_booking_workflow_v2.sql",
+      "supabase/migrations/20261003122529_downpayment_deadline_auto_cancel.sql",
+      "supabase/migrations/20261014022201_remove_mechanic_add_pms_cc_pricing.sql",
+      "supabase/migrations/20261014114324_harden_expire_downpayment_cron_only.sql",
+      "supabase/migrations/20261014115203_booking_multi_service_line_items.sql",
+      "supabase/migrations/20261014123017_restore_mechanic_roster_no_login.sql",
+      "supabase/migrations/20261015015018_wishlist_ai_install_free_installation.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/garageService.js",
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/serviceQuotationService.js",
+      "src/services/system/databaseService.js"
+    ]
+  },
+  "purchase_orders": {
+    "codeReferences": [
+      "src/services/products/productService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql"
+    ],
+    "fromCalls": [
+      "src/services/products/productService.js"
+    ]
+  },
+  "purchase_items": {
+    "codeReferences": [
+      "src/services/products/productService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql"
+    ],
+    "fromCalls": [
+      "src/services/products/productService.js"
+    ]
+  },
+  "backups": {
+    "codeReferences": [],
+    "migrationReferences": [],
+    "fromCalls": []
+  },
+  "system_settings": {
+    "codeReferences": [
+      "src/services/auth/adminSecurityService.js",
+      "src/services/system/databaseService.js",
+      "src/services/system/systemSettingsService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql"
+    ],
+    "fromCalls": [
+      "src/services/auth/adminSecurityService.js",
+      "src/services/system/databaseService.js",
+      "src/services/system/systemSettingsService.js"
+    ]
+  },
+  "otp_verifications": {
+    "codeReferences": [
+      "src/services/auth/authService.js",
+      "server/src/services/staffAccountService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/20261004152937_staff_account_otp_verification.sql"
+    ],
+    "fromCalls": [
+      "src/services/auth/authService.js",
+      "server/src/services/staffAccountService.js"
+    ]
+  },
+  "admin_pins": {
+    "codeReferences": [
+      "src/services/auth/adminSecurityService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/001_initial_schema.sql",
+      "supabase/migrations/20261009120000_secure_admin_pin_sessions.sql",
+      "supabase/migrations/20261010010000_enable_rls_admin_sessions.sql"
+    ],
+    "fromCalls": [
+      "src/services/auth/adminSecurityService.js"
+    ]
+  },
+  "order_notes": {
+    "codeReferences": [
+      "src/services/orders/orderService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/002_orders_enhancements.sql"
+    ],
+    "fromCalls": [
+      "src/services/orders/orderService.js"
+    ]
+  },
+  "account_logs": {
+    "codeReferences": [
+      "src/services/staff/userService.js",
+      "src/services/system/auditLogService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/003_account_logs.sql"
+    ],
+    "fromCalls": [
+      "src/services/staff/userService.js",
+      "src/services/system/auditLogService.js"
+    ]
+  },
+  "customer_motorcycles": {
+    "codeReferences": [
+      "src/data/motorcycleCatalog.js",
+      "src/services/bookings/customizationService.js",
+      "src/services/products/compatibilityService.js",
+      "src/services/products/motorcycleService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/004_customer_motorcycles.sql",
+      "supabase/migrations/20260927095859_motorcycle_models_catalog.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/customizationService.js",
+      "src/services/products/motorcycleService.js"
+    ]
+  },
+  "mechanics": {
+    "codeReferences": [
+      "src/components/admin/AdminBookingDetailsPanel.jsx",
+      "src/components/admin/AdminBookingManager.jsx",
+      "src/components/admin/AdminSidebar.jsx",
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/admin/ServiceQuotationPanel.jsx",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/mobile/customer/GaragePage.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/screens/web/customer/GaragePage.jsx",
+      "src/screens/web/customer/ProfilePage.jsx",
+      "src/services/bookings/garageService.js",
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/cache/cacheKeys.js",
+      "src/services/staff/userService.js",
+      "src/utils/installStudioLogic.js",
+      "src/utils/permissions.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/006_mechanics.sql",
+      "supabase/migrations/008_riders.sql",
+      "supabase/migrations/009_normalize_schema.sql",
+      "supabase/migrations/20260921002000_products_inventory_write_rls.sql",
+      "supabase/migrations/20260925061023_flexible_service_booking.sql",
+      "supabase/migrations/20261001004946_garage_booking_workflow_v2.sql",
+      "supabase/migrations/20261004152937_staff_account_otp_verification.sql",
+      "supabase/migrations/20261014022201_remove_mechanic_add_pms_cc_pricing.sql",
+      "supabase/migrations/20261014123017_restore_mechanic_roster_no_login.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/garageService.js",
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/staff/userService.js"
+    ]
+  },
+  "order_deliveries": {
+    "codeReferences": [
+      "src/services/delivery/deliveryService.js",
+      "src/services/orders/orderService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/007_delivery_management.sql",
+      "supabase/migrations/008_riders.sql",
+      "supabase/migrations/009_normalize_schema.sql",
+      "supabase/migrations/010_rider_delivery_report.sql",
+      "supabase/migrations/011_delivery_confirmation_tokens.sql",
+      "supabase/migrations/012_delivery_token_no_time_expiry.sql",
+      "supabase/migrations/013_rider_shipping_earnings.sql",
+      "supabase/migrations/014_delivery_confirm_preview_order_details.sql",
+      "supabase/migrations/016_egress_query_indexes.sql",
+      "supabase/migrations/20260918045712_rider_access_dashboard.sql",
+      "supabase/migrations/20260918052118_rider_login_accounts.sql",
+      "supabase/migrations/20260918065729_delivery_realtime_sync.sql",
+      "supabase/migrations/20261003020000_delivery_locations_gps.sql",
+      "supabase/migrations/20261003021500_rider_upsert_delivery_location_rpc.sql",
+      "supabase/migrations/20261004090000_expected_delivery_end_at.sql",
+      "supabase/migrations/20261004100000_confirm_delivery_ofd_check_delivery_status.sql"
+    ],
+    "fromCalls": [
+      "src/services/delivery/deliveryService.js"
+    ]
+  },
+  "delivery_history": {
+    "codeReferences": [
+      "src/services/delivery/deliveryService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/007_delivery_management.sql",
+      "supabase/migrations/011_delivery_confirmation_tokens.sql",
+      "supabase/migrations/20260918045712_rider_access_dashboard.sql",
+      "supabase/migrations/20261004100000_confirm_delivery_ofd_check_delivery_status.sql"
+    ],
+    "fromCalls": [
+      "src/services/delivery/deliveryService.js"
+    ]
+  },
+  "riders": {
+    "codeReferences": [
+      "src/app/index.jsx",
+      "src/components/admin/AdminSidebar.jsx",
+      "src/components/admin/AdminSystemSettingsPanel.jsx",
+      "src/components/modals/AssignDeliveryModal.jsx",
+      "src/components/modals/CompanyInfoModal.jsx",
+      "src/components/modals/RateDeliveredOrderModal.jsx",
+      "src/components/modals/RiderQrScanSheet.jsx",
+      "src/screens/mobile/admin/AdminDashboard.jsx",
+      "src/screens/shared/delivery/DeliveryConfirmPage.jsx",
+      "src/screens/web/admin/AdminDashboard.jsx",
+      "src/services/bookings/garageService.js",
+      "src/services/delivery/deliveryService.js",
+      "src/services/delivery/riderGpsTrackingService.js",
+      "src/services/inventory/excelService.js",
+      "src/services/orders/orderService.js",
+      "src/services/staff/riderService.js",
+      "src/services/staff/userService.js",
+      "server/src/services/aiCustomizeService.js",
+      "server/src/services/staffAccountService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/004_customer_motorcycles.sql",
+      "supabase/migrations/008_riders.sql",
+      "supabase/migrations/009_normalize_schema.sql",
+      "supabase/migrations/011_delivery_confirmation_tokens.sql",
+      "supabase/migrations/013_rider_shipping_earnings.sql",
+      "supabase/migrations/014_delivery_confirm_preview_order_details.sql",
+      "supabase/migrations/20260918045712_rider_access_dashboard.sql",
+      "supabase/migrations/20260918052118_rider_login_accounts.sql",
+      "supabase/migrations/20260918061003_riders_require_database_sync.sql",
+      "supabase/migrations/20260918065729_delivery_realtime_sync.sql",
+      "supabase/migrations/20261003020000_delivery_locations_gps.sql",
+      "supabase/migrations/20261003021500_rider_upsert_delivery_location_rpc.sql",
+      "supabase/migrations/20261004100000_confirm_delivery_ofd_check_delivery_status.sql",
+      "supabase/migrations/20261004152937_staff_account_otp_verification.sql"
+    ],
+    "fromCalls": [
+      "src/services/staff/riderService.js",
+      "src/services/staff/userService.js",
+      "server/src/services/staffAccountService.js"
+    ]
+  },
+  "rider_earnings": {
+    "codeReferences": [
+      "src/services/staff/riderService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/013_rider_shipping_earnings.sql"
+    ],
+    "fromCalls": [
+      "src/services/staff/riderService.js"
+    ]
+  },
+  "rider_access_tokens": {
+    "codeReferences": [],
+    "migrationReferences": [
+      "supabase/migrations/20260918045712_rider_access_dashboard.sql",
+      "supabase/migrations/20261003021500_rider_upsert_delivery_location_rpc.sql"
+    ],
+    "fromCalls": []
+  },
+  "service_history": {
+    "codeReferences": [],
+    "migrationReferences": [],
+    "fromCalls": []
+  },
+  "forecast_history": {
+    "codeReferences": [
+      "src/services/inventory/forecastService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260919153000_forecast_history.sql",
+      "supabase/migrations/20260929210000_atomic_inventory_forecast.sql"
+    ],
+    "fromCalls": [
+      "src/services/inventory/forecastService.js"
+    ]
+  },
+  "product_cost_history": {
+    "codeReferences": [],
+    "migrationReferences": [
+      "supabase/migrations/20260920170000_financial_management.sql"
+    ],
+    "fromCalls": []
+  },
+  "service_cost_records": {
+    "codeReferences": [],
+    "migrationReferences": [
+      "supabase/migrations/20260920170000_financial_management.sql"
+    ],
+    "fromCalls": []
+  },
+  "financial_expenses": {
+    "codeReferences": [
+      "src/services/products/productService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260920170000_financial_management.sql"
+    ],
+    "fromCalls": [
+      "src/services/products/productService.js"
+    ]
+  },
+  "product_reviews": {
+    "codeReferences": [
+      "src/services/products/productService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260920234500_product_reviews.sql",
+      "supabase/migrations/20260921184112_fix_fake_ratings_promos_and_oil_sizes.sql"
+    ],
+    "fromCalls": [
+      "src/services/products/productService.js"
+    ]
+  },
+  "product_compatibility": {
+    "codeReferences": [
+      "src/services/bookings/customizationService.js",
+      "src/services/products/compatibilityService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260921103000_product_customizations.sql",
+      "supabase/migrations/20260927095859_motorcycle_models_catalog.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/customizationService.js",
+      "src/services/products/compatibilityService.js"
+    ]
+  },
+  "customizations": {
+    "codeReferences": [
+      "src/components/admin/CustomizationsAdminPanel.jsx",
+      "src/context/WishlistContext.jsx",
+      "src/screens/mobile/customer/ProfilePage.jsx",
+      "src/screens/mobile/customer/WishlistPage.jsx",
+      "src/screens/web/customer/ProfilePage.jsx",
+      "src/screens/web/customer/WishlistPage.jsx",
+      "src/services/bookings/customizationService.js",
+      "src/services/products/wishlistService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260921103000_product_customizations.sql",
+      "supabase/migrations/20260921110000_customization_motorcycle_photo.sql",
+      "supabase/migrations/20261015015018_wishlist_ai_install_free_installation.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/customizationService.js",
+      "src/services/products/wishlistService.js"
+    ]
+  },
+  "customization_items": {
+    "codeReferences": [
+      "src/services/bookings/customizationService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260921103000_product_customizations.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/customizationService.js"
+    ]
+  },
+  "service_quotations": {
+    "codeReferences": [
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/serviceQuotationService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260925061023_flexible_service_booking.sql",
+      "supabase/migrations/20261001004946_garage_booking_workflow_v2.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/serviceQuotationService.js"
+    ]
+  },
+  "service_quotation_items": {
+    "codeReferences": [
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/serviceQuotationService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260925061023_flexible_service_booking.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/serviceQuotationService.js"
+    ]
+  },
+  "booking_inspections": {
+    "codeReferences": [
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/serviceQuotationService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260925061023_flexible_service_booking.sql",
+      "supabase/migrations/20261001004946_garage_booking_workflow_v2.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/serviceQuotationService.js"
+    ]
+  },
+  "booking_additional_charges": {
+    "codeReferences": [
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/serviceQuotationService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260925061023_flexible_service_booking.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/mechanicBookingService.js",
+      "src/services/bookings/serviceQuotationService.js"
+    ]
+  },
+  "booking_status_history": {
+    "codeReferences": [
+      "src/services/bookings/bookingTimelineService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260925061023_flexible_service_booking.sql",
+      "supabase/migrations/20261001004946_garage_booking_workflow_v2.sql",
+      "supabase/migrations/20261003122529_downpayment_deadline_auto_cancel.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/bookingTimelineService.js"
+    ]
+  },
+  "pickup_verifications": {
+    "codeReferences": [
+      "src/services/bookings/serviceQuotationService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260925061023_flexible_service_booking.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/serviceQuotationService.js"
+    ]
+  },
+  "motorcycle_models": {
+    "codeReferences": [
+      "src/services/products/compatibilityService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260927095859_motorcycle_models_catalog.sql"
+    ],
+    "fromCalls": [
+      "src/services/products/compatibilityService.js"
+    ]
+  },
+  "inventory_transactions": {
+    "codeReferences": [
+      "src/services/products/productService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260929210000_atomic_inventory_forecast.sql"
+    ],
+    "fromCalls": [
+      "src/services/products/productService.js"
+    ]
+  },
+  "stock_reservations": {
+    "codeReferences": [
+      "src/services/orders/reservationService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20260929210000_atomic_inventory_forecast.sql"
+    ],
+    "fromCalls": [
+      "src/services/orders/reservationService.js"
+    ]
+  },
+  "delivery_locations": {
+    "codeReferences": [
+      "src/components/modals/LiveOrderTrackingMapModal.jsx",
+      "src/services/delivery/deliveryLocationService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20261003020000_delivery_locations_gps.sql",
+      "supabase/migrations/20261003021500_rider_upsert_delivery_location_rpc.sql"
+    ],
+    "fromCalls": [
+      "src/services/delivery/deliveryLocationService.js"
+    ]
+  },
+  "promo_products": {
+    "codeReferences": [
+      "src/services/products/promoService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20261005103000_promo_management_enhancements.sql",
+      "supabase/migrations/20261015015018_wishlist_ai_install_free_installation.sql"
+    ],
+    "fromCalls": [
+      "src/services/products/promoService.js"
+    ]
+  },
+  "ai_generation_usage": {
+    "codeReferences": [
+      "server/src/services/aiRateLimitService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20261008010000_ai_generation_rate_limit.sql"
+    ],
+    "fromCalls": [
+      "server/src/services/aiRateLimitService.js"
+    ]
+  },
+  "ai_generation_history": {
+    "codeReferences": [
+      "server/src/services/aiRateLimitService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20261008010000_ai_generation_rate_limit.sql"
+    ],
+    "fromCalls": [
+      "server/src/services/aiRateLimitService.js"
+    ]
+  },
+  "admin_sessions": {
+    "codeReferences": [],
+    "migrationReferences": [
+      "supabase/migrations/20261009120000_secure_admin_pin_sessions.sql",
+      "supabase/migrations/20261010010000_enable_rls_admin_sessions.sql"
+    ],
+    "fromCalls": []
+  },
+  "cc_categories": {
+    "codeReferences": [
+      "src/services/bookings/pmsPricingService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20261014022201_remove_mechanic_add_pms_cc_pricing.sql",
+      "supabase/migrations/20261014025559_pms_catalog_admin_write_policies.sql",
+      "supabase/migrations/20261014110700_rename_big_bikes_to_200cc_above.sql",
+      "supabase/migrations/20261014115203_booking_multi_service_line_items.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/pmsPricingService.js"
+    ]
+  },
+  "pms_services": {
+    "codeReferences": [
+      "src/services/bookings/pmsPricingService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20261014022201_remove_mechanic_add_pms_cc_pricing.sql",
+      "supabase/migrations/20261014025559_pms_catalog_admin_write_policies.sql",
+      "supabase/migrations/20261014115203_booking_multi_service_line_items.sql",
+      "supabase/migrations/20261015074236_pms_repair_catalog_category.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/pmsPricingService.js"
+    ]
+  },
+  "pms_service_prices": {
+    "codeReferences": [
+      "src/services/bookings/pmsPricingService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20261014022201_remove_mechanic_add_pms_cc_pricing.sql",
+      "supabase/migrations/20261014025559_pms_catalog_admin_write_policies.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/pmsPricingService.js"
+    ]
+  },
+  "booking_service_items": {
+    "codeReferences": [
+      "src/components/admin/AdminBookingDetailsPanel.jsx",
+      "src/services/bookings/garageService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20261014115203_booking_multi_service_line_items.sql"
+    ],
+    "fromCalls": [
+      "src/services/bookings/garageService.js"
+    ]
+  },
+  "wishlist_items": {
+    "codeReferences": [
+      "src/services/products/wishlistService.js"
+    ],
+    "migrationReferences": [
+      "supabase/migrations/20261015015018_wishlist_ai_install_free_installation.sql"
+    ],
+    "fromCalls": [
+      "src/services/products/wishlistService.js"
+    ]
+  }
+}

@@ -355,12 +355,12 @@ export default function AdminSystemSettingsPanel({
             width: 42,
             height: 42,
             borderRadius: 12,
-            backgroundColor: isDarkMode ? '#1A2622' : '#E8F0EC',
+            backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
             alignItems: 'center',
             justifyContent: 'center',
           }}
         >
-          <BootstrapIcon name={icon} size={20} color="#1D4533" />
+          <BootstrapIcon name={icon} size={20} color="#EA580C" />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={{ fontSize: 16, fontWeight: '900', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
@@ -467,7 +467,7 @@ export default function AdminSystemSettingsPanel({
               width: 48,
               height: 26,
               borderRadius: 13,
-              backgroundColor: isOn ? '#1D4533' : '#CBD5E1',
+              backgroundColor: isOn ? '#EA580C' : '#CBD5E1',
               justifyContent: 'center',
               paddingHorizontal: 3,
               alignItems: isOn ? 'flex-end' : 'flex-start',
@@ -519,15 +519,11 @@ export default function AdminSystemSettingsPanel({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             <View
               style={{
-                width: 48,
-                height: 48,
-                borderRadius: 14,
-                backgroundColor: isDarkMode ? '#1A2622' : '#E8F0EC',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <BootstrapIcon name="gear-wide-connected" size={24} color="#1D4533" />
+              <BootstrapIcon name="gear-wide-connected" size={26} color="#EA580C" />
             </View>
             <View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -543,13 +539,13 @@ export default function AdminSystemSettingsPanel({
                 </Text>
                 <View
                   style={{
-                    backgroundColor: isDarkMode ? '#1A2622' : '#E8F0EC',
+                    backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
                     paddingHorizontal: 8,
                     paddingVertical: 2,
                     borderRadius: 6,
                   }}
                 >
-                  <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#1D4533' }}>
+                  <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#EA580C' }}>
                     Core Platform
                   </Text>
                 </View>
@@ -645,7 +641,7 @@ export default function AdminSystemSettingsPanel({
                     width: 26,
                     height: 26,
                     borderRadius: 7,
-                    backgroundColor: '#1D4533',
+                    backgroundColor: '#EA580C',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -714,7 +710,7 @@ export default function AdminSystemSettingsPanel({
                         padding: 10,
                         borderRadius: 10,
                         backgroundColor: isSelected
-                          ? isDarkMode ? tokens.accentBg : '#E8F0EC'
+                          ? isDarkMode ? tokens.accentBg : '#FFF7ED'
                           : 'transparent',
                         cursor: 'pointer',
                       }}
@@ -730,7 +726,7 @@ export default function AdminSystemSettingsPanel({
                           height: 32,
                           borderRadius: 8,
                           backgroundColor: isSelected
-                            ? '#1D4533'
+                            ? '#EA580C'
                             : isDarkMode ? tokens.bgSub : '#F1F5F9',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -748,7 +744,7 @@ export default function AdminSystemSettingsPanel({
                             fontSize: 13,
                             fontWeight: isSelected ? '800' : '600',
                             color: isSelected
-                              ? isDarkMode ? tokens.accentBrand : '#1D4533'
+                              ? isDarkMode ? tokens.accentBrand : '#EA580C'
                               : isDarkMode ? tokens.textPrimary : '#0F172A',
                           }}
                         >
@@ -766,7 +762,7 @@ export default function AdminSystemSettingsPanel({
                         </Text>
                       </View>
                       {isSelected && (
-                        <BootstrapIcon name="check" size={16} color="#1D4533" />
+                        <BootstrapIcon name="check" size={16} color="#EA580C" />
                       )}
                     </TouchableOpacity>
                   );
@@ -838,12 +834,12 @@ export default function AdminSystemSettingsPanel({
                         width: 48,
                         height: 48,
                         borderRadius: 10,
-                        backgroundColor: isDarkMode ? '#1A2622' : '#E8F0EC',
+                        backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
                     >
-                      <BootstrapIcon name="tools" size={20} color="#1D4533" />
+                      <BootstrapIcon name="tools" size={20} color="#EA580C" />
                     </View>
                   )}
                   <View style={{ flex: 1 }}>
@@ -897,6 +893,13 @@ export default function AdminSystemSettingsPanel({
                 />
               </View>
             </View>
+
+            <ReadOnlyField
+              title="Workshop / Hub Facility Name"
+              value={settings.hubName || "D'Blockchain Motorparts and Accessories"}
+              icon="shop"
+              description="Official name of the workshop and pit bay service hub used on bookings, receipts, and live tracking."
+            />
 
             <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
               <View style={{ flex: 1 }}>
@@ -1851,12 +1854,12 @@ export default function AdminSystemSettingsPanel({
                   width: 42,
                   height: 42,
                   borderRadius: 12,
-                  backgroundColor: isDarkMode ? '#1A2622' : '#E8F0EC',
+                  backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <BootstrapIcon name="database" size={20} color="#1D4533" />
+                <BootstrapIcon name="database" size={20} color="#EA580C" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 16, fontWeight: '900', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
@@ -1923,7 +1926,7 @@ export default function AdminSystemSettingsPanel({
                 borderColor: isDarkMode ? tokens.bgCard : '#E2E8F0',
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? '#6EE7B7' : '#1D4533', marginBottom: 12 }}>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? '#6EE7B7' : '#EA580C', marginBottom: 12 }}>
                 Live System Telemetry & Statistics
               </Text>
               <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16, flexWrap: 'wrap' }}>
@@ -2023,7 +2026,7 @@ export default function AdminSystemSettingsPanel({
                     width: 40,
                     height: 40,
                     borderRadius: 10,
-                    backgroundColor: isDarkMode ? '#1A2622' : '#E8F0EC',
+                    backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -2061,7 +2064,7 @@ export default function AdminSystemSettingsPanel({
                         : 'wrench-adjustable'
                     }
                     size={20}
-                    color="#1D4533"
+                    color="#EA580C"
                   />
                 </View>
                 <View>
@@ -2177,14 +2180,14 @@ export default function AdminSystemSettingsPanel({
                             width: 64,
                             height: 64,
                             borderRadius: 12,
-                            backgroundColor: isDarkMode ? '#1A2622' : '#E8F0EC',
+                            backgroundColor: isDarkMode ? '#1A2622' : '#FFF7ED',
                             alignItems: 'center',
                             justifyContent: 'center',
                             borderWidth: 1,
-                            borderColor: isDarkMode ? '#1D4533' : '#A7F3D0',
+                            borderColor: isDarkMode ? '#EA580C' : '#A7F3D0',
                           }}
                         >
-                          <BootstrapIcon name="tools" size={28} color="#1D4533" />
+                          <BootstrapIcon name="tools" size={28} color="#EA580C" />
                         </View>
                       )}
 
@@ -2207,7 +2210,7 @@ export default function AdminSystemSettingsPanel({
                               paddingHorizontal: 13,
                               paddingVertical: 8,
                               borderRadius: 8,
-                              backgroundColor: '#1D4533',
+                              backgroundColor: '#EA580C',
                               cursor: 'pointer',
                             }}
                             activeOpacity={0.85}
@@ -2347,6 +2350,32 @@ export default function AdminSystemSettingsPanel({
 
                   <View style={{ gap: 6 }}>
                     <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Workshop / Hub Facility Name
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        fontSize: 14,
+                        fontWeight: '600',
+                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      }}
+                      value={modalForm.hubName !== undefined ? modalForm.hubName : ''}
+                      onChangeText={(val) => handleUpdateFormField('hubName', val)}
+                      placeholder="e.g. D'Blockchain Motorparts and Accessories"
+                      placeholderTextColor="#94A3B8"
+                    />
+                    <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textSubtle : '#94A3B8' }}>
+                      Updates the workshop/hub title across customer booking cards, pit bay appointment confirmations, and maps.
+                    </Text>
+                  </View>
+
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Store Physical Address & Hub Facility
                     </Text>
                     <TextInput
@@ -2365,7 +2394,7 @@ export default function AdminSystemSettingsPanel({
                       multiline
                       value={modalForm.storeAddress || ''}
                       onChangeText={(val) => handleUpdateFormField('storeAddress', val)}
-                      placeholder="Enter street address, building, city, and zip code..."
+                      placeholder="e.g. Natalio B. Bacalso S National Hwy, South Poblacion, Naga, 6037 Cebu"
                       placeholderTextColor="#94A3B8"
                     />
                   </View>
@@ -2388,7 +2417,7 @@ export default function AdminSystemSettingsPanel({
                       }}
                       value={modalForm.cityLocation || ''}
                       onChangeText={(val) => handleUpdateFormField('cityLocation', val)}
-                      placeholder="e.g. Quezon City, Metro Manila"
+                      placeholder="e.g. City of Naga, Cebu"
                       placeholderTextColor="#94A3B8"
                     />
                   </View>
@@ -2605,7 +2634,7 @@ export default function AdminSystemSettingsPanel({
                       borderRadius: 12,
                       backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
                       borderWidth: 1.5,
-                      borderColor: modalForm.autoFulfillOrders ? '#1D4533' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                      borderColor: modalForm.autoFulfillOrders ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
                     }}
                     onPress={() => handleUpdateFormField('autoFulfillOrders', !modalForm.autoFulfillOrders)}
                     activeOpacity={0.8}
@@ -2623,7 +2652,7 @@ export default function AdminSystemSettingsPanel({
                         width: 48,
                         height: 26,
                         borderRadius: 13,
-                        backgroundColor: modalForm.autoFulfillOrders ? '#1D4533' : '#CBD5E1',
+                        backgroundColor: modalForm.autoFulfillOrders ? '#EA580C' : '#CBD5E1',
                         justifyContent: 'center',
                         paddingHorizontal: 3,
                         alignItems: modalForm.autoFulfillOrders ? 'flex-end' : 'flex-start',
@@ -2721,7 +2750,7 @@ export default function AdminSystemSettingsPanel({
                       borderRadius: 12,
                       backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
                       borderWidth: 1.5,
-                      borderColor: modalForm.enableBackorders ? '#1D4533' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                      borderColor: modalForm.enableBackorders ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
                     }}
                     onPress={() => handleUpdateFormField('enableBackorders', !modalForm.enableBackorders)}
                     activeOpacity={0.8}
@@ -2739,7 +2768,7 @@ export default function AdminSystemSettingsPanel({
                         width: 48,
                         height: 26,
                         borderRadius: 13,
-                        backgroundColor: modalForm.enableBackorders ? '#1D4533' : '#CBD5E1',
+                        backgroundColor: modalForm.enableBackorders ? '#EA580C' : '#CBD5E1',
                         justifyContent: 'center',
                         paddingHorizontal: 3,
                         alignItems: modalForm.enableBackorders ? 'flex-end' : 'flex-start',
@@ -2866,7 +2895,7 @@ export default function AdminSystemSettingsPanel({
                       borderRadius: 12,
                       backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
                       borderWidth: 1.5,
-                      borderColor: modalForm.autoAssignMechanics ? '#1D4533' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                      borderColor: modalForm.autoAssignMechanics ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
                     }}
                     onPress={() => handleUpdateFormField('autoAssignMechanics', !modalForm.autoAssignMechanics)}
                     activeOpacity={0.8}
@@ -2884,7 +2913,7 @@ export default function AdminSystemSettingsPanel({
                         width: 48,
                         height: 26,
                         borderRadius: 13,
-                        backgroundColor: modalForm.autoAssignMechanics ? '#1D4533' : '#CBD5E1',
+                        backgroundColor: modalForm.autoAssignMechanics ? '#EA580C' : '#CBD5E1',
                         justifyContent: 'center',
                         paddingHorizontal: 3,
                         alignItems: modalForm.autoAssignMechanics ? 'flex-end' : 'flex-start',
@@ -3011,7 +3040,7 @@ export default function AdminSystemSettingsPanel({
                       borderRadius: 12,
                       backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
                       borderWidth: 1.5,
-                      borderColor: modalForm.requireDownpayment !== false ? '#1D4533' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                      borderColor: modalForm.requireDownpayment !== false ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
                     }}
                     onPress={() => handleUpdateFormField('requireDownpayment', modalForm.requireDownpayment === false ? true : false)}
                     activeOpacity={0.8}
@@ -3029,7 +3058,7 @@ export default function AdminSystemSettingsPanel({
                         width: 48,
                         height: 26,
                         borderRadius: 13,
-                        backgroundColor: modalForm.requireDownpayment !== false ? '#1D4533' : '#CBD5E1',
+                        backgroundColor: modalForm.requireDownpayment !== false ? '#EA580C' : '#CBD5E1',
                         justifyContent: 'center',
                         paddingHorizontal: 3,
                         alignItems: modalForm.requireDownpayment !== false ? 'flex-end' : 'flex-start',
@@ -3078,7 +3107,7 @@ export default function AdminSystemSettingsPanel({
                       borderRadius: 12,
                       backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
                       borderWidth: 1.5,
-                      borderColor: modalForm.enableOrderSms ? '#1D4533' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                      borderColor: modalForm.enableOrderSms ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
                     }}
                     onPress={() => handleUpdateFormField('enableOrderSms', !modalForm.enableOrderSms)}
                     activeOpacity={0.8}
@@ -3096,7 +3125,7 @@ export default function AdminSystemSettingsPanel({
                         width: 48,
                         height: 26,
                         borderRadius: 13,
-                        backgroundColor: modalForm.enableOrderSms ? '#1D4533' : '#CBD5E1',
+                        backgroundColor: modalForm.enableOrderSms ? '#EA580C' : '#CBD5E1',
                         justifyContent: 'center',
                         paddingHorizontal: 3,
                         alignItems: modalForm.enableOrderSms ? 'flex-end' : 'flex-start',
@@ -3116,7 +3145,7 @@ export default function AdminSystemSettingsPanel({
                       borderRadius: 12,
                       backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
                       borderWidth: 1.5,
-                      borderColor: modalForm.enableOrderEmail !== false ? '#1D4533' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                      borderColor: modalForm.enableOrderEmail !== false ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
                     }}
                     onPress={() => handleUpdateFormField('enableOrderEmail', modalForm.enableOrderEmail === false ? true : false)}
                     activeOpacity={0.8}
@@ -3134,7 +3163,7 @@ export default function AdminSystemSettingsPanel({
                         width: 48,
                         height: 26,
                         borderRadius: 13,
-                        backgroundColor: modalForm.enableOrderEmail !== false ? '#1D4533' : '#CBD5E1',
+                        backgroundColor: modalForm.enableOrderEmail !== false ? '#EA580C' : '#CBD5E1',
                         justifyContent: 'center',
                         paddingHorizontal: 3,
                         alignItems: modalForm.enableOrderEmail !== false ? 'flex-end' : 'flex-start',
@@ -3154,7 +3183,7 @@ export default function AdminSystemSettingsPanel({
                       borderRadius: 12,
                       backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
                       borderWidth: 1.5,
-                      borderColor: modalForm.enableBookingReminder !== false ? '#1D4533' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                      borderColor: modalForm.enableBookingReminder !== false ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
                     }}
                     onPress={() => handleUpdateFormField('enableBookingReminder', modalForm.enableBookingReminder === false ? true : false)}
                     activeOpacity={0.8}
@@ -3172,7 +3201,7 @@ export default function AdminSystemSettingsPanel({
                         width: 48,
                         height: 26,
                         borderRadius: 13,
-                        backgroundColor: modalForm.enableBookingReminder !== false ? '#1D4533' : '#CBD5E1',
+                        backgroundColor: modalForm.enableBookingReminder !== false ? '#EA580C' : '#CBD5E1',
                         justifyContent: 'center',
                         paddingHorizontal: 3,
                         alignItems: modalForm.enableBookingReminder !== false ? 'flex-end' : 'flex-start',
@@ -3221,7 +3250,7 @@ export default function AdminSystemSettingsPanel({
                       borderRadius: 12,
                       backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
                       borderWidth: 1.5,
-                      borderColor: modalForm.alertOnLowStock !== false ? '#1D4533' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                      borderColor: modalForm.alertOnLowStock !== false ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
                     }}
                     onPress={() => handleUpdateFormField('alertOnLowStock', modalForm.alertOnLowStock === false ? true : false)}
                     activeOpacity={0.8}
@@ -3239,7 +3268,7 @@ export default function AdminSystemSettingsPanel({
                         width: 48,
                         height: 26,
                         borderRadius: 13,
-                        backgroundColor: modalForm.alertOnLowStock !== false ? '#1D4533' : '#CBD5E1',
+                        backgroundColor: modalForm.alertOnLowStock !== false ? '#EA580C' : '#CBD5E1',
                         justifyContent: 'center',
                         paddingHorizontal: 3,
                         alignItems: modalForm.alertOnLowStock !== false ? 'flex-end' : 'flex-start',
@@ -3259,7 +3288,7 @@ export default function AdminSystemSettingsPanel({
                       borderRadius: 12,
                       backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
                       borderWidth: 1.5,
-                      borderColor: modalForm.alertOnNewBooking !== false ? '#1D4533' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                      borderColor: modalForm.alertOnNewBooking !== false ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
                     }}
                     onPress={() => handleUpdateFormField('alertOnNewBooking', modalForm.alertOnNewBooking === false ? true : false)}
                     activeOpacity={0.8}
@@ -3277,7 +3306,7 @@ export default function AdminSystemSettingsPanel({
                         width: 48,
                         height: 26,
                         borderRadius: 13,
-                        backgroundColor: modalForm.alertOnNewBooking !== false ? '#1D4533' : '#CBD5E1',
+                        backgroundColor: modalForm.alertOnNewBooking !== false ? '#EA580C' : '#CBD5E1',
                         justifyContent: 'center',
                         paddingHorizontal: 3,
                         alignItems: modalForm.alertOnNewBooking !== false ? 'flex-end' : 'flex-start',
@@ -3296,7 +3325,7 @@ export default function AdminSystemSettingsPanel({
                     <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Store Status</Text>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       {['open', 'closed'].map((s) => (
-                        <TouchableOpacity key={s} onPress={() => handleUpdateFormField('storeStatus', s)} style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: (modalForm.storeStatus || 'open') === s ? '#1D4533' : isDarkMode ? tokens.bgSub : '#F1F5F9', borderWidth: 1.5, borderColor: (modalForm.storeStatus || 'open') === s ? '#1D4533' : '#CBD5E1' }} activeOpacity={0.85}>
+                        <TouchableOpacity key={s} onPress={() => handleUpdateFormField('storeStatus', s)} style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: (modalForm.storeStatus || 'open') === s ? '#EA580C' : isDarkMode ? tokens.bgSub : '#F1F5F9', borderWidth: 1.5, borderColor: (modalForm.storeStatus || 'open') === s ? '#EA580C' : '#CBD5E1' }} activeOpacity={0.85}>
                           <Text style={{ fontSize: 13, fontWeight: '800', color: (modalForm.storeStatus || 'open') === s ? '#FFFFFF' : '#64748B' }}>{s === 'open' ? 'Open' : 'Closed'}</Text>
                         </TouchableOpacity>
                       ))}
@@ -3324,12 +3353,12 @@ export default function AdminSystemSettingsPanel({
                     { key: 'deliveryAvailable', title: 'Delivery Availability', desc: 'Offer courier delivery at checkout.' },
                     { key: 'pickupAvailable', title: 'Pickup Availability', desc: 'Offer in-store pickup reservations.' },
                   ].map((t) => (
-                    <TouchableOpacity key={t.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderWidth: 1.5, borderColor: modalForm[t.key] !== false ? '#1D4533' : '#CBD5E1' }} onPress={() => handleUpdateFormField(t.key, modalForm[t.key] === false ? true : false)} activeOpacity={0.8}>
+                    <TouchableOpacity key={t.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderWidth: 1.5, borderColor: modalForm[t.key] !== false ? '#EA580C' : '#CBD5E1' }} onPress={() => handleUpdateFormField(t.key, modalForm[t.key] === false ? true : false)} activeOpacity={0.8}>
                       <View style={{ flex: 1, paddingRight: 10 }}>
                         <Text style={{ fontSize: 13.5, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>{t.title}</Text>
                         <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>{t.desc}</Text>
                       </View>
-                      <View style={{ width: 48, height: 26, borderRadius: 13, backgroundColor: modalForm[t.key] !== false ? '#1D4533' : '#CBD5E1', justifyContent: 'center', paddingHorizontal: 3, alignItems: modalForm[t.key] !== false ? 'flex-end' : 'flex-start' }}>
+                      <View style={{ width: 48, height: 26, borderRadius: 13, backgroundColor: modalForm[t.key] !== false ? '#EA580C' : '#CBD5E1', justifyContent: 'center', paddingHorizontal: 3, alignItems: modalForm[t.key] !== false ? 'flex-end' : 'flex-start' }}>
                         <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF' }} />
                       </View>
                     </TouchableOpacity>
@@ -3345,12 +3374,12 @@ export default function AdminSystemSettingsPanel({
                     { key: 'onlinePaymentEnabled', title: 'Online Payment', desc: 'Accept GCash and online wallets.' },
                     { key: 'paymentVerificationRequired', title: 'Payment Verification', desc: 'Staff must verify online payments.' },
                   ].map((t) => (
-                    <TouchableOpacity key={t.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderWidth: 1.5, borderColor: modalForm[t.key] !== false ? '#1D4533' : '#CBD5E1' }} onPress={() => handleUpdateFormField(t.key, modalForm[t.key] === false ? true : false)} activeOpacity={0.8}>
+                    <TouchableOpacity key={t.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderWidth: 1.5, borderColor: modalForm[t.key] !== false ? '#EA580C' : '#CBD5E1' }} onPress={() => handleUpdateFormField(t.key, modalForm[t.key] === false ? true : false)} activeOpacity={0.8}>
                       <View style={{ flex: 1, paddingRight: 10 }}>
                         <Text style={{ fontSize: 13.5, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>{t.title}</Text>
                         <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>{t.desc}</Text>
                       </View>
-                      <View style={{ width: 48, height: 26, borderRadius: 13, backgroundColor: modalForm[t.key] !== false ? '#1D4533' : '#CBD5E1', justifyContent: 'center', paddingHorizontal: 3, alignItems: modalForm[t.key] !== false ? 'flex-end' : 'flex-start' }}>
+                      <View style={{ width: 48, height: 26, borderRadius: 13, backgroundColor: modalForm[t.key] !== false ? '#EA580C' : '#CBD5E1', justifyContent: 'center', paddingHorizontal: 3, alignItems: modalForm[t.key] !== false ? 'flex-end' : 'flex-start' }}>
                         <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF' }} />
                       </View>
                     </TouchableOpacity>
@@ -3393,12 +3422,12 @@ export default function AdminSystemSettingsPanel({
                   ].map((t) => {
                     const on = t.invert ? !!modalForm[t.key] : modalForm[t.key] !== false;
                     return (
-                      <TouchableOpacity key={t.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderWidth: 1.5, borderColor: on ? '#1D4533' : '#CBD5E1' }} onPress={() => handleUpdateFormField(t.key, t.invert ? !modalForm[t.key] : modalForm[t.key] === false ? true : false)} activeOpacity={0.8}>
+                      <TouchableOpacity key={t.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderWidth: 1.5, borderColor: on ? '#EA580C' : '#CBD5E1' }} onPress={() => handleUpdateFormField(t.key, t.invert ? !modalForm[t.key] : modalForm[t.key] === false ? true : false)} activeOpacity={0.8}>
                         <View style={{ flex: 1, paddingRight: 10 }}>
                           <Text style={{ fontSize: 13.5, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>{t.title}</Text>
                           <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>{t.desc}</Text>
                         </View>
-                        <View style={{ width: 48, height: 26, borderRadius: 13, backgroundColor: on ? '#1D4533' : '#CBD5E1', justifyContent: 'center', paddingHorizontal: 3, alignItems: on ? 'flex-end' : 'flex-start' }}>
+                        <View style={{ width: 48, height: 26, borderRadius: 13, backgroundColor: on ? '#EA580C' : '#CBD5E1', justifyContent: 'center', paddingHorizontal: 3, alignItems: on ? 'flex-end' : 'flex-start' }}>
                           <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF' }} />
                         </View>
                       </TouchableOpacity>
@@ -3428,12 +3457,12 @@ export default function AdminSystemSettingsPanel({
                   ].map((t) => {
                     const on = t.defOn ? modalForm[t.key] !== false : !!modalForm[t.key];
                     return (
-                      <TouchableOpacity key={t.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderWidth: 1.5, borderColor: on ? '#1D4533' : '#CBD5E1' }} onPress={() => handleUpdateFormField(t.key, t.defOn ? (modalForm[t.key] === false ? true : false) : !modalForm[t.key])} activeOpacity={0.8}>
+                      <TouchableOpacity key={t.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderWidth: 1.5, borderColor: on ? '#EA580C' : '#CBD5E1' }} onPress={() => handleUpdateFormField(t.key, t.defOn ? (modalForm[t.key] === false ? true : false) : !modalForm[t.key])} activeOpacity={0.8}>
                         <View style={{ flex: 1, paddingRight: 10 }}>
                           <Text style={{ fontSize: 13.5, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>{t.title}</Text>
                           <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>{t.desc}</Text>
                         </View>
-                        <View style={{ width: 48, height: 26, borderRadius: 13, backgroundColor: on ? '#1D4533' : '#CBD5E1', justifyContent: 'center', paddingHorizontal: 3, alignItems: on ? 'flex-end' : 'flex-start' }}>
+                        <View style={{ width: 48, height: 26, borderRadius: 13, backgroundColor: on ? '#EA580C' : '#CBD5E1', justifyContent: 'center', paddingHorizontal: 3, alignItems: on ? 'flex-end' : 'flex-start' }}>
                           <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF' }} />
                         </View>
                       </TouchableOpacity>
@@ -3469,12 +3498,12 @@ export default function AdminSystemSettingsPanel({
                   ].map((t) => {
                     const on = t.defOn ? modalForm[t.key] !== false : !!modalForm[t.key];
                     return (
-                      <TouchableOpacity key={t.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderWidth: 1.5, borderColor: on ? '#1D4533' : '#CBD5E1' }} onPress={() => handleUpdateFormField(t.key, t.defOn ? (modalForm[t.key] === false ? true : false) : !modalForm[t.key])} activeOpacity={0.8}>
+                      <TouchableOpacity key={t.key} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 12, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderWidth: 1.5, borderColor: on ? '#EA580C' : '#CBD5E1' }} onPress={() => handleUpdateFormField(t.key, t.defOn ? (modalForm[t.key] === false ? true : false) : !modalForm[t.key])} activeOpacity={0.8}>
                         <View style={{ flex: 1, paddingRight: 10 }}>
                           <Text style={{ fontSize: 13.5, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>{t.title}</Text>
                           <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>{t.desc}</Text>
                         </View>
-                        <View style={{ width: 48, height: 26, borderRadius: 13, backgroundColor: on ? '#1D4533' : '#CBD5E1', justifyContent: 'center', paddingHorizontal: 3, alignItems: on ? 'flex-end' : 'flex-start' }}>
+                        <View style={{ width: 48, height: 26, borderRadius: 13, backgroundColor: on ? '#EA580C' : '#CBD5E1', justifyContent: 'center', paddingHorizontal: 3, alignItems: on ? 'flex-end' : 'flex-start' }}>
                           <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF' }} />
                         </View>
                       </TouchableOpacity>
@@ -3594,8 +3623,8 @@ export default function AdminSystemSettingsPanel({
                   paddingHorizontal: 22,
                   paddingVertical: 10,
                   borderRadius: 10,
-                  backgroundColor: '#1D4533',
-                  boxShadow: '0 4px 14px rgba(29, 69, 51, 0.28)',
+                  backgroundColor: '#EA580C',
+                  boxShadow: '0 4px 14px rgba(234, 88, 12, 0.28)',
                   cursor: 'pointer',
                   opacity: isModalSaving ? 0.7 : 1,
                 }}

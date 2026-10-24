@@ -277,7 +277,7 @@ export default function DeliveryTokenModal({
                 <Image source={{ uri: bundle.qrImageUrl }} style={styles.qr} />
               ) : busy ? (
                 <View style={[styles.qrPlaceholder, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
-                  <ActivityIndicator size="large" color="#1D4533" />
+                  <ActivityIndicator size="large" color="#EA580C" />
                   <Text style={[styles.qrPlaceholderText, { marginTop: 10 }, isDark && { color: '#94A3B8' }]}>
                     Generating QR code…
                   </Text>
@@ -300,8 +300,8 @@ export default function DeliveryTokenModal({
               <View style={[styles.slipCard, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <Text style={styles.slipKicker}>Commercial Shipping Package</Text>
-                  <View style={{ backgroundColor: isDark ? '#132A26' : '#E8F0EC', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#1D4533', fontFamily: 'monospace' }}>
+                  <View style={{ backgroundColor: isDark ? '#132A26' : '#FFF7ED', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#EA580C', fontFamily: 'monospace' }}>
                       Item Nº: {slip.itemNo}
                     </Text>
                   </View>
@@ -355,7 +355,7 @@ export default function DeliveryTokenModal({
             ) : null}
             {bundle?.confirmUrl ? (
               <TouchableOpacity style={styles.ghostBtn} onPress={handleCopy} activeOpacity={0.9}>
-                <BootstrapIcon name="clipboard" size={14} color="#1D4533" />
+                <BootstrapIcon name="clipboard" size={14} color="#EA580C" />
                 <Text style={styles.ghostBtnText}>Copy link</Text>
               </TouchableOpacity>
             ) : null}
@@ -369,10 +369,10 @@ export default function DeliveryTokenModal({
                 activeOpacity={0.85}
               >
                 {busy ? (
-                  <ActivityIndicator color="#1D4533" />
+                  <ActivityIndicator color="#EA580C" />
                 ) : (
                   <>
-                    <BootstrapIcon name="arrow-repeat" size={14} color="#1D4533" />
+                    <BootstrapIcon name="arrow-repeat" size={14} color="#EA580C" />
                     <Text style={styles.secondaryBtnText}>
                       {bundle ? 'Regenerate QR' : 'Generate QR'}
                     </Text>
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
   },
   qrPlaceholderText: { color: '#64748B', textAlign: 'center', fontSize: 13, lineHeight: 18 },
   slipCard: {
-    backgroundColor: '#F0FDFA',
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
     borderColor: '#99F6E4',
     borderRadius: 14,
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   },
   actions: { gap: 8 },
   primaryBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 12,
     height: 46,
     alignItems: 'center',
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  ghostBtnText: { color: '#1D4533', fontWeight: '700', fontSize: 13 },
+  ghostBtnText: { color: '#EA580C', fontWeight: '700', fontSize: 13 },
   secondaryBtn: {
     borderRadius: 12,
     height: 44,
@@ -516,5 +516,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  secondaryBtnText: { color: '#1D4533', fontWeight: '700', fontSize: 13 },
+  secondaryBtnText: { color: '#EA580C', fontWeight: '700', fontSize: 13 },
 });

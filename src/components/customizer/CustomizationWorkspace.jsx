@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { BootstrapIcon } from '../common';
 
-const TEAL = '#1D4533';
+const TEAL = '#EA580C';
 
 /**
  * Full customer customization workspace (brand→model→year, parts, save, AI preview, cart).
@@ -153,7 +153,7 @@ export default function CustomizationWorkspace({ builder, onRequireLogin, addToC
                       <Image source={{ uri: bike.photo_url }} style={styles.garageThumb} />
                     ) : (
                       <View style={[styles.garageThumb, styles.garageThumbEmpty]}>
-                        <BootstrapIcon name="bicycle" size={18} color="#1D4533" />
+                        <BootstrapIcon name="bicycle" size={18} color="#EA580C" />
                       </View>
                     )}
                     <Text style={styles.garageName} numberOfLines={1}>
@@ -512,14 +512,14 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 8,
     padding: 10,
-    backgroundColor: '#F0FDFA',
+    backgroundColor: '#FFF7ED',
     borderRadius: 10,
   },
   bikeSummaryPhoto: {
     width: 56,
     height: 42,
     borderRadius: 8,
-    backgroundColor: '#CCFBF1',
+    backgroundColor: '#FED7AA',
   },
   bikeSummaryText: { color: '#134E4A', fontWeight: '700', fontSize: 13 },
   bikeSummaryMeta: { color: '#0F766E', fontSize: 11, marginTop: 2 },
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
   productPrice: { fontSize: 13, fontWeight: '800', color: TEAL, marginTop: 4 },
   stock: { fontSize: 11, color: '#059669', marginTop: 2 },
   stockOut: { color: '#DC2626' },
-  compatOk: { fontSize: 11, color: '#1D4533', fontWeight: '600', marginTop: 2 },
+  compatOk: { fontSize: 11, color: '#EA580C', fontWeight: '600', marginTop: 2 },
   compatBad: { fontSize: 10, color: '#B91C1C', fontWeight: '600', marginTop: 2 },
   selectBtn: {
     marginTop: 8,
@@ -655,7 +655,7 @@ const styles = StyleSheet.create({
     marginTop: 12,
     padding: 20,
     borderRadius: 14,
-    backgroundColor: '#F0FDFA',
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
     borderColor: '#99F6E4',
     alignItems: 'center',
@@ -667,7 +667,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 8,
     borderRadius: 999,
-    backgroundColor: '#CCFBF1',
+    backgroundColor: '#FED7AA',
     overflow: 'hidden',
     marginTop: 8,
   },

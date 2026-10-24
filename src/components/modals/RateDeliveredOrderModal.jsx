@@ -197,7 +197,7 @@ export default function RateDeliveredOrderModal({
   };
 
   return (
-    <Modal visible={visible} transparent={true} animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={styles.backdrop}>
           <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
@@ -325,7 +325,7 @@ export default function RateDeliveredOrderModal({
                 <View style={styles.courierSectionCard}>
                   <View style={styles.courierHeader}>
                     <View style={styles.courierIconWrap}>
-                      <BootstrapIcon name="truck" size={16} color="#1D4533" />
+                      <BootstrapIcon name="truck" size={16} color="#EA580C" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.courierTitle}>Delivery & Courier Experience</Text>
@@ -405,11 +405,11 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     maxHeight: '90%',
     paddingTop: 16,
-    paddingBottom: 24,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
     paddingHorizontal: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
   productBrand: {
     fontSize: 10.5,
     fontWeight: '700',
-    color: '#1D4533',
+    color: '#EA580C',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
@@ -635,7 +635,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -674,7 +674,7 @@ const styles = StyleSheet.create({
   cancelBtn: {
     flex: 0.8,
     paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: 14,
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
@@ -691,9 +691,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#1D4533',
-    shadowColor: '#1D4533',
+    borderRadius: 14,
+    backgroundColor: '#EA580C',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 4,

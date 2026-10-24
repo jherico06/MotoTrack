@@ -157,6 +157,90 @@ export function productImageUri(product) {
   return product?.image || product?.image_url || product?.photo_url || product?.product_image || null;
 }
 
+/**
+ * Validates that a product is a physical motorcycle part or accessory suitable for AI installation preview.
+ * Excludes maintenance fluids, oils, chemicals, consumables, services, and rider gear.
+ */
+export function isInstallablePart(product) {
+  if (!product) return false;
+
+  const category = clean(product.category || product.product_type || product.type).toLowerCase();
+  const name = clean(product.name || product.product_name).toLowerCase();
+  const description = clean(product.description || product.product_description).toLowerCase();
+  const catId = clean(product.category_id).toLowerCase();
+
+  // Explicit non-part categories
+  const excludedCategoryKeywords = [
+    'maintenance',
+    'cat-08',
+    'consumable',
+    'fluid',
+    'oil',
+    'lubricant',
+    'chemical',
+    'service',
+    'labor',
+    'apparel',
+    'gear',
+    'clothing',
+    'merchandise',
+  ];
+
+  if (excludedCategoryKeywords.some((ex) => category.includes(ex) || catId === ex)) {
+    return false;
+  }
+
+  // Non-installable keywords in product name or category
+  const excludedKeywords = [
+    'engine oil',
+    'motor oil',
+    'gear oil',
+    'fork oil',
+    '2t oil',
+    '4t oil',
+    'brake fluid',
+    'clutch fluid',
+    'coolant',
+    'radiator fluid',
+    'chain lube',
+    'chain cleaner',
+    'degreaser',
+    'lubricant',
+    'grease',
+    'oil filter',
+    'spark plug',
+    'shampoo',
+    'car wash',
+    'bike wash',
+    'polish',
+    'wax',
+    'additive',
+    'injector cleaner',
+    'helmet',
+    'jacket',
+    'gloves',
+    'riding pants',
+    'riding shoes',
+    'boots',
+    'raincoat',
+    'tune-up',
+    'pms package',
+  ];
+
+  for (const kw of excludedKeywords) {
+    if (name.includes(kw) || category.includes(kw)) {
+      return false;
+    }
+  }
+
+  // Strict check for standalone word 'oil' in product name or category (e.g. "Engine oil", "4T Oil")
+  if (/\b(oil|fluids?|lubes?|coolants?|greases?|degreasers?)\b/i.test(name) || /\b(oil|fluids?|lubes?)\b/i.test(category)) {
+    return false;
+  }
+
+  return true;
+}
+
 function matchInstallationGuide(category = '', name = '', description = '') {
   const hay = `${lower(category)} ${lower(name)} ${lower(description)}`;
   return INSTALLATION_GUIDES.find((guide) => guide.keys.some((key) => hay.includes(key))) || null;

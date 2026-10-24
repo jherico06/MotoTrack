@@ -2,7 +2,7 @@
  * Organized, high-readability Booking Details & Work Order Command Center for Admin Modal.
  * Structured with modern overview cards, contextual action bar, and segmented tabs.
  */
-import React, { createContext, useContext, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Image,
+  Modal,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
@@ -20,6 +21,7 @@ import PickupQrScannerPanel from './PickupQrScannerPanel.jsx';
 import { garageService } from '../../services/bookings/garageService.js';
 import { serviceQuotationService } from '../../services/bookings/serviceQuotationService.js';
 import { getOptimizedImageUrl } from '../../utils/imageUrl.js';
+import { isPmsFixedBooking } from '../../utils/pmsCcPricing.js';
 import {
   FLEX_BOOKING_STATUS,
   normalizeBookingStatus,
@@ -34,7 +36,7 @@ import {
 } from '../../utils/bookingWorkflow.js';
 
 function formatDateTime(val) {
-  if (!val) return '—';
+  if (!val) return 'â€”';
   try {
     const d = new Date(val);
     if (isNaN(d.getTime())) return String(val);
@@ -44,7 +46,7 @@ function formatDateTime(val) {
         month: 'short',
         day: 'numeric',
       }) +
-      ' · ' +
+      ' Â· ' +
       d.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
@@ -57,7 +59,7 @@ function formatDateTime(val) {
 }
 
 function formatDateOnly(val) {
-  if (!val) return '—';
+  if (!val) return 'â€”';
   try {
     const d = new Date(val);
     if (isNaN(d.getTime())) return String(val);
@@ -71,12 +73,33 @@ function formatDateOnly(val) {
   }
 }
 
+/** Normalize service line items from either booking.service_line_items or booking_service_items rows. */
+function normalizeLineItems(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(Boolean)
+    .map((r, i) => {
+      const qty = Number(r.quantity ?? 1) || 1;
+      const rate = Number(r.laborRatePhp ?? r.labor_rate_php ?? r.laborRate ?? r.rate ?? 0) || 0;
+      const total = Number(r.lineTotalPhp ?? r.line_total_php ?? r.lineTotal ?? rate * qty) || 0;
+      return {
+        key: String(r.id || r.serviceId || r.pms_service_id || `${r.serviceName || 'svc'}-${i}`),
+        name: r.serviceName || r.service_name || r.name || 'Service',
+        group: r.serviceGroup || r.service_group || r.group || '',
+        qty,
+        rate,
+        total,
+        isAdditional: Boolean(r.isAdditional ?? r.is_additional),
+      };
+    });
+}
+
 const DARK_STATUS_TONE = {
   '#D97706': 'Warning',
   '#C2410C': 'Warning',
   '#EA580C': 'Warning',
   '#B45309': 'Warning',
-  '#1D4533': 'Success',
+  '#EA580C': 'Success',
   '#16A34A': 'Success',
   '#059669': 'Success',
   '#0284C7': 'Info',
@@ -123,7 +146,7 @@ function ClearField({
         multiline={multiline}
         keyboardType={keyboardType}
         underlineColorAndroid="transparent"
-        selectionColor={isDark ? t.accentBrand : "#1D4533"}
+        selectionColor={isDark ? t.accentBrand : "#EA580C"}
         {...rest}
       />
     </View>
@@ -149,7 +172,7 @@ function ActionBtn({ label, icon, onPress, disabled, danger, primary, outline })
         <BootstrapIcon
           name={icon}
           size={13}
-          color={danger ? (isDark ? t.statusDangerText : '#DC2626') : primary ? '#FFFFFF' : (isDark ? t.accentBrand : '#1D4533')}
+          color={danger ? (isDark ? t.statusDangerText : '#DC2626') : primary ? '#FFFFFF' : (isDark ? t.accentBrand : '#EA580C')}
         />
       ) : null}
       <Text
@@ -179,7 +202,7 @@ function InfoItem({ icon, label, value, highlight, badge }) {
         <View style={styles.itemBadge}>{value}</View>
       ) : (
         <Text
-          style={[styles.infoItemValue, highlight && { color: (isDark ? t.accentBrand : '#1D4533'), fontWeight: '800' }]}
+          style={[styles.infoItemValue, highlight && { color: (isDark ? t.accentBrand : '#EA580C'), fontWeight: '800' }]}
           numberOfLines={2}
         >
           {String(value)}
@@ -206,7 +229,7 @@ function GridKvCell({ icon, label, value, highlight = false, badge = false }) {
         <Text
           style={[
             styles.gridKvValue,
-            highlight && { color: (isDark ? t.accentBrand : '#1D4533'), fontWeight: '800' },
+            highlight && { color: (isDark ? t.accentBrand : '#EA580C'), fontWeight: '800' },
           ]}
           numberOfLines={2}
         >
@@ -217,15 +240,16 @@ function GridKvCell({ icon, label, value, highlight = false, badge = false }) {
   );
 }
 
-function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBookingUpdated }) {
+// `mechanics` prop is accepted for backward compatibility but ignored (admin-only workflow).
+function AdminBookingDetailsPanelInner({ booking, onToast, onBookingUpdated }) {
   const { t, isDark, styles } = useContext(DetailsThemeContext);
   const toast = (m) => onToast?.(m);
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'mechanic' | 'quotation' | 'inspection'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'quotation' | 'inspection'
   const [busy, setBusy] = useState(false);
   const [showRejectBox, setShowRejectBox] = useState(false);
   const [showRescheduleBox, setShowRescheduleBox] = useState(false);
 
-  const [mechanicId, setMechanicId] = useState(booking?.mechanic_id || '');
+  const isPmsFixed = isPmsFixedBooking(booking);
   const [rejectReason, setRejectReason] = useState('');
   const [insp, setInsp] = useState({
     findings: booking?.inspection_notes || '',
@@ -248,17 +272,90 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
 
   const status = booking?.status || '';
   const normalized = normalizeBookingStatus(status);
+  const isRejected =
+    normalized === FLEX_BOOKING_STATUS.REJECTED || /reject/i.test(String(status || ''));
   const colors = isDark ? darkStatusColors(statusColor(status), t) : statusColor(status);
   const media = useMemo(() => {
     const raw = booking?.media_urls || booking?.photos || [];
     return Array.isArray(raw) ? raw.filter(Boolean) : [];
   }, [booking]);
 
-  const activeMechanics = useMemo(
-    () => (mechanics || []).filter((m) => m.isActive !== false && m.is_active !== false),
-    [mechanics]
+  // PMS fixed-rate details (CC, CC category, selected service, quoted rate)
+  const pmsInfo = useMemo(() => {
+    if (!isPmsFixed) return null;
+    const rate = Number(
+      booking?.labor_subtotal ??
+        booking?.quoted_service_rate ??
+        booking?.estimated_service_total ??
+        booking?.package_price ??
+        0
+    );
+    const cc = booking?.motorcycle_cc ?? booking?.engine_cc ?? booking?.engineCc ?? booking?.cc;
+    return {
+      cc: cc != null && cc !== '' ? `${cc} cc` : 'â€”',
+      ccCategory:
+        booking?.cc_category_name ||
+        booking?.ccCategoryName ||
+        booking?.cc_category ||
+        booking?.cc_category_id ||
+        'â€”',
+      service:
+        booking?.pms_service_name ||
+        booking?.pmsServiceName ||
+        booking?.service_title ||
+        booking?.package_name ||
+        booking?.pms_service_id ||
+        'â€”',
+      rate,
+    };
+  }, [booking, isPmsFixed]);
+
+  // Multi-service line items: prefer the booking payload, else load from booking_service_items.
+  const bookingId = booking?.booking_id || booking?.id;
+  const embeddedItems = useMemo(
+    () => normalizeLineItems(booking?.service_line_items || booking?.serviceLineItems),
+    [booking?.service_line_items, booking?.serviceLineItems]
   );
-  const selectedMech = activeMechanics.find((m) => m.id === mechanicId);
+  const [fetchedItems, setFetchedItems] = useState([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    if (!bookingId || embeddedItems.length > 0) {
+      setFetchedItems([]);
+      setItemsLoading(false);
+      return undefined;
+    }
+    setItemsLoading(true);
+    Promise.resolve(garageService.fetchBookingServiceItems(bookingId))
+      .then((rows) => {
+        if (!cancelled) setFetchedItems(normalizeLineItems(rows));
+      })
+      .catch(() => {
+        if (!cancelled) setFetchedItems([]);
+      })
+      .finally(() => {
+        if (!cancelled) setItemsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingId, embeddedItems.length, booking?.updated_at]);
+
+  const lineItems = embeddedItems.length > 0 ? embeddedItems : fetchedItems;
+  const serviceTotals = useMemo(() => {
+    const sumLabor = lineItems.filter((i) => !i.isAdditional).reduce((s, i) => s + i.total, 0);
+    const labor = Number(
+      booking?.labor_subtotal ?? booking?.quoted_service_rate ?? (lineItems.length ? sumLabor : 0)
+    ) || 0;
+    const parts = Number(booking?.parts_estimate ?? 0) || 0;
+    const fees = Number(booking?.additional_fees_estimate ?? 0) || 0;
+    const estimated =
+      booking?.estimated_total != null && Number(booking.estimated_total) > 0
+        ? Number(booking.estimated_total)
+        : labor + parts + fees;
+    return { labor, parts, fees, estimated };
+  }, [booking, lineItems]);
+  const isEstimateOnly = Boolean(booking?.is_estimate_only);
 
   const refresh = async (nextBooking) => {
     if (nextBooking) {
@@ -284,36 +381,16 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
     }
   };
 
-  const assignMechanic = async ({ remove = false, mechOverride = null } = {}) => {
+  // Admin-only workflow: confirm the appointment (CONFIRMED â†’ SCHEDULED), no mechanic needed.
+  const scheduleAppointment = async () => {
     await withBusy(async () => {
       const id = booking.booking_id || booking.id;
-      if (remove) {
-        await garageService.updateBooking(id, {
-          mechanic: 'Pending Assignment',
-          mechanic_id: null,
-          mechanic_assigned_at: null,
-          mechanic_assignment_status: 'unassigned',
-          current_stage: 'Mechanic unassigned',
-        });
-        setMechanicId('');
-        toast('Mechanic removed');
-      } else {
-        const mech = mechOverride || selectedMech || activeMechanics[0];
-        if (!mech) {
-          toast('No active mechanic available');
-          return;
-        }
-        await garageService.assignMechanicToBooking(id, mech, {
-          schedule: true,
-          preferredDate: booking.preferred_date || booking.appointment_date,
-          preferredTime: booking.preferred_time || booking.time_slot,
-          startTime: booking.preferred_time || booking.time_slot || '09:00',
-          estimatedDurationMinutes: booking.estimated_duration_minutes || 90,
-          assignedBy: 'admin',
-        });
-        setMechanicId(mech.id);
-        toast(`Assigned ${mech.shortName || mech.name} to bay`);
-      }
+      await garageService.scheduleAppointment(id, {
+        preferredDate: booking.preferred_date || booking.appointment_date,
+        preferredTime: booking.preferred_time || booking.time_slot,
+        scheduledBy: 'admin',
+      });
+      toast('âœ“ Appointment scheduled â€¢ Rider notified');
       await refresh();
     });
   };
@@ -330,12 +407,12 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
         if (!fin.success) throw new Error(fin.error || 'Finalize failed');
         toast(
           fin.remaining > 0
-            ? `Service completed • Remaining balance ${formatPhp(fin.remaining)}`
-            : 'Service completed • Ready for pickup'
+            ? `Service completed â€¢ Remaining balance ${formatPhp(fin.remaining)}`
+            : 'Service completed â€¢ Ready for pickup'
         );
       } else if (next === FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS) {
         await garageService.startService(id);
-        toast('Service started in bay • Rider notified');
+        toast('Service started in bay â€¢ Rider notified');
       } else {
         await garageService.updateBooking(id, {
           status: next,
@@ -350,22 +427,37 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
   const approve = async () => {
     await withBusy(async () => {
       const id = booking.booking_id || booking.id;
-      const mech = selectedMech || activeMechanics.find((m) => m.id === booking.mechanic_id);
-      await garageService.approveBooking(id, mech?.name || 'Pending Assignment', {
+      // No mechanic required. Quoted bookings (single PMS or multi-service) use the
+      // labor subtotal / quoted service rate as the estimated total.
+      const approvalTotal =
+        isPmsFixed && pmsInfo?.rate > 0
+          ? pmsInfo.rate
+          : lineItems.length > 0 && serviceTotals.labor > 0
+            ? serviceTotals.labor
+            : Number(booking?.labor_subtotal ?? booking?.quoted_service_rate ?? 0) || 0;
+      await garageService.approveBooking(id, null, {
         flexible: true,
-        mechanicId: mech?.id || null,
         approvedBy: 'admin',
+        ...(approvalTotal > 0
+          ? { estimatedServiceCost: approvalTotal, estimated_service_total: approvalTotal }
+          : {}),
       });
-      toast('✓ Booking approved — downpayment required');
+      toast('âœ“ Booking approved â€” downpayment required');
       await refresh();
     });
   };
 
   const reject = async () => {
+    const reason = rejectReason.trim();
+    if (!reason) {
+      toast('Please enter a rejection reason');
+      return;
+    }
     await withBusy(async () => {
       const id = booking.booking_id || booking.id;
-      await garageService.rejectBooking(id, rejectReason || 'Declined by admin');
+      await garageService.rejectBooking(id, reason);
       setShowRejectBox(false);
+      setRejectReason('');
       toast('Booking declined');
       await refresh();
     });
@@ -383,7 +475,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
         preferredTime: rescheduleTime,
       });
       setShowRescheduleBox(false);
-      toast('✓ Appointment rescheduled');
+      toast('âœ“ Appointment rescheduled');
       await refresh();
     });
   };
@@ -393,7 +485,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
       const id = booking.booking_id || booking.id;
       const res = await serviceQuotationService.ensurePickupQr(id);
       if (!res.success) throw new Error(res.error || 'QR generation failed');
-      toast(res.existing ? 'Pickup QR already generated' : '✓ Pickup QR generated');
+      toast(res.existing ? 'Pickup QR already generated' : 'âœ“ Pickup QR generated');
       await refresh();
     });
   };
@@ -405,8 +497,8 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
       if (!fin.success) throw new Error(fin.error || 'Finalize failed');
       toast(
         fin.remaining > 0
-          ? `Final bill ${formatPhp(fin.finalTotal)} • Remaining ${formatPhp(fin.remaining)}`
-          : `Final bill ${formatPhp(fin.finalTotal)} • Ready for pickup`
+          ? `Final bill ${formatPhp(fin.finalTotal)} â€¢ Remaining ${formatPhp(fin.remaining)}`
+          : `Final bill ${formatPhp(fin.finalTotal)} â€¢ Ready for pickup`
       );
       await refresh();
     });
@@ -428,7 +520,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
           .join('\n'),
         recommendedWork: insp.recommended,
         photos: media,
-        inspectedBy: selectedMech?.name || booking.mechanic || 'admin',
+        inspectedBy: 'admin',
       });
       await garageService.updateBooking(id, {
         estimated_labor_hours: insp.estimatedHours ? Number(insp.estimatedHours) : booking.estimated_labor_hours,
@@ -442,12 +534,10 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
           .filter(Boolean)
           .join('\n'),
         inspection_started_at: inspectedAt,
-        mechanic: selectedMech?.name || booking.mechanic,
-        mechanic_id: selectedMech?.id || booking.mechanic_id,
         status: FLEX_BOOKING_STATUS.UNDER_INSPECTION,
         current_stage: 'Inspection recorded',
       });
-      toast('✓ Inspection details saved');
+      toast('âœ“ Inspection details saved');
       await refresh();
     });
   };
@@ -462,11 +552,11 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
       };
       if (actualHours !== '') {
         await serviceQuotationService.setActualLaborHours(id, Number(actualHours), {
-          hourlyRate: booking.quoted_hourly_rate || selectedMech?.hourly_rate || selectedMech?.hourlyRate,
+          hourlyRate: booking.quoted_hourly_rate,
         });
       }
       await garageService.updateBooking(id, patch);
-      toast('✓ Service progress logged');
+      toast('âœ“ Service progress logged');
       await refresh();
     });
   };
@@ -481,7 +571,9 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
 
   const quoteTotal = bookingQuotationTotal(booking);
   const payStatus = bookingPaymentStatus(booking);
-  const basePrice = Number(booking.pricePhp || 2500);
+  const basePrice = Number(
+    isPmsFixed && pmsInfo?.rate > 0 ? pmsInfo.rate : booking.pricePhp || 2500
+  );
   const dpAmount = Number(
     booking.downpayment_amount !== undefined
       ? booking.downpayment_amount
@@ -491,7 +583,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
 
   return (
     <View style={styles.wrap}>
-      {/* ─── 1. TOP STATUS & QUICK GLANCE BAR ─── */}
+      {/* â”€â”€â”€ 1. TOP STATUS & QUICK GLANCE BAR â”€â”€â”€ */}
       <View style={styles.topStatusStrip}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
           {/* Status Badge */}
@@ -522,7 +614,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
           <View style={styles.paymentPill}>
             <BootstrapIcon name="credit-card-2-front" size={11} color={isDark ? t.textSecondary : "#475569"} />
             <Text style={styles.paymentPillText}>
-              {quoteTotal > 0 ? formatPhp(quoteTotal) : formatPhp(basePrice)} · {payStatus}
+              {quoteTotal > 0 ? formatPhp(quoteTotal) : formatPhp(basePrice)} Â· {payStatus}
             </Text>
           </View>
 
@@ -568,26 +660,26 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
                   : normalized === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT
                     ? `DP ${formatPhp(dpAmount)} Required`
                     : normalized === FLEX_BOOKING_STATUS.BOOKING_EXPIRED
-                      ? 'Cancelled — DP deadline missed'
+                      ? 'Cancelled â€” DP deadline missed'
                     : `DP ${formatPhp(dpAmount)}`}
             </Text>
           </View>
           {normalized === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT && booking.payment_deadline ? (
             <Text style={{ fontSize: 11, color: (isDark ? t.statusWarningText : '#EA580C'), fontWeight: '700', marginTop: 4 }}>
-              Due by {new Date(booking.payment_deadline).toLocaleString()} · auto-cancels if unpaid
+              Due by {new Date(booking.payment_deadline).toLocaleString()} Â· auto-cancels if unpaid
             </Text>
           ) : null}
         </View>
 
         {busy && (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <ActivityIndicator size="small" color={isDark ? t.accentBrand : "#1D4533"} />
+            <ActivityIndicator size="small" color={isDark ? t.accentBrand : "#EA580C"} />
             <Text style={{ fontSize: 11.5, color: (isDark ? t.textMuted : '#64748B'), fontWeight: '600' }}>Updating...</Text>
           </View>
         )}
       </View>
 
-      {/* ─── 2. CONTEXTUAL ACTION TOOLBAR ─── */}
+      {/* â”€â”€â”€ 2. CONTEXTUAL ACTION TOOLBAR â”€â”€â”€ */}
       <View style={styles.actionToolbar}>
         {canAdminAction(status, 'approve') && (
           <ActionBtn label="Approve Booking" icon="check2-circle" primary onPress={approve} disabled={busy} />
@@ -595,15 +687,16 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
 
         {canAdminAction(status, 'reject') && (
           <ActionBtn
-            label={showRejectBox ? 'Close Reject Form' : 'Reject Booking'}
+            label="Reject Booking"
             icon="x-circle"
             danger
-            onPress={() => setShowRejectBox(!showRejectBox)}
+            onPress={() => setShowRejectBox(true)}
             disabled={busy}
           />
         )}
 
-        {canAdminAction(status, 'request_info') && (
+        {/* Pending Review is Approve / Reject only; Request Info stays for Needs Information. */}
+        {canAdminAction(status, 'request_info') && !canAdminAction(status, 'approve') && (
           <ActionBtn
             label="Request Info"
             icon="chat-left-quote"
@@ -630,24 +723,23 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
           />
         )}
 
-        {canAdminAction(status, 'assign_mechanic') && (
+        {canAdminAction(status, 'schedule') && (
           <ActionBtn
-            label="Assign Mechanic"
-            icon="person-plus"
-            primary={!canAdminAction(status, 'approve')}
-            outline={canAdminAction(status, 'approve')}
-            onPress={() => {
-              setActiveTab('mechanic');
-            }}
+            label="Confirm Appointment"
+            icon="calendar-check"
+            primary
+            onPress={scheduleAppointment}
             disabled={busy}
           />
         )}
 
-        {canAdminAction(status, 'start_inspection') && (
+        {/* Repair only: PMS fixed-rate bookings skip inspection/quotation. */}
+        {!isPmsFixed && canAdminAction(status, 'start_inspection') && (
           <ActionBtn
-            label="Start Bay Inspection"
+            label="Start Inspection"
             icon="search"
-            primary
+            outline={canAdminAction(status, 'start_service')}
+            primary={!canAdminAction(status, 'start_service')}
             onPress={() => {
               setStatus(FLEX_BOOKING_STATUS.UNDER_INSPECTION);
               setActiveTab('inspection');
@@ -656,14 +748,14 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
           />
         )}
 
-        {canAdminAction(status, 'start_service') && (
+        {(canAdminAction(status, 'start_service') || canAdminAction(status, 'mark_in_progress')) && (
           <ActionBtn
-            label="Start Service in Bay"
+            label="Start Service"
             icon="play-fill"
             primary
             onPress={() => {
               setStatus(FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS);
-              setActiveTab('inspection');
+              setActiveTab(isPmsFixed ? 'overview' : 'inspection');
             }}
             disabled={busy}
           />
@@ -700,45 +792,79 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
         )}
       </View>
 
-      {/* Inline Reject Drawer (only shown when Reject is pressed) */}
-      {showRejectBox && (
-        <View style={styles.interactiveDrawer}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <BootstrapIcon name="shield-exclamation" size={14} color={isDark ? t.statusDangerText : "#DC2626"} />
-            <Text style={{ fontSize: 12.5, fontWeight: '800', color: (isDark ? t.statusDangerText : '#DC2626') }}>
-              Decline Booking & Notify Customer
-            </Text>
-          </View>
-          <ClearField
-            label="Rejection Reason"
-            placeholder="e.g. Lift bays fully booked at 10 AM, please select an afternoon slot"
-            value={rejectReason}
-            onChangeText={setRejectReason}
-          />
-          <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-            <ActionBtn
-              label="Cancel"
-              outline
-              onPress={() => setShowRejectBox(false)}
-              disabled={busy}
+      {canAdminAction(status, 'approve') ? (
+        <Text style={{ fontSize: 11.5, color: isDark ? t.textMuted : '#64748B' }}>
+          Approve to request the customer's downpayment, or reject with a reason (required, shown to the customer).
+          No mechanic assignment is needed.
+        </Text>
+      ) : null}
+
+      {isRejected ? (
+        <View
+          style={{
+            backgroundColor: isDark ? t.statusDangerBg : '#FEF2F2',
+            borderColor: isDark ? 'rgba(180, 120, 120, 0.28)' : '#FECACA',
+            borderWidth: 1,
+            borderRadius: 10,
+            padding: 12,
+          }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: '800', color: isDark ? t.statusDangerText : '#B91C1C', textTransform: 'uppercase' }}>
+            Rejection Reason
+          </Text>
+          <Text style={{ fontSize: 13, fontWeight: '600', marginTop: 2, color: isDark ? t.textPrimary : '#7F1D1D' }}>
+            {booking.rejection_reason || booking.rejection_notes || 'No reason recorded.'}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Reject reason dialog (reason is required) */}
+      <Modal
+        visible={showRejectBox}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRejectBox(false)}
+      >
+        <View style={styles.dialogBackdrop}>
+          <View style={[styles.interactiveDrawer, styles.dialogCard]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+              <BootstrapIcon name="shield-exclamation" size={14} color={isDark ? t.statusDangerText : "#DC2626"} />
+              <Text style={{ fontSize: 12.5, fontWeight: '800', color: (isDark ? t.statusDangerText : '#DC2626') }}>
+                Decline Booking & Notify Customer
+              </Text>
+            </View>
+            <ClearField
+              label="Rejection Reason (required)"
+              placeholder="e.g. Lift bays fully booked at 10 AM, please select an afternoon slot"
+              value={rejectReason}
+              onChangeText={setRejectReason}
+              multiline
             />
-            <ActionBtn
-              label="Confirm Decline"
-              icon="x-circle"
-              danger
-              onPress={reject}
-              disabled={busy}
-            />
+            <View style={{ flexDirection: 'row', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
+              <ActionBtn
+                label="Cancel"
+                outline
+                onPress={() => setShowRejectBox(false)}
+                disabled={busy}
+              />
+              <ActionBtn
+                label="Confirm Decline"
+                icon="x-circle"
+                danger
+                onPress={reject}
+                disabled={busy || !rejectReason.trim()}
+              />
+            </View>
           </View>
         </View>
-      )}
+      </Modal>
 
       {/* Inline Reschedule Drawer (only shown when Reschedule is pressed) */}
       {showRescheduleBox && (
         <View style={styles.interactiveDrawer}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-            <BootstrapIcon name="calendar2-check" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
-            <Text style={{ fontSize: 12.5, fontWeight: '800', color: (isDark ? t.accentBrand : '#1D4533') }}>
+            <BootstrapIcon name="calendar2-check" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
+            <Text style={{ fontSize: 12.5, fontWeight: '800', color: (isDark ? t.accentBrand : '#EA580C') }}>
               Update Appointment Schedule
             </Text>
           </View>
@@ -778,13 +904,22 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
         </View>
       )}
 
-      {/* ─── 3. ORGANIZED NAVIGATION TABS ─── */}
+      {/* â”€â”€â”€ 3. ORGANIZED NAVIGATION TABS â”€â”€â”€ */}
       <View style={styles.tabBar}>
         {[
           { id: 'overview', label: 'Overview & Profile', icon: 'person-vcard' },
-          { id: 'mechanic', label: 'Technician & Bay', icon: 'wrench-adjustable' },
-          { id: 'quotation', label: 'Quotation & Billing', icon: 'receipt' },
-          { id: 'inspection', label: 'Inspection & Release', icon: 'clipboard2-check' },
+          // PMS fixed-rate bookings are already quoted: no quotation/inspection steps required.
+          // ...but additional work found during service still needs the customer-approval flow.
+          ...(isPmsFixed
+            ? canAdminAction(status, 'create_additional') ||
+              canAdminAction(status, 'review_additional') ||
+              canAdminAction(status, 'send_additional')
+              ? [{ id: 'quotation', label: 'Additional Work', icon: 'receipt' }]
+              : []
+            : [
+                { id: 'quotation', label: 'Quotation & Billing', icon: 'receipt' },
+                { id: 'inspection', label: 'Inspection & Release', icon: 'clipboard2-check' },
+              ]),
         ].map((tab) => {
           const isSelected = activeTab === tab.id;
           return (
@@ -797,7 +932,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
               <BootstrapIcon
                 name={tab.icon}
                 size={13}
-                color={isSelected ? (isDark ? t.accentBrand : '#1D4533') : (isDark ? t.textMuted : '#64748B')}
+                color={isSelected ? (isDark ? t.accentBrand : '#EA580C') : (isDark ? t.textMuted : '#64748B')}
               />
               <Text style={[styles.tabButtonText, isSelected && styles.tabButtonTextActive]}>
                 {tab.label}
@@ -807,14 +942,47 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
         })}
       </View>
 
-      {/* ─── 4. TAB CONTENT ─── */}
+      {/* â”€â”€â”€ 4. TAB CONTENT â”€â”€â”€ */}
       {/* TAB 1: OVERVIEW & PROFILE */}
       {activeTab === 'overview' && (
         <View style={styles.cardsGrid}>
+          {/* Card 0: Booking Information */}
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <BootstrapIcon name="journal-text" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
+              <Text style={styles.cardTitle}>Booking Information</Text>
+            </View>
+            <View style={styles.cardBody}>
+              <View style={styles.twoColumnGrid}>
+                <View style={styles.gridColumn}>
+                  <GridKvCell icon="hash" label="Booking ID" value={bookingId} highlight />
+                  <GridKvCell icon="flag" label="Status" value={statusLabel(status)} />
+                </View>
+                <View style={styles.gridColumn}>
+                  <GridKvCell
+                    icon="list-check"
+                    label="Services Requested"
+                    value={
+                      lineItems.length > 0
+                        ? `${lineItems.length} service${lineItems.length === 1 ? '' : 's'}`
+                        : booking.service_title || booking.package_name || null
+                    }
+                  />
+                  <GridKvCell
+                    icon="cash-coin"
+                    label="Labor Subtotal"
+                    value={serviceTotals.labor > 0 ? formatPhp(serviceTotals.labor) : null}
+                    highlight
+                  />
+                </View>
+              </View>
+            </View>
+          </View>
+
           {/* Card 1: Customer Profile */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="person-fill" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
+              <BootstrapIcon name="person-fill" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
               <Text style={styles.cardTitle}>Customer Profile</Text>
             </View>
             <View style={styles.cardBody}>
@@ -857,7 +1025,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
           {/* Card 2: Motorcycle Specs */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="bicycle" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
+              <BootstrapIcon name="bicycle" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
               <Text style={styles.cardTitle}>Motorcycle Specs</Text>
             </View>
             <View style={styles.cardBody}>
@@ -872,7 +1040,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
                   <GridKvCell
                     icon="card-heading"
                     label="License Plate"
-                    value={booking.plate_number || booking.bikePlate || 'N/A–RJCX'}
+                    value={booking.plate_number || booking.bikePlate || 'N/Aâ€“RJCX'}
                     badge
                   />
                 </View>
@@ -884,25 +1052,127 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
                     value={booking.odometer || booking.bikeOdo || '0 km'}
                   />
                   <GridKvCell
+                    icon="speedometer2"
+                    label="Engine CC"
+                    value={
+                      booking.motorcycle_cc ?? booking.engine_cc ?? booking.cc
+                        ? `${booking.motorcycle_cc ?? booking.engine_cc ?? booking.cc} cc`
+                        : null
+                    }
+                  />
+                  <GridKvCell
+                    icon="layers"
+                    label="CC Category"
+                    value={booking.cc_category_name || booking.cc_category || booking.cc_category_id || null}
+                  />
+                  <GridKvCell
                     icon="palette"
                     label="Color & Year"
-                    value={`${booking.bike_color || booking.color || 'Standard'} • ${booking.bike_year || booking.year || '2024'}`}
+                    value={`${booking.bike_color || booking.color || 'Standard'} â€¢ ${booking.bike_year || booking.year || '2024'}`}
                   />
                 </View>
               </View>
             </View>
           </View>
 
+          {/* Card 2b: PMS fixed-rate package (already quoted â€” no inspection/quotation needed) */}
+          {(lineItems.length > 0 || itemsLoading || isPmsFixed) ? (
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <BootstrapIcon name="tools" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
+                <Text style={styles.cardTitle}>
+                  Requested Services{lineItems.length > 0 ? ` (${lineItems.length})` : ''}
+                </Text>
+              </View>
+              <View style={styles.cardBody}>
+                {itemsLoading && lineItems.length === 0 ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <ActivityIndicator size="small" color={isDark ? t.accentBrand : '#EA580C'} />
+                    <Text style={{ fontSize: 12, color: isDark ? t.textMuted : '#64748B' }}>Loading services...</Text>
+                  </View>
+                ) : null}
+
+                {lineItems.length > 0 ? (
+                  <View style={styles.svcTable}>
+                    <View style={[styles.svcRow, styles.svcHeadRow]}>
+                      <Text style={[styles.svcHeadText, { flex: 2.2 }]}>Service</Text>
+                      <Text style={[styles.svcHeadText, { flex: 1.2 }]}>Group</Text>
+                      <Text style={[styles.svcHeadText, { flex: 1, textAlign: 'right' }]}>Labor Rate</Text>
+                      <Text style={[styles.svcHeadText, { flex: 1, textAlign: 'right' }]}>Line Total</Text>
+                    </View>
+                    {lineItems.map((item) => (
+                      <View key={item.key} style={styles.svcRow}>
+                        <View style={{ flex: 2.2 }}>
+                          <Text style={styles.svcCell}>
+                            {item.name}
+                            {item.qty > 1 ? ` x${item.qty}` : ''}
+                          </Text>
+                          {item.isAdditional ? (
+                            <Text style={styles.svcTag}>Additional work</Text>
+                          ) : null}
+                        </View>
+                        <Text style={[styles.svcCellMuted, { flex: 1.2 }]}>{item.group || '-'}</Text>
+                        <Text style={[styles.svcCell, { flex: 1, textAlign: 'right' }]}>{formatPhp(item.rate)}</Text>
+                        <Text style={[styles.svcCell, { flex: 1, textAlign: 'right', fontWeight: '800' }]}>
+                          {formatPhp(item.total)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : !itemsLoading ? (
+                  <GridKvCell
+                    icon="wrench-adjustable"
+                    label="Selected Service"
+                    value={pmsInfo?.service || booking.service_title || booking.package_name}
+                    highlight
+                  />
+                ) : null}
+
+                <View style={styles.svcTotals}>
+                  <View style={styles.svcTotalRow}>
+                    <Text style={styles.svcTotalLabel}>Labor subtotal</Text>
+                    <Text style={styles.svcTotalValue}>{formatPhp(serviceTotals.labor)}</Text>
+                  </View>
+                  <View style={styles.svcTotalRow}>
+                    <Text style={styles.svcTotalLabel}>Parts estimate</Text>
+                    <Text style={styles.svcTotalValue}>{formatPhp(serviceTotals.parts)}</Text>
+                  </View>
+                  {serviceTotals.fees > 0 ? (
+                    <View style={styles.svcTotalRow}>
+                      <Text style={styles.svcTotalLabel}>Additional fees estimate</Text>
+                      <Text style={styles.svcTotalValue}>{formatPhp(serviceTotals.fees)}</Text>
+                    </View>
+                  ) : null}
+                  <View style={[styles.svcTotalRow, styles.svcGrandRow]}>
+                    <Text style={[styles.svcTotalLabel, { fontWeight: '800' }]}>
+                      {isEstimateOnly ? 'Estimated total' : 'Total'}
+                    </Text>
+                    <Text style={[styles.svcTotalValue, { color: isDark ? t.accentBrand : '#EA580C', fontSize: 14 }]}>
+                      {formatPhp(serviceTotals.estimated)}
+                    </Text>
+                  </View>
+                </View>
+
+                {isEstimateOnly ? (
+                  <Text style={styles.svcDisclaimer}>
+                    ESTIMATE ONLY: prices are for the listed labor and may change. Parts are not included,
+                    and any additional work found during service needs the customer's approval first.
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          ) : null}
+
           {/* Card 3: Appointment & Financials */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="calendar3" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
+              <BootstrapIcon name="calendar3" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
               <Text style={styles.cardTitle}>Appointment & Financials</Text>
             </View>
             <View style={styles.cardBody}>
               {/* Subgroup 1: Appointment */}
               <View style={styles.subGroupHeader}>
-                <BootstrapIcon name="calendar-event" size={12} color={isDark ? t.accentBrand : "#1D4533"} />
+                <BootstrapIcon name="calendar-event" size={12} color={isDark ? t.accentBrand : "#EA580C"} />
                 <Text style={styles.subGroupTitle}>Appointment Details</Text>
               </View>
               <View style={styles.twoColumnGrid}>
@@ -927,21 +1197,24 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
 
                 <View style={styles.gridColumn}>
                   <GridKvCell
-                    icon="person-gear"
-                    label="Assigned Technician"
-                    value={booking.mechanic && !String(booking.mechanic).toLowerCase().includes('pending') ? booking.mechanic : 'Master Tech Jayson'}
+                    icon="tag"
+                    label="Booking Type"
+                    value={isPmsFixed ? 'PMS Â· Fixed Rate' : 'Repair Â· Quotation'}
                   />
-                  <GridKvCell
-                    icon="segmented-nav"
-                    label="Pit Bay"
-                    value={booking.bay_name || booking.pit_bay || 'Bay 1'}
-                  />
+                  {isPmsFixed && pmsInfo ? (
+                    <GridKvCell
+                      icon="cash-coin"
+                      label="Quoted Fixed Rate"
+                      value={formatPhp(pmsInfo.rate)}
+                      highlight
+                    />
+                  ) : null}
                 </View>
               </View>
 
               {/* Subgroup 2: Financials */}
               <View style={[styles.subGroupHeader, { marginTop: 14 }]}>
-                <BootstrapIcon name="cash-stack" size={12} color={isDark ? t.accentBrand : "#1D4533"} />
+                <BootstrapIcon name="cash-stack" size={12} color={isDark ? t.accentBrand : "#EA580C"} />
                 <Text style={styles.subGroupTitle}>Financial Information</Text>
               </View>
               <View style={styles.twoColumnGrid}>
@@ -949,18 +1222,18 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
                   <GridKvCell
                     icon="cash-coin"
                     label="Service Amount"
-                    value={`₱${basePrice.toLocaleString()}`}
+                    value={`â‚±${basePrice.toLocaleString()}`}
                     highlight
                   />
                   <GridKvCell
                     icon="shield-check"
                     label="Down Payment"
-                    value={`₱${dpAmount.toLocaleString()} (Paid via ${booking.downpayment_method || 'GCash'})`}
+                    value={`â‚±${dpAmount.toLocaleString()} (Paid via ${booking.downpayment_method || 'GCash'})`}
                   />
                   <GridKvCell
                     icon="wallet2"
                     label="Remaining Balance"
-                    value={`₱${remainingBalance.toLocaleString()}`}
+                    value={`â‚±${remainingBalance.toLocaleString()}`}
                     highlight
                   />
                 </View>
@@ -984,7 +1257,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
           {/* Card 4: Customer Request & Notes */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="chat-square-quote-fill" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
+              <BootstrapIcon name="chat-square-quote-fill" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
               <Text style={styles.cardTitle}>Customer Request & Photos</Text>
             </View>
             <View style={styles.cardBody}>
@@ -1022,140 +1295,45 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
               ) : null}
             </View>
           </View>
-        </View>
-      )}
 
-      {/* TAB 2: MECHANIC & BAY */}
-      {activeTab === 'mechanic' && (
-        <View style={{ gap: 14 }}>
-          {/* Current Technician Card */}
+          {/* Card 5: Status / Timeline */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="person-gear" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
-              <Text style={styles.cardTitle}>Currently Assigned Technician</Text>
+              <BootstrapIcon name="clock-history" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
+              <Text style={styles.cardTitle}>Status & Timeline</Text>
             </View>
             <View style={styles.cardBody}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <View style={styles.avatarCircle}>
-                    <BootstrapIcon name="wrench" size={16} color={isDark ? t.accentBrand : "#1D4533"} />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: (isDark ? t.textPrimary : '#0F172A') }}>
-                      {booking.mechanic || 'Pending Assignment'}
-                    </Text>
-                    <Text style={{ fontSize: 11.5, color: (isDark ? t.textMuted : '#64748B') }}>
-                      {selectedMech
-                        ? `${selectedMech.specialization} · ₱${Number(selectedMech.hourlyRate ?? selectedMech.hourly_rate ?? 150).toLocaleString()}/hr`
-                        : 'No technician assigned to this lift bay yet'}
-                    </Text>
-                  </View>
+              <View style={styles.twoColumnGrid}>
+                <View style={styles.gridColumn}>
+                  <GridKvCell icon="flag" label="Current Status" value={statusLabel(status)} highlight />
+                  <GridKvCell icon="signpost-split" label="Current Stage" value={booking.current_stage} />
+                  {isRejected ? (
+                    <GridKvCell
+                      icon="x-circle"
+                      label="Rejection Reason"
+                      value={booking.rejection_reason || booking.rejection_notes || 'No reason recorded.'}
+                    />
+                  ) : null}
                 </View>
-                {booking.mechanic && (
-                  <TouchableOpacity
-                    style={[styles.actionBtn, styles.actionBtnDanger, { paddingVertical: 6, paddingHorizontal: 10 }]}
-                    onPress={() => assignMechanic({ remove: true })}
-                    disabled={busy}
-                  >
-                    <BootstrapIcon name="person-dash" size={12} color={isDark ? t.statusDangerText : "#DC2626"} />
-                    <Text style={{ fontSize: 11.5, fontWeight: '800', color: (isDark ? t.statusDangerText : '#DC2626') }}>Unassign</Text>
-                  </TouchableOpacity>
-                )}
+                <View style={styles.gridColumn}>
+                  <GridKvCell icon="calendar-plus" label="Submitted" value={formatDateTime(booking.created_at || booking.createdAt)} />
+                  <GridKvCell
+                    icon="check2-circle"
+                    label="Approved"
+                    value={booking.approved_at ? formatDateTime(booking.approved_at) : null}
+                  />
+                  <GridKvCell
+                    icon="play-circle"
+                    label="Service Started"
+                    value={booking.service_started_at ? formatDateTime(booking.service_started_at) : null}
+                  />
+                  <GridKvCell
+                    icon="flag-fill"
+                    label="Service Completed"
+                    value={booking.service_completed_at ? formatDateTime(booking.service_completed_at) : null}
+                  />
+                </View>
               </View>
-
-              <View style={{ flexDirection: 'row', gap: 16, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: (isDark ? t.border : '#F1F5F9') }}>
-                <InfoItem
-                  icon="calendar-event"
-                  label="Assignment Timestamp"
-                  value={formatDateTime(booking.mechanic_assigned_at || booking.assigned_at)}
-                />
-                <InfoItem
-                  icon="check-circle"
-                  label="Assignment Status"
-                  value={booking.mechanic_id || booking.mechanic ? 'Assigned' : 'Unassigned'}
-                />
-              </View>
-            </View>
-          </View>
-
-          {/* Active Mechanics Roster Selector */}
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <BootstrapIcon name="people-fill" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
-              <Text style={styles.cardTitle}>Select from Technician Roster</Text>
-            </View>
-            <View style={styles.cardBody}>
-              <Text style={{ fontSize: 12, color: (isDark ? t.textMuted : '#64748B'), marginBottom: 10 }}>
-                Choose a certified garage mechanic to assign or reassign to this work order:
-              </Text>
-              {activeMechanics.length === 0 ? (
-                <View style={{ padding: 14, backgroundColor: (isDark ? t.bgSub : '#F8FAFC'), borderRadius: 8, alignItems: 'center' }}>
-                  <Text style={{ fontSize: 12, color: (isDark ? t.textMuted : '#64748B') }}>
-                    No certified mechanics registered yet. You can add mechanics in the Mechanics tab.
-                  </Text>
-                </View>
-              ) : (
-                <View style={{ gap: 8 }}>
-                  {activeMechanics.map((m) => {
-                    const isCurrent =
-                      mechanicId === m.id ||
-                      (booking.mechanic && booking.mechanic.toLowerCase().includes(m.name.toLowerCase()));
-                    const rate = m.hourlyRate ?? m.hourly_rate ?? 150;
-                    return (
-                      <TouchableOpacity
-                        key={m.id}
-                        style={[
-                          styles.rosterCard,
-                          isCurrent && styles.rosterCardSelected,
-                        ]}
-                        onPress={() => {
-                          setMechanicId(m.id);
-                          assignMechanic({ mechOverride: m });
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                          <View
-                            style={[
-                              styles.rosterAvatar,
-                              isCurrent && { backgroundColor: isDark ? '#1F6B52' : '#1D4533' },
-                            ]}
-                          >
-                            <BootstrapIcon
-                              name="person-fill"
-                              size={14}
-                              color={isCurrent ? '#FFFFFF' : (isDark ? t.accentBrand : '#1D4533')}
-                            />
-                          </View>
-                          <View>
-                            <Text
-                              style={[
-                                styles.rosterName,
-                                isCurrent && { color: (isDark ? t.accentBrand : '#1D4533'), fontWeight: '800' },
-                              ]}
-                            >
-                              {m.name}
-                            </Text>
-                            <Text style={styles.rosterSub}>
-                              {m.specialization || 'Certified Tech'} · ₱{Number(rate).toLocaleString()}/hour
-                            </Text>
-                          </View>
-                        </View>
-                        {isCurrent ? (
-                          <View style={styles.rosterAssignedPill}>
-                            <BootstrapIcon name="check-circle-fill" size={12} color={isDark ? t.accentBrand : "#1D4533"} />
-                            <Text style={{ fontSize: 11, fontWeight: '800', color: (isDark ? t.accentBrand : '#1D4533') }}>Assigned</Text>
-                          </View>
-                        ) : (
-                          <Text style={{ fontSize: 11.5, fontWeight: '700', color: (isDark ? t.statusInfoText : '#2563EB') }}>
-                            Tap to Assign
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              )}
             </View>
           </View>
         </View>
@@ -1165,10 +1343,14 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
       {activeTab === 'quotation' && (
         <View style={styles.card}>
           <View style={styles.cardHeader}>
-            <BootstrapIcon name="receipt-cutoff" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
+            <BootstrapIcon name="receipt-cutoff" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
             <Text style={styles.cardTitle}>Detailed Quotation & Parts Itemization</Text>
           </View>
           <View style={[styles.cardBody, { padding: 8 }]}>
+            <Text style={{ fontSize: 11.5, color: isDark ? t.textMuted : '#64748B', paddingHorizontal: 6 }}>
+              Any additional work or charge found during service must be approved by the customer
+              before it proceeds. The customer is notified and the work stays on hold until they respond.
+            </Text>
             <ServiceQuotationPanel
               booking={booking}
               onToast={toast}
@@ -1186,7 +1368,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
           {/* Inspection Section */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="search" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
+              <BootstrapIcon name="search" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
               <Text style={styles.cardTitle}>Vehicle Inspection & Diagnostic Findings</Text>
             </View>
             <View style={styles.cardBody}>
@@ -1243,7 +1425,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
           {/* Service Progress Tracking */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="tools" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
+              <BootstrapIcon name="tools" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
               <Text style={styles.cardTitle}>Service Progress & Work Executed</Text>
             </View>
             <View style={styles.cardBody}>
@@ -1280,7 +1462,7 @@ function AdminBookingDetailsPanelInner({ booking, mechanics = [], onToast, onBoo
           {/* Pickup QR & Verification */}
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <BootstrapIcon name="qr-code-scan" size={14} color={isDark ? t.accentBrand : "#1D4533"} />
+              <BootstrapIcon name="qr-code-scan" size={14} color={isDark ? t.accentBrand : "#EA580C"} />
               <Text style={styles.cardTitle}>Vehicle Release & QR Verification</Text>
             </View>
             <View style={styles.cardBody}>
@@ -1394,18 +1576,26 @@ function createStyles(t, isDark) {
       paddingVertical: 8,
       borderRadius: 8,
       borderWidth: 1.5,
-      borderColor: isDark ? t.accentBorder : '#1D4533',
+      borderColor: isDark ? t.accentBorder : '#EA580C',
       backgroundColor: isDark ? t.bgCard : '#FFFFFF',
     },
     actionBtnPrimary: {
-      backgroundColor: isDark ? '#1F6B52' : '#1D4533',
-      borderColor: isDark ? '#1F6B52' : '#1D4533',
+      backgroundColor: isDark ? '#EA580C' : '#EA580C',
+      borderColor: isDark ? '#EA580C' : '#EA580C',
     },
     actionBtnDanger: { borderColor: isDark ? 'rgba(180, 120, 120, 0.28)' : '#FECACA', backgroundColor: isDark ? t.statusDangerBg : '#FEF2F2' },
     actionBtnOutline: { borderColor: isDark ? t.borderInput : '#CBD5E1', backgroundColor: isDark ? t.bgCard : '#FFFFFF' },
     actionBtnDisabled: { opacity: 0.5 },
-    actionBtnText: { fontSize: 12, fontWeight: '800', color: isDark ? t.accentBrand : '#1D4533' },
+    actionBtnText: { fontSize: 12, fontWeight: '800', color: isDark ? t.accentBrand : '#EA580C' },
 
+    dialogBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(15, 23, 42, 0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+    },
+    dialogCard: { width: '100%', maxWidth: 480 },
     interactiveDrawer: {
       backgroundColor: isDark ? t.bgSub : '#F8FAFC',
       borderRadius: 12,
@@ -1442,7 +1632,7 @@ function createStyles(t, isDark) {
       elevation: 2,
     },
     tabButtonText: { fontSize: 12, fontWeight: '700', color: isDark ? t.textMuted : '#64748B' },
-    tabButtonTextActive: { color: isDark ? t.accentBrand : '#1D4533', fontWeight: '800' },
+    tabButtonTextActive: { color: isDark ? t.accentBrand : '#EA580C', fontWeight: '800' },
 
     cardsGrid: {
       gap: 14,
@@ -1523,7 +1713,7 @@ function createStyles(t, isDark) {
       width: 26,
       height: 26,
       borderRadius: 7,
-      backgroundColor: isDark ? t.accentBg : '#E8F0EC',
+      backgroundColor: isDark ? t.accentBg : '#FFF7ED',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1553,9 +1743,55 @@ function createStyles(t, isDark) {
       borderRadius: 8,
       padding: 10,
       borderLeftWidth: 3,
-      borderLeftColor: isDark ? t.accentBrand : '#1D4533',
+      borderLeftColor: isDark ? t.accentBrand : '#EA580C',
     },
     quoteText: { fontSize: 12.5, color: isDark ? t.textSecondary : '#334155', fontStyle: 'italic', lineHeight: 18 },
+
+    svcTable: {
+      borderWidth: 1,
+      borderColor: isDark ? t.border : '#E2E8F0',
+      borderRadius: 10,
+      overflow: 'hidden',
+    },
+    svcRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? t.border : '#F1F5F9',
+    },
+    svcHeadRow: { backgroundColor: isDark ? t.bgSub : '#F8FAFC', borderTopWidth: 0 },
+    svcHeadText: {
+      fontSize: 10,
+      fontWeight: '800',
+      color: isDark ? t.textMuted : '#64748B',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    svcCell: { fontSize: 12.5, fontWeight: '700', color: isDark ? t.textPrimary : '#0F172A' },
+    svcCellMuted: { fontSize: 12, color: isDark ? t.textMuted : '#64748B' },
+    svcTag: { fontSize: 10, fontWeight: '800', color: isDark ? t.statusWarningText : '#B45309', marginTop: 2 },
+    svcTotals: { gap: 4, marginTop: 4 },
+    svcTotalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    svcGrandRow: {
+      marginTop: 4,
+      paddingTop: 6,
+      borderTopWidth: 1,
+      borderTopColor: isDark ? t.border : '#E2E8F0',
+    },
+    svcTotalLabel: { fontSize: 12.5, color: isDark ? t.textSecondary : '#475569', fontWeight: '600' },
+    svcTotalValue: { fontSize: 12.5, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A' },
+    svcDisclaimer: {
+      fontSize: 11.5,
+      lineHeight: 16,
+      color: isDark ? t.statusWarningText : '#92400E',
+      backgroundColor: isDark ? t.statusWarningBg : '#FFFBEB',
+      borderRadius: 8,
+      padding: 10,
+      fontWeight: '600',
+    },
 
     thumb: { width: 88, height: 88, borderRadius: 8, backgroundColor: isDark ? t.bgSub : '#E2E8F0' },
 
@@ -1579,7 +1815,7 @@ function createStyles(t, isDark) {
       backgroundColor: isDark ? t.bgCard : '#FFFFFF',
     },
     rosterCardSelected: {
-      borderColor: isDark ? t.accentBrand : '#1D4533',
+      borderColor: isDark ? t.accentBrand : '#EA580C',
       backgroundColor: isDark ? t.accentBg : '#F0FDF4',
     },
     rosterAvatar: {

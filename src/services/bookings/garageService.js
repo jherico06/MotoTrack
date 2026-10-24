@@ -3,6 +3,7 @@ import { storageAdapter } from '../system/storageAdapter.js';
 import { supabaseManager } from '../../lib/supabase.js';
 import { usdToPhp } from '../../utils/currency.js';
 import { notificationService } from '../notifications/notificationService.js';
+import { emailService } from '../notifications/emailService.js';
 import { auditLogService } from '../system/auditLogService.js';
 import { dataCache } from '../cache/dataCache.js';
 import { CACHE_TTL, CacheKeys, mechanicInvalidationKeys, bookingInvalidationKeys } from '../cache/cacheKeys.js';
@@ -21,6 +22,8 @@ import {
   roundMoney,
 } from '../../utils/serviceQuotation.js';
 import { BOOKING_ROLES, TIMELINE_EVENTS } from '../../utils/bookingWorkflow.js';
+import { isPmsFixedBooking } from '../../utils/pmsCcPricing.js';
+import { pmsPricingService } from './pmsPricingService.js';
 import { serviceQuotationService } from './serviceQuotationService.js';
 import { bookingTimelineService } from './bookingTimelineService.js';
 import { systemSettingsService } from '../system/systemSettingsService.js';
@@ -34,10 +37,6 @@ export function setMechanicUserIdColumnSupport(supported) {
 }
 
 // ─── CACHE & THROTTLE KEYS TO PREVENT LOG INGESTION SPIKES ───
-const DOWNPAYMENT_EXPIRY_STORAGE_KEY = 'mototrack_last_downpayment_expiry_rpc';
-const DOWNPAYMENT_EXPIRY_COOLDOWN_MS = 15 * 60 * 1000; // 15-minute cross-tab cooldown
-let _lastDownpaymentExpiryRpcTime = 0;
-let _downpaymentExpiryRpcInFlight = null;
 let _cleanedDemoBookingsOnce = false;
 
 export const REPAIR_COMMON_ISSUES = [
@@ -51,7 +50,7 @@ export const REPAIR_COMMON_ISSUES = [
 
 export const BOOKING_CATEGORIES = [
   { id: 'Repair', label: 'Mechanical Repair', icon: 'wrench', color: '#DC2626', bg: '#FEE2E2' },
-  { id: 'PMS', label: 'Preventive Maintenance (PMS)', icon: 'wrench-adjustable', color: '#1D4533', bg: '#C8DDD3' },
+  { id: 'PMS', label: 'Preventive Maintenance (PMS)', icon: 'wrench-adjustable', color: '#EA580C', bg: '#FED7AA' },
 ];
 
 export function generateBookingId(category = 'PMS', existingBookings = []) {
@@ -328,7 +327,7 @@ export const TIME_SLOTS = [
 ];
 
 export const PACKAGE_CATEGORIES = [
-  { id: 'PMS', label: 'Preventive Maintenance', icon: 'wrench-adjustable', color: '#1D4533' },
+  { id: 'PMS', label: 'Preventive Maintenance', icon: 'wrench-adjustable', color: '#EA580C' },
   { id: 'Repair', label: 'Mechanical Repair', icon: 'wrench', color: '#DC2626' },
   { id: 'Customization', label: 'Customization & Tuning', icon: 'tools', color: '#7C3AED' },
 ];
@@ -842,8 +841,6 @@ export const garageService = {
                 phone: item.phone || '',
                 email: item.email || '',
                 rating: item.rating !== undefined && item.rating !== null ? Number(item.rating) : 5.0,
-                hourlyRate: Number(item.hourly_rate ?? 150),
-                hourly_rate: Number(item.hourly_rate ?? 150),
                 isActive: item.is_active !== false,
                 is_active: item.is_active !== false,
                 user_id: item.user_id || null,
@@ -908,18 +905,12 @@ export const garageService = {
     const email = String(mechanicData.email || '')
       .trim()
       .toLowerCase();
-    // Login identity is the email (same as customer signup / sign in)
-    const username = email;
-    const password = String(mechanicData.password || '').trim();
     const phone = String(mechanicData.phone || '').trim();
 
-    if (!email || !email.includes('@')) {
-      return { success: false, error: 'A valid mechanic email is required for login.' };
+    if (email && !email.includes('@')) {
+      return { success: false, error: 'Enter a valid contact email, or leave it blank.' };
     }
-    if (!password || password.length < 6) {
-      return { success: false, error: 'Temporary password must be at least 6 characters.' };
-    }
-    if (list.some((m) => String(m.email || '').toLowerCase() === email)) {
+    if (email && list.some((m) => String(m.email || '').toLowerCase() === email)) {
       return { success: false, error: 'That email is already assigned to another mechanic.' };
     }
 
@@ -927,29 +918,8 @@ export const garageService = {
       mechanicData.id ||
       `tech-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
 
-    const hourlyRate = Number(
-      mechanicData.hourlyRate ?? mechanicData.hourly_rate ?? 150
-    );
-
-    const userRes = await userService.createUser({
-      name: cleanName,
-      email,
-      password,
-      phone,
-      address: 'MotoTrack Garage Staff',
-      role: 'mechanic',
-      username,
-      status: 'active',
-    });
-    if (!userRes.success) {
-      return {
-        success: false,
-        error: userRes.error || 'Could not create the mechanic login account.',
-      };
-    }
-
-    const userId = userRes.user?.user_id || userRes.user?.id || null;
-
+    // Roster-only: admins manage technicians. No login / user account is created.
+    // Labor pricing comes from fixed service rates — not per-mechanic hourly rates.
     const newMechanic = {
       id: uniqueId,
       name: cleanName,
@@ -963,13 +933,10 @@ export const garageService = {
       bay: mechanicData.bay?.trim() || '',
       status: mechanicData.status || 'Available',
       phone,
-      email,
-      username,
-      userId,
-      user_id: userId,
+      email: email || '',
+      userId: null,
+      user_id: null,
       rating: mechanicData.rating !== undefined ? Number(mechanicData.rating) : 5.0,
-      hourlyRate,
-      hourly_rate: hourlyRate,
       isActive: mechanicData.isActive !== false && mechanicData.is_active !== false,
       is_active: mechanicData.isActive !== false && mechanicData.is_active !== false,
       createdAt: new Date().toISOString(),
@@ -979,7 +946,6 @@ export const garageService = {
     this.saveMechanics(updated);
     dataCache.invalidateMany(mechanicInvalidationKeys(newMechanic.id));
 
-    // Supabase synchronization
     try {
       const client = supabaseManager.getClient();
       if (client) {
@@ -994,11 +960,10 @@ export const garageService = {
           bay: newMechanic.bay,
           status: newMechanic.status,
           phone: newMechanic.phone,
-          email: newMechanic.email,
+          email: newMechanic.email || null,
           rating: newMechanic.rating,
-          hourly_rate: hourlyRate,
           is_active: newMechanic.is_active,
-          user_id: userId,
+          user_id: null,
         };
         let { error: supaErr } = await client.from('mechanics').insert([insertRow]);
         if (supaErr && (supaErr.code === '42703' || /user_id/i.test(String(supaErr.message || '')))) {
@@ -1010,9 +975,7 @@ export const garageService = {
           console.warn('Supabase mechanic insert note:', supaErr.message || supaErr);
           return {
             success: false,
-            error:
-              supaErr.message ||
-              'Mechanic login was created, but the mechanic profile could not be saved.',
+            error: supaErr.message || 'Could not save the mechanic roster profile.',
           };
         }
       }
@@ -1020,30 +983,7 @@ export const garageService = {
       console.warn('Supabase mechanic insert exception:', _supaErr);
     }
 
-    let emailResult = null;
-    try {
-      const { staffAccountApi } = await import('../staff/staffAccountApi.js');
-      emailResult = await staffAccountApi.sendTempCredentials({
-        name: cleanName,
-        email,
-        role: 'mechanic',
-        temporaryPassword: password,
-      });
-    } catch (_e) {
-      emailResult = { success: false, error: 'Could not reach the email server.' };
-    }
-
-    return {
-      success: true,
-      mechanic: newMechanic,
-      credentialsEmailed: Boolean(emailResult?.success && emailResult?.emailed),
-      emailWarning: emailResult?.emailed
-        ? emailResult.warning || null
-        : emailResult?.error ||
-          emailResult?.message ||
-          emailResult?.warning ||
-          'Account created, but credentials email could not be sent.',
-    };
+    return { success: true, mechanic: newMechanic };
   },
 
   async updateMechanic(mechanicId, updateData) {
@@ -1054,29 +994,22 @@ export const garageService = {
     }
 
     const existing = list[index];
-    // Login credentials (email / username / password) are self-service only after creation.
-    const nextEmail = String(existing.email || '')
-      .trim()
-      .toLowerCase();
-    const nextUsername = String(existing.username || existing.email || '')
+    // Roster-only: no login account. Email/phone are contact fields managed by admin.
+    const nextEmail = String(updateData.email ?? existing.email ?? '')
       .trim()
       .toLowerCase();
     const nextPhone = String(updateData.phone ?? existing.phone ?? '').trim();
 
-    let userId = existing.userId || existing.user_id || null;
-    if (userId) {
-      const userUpdates = {
-        name: updateData.name ?? existing.name,
-        phone: nextPhone,
-        status: 'active',
-      };
-      const accountRes = await userService.updateRiderAccount(userId, userUpdates);
-      if (!accountRes?.success) {
-        return {
-          success: false,
-          error: accountRes?.error || 'Could not update the mechanic profile.',
-        };
-      }
+    if (nextEmail && !nextEmail.includes('@')) {
+      return { success: false, error: 'Enter a valid contact email, or leave it blank.' };
+    }
+    if (
+      nextEmail &&
+      list.some(
+        (m) => m.id !== mechanicId && String(m.email || '').toLowerCase() === nextEmail
+      )
+    ) {
+      return { success: false, error: 'That email is already assigned to another mechanic.' };
     }
 
     const updatedMech = {
@@ -1084,23 +1017,20 @@ export const garageService = {
       ...updateData,
       id: existing.id,
       email: nextEmail,
-      username: nextUsername,
       phone: nextPhone,
-      userId,
-      user_id: userId,
+      userId: null,
+      user_id: null,
       updatedAt: new Date().toISOString(),
     };
 
-    if (updateData.hourlyRate !== undefined || updateData.hourly_rate !== undefined) {
-      const rate = Number(updateData.hourlyRate ?? updateData.hourly_rate);
-      updatedMech.hourlyRate = rate;
-      updatedMech.hourly_rate = rate;
-    }
     if (updateData.isActive !== undefined || updateData.is_active !== undefined) {
       const active = updateData.isActive !== false && updateData.is_active !== false;
       updatedMech.isActive = active;
       updatedMech.is_active = active;
     }
+    // Drop legacy per-mechanic hourly rates (pricing is fixed service rates).
+    delete updatedMech.hourlyRate;
+    delete updatedMech.hourly_rate;
 
     list[index] = updatedMech;
     this.saveMechanics(list);
@@ -1122,12 +1052,9 @@ export const garageService = {
           updated_at: new Date().toISOString(),
         };
         if (updatedMech.phone !== undefined) updatePayload.phone = updatedMech.phone;
-        if (updatedMech.email !== undefined) updatePayload.email = updatedMech.email;
-        if (userId) updatePayload.user_id = userId;
+        if (updatedMech.email !== undefined) updatePayload.email = updatedMech.email || null;
+        updatePayload.user_id = null;
         if (updatedMech.rating !== undefined) updatePayload.rating = Number(updatedMech.rating);
-        if (updatedMech.hourly_rate !== undefined) {
-          updatePayload.hourly_rate = Number(updatedMech.hourly_rate);
-        }
         if (updatedMech.is_active !== undefined) {
           updatePayload.is_active = !!updatedMech.is_active;
         }
@@ -1252,6 +1179,28 @@ export const garageService = {
     return 2;
   },
 
+  /** Shop-wide daily booking cap (independent of mechanic roster). */
+  getShopDailyCapacity() {
+    try {
+      const settings = systemSettingsService.getSettings();
+      const n = Number(settings?.maxDailyAppointments);
+      if (Number.isFinite(n) && n > 0) return Math.min(100, Math.floor(n));
+    } catch (_e) {}
+    return 24;
+  },
+
+  /** Concurrent bookings per time slot (bays / concurrent capacity). */
+  getShopConcurrentCapacity() {
+    try {
+      const settings = systemSettingsService.getSettings();
+      const concurrent = Number(settings?.maxConcurrentBookings);
+      if (Number.isFinite(concurrent) && concurrent > 0) return Math.min(24, Math.floor(concurrent));
+      const bays = Number(settings?.serviceBayCount);
+      if (Number.isFinite(bays) && bays > 0) return Math.min(24, Math.floor(bays));
+    } catch (_e) {}
+    return 4;
+  },
+
   getOnDutyMechanics() {
     return this.getMechanics().filter((mech) => {
       if (!mech) return false;
@@ -1283,14 +1232,21 @@ export const garageService = {
     const slotsPerMechanic = this.getSlotsPerMechanic();
     const onDutyMechanics = this.getOnDutyMechanics();
     const mechanicCount = onDutyMechanics.length;
-    const totalSlots = mechanicCount * slotsPerMechanic;
-    const dayAtCapacity = isOverrideFull || mechanicCount === 0 || activeBookings.length >= totalSlots;
+    const shopDailyCap = this.getShopDailyCapacity();
+    const concurrentCap = this.getShopConcurrentCapacity();
+    // Prefer shop capacity after mechanic role removal. An empty roster must NOT
+    // mark every day as FULL (previously: mechanicCount === 0 → totalSlots 0).
+    const mechanicBasedCap = mechanicCount > 0 ? mechanicCount * slotsPerMechanic : 0;
+    const totalSlots =
+      mechanicBasedCap > 0 ? Math.min(shopDailyCap, mechanicBasedCap) : shopDailyCap;
+    const dayAtCapacity = isOverrideFull || activeBookings.length >= totalSlots;
+    const perSlotCap = mechanicCount > 0 ? mechanicCount : concurrentCap;
 
     const slotsData = TIME_SLOTS.map((ts) => {
       const matches = isOverrideFull
         ? [{ customer_name: 'Trackday Customer' }]
         : activeBookings.filter((b) => (b.time_slot || b.time) === ts);
-      const timeAtCapacity = mechanicCount > 0 && matches.length >= mechanicCount;
+      const timeAtCapacity = matches.length >= perSlotCap;
       const isBooked = dayAtCapacity || timeAtCapacity;
       return {
         timeSlot: ts,
@@ -1304,8 +1260,9 @@ export const garageService = {
     const bookedSlotsCount = isOverrideFull
       ? totalSlots
       : Math.min(activeBookings.length, totalSlots);
-    const availableSlotsCount =
-      isOverrideFull || totalSlots === 0 ? 0 : Math.max(0, totalSlots - activeBookings.length);
+    const availableSlotsCount = isOverrideFull
+      ? 0
+      : Math.max(0, totalSlots - activeBookings.length);
     const isFullyBooked = availableSlotsCount === 0;
 
     return {
@@ -1324,6 +1281,75 @@ export const garageService = {
   },
 
   // ─── BOOKINGS CRUD (SUPABASE PRIMARY WITH LOCAL MERGE) ───
+  async syncBookingServiceItems(bookingId, lineItems = [], meta = {}) {
+    try {
+      const client = supabaseManager.getClient();
+      if (!client || !bookingId) return null;
+      const rows = (lineItems || []).map((item, index) => ({
+        booking_id: bookingId,
+        pms_service_id: item.serviceId || item.pms_service_id || null,
+        service_name: item.serviceName || item.service_name || 'Service',
+        service_group: item.serviceGroup || item.service_group || null,
+        service_description: item.serviceDescription || item.service_description || null,
+        motorcycle_cc: item.motorcycleCc ?? item.motorcycle_cc ?? meta.motorcycleCc ?? null,
+        cc_category_id: item.ccCategoryId || item.cc_category_id || meta.ccCategoryId || null,
+        cc_category_name: item.ccCategoryName || item.cc_category_name || meta.ccCategoryName || null,
+        labor_rate_php: Number(item.laborRatePhp ?? item.labor_rate_php ?? 0),
+        quantity: Number(item.quantity || 1),
+        line_total_php: Number(item.lineTotalPhp ?? item.line_total_php ?? item.laborRatePhp ?? 0),
+        is_additional: Boolean(item.isAdditional || item.is_additional),
+        sort_order: Number(item.sortOrder ?? item.sort_order ?? index + 1),
+        updated_at: new Date().toISOString(),
+      }));
+      // Replace snapshot set for this booking
+      await client.from('booking_service_items').delete().eq('booking_id', bookingId);
+      if (!rows.length) return [];
+      const { data, error } = await client.from('booking_service_items').insert(rows).select();
+      if (error) {
+        console.warn('booking_service_items sync error:', error.message || error);
+        return null;
+      }
+      return data || rows;
+    } catch (err) {
+      console.warn('syncBookingServiceItems failed:', err);
+      return null;
+    }
+  },
+
+  async fetchBookingServiceItems(bookingId) {
+    try {
+      const client = supabaseManager.getClient();
+      if (!client || !bookingId) return [];
+      const { data, error } = await client
+        .from('booking_service_items')
+        .select('*')
+        .eq('booking_id', bookingId)
+        .order('sort_order', { ascending: true });
+      if (error) return [];
+      return (data || []).map((row) => ({
+        id: row.id,
+        serviceId: row.pms_service_id,
+        pms_service_id: row.pms_service_id,
+        serviceName: row.service_name,
+        service_name: row.service_name,
+        serviceGroup: row.service_group,
+        serviceDescription: row.service_description,
+        motorcycleCc: row.motorcycle_cc,
+        ccCategoryId: row.cc_category_id,
+        ccCategoryName: row.cc_category_name,
+        laborRatePhp: Number(row.labor_rate_php || 0),
+        labor_rate_php: Number(row.labor_rate_php || 0),
+        quantity: Number(row.quantity || 1),
+        lineTotalPhp: Number(row.line_total_php || 0),
+        line_total_php: Number(row.line_total_php || 0),
+        isAdditional: Boolean(row.is_additional),
+        sortOrder: Number(row.sort_order || 0),
+      }));
+    } catch (_e) {
+      return [];
+    }
+  },
+
   async syncBookingToSupabase(booking) {
     try {
       const client = supabaseManager.getClient();
@@ -1443,8 +1469,14 @@ export const garageService = {
         customer_name: booking.customer_name || booking.userName || 'Guest Rider',
         customer_phone: booking.customer_phone || booking.userPhone || '',
         notes: notesToStore,
-        price: booking.booking_mode === 'flexible' ? Number(booking.pricePhp || 0) : packagePrice || booking.pricePhp || 2500,
-        price_php: booking.booking_mode === 'flexible' ? Number(booking.pricePhp || 0) : packagePrice || booking.pricePhp || 0,
+        price:
+          booking.booking_mode === 'flexible'
+            ? Number(booking.pricePhp || 0)
+            : Number(booking.quoted_service_rate || packagePrice || booking.pricePhp || 0),
+        price_php:
+          booking.booking_mode === 'flexible'
+            ? Number(booking.pricePhp || 0)
+            : Number(booking.quoted_service_rate || packagePrice || booking.pricePhp || 0),
         status: booking.status || 'Pending',
         category: booking.category || 'PMS',
         service_type: booking.service_type || booking.category || 'PMS',
@@ -1453,9 +1485,28 @@ export const garageService = {
         preferred_date: booking.preferred_date || booking.appointment_date || booking.date || '',
         preferred_time: booking.preferred_time || booking.time_slot || booking.time || '',
         repair_type: booking.repair_type || '',
-        package_id: booking.booking_mode === 'flexible' ? null : validServiceId || requestedServiceId,
+        package_id:
+          booking.booking_mode === 'flexible'
+            ? null
+            : booking.booking_mode === 'pms_fixed'
+              ? booking.pms_service_id || requestedServiceId
+              : validServiceId || requestedServiceId,
         package_name: packageName,
-        package_price: booking.booking_mode === 'flexible' ? 0 : packagePrice || booking.pricePhp || 0,
+        package_price:
+          booking.booking_mode === 'flexible'
+            ? 0
+            : Number(booking.quoted_service_rate || packagePrice || booking.pricePhp || 0),
+        motorcycle_cc: booking.motorcycle_cc ?? null,
+        cc_category_id: booking.cc_category_id ?? null,
+        cc_category_name: booking.cc_category_name ?? null,
+        pms_service_id: booking.pms_service_id ?? null,
+        quoted_service_rate: booking.quoted_service_rate ?? null,
+        labor_subtotal: booking.labor_subtotal ?? null,
+        parts_estimate: booking.parts_estimate ?? null,
+        additional_fees_estimate: booking.additional_fees_estimate ?? null,
+        estimated_total: booking.estimated_total ?? null,
+        is_estimate_only: booking.is_estimate_only ?? null,
+        rejection_reason: booking.rejection_reason ?? null,
         included_services: includedServices,
         estimated_duration: booking.estimated_duration || booking.duration || '',
         service_title: packageName,
@@ -1478,6 +1529,12 @@ export const garageService = {
         problem_description: booking.problem_description || '',
         media_urls: booking.media_urls || booking.photos || [],
         motorcycle_id: booking.motorcycle_id || null,
+        customization_id: booking.customization_id || booking.customizationId || null,
+        installation_fee_waived: Boolean(
+          booking.installation_fee_waived ?? booking.installationFeeWaived
+        ),
+        installation_promo_id:
+          booking.installation_promo_id || booking.installationPromoId || null,
         user_id: booking.user_id || booking.customer_id || null,
         parts_cost: booking.parts_cost ?? booking.partsCost ?? null,
         materials_cost: booking.materials_cost ?? booking.materialsCost ?? null,
@@ -1570,7 +1627,7 @@ export const garageService = {
         let query = client
           .from('bookings')
           .select(
-            'booking_id,customer_id,user_id,service_id,package_id,package_name,package_price,status,notes,bike_brand,bike_model,bike_plate,bike_odo,bike_year,branch_name,customer_name,customer_phone,mechanic_id,mechanic,category,service_type,time_slot,appointment_date,preferred_date,preferred_time,repair_type,estimated_duration,created_at,updated_at,current_stage,approved_by,service_title,booking_mode,problem_description,media_urls,motorcycle_id,estimated_labor_hours,actual_labor_hours,quoted_hourly_rate,estimated_labor_cost,actual_labor_cost,estimated_service_total,final_service_total,downpayment_amount,downpayment_status,downpayment_percent,remaining_balance,amount_paid,payment_status,active_quotation_id,pickup_qr_token,service_progress,customer_email,customer_address,plate_number,odometer,branch,inspection_notes,inspection_started_at,mechanic_assigned_at,mechanic_assignment_status,service_notes,service_started_at,service_completed_at,bike_color,priority,pickup_verified_at,pickup_released_by'
+            'booking_id,customer_id,user_id,service_id,package_id,package_name,package_price,status,notes,bike_brand,bike_model,bike_plate,bike_odo,bike_year,branch_name,customer_name,customer_phone,mechanic_id,mechanic,category,service_type,time_slot,appointment_date,preferred_date,preferred_time,repair_type,estimated_duration,created_at,updated_at,current_stage,approved_by,service_title,booking_mode,problem_description,media_urls,motorcycle_id,motorcycle_cc,cc_category_id,cc_category_name,pms_service_id,quoted_service_rate,labor_subtotal,parts_estimate,additional_fees_estimate,estimated_total,is_estimate_only,rejection_reason,estimated_labor_hours,actual_labor_hours,quoted_hourly_rate,estimated_labor_cost,actual_labor_cost,estimated_service_total,final_service_total,downpayment_amount,downpayment_status,downpayment_percent,remaining_balance,amount_paid,payment_status,active_quotation_id,pickup_qr_token,service_progress,customer_email,customer_address,plate_number,odometer,branch,inspection_notes,inspection_started_at,mechanic_assigned_at,mechanic_assignment_status,service_notes,service_started_at,service_completed_at,bike_color,priority,pickup_verified_at,pickup_released_by'
           )
           .order('created_at', { ascending: false })
           .range(customerId ? 0 : from, customerId ? 79 : to);
@@ -1693,6 +1750,18 @@ export const garageService = {
               problem_description: b.problem_description || null,
               booking_mode: b.booking_mode || null,
               service_type: b.service_type || null,
+              motorcycle_cc: b.motorcycle_cc ?? null,
+              cc_category_id: b.cc_category_id || null,
+              cc_category_name: b.cc_category_name || null,
+              pms_service_id: b.pms_service_id || null,
+              quoted_service_rate: b.quoted_service_rate != null ? Number(b.quoted_service_rate) : null,
+              labor_subtotal: b.labor_subtotal != null ? Number(b.labor_subtotal) : null,
+              parts_estimate: b.parts_estimate != null ? Number(b.parts_estimate) : null,
+              additional_fees_estimate:
+                b.additional_fees_estimate != null ? Number(b.additional_fees_estimate) : null,
+              estimated_total: b.estimated_total != null ? Number(b.estimated_total) : null,
+              is_estimate_only: b.is_estimate_only ?? null,
+              rejection_reason: b.rejection_reason || null,
               estimated_labor_hours: b.estimated_labor_hours,
               actual_labor_hours: b.actual_labor_hours,
               quoted_hourly_rate: b.quoted_hourly_rate,
@@ -1845,17 +1914,75 @@ export const garageService = {
       selectedPackage?.id ||
       'repair-diag';
 
-    const isFlexible =
-      newBookingData.booking_mode === 'flexible' ||
-      newBookingData.bookingMode === 'flexible' ||
-      newBookingData.skip_downpayment === true ||
-      newBookingData.flexible === true;
+    const categoryHint = String(newBookingData.category || newBookingData.service_type || '').toUpperCase();
+    const modeHint = String(newBookingData.booking_mode || newBookingData.bookingMode || '').toLowerCase();
+    const requestedServiceIds = [
+      ...(Array.isArray(newBookingData.service_ids) ? newBookingData.service_ids : []),
+      ...(Array.isArray(newBookingData.selected_service_ids) ? newBookingData.selected_service_ids : []),
+      ...(Array.isArray(newBookingData.service_line_items)
+        ? newBookingData.service_line_items.map((row) => row.serviceId || row.pms_service_id || row.id)
+        : []),
+      newBookingData.pms_service_id,
+      newBookingData.pmsServiceId,
+      newBookingData.service_id,
+      newBookingData.serviceId,
+    ]
+      .map((id) => String(id || '').trim())
+      .filter(Boolean);
+    const uniqueServiceIds = [...new Set(requestedServiceIds)];
 
-    const pricePhp = isFlexible
-      ? Number(newBookingData.pricePhp ?? newBookingData.package_price ?? 0)
-      : newBookingData.pricePhp ||
-        selectedPackage?.pricePhp ||
-        (newBookingData.servicePrice ? newBookingData.servicePrice * 50 : 2500);
+    // Server-side multi-service quote — never trust client-submitted prices
+    let pmsQuote = null;
+    const wantsFixedCatalog =
+      uniqueServiceIds.length > 0 &&
+      (modeHint === 'pms_fixed' ||
+        categoryHint === 'PMS' ||
+        categoryHint === 'SERVICE' ||
+        Boolean(newBookingData.pms_service_id || newBookingData.service_line_items));
+
+    if (wantsFixedCatalog) {
+      const engineCc =
+        newBookingData.motorcycle_cc ??
+        newBookingData.motorcycleCc ??
+        newBookingData.engine_cc ??
+        newBookingData.engineCc;
+      pmsQuote = await pmsPricingService.quoteBookingServices({
+        engineCc,
+        serviceIds: uniqueServiceIds,
+        partsEstimate: newBookingData.parts_estimate ?? newBookingData.partsEstimate ?? 0,
+        additionalFeesEstimate:
+          newBookingData.additional_fees_estimate ?? newBookingData.additionalFeesEstimate ?? 0,
+      });
+      if (!pmsQuote?.ok) {
+        throw new Error(pmsQuote?.error || 'Unable to price the selected services for this motorcycle.');
+      }
+    }
+
+    const isPmsFixed = Boolean(pmsQuote?.ok);
+    const isFlexible =
+      !isPmsFixed &&
+      (newBookingData.booking_mode === 'flexible' ||
+        newBookingData.bookingMode === 'flexible' ||
+        newBookingData.skip_downpayment === true ||
+        newBookingData.flexible === true);
+
+    const pricePhp = isPmsFixed
+      ? Number(pmsQuote.laborSubtotal ?? pmsQuote.quotedServiceRate)
+      : isFlexible
+        ? Number(newBookingData.pricePhp ?? newBookingData.package_price ?? 0)
+        : newBookingData.pricePhp ||
+          selectedPackage?.pricePhp ||
+          (newBookingData.servicePrice ? newBookingData.servicePrice * 50 : 2500);
+
+    const resolvedServiceTitle = isPmsFixed
+      ? (pmsQuote.lineItems || []).map((l) => l.serviceName).join(', ') || pmsQuote.service?.name || serviceTitle
+      : serviceTitle;
+    const resolvedPackageId = isPmsFixed
+      ? pmsQuote.lineItems?.[0]?.serviceId || pmsQuote.service?.id
+      : packageId;
+    const serviceLineItems = isPmsFixed ? pmsQuote.lineItems || [] : [];
+    const laborSubtotal = isPmsFixed ? Number(pmsQuote.laborSubtotal || pricePhp) : null;
+    const estimatedTotal = isPmsFixed ? Number(pmsQuote.estimatedTotal || laborSubtotal) : null;
 
     // Snapshot service costs at booking time (historical P&L integrity)
     const partsCost = Number(
@@ -1890,8 +2017,9 @@ export const garageService = {
     let dueHours = Number(settings.downpaymentDueHours);
     if (!Number.isFinite(dueHours) || dueHours <= 0) dueHours = 1;
 
-    const serviceTypeForEstimate =
-      newBookingData.service_type || newBookingData.category || selectedPackage?.category || 'Other';
+    const serviceTypeForEstimate = isPmsFixed
+      ? 'PMS'
+      : newBookingData.service_type || newBookingData.category || selectedPackage?.category || 'Other';
     const estimateDefaults = getServiceEstimateDefaults(serviceTypeForEstimate);
     const settingsDpPercent = Number(settings.downpaymentPercent);
     const dpPercentFromSettings =
@@ -1899,8 +2027,8 @@ export const garageService = {
         ? settingsDpPercent
         : Number(estimateDefaults.downpaymentPercent || 20);
 
-    // When downpayment is required, due clock starts at booking time (not admin approval).
-    const shouldRequireDpNow = requireDownpayment;
+    // PMS fixed + package: downpayment can apply. Repair flexible: quote later (no DP at create).
+    const shouldRequireDpNow = requireDownpayment && !isFlexible;
 
     let downpaymentPercent = isFlexible ? 0 : 20;
     let downpaymentAmount = isFlexible
@@ -1914,8 +2042,10 @@ export const garageService = {
         ? Number(newBookingData.remaining_balance)
         : Math.max(0, pricePhp - downpaymentAmount);
     let paymentDeadline = newBookingData.payment_deadline || null;
-    let estimatedServiceTotal = Number(newBookingData.estimated_service_total || 0);
-    let initialStatus = isFlexible
+    let estimatedServiceTotal = isPmsFixed
+      ? Number(laborSubtotal || pmsQuote.laborSubtotal || 0)
+      : Number(newBookingData.estimated_service_total || 0);
+    let initialStatus = isPmsFixed || isFlexible
       ? newBookingData.status || FLEX_BOOKING_STATUS.PENDING_REVIEW
       : newBookingData.status || 'Pending';
     let downpaymentRequired = !isFlexible;
@@ -1927,18 +2057,15 @@ export const garageService = {
         : true;
     let paymentStatus = isFlexible ? 'Unpaid' : 'DOWNPAYMENT_PAID';
     let amountPaid = isFlexible ? 0 : downpaymentAmount;
-    let currentStage = isFlexible
-      ? 'Pending advisor review • No price required until inspection quotation'
-      : `20% Downpayment Verified (₱${downpaymentAmount.toLocaleString()}) • Pending Advisor Review`;
+    let currentStage = isPmsFixed
+      ? `Labor estimate ${formatPhp(pricePhp)} (${serviceLineItems.length} service${serviceLineItems.length === 1 ? '' : 's'}) • Pending admin review`
+      : isFlexible
+        ? 'Pending advisor review • No price required until inspection quotation'
+        : `20% Downpayment Verified (₱${downpaymentAmount.toLocaleString()}) • Pending Advisor Review`;
 
     if (shouldRequireDpNow) {
-      const estimateBase = isFlexible
-        ? Number(
-            newBookingData.estimated_service_total ||
-              newBookingData.pricePhp ||
-              estimateDefaults.estimatedCost ||
-              0
-          )
+      const estimateBase = isPmsFixed
+        ? Number(laborSubtotal || pmsQuote.laborSubtotal || 0)
         : Number(pricePhp || estimateDefaults.estimatedCost || 0);
       estimatedServiceTotal = estimateBase > 0 ? estimateBase : Number(estimateDefaults.estimatedCost || 2500);
       downpaymentPercent = dpPercentFromSettings;
@@ -1950,13 +2077,24 @@ export const garageService = {
       downpaymentAmount = dpCalc.downpaymentAmount;
       remainingBalance = dpCalc.remainingBalance;
       paymentDeadline = calcPaymentDeadline(new Date(), dueHours);
-      initialStatus = FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT;
-      downpaymentRequired = true;
-      downpaymentStatus = 'Required';
-      downpaymentPaid = false;
-      paymentStatus = 'Unpaid';
-      amountPaid = 0;
-      currentStage = `Downpayment ${formatPhp(downpaymentAmount)} due by ${new Date(paymentDeadline).toLocaleString()} · pay within ${dueHours} hour${dueHours === 1 ? '' : 's'} or booking cancels`;
+      // PMS fixed: stay Pending Review until admin approves, then collect DP
+      if (isPmsFixed) {
+        initialStatus = FLEX_BOOKING_STATUS.PENDING_REVIEW;
+        downpaymentRequired = true;
+        downpaymentStatus = 'Pending Approval';
+        downpaymentPaid = false;
+        paymentStatus = 'Unpaid';
+        amountPaid = 0;
+        currentStage = `PMS ${formatPhp(estimatedServiceTotal)} • Pending admin review (downpayment ${formatPhp(downpaymentAmount)} after approval)`;
+      } else {
+        initialStatus = FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT;
+        downpaymentRequired = true;
+        downpaymentStatus = 'Required';
+        downpaymentPaid = false;
+        paymentStatus = 'Unpaid';
+        amountPaid = 0;
+        currentStage = `Downpayment ${formatPhp(downpaymentAmount)} due by ${new Date(paymentDeadline).toLocaleString()} · pay within ${dueHours} hour${dueHours === 1 ? '' : 's'} or booking cancels`;
+      }
     }
 
     const downpaymentRef = !shouldRequireDpNow && !isFlexible
@@ -1968,25 +2106,37 @@ export const garageService = {
     const booking = {
       id: bookingId,
       booking_id: bookingId,
-      booking_mode: isFlexible ? 'flexible' : newBookingData.booking_mode || 'package',
+      booking_mode: isPmsFixed ? 'pms_fixed' : isFlexible ? 'flexible' : newBookingData.booking_mode || 'package',
       status: initialStatus,
       created_at: newBookingData.created_at || new Date().toISOString(),
       createdAt: newBookingData.createdAt || new Date().toISOString(),
-      mechanic: newBookingData.mechanic || 'Pending Assignment',
+      mechanic: newBookingData.mechanic || null,
       mechanic_id: newBookingData.mechanic_id || newBookingData.mechanicId || null,
       branch: newBookingData.branch || defaultBranch.name,
       branch_address: defaultBranch.address,
-      category: newBookingData.category || selectedPackage?.category || 'Repair',
-      service_type: newBookingData.service_type || newBookingData.category || selectedPackage?.category || 'Repair',
-      service_id: isFlexible ? null : packageId,
-      serviceId: isFlexible ? null : packageId,
-      package_id: isFlexible ? null : packageId,
-      package_name: serviceTitle,
+      category: isPmsFixed ? (newBookingData.category || 'Service') : newBookingData.category || selectedPackage?.category || 'Repair',
+      service_type: isPmsFixed ? (newBookingData.service_type || 'Service') : newBookingData.service_type || newBookingData.category || selectedPackage?.category || 'Repair',
+      service_id: isPmsFixed ? resolvedPackageId : isFlexible ? null : packageId,
+      serviceId: isPmsFixed ? resolvedPackageId : isFlexible ? null : packageId,
+      package_id: isPmsFixed ? resolvedPackageId : isFlexible ? null : packageId,
+      package_name: resolvedServiceTitle,
       package_price: isFlexible ? 0 : pricePhp,
+      pms_service_id: isPmsFixed ? resolvedPackageId : null,
+      service_ids: isPmsFixed ? serviceLineItems.map((l) => l.serviceId) : [],
+      service_line_items: serviceLineItems,
+      labor_subtotal: laborSubtotal,
+      parts_estimate: isPmsFixed ? Number(pmsQuote.partsEstimate || 0) : null,
+      additional_fees_estimate: isPmsFixed ? Number(pmsQuote.additionalFeesEstimate || 0) : null,
+      estimated_total: estimatedTotal,
+      is_estimate_only: isPmsFixed ? true : newBookingData.is_estimate_only ?? null,
+      motorcycle_cc: isPmsFixed ? pmsQuote.engineCc : newBookingData.motorcycle_cc ?? newBookingData.engine_cc ?? null,
+      cc_category_id: isPmsFixed ? pmsQuote.category.id : null,
+      cc_category_name: isPmsFixed ? pmsQuote.category.name : null,
+      quoted_service_rate: isPmsFixed ? laborSubtotal : null,
       included_services: includedServices,
       estimated_duration: newBookingData.estimated_duration || selectedPackage?.duration || '',
-      service_title: serviceTitle,
-      serviceName: serviceTitle,
+      service_title: resolvedServiceTitle,
+      serviceName: resolvedServiceTitle,
       servicePrice: isFlexible ? 0 : newBookingData.servicePrice || Math.round(pricePhp / 50),
       pricePhp: isFlexible ? 0 : pricePhp,
       problem_description:
@@ -2055,16 +2205,34 @@ export const garageService = {
       current_stage: currentStage,
       additional_estimates: [],
       ...newBookingData,
-      booking_mode: isFlexible ? 'flexible' : newBookingData.booking_mode || 'package',
-      package_id: isFlexible ? null : packageId,
-      package_name: serviceTitle,
+      booking_mode: isPmsFixed ? 'pms_fixed' : isFlexible ? 'flexible' : newBookingData.booking_mode || 'package',
+      package_id: isPmsFixed ? resolvedPackageId : isFlexible ? null : packageId,
+      package_name: resolvedServiceTitle,
       package_price: isFlexible ? 0 : pricePhp,
       included_services: includedServices,
-      service_id: isFlexible ? null : packageId,
-      serviceId: isFlexible ? null : packageId,
-      service_title: serviceTitle,
-      serviceName: serviceTitle,
+      service_id: isPmsFixed ? resolvedPackageId : isFlexible ? null : packageId,
+      serviceId: isPmsFixed ? resolvedPackageId : isFlexible ? null : packageId,
+      service_title: resolvedServiceTitle,
+      serviceName: resolvedServiceTitle,
       pricePhp: isFlexible ? 0 : pricePhp,
+      pms_service_id: isPmsFixed ? resolvedPackageId : newBookingData.pms_service_id || null,
+      service_ids: isPmsFixed ? serviceLineItems.map((l) => l.serviceId) : newBookingData.service_ids || [],
+      service_line_items: isPmsFixed ? serviceLineItems : newBookingData.service_line_items || [],
+      labor_subtotal: isPmsFixed ? laborSubtotal : newBookingData.labor_subtotal ?? null,
+      parts_estimate: isPmsFixed ? Number(pmsQuote.partsEstimate || 0) : newBookingData.parts_estimate ?? null,
+      additional_fees_estimate: isPmsFixed
+        ? Number(pmsQuote.additionalFeesEstimate || 0)
+        : newBookingData.additional_fees_estimate ?? null,
+      estimated_total: isPmsFixed ? estimatedTotal : newBookingData.estimated_total ?? null,
+      is_estimate_only: isPmsFixed ? true : newBookingData.is_estimate_only ?? null,
+      motorcycle_cc: isPmsFixed
+        ? pmsQuote.engineCc
+        : newBookingData.motorcycle_cc ?? newBookingData.engine_cc ?? null,
+      cc_category_id: isPmsFixed ? pmsQuote.category.id : newBookingData.cc_category_id || null,
+      cc_category_name: isPmsFixed ? pmsQuote.category.name : newBookingData.cc_category_name || null,
+      quoted_service_rate: isPmsFixed
+        ? laborSubtotal
+        : newBookingData.quoted_service_rate ?? null,
       status: initialStatus,
       downpayment_required: downpaymentRequired,
       downpayment_paid: downpaymentPaid,
@@ -2074,7 +2242,7 @@ export const garageService = {
       remaining_balance: remainingBalance,
       payment_status: paymentStatus,
       amount_paid: amountPaid,
-      payment_deadline: paymentDeadline,
+      payment_deadline: isPmsFixed && initialStatus === FLEX_BOOKING_STATUS.PENDING_REVIEW ? null : paymentDeadline,
       estimated_service_total: estimatedServiceTotal || null,
       current_stage: currentStage,
       skip_downpayment: !downpaymentRequired,
@@ -2087,33 +2255,70 @@ export const garageService = {
     this.saveLocalBookings(updated);
     dataCache.invalidateMany(bookingInvalidationKeys(bookingId, booking.customer_id));
 
-    // 2. Persist directly to Supabase
+    // 2. Persist directly to Supabase (+ service line item snapshots)
     await this.syncBookingToSupabase(booking);
+    if (isPmsFixed && serviceLineItems.length) {
+      await this.syncBookingServiceItems(bookingId, serviceLineItems, {
+        motorcycleCc: booking.motorcycle_cc,
+        ccCategoryId: booking.cc_category_id,
+        ccCategoryName: booking.cc_category_name,
+      });
+    }
 
     // 3. Push Notification to Customer
     try {
       if (notificationService?.addNotification) {
         const notifyUserId =
           booking.customer_id || newBookingData.customer_id || newBookingData.user_id || 'guest';
+        const notifEmail =
+          booking.customer_email ||
+          booking.userEmail ||
+          newBookingData.customer_email ||
+          newBookingData.userEmail;
+        const notifName =
+          booking.customer_name ||
+          booking.userName ||
+          newBookingData.customer_name ||
+          newBookingData.userName;
+        const notifCustId = booking.customer_id || newBookingData.customer_id;
+        const notifMeta = {
+          bookingId,
+          serviceTitle: booking.service_title,
+          customerEmail: notifEmail,
+          customerName: notifName,
+          customerId: notifCustId,
+        };
         if (shouldRequireDpNow && paymentDeadline) {
           notificationService.addNotification({
             user_id: notifyUserId,
+            customer_email: notifEmail,
+            customer_name: notifName,
+            customer_id: notifCustId,
             title: 'Downpayment Due — Pay Within Timeframe',
             message: `Booking #${bookingId} for ${booking.service_title} is reserved. Pay the ${formatPhp(downpaymentAmount)} downpayment by ${new Date(paymentDeadline).toLocaleString()} (${dueHours} hour${dueHours === 1 ? '' : 's'} from booking). If unpaid, your booking will be cancelled automatically.`,
             type: 'booking',
+            category: 'booking_status',
             link: 'bookings',
+            meta: notifMeta,
           });
         } else {
           notificationService.addNotification({
             user_id: notifyUserId,
+            customer_email: notifEmail,
+            customer_name: notifName,
+            customer_id: notifCustId,
             title: isFlexible
               ? 'Service Booking Submitted'
               : 'Pit Bay Booking Reserved (20% Downpayment Paid)',
-            message: isFlexible
-              ? `Your booking #${bookingId} for ${booking.service_title} was submitted for review. Pricing follows after inspection and quotation — no payment required yet.`
-              : `Your booking #${bookingId} for ${booking.service_title} is pending admin approval. ₱${downpaymentAmount.toLocaleString()} downpayment received. We'll notify you once a technician is assigned.`,
+            message: isPmsFixed
+              ? `Your PMS booking #${bookingId} for ${booking.service_title} (${formatPhp(booking.quoted_service_rate)}) was submitted for admin review.`
+              : isFlexible
+                ? `Your booking #${bookingId} for ${booking.service_title} was submitted for review. Pricing follows after inspection and quotation — no payment required yet.`
+                : `Your booking #${bookingId} for ${booking.service_title} is pending admin approval.`,
             type: 'booking',
+            category: 'booking_status',
             link: 'bookings',
+            meta: notifMeta,
           });
         }
       }
@@ -2168,28 +2373,33 @@ export const garageService = {
 
   // ─── WORKSHOP LIFECYCLE ACTIONS ───
 
-  // 1. Advisor Approves → Payment Required (flexible) or Confirmed (package legacy).
-  // Mechanic assignment happens AFTER downpayment (CONFIRMED → SCHEDULED).
+  // 1. Admin Approves → Payment Required (flexible / PMS fixed) or Confirmed (package legacy).
+  // Admin-only workflow: a mechanic is NEVER required. `mechanicName` is optional (null /
+  // 'Unassigned' / 'Pending Assignment' are all treated as "no mechanic").
   async approveBooking(bookingId, mechanicName, opts = {}) {
     const local = this.getLocalBookings().find(
       (b) => b.id === bookingId || b.booking_id === bookingId
     );
-    const flexible = isFlexibleBooking(local) || opts.flexible === true;
-    const assignedMech =
-      mechanicName && !String(mechanicName).toLowerCase().includes('pending')
-        ? mechanicName
-        : opts.mechanicName || local?.mechanic || 'Pending Assignment';
+    const isPmsFixed = isPmsFixedBooking(local);
+    const flexible = isFlexibleBooking(local) || opts.flexible === true || isPmsFixed;
+    const rawMech = mechanicName || opts.mechanicName || local?.mechanic || '';
+    const hasMechanicName =
+      rawMech && !/pending|unassigned/i.test(String(rawMech));
+    const assignedMech = hasMechanicName ? rawMech : null;
     const mechanicId = opts.mechanicId || opts.mechanic_id || local?.mechanic_id || null;
-    const hasMechanic = Boolean(mechanicId) || (assignedMech && !String(assignedMech).toLowerCase().includes('pending'));
+    const hasMechanic = Boolean(mechanicId) || Boolean(assignedMech);
 
     let patch = {
-      mechanic: assignedMech,
-      mechanic_id: mechanicId,
-      mechanic_assigned_at: hasMechanic ? new Date().toISOString() : null,
-      mechanic_assignment_status: hasMechanic ? 'assigned' : 'unassigned',
       approved_at: new Date().toISOString(),
       approved_by: opts.approvedBy || 'admin',
     };
+    // Only touch mechanic fields when one is actually provided (legacy data); never required.
+    if (hasMechanic) {
+      patch.mechanic = assignedMech;
+      patch.mechanic_id = mechanicId;
+      patch.mechanic_assigned_at = new Date().toISOString();
+      patch.mechanic_assignment_status = 'assigned';
+    }
 
     if (flexible) {
       const serviceType =
@@ -2199,12 +2409,18 @@ export const garageService = {
         local?.package_name ||
         'Other';
       const defaults = getServiceEstimateDefaults(serviceType);
+      // PMS fixed-rate: the already-quoted rate IS the service total (no estimate defaults).
+      const pmsQuotedRate = isPmsFixed
+        ? Number(local?.quoted_service_rate ?? local?.package_price ?? 0)
+        : 0;
       const estimatedCost = roundMoney(
         Number(
-          opts.estimatedServiceCost ??
-            opts.estimated_service_total ??
-            local?.estimated_service_total ??
-            defaults.estimatedCost
+          isPmsFixed && pmsQuotedRate > 0
+            ? pmsQuotedRate
+            : opts.estimatedServiceCost ??
+                opts.estimated_service_total ??
+                local?.estimated_service_total ??
+                defaults.estimatedCost
         )
       );
       const dpPercent = Number(
@@ -2252,7 +2468,9 @@ export const garageService = {
       patch = {
         ...patch,
         status: 'Confirmed',
-        current_stage: `Appointment Confirmed • Assigned to ${assignedMech}`,
+        current_stage: assignedMech
+          ? `Appointment Confirmed • Assigned to ${assignedMech}`
+          : 'Appointment Confirmed',
       };
     }
 
@@ -2264,11 +2482,30 @@ export const garageService = {
         title: flexible ? 'Booking Approved' : 'Service Booking Confirmed!',
         message: flexible
           ? `Your booking #${bookingId} was approved. Pay the ${formatPhp(patch.downpayment_amount)} downpayment by ${new Date(patch.payment_deadline).toLocaleString()} or the booking will be cancelled automatically.`
-          : `Your appointment #${bookingId} has been confirmed. Master Tech ${assignedMech} is assigned to your motorcycle. Please bring your bike on the scheduled time.`,
+          : `Your appointment #${bookingId} has been confirmed. Please bring your bike on the scheduled time.`,
         type: 'booking',
         link: 'bookings',
       });
     } catch (_e) {}
+
+    try {
+      const bookingForEmail = updated || { ...local, ...patch, booking_id: bookingId, id: bookingId };
+      await emailService.sendBookingApprovalEmail({
+        booking: bookingForEmail,
+        bookingId,
+        customerEmail: bookingForEmail.customer_email || bookingForEmail.userEmail,
+        customerName: bookingForEmail.customer_name,
+        status: patch.status,
+        downpaymentAmount: patch.downpayment_amount,
+        paymentDeadline: patch.payment_deadline,
+        serviceTitle: bookingForEmail.service_title || bookingForEmail.package_name,
+        appointmentDate: bookingForEmail.appointment_date || bookingForEmail.preferred_date,
+        timeSlot: bookingForEmail.time_slot || bookingForEmail.preferred_time,
+        branchName: bookingForEmail.branch_name || bookingForEmail.branch,
+      });
+    } catch (emailErr) {
+      console.warn('[GarageService] Booking approval email failed:', emailErr);
+    }
 
     try {
       await bookingTimelineService.append({
@@ -2296,52 +2533,14 @@ export const garageService = {
   },
 
   /**
-   * Expire unpaid downpayment bookings past payment_deadline.
-   * Releases the reserved preferred slot (status becomes terminal / cancelled).
-   * Throttled with cross-tab cache & 15m cooldown to prevent API log flooding.
+   * Local-only mirror of overdue downpayment bookings for UI responsiveness.
+   * Authoritative expiry is done by Postgres pg_cron
+   * (`expire_unpaid_downpayment_bookings`) — clients must NOT call that RPC
+   * (it was flooding Supabase API/log ingestion when every tab polled it).
    */
-  async expireUnpaidDownpayments({ now = new Date(), force = false } = {}) {
+  async expireUnpaidDownpayments({ now = new Date() } = {}) {
     const cutoff = new Date(now).getTime();
     const expired = [];
-
-    // ─── 1. THROTTLED & CACHED SUPABASE RPC (15 min cooldown across all tabs) ───
-    try {
-      const client = supabaseManager.getClient();
-      if (client) {
-        let lastStored = 0;
-        try {
-          lastStored = Number(storageAdapter.getItem(DOWNPAYMENT_EXPIRY_STORAGE_KEY)) || 0;
-        } catch (_e) {}
-        const lastCheck = Math.max(_lastDownpaymentExpiryRpcTime, lastStored);
-        const elapsed = Date.now() - lastCheck;
-
-        // Skip remote RPC if within 15-minute cooldown (unless explicitly forced)
-        if (!force && elapsed < DOWNPAYMENT_EXPIRY_COOLDOWN_MS) {
-          // Cooldown active: skip RPC to avoid high log ingestion
-        } else {
-          if (!_downpaymentExpiryRpcInFlight) {
-            _downpaymentExpiryRpcInFlight = (async () => {
-              try {
-                _lastDownpaymentExpiryRpcTime = Date.now();
-                try {
-                  storageAdapter.setItem(DOWNPAYMENT_EXPIRY_STORAGE_KEY, String(_lastDownpaymentExpiryRpcTime));
-                } catch (_e) {}
-                const { data: rpcCount, error: rpcErr } = await client.rpc('expire_unpaid_downpayment_bookings');
-                if (!rpcErr && Number(rpcCount) > 0) {
-                  try {
-                    await this.fetchBookings({ force: true });
-                  } catch (_e) {}
-                }
-                return rpcCount;
-              } finally {
-                _downpaymentExpiryRpcInFlight = null;
-              }
-            })();
-          }
-          await _downpaymentExpiryRpcInFlight;
-        }
-      }
-    } catch (_e) {}
 
     const all = this.getLocalBookings() || [];
     for (const b of all) {
@@ -2352,56 +2551,34 @@ export const garageService = {
       const deadline = b.payment_deadline ? new Date(b.payment_deadline).getTime() : null;
       if (!deadline || !Number.isFinite(deadline) || deadline > cutoff) continue;
       const id = b.booking_id || b.id;
-      const updated = await this.updateBooking(id, {
+      // Optimistic local status only — DB is updated by cron. Avoid RPC + avoid
+      // writing conflicting client patches that re-trigger API chatter.
+      const localPatch = {
+        ...b,
         status: FLEX_BOOKING_STATUS.BOOKING_EXPIRED,
         current_stage: 'Booking cancelled — downpayment deadline passed; slot released',
         cancelled_reason: 'Downpayment not paid by due date',
         downpayment_status: 'Expired',
-      });
+      };
       try {
-        await bookingTimelineService.append({
-          bookingId: id,
-          eventType: TIMELINE_EVENTS.BOOKING_CANCELLED,
-          description: 'Booking automatically cancelled — downpayment deadline missed',
-          actorRole: BOOKING_ROLES.SYSTEM,
-          fromStatus: b.status,
-          toStatus: FLEX_BOOKING_STATUS.BOOKING_EXPIRED,
-        });
+        const current = this.getLocalBookings();
+        const next = current.map((row) =>
+          String(row.id || row.booking_id) === String(id) ? { ...row, ...localPatch } : row
+        );
+        this.saveLocalBookings(next);
       } catch (_e) {}
-      try {
-        notificationService?.addNotification?.({
-          user_id: b.customer_id || b.user_id || 'guest',
-          title: 'Booking Cancelled — Downpayment Not Paid',
-          message: `Booking #${id} was automatically cancelled because you did not pay the downpayment within the allowed timeframe. Please book again if you still need service.`,
-          type: 'booking',
-          link: 'bookings',
-        });
-      } catch (_e) {}
-      expired.push(updated);
+      expired.push(localPatch);
     }
     return expired;
   },
 
-  /** Run expire sweep periodically with 15m cooldown cache while the app is open. */
-  startDownpaymentExpiryWatcher(intervalMs = 15 * 60 * 1000) {
-    if (this._downpaymentExpiryTimer) {
-      clearInterval(this._downpaymentExpiryTimer);
-      this._downpaymentExpiryTimer = null;
-    }
-    const safeInterval = Math.max(10 * 60 * 1000, Number(intervalMs) || 15 * 60 * 1000);
-    const run = () => {
-      this.expireUnpaidDownpayments().catch(() => {});
-    };
-    // Only run immediately if cooldown has already expired
-    let lastStored = 0;
-    try {
-      lastStored = Number(storageAdapter.getItem(DOWNPAYMENT_EXPIRY_STORAGE_KEY)) || 0;
-    } catch (_e) {}
-    const elapsed = Date.now() - Math.max(_lastDownpaymentExpiryRpcTime, lastStored);
-    if (elapsed >= safeInterval) {
-      run();
-    }
-    this._downpaymentExpiryTimer = setInterval(run, safeInterval);
+  /**
+   * @deprecated No-op. Expiry is cron-only to protect log ingestion quotas.
+   * Kept so older callers do not throw.
+   */
+  startDownpaymentExpiryWatcher(_intervalMs) {
+    this.stopDownpaymentExpiryWatcher();
+    return null;
   },
 
   stopDownpaymentExpiryWatcher() {
@@ -2543,6 +2720,55 @@ export const garageService = {
         user_id: local?.customer_id || local?.user_id || 'guest',
         title: 'Mechanic Assigned',
         message: `Technician ${mechName} was assigned to booking #${bookingId}.`,
+        type: 'booking',
+        link: 'bookings',
+      });
+    } catch (_e) {}
+    return updated;
+  },
+
+  /**
+   * Admin-only workflow: confirm the appointment (CONFIRMED/APPROVED → SCHEDULED)
+   * without any mechanic assignment. Optional date/time/bay overrides.
+   */
+  async scheduleAppointment(bookingId, opts = {}) {
+    const local = this.getLocalBookings().find(
+      (b) => b.id === bookingId || b.booking_id === bookingId
+    );
+    const date = opts.preferredDate || opts.date || local?.preferred_date || local?.appointment_date;
+    const time = opts.preferredTime || opts.time || local?.preferred_time || local?.time_slot;
+    const patch = {
+      status: FLEX_BOOKING_STATUS.SCHEDULED,
+      current_stage: `Scheduled${date ? ` • ${String(date).slice(0, 10)}` : ''}${time ? ` ${time}` : ''}`,
+    };
+    if (date) {
+      patch.preferred_date = String(date).slice(0, 10);
+      patch.appointment_date = String(date).slice(0, 10);
+    }
+    if (time) {
+      patch.preferred_time = time;
+      patch.time_slot = time;
+    }
+    const bay = opts.serviceBay || opts.service_bay || opts.bay;
+    if (bay) patch.service_bay = bay;
+
+    const updated = await this.updateBooking(bookingId, patch);
+    try {
+      await bookingTimelineService.append({
+        bookingId,
+        eventType: TIMELINE_EVENTS.APPOINTMENT_SCHEDULED,
+        description: `Appointment scheduled${date ? ` for ${String(date).slice(0, 10)}` : ''}`,
+        actorId: opts.scheduledBy || 'admin',
+        actorRole: BOOKING_ROLES.ADMIN,
+        fromStatus: local?.status,
+        toStatus: FLEX_BOOKING_STATUS.SCHEDULED,
+      });
+    } catch (_e) {}
+    try {
+      notificationService?.addNotification?.({
+        user_id: local?.customer_id || local?.user_id || 'guest',
+        title: 'Appointment Scheduled',
+        message: `Your appointment #${bookingId} is scheduled${date ? ` for ${String(date).slice(0, 10)}` : ''}${time ? ` (${time})` : ''}.`,
         type: 'booking',
         link: 'bookings',
       });
@@ -2699,12 +2925,20 @@ export const garageService = {
     });
 
     try {
+      const local = this.getLocalBookings().find(
+        (b) => b.id === bookingId || b.booking_id === bookingId
+      );
       notificationService?.addNotification?.({
-        user_id: 'guest',
+        user_id: local?.customer_id || local?.user_id || 'guest',
+        customer_email: local?.customer_email || local?.userEmail,
+        customer_name: local?.customer_name || local?.userName,
+        customer_id: local?.customer_id,
         title: 'Motorcycle Checked In',
-        message: `Motorcycle #${bookingId} is in Pit Bay 1. Initial technician diagnostic and multi-point inspection is underway.`,
+        message: `Motorcycle for booking #${bookingId} is in Pit Bay 1. Initial technician diagnostic and multi-point inspection is underway.`,
         type: 'booking',
+        category: 'booking_status',
         link: 'bookings',
+        meta: { bookingId, customerId: local?.customer_id, customerEmail: local?.customer_email },
       });
     } catch (_e) {}
 
@@ -2744,11 +2978,16 @@ export const garageService = {
 
     try {
       notificationService?.addNotification?.({
-        user_id: 'guest',
+        user_id: updatedBooking?.customer_id || updatedBooking?.user_id || 'guest',
+        customer_email: updatedBooking?.customer_email || updatedBooking?.userEmail,
+        customer_name: updatedBooking?.customer_name || updatedBooking?.userName,
+        customer_id: updatedBooking?.customer_id,
         title: 'Additional Work Estimate Required',
         message: `Technician discovered a necessary repair for #${bookingId}: ${estimateItem.title} (+₱${Number(estimateItem.amount || 0).toLocaleString()}). Tap to review & approve.`,
         type: 'booking',
+        category: 'booking_status',
         link: 'bookings',
+        meta: { bookingId, customerId: updatedBooking?.customer_id, customerEmail: updatedBooking?.customer_email },
       });
     } catch (_e) {}
 
@@ -2893,11 +3132,16 @@ export const garageService = {
 
     try {
       notificationService?.addNotification?.({
-        user_id: 'guest',
+        user_id: updatedBooking?.customer_id || updatedBooking?.user_id || 'guest',
+        customer_email: updatedBooking?.customer_email || updatedBooking?.userEmail,
+        customer_name: updatedBooking?.customer_name || updatedBooking?.userName,
+        customer_id: updatedBooking?.customer_id,
         title: 'Payment Received & Verified',
         message: `Payment of ₱${Number(paymentData.amount || 0).toLocaleString()} for Ticket #${bookingId} is confirmed. Official invoice receipt generated.`,
         type: 'booking',
+        category: 'booking_status',
         link: 'bookings',
+        meta: { bookingId, customerId: updatedBooking?.customer_id, customerEmail: updatedBooking?.customer_email },
       });
     } catch (_e) {}
 
@@ -2956,11 +3200,16 @@ export const garageService = {
 
     try {
       notificationService?.addNotification?.({
-        user_id: 'guest',
+        user_id: updatedBooking?.customer_id || updatedBooking?.user_id || 'guest',
+        customer_email: updatedBooking?.customer_email || updatedBooking?.userEmail,
+        customer_name: updatedBooking?.customer_name || updatedBooking?.userName,
+        customer_id: updatedBooking?.customer_id,
         title: 'Motorcycle Released • Safe Riding!',
         message: `Ticket #${bookingId} is closed. Your Service Report and Next PMS Reminder (${updatedBooking?.next_pms_due?.date}) have been filed in your profile.`,
         type: 'booking',
+        category: 'booking_status',
         link: 'bookings',
+        meta: { bookingId, customerId: updatedBooking?.customer_id, customerEmail: updatedBooking?.customer_email },
       });
     } catch (_e) {}
 
@@ -3292,12 +3541,23 @@ export const garageService = {
       if (notificationService?.addNotification) {
         notificationService.addNotification({
           user_id: updatedBooking?.customer_id || 'guest',
+          customer_email: updatedBooking?.customer_email || updatedBooking?.userEmail,
+          customer_name: updatedBooking?.customer_name || updatedBooking?.userName,
+          customer_id: updatedBooking?.customer_id,
           title: noChargeCancel ? 'Service Request Cancelled' : 'Pit Bay Booking Cancelled (Downpayment Forfeited)',
           message: noChargeCancel
             ? `Your service request #${bookingId} has been cancelled. No payment was charged.`
             : `Your appointment #${bookingId} has been cancelled. In accordance with our anti-fake booking policy, the advance downpayment is non-refundable.`,
           type: 'booking',
+          category: 'booking_cancelled',
           link: 'bookings',
+          meta: {
+            bookingId,
+            serviceTitle: updatedBooking?.service_title,
+            customerId: updatedBooking?.customer_id,
+            customerEmail: updatedBooking?.customer_email || updatedBooking?.userEmail,
+            customerName: updatedBooking?.customer_name || updatedBooking?.userName,
+          },
         });
       }
       if (notificationService?.notifyAdminBookingCancelled) {

@@ -57,89 +57,11 @@ export const MOTORCYCLE_PHOTO_PRESETS = [
   },
 ];
 
-const DEFAULT_SEED_MOTORCYCLES = [
-  {
-    motorcycle_id: 'moto-seed-01',
-    user_id: 'usr-customer-01',
-    customer_id: 'cust-01',
-    brand: 'Yamaha',
-    model: 'NMAX 155 Connected',
-    year: 2023,
-    plate_number: 'NM-4892',
-    engine_cc: 155,
-    color: 'Matte Dark Bluish Gray',
-    odometer: '12,400 km',
-    vin_number: 'MH3SG3320PJ01982',
-    nickname: 'Blue Hornet (Daily Commuter)',
-    photo_url: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
-    is_primary: true,
-    notes: 'Stage 1 CVT tuning, Pirelli Angel Scooter tires installed.',
-    created_at: new Date(Date.now() - 30 * 86400000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    motorcycle_id: 'moto-seed-02',
-    user_id: 'usr-customer-01',
-    customer_id: 'cust-01',
-    brand: 'Kawasaki',
-    model: 'Ninja ZX-6R 636',
-    year: 2024,
-    plate_number: 'ZX-6360',
-    engine_cc: 636,
-    color: 'KRT Lime Green / Ebony',
-    odometer: '4,850 km',
-    vin_number: 'JKAZX4J10PA04812',
-    nickname: 'Green Goblin (Weekend Track)',
-    photo_url: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=800&q=80',
-    is_primary: false,
-    notes: 'Akrapovič slip-on exhaust, Quickshifter calibrated for track days.',
-    created_at: new Date(Date.now() - 15 * 86400000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    motorcycle_id: 'moto-seed-03',
-    user_id: 'usr-customer-01',
-    customer_id: 'cust-01',
-    brand: 'Honda',
-    model: 'Click 160',
-    year: 2024,
-    plate_number: 'CL-1609',
-    engine_cc: 160,
-    color: 'Pearl Smoky Gray',
-    odometer: '2,800 km',
-    vin_number: 'MH3SG3320PJ01983',
-    nickname: 'Silver Bullet',
-    photo_url: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
-    is_primary: false,
-    notes: 'Stock city scooter with top box rack.',
-    created_at: new Date(Date.now() - 10 * 86400000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  {
-    motorcycle_id: 'moto-seed-04',
-    user_id: 'usr-customer-01',
-    customer_id: 'cust-01',
-    brand: 'Vespa',
-    model: 'Sprint 150 TFT',
-    year: 2023,
-    plate_number: 'VP-1502',
-    engine_cc: 155,
-    color: 'Bronze Antico Matte',
-    odometer: '5,120 km',
-    vin_number: 'MH3SG3320PJ01984',
-    nickname: 'Bella Vespa',
-    photo_url: 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=800&q=80',
-    is_primary: false,
-    notes: 'Zelioni accessories, Bitubo suspension.',
-    created_at: new Date(Date.now() - 5 * 86400000).toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-];
-
 class MotorcycleService {
   constructor() {
     this.listeners = new Set();
     this.motorcycles = this._loadLocal();
+    this._syncPromise = null;
     // Background sync on init
     this.syncFromSupabase();
   }
@@ -183,36 +105,47 @@ class MotorcycleService {
   }
 
   async syncFromSupabase(userId, customerEmail) {
-    try {
-      const client = supabaseManager.getClient();
-      if (!client) return this.motorcycles;
+    if (this._syncPromise) return this._syncPromise;
 
-      let query = client
-        .from('customer_motorcycles')
-        .select(
-          'motorcycle_id,user_id,customer_id,customer_email,brand,model,year,plate_number,engine_cc,color,odometer,vin_number,nickname,is_primary,notes,created_at,updated_at,photo_url'
-        )
-        .order('is_primary', { ascending: false })
-        .order('created_at', { ascending: false });
+    this._syncPromise = (async () => {
+      try {
+        const client = supabaseManager.getClient();
+        if (!client) return this.motorcycles;
 
-      if (userId && customerEmail) {
-        query = query.or(`user_id.eq.${userId},customer_email.eq.${customerEmail}`);
-      } else if (userId) {
-        query = query.eq('user_id', userId);
-      } else if (customerEmail) {
-        query = query.eq('customer_email', customerEmail);
+        let query = client
+          .from('customer_motorcycles')
+          .select(
+            'motorcycle_id,user_id,customer_id,customer_email,brand,model,year,plate_number,engine_cc,color,odometer,vin_number,nickname,is_primary,notes,created_at,updated_at,photo_url'
+          )
+          .order('is_primary', { ascending: false })
+          .order('created_at', { ascending: false });
+
+        if (userId && customerEmail) {
+          query = query.or(`user_id.eq.${userId},customer_email.eq.${customerEmail}`);
+        } else if (userId) {
+          query = query.eq('user_id', userId);
+        } else if (customerEmail) {
+          query = query.eq('customer_email', customerEmail);
+        }
+
+        const { data, error } = await query;
+
+        if (!error && Array.isArray(data)) {
+          const hasChanged = JSON.stringify(this.motorcycles) !== JSON.stringify(data);
+          if (hasChanged) {
+            this._saveLocal(data);
+          }
+          return data;
+        }
+      } catch (_e) {
+        // Offline fallback is already active
+      } finally {
+        this._syncPromise = null;
       }
+      return this.motorcycles;
+    })();
 
-      const { data, error } = await query;
-
-      if (!error && Array.isArray(data)) {
-        this._saveLocal(data);
-        return data;
-      }
-    } catch (_e) {
-      // Offline fallback is already active
-    }
-    return this.motorcycles;
+    return this._syncPromise;
   }
 
   /**

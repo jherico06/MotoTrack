@@ -8,6 +8,9 @@ import {
   StyleSheet,
   useWindowDimensions,
   Platform,
+  Modal,
+  TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -19,7 +22,7 @@ import {
   BrandLogo,
   NotificationDropdown,
 } from '../../../components/common';
-import { LiveOrderTrackingMapModal, ProductSpecsModal, CartModal, CheckoutModal } from '../../../components/modals';
+import { LiveOrderTrackingMapModal, ProductSpecsModal, CartModal, CheckoutModal, BookInstallationModal } from '../../../components/modals';
 import { createWishlistWebStyles, wishlistWebStyles } from '../../../styles/web/wishlistPage.web.styles.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useCart } from '../../../context/CartContext.jsx';
@@ -27,10 +30,12 @@ import { useWishlist } from '../../../context/WishlistContext.jsx';
 import { useTheme } from '../../../context/ThemeContext.jsx';
 import { resolveReorderLevel } from '../../../utils/inventoryHelpers.js';
 import { notificationService } from '../../../services/notifications/notificationService.js';
-import { MOTOR_PARTS } from '../../../data/motorParts.js';
 import { productService } from '../../../services/products/productService.js';
 import { orderService } from '../../../services/orders/orderService.js';
 import { productHasCustomerRatings } from '../../../utils/productCatalog.js';
+import { aiCustomizerService } from '../../../services/ai/aiCustomizerService.js';
+import { GARAGE_BRANCHES, TIME_SLOTS } from '../../../services/bookings/garageService.js';
+import { promoService } from '../../../services/products/promoService.js';
 
 export default function WishlistPageWeb({
   onNavigateToStore,
@@ -50,26 +55,42 @@ export default function WishlistPageWeb({
   const { isDarkMode, toggleDarkMode } = useTheme();
   const wStyles = useMemo(() => createWishlistWebStyles(isDarkMode), [isDarkMode]);
   const { addToCart, showToast, toastMessage, cartItemCount } = useCart();
-  const { wishlist, toggleWishlist, clearWishlist, wishlistCount } = useWishlist();
+  const {
+    wishlist,
+    toggleWishlist,
+    clearWishlist,
+    wishlistCount,
+    customizations,
+    removeCustomizationFromWishlist,
+  } = useWishlist();
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [bookingTarget, setBookingTarget] = useState(null);
+  const [bookingBranch, setBookingBranch] = useState(
+    () => GARAGE_BRANCHES?.[0]?.name || "D'Blockchain Motorparts"
+  );
+  const [bookingTimeSlot, setBookingTimeSlot] = useState(() => TIME_SLOTS?.[1] || '10:30 AM - 12:00 PM');
+  const [bookingPhone, setBookingPhone] = useState('');
+  const [bookingNotes, setBookingNotes] = useState('');
+  const [bookingBusy, setBookingBusy] = useState(false);
+  const [bookingFreeInstall, setBookingFreeInstall] = useState(null);
 
   const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
-    currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
+    currentUser ? notificationService.getUnreadCount(currentUser) : 0
   );
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
       setUnreadNotifCount(
-        currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
+        currentUser ? notificationService.getUnreadCount(currentUser) : 0
       );
     });
     return () => unsub?.();
-  }, [currentUser]);
+  }, [currentUser?.id, currentUser?.customer_id, currentUser?.email]);
 
-  const [catalogProducts, setCatalogProducts] = useState(MOTOR_PARTS);
+  const [catalogProducts, setCatalogProducts] = useState([]);
   const [selectedProductForSpecs, setSelectedProductForSpecs] = useState(null);
   const [isSpecsOpen, setIsSpecsOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
@@ -86,9 +107,83 @@ export default function WishlistPageWeb({
     return () => unsubscribe();
   }, []);
 
-  const prods = Array.isArray(catalogProducts) ? catalogProducts : MOTOR_PARTS;
+  const prods = Array.isArray(catalogProducts) ? catalogProducts : [];
   const wishlistedProducts = prods.filter((p) => Boolean(wishlist?.[p.id]));
+  const aiInstalls = Array.isArray(customizations) ? customizations : [];
   const totalWishlistValue = wishlistedProducts.reduce((sum, p) => sum + Number(p.price || 0), 0);
+  const isWishlistEmpty = wishlistedProducts.length === 0 && aiInstalls.length === 0;
+
+  const openInstallBooking = async (entry) => {
+    if (!currentUser) {
+      setRedirectReason?.('Please sign in to book installation.');
+      onNavigateToLogin?.();
+      return;
+    }
+    setBookingTarget(entry);
+    setBookingPhone(currentUser?.phone || '');
+    setBookingNotes('');
+    const pids = (entry.productIds || []).map(String);
+    try {
+      const match = await promoService.findApplicableFreeInstallation(pids);
+      setBookingFreeInstall(match);
+    } catch {
+      setBookingFreeInstall(null);
+    }
+  };
+
+  const confirmInstallBooking = async () => {
+    if (!bookingTarget) return;
+    if (!bookingPhone.trim()) {
+      showToast('Please enter your contact phone number');
+      return;
+    }
+    setBookingBusy(true);
+    try {
+      const moto = bookingTarget.motorcycle || {};
+      const selectedParts = (bookingTarget.items || [])
+        .map((it) => ({
+          id: it.productId || it.product_id || it.id,
+          product_id: it.productId || it.product_id || it.id,
+          name: it.name || it.product_name,
+          price: Number(it.price) || 0,
+          brand: it.brand || '',
+        }))
+        .filter((p) => p.id);
+
+      const booking = await aiCustomizerService.bookCustomizationService({
+        customizationData: {
+          customizationId: bookingTarget.customizationId || bookingTarget.id,
+          bikeName:
+            bookingTarget.name ||
+            [moto.brand, moto.model].filter(Boolean).join(' ') ||
+            'Motorcycle',
+          bikeBrand: moto.brand || 'Motorcycle',
+          bikeModel: moto.model || '',
+          motorcycleId: moto.motorcycle_id || moto.motorcycleId || null,
+          selectedParts,
+          partsTotalUsd: selectedParts.reduce((s, p) => s + Number(p.price || 0), 0),
+          generatedImage: bookingTarget.previewImageUrl,
+        },
+        branchName: bookingBranch,
+        appointmentDate: 'Tomorrow',
+        timeSlot: bookingTimeSlot,
+        customerName: currentUser?.name || 'Rider',
+        customerPhone: bookingPhone.trim(),
+        plateNumber: moto.plate_number || 'Pending Plate',
+        notes: bookingNotes,
+        currentUser,
+      });
+
+      setBookingTarget(null);
+      const feeMsg = booking?.installationFeeWaived ? ' Free installation applied!' : '';
+      showToast(`🏁 Installation booked! Ticket #${booking?.id || booking?.booking_id}.${feeMsg}`);
+      onNavigateToGarage?.();
+    } catch (err) {
+      showToast(err?.message || 'Could not book installation.');
+    } finally {
+      setBookingBusy(false);
+    }
+  };
 
   const handleMoveAllToCart = () => {
     if (wishlistedProducts.length === 0) return;
@@ -120,8 +215,14 @@ export default function WishlistPageWeb({
       <StatusBar style={isDarkMode ? "light" : "dark"} />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── RESPONSIVE TOP STICKY NAVBAR ─── */}
-      <View style={wStyles.headerWrapper}>
+      {/* ─── FULL-HEIGHT WISHLIST SCROLLVIEW (Scrollbar extends through header from top: 0) ─── */}
+      <ScrollView
+        style={{ flex: 1, width: '100%' }}
+        contentContainerStyle={wStyles.scrollContent}
+        showsVerticalScrollIndicator={true}
+      >
+        {/* ─── RESPONSIVE TOP STICKY NAVBAR (Pinned at top: 0, does not scroll away) ─── */}
+        <View style={wStyles.headerWrapper}>
         <View style={[wStyles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
           {/* Left: Logo */}
           <View style={wStyles.headerLeft}>
@@ -252,15 +353,15 @@ export default function WishlistPageWeb({
                   width: 42,
                   height: 42,
                   borderRadius: 21,
-                  backgroundColor: 'rgba(29, 69, 51, 0.4)',
-                  borderWidth: 1,
-                  borderColor: '#1D4533',
+                  backgroundColor: 'transparent',
+                  borderWidth: 0,
+                  borderColor: 'transparent',
                 }}
                 onPress={() => onNavigateToAdmin?.()}
                 activeOpacity={0.8}
                 title="Admin Panel"
               >
-                <BootstrapIcon name="shield-lock-fill" size={16} color="#56B9A1" />
+                <BootstrapIcon name="shield-lock-fill" size={16} color="#EA580C" />
               </TouchableOpacity>
             )}
 
@@ -318,18 +419,18 @@ export default function WishlistPageWeb({
       </View>
 
       {/* ─── WISHLIST CONTENT ─── */}
-      <ScrollView contentContainerStyle={wStyles.scrollContent} showsVerticalScrollIndicator={true}>
-        <View style={wStyles.maxContainer}>
+      <View style={wStyles.maxContainer}>
           {/* Top Title & Batch Actions Bar */}
           <View style={wStyles.actionBar}>
             <View>
               <Text style={wStyles.pageTitle}>Saved Performance Wishlist</Text>
               <Text style={wStyles.pageSub}>
-                {wishlistedProducts.length} items saved • Total Value: ₱{Number(totalWishlistValue || 0).toFixed(2)}
+                {wishlistCount} saved • {aiInstalls.length} AI installs • Parts value: ₱
+                {Number(totalWishlistValue || 0).toFixed(2)}
               </Text>
             </View>
 
-            {wishlistedProducts.length > 0 && (
+            {!isWishlistEmpty && (
               <View style={wStyles.actionBtnsGroup}>
                 <TouchableOpacity
                   style={wStyles.clearWishlistBtn}
@@ -343,36 +444,174 @@ export default function WishlistPageWeb({
                   <Text style={wStyles.clearWishlistBtnText}>Clear List</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={wStyles.moveAllBtn}
-                  onPress={handleMoveAllToCart}
-                  activeOpacity={0.85}
-                >
-                  <BootstrapIcon name="cart-check-fill" size={14} color="#FFFFFF" />
-                  <Text style={wStyles.moveAllBtnText}>Move All to Cart</Text>
-                </TouchableOpacity>
+                {wishlistedProducts.length > 0 ? (
+                  <TouchableOpacity
+                    style={wStyles.moveAllBtn}
+                    onPress={handleMoveAllToCart}
+                    activeOpacity={0.85}
+                  >
+                    <BootstrapIcon name="cart-check-fill" size={14} color="#FFFFFF" />
+                    <Text style={wStyles.moveAllBtnText}>Move All to Cart</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
             )}
           </View>
 
+          {/* AI Installation Previews */}
+          {aiInstalls.length > 0 ? (
+            <View style={{ marginBottom: 28 }}>
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: '800',
+                  color: isDarkMode ? '#E2E8F0' : '#0F172A',
+                  marginBottom: 6,
+                }}
+              >
+                AI Installation Previews
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12.5,
+                  color: isDarkMode ? '#94A3B8' : '#64748B',
+                  marginBottom: 14,
+                }}
+              >
+                Saved from Install Studio — book shop installation for these builds.
+              </Text>
+              <View style={wStyles.productGrid}>
+                {aiInstalls.map((entry) => (
+                  <View
+                    key={entry.id || entry.customizationId}
+                    style={[wStyles.productCard, { width: cardWidth }]}
+                  >
+                    <View style={wStyles.productImgWrap}>
+                      {entry.previewImageUrl ? (
+                        <Image
+                          source={{ uri: entry.previewImageUrl }}
+                          style={wStyles.productImg}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            flex: 1,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            backgroundColor: '#F1F5F9',
+                          }}
+                        >
+                          <BootstrapIcon name="image" size={28} color="#94A3B8" />
+                        </View>
+                      )}
+                      <TouchableOpacity
+                        style={wStyles.removeFavBtn}
+                        onPress={() => {
+                          removeCustomizationFromWishlist(entry.id || entry.customizationId);
+                          showToast('Removed AI preview from wishlist.');
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <BootstrapIcon name="heart-fill" size={13} color="#EF4444" />
+                      </TouchableOpacity>
+                      <View
+                        style={{
+                          position: 'absolute',
+                          left: 8,
+                          bottom: 8,
+                          backgroundColor: 'rgba(29,69,51,0.92)',
+                          borderRadius: 6,
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                        }}
+                      >
+                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>
+                          AI INSTALL
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={wStyles.productDetails}>
+                      <Text style={wStyles.productName} numberOfLines={2}>
+                        {entry.name || entry.title || 'AI Installation Preview'}
+                      </Text>
+                      <Text
+                        style={{ fontSize: 11, color: '#64748B', marginBottom: 8 }}
+                        numberOfLines={1}
+                      >
+                        {(entry.items || []).map((i) => i.name).filter(Boolean).join(', ') ||
+                          'Custom part install'}
+                      </Text>
+                      <TouchableOpacity
+                        style={wStyles.addToCartBtn}
+                        onPress={() => openInstallBooking(entry)}
+                        activeOpacity={0.85}
+                      >
+                        <BootstrapIcon name="calendar-check" size={13} color="#FFFFFF" />
+                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>
+                          Book Installation
+                        </Text>
+                      </TouchableOpacity>
+                      {(entry.productIds || []).length > 0 ? (
+                        <TouchableOpacity
+                          style={{
+                            marginTop: 8,
+                            borderWidth: 1,
+                            borderColor: '#EA580C',
+                            borderRadius: 8,
+                            paddingVertical: 8,
+                            alignItems: 'center',
+                          }}
+                          onPress={() => {
+                            const first = prods.find((p) =>
+                              (entry.productIds || []).includes(String(p.id))
+                            );
+                            if (first) handleAddToCartSingle(first);
+                            else showToast('Part added via Install Studio wishlist.');
+                          }}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={{ color: '#EA580C', fontSize: 12, fontWeight: '700' }}>
+                            Add Part to Cart
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
           {/* Grid or Empty View */}
-          {wishlistedProducts.length === 0 ? (
+          {isWishlistEmpty ? (
             <View style={wStyles.emptyBox}>
               <BootstrapIcon name="heart" size={42} color="#94A3B8" />
               <Text style={wStyles.emptyTitle}>Your Wishlist is Empty</Text>
               <Text style={wStyles.emptySub}>
-                Browse our high-performance racing parts catalog and tap the heart icon to save items.
+                Save catalog parts with the heart icon, or save AI installation previews from Install
+                Studio.
               </Text>
-              <TouchableOpacity
-                style={wStyles.exploreStoreBtn}
-                onPress={() => onNavigateToStore?.()}
-                activeOpacity={0.85}
-              >
-                <BootstrapIcon name="cart-plus-fill" size={14} color="#FFFFFF" />
-                <Text style={wStyles.exploreStoreBtnText}>Explore Performance Gear</Text>
-              </TouchableOpacity>
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
+                <TouchableOpacity
+                  style={wStyles.exploreStoreBtn}
+                  onPress={() => onNavigateToStore?.()}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="cart-plus-fill" size={14} color="#FFFFFF" />
+                  <Text style={wStyles.exploreStoreBtnText}>Explore Parts</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[wStyles.exploreStoreBtn, { backgroundColor: '#0F172A' }]}
+                  onPress={() => onNavigateToCustomizer?.() || onNavigateToCustomize?.()}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="stars" size={14} color="#FFFFFF" />
+                  <Text style={wStyles.exploreStoreBtnText}>Open Install Studio</Text>
+                </TouchableOpacity>
+              </View>
             </View>
-          ) : (
+          ) : wishlistedProducts.length > 0 ? (
             <View style={wStyles.productGrid}>
               {wishlistedProducts.map((product) => (
                 <TouchableOpacity
@@ -429,7 +668,7 @@ export default function WishlistPageWeb({
                     <View style={wStyles.priceRow} className="flex flex-row items-baseline gap-1.5 mb-1.5">
                       <Text
                         style={wStyles.priceMainText}
-                        className="text-[15px] font-extrabold text-[#1D4533]"
+                        className="text-[15px] font-extrabold text-[#EA580C]"
                       >
                         ₱{Number(product.price || 0).toFixed(2)}
                       </Text>
@@ -495,7 +734,7 @@ export default function WishlistPageWeb({
                     {/* Add to Cart Button with matching App Solid Teal style */}
                     <TouchableOpacity
                       style={wStyles.addToCartBtn}
-                      className="bg-[#1D4533] hover:bg-[#094e46] rounded-lg py-2 flex flex-row items-center justify-center gap-1.5 mt-1.5 transition-colors cursor-pointer"
+                      className="bg-[#EA580C] hover:bg-[#094e46] rounded-lg py-2 flex flex-row items-center justify-center gap-1.5 mt-1.5 transition-colors cursor-pointer"
                       onPress={(e) => {
                         e?.stopPropagation?.();
                         handleAddToCartSingle(product);
@@ -511,9 +750,37 @@ export default function WishlistPageWeb({
                 </TouchableOpacity>
               ))}
             </View>
-          )}
+          ) : null}
         </View>
       </ScrollView>
+
+      {/* Book Installation from AI wishlist preview */}
+      <BookInstallationModal
+        visible={Boolean(bookingTarget)}
+        onClose={() => !bookingBusy && setBookingTarget(null)}
+        previewImageUri={bookingTarget?.previewImageUrl || bookingTarget?.preview_image_url}
+        motorcycle={bookingTarget?.motorcycle}
+        bikeTitle={
+          bookingTarget?.motorcycle
+            ? `${bookingTarget.motorcycle.brand || ''} ${bookingTarget.motorcycle.model || ''}`.trim()
+            : ''
+        }
+        serviceName={bookingTarget?.name || bookingTarget?.title || 'AI Custom Installation'}
+        laborFeePhp={3250}
+        freeInstallPromo={bookingFreeInstall}
+        branches={GARAGE_BRANCHES}
+        selectedBranch={bookingBranch}
+        onSelectBranch={setBookingBranch}
+        timeSlots={TIME_SLOTS}
+        selectedTimeSlot={bookingTimeSlot}
+        onSelectTimeSlot={setBookingTimeSlot}
+        phone={bookingPhone}
+        onChangePhone={setBookingPhone}
+        notes={bookingNotes}
+        onChangeNotes={setBookingNotes}
+        onConfirm={confirmInstallBooking}
+        busy={bookingBusy}
+      />
 
       {/* Specs Modal */}
       <ProductSpecsModal
@@ -559,12 +826,19 @@ export default function WishlistPageWeb({
           onTabChange={(tab) => {
             if (tab === 'Home') {
               onNavigateToStore?.();
+            } else if (tab === 'Services') {
+              onNavigateToGarage?.();
             } else if (tab === 'Customize') {
               if (onNavigateToCustomizer) onNavigateToCustomizer();
               else if (onNavigateToCustomize) onNavigateToCustomize();
               else onNavigateToStore?.();
             } else if (tab === 'Garage') {
-              onNavigateToGarage?.();
+              if (!currentUser) {
+                setRedirectReason?.('Please sign in to access your motorcycle garage fleet.');
+                onNavigateToLogin?.();
+              } else {
+                onNavigateToProfile?.('garage');
+              }
             } else if (tab === 'Orders') {
               onNavigateToOrders?.();
             } else if (tab === 'Wishlist' || tab === 'Favorites') {

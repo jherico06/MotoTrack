@@ -9,9 +9,32 @@ import {
   Platform,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import Skeleton, { StatCardSkeleton } from '../common/Skeleton.jsx';
 import RevenueTrendChart from './RevenueTrendChart.jsx';
 import BookingCategoryPieChart from './BookingCategoryPieChart.jsx';
 import excelService from '../../services/inventory/excelService.js';
+import {
+  computeWeeklyKpiSeries,
+  isRecognizedSalesOrder,
+  recognizedOrderAmount,
+} from '../../services/inventory/dashboardInsightsService.js';
+
+function parseLocalDay(value, endOfDay = false) {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const year = Number(match[1]);
+    const month = Number(match[2]) - 1;
+    const day = Number(match[3]);
+    if (month < 0 || month > 11 || day < 1 || day > 31) return null;
+    return endOfDay
+      ? new Date(year, month, day, 23, 59, 59, 999)
+      : new Date(year, month, day, 0, 0, 0, 0);
+  }
+  const parsed = new Date(raw);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 const CATEGORY_NAMES = [
   'Engine & Transmission',
@@ -93,37 +116,37 @@ export default function SalesAnalyticsPanel({
   const theme = useMemo(() => {
     if (isDarkMode) {
       return {
-        bg: '#0F1412',
-        cardBg: '#151C19',
-        cardBgSub: '#1A2320',
-        border: '#26332E',
-        borderInput: '#2F3F39',
+        bg: '#181A1D',
+        cardBg: '#24272B',
+        cardBgSub: '#1E2124',
+        border: '#374151',
+        borderInput: '#374151',
         textPrimary: '#F8FAFC',
         textMuted: '#94A3B8',
-        brandGreen: '#4DB896',
-        brandGreenDark: '#1F6B52',
-        brandGreenLight: '#10B981',
+        brandGreen: '#EA580C',
+        brandGreenDark: '#EA580C',
+        brandGreenLight: '#FB923C',
         cardShadow: '0 2px 6px rgba(0, 0, 0, 0.35)',
-        chipBg: '#1A2320',
-        progressTrack: '#26332E',
+        chipBg: '#1E2124',
+        progressTrack: '#374151',
         statusGreenBg: 'rgba(16, 185, 129, 0.15)',
         statusGreenText: '#34D399',
       };
     }
     return {
-      bg: '#F8FAFC',
+      bg: '#F3F4F6',
       cardBg: '#FFFFFF',
-      cardBgSub: '#F8FAFC',
-      border: '#E2E8F0',
+      cardBgSub: '#F9FAFB',
+      border: '#E5E7EB',
       borderInput: '#CBD5E1',
       textPrimary: '#0F172A',
       textMuted: '#64748B',
-      brandGreen: '#1D4533',
-      brandGreenDark: '#107C41',
-      brandGreenLight: '#059669',
+      brandGreen: '#EA580C',
+      brandGreenDark: '#EA580C',
+      brandGreenLight: '#FB923C',
       cardShadow: '0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03)',
       chipBg: '#F1F5F9',
-      progressTrack: '#F1F5F9',
+      progressTrack: '#E5E7EB',
       statusGreenBg: '#ECFDF5',
       statusGreenText: '#065F46',
     };
@@ -137,41 +160,45 @@ export default function SalesAnalyticsPanel({
 
     const now = new Date();
 
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
     if (globalPeriod === 'today') {
-      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       return all.filter((o) => {
         const raw = o.created_at || o.order_date || o.date;
-        if (!raw) return true;
+        if (!raw) return false;
         const d = new Date(raw);
         return d >= startOfToday;
       });
     }
 
     if (globalPeriod === '7D') {
-      const past7 = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const past7 = new Date(startOfToday);
+      past7.setDate(past7.getDate() - 6);
       return all.filter((o) => {
         const raw = o.created_at || o.order_date || o.date;
-        if (!raw) return true;
+        if (!raw) return false;
         const d = new Date(raw);
         return d >= past7;
       });
     }
 
     if (globalPeriod === '30D') {
-      const past30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const past30 = new Date(startOfToday);
+      past30.setDate(past30.getDate() - 29);
       return all.filter((o) => {
         const raw = o.created_at || o.order_date || o.date;
-        if (!raw) return true;
+        if (!raw) return false;
         const d = new Date(raw);
         return d >= past30;
       });
     }
 
     if (globalPeriod === '3M') {
-      const past90 = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+      const past90 = new Date(startOfToday);
+      past90.setMonth(past90.getMonth() - 3);
       return all.filter((o) => {
         const raw = o.created_at || o.order_date || o.date;
-        if (!raw) return true;
+        if (!raw) return false;
         const d = new Date(raw);
         return d >= past90;
       });
@@ -181,7 +208,7 @@ export default function SalesAnalyticsPanel({
       const { start, end } = appliedCustomRange;
       return all.filter((o) => {
         const raw = o.created_at || o.order_date || o.date;
-        if (!raw) return true;
+        if (!raw) return false;
         const d = new Date(raw);
         if (start && d < start) return false;
         if (end && d > end) return false;
@@ -206,9 +233,8 @@ export default function SalesAnalyticsPanel({
   };
 
   const handleApplyCustomRange = () => {
-    const s = customStartDate ? new Date(customStartDate) : null;
-    const e = customEndDate ? new Date(customEndDate) : null;
-    if (e) e.setHours(23, 59, 59, 999);
+    const s = parseLocalDay(customStartDate, false);
+    const e = parseLocalDay(customEndDate, true);
     setAppliedCustomRange({ start: s, end: e });
     setIsPeriodDropdownOpen(false);
   };
@@ -217,22 +243,13 @@ export default function SalesAnalyticsPanel({
   const analyticsData = useMemo(() => {
     // If the filtered order set is empty due to a restrictive period filter,
     // we strictly respect that (no fabricated metrics).
-    const orderList = filteredOrders;
+    const orderList = filteredOrders.filter(isRecognizedSalesOrder);
     const posOrders = orderList.filter((o) => o.channel === 'POS (In-Store)');
     const onlineOrders = orderList.filter((o) => o.channel !== 'POS (In-Store)');
 
-    const totalRevenue = orderList.reduce(
-      (sum, o) => sum + (Number(o.grand_total) || Number(o.total_amount) || 0),
-      0
-    );
-    const posRevenue = posOrders.reduce(
-      (sum, o) => sum + (Number(o.grand_total) || Number(o.total_amount) || 0),
-      0
-    );
-    const onlineRevenue = onlineOrders.reduce(
-      (sum, o) => sum + (Number(o.grand_total) || Number(o.total_amount) || 0),
-      0
-    );
+    const totalRevenue = orderList.reduce((sum, o) => sum + recognizedOrderAmount(o), 0);
+    const posRevenue = posOrders.reduce((sum, o) => sum + recognizedOrderAmount(o), 0);
+    const onlineRevenue = onlineOrders.reduce((sum, o) => sum + recognizedOrderAmount(o), 0);
 
     const aov = orderList.length > 0 ? totalRevenue / orderList.length : 0;
     const totalItemsSold = orderList.reduce(
@@ -317,52 +334,10 @@ export default function SalesAnalyticsPanel({
     if (chartPeriod === '4W') periodsCount = 4;
     else if (chartPeriod === '24W') periodsCount = 24;
 
-    const weekBuckets = new Map();
-    const now = new Date();
-    for (let i = periodsCount - 1; i >= 0; i -= 1) {
-      const d = new Date(
-        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i * 7)
-      );
-      const day = d.getUTCDay();
-      const diff = day === 0 ? -6 : 1 - day;
-      d.setUTCDate(d.getUTCDate() + diff);
-      const key = `${d.getUTCFullYear()}-W${String(
-        Math.floor(
-          (d - new Date(Date.UTC(d.getUTCFullYear(), 0, 1))) /
-            (7 * 24 * 60 * 60 * 1000)
-        ) + 1
-      ).padStart(2, '0')}`;
-      weekBuckets.set(key, 0);
-    }
-
-    // Chart trend reflects orders within the selected chart window
-    const baseOrdersForChart = orders || [];
-    baseOrdersForChart.forEach((o) => {
-      const raw = o.created_at || o.order_date;
-      if (!raw) return;
-      const dt = new Date(raw);
-      if (Number.isNaN(dt.getTime())) return;
-      const day = dt.getUTCDay();
-      const monday = new Date(
-        Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate())
-      );
-      const diff = day === 0 ? -6 : 1 - day;
-      monday.setUTCDate(monday.getUTCDate() + diff);
-      const key = `${monday.getUTCFullYear()}-W${String(
-        Math.floor(
-          (monday - new Date(Date.UTC(monday.getUTCFullYear(), 0, 1))) /
-            (7 * 24 * 60 * 60 * 1000)
-        ) + 1
-      ).padStart(2, '0')}`;
-      if (!weekBuckets.has(key)) return;
-      const rev = Number(o.grand_total) || Number(o.total_amount) || 0;
-      weekBuckets.set(key, (weekBuckets.get(key) || 0) + rev);
-    });
-
-    const trendBars = Array.from(weekBuckets.entries()).map(([key, revenue], i) => ({
-      label: `W${i + 1}`,
-      weekKey: key,
-      revenue: Math.round(revenue),
+    const trendBars = computeWeeklyKpiSeries(orders || [], periodsCount).map((bucket, index) => ({
+      label: `W${index + 1}`,
+      weekKey: bucket.key,
+      revenue: Math.round(bucket.revenue),
     }));
 
     const hasRealTrend = trendBars.some((b) => b.revenue > 0);
@@ -526,22 +501,16 @@ export default function SalesAnalyticsPanel({
           }}
         >
           {[1, 2, 3, 4].map((i) => (
-            <View
+            <StatCardSkeleton
               key={i}
               style={{
                 flex: 1,
                 minWidth: isDesktop ? 220 : 150,
-                height: 120,
-                backgroundColor: theme.cardBg,
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: theme.border,
-                padding: 18,
-                opacity: 0.6,
               }}
             />
           ))}
         </View>
+
         {/* Chart Skeleton */}
         <View
           style={{
@@ -550,9 +519,17 @@ export default function SalesAnalyticsPanel({
             borderRadius: 14,
             borderWidth: 1,
             borderColor: theme.border,
-            opacity: 0.6,
+            padding: 24,
+            justifyContent: 'space-between',
           }}
-        />
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Skeleton width={180} height={20} borderRadius={6} />
+            <Skeleton width={120} height={32} borderRadius={8} />
+          </View>
+          <Skeleton width="100%" height={260} borderRadius={10} />
+        </View>
+
         {/* Grid Skeletons */}
         <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
           <View
@@ -564,9 +541,13 @@ export default function SalesAnalyticsPanel({
               borderRadius: 14,
               borderWidth: 1,
               borderColor: theme.border,
-              opacity: 0.6,
+              padding: 20,
+              gap: 14,
             }}
-          />
+          >
+            <Skeleton width={140} height={18} borderRadius={4} />
+            <Skeleton.Text lines={5} lineHeight={14} gap={10} />
+          </View>
           <View
             style={{
               flex: 1,
@@ -576,9 +557,13 @@ export default function SalesAnalyticsPanel({
               borderRadius: 14,
               borderWidth: 1,
               borderColor: theme.border,
-              opacity: 0.6,
+              padding: 20,
+              gap: 14,
             }}
-          />
+          >
+            <Skeleton width={140} height={18} borderRadius={4} />
+            <Skeleton.Text lines={5} lineHeight={14} gap={10} />
+          </View>
         </View>
       </View>
     );
@@ -651,7 +636,7 @@ export default function SalesAnalyticsPanel({
               <BootstrapIcon
                 name="graph-up-arrow"
                 size={12}
-                color={isDarkMode ? '#4DB896' : '#1D4533'}
+                color={isDarkMode ? '#EA580C' : '#EA580C'}
               />
             </View>
           </View>
@@ -675,7 +660,7 @@ export default function SalesAnalyticsPanel({
               color: theme.textMuted,
             }}
           >
-            Combined online & in-store
+            Excludes cancelled and refunded
           </Text>
         </View>
 
@@ -799,7 +784,7 @@ export default function SalesAnalyticsPanel({
               <BootstrapIcon
                 name="box-seam"
                 size={12}
-                color={isDarkMode ? '#4DB896' : '#059669'}
+                color={isDarkMode ? '#EA580C' : '#059669'}
               />
             </View>
           </View>
@@ -1098,11 +1083,11 @@ export default function SalesAnalyticsPanel({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 8,
-              backgroundColor: isDarkMode ? '#1F6B52' : '#1D4533',
+              backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
               borderRadius: 10,
               paddingHorizontal: 13,
               paddingVertical: 8,
-              boxShadow: '0 2px 6px rgba(29, 69, 51, 0.25)',
+              boxShadow: '0 2px 6px rgba(234, 88, 12, 0.25)',
             }}
             onPress={() => {
               setIsExportDropdownOpen(!isExportDropdownOpen);
@@ -1308,7 +1293,7 @@ export default function SalesAnalyticsPanel({
                     style={{
                       fontSize: 11,
                       fontWeight: '700',
-                      color: isDarkMode ? '#4DB896' : '#1D4533',
+                      color: isDarkMode ? '#EA580C' : '#EA580C',
                     }}
                   >
                     ({onlineSharePercent}%)
@@ -1327,7 +1312,7 @@ export default function SalesAnalyticsPanel({
                   style={{
                     height: '100%',
                     width: `${onlineSharePercent}%`,
-                    backgroundColor: isDarkMode ? '#4DB896' : '#1D4533',
+                    backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
                     borderRadius: 4,
                     transition: 'width 0.6s ease',
                   }}
@@ -1556,7 +1541,7 @@ export default function SalesAnalyticsPanel({
                 style={{
                   fontSize: 11.5,
                   fontWeight: '700',
-                  color: isDarkMode ? '#4DB896' : '#1D4533',
+                  color: isDarkMode ? '#EA580C' : '#EA580C',
                 }}
               >
                 View all →
@@ -1595,7 +1580,7 @@ export default function SalesAnalyticsPanel({
                             width: 20,
                             height: 20,
                             borderRadius: 10,
-                            backgroundColor: idx === 0 ? (isDarkMode ? '#1F6B52' : '#1D4533') : theme.chipBg,
+                            backgroundColor: idx === 0 ? (isDarkMode ? '#EA580C' : '#EA580C') : theme.chipBg,
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
@@ -1676,7 +1661,7 @@ export default function SalesAnalyticsPanel({
                         style={{
                           height: '100%',
                           width: `${barWidth}%`,
-                          backgroundColor: isDarkMode ? '#4DB896' : '#107C41',
+                          backgroundColor: isDarkMode ? '#EA580C' : '#107C41',
                           borderRadius: 2.5,
                           transition: 'width 0.6s ease',
                         }}
@@ -1740,18 +1725,22 @@ export default function SalesAnalyticsPanel({
               style={{
                 flexDirection: 'row',
                 justifyContent: 'space-between',
-                paddingBottom: 8,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                backgroundColor: '#24272B',
+                borderRadius: 8,
                 borderBottomWidth: 1,
-                borderBottomColor: theme.border,
-                marginBottom: 6,
+                borderBottomColor: isDarkMode ? '#374151' : '#32373D',
+                marginBottom: 8,
               }}
             >
               <Text
                 style={{
                   fontSize: 11,
                   fontWeight: '700',
-                  color: theme.textMuted,
+                  color: '#CBD5E1',
                   textTransform: 'uppercase',
+                  letterSpacing: 0.6,
                   flex: 1.5,
                 }}
               >
@@ -1761,8 +1750,9 @@ export default function SalesAnalyticsPanel({
                 style={{
                   fontSize: 11,
                   fontWeight: '700',
-                  color: theme.textMuted,
+                  color: '#CBD5E1',
                   textTransform: 'uppercase',
+                  letterSpacing: 0.6,
                   width: 90,
                   textAlign: 'right',
                 }}
@@ -1773,8 +1763,9 @@ export default function SalesAnalyticsPanel({
                 style={{
                   fontSize: 11,
                   fontWeight: '700',
-                  color: theme.textMuted,
+                  color: '#CBD5E1',
                   textTransform: 'uppercase',
+                  letterSpacing: 0.6,
                   width: 70,
                   textAlign: 'right',
                 }}
@@ -1835,7 +1826,7 @@ export default function SalesAnalyticsPanel({
                           style={{
                             fontSize: 12,
                             fontWeight: '800',
-                            color: isDarkMode ? '#4DB896' : '#1D4533',
+                            color: isDarkMode ? '#EA580C' : '#EA580C',
                             fontVariant: ['tabular-nums'],
                           }}
                         >
@@ -1914,7 +1905,7 @@ export default function SalesAnalyticsPanel({
                 style={{
                   fontSize: 10.5,
                   fontWeight: '700',
-                  color: isDarkMode ? '#4DB896' : '#1D4533',
+                  color: isDarkMode ? '#EA580C' : '#EA580C',
                 }}
               >
                 Forecast →

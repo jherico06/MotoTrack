@@ -40,7 +40,7 @@ export default function BookingWorkflowTracker({ progress = [] }) {
       {/* Header Bar */}
       <View style={styles.headerTitleRow}>
         <View style={styles.headerLeft}>
-          <BootstrapIcon name="diagram-3" size={15} color="#1D4533" />
+          <BootstrapIcon name="diagram-3" size={15} color="#EA580C" />
           <Text style={styles.headerTitleText}>Service Workflow Tracker</Text>
         </View>
         <Text style={styles.headerSubtitleText}>Live Progress</Text>
@@ -291,12 +291,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   stepCircleDone: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   stepCircleCurrent: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
     ...(Platform.OS === 'web'
       ? { boxShadow: '0 0 0 3px #DCE9E2' }
       : { elevation: 2 }),
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   statusLabelTextCurrent: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '900',
   },
   horizontalConnectorWrap: {
@@ -343,6 +343,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E8F0',
   },
   lineCompleted: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
 });

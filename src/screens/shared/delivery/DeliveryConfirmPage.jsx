@@ -151,7 +151,7 @@ export default function DeliveryConfirmPage({ token: tokenProp, onDone }) {
         </Text>
 
         {loading ? (
-          <ActivityIndicator color="#1D4533" style={{ marginTop: 32 }} />
+          <ActivityIndicator color="#EA580C" style={{ marginTop: 32 }} />
         ) : (
           <View style={styles.card}>
             {error ? (
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     fontSize: 11,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
     textTransform: 'uppercase',
     letterSpacing: 0.6,
   },
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
   },
   rowLabel: { fontSize: 12, fontWeight: '700', color: '#64748B', textTransform: 'uppercase' },
   rowValue: { fontSize: 14, fontWeight: '700', color: '#0F172A', flex: 1, textAlign: 'right' },
-  rowValueEmphasize: { color: '#1D4533', fontSize: 15 },
+  rowValueEmphasize: { color: '#EA580C', fontSize: 15 },
   addressBlock: {
     paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   itemMeta: { flex: 1, gap: 2 },
   itemName: { fontSize: 13, fontWeight: '700', color: '#0F172A' },
   itemSub: { fontSize: 11, color: '#64748B', fontWeight: '600' },
-  itemPrice: { fontSize: 12, fontWeight: '800', color: '#1D4533' },
+  itemPrice: { fontSize: 12, fontWeight: '800', color: '#EA580C' },
   itemsFallback: {
     fontSize: 13,
     color: '#334155',
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
   },
   primaryBtn: {
     marginTop: 18,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 14,
     height: 52,
     alignItems: 'center',

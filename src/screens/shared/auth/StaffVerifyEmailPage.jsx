@@ -131,7 +131,7 @@ export default function StaffVerifyEmailPage({
     <View style={styles.page}>
       <View style={styles.card}>
         <View style={styles.badge}>
-          <BootstrapIcon name="shield-lock-fill" size={22} color="#1D4533" />
+          <BootstrapIcon name="shield-lock-fill" size={22} color="#EA580C" />
         </View>
         <Text style={styles.title}>Verify Your Email</Text>
         <Text style={styles.subtitle}>A verification code has been sent to:</Text>
@@ -207,7 +207,7 @@ export default function StaffVerifyEmailPage({
         </View>
 
         <TouchableOpacity style={styles.backBtn} onPress={onBackToLogin} activeOpacity={0.8}>
-          <BootstrapIcon name="arrow-left" size={14} color="#1D4533" />
+          <BootstrapIcon name="arrow-left" size={14} color="#EA580C" />
           <Text style={styles.backBtnText}>Back to Login</Text>
         </TouchableOpacity>
       </View>
@@ -218,7 +218,7 @@ export default function StaffVerifyEmailPage({
 const styles = StyleSheet.create({
   page: {
     flex: 1,
-    backgroundColor: '#0F1F18',
+    backgroundColor: '#181A1D',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 20,
@@ -243,7 +243,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 14,
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     fontWeight: '700',
-    color: '#1D4533',
+    color: '#EA580C',
     marginBottom: 18,
     backgroundColor: '#F8FAFC',
   },
@@ -275,7 +275,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0F172A',
   },
-  otpBoxFilled: { borderColor: '#1D4533', backgroundColor: '#F0F7F3' },
+  otpBoxFilled: { borderColor: '#EA580C', backgroundColor: '#FFF7ED' },
   timer: { fontSize: 13, color: '#64748B', marginBottom: 14 },
   timerExpired: { color: '#DC2626', fontWeight: '700' },
   errorBox: {
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
   },
   successText: { flex: 1, color: '#065F46', fontSize: 13, fontWeight: '600' },
   primaryBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   resendHint: { color: '#64748B', fontSize: 13 },
-  resendLink: { color: '#1D4533', fontWeight: '800', fontSize: 13 },
+  resendLink: { color: '#EA580C', fontWeight: '800', fontSize: 13 },
   resendWait: { color: '#94A3B8', fontSize: 13, fontWeight: '600' },
   backBtn: {
     flexDirection: 'row',
@@ -324,5 +324,5 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 18,
   },
-  backBtnText: { color: '#1D4533', fontWeight: '700', fontSize: 13 },
+  backBtnText: { color: '#EA580C', fontWeight: '700', fontSize: 13 },
 });

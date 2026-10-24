@@ -16,6 +16,6 @@ export { default as AdminSystemSettingsPanel } from './AdminSystemSettingsPanel.
 export { default as PromosAdminPanel } from './PromosAdminPanel.jsx';
 export { default as RiderProfileCard } from './RiderProfileCard.jsx';
 export { default as SalesAnalyticsPanel } from './SalesAnalyticsPanel.jsx';
-export { default as AdminSidebar } from './AdminSidebar.jsx';
+export { default as AdminSidebar, AdminSidebarSkeleton } from './AdminSidebar.jsx';
 export { default as AdminProfileLogsPanel } from './AdminProfileLogsPanel.jsx';
 export { default as ModernOverviewDashboard } from './ModernOverviewDashboard.jsx';

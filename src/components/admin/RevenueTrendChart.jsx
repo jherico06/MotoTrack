@@ -296,15 +296,38 @@ export default function RevenueTrendChart({
   const periodSelector = (
     <View
       style={{
+        position: 'relative',
         flexDirection: 'row',
         backgroundColor: activeIsDark ? '#151C19' : '#F1F5F9',
         borderRadius: 9,
         padding: 3,
         borderWidth: 1,
         borderColor: activeIsDark ? '#26332E' : '#E2E8F0',
-        gap: 3,
+        width: isDesktop ? 220 : '100%',
       }}
     >
+      {/* Smooth animated active-state sliding indicator */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 3,
+          bottom: 3,
+          left: 3,
+          width: 'calc((100% - 6px) / 3)',
+          backgroundColor: '#EA580C',
+          borderRadius: 6,
+          boxShadow: '0 1px 4px rgba(234, 88, 12, 0.35)',
+          transition: 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)',
+          transform:
+            activeGranularity === 'daily'
+              ? 'translateX(0%)'
+              : activeGranularity === 'weekly'
+              ? 'translateX(100%)'
+              : 'translateX(200%)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
       {[
         { id: 'daily', label: 'Daily' },
         { id: 'weekly', label: 'Weekly' },
@@ -315,14 +338,16 @@ export default function RevenueTrendChart({
           <TouchableOpacity
             key={tab.id}
             onPress={() => handleGranularityChange(tab.id)}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             style={{
-              paddingHorizontal: 11,
+              flex: 1,
               paddingVertical: 5,
-              borderRadius: 7,
-              backgroundColor: active
-                ? (activeIsDark ? '#10B981' : '#1D4533')
-                : 'transparent',
+              borderRadius: 6,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              zIndex: 1,
             }}
           >
             <Text
@@ -332,6 +357,7 @@ export default function RevenueTrendChart({
                 color: active
                   ? '#FFFFFF'
                   : (activeIsDark ? '#AAB4B0' : '#64748B'),
+                transition: 'color 200ms ease',
               }}
             >
               {tab.label}
@@ -347,10 +373,10 @@ export default function RevenueTrendChart({
       ref={containerRef}
       style={[
         {
-          backgroundColor: activeIsDark ? '#0F1412' : '#FFFFFF',
+          backgroundColor: activeIsDark ? '#24272B' : '#FFFFFF',
           borderRadius: 16,
           borderWidth: 1,
-          borderColor: activeIsDark ? '#26332E' : '#E2E8F0',
+          borderColor: activeIsDark ? '#374151' : '#E5E7EB',
           padding: 20,
           marginBottom: 20,
           shadowColor: '#000000',
@@ -379,7 +405,7 @@ export default function RevenueTrendChart({
               width: 32,
               height: 32,
               borderRadius: 8,
-              backgroundColor: activeIsDark ? 'rgba(16, 185, 129, 0.16)' : 'rgba(29, 69, 51, 0.08)',
+              backgroundColor: activeIsDark ? 'rgba(16, 185, 129, 0.16)' : 'rgba(234, 88, 12, 0.12)',
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -387,7 +413,7 @@ export default function RevenueTrendChart({
             <BootstrapIcon
               name="graph-up"
               size={15}
-              color={activeIsDark ? '#4ADE80' : '#1D4533'}
+              color="#EA580C"
             />
           </View>
           <View>
@@ -395,13 +421,13 @@ export default function RevenueTrendChart({
               style={{
                 fontSize: 14,
                 fontWeight: '800',
-                color: activeIsDark ? '#F5F7F6' : '#0F172A',
+                color: activeIsDark ? '#F9FAFB' : '#111827',
                 letterSpacing: 0.2,
               }}
             >
               {title}
             </Text>
-            <Text style={{ fontSize: 11.5, color: activeIsDark ? '#AAB4B0' : '#64748B', marginTop: 1 }}>
+            <Text style={{ fontSize: 11.5, color: activeIsDark ? '#9CA3AF' : '#6B7280', marginTop: 1 }}>
               {resolvedSubtitle}
             </Text>
           </View>
@@ -427,11 +453,11 @@ export default function RevenueTrendChart({
                   width: 12,
                   height: 2,
                   borderTopWidth: 2,
-                  borderTopColor: activeIsDark ? '#4ADE80' : '#1D4533',
+                  borderTopColor: '#9CA3AF',
                   borderStyle: 'dashed',
                 }}
               />
-              <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#AAB4B0' : '#64748B' }}>
+              <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#9CA3AF' : '#6B7280' }}>
                 Avg: {formatPeso(avgRev)}/{activeGranularity === 'daily' ? 'day' : activeGranularity === 'weekly' ? 'wk' : 'mo'}
               </Text>
             </View>
@@ -441,33 +467,8 @@ export default function RevenueTrendChart({
         </View>
       </View>
 
-      {/* Main Chart Body */}
-      {!hasData ? (
-        <View style={{ paddingVertical: 40, alignItems: 'center', justifyContent: 'center' }}>
-          <View
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: activeIsDark ? '#151C19' : '#F8FAFC',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 10,
-              borderWidth: 1,
-              borderColor: activeIsDark ? '#26332E' : '#E2E8F0',
-            }}
-          >
-            <BootstrapIcon name="bar-chart" size={20} color={activeIsDark ? '#AAB4B0' : '#64748B'} />
-          </View>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: activeIsDark ? '#F5F7F6' : '#0F172A' }}>
-            No sales recorded for this period
-          </Text>
-          <Text style={{ fontSize: 11.5, color: activeIsDark ? '#AAB4B0' : '#64748B', marginTop: 3 }}>
-            Order transactions within this date range will appear here automatically.
-          </Text>
-        </View>
-      ) : (
-        <View style={{ width: '100%', height: chartHeight, position: 'relative' }}>
+      {/* Main Chart Body — zero revenue still draws the baseline and date axis */}
+      <View style={{ width: '100%', height: chartHeight, position: 'relative' }}>
           {Platform.OS === 'web' ? (
             <svg
               width="100%"
@@ -479,12 +480,12 @@ export default function RevenueTrendChart({
                 <linearGradient id="reportsRevTrendGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop
                     offset="0%"
-                    stopColor={activeIsDark ? '#10B981' : '#1D4533'}
-                    stopOpacity={activeIsDark ? 0.35 : 0.22}
+                    stopColor="#EA580C"
+                    stopOpacity={0.28}
                   />
                   <stop
                     offset="100%"
-                    stopColor={activeIsDark ? '#10B981' : '#1D4533'}
+                    stopColor="#EA580C"
                     stopOpacity={0.0}
                   />
                 </linearGradient>
@@ -526,10 +527,10 @@ export default function RevenueTrendChart({
                   y1={avgY}
                   x2={chartWidth - padding.right}
                   y2={avgY}
-                  stroke={activeIsDark ? '#34D399' : '#1D4533'}
+                  stroke="#9CA3AF"
                   strokeWidth="1.2"
                   strokeDasharray="4 4"
-                  strokeOpacity={0.7}
+                  strokeOpacity={0.8}
                 />
               )}
 
@@ -541,7 +542,7 @@ export default function RevenueTrendChart({
                 <path
                   d={linePath}
                   fill="none"
-                  stroke={activeIsDark ? '#34D399' : '#1D4533'}
+                  stroke="#EA580C"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -555,7 +556,7 @@ export default function RevenueTrendChart({
                   y1={padding.top}
                   x2={activePoint.x}
                   y2={baseline}
-                  stroke={activeIsDark ? '#34D399' : '#1D4533'}
+                  stroke="#EA580C"
                   strokeWidth="1.2"
                   strokeDasharray="3 3"
                   strokeOpacity={0.8}
@@ -570,16 +571,17 @@ export default function RevenueTrendChart({
 
                 return (
                   <g key={`pt-${i}`}>
-                    {/* Circle */}
-                    <circle
-                      cx={p.x}
-                      cy={p.y}
-                      r={isHovered ? 6 : p.revenue > 0 ? 3.5 : 2}
-                      fill={isHovered ? (activeIsDark ? '#34D399' : '#1D4533') : activeIsDark ? '#0F1412' : '#FFFFFF'}
-                      stroke={activeIsDark ? '#34D399' : '#1D4533'}
-                      strokeWidth={isHovered ? 2.5 : 2}
-                      style={{ transition: 'all 0.15s ease' }}
-                    />
+                    {(isHovered || p.revenue > 0 || i === points.length - 1) && (
+                      <circle
+                        cx={p.x}
+                        cy={p.y}
+                        r={isHovered ? 6 : 3.5}
+                        fill={isHovered || p.revenue <= 0 ? '#EA580C' : (activeIsDark ? '#24272B' : '#FFFFFF')}
+                        stroke="#EA580C"
+                        strokeWidth={isHovered ? 2.5 : 2}
+                        style={{ transition: 'all 0.15s ease' }}
+                      />
+                    )}
 
                     {/* X-Axis Date Label */}
                     {(visibleXLabels.has(i) || isHovered) ? (
@@ -618,7 +620,7 @@ export default function RevenueTrendChart({
                 style={{
                   height: '100%',
                   width: hasData ? '70%' : '10%',
-                  backgroundColor: activeIsDark ? '#34D399' : '#1D4533',
+                  backgroundColor: '#EA580C',
                   borderRadius: 3,
                 }}
               />
@@ -636,7 +638,7 @@ export default function RevenueTrendChart({
                   Math.max(10, activePoint.x - 70),
                   Math.max(10, chartWidth - 170)
                 ),
-                backgroundColor: activeIsDark ? '#151C19' : '#0F172A',
+                backgroundColor: '#24272B',
                 paddingHorizontal: 12,
                 paddingVertical: 8,
                 borderRadius: 8,
@@ -646,7 +648,7 @@ export default function RevenueTrendChart({
                 shadowRadius: 8,
                 elevation: 6,
                 borderWidth: 1,
-                borderColor: activeIsDark ? '#26332E' : 'rgba(255,255,255,0.1)',
+                borderColor: 'rgba(255,255,255,0.1)',
                 zIndex: 99,
                 minWidth: 140,
               }}
@@ -685,7 +687,6 @@ export default function RevenueTrendChart({
             </View>
           ) : null}
         </View>
-      )}
 
       {/* Telemetry Summary Bar */}
       <View

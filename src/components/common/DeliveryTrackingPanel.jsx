@@ -71,7 +71,7 @@ export default function DeliveryTrackingPanel({
 
       {loading && !riderLat ? (
         <View style={styles.loadingRow}>
-          <ActivityIndicator size="small" color="#1D4533" />
+          <ActivityIndicator size="small" color="#EA580C" />
           <Text style={styles.loadingText}>Connecting to live GPS…</Text>
         </View>
       ) : null}

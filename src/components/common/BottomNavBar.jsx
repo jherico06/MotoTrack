@@ -4,6 +4,7 @@ import { BootstrapIcon } from './BootstrapIcon.jsx';
 import { useWishlist } from '../../context/WishlistContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 export default function BottomNavBar({
   activeTab = 'Home',
@@ -15,13 +16,19 @@ export default function BottomNavBar({
   const wishlistCtx = useWishlist();
   const cartCtx = useCart();
   const authCtx = useAuth();
+  const { isDarkMode } = useTheme?.() || { isDarkMode: false };
 
   const user = propCurrentUser !== undefined ? propCurrentUser : authCtx?.currentUser;
 
+  const inactiveIconColor = isDarkMode ? '#94A3B8' : '#64748B';
+
   const isHomeActive = activeTab === 'Home' || activeTab === 'Shop' || activeTab === 'shop';
-  const isGarageActive = activeTab === 'Garage' || activeTab === 'garage';
+  const isServicesActive =
+    activeTab === 'Services' || activeTab === 'services' || activeTab === 'Pitstop' || activeTab === 'pitstop';
   const isCustomizeActive =
     activeTab === 'Customize' || activeTab === 'customizer' || activeTab === 'Customizer';
+  const isGarageActive =
+    activeTab === 'Garage' || activeTab === 'garage' || activeTab === 'MyGarage' || activeTab === 'Fleet';
   const isOrdersActive = activeTab === 'Orders' || activeTab === 'orders';
   const isMoreActive =
     activeTab === 'More' ||
@@ -34,7 +41,16 @@ export default function BottomNavBar({
     activeTab === 'profile';
 
   return (
-    <View style={navStyles.bottomNavWrapper}>
+    <View
+      style={[
+        navStyles.bottomNavWrapper,
+        isDarkMode && {
+          backgroundColor: '#181A1D',
+          borderTopColor: '#2D3136',
+          shadowColor: '#000000',
+        },
+      ]}
+    >
       {/* 1. Shop */}
       <TouchableOpacity
         style={navStyles.bottomNavItem}
@@ -44,25 +60,35 @@ export default function BottomNavBar({
         accessibilityLabel="Shop"
       >
         <View style={navStyles.iconContainer}>
-          <BootstrapIcon name="house" size={22} color={isHomeActive ? '#1D4533' : '#64748B'} />
+          <BootstrapIcon name="house" size={21} color={isHomeActive ? '#EA580C' : inactiveIconColor} />
         </View>
-        <Text style={[navStyles.bottomNavLabel, isHomeActive && navStyles.bottomNavLabelActive]}>Shop</Text>
+        <Text
+          numberOfLines={1}
+          style={[navStyles.bottomNavLabel, isDarkMode && { color: '#94A3B8' }, isHomeActive && navStyles.bottomNavLabelActive]}
+        >
+          Shop
+        </Text>
+        {isHomeActive && <View style={navStyles.activeUnderline} />}
       </TouchableOpacity>
 
       {/* 2. Services */}
       <TouchableOpacity
         style={navStyles.bottomNavItem}
-        onPress={() => onTabChange('Garage')}
+        onPress={() => onTabChange('Services')}
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel="Services"
       >
         <View style={navStyles.iconContainer}>
-          <BootstrapIcon name="tools" size={21} color={isGarageActive ? '#1D4533' : '#64748B'} />
+          <BootstrapIcon name="tools" size={20} color={isServicesActive ? '#EA580C' : inactiveIconColor} />
         </View>
-        <Text style={[navStyles.bottomNavLabel, isGarageActive && navStyles.bottomNavLabelActive]}>
+        <Text
+          numberOfLines={1}
+          style={[navStyles.bottomNavLabel, isDarkMode && { color: '#94A3B8' }, isServicesActive && navStyles.bottomNavLabelActive]}
+        >
           Services
         </Text>
+        {isServicesActive && <View style={navStyles.activeUnderline} />}
       </TouchableOpacity>
 
       {/* 3. Customizer */}
@@ -74,17 +100,41 @@ export default function BottomNavBar({
         accessibilityLabel="Customizer"
       >
         <View style={navStyles.iconContainer}>
-          <BootstrapIcon name="magic" size={21} color={isCustomizeActive ? '#1D4533' : '#64748B'} />
+          <BootstrapIcon name="magic" size={20} color={isCustomizeActive ? '#EA580C' : inactiveIconColor} />
           <View style={navStyles.aiBadge}>
             <Text style={navStyles.aiBadgeText}>AI</Text>
           </View>
         </View>
-        <Text style={[navStyles.bottomNavLabel, isCustomizeActive && navStyles.bottomNavLabelActive]}>
+        <Text
+          numberOfLines={1}
+          style={[navStyles.bottomNavLabel, isDarkMode && { color: '#94A3B8' }, isCustomizeActive && navStyles.bottomNavLabelActive]}
+        >
           Customizer
         </Text>
+        {isCustomizeActive && <View style={navStyles.activeUnderline} />}
       </TouchableOpacity>
 
-      {/* 4. Orders */}
+      {/* 4. Garage (My Bike Fleet) */}
+      <TouchableOpacity
+        style={navStyles.bottomNavItem}
+        onPress={() => onTabChange('Garage')}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Garage"
+      >
+        <View style={navStyles.iconContainer}>
+          <BootstrapIcon name="motorcycle" size={21} color={isGarageActive ? '#EA580C' : inactiveIconColor} />
+        </View>
+        <Text
+          numberOfLines={1}
+          style={[navStyles.bottomNavLabel, isDarkMode && { color: '#94A3B8' }, isGarageActive && navStyles.bottomNavLabelActive]}
+        >
+          Garage
+        </Text>
+        {isGarageActive && <View style={navStyles.activeUnderline} />}
+      </TouchableOpacity>
+
+      {/* 5. Orders */}
       <TouchableOpacity
         style={navStyles.bottomNavItem}
         onPress={() => onTabChange('Orders')}
@@ -93,14 +143,18 @@ export default function BottomNavBar({
         accessibilityLabel="Orders"
       >
         <View style={navStyles.iconContainer}>
-          <BootstrapIcon name="box-seam" size={21} color={isOrdersActive ? '#1D4533' : '#64748B'} />
+          <BootstrapIcon name="box-seam" size={20} color={isOrdersActive ? '#EA580C' : inactiveIconColor} />
         </View>
-        <Text style={[navStyles.bottomNavLabel, isOrdersActive && navStyles.bottomNavLabelActive]}>
+        <Text
+          numberOfLines={1}
+          style={[navStyles.bottomNavLabel, isDarkMode && { color: '#94A3B8' }, isOrdersActive && navStyles.bottomNavLabelActive]}
+        >
           Orders
         </Text>
+        {isOrdersActive && <View style={navStyles.activeUnderline} />}
       </TouchableOpacity>
 
-      {/* 5. More (Hamburger Icon in the LAST position) */}
+      {/* 6. More */}
       <TouchableOpacity
         style={navStyles.bottomNavItem}
         onPress={() => onTabChange('More')}
@@ -109,9 +163,15 @@ export default function BottomNavBar({
         accessibilityLabel="Menu and Dashboard choices"
       >
         <View style={navStyles.iconContainer}>
-          <BootstrapIcon name="list" size={22} color={isMoreActive ? '#1D4533' : '#64748B'} />
+          <BootstrapIcon name="list" size={21} color={isMoreActive ? '#EA580C' : inactiveIconColor} />
         </View>
-        <Text style={[navStyles.bottomNavLabel, isMoreActive && navStyles.bottomNavLabelActive]}>More</Text>
+        <Text
+          numberOfLines={1}
+          style={[navStyles.bottomNavLabel, isDarkMode && { color: '#94A3B8' }, isMoreActive && navStyles.bottomNavLabelActive]}
+        >
+          More
+        </Text>
+        {isMoreActive && <View style={navStyles.activeUnderline} />}
       </TouchableOpacity>
     </View>
   );
@@ -128,14 +188,18 @@ const navStyles = StyleSheet.create({
     borderTopColor: '#F1F5F9',
     height: Platform.OS === 'ios' ? 76 : Platform.OS === 'android' ? 68 : 62,
     paddingBottom: Platform.OS === 'ios' ? 18 : Platform.OS === 'android' ? 12 : 6,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    ...(Platform.OS === 'web'
+      ? { boxShadow: '0 -3px 8px rgba(15, 23, 42, 0.05)' }
+      : {
+          shadowColor: '#0F172A',
+          shadowOffset: { width: 0, height: -3 },
+          shadowOpacity: 0.05,
+          shadowRadius: 8,
+        }),
     elevation: 10,
     zIndex: 1000,
   },
@@ -144,30 +208,31 @@ const navStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
+    paddingHorizontal: 2,
   },
   iconContainer: {
     width: 28,
-    height: 26,
+    height: 24,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
   bottomNavLabel: {
-    fontSize: 10.5,
+    fontSize: 9.5,
     fontWeight: '500',
     color: '#64748B',
-    marginTop: 3,
-    letterSpacing: -0.1,
+    marginTop: 2,
+    letterSpacing: -0.2,
   },
   bottomNavLabelActive: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
   },
   aiBadge: {
     position: 'absolute',
-    top: -2,
-    right: -4,
-    backgroundColor: '#1D4533',
+    top: -3,
+    right: -6,
+    backgroundColor: '#EA580C',
     borderRadius: 5,
     paddingHorizontal: 3,
     paddingVertical: 0.5,
@@ -177,5 +242,12 @@ const navStyles = StyleSheet.create({
     fontSize: 7,
     fontWeight: '800',
     letterSpacing: 0.2,
+  },
+  activeUnderline: {
+    width: 18,
+    height: 2.5,
+    borderRadius: 2,
+    backgroundColor: '#EA580C',
+    marginTop: 2,
   },
 });

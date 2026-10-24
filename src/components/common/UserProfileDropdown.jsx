@@ -17,56 +17,7 @@ import { ANDROID_TOP_INSET } from '../../utils/safeArea.js';
 import { appStorage } from '../../services/system/storageAdapter.js';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { useWishlist } from '../../context/WishlistContext.jsx';
-
-function ToggleSwitch({
-  value,
-  onToggle,
-  activeTrackColor = '#1D4533',
-  inactiveTrackColor = '#CBD5E1',
-}) {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.85}
-      onPress={(e) => {
-        e?.stopPropagation?.();
-        onToggle?.();
-      }}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-      style={{
-        width: 48,
-        height: 26,
-        borderRadius: 13,
-        backgroundColor: value ? activeTrackColor : inactiveTrackColor,
-        paddingHorizontal: 3,
-        paddingVertical: 3,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: value ? 'flex-end' : 'flex-start',
-        ...(Platform.OS === 'web'
-          ? {
-              cursor: 'pointer',
-              transition: 'background-color 0.2s ease, all 0.2s ease',
-            }
-          : {}),
-      }}
-    >
-      <View
-        style={{
-          width: 20,
-          height: 20,
-          borderRadius: 10,
-          backgroundColor: '#FFFFFF',
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: 1.5 },
-          shadowOpacity: 0.25,
-          shadowRadius: 2.5,
-          elevation: 3,
-        }}
-      />
-    </TouchableOpacity>
-  );
-}
+import ToggleSwitch from './ToggleSwitch.jsx';
 
 export default function UserProfileDropdown({
   currentUser,
@@ -92,7 +43,7 @@ export default function UserProfileDropdown({
 }) {
   const dropdownRef = useRef(null);
   const [currentView, setCurrentView] = useState('main'); // 'main' | 'settings_privacy'
-  const [isProfileCardHovered, setIsProfileCardHovered] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState(null);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
@@ -151,23 +102,21 @@ export default function UserProfileDropdown({
 
   const theme = {
     isDark: effectiveDarkMode,
-    bgCard: effectiveDarkMode ? '#151C19' : '#FFFFFF',
-    border: effectiveDarkMode ? '#26332E' : '#CED0D4',
-    bgSub: effectiveDarkMode ? '#1A2320' : '#F0F2F5',
-    bgHover: effectiveDarkMode ? '#1E2824' : '#F0F2F5',
-    iconWrapBg: effectiveDarkMode ? '#1A2320' : '#E4E6EB',
-    iconColor: effectiveDarkMode ? '#F5F7F6' : '#050505',
-    textPrimary: effectiveDarkMode ? '#F5F7F6' : '#050505',
-    textMuted: effectiveDarkMode ? '#AAB4B0' : '#65676B',
-    accentText: effectiveDarkMode ? '#4DB896' : '#1D4533',
-    accentBg: effectiveDarkMode ? 'rgba(77, 184, 150, 0.16)' : '#E8F0EC',
-    accentBorder: effectiveDarkMode ? 'rgba(77, 184, 150, 0.35)' : '#C8DDD3',
-    divider: effectiveDarkMode ? '#26332E' : '#CED0D4',
-    inputBg: effectiveDarkMode ? '#1A2320' : '#F0F2F5',
-    inputBorder: effectiveDarkMode ? '#2F3F39' : '#CED0D4',
-    btnCancelBg: effectiveDarkMode ? '#1A2320' : '#E4E6EB',
-    btnCancelText: effectiveDarkMode ? '#E3E8E6' : '#050505',
-    btnSubmitBg: effectiveDarkMode ? '#1F6B52' : '#1D4533',
+    bgCard: effectiveDarkMode ? '#1E293B' : '#FFFFFF',
+    border: effectiveDarkMode ? '#334155' : '#E2E8F0',
+    bgSub: effectiveDarkMode ? '#0F172A' : '#F8FAFC',
+    bgHover: effectiveDarkMode ? '#334155' : '#F1F5F9',
+    iconWrapBg: effectiveDarkMode ? '#334155' : '#F1F5F9',
+    iconColor: effectiveDarkMode ? '#F8FAFC' : '#0F172A',
+    textPrimary: effectiveDarkMode ? '#F8FAFC' : '#0F172A',
+    textMuted: effectiveDarkMode ? '#94A3B8' : '#64748B',
+    chevronColor: effectiveDarkMode ? '#64748B' : '#94A3B8',
+    divider: effectiveDarkMode ? '#334155' : '#E2E8F0',
+    inputBg: effectiveDarkMode ? '#0F172A' : '#F8FAFC',
+    inputBorder: effectiveDarkMode ? '#334155' : '#CBD5E1',
+    btnCancelBg: effectiveDarkMode ? '#334155' : '#E2E8F0',
+    btnCancelText: effectiveDarkMode ? '#F8FAFC' : '#0F172A',
+    btnSubmitBg: '#EA580C',
     btnSubmitText: '#FFFFFF',
   };
 
@@ -175,7 +124,7 @@ export default function UserProfileDropdown({
   useEffect(() => {
     if (!isOpen) {
       setCurrentView('main');
-      setIsProfileCardHovered(false);
+      setHoveredItem(null);
     }
   }, [isOpen]);
 
@@ -330,12 +279,12 @@ export default function UserProfileDropdown({
       {/* Top Header with Back Arrow and Title */}
       <View style={styles.submenuHeader}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: theme.iconWrapBg }]}
           onPress={() => setCurrentView('main')}
           activeOpacity={0.7}
           accessibilityLabel="Back to main menu"
         >
-          <BootstrapIcon name="arrow-left" size={20} color={theme.textPrimary} />
+          <BootstrapIcon name="arrow-left" size={16} color={theme.iconColor} />
         </TouchableOpacity>
         <Text style={[styles.submenuTitle, { color: theme.textPrimary }]}>Settings & privacy</Text>
       </View>
@@ -349,7 +298,7 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="gear-fill" size={19} color={theme.iconColor} />
+            <BootstrapIcon name="gear-fill" size={16} color={theme.iconColor} />
           </View>
           <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Settings</Text>
         </TouchableOpacity>
@@ -361,10 +310,10 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="globe" size={19} color={theme.iconColor} />
+            <BootstrapIcon name="globe" size={16} color={theme.iconColor} />
           </View>
           <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Language</Text>
-          <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
+          <BootstrapIcon name="chevron-right" size={15} color={theme.textMuted} />
         </TouchableOpacity>
 
         {/* 3. Privacy checkup */}
@@ -374,7 +323,7 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="shield-check" size={19} color={theme.iconColor} />
+            <BootstrapIcon name="shield-check" size={16} color={theme.iconColor} />
           </View>
           <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Privacy checkup</Text>
         </TouchableOpacity>
@@ -389,7 +338,7 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="shield-lock-fill" size={19} color={theme.iconColor} />
+            <BootstrapIcon name="shield-lock-fill" size={16} color={theme.iconColor} />
           </View>
           <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Privacy Center</Text>
         </TouchableOpacity>
@@ -401,7 +350,7 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="list-task" size={19} color={theme.iconColor} />
+            <BootstrapIcon name="list-task" size={16} color={theme.iconColor} />
           </View>
           <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Activity log</Text>
         </TouchableOpacity>
@@ -413,7 +362,7 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="sliders" size={19} color={theme.iconColor} />
+            <BootstrapIcon name="sliders" size={16} color={theme.iconColor} />
           </View>
           <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Content preferences</Text>
         </TouchableOpacity>
@@ -428,13 +377,7 @@ export default function UserProfileDropdown({
       <TouchableOpacity
         style={[
           styles.userProfileCard,
-          {
-            backgroundColor: isProfileCardHovered ? theme.bgHover : 'transparent',
-          },
-          Platform.OS === 'web' && {
-            cursor: 'pointer',
-            transition: 'background-color 0.15s ease',
-          },
+          hoveredItem === 'profile' && { backgroundColor: theme.bgHover },
         ]}
         onPress={handleOpenProfile}
         activeOpacity={0.75}
@@ -443,8 +386,8 @@ export default function UserProfileDropdown({
         accessibilityHint="Navigates to your rider and motorcycle profile page"
         {...(Platform.OS === 'web'
           ? {
-              onMouseEnter: () => setIsProfileCardHovered(true),
-              onMouseLeave: () => setIsProfileCardHovered(false),
+              onMouseEnter: () => setHoveredItem('profile'),
+              onMouseLeave: () => setHoveredItem(null),
             }
           : {})}
       >
@@ -454,39 +397,32 @@ export default function UserProfileDropdown({
             style={[styles.avatarImg, { borderColor: theme.border, backgroundColor: theme.bgSub }]}
           />
         ) : (
-          <View style={[styles.avatarFallback, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="person-fill" size={24} color={theme.textMuted} />
+          <View style={[styles.avatarFallback, { backgroundColor: theme.iconWrapBg, borderColor: theme.border }]}>
+            <BootstrapIcon name="person-fill" size={20} color={theme.iconColor} />
           </View>
         )}
         <View style={styles.userInfo}>
           <Text style={[styles.userName, { color: theme.textPrimary }]} numberOfLines={1}>
             {currentUser.name || currentUser.fullName || 'Rider Account'}
           </Text>
-          <Text
-            style={[
-              styles.userSub,
-              { color: isProfileCardHovered ? theme.accentText : theme.textMuted },
-            ]}
-            numberOfLines={1}
-          >
+          <Text style={[styles.userSub, { color: theme.textMuted }]} numberOfLines={1}>
             See your profile
           </Text>
         </View>
-        <BootstrapIcon
-          name="chevron-right"
-          size={17}
-          color={isProfileCardHovered ? theme.textPrimary : theme.textMuted}
-        />
+        <BootstrapIcon name="chevron-right" size={16} color={theme.chevronColor} />
       </TouchableOpacity>
 
       <View style={[styles.divider, { backgroundColor: theme.divider }]} />
 
       {/* Main Choices Menu */}
       <View style={styles.menuList}>
-        {/* 0. Dashboard shortcut (Visible across all customer pages) */}
+        {/* 1. Dashboard */}
         {showDashboard !== false && (
           <TouchableOpacity
-            style={styles.menuItem}
+            style={[
+              styles.menuItem,
+              hoveredItem === 'dashboard' && { backgroundColor: theme.bgHover },
+            ]}
             onPress={() => {
               onClose?.();
               if (onNavigateToDashboard) {
@@ -496,141 +432,174 @@ export default function UserProfileDropdown({
               }
             }}
             activeOpacity={0.7}
+            {...(Platform.OS === 'web'
+              ? {
+                  onMouseEnter: () => setHoveredItem('dashboard'),
+                  onMouseLeave: () => setHoveredItem(null),
+                }
+              : {})}
           >
-            <View style={[styles.circularIconWrap, { backgroundColor: theme.accentBg }]}>
-              <BootstrapIcon name="speedometer2" size={18} color={theme.accentText} />
+            <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+              <BootstrapIcon name="speedometer2" size={16} color={theme.iconColor} />
             </View>
-            <Text style={[styles.menuTitle, { fontWeight: '700', color: theme.accentText }]}>Dashboard</Text>
-            <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
+            <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Dashboard</Text>
+            <BootstrapIcon name="chevron-right" size={16} color={theme.chevronColor} />
           </TouchableOpacity>
         )}
 
-        {/* 0b. My Wishlist Shortcut */}
+        {/* 2. Settings & privacy */}
         <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => {
-            onClose?.();
-            if (onNavigateToWishlist) {
-              onNavigateToWishlist();
-            } else if (onNavigateToScreen) {
-              onNavigateToScreen('wishlist');
-            }
-          }}
-          activeOpacity={0.7}
-        >
-          <View
-            style={[
-              styles.circularIconWrap,
-              { backgroundColor: effectiveDarkMode ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2' },
-            ]}
-          >
-            <BootstrapIcon name="heart-fill" size={17} color="#EF4444" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>My Wishlist</Text>
-            {wishlistCount > 0 && (
-              <Text style={[styles.shortcutSub, { color: theme.textMuted }]}>
-                {wishlistCount} {wishlistCount === 1 ? 'saved item' : 'saved items'}
-              </Text>
-            )}
-          </View>
-          <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
-        </TouchableOpacity>
-
-        {/* 1. Settings & privacy -> Switches to Settings & privacy submenu */}
-        <TouchableOpacity
-          style={styles.menuItem}
+          style={[
+            styles.menuItem,
+            hoveredItem === 'settings' && { backgroundColor: theme.bgHover },
+          ]}
           onPress={() => setCurrentView('settings_privacy')}
           activeOpacity={0.7}
+          {...(Platform.OS === 'web'
+            ? {
+                onMouseEnter: () => setHoveredItem('settings'),
+                onMouseLeave: () => setHoveredItem(null),
+              }
+            : {})}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="gear-fill" size={19} color={theme.iconColor} />
+            <BootstrapIcon name="gear-fill" size={16} color={theme.iconColor} />
           </View>
           <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Settings & privacy</Text>
-          <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
+          <BootstrapIcon name="chevron-right" size={16} color={theme.chevronColor} />
         </TouchableOpacity>
 
-        {/* 2. Help & support */}
+        {/* 3. Help & support */}
         <TouchableOpacity
-          style={styles.menuItem}
+          style={[
+            styles.menuItem,
+            hoveredItem === 'help' && { backgroundColor: theme.bgHover },
+          ]}
           onPress={handleOpenHelp}
           activeOpacity={0.7}
+          {...(Platform.OS === 'web'
+            ? {
+                onMouseEnter: () => setHoveredItem('help'),
+                onMouseLeave: () => setHoveredItem(null),
+              }
+            : {})}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="question-circle-fill" size={19} color={theme.iconColor} />
+            <BootstrapIcon name="question-circle-fill" size={16} color={theme.iconColor} />
           </View>
           <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Help & support</Text>
-          <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
+          <BootstrapIcon name="chevron-right" size={16} color={theme.chevronColor} />
         </TouchableOpacity>
 
-        {/* 3. Report a problem (CTRL B) */}
+        {/* 4. Report a problem (CTRL B) */}
         <TouchableOpacity
-          style={styles.menuItem}
+          style={[
+            styles.menuItem,
+            hoveredItem === 'report' && { backgroundColor: theme.bgHover },
+          ]}
           onPress={handleOpenReport}
           activeOpacity={0.7}
+          {...(Platform.OS === 'web'
+            ? {
+                onMouseEnter: () => setHoveredItem('report'),
+                onMouseLeave: () => setHoveredItem(null),
+              }
+            : {})}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="chat-square-dots-fill" size={18} color={theme.iconColor} />
+            <BootstrapIcon name="chat-square-dots-fill" size={16} color={theme.iconColor} />
           </View>
           <View style={styles.textWithSubWrap}>
             <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Report a problem</Text>
             <Text style={[styles.shortcutSub, { color: theme.textMuted }]}>CTRL B</Text>
           </View>
+          <BootstrapIcon name="chevron-right" size={16} color={theme.chevronColor} />
         </TouchableOpacity>
 
-        {/* 4. Display & accessibility */}
+        {/* 5. Dark mode */}
         <TouchableOpacity
-          style={styles.menuItem}
-          onPress={handleOpenDisplay}
+          style={[
+            styles.menuItem,
+            hoveredItem === 'darkmode' && { backgroundColor: theme.bgHover },
+          ]}
+          onPress={handleToggleDarkMode}
           activeOpacity={0.7}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: effectiveDarkMode }}
+          {...(Platform.OS === 'web'
+            ? {
+                onMouseEnter: () => setHoveredItem('darkmode'),
+                onMouseLeave: () => setHoveredItem(null),
+              }
+            : {})}
         >
-          <View style={[styles.circularIconWrap, { backgroundColor: effectiveDarkMode ? theme.accentBg : theme.iconWrapBg }]}>
-            <BootstrapIcon
-              name={effectiveDarkMode ? "moon-stars-fill" : "moon-fill"}
-              size={18}
-              color={effectiveDarkMode ? theme.accentText : theme.iconColor}
-            />
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="moon-fill" size={16} color={theme.iconColor} />
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Display & accessibility</Text>
+          <View style={styles.textWithSubWrap}>
+            <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Dark mode</Text>
             <Text style={[styles.shortcutSub, { color: theme.textMuted }]}>
               {effectiveDarkMode ? 'Dark theme active' : 'Light theme active'}
             </Text>
           </View>
-          <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
+          <ToggleSwitch
+            value={effectiveDarkMode}
+            onToggle={handleToggleDarkMode}
+            size="sm"
+            activeTrackColor="#EA580C"
+            inactiveTrackColor={effectiveDarkMode ? '#475569' : '#CBD5E1'}
+          />
         </TouchableOpacity>
 
-        {/* 5. Admin Console (Store Administrator Only) */}
+        {/* Admin Console (Store Administrator Only) */}
         {isAdmin && (
           <TouchableOpacity
-            style={styles.menuItem}
+            style={[
+              styles.menuItem,
+              hoveredItem === 'admin' && { backgroundColor: theme.bgHover },
+            ]}
             onPress={() => {
               onClose();
               onNavigateToAdmin?.();
             }}
             activeOpacity={0.7}
+            {...(Platform.OS === 'web'
+              ? {
+                  onMouseEnter: () => setHoveredItem('admin'),
+                  onMouseLeave: () => setHoveredItem(null),
+                }
+              : {})}
           >
-            <View style={[styles.circularIconWrap, { backgroundColor: theme.accentBg }]}>
-              <BootstrapIcon name="shield-lock-fill" size={18} color={theme.accentText} />
+            <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+              <BootstrapIcon name="shield-lock-fill" size={16} color={theme.iconColor} />
             </View>
             <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Admin console</Text>
-            <BootstrapIcon name="chevron-right" size={17} color={theme.textMuted} />
+            <BootstrapIcon name="chevron-right" size={16} color={theme.chevronColor} />
           </TouchableOpacity>
         )}
 
         {/* 6. Log out */}
         <TouchableOpacity
-          style={styles.menuItem}
+          style={[
+            styles.menuItem,
+            hoveredItem === 'logout' && { backgroundColor: theme.bgHover },
+          ]}
           onPress={() => {
             onClose();
             setIsLogoutConfirmOpen(true);
           }}
           activeOpacity={0.7}
+          {...(Platform.OS === 'web'
+            ? {
+                onMouseEnter: () => setHoveredItem('logout'),
+                onMouseLeave: () => setHoveredItem(null),
+              }
+            : {})}
         >
-          <View style={[styles.circularIconWrap, { backgroundColor: effectiveDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2' }]}>
-            <BootstrapIcon name="box-arrow-right" size={18} color="#EF4444" />
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="box-arrow-right" size={16} color={theme.iconColor} />
           </View>
-          <Text style={[styles.menuTitle, { color: '#EF4444' }]}>Log out</Text>
+          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Log out</Text>
         </TouchableOpacity>
       </View>
     </>
@@ -1039,7 +1008,7 @@ export default function UserProfileDropdown({
                       styles.themeOptionRow,
                       {
                         backgroundColor: effectiveDarkMode ? (theme.isDark ? '#1C2622' : 'rgba(77, 184, 150, 0.12)') : theme.bgSub,
-                        borderColor: effectiveDarkMode ? '#4DB896' : theme.border,
+                        borderColor: effectiveDarkMode ? '#EA580C' : theme.border,
                       },
                     ]}
                     onPress={handleToggleDarkMode}
@@ -1057,7 +1026,7 @@ export default function UserProfileDropdown({
                         <BootstrapIcon
                           name="moon-stars-fill"
                           size={17}
-                          color={effectiveDarkMode ? '#4DB896' : '#64748B'}
+                          color={effectiveDarkMode ? '#EA580C' : '#64748B'}
                         />
                       </View>
                       <View style={{ flex: 1 }}>
@@ -1073,7 +1042,7 @@ export default function UserProfileDropdown({
                     <ToggleSwitch
                       value={effectiveDarkMode}
                       onToggle={handleToggleDarkMode}
-                      activeTrackColor="#1D4533"
+                      activeTrackColor="#EA580C"
                       inactiveTrackColor="#CBD5E1"
                     />
                   </TouchableOpacity>
@@ -1106,7 +1075,7 @@ export default function UserProfileDropdown({
                     <ToggleSwitch
                       value={highLegibility}
                       onToggle={() => setHighLegibility((prev) => !prev)}
-                      activeTrackColor="#1D4533"
+                      activeTrackColor="#EA580C"
                       inactiveTrackColor="#CBD5E1"
                     />
                   </TouchableOpacity>
@@ -1158,19 +1127,24 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: '100%',
     right: 0,
-    marginTop: 8,
-    width: 320,
+    marginTop: 6,
+    width: 295,
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#CED0D4',
+    borderColor: '#E2E8F0',
     paddingHorizontal: 8,
     paddingVertical: 10,
     zIndex: 9999,
+    ...(Platform.OS === 'web'
+      ? {
+          boxShadow: '0 16px 36px -8px rgba(0, 0, 0, 0.14), 0 6px 12px -4px rgba(0, 0, 0, 0.05)',
+        }
+      : {}),
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
     elevation: 16,
   },
   dropdownContainerMobile: {
@@ -1180,91 +1154,122 @@ const styles = StyleSheet.create({
     right: 'auto',
     marginTop: 0,
     width: '100%',
-    maxWidth: 340,
+    maxWidth: 295,
     backgroundColor: '#FFFFFF',
-    borderColor: '#CED0D4',
+    borderRadius: 16,
+    borderColor: '#E2E8F0',
   },
   userProfileCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
+    gap: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
     borderRadius: 10,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {}),
+    ...(Platform.OS === 'web'
+      ? {
+          cursor: 'pointer',
+          userSelect: 'none',
+          transition: 'background-color 0.15s ease',
+        }
+      : {}),
   },
   avatarImg: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#F0F2F5',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
     borderWidth: 1,
-    borderColor: '#CED0D4',
+    borderColor: '#E2E8F0',
   },
   avatarFallback: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#E4E6EB',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
   },
   userInfo: {
     flex: 1,
+    justifyContent: 'center',
   },
   userName: {
-    fontSize: 16,
+    fontSize: 14.5,
     fontWeight: '700',
-    color: '#050505',
+    color: '#0F172A',
     letterSpacing: -0.2,
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   userSub: {
-    fontSize: 13,
-    color: '#65676B',
-    marginTop: 2,
-    fontWeight: '500',
+    fontSize: 12,
+    color: '#64748B',
+    marginTop: 1,
+    fontWeight: '400',
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   divider: {
     height: 1,
-    backgroundColor: '#CED0D4',
+    backgroundColor: '#E2E8F0',
     marginVertical: 6,
-    marginHorizontal: 8,
+    marginHorizontal: 4,
   },
   menuList: {
-    paddingVertical: 2,
+    paddingVertical: 1,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: 8,
+    paddingVertical: 6.5,
+    paddingHorizontal: 6,
     borderRadius: 10,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {}),
+    marginVertical: 0.5,
+    ...(Platform.OS === 'web'
+      ? {
+          cursor: 'pointer',
+          userSelect: 'none',
+          transition: 'background-color 0.15s ease',
+        }
+      : {}),
   },
   circularIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#E4E6EB',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
   menuTitle: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#050505',
+    color: '#0F172A',
     flex: 1,
+    letterSpacing: -0.1,
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   textWithSubWrap: {
     flex: 1,
+    justifyContent: 'center',
   },
   shortcutSub: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
-    color: '#65676B',
+    color: '#64748B',
     marginTop: 1,
     letterSpacing: 0.2,
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   modalOverlay: {
     flex: 1,
@@ -1335,7 +1340,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   reportSubmitText: {
     fontSize: 14,
@@ -1376,7 +1381,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   activeTag: {
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
@@ -1384,7 +1389,7 @@ const styles = StyleSheet.create({
   activeTagText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   submenuContainer: {
     paddingVertical: 2,
@@ -1392,23 +1397,27 @@ const styles = StyleSheet.create({
   submenuHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 4,
     paddingHorizontal: 4,
-    marginBottom: 6,
+    marginBottom: 4,
     gap: 8,
   },
   backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {}),
   },
   submenuTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#050505',
-    letterSpacing: -0.3,
+    color: '#0F172A',
+    letterSpacing: -0.2,
+    ...(Platform.OS === 'web'
+      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      : {}),
   },
   menuItemHighlighted: {
     backgroundColor: '#F0F2F5',
@@ -1425,9 +1434,9 @@ const styles = StyleSheet.create({
     borderColor: '#CED0D4',
   },
   selectionRowActive: {
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
   },
   selectionRowText: {
     fontSize: 14,

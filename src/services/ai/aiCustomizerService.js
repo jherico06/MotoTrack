@@ -2,6 +2,10 @@
 import { garageService } from '../bookings/garageService.js';
 import { geminiService } from './geminiService.js';
 import { usdToPhp } from '../../utils/currency.js';
+import { promoService } from '../products/promoService.js';
+
+/** Standard AI install labor fee (USD). Waived when product has FREE_INSTALLATION promo. */
+export const AI_INSTALLATION_FEE_USD = 65.0;
 
 export const BIKE_PRESETS = [
   {
@@ -67,8 +71,8 @@ export const CUSTOM_THEMES = [
     name: 'Factory Racing Edition',
     badge: 'Track Spec',
     description: 'High-contrast racing decals, anodized gold hardware, and titanium blue flame pipe accents.',
-    accentColor: '#1D4533',
-    previewGradient: ['#1D4533', '#F59E0B'],
+    accentColor: '#EA580C',
+    previewGradient: ['#24272B', '#EA580C'],
   },
   {
     id: 'theme-stealth-carbon',
@@ -423,7 +427,8 @@ export const aiCustomizerService = {
 
 
   /**
-   * Book a customization service at MotoTrack Pitstop Garage
+   * Book a customization / AI install service at MotoTrack Pitstop Garage.
+   * Applies FREE_INSTALLATION promo when any selected product is eligible.
    */
   async bookCustomizationService({
     customizationData,
@@ -436,35 +441,93 @@ export const aiCustomizerService = {
     notes,
     currentUser,
   }) {
-    const partsNames = (customizationData?.selectedParts || []).map((p) => p.name).join(' + ');
-    const partsCost = customizationData?.partsTotalUsd || 150;
-    const installationFee = 65.0; // Professional installation fee in USD
-    const totalEstUsd = partsCost + installationFee;
+    const selectedParts = customizationData?.selectedParts || [];
+    const partsNames = selectedParts.map((p) => p.name || p.product_name).filter(Boolean).join(' + ');
+    const productIds = selectedParts
+      .map((p) => p.id || p.product_id || p.productId)
+      .filter(Boolean)
+      .map(String);
+
+    const partsCostUsd = Number(
+      customizationData?.partsTotalUsd ??
+        selectedParts.reduce((sum, p) => sum + Number(p.price || 0), 0)
+    );
+    let installationFeeUsd = AI_INSTALLATION_FEE_USD;
+    let freeInstallPromo = null;
+
+    try {
+      freeInstallPromo = await promoService.findApplicableFreeInstallation(productIds);
+      if (freeInstallPromo?.isFreeInstallation) {
+        installationFeeUsd = 0;
+      }
+    } catch (e) {
+      console.warn('[bookCustomization] free install lookup:', e?.message || e);
+    }
+
+    const totalEstUsd = Math.max(0, partsCostUsd) + installationFeeUsd;
     const totalEstPhp = usdToPhp(totalEstUsd);
+    const installFeePhp = usdToPhp(installationFeeUsd);
+    const customizationId =
+      customizationData?.customizationId ||
+      customizationData?.customization_id ||
+      null;
+
+    const feeNote = freeInstallPromo
+      ? `Installation fee: FREE (promo ${freeInstallPromo.code})`
+      : `Installation fee: ₱${installFeePhp.toLocaleString()}`;
 
     const bookingPayload = {
       category: 'Customization',
       service_id: 'cust-ai-bespoke',
-      service_title: `AI Custom Build: ${customizationData?.bikeName || 'Motorcycle'}`,
+      service_title: `AI Install: ${customizationData?.bikeName || 'Motorcycle'}`,
       service_price: totalEstUsd,
       pricePhp: totalEstPhp,
       bike_brand: customizationData?.bikeBrand || 'Motorcycle',
-      bike_model: customizationData?.bikeName || 'Custom Model',
+      bike_model: customizationData?.bikeName || customizationData?.bikeModel || 'Custom Model',
       plate_number: plateNumber || 'Pending Plate',
       odometer: 'Custom Project',
       appointment_date: appointmentDate || 'Tomorrow, 10:30 AM',
       time_slot: timeSlot || '10:30 AM - 12:00 PM',
-      branch: branchName || 'MotoTrack Flagship Central Hub - Quezon City',
+      branch: branchName || 'MotoTrack Flagship Central Hub & Pit Bays',
       customer_name: customerName || currentUser?.name || 'MotoTrack Rider',
-      customer_phone: customerPhone || '+63 917 882 9102',
+      customer_phone: customerPhone || currentUser?.phone || '',
       customer_id: currentUser?.customer_id || currentUser?.id || 'guest',
-      notes: `[AI Customizer Build #${customizationData?.customizationId}]\nEquipped Parts: ${partsNames}\n${notes || ''}`,
+      user_id: currentUser?.id || currentUser?.user_id || null,
+      motorcycle_id: customizationData?.motorcycleId || customizationData?.motorcycle_id || null,
+      customization_id: customizationId,
+      installation_fee_waived: Boolean(freeInstallPromo),
+      installation_promo_id: freeInstallPromo?.promoId || null,
+      photos: customizationData?.generatedImage ? [customizationData.generatedImage] : [],
+      notes: [
+        `[AI Install Studio${customizationId ? ` #${customizationId}` : ''}]`,
+        partsNames ? `Parts: ${partsNames}` : null,
+        feeNote,
+        notes || null,
+      ]
+        .filter(Boolean)
+        .join('\n'),
       ai_custom_image: customizationData?.generatedImage,
-      custom_parts_list: customizationData?.selectedParts,
-      performance_gain: `+${customizationData?.diagnostics?.hpGain || 0} HP, -${customizationData?.diagnostics?.weightSavingsKg || 0} kg`,
+      custom_parts_list: selectedParts,
+      performance_gain: customizationData?.diagnostics
+        ? `+${customizationData?.diagnostics?.hpGain || 0} HP, -${customizationData?.diagnostics?.weightSavingsKg || 0} kg`
+        : '',
     };
 
     const newBooking = await garageService.createBooking(bookingPayload);
-    return newBooking;
+
+    if (freeInstallPromo?.promoId) {
+      try {
+        await promoService.incrementUsage(freeInstallPromo.promoId);
+      } catch (_e) {
+        /* non-blocking */
+      }
+    }
+
+    return {
+      ...newBooking,
+      installationFeeWaived: Boolean(freeInstallPromo),
+      installationPromo: freeInstallPromo,
+      installationFeePhp: installFeePhp,
+    };
   },
 };

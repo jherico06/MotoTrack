@@ -14,7 +14,7 @@ export default function DesktopWorkArea({ title, subtitle, children, maxWidth = 
       <View
         style={{
           width: 232,
-          backgroundColor: '#1D4533',
+          backgroundColor: '#EA580C',
           paddingTop: 28,
           paddingHorizontal: 22,
         }}

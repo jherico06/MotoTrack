@@ -245,7 +245,7 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
                     onPress={onNavigateToLogin}
                     activeOpacity={0.8}
                   >
-                    <BootstrapIcon name="arrow-left" size={14} color="#1D4533" />
+                    <BootstrapIcon name="arrow-left" size={14} color="#EA580C" />
                     <Text style={styles.backLinkText}>Back to login</Text>
                   </TouchableOpacity>
 
@@ -264,11 +264,11 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
                   {/* 1. Full Name */}
                   <View style={styles.inputGroup}>
                     <View style={[styles.inputPill, focusedField === 'name' && styles.inputPillFocused]}>
-                      <BootstrapIcon name="person" size={17} color="#88A9A3" />
+                      <BootstrapIcon name="person" size={17} color="#94A3B8" />
                       <TextInput
                         style={styles.textInput}
                         placeholder="Full Name"
-                        placeholderTextColor="#9FB9B5"
+                        placeholderTextColor="#94A3B8"
                         value={name}
                         onChangeText={(t) => {
                           setName(t);
@@ -283,11 +283,11 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
                   {/* 2. Email */}
                   <View style={styles.inputGroup}>
                     <View style={[styles.inputPill, focusedField === 'email' && styles.inputPillFocused]}>
-                      <BootstrapIcon name="envelope" size={17} color="#88A9A3" />
+                      <BootstrapIcon name="envelope" size={17} color="#94A3B8" />
                       <TextInput
                         style={styles.textInput}
                         placeholder="Email Address"
-                        placeholderTextColor="#9FB9B5"
+                        placeholderTextColor="#94A3B8"
                         value={email}
                         onChangeText={(t) => {
                           setEmail(t);
@@ -304,11 +304,11 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
                   {/* 3. Phone */}
                   <View style={styles.inputGroup}>
                     <View style={[styles.inputPill, focusedField === 'phone' && styles.inputPillFocused]}>
-                      <BootstrapIcon name="phone" size={17} color="#88A9A3" />
+                      <BootstrapIcon name="phone" size={17} color="#94A3B8" />
                       <TextInput
                         style={styles.textInput}
                         placeholder="Phone Number (+63 917...)"
-                        placeholderTextColor="#9FB9B5"
+                        placeholderTextColor="#94A3B8"
                         value={phone}
                         onChangeText={(t) => {
                           setPhone(t);
@@ -324,11 +324,11 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
                   {/* Delivery Address */}
                   <View style={styles.inputGroup}>
                     <View style={[styles.inputPill, focusedField === 'address' && styles.inputPillFocused]}>
-                      <BootstrapIcon name="geo-alt" size={17} color="#88A9A3" />
+                      <BootstrapIcon name="geo-alt" size={17} color="#94A3B8" />
                       <TextInput
                         style={styles.textInput}
                         placeholder="Delivery Address (Street, City, Province)"
-                        placeholderTextColor="#9FB9B5"
+                        placeholderTextColor="#94A3B8"
                         value={address}
                         onChangeText={(t) => {
                           setAddress(t);
@@ -344,11 +344,11 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
                   {/* 4. Password */}
                   <View style={styles.inputGroup}>
                     <View style={[styles.inputPill, focusedField === 'password' && styles.inputPillFocused]}>
-                      <BootstrapIcon name="lock" size={17} color="#88A9A3" />
+                      <BootstrapIcon name="lock" size={17} color="#94A3B8" />
                       <TextInput
                         style={styles.textInput}
                         placeholder="Password"
-                        placeholderTextColor="#9FB9B5"
+                        placeholderTextColor="#94A3B8"
                         value={password}
                         onChangeText={(t) => {
                           setPassword(t);
@@ -362,7 +362,7 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
                         onPress={() => setShowPassword(!showPassword)}
                         hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                       >
-                        <BootstrapIcon name={showPassword ? 'eye-slash' : 'eye'} size={16} color="#88A9A3" />
+                        <BootstrapIcon name={showPassword ? 'eye-slash' : 'eye'} size={16} color="#94A3B8" />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -477,11 +477,11 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
                         focusedField === 'confirmPassword' && styles.inputPillFocused,
                       ]}
                     >
-                      <BootstrapIcon name="lock-fill" size={17} color="#88A9A3" />
+                      <BootstrapIcon name="lock-fill" size={17} color="#94A3B8" />
                       <TextInput
                         style={styles.textInput}
                         placeholder="Confirm Password"
-                        placeholderTextColor="#9FB9B5"
+                        placeholderTextColor="#94A3B8"
                         value={confirmPassword}
                         onChangeText={(t) => {
                           setConfirmPassword(t);
@@ -520,13 +520,13 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
                 // ─── STEP 2: OTP VERIFICATION SCREEN ───
                 <>
                   <TouchableOpacity style={styles.backLinkRow} onPress={() => setStep(1)} activeOpacity={0.8}>
-                    <BootstrapIcon name="arrow-left" size={14} color="#1D4533" />
+                    <BootstrapIcon name="arrow-left" size={14} color="#EA580C" />
                     <Text style={styles.backLinkText}>Edit registration details</Text>
                   </TouchableOpacity>
 
                   <View style={styles.otpHeroBox}>
                     <View style={styles.otpIconBadge}>
-                      <BootstrapIcon name="shield-lock-fill" size={28} color="#1D4533" />
+                      <BootstrapIcon name="shield-lock-fill" size={28} color="#EA580C" />
                     </View>
                     <Text style={styles.otpTitle}>Verify Your Email</Text>
                     <Text style={styles.otpSubtitle}>

@@ -192,14 +192,14 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <View style={styles.titleRow}>
                 <View style={styles.iconWrap}>
-                  <BootstrapIcon name="shield-lock-fill" size={16} color="#1D4533" />
+                  <BootstrapIcon name="shield-lock-fill" size={17} color="#EA580C" />
                 </View>
                 <Text style={styles.title}>Admin Account</Text>
               </View>
@@ -207,8 +207,8 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
                 Change your login password and Admin Security PIN. Only you can update these.
               </Text>
             </View>
-            <TouchableOpacity onPress={onClose} hitSlop={10}>
-              <BootstrapIcon name="x-lg" size={16} color="#64748B" />
+            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
+              <BootstrapIcon name="x-lg" size={14} color="#64748B" />
             </TouchableOpacity>
           </View>
 
@@ -309,7 +309,7 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
                 onPress={() => setShowPins((v) => !v)}
                 activeOpacity={0.8}
               >
-                <BootstrapIcon name={showPins ? 'eye-slash' : 'eye'} size={13} color="#1D4533" />
+                <BootstrapIcon name={showPins ? 'eye-slash' : 'eye'} size={13} color="#EA580C" />
                 <Text style={styles.pinToggleText}>{showPins ? 'Hide' : 'Show'}</Text>
               </TouchableOpacity>
             </View>
@@ -389,50 +389,65 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15,23,42,0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'flex-end',
+    padding: 0,
   },
   sheet: {
     width: '100%',
-    maxWidth: 460,
+    maxWidth: 600,
     maxHeight: '92%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
     overflow: 'hidden',
-    ...Platform.select({
-      web: { boxShadow: '0 18px 40px rgba(0,0,0,0.25)' },
-      default: { elevation: 8 },
-    }),
+    alignSelf: 'center',
+    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 18,
+    alignItems: 'center',
+    paddingHorizontal: 18,
+    paddingTop: 18,
+    paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#F1F5F9',
   },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 2 },
   iconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: '#F3F7F6',
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
-    borderColor: '#C8DDD3',
+    borderColor: '#FED7AA',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { fontSize: 18, fontWeight: '900', color: '#0F172A' },
-  subtitle: { fontSize: 12, color: '#64748B', marginTop: 6, lineHeight: 17 },
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  title: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
+  subtitle: { fontSize: 12, color: '#64748B', marginTop: 2, lineHeight: 17 },
   body: { paddingHorizontal: 18, paddingTop: 14 },
   label: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 },
   section: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
     marginTop: 10,
     marginBottom: 4,
     letterSpacing: 0.3,
@@ -499,7 +514,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: '#F3F7F6',
   },
-  pinToggleText: { fontSize: 11, fontWeight: '800', color: '#1D4533' },
+  pinToggleText: { fontSize: 11, fontWeight: '800', color: '#EA580C' },
   errorBox: {
     backgroundColor: '#FEF2F2',
     borderRadius: 8,
@@ -531,16 +546,16 @@ const styles = StyleSheet.create({
   cancelBtn: {
     borderWidth: 1,
     borderColor: '#CBD5E1',
-    borderRadius: 10,
+    borderRadius: 14,
     paddingHorizontal: 16,
-    paddingVertical: 11,
+    paddingVertical: 12,
   },
   cancelText: { color: '#64748B', fontWeight: '700' },
   saveBtn: {
-    backgroundColor: '#1D4533',
-    borderRadius: 10,
+    backgroundColor: '#EA580C',
+    borderRadius: 14,
     paddingHorizontal: 18,
-    paddingVertical: 11,
+    paddingVertical: 12,
     minWidth: 130,
     alignItems: 'center',
   },

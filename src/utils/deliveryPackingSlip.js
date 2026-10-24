@@ -218,7 +218,7 @@ function buildPackingSlipHtml(fields) {
       margin-bottom: 16px;
     }
     .btn-action {
-      background: #1D4533;
+      background: #EA580C;
       color: #FFFFFF;
       border: none;
       border-radius: 8px;

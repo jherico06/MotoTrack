@@ -134,7 +134,28 @@ export default function ProductSpecsModal({
         <View style={styles.modalOverlay}>
           <View style={[styles.modalSheet, { maxHeight: '92%' }]}>
             <View style={styles.modalHeaderRow}>
-              <Text style={styles.modalTitle}>Product Details</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+                <View
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 12,
+                    backgroundColor: '#FFF7ED',
+                    borderWidth: 1,
+                    borderColor: '#FED7AA',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BootstrapIcon name="box-seam-fill" size={16} color="#EA580C" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalTitle}>Product Details</Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                    Specifications & customer reviews
+                  </Text>
+                </View>
+              </View>
               <TouchableOpacity style={styles.modalCloseBtn} onPress={handleClose}>
                 <BootstrapIcon name="x-lg" size={14} color="#64748b" />
               </TouchableOpacity>
@@ -205,7 +226,7 @@ export default function ProductSpecsModal({
                   <Text style={styles.formLabel}>Key Features</Text>
                   {product.features.map((feat, idx) => (
                     <View key={idx} style={styles.featureBullet}>
-                      <BootstrapIcon name="check2" size={14} color="#1D4533" />
+                      <BootstrapIcon name="check2" size={14} color="#EA580C" />
                       <Text style={styles.featureBulletText}>{feat}</Text>
                     </View>
                   ))}
@@ -216,7 +237,7 @@ export default function ProductSpecsModal({
                 <Text style={styles.formLabel}>Customer Reviews</Text>
                 {reviewsLoading ? (
                   <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-                    <ActivityIndicator color="#1D4533" />
+                    <ActivityIndicator color="#EA580C" />
                   </View>
                 ) : reviews.length === 0 ? (
                   <View
@@ -313,7 +334,7 @@ export default function ProductSpecsModal({
                     gap: 6,
                     backgroundColor: '#FFFFFF',
                     borderWidth: 1.5,
-                    borderColor: '#1D4533',
+                    borderColor: '#EA580C',
                     opacity: productSoldOut ? 0.5 : 1,
                   },
                 ]}
@@ -321,8 +342,8 @@ export default function ProductSpecsModal({
                 onPress={handleBuyNowPress}
                 activeOpacity={0.9}
               >
-                <BootstrapIcon name="lightning-fill" size={14} color="#1D4533" />
-                <Text style={[styles.checkoutBtnText, { color: '#1D4533' }]}>Buy Now</Text>
+                <BootstrapIcon name="lightning-fill" size={14} color="#EA580C" />
+                <Text style={[styles.checkoutBtnText, { color: '#EA580C' }]}>Buy Now</Text>
               </TouchableOpacity>
             </View>
           </View>

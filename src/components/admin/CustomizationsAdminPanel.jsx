@@ -13,7 +13,7 @@ import { customizationService } from '../../services/bookings/customizationServi
 import { BootstrapIcon } from '../common';
 import { getThemeTokens } from '../../styles/theme.js';
 
-const TEAL = '#1D4533';
+const TEAL = '#EA580C';
 
 /**
  * Admin read-only customization activity panel.
@@ -191,7 +191,7 @@ function createStyles(t, isDark) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      backgroundColor: isDark ? '#1F6B52' : TEAL,
+      backgroundColor: isDark ? '#EA580C' : TEAL,
       paddingHorizontal: 12,
       paddingVertical: 8,
       borderRadius: 8,
@@ -221,15 +221,21 @@ function createStyles(t, isDark) {
     error: { color: isDark ? t.statusDangerText : '#B91C1C', marginBottom: 8 },
     tableHead: {
       flexDirection: 'row',
-      paddingVertical: 8,
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: '#24272B',
+      borderRadius: 8,
       borderBottomWidth: 1,
-      borderBottomColor: isDark ? t.border : '#E2E8F0',
+      borderBottomColor: isDark ? '#374151' : '#32373D',
+      marginBottom: 6,
     },
-    th: { fontSize: 11, fontWeight: '700', color: isDark ? t.textMuted : '#64748B', textTransform: 'uppercase' },
+    th: { fontSize: 11, fontWeight: '700', color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: 0.5 },
     tr: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingVertical: 10,
+      paddingHorizontal: 12,
       borderBottomWidth: 1,
       borderBottomColor: isDark ? t.tableRowBorder : '#F1F5F9',
     },

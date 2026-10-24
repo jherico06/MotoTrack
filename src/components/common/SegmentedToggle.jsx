@@ -91,12 +91,12 @@ export default function SegmentedToggle({
               borderRadius: 10,
               backgroundColor: '#FFFFFF',
               borderWidth: 1.5,
-              borderColor: selectedOption?.activeBorder || selectedOption?.color || '#1D4533',
+              borderColor: selectedOption?.activeBorder || selectedOption?.color || '#EA580C',
               boxShadow: selectedOption?.glow
                 ? `0 3px 12px ${selectedOption.glow}`
                 : selectedOption?.id === 'Repair'
                 ? '0 3px 12px rgba(220, 38, 38, 0.15)'
-                : '0 3px 12px rgba(29, 69, 51, 0.15)',
+                : '0 3px 12px rgba(234, 88, 12, 0.15)',
               transform: `translateX(calc(${selectedIndex} * (100% + ${gap}px)))`,
               transition:
                 'transform 0.3s cubic-bezier(0.34, 1.35, 0.64, 1), border-color 0.22s ease, box-shadow 0.22s ease',
@@ -116,7 +116,7 @@ export default function SegmentedToggle({
                 borderRadius: 10,
                 backgroundColor: '#FFFFFF',
                 borderWidth: 1.5,
-                borderColor: selectedOption?.activeBorder || selectedOption?.color || '#1D4533',
+                borderColor: selectedOption?.activeBorder || selectedOption?.color || '#EA580C',
                 transform: [
                   {
                     translateX: slideAnim.interpolate({
@@ -135,9 +135,9 @@ export default function SegmentedToggle({
         {options.map((opt, idx) => {
           const isSelected = selectedIndex === idx;
           const isRepair = opt.id === 'Repair';
-          const activeColor = opt.color || (isRepair ? '#DC2626' : '#1D4533');
-          const activeLabelColor = opt.activeColor || (isRepair ? '#991B1B' : '#1D4533');
-          const badgeBg = opt.badgeBg || (isRepair ? '#FEE2E2' : '#C8DDD3');
+          const activeColor = opt.color || (isRepair ? '#DC2626' : '#EA580C');
+          const activeLabelColor = opt.activeColor || (isRepair ? '#991B1B' : '#EA580C');
+          const badgeBg = opt.badgeBg || (isRepair ? '#FEE2E2' : '#FED7AA');
 
           return (
             <TouchableOpacity

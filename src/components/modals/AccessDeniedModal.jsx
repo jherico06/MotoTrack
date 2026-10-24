@@ -25,18 +25,74 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.modalSheet, { maxWidth: 460, alignItems: 'center', textAlign: 'center' }]}>
-          <BootstrapIcon name="shield-lock-fill" size={44} color="#1D4533" style={{ marginBottom: 10 }} />
-          <Text style={{ fontSize: 19, fontWeight: '900', color: '#0F172A', marginBottom: 8 }}>
-            Admin Privileges Required
-          </Text>
+        <View
+          style={[
+            styles.modalSheet,
+            {
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              paddingBottom: 24,
+            },
+          ]}
+        >
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingBottom: 14,
+              borderBottomWidth: 1,
+              borderBottomColor: '#F1F5F9',
+              marginBottom: 16,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <View
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  backgroundColor: '#FFF7ED',
+                  borderWidth: 1,
+                  borderColor: '#FED7AA',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <BootstrapIcon name="shield-lock-fill" size={17} color="#EA580C" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16.5, fontWeight: '800', color: '#0F172A' }}>
+                  Admin Privileges Required
+                </Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                  Store administrator verification
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 17,
+                backgroundColor: '#F1F5F9',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              onPress={onClose}
+              activeOpacity={0.7}
+            >
+              <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+            </TouchableOpacity>
+          </View>
+
           <Text
             style={{
               fontSize: 13.5,
               color: '#64748B',
-              textAlign: 'center',
               lineHeight: 20,
               marginBottom: 20,
             }}
@@ -46,42 +102,46 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
 
           {/* Quick One-Click Switch to Admin */}
           <TouchableOpacity
-            style={[
-              styles.checkoutBtn,
-              {
-                backgroundColor: '#1D4533',
-                width: '100%',
-                marginBottom: 8,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-              },
-            ]}
+            style={{
+              backgroundColor: '#EA580C',
+              width: '100%',
+              paddingVertical: 13,
+              borderRadius: 14,
+              marginBottom: 10,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              shadowColor: '#EA580C',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 4,
+              elevation: 2,
+            }}
             onPress={handleInstantAdminSwitch}
             activeOpacity={0.85}
           >
             <BootstrapIcon name="shield-check" size={16} color="#FFFFFF" />
-            <Text style={[styles.checkoutBtnText, { color: '#FFFFFF' }]}>
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13.5 }}>
               Switch to Store Admin (One-Click)
             </Text>
           </TouchableOpacity>
 
           {/* Sign In with Another Account */}
           <TouchableOpacity
-            style={[
-              styles.checkoutBtn,
-              {
-                backgroundColor: '#F1F5F9',
-                width: '100%',
-                marginTop: 0,
-                marginBottom: 8,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-              },
-            ]}
+            style={{
+              backgroundColor: '#F1F5F9',
+              width: '100%',
+              paddingVertical: 13,
+              borderRadius: 14,
+              marginBottom: 10,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              borderWidth: 1,
+              borderColor: '#E2E8F0',
+            }}
             onPress={handleManualAdminLogin}
             activeOpacity={0.85}
           >

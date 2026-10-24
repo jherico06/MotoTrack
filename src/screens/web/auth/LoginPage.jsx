@@ -9,12 +9,14 @@ import {
   Animated,
   Easing,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BootstrapIcon, BrandLogo, GoogleIcon } from '../../../components';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import { appStorage } from '../../../services/system/storageAdapter.js';
+import { fontFamily } from '../../../styles/typography.js';
 import { botanicalStyles, authWebStyles as authStyles } from '../../../styles/web/loginPage.web.styles.js';
 
 const REMEMBER_EMAIL_KEY = 'mototrack_remember_login_email';
@@ -40,7 +42,7 @@ export default function LoginPageWeb({
   const [activeMode, setActiveMode] = useState(initialMode);
 
   // Animated Sliding Value (0 = Sign In [Panel on Right], 1 = Sign Up [Panel on Left])
-  const slideAnim = useRef(new Animated.Value(initialMode === 'signup' ? 1 : 0)).current;
+  const [slideAnim] = useState(() => new Animated.Value(initialMode === 'signup' ? 1 : 0));
 
   // Sign In Form State
   const [signInEmail, setSignInEmail] = useState(() => {
@@ -55,10 +57,42 @@ export default function LoginPageWeb({
   const [signInError, setSignInError] = useState('');
   const [authSuccessNotification, setAuthSuccessNotification] = useState('');
   const [brandSettings, setBrandSettings] = useState(() => systemSettingsService.getSettings());
+  const [focusedField, setFocusedField] = useState(null);
 
   useEffect(() => {
     const unsub = systemSettingsService.subscribe(setBrandSettings);
     return unsub;
+  }, []);
+
+  // Suppress native Edge / Chromium password reveal icon to prevent duplicate eye icons
+  useEffect(() => {
+    if (Platform.OS === 'web' && typeof document !== 'undefined') {
+      const styleId = 'mototrack-hide-native-password-reveal';
+      if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.innerHTML = `
+          input::-ms-reveal,
+          input::-ms-clear {
+            display: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+          }
+          input::-webkit-contacts-auto-fill-button,
+          input::-webkit-credentials-auto-fill-button {
+            visibility: hidden !important;
+            display: none !important;
+            pointer-events: none !important;
+            height: 0 !important;
+            width: 0 !important;
+            margin: 0 !important;
+          }
+        `;
+        document.head.appendChild(style);
+      }
+    }
   }, []);
   const [isSignInLoading, setIsSignInLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -89,6 +123,16 @@ export default function LoginPageWeb({
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const otpInputRefs = useRef([]);
+
+  // Input Refs for smooth keyboard traversal & enter-to-submit
+  const signInEmailRef = useRef(null);
+  const signInPasswordRef = useRef(null);
+  const signUpNameRef = useRef(null);
+  const signUpEmailRef = useRef(null);
+  const signUpPhoneRef = useRef(null);
+  const signUpAddressRef = useRef(null);
+  const signUpPasswordRef = useRef(null);
+  const signUpConfirmPasswordRef = useRef(null);
 
   // Password Strength State
   const passwordAnalysis = validatePasswordStrength
@@ -146,6 +190,7 @@ export default function LoginPageWeb({
 
   // ─── 1. SIGN IN HANDLER (CONNECTED TO SUPABASE) ───
   const handleSignInSubmit = async () => {
+    if (isSignInLoading) return;
     setSignInError('');
     setAuthSuccessNotification('');
     const cleanEmail = (signInEmail || '').trim();
@@ -229,6 +274,7 @@ export default function LoginPageWeb({
 
   // ─── 2. SIGN UP STEP 1: SEND OTP (WITH STRONG PASSWORD VALIDATION) ───
   const handleRequestOtp = async () => {
+    if (isSignUpLoading) return;
     setSignUpError('');
     setSignUpSuccessMsg('');
 
@@ -340,6 +386,7 @@ export default function LoginPageWeb({
 
   // ─── 5. SIGN UP STEP 2: VERIFY OTP & CREATE ACCOUNT IN SUPABASE ───
   const handleVerifyOtpAndCreate = async () => {
+    if (isSignUpLoading) return;
     setSignUpError('');
     const fullOtp = otpDigits.join('');
 
@@ -378,708 +425,951 @@ export default function LoginPageWeb({
     }
   };
 
-  // Interpolated sliding translations for 820px wide card (410px each half)
+  const { width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth < 768;
+  const halfWidth = Math.round(windowWidth * 0.5);
+
+  // Interpolated sliding translations for full-screen split-screen layout (half-width slide)
   const overlayTranslateX = slideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [410, 0],
+    outputRange: [halfWidth, 0],
   });
 
   const isSignUp = activeMode === 'signup';
 
+  const signInFormContent = (
+    <>
+      {/* MotoTrack Brand Logo */}
+      <View style={authStyles.modalTopLogo}>
+        <BrandLogo size={42} textColor="#181A1D" accentColor="#EA580C" />
+      </View>
+
+      <Text style={[authStyles.formHeading, { fontFamily: fontFamily.sans }]}>
+        Sign In to {brandSettings.storeName || 'MotoTrack'}
+      </Text>
+
+      {authSuccessNotification ? (
+        <View style={authStyles.successBadge}>
+          <BootstrapIcon name="check-circle" size={14} color="#065F46" />
+          <Text style={[authStyles.successBadgeText, { fontFamily: fontFamily.sans }]}>{authSuccessNotification}</Text>
+        </View>
+      ) : null}
+
+      {signInError.length > 0 && (
+        <View style={authStyles.errorBadge}>
+          <BootstrapIcon name="exclamation-circle" size={13} color="#DC2626" />
+          <Text style={[authStyles.errorBadgeText, { fontFamily: fontFamily.sans }]}>{signInError}</Text>
+        </View>
+      )}
+
+      {/* Email / Username Input */}
+      <View
+        style={[
+          authStyles.inputWrap,
+          focusedField === 'signInEmail' && authStyles.inputWrapFocused,
+        ]}
+      >
+        <BootstrapIcon
+          name="envelope"
+          size={16}
+          color={focusedField === 'signInEmail' ? '#EA580C' : '#64748B'}
+        />
+        <TextInput
+          ref={signInEmailRef}
+          style={[authStyles.textInput, { fontFamily: fontFamily.sans }]}
+          placeholder="Email or username"
+          placeholderTextColor="#64748B"
+          value={signInEmail}
+          onChangeText={(t) => {
+            setSignInEmail(t);
+            if (signInError) setSignInError('');
+          }}
+          onFocus={() => setFocusedField('signInEmail')}
+          onBlur={() => setFocusedField(null)}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          returnKeyType="next"
+          blurOnSubmit={false}
+          onSubmitEditing={() => {
+            if (signInPassword.trim()) {
+              handleSignInSubmit();
+            } else {
+              signInPasswordRef.current?.focus();
+            }
+          }}
+        />
+      </View>
+
+      {/* Password Input */}
+      <View
+        style={[
+          authStyles.inputWrap,
+          focusedField === 'signInPassword' && authStyles.inputWrapFocused,
+        ]}
+      >
+        <BootstrapIcon
+          name="lock"
+          size={16}
+          color={focusedField === 'signInPassword' ? '#EA580C' : '#64748B'}
+        />
+        <TextInput
+          ref={signInPasswordRef}
+          style={[authStyles.textInput, { fontFamily: fontFamily.sans }]}
+          placeholder="Password"
+          placeholderTextColor="#64748B"
+          value={signInPassword}
+          onChangeText={(t) => {
+            setSignInPassword(t);
+            if (signInError) setSignInError('');
+          }}
+          onFocus={() => setFocusedField('signInPassword')}
+          onBlur={() => setFocusedField(null)}
+          secureTextEntry={!showSignInPassword}
+          autoCapitalize="none"
+          returnKeyType="go"
+          onSubmitEditing={handleSignInSubmit}
+        />
+        <TouchableOpacity
+          onPress={() => setShowSignInPassword(!showSignInPassword)}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={{ cursor: 'pointer' }}
+        >
+          <BootstrapIcon
+            name={showSignInPassword ? 'eye-slash' : 'eye'}
+            size={16}
+            color={focusedField === 'signInPassword' ? '#EA580C' : '#64748B'}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {/* Remember Me & Forgot Password */}
+      <View style={authStyles.rememberForgotRow}>
+        <TouchableOpacity
+          style={authStyles.rememberMeBtn}
+          onPress={() => setRememberMe((prev) => !prev)}
+          activeOpacity={0.8}
+        >
+          <View
+            style={[
+              authStyles.rememberCheckbox,
+              rememberMe && authStyles.rememberCheckboxChecked,
+            ]}
+          >
+            {rememberMe ? (
+              <BootstrapIcon name="check" size={12} color="#FFFFFF" />
+            ) : null}
+          </View>
+          <Text style={[authStyles.rememberMeText, { fontFamily: fontFamily.sans }]}>Remember me</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={authStyles.forgotPasswordBtn}
+          onPress={() => alert('Password reset verification link sent to registered email.')}
+          activeOpacity={0.8}
+        >
+          <Text style={[authStyles.forgotPasswordText, { fontFamily: fontFamily.sans }]}>Forgot Password?</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Orange Login Button */}
+      <TouchableOpacity
+        style={authStyles.primaryTealBtn}
+        onPress={handleSignInSubmit}
+        activeOpacity={0.85}
+        disabled={isSignInLoading}
+      >
+        <Text style={[authStyles.primaryTealBtnText, { fontFamily: fontFamily.sans }]}>
+          {isSignInLoading ? 'LOGGING IN...' : 'LOGIN TO ACCOUNT'}
+        </Text>
+      </TouchableOpacity>
+
+      {/* Or Continue With Google */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          width: '100%',
+          marginVertical: 18,
+          gap: 12,
+        }}
+      >
+        <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
+        <Text
+          style={{
+            fontSize: 11,
+            color: '#94A3B8',
+            fontWeight: '700',
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
+            fontFamily: fontFamily.sans,
+          }}
+        >
+          Or continue with
+        </Text>
+        <View style={{ flex: 1, height: 1, backgroundColor: '#E2E8F0' }} />
+      </View>
+
+      {/* Google Sign In Button */}
+      <TouchableOpacity
+        style={{
+          width: '100%',
+          height: 48,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          backgroundColor: '#FFFFFF',
+          borderWidth: 1.5,
+          borderColor: '#94A3B8',
+          borderRadius: 12,
+          paddingVertical: 12,
+          paddingHorizontal: 18,
+          boxShadow: '0 1px 2px rgba(15, 23, 42, 0.05)',
+          cursor: 'pointer',
+        }}
+        onPress={handleGoogleSignIn}
+        activeOpacity={0.85}
+        disabled={isGoogleLoading || isSignInLoading}
+      >
+        <GoogleIcon size={18} />
+        <Text
+          style={{
+            color: '#1E293B',
+            fontWeight: '700',
+            fontSize: 13.5,
+            letterSpacing: 0.2,
+            fontFamily: fontFamily.sans,
+          }}
+        >
+          {isGoogleLoading ? 'Connecting to Google...' : 'Sign in with Google'}
+        </Text>
+      </TouchableOpacity>
+
+      {googleAdvisory && (
+        <View
+          style={{
+            marginTop: 14,
+            padding: 14,
+            backgroundColor: '#FEF3C7',
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: '#FDE68A',
+            width: '100%',
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+            <BootstrapIcon name="info-circle-fill" size={14} color="#B45309" />
+            <Text style={{ fontWeight: '800', fontSize: 12.5, color: '#92400E', fontFamily: fontFamily.sans }}>
+              Google OAuth Setup Required
+            </Text>
+          </View>
+          <Text style={{ fontSize: 11.5, color: '#78350F', lineHeight: 16, marginBottom: 10, fontFamily: fontFamily.sans }}>
+            Google provider is not enabled yet in your Supabase project (vtbdmurblidtdghaotne). Enable Google in Supabase Dashboard &gt; Authentication &gt; Providers. In the meantime, you can test immediately with one click:
+          </Text>
+
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#EA580C',
+              borderRadius: 10,
+              paddingVertical: 9,
+              paddingHorizontal: 12,
+              alignItems: 'center',
+              marginBottom: 8,
+              cursor: 'pointer',
+            }}
+            onPress={handleGoogleInstantTest}
+            activeOpacity={0.85}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12, fontFamily: fontFamily.sans }}>
+              ✓ Test Sign In as Google Rider (Instant)
+            </Text>
+          </TouchableOpacity>
+
+          <View style={{ backgroundColor: '#FFFFFF', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}>
+            <Text style={{ fontSize: 10.5, color: '#64748B', marginBottom: 2, fontFamily: fontFamily.sans }}>
+              Your Supabase Redirect URI:
+            </Text>
+            <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#EA580C', fontFamily: fontFamily.sans }}>
+              https://vtbdmurblidtdghaotne.supabase.co/auth/v1/callback
+            </Text>
+          </View>
+        </View>
+      )}
+    </>
+  );
+
+  const signUpFormContent = (
+    <>
+      {/* MotoTrack Brand Logo */}
+      <View style={authStyles.modalTopLogo}>
+        <BrandLogo size={42} textColor="#181A1D" accentColor="#EA580C" />
+      </View>
+
+      {signUpStep === 1 ? (
+        // ─── SIGN UP STEP 1: CREDENTIALS & STRONG PASSWORD ───
+        <>
+          <Text style={[authStyles.formHeading, { fontFamily: fontFamily.sans }]}>Create Account</Text>
+          <Text style={[authStyles.mutedSubtext, { fontFamily: fontFamily.sans }]}>Join {brandSettings.storeName || 'MotoTrack'} Community</Text>
+
+          {signUpError.length > 0 && (
+            <View style={authStyles.errorBadge}>
+              <BootstrapIcon name="exclamation-circle" size={13} color="#DC2626" />
+              <Text style={[authStyles.errorBadgeText, { fontFamily: fontFamily.sans }]}>{signUpError}</Text>
+            </View>
+          )}
+
+          {/* Name */}
+          <View
+            style={[
+              authStyles.inputWrap,
+              focusedField === 'signUpName' && authStyles.inputWrapFocused,
+            ]}
+          >
+            <BootstrapIcon
+              name="person"
+              size={16}
+              color={focusedField === 'signUpName' ? '#EA580C' : '#64748B'}
+            />
+            <TextInput
+              ref={signUpNameRef}
+              style={[authStyles.textInput, { fontFamily: fontFamily.sans }]}
+              placeholder="Full Name"
+              placeholderTextColor="#64748B"
+              value={signUpName}
+              onChangeText={(t) => {
+                setSignUpName(t);
+                if (signUpError) setSignUpError('');
+              }}
+              onFocus={() => setFocusedField('signUpName')}
+              onBlur={() => setFocusedField(null)}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => signUpEmailRef.current?.focus()}
+            />
+          </View>
+
+          {/* Email */}
+          <View
+            style={[
+              authStyles.inputWrap,
+              focusedField === 'signUpEmail' && authStyles.inputWrapFocused,
+            ]}
+          >
+            <BootstrapIcon
+              name="envelope"
+              size={16}
+              color={focusedField === 'signUpEmail' ? '#EA580C' : '#64748B'}
+            />
+            <TextInput
+              ref={signUpEmailRef}
+              style={[authStyles.textInput, { fontFamily: fontFamily.sans }]}
+              placeholder="Email Address"
+              placeholderTextColor="#64748B"
+              value={signUpEmail}
+              onChangeText={(t) => {
+                setSignUpEmail(t);
+                if (signUpError) setSignUpError('');
+              }}
+              onFocus={() => setFocusedField('signUpEmail')}
+              onBlur={() => setFocusedField(null)}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => signUpPhoneRef.current?.focus()}
+            />
+          </View>
+
+          {/* Phone */}
+          <View
+            style={[
+              authStyles.inputWrap,
+              focusedField === 'signUpPhone' && authStyles.inputWrapFocused,
+            ]}
+          >
+            <BootstrapIcon
+              name="phone"
+              size={16}
+              color={focusedField === 'signUpPhone' ? '#EA580C' : '#64748B'}
+            />
+            <TextInput
+              ref={signUpPhoneRef}
+              style={[authStyles.textInput, { fontFamily: fontFamily.sans }]}
+              placeholder="Contact Number (+63 917...)"
+              placeholderTextColor="#64748B"
+              value={signUpPhone}
+              onChangeText={(t) => {
+                setSignUpPhone(t);
+                if (signUpError) setSignUpError('');
+              }}
+              onFocus={() => setFocusedField('signUpPhone')}
+              onBlur={() => setFocusedField(null)}
+              keyboardType="phone-pad"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => signUpAddressRef.current?.focus()}
+            />
+          </View>
+
+          {/* Delivery Address */}
+          <View
+            style={[
+              authStyles.inputWrap,
+              focusedField === 'signUpAddress' && authStyles.inputWrapFocused,
+            ]}
+          >
+            <BootstrapIcon
+              name="geo-alt"
+              size={16}
+              color={focusedField === 'signUpAddress' ? '#EA580C' : '#64748B'}
+            />
+            <TextInput
+              ref={signUpAddressRef}
+              style={[authStyles.textInput, { fontFamily: fontFamily.sans }]}
+              placeholder="Complete Delivery Address"
+              placeholderTextColor="#64748B"
+              value={signUpAddress}
+              onChangeText={(t) => {
+                setSignUpAddress(t);
+                if (signUpError) setSignUpError('');
+              }}
+              onFocus={() => setFocusedField('signUpAddress')}
+              onBlur={() => setFocusedField(null)}
+              autoCapitalize="words"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => signUpPasswordRef.current?.focus()}
+            />
+          </View>
+
+          {/* Password */}
+          <View
+            style={[
+              authStyles.inputWrap,
+              focusedField === 'signUpPassword' && authStyles.inputWrapFocused,
+            ]}
+          >
+            <BootstrapIcon
+              name="lock"
+              size={16}
+              color={focusedField === 'signUpPassword' ? '#EA580C' : '#64748B'}
+            />
+            <TextInput
+              ref={signUpPasswordRef}
+              style={[authStyles.textInput, { fontFamily: fontFamily.sans }]}
+              placeholder="Create Strong Password"
+              placeholderTextColor="#64748B"
+              value={signUpPassword}
+              onChangeText={(t) => {
+                setSignUpPassword(t);
+                if (signUpError) setSignUpError('');
+              }}
+              onFocus={() => setFocusedField('signUpPassword')}
+              onBlur={() => setFocusedField(null)}
+              secureTextEntry={!showSignUpPassword}
+              autoCapitalize="none"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => signUpConfirmPasswordRef.current?.focus()}
+            />
+            <TouchableOpacity
+              onPress={() => setShowSignUpPassword(!showSignUpPassword)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={{ cursor: 'pointer' }}
+            >
+              <BootstrapIcon
+                name={showSignUpPassword ? 'eye-slash' : 'eye'}
+                size={16}
+                color={focusedField === 'signUpPassword' ? '#EA580C' : '#64748B'}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Real-time Password Strength Meter */}
+          {signUpPassword.length > 0 && (
+            <View style={authStyles.strengthMeterBox}>
+              <View style={authStyles.strengthHeader}>
+                <Text style={[authStyles.strengthLabel, { fontFamily: fontFamily.sans }]}>Password Strength:</Text>
+                <Text style={[authStyles.strengthBadge, { color: passwordAnalysis.color, fontFamily: fontFamily.sans }]}>
+                  {passwordAnalysis.label} ({passwordAnalysis.score}%)
+                </Text>
+              </View>
+              <View style={authStyles.meterTrack}>
+                <View
+                  style={[
+                    authStyles.meterFill,
+                    {
+                      width: `${passwordAnalysis.score}%`,
+                      backgroundColor: passwordAnalysis.color,
+                    },
+                  ]}
+                />
+              </View>
+              <View style={authStyles.criteriaRow}>
+                <View style={authStyles.criteriaChip}>
+                  <BootstrapIcon
+                    name={passwordAnalysis.criteria.minLength ? 'check-circle-fill' : 'circle'}
+                    size={10}
+                    color={passwordAnalysis.criteria.minLength ? '#10B981' : '#94A3B8'}
+                  />
+                  <Text
+                    style={[
+                      authStyles.criteriaChipText,
+                      passwordAnalysis.criteria.minLength && authStyles.criteriaChipTextActive,
+                      { fontFamily: fontFamily.sans },
+                    ]}
+                  >
+                    8+ Chars
+                  </Text>
+                </View>
+                <View style={authStyles.criteriaChip}>
+                  <BootstrapIcon
+                    name={passwordAnalysis.criteria.hasUppercase ? 'check-circle-fill' : 'circle'}
+                    size={10}
+                    color={passwordAnalysis.criteria.hasUppercase ? '#10B981' : '#94A3B8'}
+                  />
+                  <Text
+                    style={[
+                      authStyles.criteriaChipText,
+                      passwordAnalysis.criteria.hasUppercase && authStyles.criteriaChipTextActive,
+                      { fontFamily: fontFamily.sans },
+                    ]}
+                  >
+                    A-Z
+                  </Text>
+                </View>
+                <View style={authStyles.criteriaChip}>
+                  <BootstrapIcon
+                    name={passwordAnalysis.criteria.hasLowercase ? 'check-circle-fill' : 'circle'}
+                    size={10}
+                    color={passwordAnalysis.criteria.hasLowercase ? '#10B981' : '#94A3B8'}
+                  />
+                  <Text
+                    style={[
+                      authStyles.criteriaChipText,
+                      passwordAnalysis.criteria.hasLowercase && authStyles.criteriaChipTextActive,
+                      { fontFamily: fontFamily.sans },
+                    ]}
+                  >
+                    a-z
+                  </Text>
+                </View>
+                <View style={authStyles.criteriaChip}>
+                  <BootstrapIcon
+                    name={passwordAnalysis.criteria.hasNumber ? 'check-circle-fill' : 'circle'}
+                    size={10}
+                    color={passwordAnalysis.criteria.hasNumber ? '#10B981' : '#94A3B8'}
+                  />
+                  <Text
+                    style={[
+                      authStyles.criteriaChipText,
+                      passwordAnalysis.criteria.hasNumber && authStyles.criteriaChipTextActive,
+                      { fontFamily: fontFamily.sans },
+                    ]}
+                  >
+                    0-9
+                  </Text>
+                </View>
+                <View style={authStyles.criteriaChip}>
+                  <BootstrapIcon
+                    name={passwordAnalysis.criteria.hasSpecial ? 'check-circle-fill' : 'circle'}
+                    size={10}
+                    color={passwordAnalysis.criteria.hasSpecial ? '#10B981' : '#94A3B8'}
+                  />
+                  <Text
+                    style={[
+                      authStyles.criteriaChipText,
+                      passwordAnalysis.criteria.hasSpecial && authStyles.criteriaChipTextActive,
+                      { fontFamily: fontFamily.sans },
+                    ]}
+                  >
+                    !@#$
+                  </Text>
+                </View>
+              </View>
+            </View>
+          )}
+
+          {/* Confirm Password */}
+          <View
+            style={[
+              authStyles.inputWrap,
+              focusedField === 'signUpConfirmPassword' && authStyles.inputWrapFocused,
+            ]}
+          >
+            <BootstrapIcon
+              name="lock-fill"
+              size={16}
+              color={focusedField === 'signUpConfirmPassword' ? '#EA580C' : '#64748B'}
+            />
+            <TextInput
+              ref={signUpConfirmPasswordRef}
+              style={[authStyles.textInput, { fontFamily: fontFamily.sans }]}
+              placeholder="Confirm Password"
+              placeholderTextColor="#64748B"
+              value={signUpConfirmPassword}
+              onChangeText={(t) => {
+                setSignUpConfirmPassword(t);
+                if (signUpError) setSignUpError('');
+              }}
+              onFocus={() => setFocusedField('signUpConfirmPassword')}
+              onBlur={() => setFocusedField(null)}
+              secureTextEntry={!showSignUpPassword}
+              autoCapitalize="none"
+              returnKeyType="go"
+              onSubmitEditing={handleRequestOtp}
+            />
+            {signUpConfirmPassword.length > 0 && (
+              <BootstrapIcon
+                name={signUpPassword === signUpConfirmPassword ? 'check-circle-fill' : 'x-circle-fill'}
+                size={16}
+                color={signUpPassword === signUpConfirmPassword ? '#10B981' : '#DC2626'}
+              />
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={[
+              authStyles.primaryTealBtn,
+              (!passwordAnalysis.isStrong || isSignUpLoading) && authStyles.primaryTealBtnDisabled,
+            ]}
+            onPress={handleRequestOtp}
+            activeOpacity={0.85}
+            disabled={!passwordAnalysis.isStrong || isSignUpLoading}
+          >
+            <Text style={[authStyles.primaryTealBtnText, { fontFamily: fontFamily.sans }]}>
+              {isSignUpLoading ? 'SENDING...' : 'CONTINUE'}
+            </Text>
+          </TouchableOpacity>
+        </>
+      ) : (
+        // ─── SIGN UP STEP 2: 6-DIGIT OTP VERIFICATION ───
+        <View style={authStyles.otpContainer}>
+          <TouchableOpacity
+            style={authStyles.otpBackBtn}
+            onPress={() => setSignUpStep(1)}
+            activeOpacity={0.8}
+          >
+            <BootstrapIcon name="arrow-left" size={13} color="#EA580C" />
+            <Text style={[authStyles.otpBackBtnText, { fontFamily: fontFamily.sans }]}>Back to details</Text>
+          </TouchableOpacity>
+
+          <View style={authStyles.otpHeader}>
+            <View style={authStyles.otpBadge}>
+              <BootstrapIcon name="shield-lock-fill" size={24} color="#EA580C" />
+            </View>
+            <Text style={[authStyles.formHeading, { fontFamily: fontFamily.sans }]}>Enter OTP Code</Text>
+            <Text style={[authStyles.otpSubtitle, { fontFamily: fontFamily.sans }]}>
+              We sent a 6-digit code to <Text style={authStyles.otpEmailHighlight}>{signUpEmail}</Text>
+            </Text>
+          </View>
+
+          {signUpSuccessMsg ? (
+            <View style={authStyles.successBadge}>
+              <BootstrapIcon name="check-circle" size={13} color="#065F46" />
+              <Text style={[authStyles.successBadgeText, { fontFamily: fontFamily.sans }]}>{signUpSuccessMsg}</Text>
+            </View>
+          ) : null}
+
+          {signUpError.length > 0 && (
+            <View style={authStyles.errorBadge}>
+              <BootstrapIcon name="exclamation-circle" size={13} color="#DC2626" />
+              <Text style={[authStyles.errorBadgeText, { fontFamily: fontFamily.sans }]}>{signUpError}</Text>
+            </View>
+          )}
+
+          {/* 6 PIN Digit Input Boxes */}
+          <View style={authStyles.otpBoxesRow}>
+            {otpDigits.map((digit, idx) => (
+              <TextInput
+                key={idx}
+                ref={(el) => (otpInputRefs.current[idx] = el)}
+                style={[authStyles.otpBox, digit ? authStyles.otpBoxFilled : null, { fontFamily: fontFamily.sans }]}
+                value={digit}
+                onChangeText={(val) => handleOtpChange(val, idx)}
+                onKeyPress={(e) => handleOtpKeyPress(e, idx)}
+                keyboardType="number-pad"
+                maxLength={6}
+                selectTextOnFocus
+                returnKeyType={idx === 5 ? 'go' : 'next'}
+                onSubmitEditing={handleVerifyOtpAndCreate}
+              />
+            ))}
+          </View>
+
+          {/* Verify & Complete Button */}
+          <TouchableOpacity
+            style={authStyles.primaryTealBtn}
+            onPress={handleVerifyOtpAndCreate}
+            activeOpacity={0.85}
+            disabled={isSignUpLoading}
+          >
+            <Text style={[authStyles.primaryTealBtnText, { fontFamily: fontFamily.sans }]}>
+              {isSignUpLoading ? 'CREATING ACCOUNT...' : 'VERIFY & CREATE ACCOUNT'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Resend Timer Row */}
+          <View style={authStyles.resendRow}>
+            <Text style={[authStyles.resendText, { fontFamily: fontFamily.sans }]}>Didn't receive code? </Text>
+            {canResend ? (
+              <TouchableOpacity onPress={handleResendOtp} activeOpacity={0.8}>
+                <Text style={[authStyles.resendLink, { fontFamily: fontFamily.sans }]}>Resend Code</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={[authStyles.resendCountdown, { fontFamily: fontFamily.sans }]}>Resend in {resendTimer}s</Text>
+            )}
+          </View>
+        </View>
+      )}
+    </>
+  );
+
+  const renderSuccessModal = () => {
+    if (!successModalVisible) return null;
+    return (
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(24, 26, 29, 0.85)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 999,
+          padding: 20,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 24,
+            padding: 32,
+            maxWidth: 440,
+            width: '100%',
+            alignItems: 'center',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.35)',
+            borderWidth: 1.5,
+            borderColor: '#E2E8F0',
+          }}
+        >
+          <View
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              backgroundColor: '#D1FAE5',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}
+          >
+            <BootstrapIcon name="check-circle-fill" size={34} color="#059669" />
+          </View>
+
+          <Text
+            style={{
+              fontSize: 22,
+              fontWeight: '900',
+              color: '#EA580C',
+              textAlign: 'center',
+              marginBottom: 8,
+              fontFamily: fontFamily.sans,
+            }}
+          >
+            Account Created!
+          </Text>
+
+          <Text
+            style={{
+              fontSize: 13.5,
+              color: '#64748B',
+              textAlign: 'center',
+              lineHeight: 20,
+              marginBottom: 24,
+              fontFamily: fontFamily.sans,
+            }}
+          >
+            Welcome to {brandSettings.storeName || 'MotoTrack'}, <Text style={{ fontWeight: '700', color: '#0F172A' }}>{createdUserName}</Text>! Your email has been verified. Please sign in with your password to continue to the storefront.
+          </Text>
+
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#EA580C',
+              paddingVertical: 13,
+              paddingHorizontal: 28,
+              borderRadius: 10,
+              width: '100%',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 14px rgba(234, 88, 12, 0.35)',
+              cursor: 'pointer',
+            }}
+            onPress={() => setSuccessModalVisible(false)}
+            activeOpacity={0.85}
+          >
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontWeight: '900',
+                fontSize: 13.5,
+                letterSpacing: 0.5,
+                fontFamily: fontFamily.sans,
+              }}
+            >
+              PROCEED TO SIGN IN ➔
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  // ─── RESPONSIVE LAYOUT: MOBILE VIEW (< 768px) ───
+  if (isMobile) {
+    return (
+      <View style={authStyles.mobilePageWrapper}>
+        <StatusBar style="dark" />
+        <ScrollView
+          contentContainerStyle={authStyles.mobileScrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Top Bar with Back to Store */}
+          <View style={authStyles.mobileTopBar}>
+            <TouchableOpacity
+              style={authStyles.mobileBackBtn}
+              onPress={() => onNavigateToStore?.()}
+              activeOpacity={0.8}
+            >
+              <BootstrapIcon name="arrow-left" size={13} color="#475569" />
+              <Text style={[authStyles.mobileBackBtnText, { fontFamily: fontFamily.sans }]}>Back to Store</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Form Container (Full Width up to 480px) */}
+          <View style={authStyles.mobileFormCard}>
+            {isSignUp ? signUpFormContent : signInFormContent}
+          </View>
+
+          {/* Compact Charcoal Welcome / Sign-Up / Sign-In Section */}
+          <View style={authStyles.mobileWelcomeSection}>
+            <View style={authStyles.mobileOrganicBlob} />
+            <Text style={[authStyles.mobileWelcomeTitle, { fontFamily: fontFamily.sans }]}>
+              {isSignUp ? 'Welcome Back!' : 'Hello!'}
+            </Text>
+            <Text style={[authStyles.mobileWelcomeSubtitle, { fontFamily: fontFamily.sans }]}>
+              {isSignUp ? `To ${brandSettings.storeName || 'MotoTrack'}` : `Welcome to ${brandSettings.storeName || 'MotoTrack'}`}
+            </Text>
+            <Text style={[authStyles.mobileWelcomeText, { fontFamily: fontFamily.sans }]}>
+              {isSignUp
+                ? 'Already have an account? Sign in with your registered email and password.'
+                : 'Enter your personal details, verify your email with OTP, and start your track journey.'}
+            </Text>
+            <TouchableOpacity
+              style={authStyles.overlayGhostBtn}
+              onPress={toggleMode}
+              activeOpacity={0.85}
+            >
+              <Text style={[authStyles.overlayGhostBtnText, { fontFamily: fontFamily.sans }]}>
+                {isSignUp ? 'SIGN IN' : 'SIGN UP'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <Text style={[authStyles.modalFooterCopyright, { fontFamily: fontFamily.sans }]}>
+            © 2026 {brandSettings.storeName || 'MotoTrack'}. All Rights Reserved.
+          </Text>
+        </ScrollView>
+
+        {renderSuccessModal()}
+      </View>
+    );
+  }
+
+  // ─── FULL-SCREEN SPLIT-SCREEN LAYOUT: DESKTOP & TABLET (>= 768px) ───
   return (
     <View style={authStyles.pageWrapper}>
       <StatusBar style="light" />
 
-      {/* ─── MAIN SLIDING AUTHENTICATION CARD ─── */}
+      {/* ─── FULL-SCREEN SPLIT CONTAINER ─── */}
       <View style={authStyles.cardContainer}>
-        {/* ─── LEFT HALF: SIGN IN FORM (Visible when overlay is on right) ─── */}
+        {/* ─── LEFT PANEL (50%): SIGN IN FORM ─── */}
         <View style={[authStyles.formHalf, authStyles.leftFormHalf]}>
-          <ScrollView contentContainerStyle={authStyles.formScrollInner} showsVerticalScrollIndicator={false}>
-            {/* Logo at the top of modal login details */}
-            <View style={authStyles.modalTopLogo}>
-              <BrandLogo size={36} textColor="#1D4533" accentColor="#16A34A" />
-            </View>
-
-            <Text style={[authStyles.formHeading, { marginBottom: 18 }]}>Sign In to {brandSettings.storeName || 'MotoTrack'}</Text>
-
-            {authSuccessNotification ? (
-              <View style={authStyles.successBadge}>
-                <BootstrapIcon name="check-circle" size={14} color="#065F46" />
-                <Text style={authStyles.successBadgeText}>{authSuccessNotification}</Text>
-              </View>
-            ) : null}
-
-            {signInError.length > 0 && (
-              <View style={authStyles.errorBadge}>
-                <BootstrapIcon name="exclamation-circle" size={13} color="#DC2626" />
-                <Text style={authStyles.errorBadgeText}>{signInError}</Text>
-              </View>
-            )}
-
-            {/* Email Input */}
-            <View style={authStyles.inputWrap}>
-              <BootstrapIcon name="envelope" size={15} color="#88A9A3" />
-              <TextInput
-                style={authStyles.textInput}
-                placeholder="Email or username"
-                placeholderTextColor="#9FB9B5"
-                value={signInEmail}
-                onChangeText={(t) => {
-                  setSignInEmail(t);
-                  if (signInError) setSignInError('');
-                }}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-
-            {/* Password Input */}
-            <View style={authStyles.inputWrap}>
-              <BootstrapIcon name="lock" size={15} color="#88A9A3" />
-              <TextInput
-                style={authStyles.textInput}
-                placeholder="Password"
-                placeholderTextColor="#9FB9B5"
-                value={signInPassword}
-                onChangeText={(t) => {
-                  setSignInPassword(t);
-                  if (signInError) setSignInError('');
-                }}
-                secureTextEntry={!showSignInPassword}
-                autoCapitalize="none"
-              />
-              <TouchableOpacity
-                onPress={() => setShowSignInPassword(!showSignInPassword)}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                <BootstrapIcon name={showSignInPassword ? 'eye-slash' : 'eye'} size={15} color="#88A9A3" />
-              </TouchableOpacity>
-            </View>
-
-            <View style={authStyles.rememberForgotRow}>
-              <TouchableOpacity
-                style={authStyles.rememberMeBtn}
-                onPress={() => setRememberMe((prev) => !prev)}
-                activeOpacity={0.8}
-              >
-                <View
-                  style={[
-                    authStyles.rememberCheckbox,
-                    rememberMe && authStyles.rememberCheckboxChecked,
-                  ]}
-                >
-                  {rememberMe ? (
-                    <BootstrapIcon name="check" size={11} color="#FFFFFF" />
-                  ) : null}
-                </View>
-                <Text style={authStyles.rememberMeText}>Remember me</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={authStyles.forgotPasswordBtn}
-                onPress={() => alert('Password reset verification link sent to registered email.')}
-              >
-                <Text style={authStyles.forgotPasswordText}>Forgot Password?</Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={authStyles.primaryTealBtn}
-              onPress={handleSignInSubmit}
-              activeOpacity={0.85}
-              disabled={isSignInLoading}
-            >
-              <Text style={authStyles.primaryTealBtnText}>
-                {isSignInLoading ? 'LOGGING IN...' : 'LOGIN TO ACCOUNT'}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Or Continue With Google */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                width: '100%',
-                marginVertical: 18,
-                gap: 12,
-              }}
-            >
-              <View style={{ flex: 1, height: 1, backgroundColor: '#E2ECE9' }} />
-              <Text
-                style={{
-                  fontSize: 11,
-                  color: '#88A9A3',
-                  fontWeight: '700',
-                  letterSpacing: 0.6,
-                  textTransform: 'uppercase',
-                }}
-              >
-                Or continue with
-              </Text>
-              <View style={{ flex: 1, height: 1, backgroundColor: '#E2ECE9' }} />
-            </View>
-
-            {/* Google Sign In Button */}
-            <TouchableOpacity
-              style={{
-                width: '100%',
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 10,
-                backgroundColor: '#FFFFFF',
-                borderWidth: 1.5,
-                borderColor: '#E2ECE9',
-                borderRadius: 22,
-                paddingVertical: 12,
-                paddingHorizontal: 18,
-                shadowColor: '#1D4533',
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.06,
-                shadowRadius: 6,
-                elevation: 1,
-              }}
-              onPress={handleGoogleSignIn}
-              activeOpacity={0.85}
-              disabled={isGoogleLoading || isSignInLoading}
-            >
-              <GoogleIcon size={18} />
-              <Text
-                style={{
-                  color: '#1E293B',
-                  fontWeight: '700',
-                  fontSize: 13.5,
-                  letterSpacing: 0.2,
-                }}
-              >
-                {isGoogleLoading ? 'Connecting to Google...' : 'Sign in with Google'}
-              </Text>
-            </TouchableOpacity>
-
-            {googleAdvisory && (
-              <View
-                style={{
-                  marginTop: 14,
-                  padding: 14,
-                  backgroundColor: '#FEF3C7',
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: '#FDE68A',
-                  width: '100%',
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                  <BootstrapIcon name="info-circle-fill" size={14} color="#B45309" />
-                  <Text style={{ fontWeight: '800', fontSize: 12.5, color: '#92400E' }}>
-                    Google OAuth Setup Required
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 11.5, color: '#78350F', lineHeight: 16, marginBottom: 10 }}>
-                  Google provider is not enabled yet in your Supabase project (vtbdmurblidtdghaotne). Enable Google in Supabase Dashboard &gt; Authentication &gt; Providers. In the meantime, you can test immediately with one click:
-                </Text>
-
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: '#1D4533',
-                    borderRadius: 10,
-                    paddingVertical: 9,
-                    paddingHorizontal: 12,
-                    alignItems: 'center',
-                    marginBottom: 8,
-                  }}
-                  onPress={handleGoogleInstantTest}
-                  activeOpacity={0.85}
-                >
-                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>
-                    ✓ Test Sign In as Google Rider (Instant)
-                  </Text>
-                </TouchableOpacity>
-
-                <View style={{ backgroundColor: '#FFFFFF', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}>
-                  <Text style={{ fontSize: 10.5, color: '#64748B', marginBottom: 2 }}>
-                    Your Supabase Redirect URI:
-                  </Text>
-                  <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#1D4533' }}>
-                    https://vtbdmurblidtdghaotne.supabase.co/auth/v1/callback
-                  </Text>
-                </View>
-              </View>
-            )}
-
-            <Text style={authStyles.modalFooterCopyright}>
+          <ScrollView
+            style={{ width: '100%' }}
+            contentContainerStyle={authStyles.formScrollInner}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {signInFormContent}
+            <Text style={[authStyles.modalFooterCopyright, { fontFamily: fontFamily.sans }]}>
               © 2026 {brandSettings.storeName || 'MotoTrack'}. All Rights Reserved.
             </Text>
           </ScrollView>
         </View>
 
-        {/* ─── RIGHT HALF: SIGN UP FORM WITH STRONG PASSWORD & OTP ─── */}
+        {/* ─── RIGHT PANEL (50%): SIGN UP FORM WITH STRONG PASSWORD & OTP ─── */}
         <View style={[authStyles.formHalf, authStyles.rightFormHalf]}>
-          <ScrollView contentContainerStyle={authStyles.formScrollInner} showsVerticalScrollIndicator={false}>
-            {/* Logo at the top of modal login details */}
-            <View style={authStyles.modalTopLogo}>
-              <BrandLogo size={36} textColor="#1D4533" accentColor="#16A34A" />
-            </View>
-
-            {signUpStep === 1 ? (
-              // ─── SIGN UP STEP 1: CREDENTIALS & STRONG PASSWORD ───
-              <>
-                <Text style={authStyles.formHeading}>Create Account</Text>
-                <Text style={authStyles.mutedSubtext}>Join {brandSettings.storeName || 'MotoTrack'} Community</Text>
-
-                {signUpError.length > 0 && (
-                  <View style={authStyles.errorBadge}>
-                    <BootstrapIcon name="exclamation-circle" size={13} color="#DC2626" />
-                    <Text style={authStyles.errorBadgeText}>{signUpError}</Text>
-                  </View>
-                )}
-
-                {/* Name */}
-                <View style={authStyles.inputWrap}>
-                  <BootstrapIcon name="person" size={15} color="#88A9A3" />
-                  <TextInput
-                    style={authStyles.textInput}
-                    placeholder="Full Name"
-                    placeholderTextColor="#9FB9B5"
-                    value={signUpName}
-                    onChangeText={(t) => {
-                      setSignUpName(t);
-                      if (signUpError) setSignUpError('');
-                    }}
-                  />
-                </View>
-
-                {/* Email */}
-                <View style={authStyles.inputWrap}>
-                  <BootstrapIcon name="envelope" size={15} color="#88A9A3" />
-                  <TextInput
-                    style={authStyles.textInput}
-                    placeholder="Email Address"
-                    placeholderTextColor="#9FB9B5"
-                    value={signUpEmail}
-                    onChangeText={(t) => {
-                      setSignUpEmail(t);
-                      if (signUpError) setSignUpError('');
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                  />
-                </View>
-
-                {/* Phone */}
-                <View style={authStyles.inputWrap}>
-                  <BootstrapIcon name="phone" size={15} color="#88A9A3" />
-                  <TextInput
-                    style={authStyles.textInput}
-                    placeholder="Contact Number (+63 917...)"
-                    placeholderTextColor="#9FB9B5"
-                    value={signUpPhone}
-                    onChangeText={(t) => {
-                      setSignUpPhone(t);
-                      if (signUpError) setSignUpError('');
-                    }}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-
-                {/* Delivery Address */}
-                <View style={authStyles.inputWrap}>
-                  <BootstrapIcon name="geo-alt" size={15} color="#88A9A3" />
-                  <TextInput
-                    style={authStyles.textInput}
-                    placeholder="Complete Delivery Address"
-                    placeholderTextColor="#9FB9B5"
-                    value={signUpAddress}
-                    onChangeText={(t) => {
-                      setSignUpAddress(t);
-                      if (signUpError) setSignUpError('');
-                    }}
-                    autoCapitalize="words"
-                  />
-                </View>
-
-                {/* Password */}
-                <View style={authStyles.inputWrap}>
-                  <BootstrapIcon name="lock" size={15} color="#88A9A3" />
-                  <TextInput
-                    style={authStyles.textInput}
-                    placeholder="Create Strong Password"
-                    placeholderTextColor="#9FB9B5"
-                    value={signUpPassword}
-                    onChangeText={(t) => {
-                      setSignUpPassword(t);
-                      if (signUpError) setSignUpError('');
-                    }}
-                    secureTextEntry={!showSignUpPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowSignUpPassword(!showSignUpPassword)}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  >
-                    <BootstrapIcon
-                      name={showSignUpPassword ? 'eye-slash' : 'eye'}
-                      size={15}
-                      color="#88A9A3"
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {/* Real-time Password Strength Meter */}
-                {signUpPassword.length > 0 && (
-                  <View style={authStyles.strengthMeterBox}>
-                    <View style={authStyles.strengthHeader}>
-                      <Text style={authStyles.strengthLabel}>Password Strength:</Text>
-                      <Text style={[authStyles.strengthBadge, { color: passwordAnalysis.color }]}>
-                        {passwordAnalysis.label} ({passwordAnalysis.score}%)
-                      </Text>
-                    </View>
-                    <View style={authStyles.meterTrack}>
-                      <View
-                        style={[
-                          authStyles.meterFill,
-                          {
-                            width: `${passwordAnalysis.score}%`,
-                            backgroundColor: passwordAnalysis.color,
-                          },
-                        ]}
-                      />
-                    </View>
-                    <View style={authStyles.criteriaRow}>
-                      <View style={authStyles.criteriaChip}>
-                        <BootstrapIcon
-                          name={passwordAnalysis.criteria.minLength ? 'check-circle-fill' : 'circle'}
-                          size={10}
-                          color={passwordAnalysis.criteria.minLength ? '#10B981' : '#94A3B8'}
-                        />
-                        <Text
-                          style={[
-                            authStyles.criteriaChipText,
-                            passwordAnalysis.criteria.minLength && authStyles.criteriaChipTextActive,
-                          ]}
-                        >
-                          8+ Chars
-                        </Text>
-                      </View>
-                      <View style={authStyles.criteriaChip}>
-                        <BootstrapIcon
-                          name={passwordAnalysis.criteria.hasUppercase ? 'check-circle-fill' : 'circle'}
-                          size={10}
-                          color={passwordAnalysis.criteria.hasUppercase ? '#10B981' : '#94A3B8'}
-                        />
-                        <Text
-                          style={[
-                            authStyles.criteriaChipText,
-                            passwordAnalysis.criteria.hasUppercase && authStyles.criteriaChipTextActive,
-                          ]}
-                        >
-                          A-Z
-                        </Text>
-                      </View>
-                      <View style={authStyles.criteriaChip}>
-                        <BootstrapIcon
-                          name={passwordAnalysis.criteria.hasLowercase ? 'check-circle-fill' : 'circle'}
-                          size={10}
-                          color={passwordAnalysis.criteria.hasLowercase ? '#10B981' : '#94A3B8'}
-                        />
-                        <Text
-                          style={[
-                            authStyles.criteriaChipText,
-                            passwordAnalysis.criteria.hasLowercase && authStyles.criteriaChipTextActive,
-                          ]}
-                        >
-                          a-z
-                        </Text>
-                      </View>
-                      <View style={authStyles.criteriaChip}>
-                        <BootstrapIcon
-                          name={passwordAnalysis.criteria.hasNumber ? 'check-circle-fill' : 'circle'}
-                          size={10}
-                          color={passwordAnalysis.criteria.hasNumber ? '#10B981' : '#94A3B8'}
-                        />
-                        <Text
-                          style={[
-                            authStyles.criteriaChipText,
-                            passwordAnalysis.criteria.hasNumber && authStyles.criteriaChipTextActive,
-                          ]}
-                        >
-                          0-9
-                        </Text>
-                      </View>
-                      <View style={authStyles.criteriaChip}>
-                        <BootstrapIcon
-                          name={passwordAnalysis.criteria.hasSpecial ? 'check-circle-fill' : 'circle'}
-                          size={10}
-                          color={passwordAnalysis.criteria.hasSpecial ? '#10B981' : '#94A3B8'}
-                        />
-                        <Text
-                          style={[
-                            authStyles.criteriaChipText,
-                            passwordAnalysis.criteria.hasSpecial && authStyles.criteriaChipTextActive,
-                          ]}
-                        >
-                          !@#$
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
-
-                {/* Confirm Password */}
-                <View style={authStyles.inputWrap}>
-                  <BootstrapIcon name="lock-fill" size={15} color="#88A9A3" />
-                  <TextInput
-                    style={authStyles.textInput}
-                    placeholder="Confirm Password"
-                    placeholderTextColor="#9FB9B5"
-                    value={signUpConfirmPassword}
-                    onChangeText={(t) => {
-                      setSignUpConfirmPassword(t);
-                      if (signUpError) setSignUpError('');
-                    }}
-                    secureTextEntry={!showSignUpPassword}
-                    autoCapitalize="none"
-                  />
-                  {signUpConfirmPassword.length > 0 && (
-                    <BootstrapIcon
-                      name={signUpPassword === signUpConfirmPassword ? 'check-circle-fill' : 'x-circle-fill'}
-                      size={15}
-                      color={signUpPassword === signUpConfirmPassword ? '#10B981' : '#DC2626'}
-                    />
-                  )}
-                </View>
-
-                <TouchableOpacity
-                  style={[
-                    authStyles.primaryTealBtn,
-                    (!passwordAnalysis.isStrong || isSignUpLoading) && authStyles.primaryTealBtnDisabled,
-                  ]}
-                  onPress={handleRequestOtp}
-                  activeOpacity={0.85}
-                  disabled={!passwordAnalysis.isStrong || isSignUpLoading}
-                >
-                  <Text style={authStyles.primaryTealBtnText}>
-                    {isSignUpLoading ? 'SENDING...' : 'CONTINUE'}
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              // ─── SIGN UP STEP 2: 6-DIGIT OTP VERIFICATION ───
-              <View style={authStyles.otpContainer}>
-                <TouchableOpacity
-                  style={authStyles.otpBackBtn}
-                  onPress={() => setSignUpStep(1)}
-                  activeOpacity={0.8}
-                >
-                  <BootstrapIcon name="arrow-left" size={13} color="#1D4533" />
-                  <Text style={authStyles.otpBackBtnText}>Back to details</Text>
-                </TouchableOpacity>
-
-                <View style={authStyles.otpHeader}>
-                  <View style={authStyles.otpBadge}>
-                    <BootstrapIcon name="shield-lock-fill" size={24} color="#1D4533" />
-                  </View>
-                  <Text style={authStyles.formHeading}>Enter OTP Code</Text>
-                  <Text style={authStyles.otpSubtitle}>
-                    We sent a 6-digit code to <Text style={authStyles.otpEmailHighlight}>{signUpEmail}</Text>
-                  </Text>
-                </View>
-
-                {signUpSuccessMsg ? (
-                  <View style={authStyles.successBadge}>
-                    <BootstrapIcon name="check-circle" size={13} color="#065F46" />
-                    <Text style={authStyles.successBadgeText}>{signUpSuccessMsg}</Text>
-                  </View>
-                ) : null}
-
-                {signUpError.length > 0 && (
-                  <View style={authStyles.errorBadge}>
-                    <BootstrapIcon name="exclamation-circle" size={13} color="#DC2626" />
-                    <Text style={authStyles.errorBadgeText}>{signUpError}</Text>
-                  </View>
-                )}
-
-                {/* 6 PIN Digit Input Boxes */}
-                <View style={authStyles.otpBoxesRow}>
-                  {otpDigits.map((digit, idx) => (
-                    <TextInput
-                      key={idx}
-                      ref={(el) => (otpInputRefs.current[idx] = el)}
-                      style={[authStyles.otpBox, digit ? authStyles.otpBoxFilled : null]}
-                      value={digit}
-                      onChangeText={(val) => handleOtpChange(val, idx)}
-                      onKeyPress={(e) => handleOtpKeyPress(e, idx)}
-                      keyboardType="number-pad"
-                      maxLength={6}
-                      selectTextOnFocus
-                    />
-                  ))}
-                </View>
-
-                {/* Verify & Complete Button */}
-                <TouchableOpacity
-                  style={authStyles.primaryTealBtn}
-                  onPress={handleVerifyOtpAndCreate}
-                  activeOpacity={0.85}
-                  disabled={isSignUpLoading}
-                >
-                  <Text style={authStyles.primaryTealBtnText}>
-                    {isSignUpLoading ? 'CREATING ACCOUNT...' : 'VERIFY & CREATE ACCOUNT'}
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Resend Timer Row */}
-                <View style={authStyles.resendRow}>
-                  <Text style={authStyles.resendText}>Didn't receive code? </Text>
-                  {canResend ? (
-                    <TouchableOpacity onPress={handleResendOtp} activeOpacity={0.8}>
-                      <Text style={authStyles.resendLink}>Resend Code</Text>
-                    </TouchableOpacity>
-                  ) : (
-                    <Text style={authStyles.resendCountdown}>Resend in {resendTimer}s</Text>
-                  )}
-                </View>
-              </View>
-            )}
-
-            <Text style={authStyles.modalFooterCopyright}>
+          <ScrollView
+            style={{ width: '100%' }}
+            contentContainerStyle={authStyles.formScrollInner}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {signUpFormContent}
+            <Text style={[authStyles.modalFooterCopyright, { fontFamily: fontFamily.sans }]}>
               © 2026 {brandSettings.storeName || 'MotoTrack'}. All Rights Reserved.
             </Text>
           </ScrollView>
         </View>
 
-        {/* ─── SLIDING TEAL DECORATIVE OVERLAY PANEL ─── */}
+        {/* ─── SLIDING CHARCOAL WELCOME OVERLAY PANEL (50%) ─── */}
         <Animated.View
           style={[authStyles.slidingOverlayPanel, { transform: [{ translateX: overlayTranslateX }] }]}
         >
-          {/* Store button placed on the green side */}
+          {/* Back to Store button placed on charcoal panel */}
           <TouchableOpacity
             style={[
               authStyles.overlayStoreBtn,
-              isSignUp ? { left: 20, right: undefined } : { right: 20, left: undefined },
+              isSignUp ? { left: 40, right: undefined } : { right: 40, left: undefined },
             ]}
             onPress={() => onNavigateToStore?.()}
             activeOpacity={0.8}
           >
-            <BootstrapIcon name="arrow-left" size={13} color="#FFFFFF" />
-            <Text style={authStyles.overlayStoreBtnText}>Back to Store</Text>
+            <BootstrapIcon name="arrow-left" size={14} color="#FFFFFF" />
+            <Text style={[authStyles.overlayStoreBtnText, { fontFamily: fontFamily.sans }]}>Back to Store</Text>
           </TouchableOpacity>
 
           <View style={botanicalStyles.organicBlob} />
 
           <View style={authStyles.overlayContentBox}>
-            <Text style={authStyles.overlayHeadingLine1}>{isSignUp ? 'Welcome Back!' : 'Hello!'}</Text>
-            <Text style={authStyles.overlayHeadingLine2}>
+            <Text style={[authStyles.overlayHeadingLine1, { fontFamily: fontFamily.sans }]}>
+              {isSignUp ? 'Welcome Back!' : 'Hello!'}
+            </Text>
+            <Text style={[authStyles.overlayHeadingLine2, { fontFamily: fontFamily.sans }]}>
               {isSignUp ? `To ${brandSettings.storeName || 'MotoTrack'}` : `Welcome to ${brandSettings.storeName || 'MotoTrack'}`}
             </Text>
 
-            <Text style={authStyles.overlaySubtext}>
+            <Text style={[authStyles.overlaySubtext, { fontFamily: fontFamily.sans }]}>
               {isSignUp
                 ? 'Already have an account? Sign in with your registered email and password'
                 : 'Enter your personal details, verify your email with OTP, and start your track journey'}
             </Text>
 
             <TouchableOpacity style={authStyles.overlayGhostBtn} onPress={toggleMode} activeOpacity={0.85}>
-              <Text style={authStyles.overlayGhostBtnText}>{isSignUp ? 'SIGN IN' : 'SIGN UP'}</Text>
+              <Text style={[authStyles.overlayGhostBtnText, { fontFamily: fontFamily.sans }]}>
+                {isSignUp ? 'SIGN IN' : 'SIGN UP'}
+              </Text>
             </TouchableOpacity>
           </View>
         </Animated.View>
       </View>
 
       {/* ─── SUCCESS REGISTRATION POPUP MODAL ─── */}
-      {successModalVisible ? (
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(4, 47, 46, 0.82)',
-            justifyContent: 'center',
-            alignItems: 'center',
-            zIndex: 999,
-            padding: 20,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: 24,
-              padding: 32,
-              maxWidth: 440,
-              width: '100%',
-              alignItems: 'center',
-              boxShadow: '0 20px 50px rgba(0, 0, 0, 0.35)',
-              borderWidth: 1.5,
-              borderColor: '#E2E8F0',
-            }}
-          >
-            <View
-              style={{
-                width: 64,
-                height: 64,
-                borderRadius: 32,
-                backgroundColor: '#D1FAE5',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: 16,
-              }}
-            >
-              <BootstrapIcon name="check-circle-fill" size={34} color="#059669" />
-            </View>
-
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: '900',
-                color: '#1D4533',
-                textAlign: 'center',
-                marginBottom: 8,
-              }}
-            >
-              Account Created!
-            </Text>
-
-            <Text
-              style={{
-                fontSize: 13.5,
-                color: '#64748B',
-                textAlign: 'center',
-                lineHeight: 20,
-                marginBottom: 24,
-              }}
-            >
-              Welcome to {brandSettings.storeName || 'MotoTrack'}, <Text style={{ fontWeight: '700', color: '#0F172A' }}>{createdUserName}</Text>! Your email has been verified. Please sign in with your password to continue to the storefront.
-            </Text>
-
-            <TouchableOpacity
-              style={{
-                backgroundColor: '#1D4533',
-                paddingVertical: 13,
-                paddingHorizontal: 28,
-                borderRadius: 22,
-                width: '100%',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 14px rgba(29, 69, 51, 0.35)',
-              }}
-              onPress={() => setSuccessModalVisible(false)}
-              activeOpacity={0.85}
-            >
-              <Text
-                style={{
-                  color: '#FFFFFF',
-                  fontWeight: '900',
-                  fontSize: 13.5,
-                  letterSpacing: 0.5,
-                }}
-              >
-                PROCEED TO SIGN IN ➔
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : null}
+      {renderSuccessModal()}
     </View>
   );
 }

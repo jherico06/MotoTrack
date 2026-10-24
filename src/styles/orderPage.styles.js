@@ -9,7 +9,7 @@ export const orderStyles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    paddingTop: ANDROID_TOP_INSET,
+    paddingTop: Platform.OS === 'android' ? ANDROID_TOP_INSET : 0,
   },
   scrollContent: {
     paddingBottom: 110,
@@ -52,7 +52,7 @@ export const orderStyles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   logoAccent: {
-    color: '#1D4533',
+    color: '#EA580C',
   },
   navActionsRight: {
     flexDirection: 'row',
@@ -93,7 +93,7 @@ export const orderStyles = StyleSheet.create({
     fontWeight: '600',
   },
   breadcrumbActive: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '800',
   },
   titleRow: {
@@ -120,7 +120,7 @@ export const orderStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
@@ -128,7 +128,7 @@ export const orderStyles = StyleSheet.create({
   statChipText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#1D4533',
+    color: '#EA580C',
   },
 
   // ─── SEARCH & STATUS TABS TOOLBAR ───
@@ -255,9 +255,9 @@ export const orderStyles = StyleSheet.create({
 
   // Status Badges
   statusPillProcessing: {
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#E0F2FE',
     borderWidth: 1,
-    borderColor: '#C8DDD3',
+    borderColor: '#BAE6FD',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 20,
@@ -266,7 +266,7 @@ export const orderStyles = StyleSheet.create({
     gap: 5,
   },
   statusTextProcessing: {
-    color: '#1D4533',
+    color: '#075985',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -381,7 +381,7 @@ export const orderStyles = StyleSheet.create({
   orderTotalValue: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   paymentMethodText: {
     fontSize: 11.5,
@@ -395,7 +395,7 @@ export const orderStyles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   trackShipmentBtn: {
-    backgroundColor: '#0F172A',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 12,
@@ -409,9 +409,9 @@ export const orderStyles = StyleSheet.create({
     fontWeight: '800',
   },
   buyAgainBtn: {
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#C8DDD3',
+    borderColor: '#E5E7EB',
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 12,
@@ -420,7 +420,7 @@ export const orderStyles = StyleSheet.create({
     gap: 6,
   },
   buyAgainBtnText: {
-    color: '#1D4533',
+    color: '#24272B',
     fontSize: 12.5,
     fontWeight: '800',
   },
@@ -553,8 +553,8 @@ export const orderStyles = StyleSheet.create({
     zIndex: 2,
   },
   timelineNodeCompleted: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   timelineNodeCancelled: {
     backgroundColor: '#EF4444',
@@ -570,7 +570,7 @@ export const orderStyles = StyleSheet.create({
     zIndex: 1,
   },
   timelineLineCompleted: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   timelineContent: {
     flex: 1,
@@ -657,7 +657,7 @@ export const orderStyles = StyleSheet.create({
   invoiceTotalVal: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
 
   // ─── EMPTY STATE ───
@@ -680,7 +680,7 @@ export const orderStyles = StyleSheet.create({
     width: 84,
     height: 84,
     borderRadius: 42,
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -701,7 +701,7 @@ export const orderStyles = StyleSheet.create({
     marginBottom: 24,
   },
   emptyShopBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 14,

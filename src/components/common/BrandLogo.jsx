@@ -6,12 +6,14 @@ export default function BrandLogo({
   size = 48,
   showText = true,
   textColor,
-  accentColor = '#16A34A',
+  accentColor = '#EA580C',
   variant = 'horizontal',
   style,
   customName,
   customTagline,
   customLogo,
+  textSize,
+  titleStyle,
 }) {
   const [settings, setSettings] = useState(() => systemSettingsService.getSettings());
 
@@ -34,7 +36,8 @@ export default function BrandLogo({
         <View style={[styles.container, style]}>
           <Image
             source={{ uri: customLogoUrl }}
-            style={{ width: Math.round(size * 2.62), height: size, resizeMode: 'contain' }}
+            resizeMode="contain"
+            style={{ width: Math.round(size * 2.62), height: size }}
           />
         </View>
       );
@@ -43,7 +46,8 @@ export default function BrandLogo({
       <View style={[styles.container, style]}>
         <Image
           source={isDark ? require('../../../assets/logo-dark.png') : require('../../../assets/logo-full.png')}
-          style={{ width: Math.round(size * 2.62), height: size, resizeMode: 'contain' }}
+          resizeMode="contain"
+          style={{ width: Math.round(size * 2.62), height: size }}
         />
       </View>
     );
@@ -55,7 +59,7 @@ export default function BrandLogo({
       const rest = upper.slice(4);
       return (
         <>
-          MOTO<Text style={{ color: isDark ? '#6EE7B7' : (accentColor || '#16A34A') }}>{rest}</Text>
+          MOTO<Text style={{ color: isDark ? '#EA580C' : (accentColor || '#EA580C') }}>{rest}</Text>
         </>
       );
     }
@@ -65,12 +69,19 @@ export default function BrandLogo({
       const last = words[words.length - 1];
       return (
         <>
-          {first.toUpperCase()} <Text style={{ color: isDark ? '#6EE7B7' : (accentColor || '#16A34A') }}>{last.toUpperCase()}</Text>
+          {first.toUpperCase()}{' '}
+          <Text style={{ color: isDark ? '#EA580C' : (accentColor || '#EA580C') }}>
+            {last.toUpperCase()}
+          </Text>
         </>
       );
     }
     return upper;
   };
+
+  const effectiveFontSize = textSize !== undefined
+    ? textSize
+    : Math.max(12, Math.round(size * 0.44));
 
   return (
     <View style={[styles.container, style]}>
@@ -87,20 +98,20 @@ export default function BrandLogo({
         {customLogoUrl ? (
           <Image
             source={{ uri: customLogoUrl }}
+            resizeMode="contain"
             style={{
               width: Math.round(size * 0.95),
               height: Math.round(size * 0.95),
               borderRadius: Math.round(size * 0.2),
-              resizeMode: 'contain',
             }}
           />
         ) : (
           <Image
             source={require('../../../assets/emblem.png')}
+            resizeMode="contain"
             style={{
               width: Math.round(size * 0.92),
               height: Math.round(size * 0.92),
-              resizeMode: 'contain',
             }}
           />
         )}
@@ -112,7 +123,11 @@ export default function BrandLogo({
               style={[
                 styles.brandTitle,
                 textColor ? { color: textColor } : null,
-                { fontSize: Math.max(10, Math.round(size * 0.28)) },
+                {
+                  fontSize: effectiveFontSize,
+                  lineHeight: Math.round(effectiveFontSize * 1.2),
+                },
+                titleStyle,
               ]}
             >
               {renderBrandName()}
@@ -122,8 +137,8 @@ export default function BrandLogo({
             <Text
               style={[
                 styles.brandSubtitle,
-                { color: isDark ? 'rgba(255,255,255,0.65)' : (accentColor || '#16A34A') },
-                { fontSize: Math.max(5.5, Math.round(size * 0.135)) },
+                { color: isDark ? 'rgba(255,255,255,0.75)' : (accentColor || '#EA580C') },
+                { fontSize: Math.max(5.5, Math.round(size * 0.14)) },
               ]}
               numberOfLines={1}
             >
@@ -146,10 +161,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 2,
   },
   textColumn: {
     justifyContent: 'center',
+    alignItems: 'flex-start',
   },
   titleRow: {
     flexDirection: 'row',
@@ -158,15 +173,14 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontFamily: 'Plus Jakarta Sans',
     fontWeight: '900',
-    letterSpacing: -0.3,
+    letterSpacing: 0.3,
     color: '#0F172A',
   },
   brandSubtitle: {
     fontFamily: 'Plus Jakarta Sans',
     fontWeight: '800',
     letterSpacing: 0.6,
-    color: '#16A34A',
+    color: '#EA580C',
     marginTop: -1,
   },
 });
-

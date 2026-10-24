@@ -34,6 +34,7 @@ import {
   RegisterMotorcycleModal,
   CheckoutModal,
   CartModal,
+  BookInstallationModal,
 } from '../../../components/modals';
 import CustomizationWorkspace from '../../../components/customizer/CustomizationWorkspace.jsx';
 import AiMotorcycleInstallStudio from '../../../components/customizer/AiMotorcycleInstallStudio.jsx';
@@ -73,14 +74,14 @@ export default function CustomizerPageWeb({
 
   // ─── NOTIFICATION STATE ───
   const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
-    currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
+    currentUser ? notificationService.getUnreadCount(currentUser) : 0
   );
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
       setUnreadNotifCount(
-        currentUser ? notificationService.getUnreadCount(currentUser?.id) : 0
+        currentUser ? notificationService.getUnreadCount(currentUser) : 0
       );
     });
     return () => unsub?.();
@@ -120,14 +121,7 @@ export default function CustomizerPageWeb({
     return () => unsub?.();
   }, [currentUser]);
 
-  useEffect(() => {
-    const list = motorcycleService.getMotorcycles(currentUser?.id);
-    const bikes = Array.isArray(list) && list.length > 0 ? list : motorcycleService.getMotorcycles();
-    setRegisteredBikes(bikes);
-    if (!selectedRegisteredBike && bikes.length > 0) {
-      setSelectedRegisteredBike(bikes.find((b) => b.is_primary) || bikes[0]);
-    }
-  }, [currentUser]);
+
 
   // Active motorcycle object
   const activeMotorcycle = useMemo(() => {
@@ -267,7 +261,9 @@ export default function CustomizerPageWeb({
 
   useEffect(() => {
     if (!isPromptCustomized) {
-      setCustomPrompt(synthesizedPromptSentence);
+      Promise.resolve().then(() => {
+        setCustomPrompt(synthesizedPromptSentence);
+      });
     }
   }, [synthesizedPromptSentence, isPromptCustomized]);
 
@@ -278,6 +274,7 @@ export default function CustomizerPageWeb({
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [isCartModalOpen, setIsCartModalOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
   const [bookingBranch, setBookingBranch] = useState(GARAGE_BRANCHES[0].name);
   const [bookingDate, setBookingDate] = useState('Tomorrow, 10:30 AM');
   const [bookingTimeSlot, setBookingTimeSlot] = useState(TIME_SLOTS[1]);
@@ -471,32 +468,40 @@ export default function CustomizerPageWeb({
       return;
     }
 
-    const customizationPayload = generationResult || {
-      customizationId: 'AI-CUST-' + Math.floor(10000 + Math.random() * 90000),
-      bikeName: currentBikeTitle,
-      bikeBrand: activeMotorcycle?.brand || 'MotoTrack',
-      selectedParts,
-      partsTotalUsd,
-      partsTotalPhp,
-      generatedImage: currentBasePhoto,
-      diagnostics: liveDiagnostics,
-    };
+    setIsBookingSubmitting(true);
+    try {
+      const customizationPayload = generationResult || {
+        customizationId: 'AI-CUST-' + Math.floor(10000 + Math.random() * 90000),
+        bikeName: currentBikeTitle,
+        bikeBrand: activeMotorcycle?.brand || 'MotoTrack',
+        selectedParts,
+        partsTotalUsd,
+        partsTotalPhp,
+        generatedImage: currentBasePhoto,
+        diagnostics: liveDiagnostics,
+      };
 
-    const booking = await aiCustomizerService.bookCustomizationService({
-      customizationData: customizationPayload,
-      branchName: bookingBranch,
-      appointmentDate: bookingDate,
-      timeSlot: bookingTimeSlot,
-      customerName: riderName || currentUser?.name || 'Rider',
-      customerPhone: riderPhone,
-      plateNumber: bikePlate || activeMotorcycle?.plate_number || 'Custom Project',
-      notes: bookingNotes,
-      currentUser,
-    });
+      const booking = await aiCustomizerService.bookCustomizationService({
+        customizationData: customizationPayload,
+        branchName: bookingBranch,
+        appointmentDate: bookingDate,
+        timeSlot: bookingTimeSlot,
+        customerName: riderName || currentUser?.name || 'Rider',
+        customerPhone: riderPhone,
+        plateNumber: bikePlate || activeMotorcycle?.plate_number || 'Custom Project',
+        notes: bookingNotes,
+        currentUser,
+      });
 
-    setIsBookingModalOpen(false);
-    showToast(`🏁 Pitstop installation booked! Ticket #${booking.id}`);
-    onNavigateToGarage?.();
+      setIsBookingModalOpen(false);
+      showToast(`🏁 Pitstop installation booked! Ticket #${booking.id}`);
+      onNavigateToGarage?.();
+    } catch (err) {
+      console.error('[CustomizerPageWeb] Booking error:', err);
+      showToast(err?.message || 'Could not complete installation booking');
+    } finally {
+      setIsBookingSubmitting(false);
+    }
   };
 
   // Copy/Reset Prompt
@@ -527,8 +532,14 @@ export default function CustomizerPageWeb({
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── 1. NAVBAR ─── */}
-      <View style={[styles.headerWrapper, isDarkMode && { backgroundColor: '#151C19', borderBottomColor: '#26332E' }]}>
+      {/* ─── FULL-HEIGHT CUSTOMIZER SCROLLVIEW (Scrollbar extends through header from top: 0) ─── */}
+      <ScrollView
+        style={[styles.container, isDarkMode && { backgroundColor: '#0F1412' }]}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+      >
+        {/* ─── 1. NAVBAR (Pinned at top: 0, does not scroll away) ─── */}
+        <View style={[styles.headerWrapper, isDarkMode && { backgroundColor: '#151C19', borderBottomColor: '#26332E' }]}>
         <View style={[styles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
           {/* Left: Logo */}
           <View style={styles.headerLeft}>
@@ -685,18 +696,16 @@ export default function CustomizerPageWeb({
       </View>
 
       {/* ─── MAIN CONTENT ─── */}
-      <ScrollView
-        style={[styles.container, isDarkMode && { backgroundColor: '#0F1412' }]}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={true}
-      >
-        <View style={styles.maxContainer}>
+      <View style={styles.maxContainer}>
           <AiMotorcycleInstallStudio
             currentUser={currentUser}
             onRequireLogin={() => {
               setRedirectReason?.('ai-install');
               onNavigateToLogin?.();
             }}
+            onNavigateToGarage={onNavigateToGarage}
+            onNavigateToWishlist={onNavigateToWishlist}
+            layout="web"
           />
         </View>
       </ScrollView>
@@ -708,7 +717,7 @@ export default function CustomizerPageWeb({
             <View style={[styles.partModalSheet, isDarkMode && { backgroundColor: '#151C19', borderColor: '#26332E' }]}>
               <View style={[styles.partModalHeader, isDarkMode && { borderBottomColor: '#26332E' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <BootstrapIcon name="info-circle-fill" size={18} color={isDarkMode ? '#4DB896' : '#1D4533'} />
+                  <BootstrapIcon name="info-circle-fill" size={18} color={isDarkMode ? '#EA580C' : '#EA580C'} />
                   <Text style={{ fontSize: 15, fontWeight: '800', color: isDarkMode ? '#F5F7F6' : '#0F172A' }}>
                     Part Details & Fitment
                   </Text>
@@ -725,7 +734,7 @@ export default function CustomizerPageWeb({
                   resizeMode="cover"
                 />
                 <View style={[styles.partModalBadge, isDarkMode && { backgroundColor: '#1E3A2F' }]}>
-                  <Text style={[styles.partModalBadgeText, isDarkMode && { color: '#4DB896' }]}>
+                  <Text style={[styles.partModalBadgeText, isDarkMode && { color: '#EA580C' }]}>
                     {viewingPartDetails.category || 'Performance'}
                   </Text>
                 </View>
@@ -737,7 +746,7 @@ export default function CustomizerPageWeb({
               </Text>
 
               <View style={styles.partModalPriceRow}>
-                <Text style={[styles.partModalPricePhp, isDarkMode && { color: '#4DB896' }]}>
+                <Text style={[styles.partModalPricePhp, isDarkMode && { color: '#EA580C' }]}>
                   ₱{usdToPhp(viewingPartDetails.price || 0).toLocaleString()}
                 </Text>
                 <Text style={[styles.partModalPriceUsd, isDarkMode && { color: '#AAB4B0' }]}>
@@ -747,7 +756,7 @@ export default function CustomizerPageWeb({
 
               <View style={styles.partModalSpecsRow}>
                 <View style={styles.partModalSpecChip}>
-                  <BootstrapIcon name="check-circle" size={12} color="#1D4533" />
+                  <BootstrapIcon name="check-circle" size={12} color="#EA580C" />
                   <Text style={styles.partModalSpecText}>
                     Compatible with {activeMotorcycle?.brand} {activeMotorcycle?.model}
                   </Text>
@@ -807,95 +816,31 @@ export default function CustomizerPageWeb({
       />
 
       {/* ─── 5. BOOKING MODAL (PITSTOP SERVICE) ─── */}
-      <Modal visible={isBookingModalOpen} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <BootstrapIcon name="calendar-check-fill" size={18} color="#1D4533" />
-                <Text style={styles.modalTitle}>Book Installation Pitstop</Text>
-              </View>
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsBookingModalOpen(false)}>
-                <BootstrapIcon name="x" size={20} color="#CBD5E1" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={true}>
-              <Text style={styles.formLabel}>Selected Motorcycle</Text>
-              <View
-                style={{
-                  backgroundColor: '#F1F5F9',
-                  padding: 10,
-                  borderRadius: 10,
-                  marginBottom: 12,
-                }}
-              >
-                <Text style={{ fontWeight: '700', color: '#0F172A', fontSize: 13 }}>{currentBikeTitle}</Text>
-                <Text style={{ fontSize: 11, color: '#64748B' }}>
-                  {selectedParts.length} Custom Parts to be Installed
-                </Text>
-              </View>
-
-              <Text style={styles.formLabel}>Select Pitstop Bay Location *</Text>
-              {GARAGE_BRANCHES.map((b) => (
-                <TouchableOpacity
-                  key={b.name}
-                  style={[styles.branchBtn, bookingBranch === b.name && styles.branchBtnActive]}
-                  onPress={() => setBookingBranch(b.name)}
-                >
-                  <Text style={styles.branchText}>{b.name}</Text>
-                  <Text style={styles.branchSub}>
-                    {b.address} • {b.phone}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-
-              <Text style={[styles.formLabel, { marginTop: 10 }]}>Preferred Appointment Time Slot *</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-                {TIME_SLOTS.map((slot) => (
-                  <TouchableOpacity
-                    key={slot}
-                    style={[styles.slotChip, bookingTimeSlot === slot && styles.slotChipActive]}
-                    onPress={() => setBookingTimeSlot(slot)}
-                  >
-                    <Text style={[styles.slotText, bookingTimeSlot === slot && styles.slotTextActive]}>
-                      {slot}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={[styles.formLabel, { marginTop: 10 }]}>Contact Phone Number *</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="+63 9XX XXX XXXX"
-                placeholderTextColor="#64748B"
-                value={riderPhone}
-                onChangeText={setRiderPhone}
-              />
-
-              <Text style={styles.formLabel}>Special Mechanic / Fitting Notes</Text>
-              <TextInput
-                style={[styles.formInput, { height: 60 }]}
-                placeholder="e.g. Please dyno test before/after exhaust install..."
-                placeholderTextColor="#64748B"
-                multiline
-                value={bookingNotes}
-                onChangeText={setBookingNotes}
-              />
-            </ScrollView>
-
-            <TouchableOpacity
-              style={[styles.generateCtaBtn, { marginTop: 14 }]}
-              onPress={handleConfirmCustomBooking}
-              activeOpacity={0.9}
-            >
-              <BootstrapIcon name="check-circle-fill" size={16} color="#FFFFFF" />
-              <Text style={styles.generateCtaText}>Confirm Pitstop Customization Booking</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <BookInstallationModal
+        visible={isBookingModalOpen}
+        onClose={() => !isBookingSubmitting && setIsBookingModalOpen(false)}
+        previewImageUri={currentBasePhoto || null}
+        motorcycle={activeMotorcycle}
+        bikeTitle={currentBikeTitle}
+        serviceName={
+          selectedParts.length > 0
+            ? `${selectedParts.length} Custom Parts Installation`
+            : 'Custom Parts Installation'
+        }
+        laborFeePhp={3250}
+        branches={GARAGE_BRANCHES}
+        selectedBranch={bookingBranch}
+        onSelectBranch={setBookingBranch}
+        timeSlots={TIME_SLOTS}
+        selectedTimeSlot={bookingTimeSlot}
+        onSelectTimeSlot={setBookingTimeSlot}
+        phone={riderPhone}
+        onChangePhone={setRiderPhone}
+        notes={bookingNotes}
+        onChangeNotes={setBookingNotes}
+        onConfirm={handleConfirmCustomBooking}
+        busy={isBookingSubmitting}
+      />
 
       {/* ─── 6. REGISTER MOTORCYCLE MODAL ─── */}
       <RegisterMotorcycleModal
@@ -918,8 +863,17 @@ export default function CustomizerPageWeb({
           activeTab="Customize"
           onTabChange={(tab) => {
             if (tab === 'Home') onNavigateToStore?.();
-            else if (tab === 'Garage') onNavigateToGarage?.();
-            else if (tab === 'Orders') onNavigateToOrders?.();
+            else if (tab === 'Services') onNavigateToGarage?.();
+            else if (tab === 'Customize') {
+              // Already on Customizer
+            } else if (tab === 'Garage') {
+              if (!currentUser) {
+                setRedirectReason?.('Please sign in to access your motorcycle garage fleet.');
+                onNavigateToLogin?.();
+              } else {
+                onNavigateToProfile?.('garage');
+              }
+            } else if (tab === 'Orders') onNavigateToOrders?.();
             else if (tab === 'Wishlist' || tab === 'Favorites') onNavigateToWishlist?.();
             else if (tab === 'More') {
               if (!currentUser) {

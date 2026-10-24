@@ -283,6 +283,13 @@ const ICON_MAP = {
   globe: { type: 'ion', name: 'globe-outline' },
   tree: { type: 'mci', name: 'pine-tree' },
   bicycle: { type: 'ion', name: 'bicycle' },
+  motorcycle: { type: 'mci', name: 'moped-outline' },
+  motorbike: { type: 'mci', name: 'moped-outline' },
+  'motorcycle-fill': { type: 'mci', name: 'moped' },
+  scooter: { type: 'mci', name: 'moped-outline' },
+  moped: { type: 'mci', name: 'moped-outline' },
+  garage: { type: 'mci', name: 'garage' },
+  'garage-open': { type: 'mci', name: 'garage-open' },
   phone: { type: 'ion', name: 'call-outline' },
   'phone-fill': { type: 'ion', name: 'call' },
   telephone: { type: 'ion', name: 'call-outline' },
@@ -422,6 +429,83 @@ export default function BootstrapIcon({ name, size = 16, color = '#0F172A', styl
 
   // 1. Web Environment: Direct High-Fidelity Bootstrap Icons HTML Icon Rendering
   if (Platform.OS === 'web') {
+    if (
+      cleanName === 'motorcycle' ||
+      cleanName === 'motorbike' ||
+      cleanName === 'motorcycle-fill' ||
+      cleanName === 'scooter' ||
+      cleanName === 'moped'
+    ) {
+      return (
+        <svg
+          width={Math.round(size * 1.35)}
+          height={size}
+          viewBox="0 0 70 48"
+          fill="none"
+          stroke={iconColor}
+          strokeWidth="2.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ display: 'inline-flex', verticalAlign: 'middle', flexShrink: 0, ...flatStyle }}
+        >
+          {/* Rear wheel */}
+          <circle cx="16.5" cy="35" r="7" />
+          <circle cx="16.5" cy="35" r="3" />
+
+          {/* Rear body/cowl */}
+          <path d="M 6.5 33 C 6.5 22, 11 19, 21 19 L 29 19" />
+          <line x1="12" y1="26" x2="19" y2="26" />
+          <line x1="6.5" y1="33" x2="26" y2="33" />
+
+          {/* Seat */}
+          <path d="M 15 19 C 15 16.5, 18 16, 29 16 C 31 16.5, 31 18, 29 19 Z" />
+
+          {/* Step-through footboard to front apron */}
+          <path d="M 29 19 C 31 23, 31 28, 31 32 C 31 34.5, 33 35.5, 37 35.5 L 40 35.5 C 44 35.5, 45 32, 44 26 L 41.5 16" />
+
+          {/* Steering column / upper legshield */}
+          <line x1="43.5" y1="20" x2="45.5" y2="25" />
+
+          {/* Handlebars & stem */}
+          <path d="M 37 17 L 43.5 14.5" />
+
+          {/* Mirror */}
+          <path d="M 39 15.5 C 37 12, 35 9, 35 6.5 C 35 5, 36.5 4, 38.5 4 C 40.5 4, 42 5, 42 6.5 C 42 8, 40.5 10, 39.5 12" />
+
+          {/* Headlight */}
+          <path d="M 43.5 13.5 L 50 11.5 L 50.5 17.5 L 43.5 16 Z" />
+          <line x1="47" y1="12.5" x2="47" y2="16.5" />
+
+          {/* Front mudguard / fender */}
+          <path d="M 44 31 C 46 25, 53.5 26, 56.5 30.5 L 53 35" />
+
+          {/* Front fork */}
+          <line x1="48" y1="29" x2="52.5" y2="35" />
+
+          {/* Front wheel */}
+          <circle cx="53.5" cy="35" r="7" />
+          <circle cx="53.5" cy="35" r="3" />
+        </svg>
+      );
+    }
+    if (cleanName === 'garage' || cleanName === 'garage-open') {
+      return (
+        <svg
+          width={size}
+          height={size}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={iconColor}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          style={{ display: 'inline-flex', verticalAlign: 'middle', flexShrink: 0, ...flatStyle }}
+        >
+          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+          <polyline points="9 22 9 12 15 12 15 22" />
+        </svg>
+      );
+    }
     return (
       <i
         className={`bi bi-${cleanName}`}
@@ -442,7 +526,7 @@ export default function BootstrapIcon({ name, size = 16, color = '#0F172A', styl
     );
   }
 
-  // 2. Mobile Environment (iOS / Android)
+  // 2. Mobile Environment (iOS / Android) - Render synchronous vector glyphs via @expo/vector-icons
   const mapped = ICON_MAP[cleanName] || getFallbackIcon(cleanName);
 
   if (mapped.type === 'mci') {

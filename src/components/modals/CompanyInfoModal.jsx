@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import BrandLogo from '../common/BrandLogo.jsx';
@@ -49,9 +50,14 @@ export default function CompanyInfoModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      onRequestClose={onClose}
+    >
       <View style={styles.backdrop}>
-        <View style={[styles.dialog, { maxWidth: isDesktop ? 760 : '94%' }]}>
+        <View style={[styles.dialog, { maxWidth: isDesktop ? 760 : '100%' }]}>
           {/* Header */}
           <View style={styles.header}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -80,7 +86,7 @@ export default function CompanyInfoModal({
                   <BootstrapIcon
                     name={tab.icon}
                     size={14}
-                    color={isActive ? '#1D4533' : '#64748B'}
+                    color={isActive ? '#EA580C' : '#64748B'}
                   />
                   <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
                     {tab.label}
@@ -173,7 +179,7 @@ export default function CompanyInfoModal({
                   {/* Address */}
                   <View style={styles.contactCard}>
                     <View style={styles.contactIconBox}>
-                      <BootstrapIcon name="geo-alt-fill" size={20} color="#1D4533" />
+                      <BootstrapIcon name="geo-alt-fill" size={20} color="#EA580C" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.contactLabel}>Flagship Central Pit Bays</Text>
@@ -186,7 +192,7 @@ export default function CompanyInfoModal({
                   {/* Hotlines */}
                   <View style={styles.contactCard}>
                     <View style={styles.contactIconBox}>
-                      <BootstrapIcon name="telephone-fill" size={20} color="#1D4533" />
+                      <BootstrapIcon name="telephone-fill" size={20} color="#EA580C" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.contactLabel}>Customer & Garage Hotline</Text>
@@ -203,7 +209,7 @@ export default function CompanyInfoModal({
                   {/* Email */}
                   <View style={styles.contactCard}>
                     <View style={styles.contactIconBox}>
-                      <BootstrapIcon name="envelope-fill" size={20} color="#1D4533" />
+                      <BootstrapIcon name="envelope-fill" size={20} color="#EA580C" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.contactLabel}>Official Support Email</Text>
@@ -222,7 +228,7 @@ export default function CompanyInfoModal({
                   {/* Operating Hours */}
                   <View style={styles.contactCard}>
                     <View style={styles.contactIconBox}>
-                      <BootstrapIcon name="clock-fill" size={20} color="#1D4533" />
+                      <BootstrapIcon name="clock-fill" size={20} color="#EA580C" />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles.contactLabel}>Operating Hours</Text>
@@ -354,7 +360,7 @@ export default function CompanyInfoModal({
           {/* Footer Action */}
           <View style={styles.footerBar}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <BootstrapIcon name="shield-check" size={16} color="#1D4533" />
+              <BootstrapIcon name="shield-check" size={16} color="#EA580C" />
               <Text style={{ fontSize: 12, color: '#475569', fontWeight: '600' }}>
                 MotoTrack Official Performance Network
               </Text>
@@ -373,17 +379,20 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    padding: Platform.OS === 'web' ? 16 : 0,
     zIndex: 9999,
   },
   dialog: {
     width: '100%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 22,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 22 : 0,
+    borderBottomRightRadius: Platform.OS === 'web' ? 22 : 0,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
+    shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.18,
     shadowRadius: 28,
     elevation: 10,
@@ -440,7 +449,7 @@ const styles = StyleSheet.create({
     cursor: 'pointer',
   },
   tabBtnActive: {
-    borderBottomColor: '#1D4533',
+    borderBottomColor: '#EA580C',
     backgroundColor: '#FFFFFF',
   },
   tabText: {
@@ -449,7 +458,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   tabTextActive: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '800',
   },
   bodyScroll: {
@@ -471,7 +480,7 @@ const styles = StyleSheet.create({
   },
   heroBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -559,7 +568,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
@@ -586,7 +595,7 @@ const styles = StyleSheet.create({
   copyBtnText: {
     fontSize: 11.5,
     fontWeight: '700',
-    color: '#1D4533',
+    color: '#EA580C',
     textDecorationLine: 'underline',
   },
   legalSection: {
@@ -611,23 +620,24 @@ const styles = StyleSheet.create({
   footerBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
     paddingHorizontal: 22,
-    paddingVertical: 14,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
     backgroundColor: '#FFFFFF',
   },
   doneBtn: {
-    backgroundColor: '#1D4533',
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 10,
+    backgroundColor: '#EA580C',
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    borderRadius: 14,
     cursor: 'pointer',
   },
   doneBtnText: {
     color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 13.5,
+    fontWeight: '800',
   },
 });

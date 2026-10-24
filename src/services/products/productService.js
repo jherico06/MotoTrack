@@ -1,5 +1,4 @@
 import { supabaseManager } from '../../lib/supabase.js';
-import { MOTOR_PARTS } from '../../data/motorParts.js';
 import { appStorage } from '../system/storageAdapter.js';
 import { notificationService } from '../notifications/notificationService.js';
 import { serializeProductSizes, normalizeProductSizes } from '../../utils/productSizes.js';
@@ -276,10 +275,10 @@ export const productService = {
             return {
               id: item.product_id || item.id,
               product_id: item.product_id || item.id,
-              name: item.name || 'Pro Racing Component',
+              name: item.name || 'Unnamed product',
               category: cat?.name || item.category || 'Accessories',
               category_id: item.category_id || categoryIdFromName(cat?.name || item.category),
-              brand: item.brand || 'MotoTrack',
+              brand: item.brand || '',
               price: Number(item.price) || 0,
               unit_cost: Number(item.unit_cost || 0),
               unitCost: Number(item.unit_cost || 0),
@@ -288,7 +287,7 @@ export const productService = {
               oldPrice: sanitizeCompareAtPrice(item.old_price, item.price),
               rating: Number(item.reviews) > 0 ? Number(item.rating || 0) : 0,
               reviews: Number(item.reviews || 0),
-              compatibility: item.compatibility || 'Universal Fitment',
+              compatibility: item.compatibility || '',
               sku: item.sku || 'SKU-' + (item.product_id || item.id),
               stock: Number(inv?.stock_quantity ?? item.stock ?? 0),
               reorder_level: Number(inv?.reorder_level ?? 5),
@@ -303,11 +302,9 @@ export const productService = {
               type: item.type || 'newArrival',
               isNew: Boolean(item.is_new),
               discount: item.discount,
-              image:
-                item.image ||
-                'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
-              material: item.material || 'Aircraft Grade Alloy',
-              weight: item.weight || '1.0 kg',
+              image: item.image || '',
+              material: item.material || '',
+              weight: item.weight || '',
               description: item.description || '',
               features: Array.isArray(item.features)
                 ? item.features
@@ -647,8 +644,8 @@ export const productService = {
           list = JSON.parse(stored);
         } catch (e) {}
       }
-      if (!Array.isArray(list) || list.length === 0) {
-        list = MOTOR_PARTS;
+      if (!Array.isArray(list)) {
+        list = [];
       }
       const updated = list.filter((p) => p.id !== prodId && p.product_id !== prodId);
       appStorage.setItem(STORAGE_KEY, JSON.stringify(updated));

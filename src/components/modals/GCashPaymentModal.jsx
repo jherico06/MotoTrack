@@ -9,6 +9,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   useWindowDimensions,
+  Platform,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { gcashPaymentService, GCASH_CONFIG } from '../../services/orders/gcashPaymentService.js';
@@ -511,21 +512,25 @@ const gStyles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    padding: Platform.OS === 'web' ? 16 : 0,
   },
   container: {
     width: '100%',
-    maxWidth: 440,
+    maxWidth: Platform.OS === 'web' ? 440 : '100%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 24 : 0,
+    borderBottomRightRadius: Platform.OS === 'web' ? 24 : 0,
     overflow: 'hidden',
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
+    shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.25,
     shadowRadius: 20,
     elevation: 20,
+    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
   },
   containerDesktop: {
     maxWidth: 440,

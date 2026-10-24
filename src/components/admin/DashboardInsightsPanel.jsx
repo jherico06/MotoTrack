@@ -581,7 +581,7 @@ function SalesRevenueTrendChart({
               width: 26,
               height: 26,
               borderRadius: 6,
-              backgroundColor: isDark ? 'rgba(16, 185, 129, 0.16)' : 'rgba(29, 69, 51, 0.08)',
+              backgroundColor: isDark ? 'rgba(16, 185, 129, 0.16)' : 'rgba(234, 88, 12, 0.12)',
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -589,7 +589,7 @@ function SalesRevenueTrendChart({
             <BootstrapIcon
               name="graph-up"
               size={13}
-              color={isDark ? '#4ADE80' : '#1D4533'}
+              color={isDark ? '#4ADE80' : '#EA580C'}
             />
           </View>
           <View>
@@ -632,7 +632,7 @@ function SalesRevenueTrendChart({
                 width: 12,
                 height: 2,
                 borderTopWidth: 2,
-                borderTopColor: isDark ? '#4ADE80' : '#1D4533',
+                borderTopColor: isDark ? '#4ADE80' : '#EA580C',
                 borderStyle: 'dashed',
               }}
             />
@@ -643,33 +643,8 @@ function SalesRevenueTrendChart({
         )}
       </View>
 
-      {/* Main Chart Body */}
-      {!hasData ? (
-        <View style={{ paddingVertical: 36, alignItems: 'center', justifyContent: 'center' }}>
-          <View
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: isDark ? '#151C19' : '#FFFFFF',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 10,
-              borderWidth: 1,
-              borderColor: isDark ? (tokens?.border || '#26332E') : '#E2E8F0',
-            }}
-          >
-            <BootstrapIcon name="bar-chart" size={20} color={isDark ? '#94A3B8' : tokens.textMuted} />
-          </View>
-          <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F8FAFC' : tokens.textPrimary }}>
-            No sales recorded for this period
-          </Text>
-          <Text style={{ fontSize: 11.5, color: isDark ? '#94A3B8' : tokens.textMuted, marginTop: 3 }}>
-            Order transactions within this date range will appear here automatically.
-          </Text>
-        </View>
-      ) : (
-        <View style={{ width: '100%', height: chartHeight, position: 'relative' }}>
+      {/* Main Chart Body — zero revenue still draws the baseline and date axis */}
+      <View style={{ width: '100%', height: chartHeight, position: 'relative' }}>
           {Platform.OS === 'web' ? (
             <svg
               width="100%"
@@ -681,12 +656,12 @@ function SalesRevenueTrendChart({
                 <linearGradient id="salesTrendGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop
                     offset="0%"
-                    stopColor={isDark ? '#10B981' : '#1D4533'}
+                    stopColor="#EA580C"
                     stopOpacity={isDark ? 0.35 : 0.22}
                   />
                   <stop
                     offset="100%"
-                    stopColor={isDark ? '#10B981' : '#1D4533'}
+                    stopColor="#EA580C"
                     stopOpacity={0.0}
                   />
                 </linearGradient>
@@ -728,7 +703,7 @@ function SalesRevenueTrendChart({
                   y1={avgY}
                   x2={chartWidth - padding.right}
                   y2={avgY}
-                  stroke={isDark ? '#34D399' : '#1D4533'}
+                  stroke={isDark ? '#34D399' : '#EA580C'}
                   strokeWidth="1.2"
                   strokeDasharray="4 4"
                   strokeOpacity={0.7}
@@ -743,7 +718,7 @@ function SalesRevenueTrendChart({
                 <path
                   d={linePath}
                   fill="none"
-                  stroke={isDark ? '#34D399' : '#1D4533'}
+                  stroke={isDark ? '#34D399' : '#EA580C'}
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
@@ -757,7 +732,7 @@ function SalesRevenueTrendChart({
                   y1={padding.top}
                   x2={activePoint.x}
                   y2={baseline}
-                  stroke={isDark ? '#34D399' : '#1D4533'}
+                  stroke={isDark ? '#34D399' : '#EA580C'}
                   strokeWidth="1.2"
                   strokeDasharray="3 3"
                   strokeOpacity={0.8}
@@ -772,16 +747,21 @@ function SalesRevenueTrendChart({
 
                 return (
                   <g key={`pt-${i}`}>
-                    {/* Circle */}
-                    <circle
-                      cx={p.x}
-                      cy={p.y}
-                      r={isHovered ? 6 : p.revenue > 0 ? 3.5 : 2}
-                      fill={isHovered ? (isDark ? '#34D399' : '#1D4533') : isDark ? '#0F1412' : '#FFFFFF'}
-                      stroke={isDark ? '#34D399' : '#1D4533'}
-                      strokeWidth={isHovered ? 2.5 : 2}
-                      style={{ transition: 'all 0.15s ease' }}
-                    />
+                    {(isHovered || p.revenue > 0 || i === points.length - 1) && (
+                      <circle
+                        cx={p.x}
+                        cy={p.y}
+                        r={isHovered ? 6 : 3.5}
+                        fill={
+                          isHovered || p.revenue <= 0
+                            ? (isDark ? '#34D399' : '#EA580C')
+                            : (isDark ? '#0F1412' : '#FFFFFF')
+                        }
+                        stroke={isDark ? '#34D399' : '#EA580C'}
+                        strokeWidth={isHovered ? 2.5 : 2}
+                        style={{ transition: 'all 0.15s ease' }}
+                      />
+                    )}
 
                     {/* X-Axis Date Label */}
                     {(visibleXLabels.has(i) || isHovered) ? (
@@ -820,7 +800,7 @@ function SalesRevenueTrendChart({
                 style={{
                   height: '100%',
                   width: hasData ? '70%' : '10%',
-                  backgroundColor: isDark ? '#34D399' : '#1D4533',
+                  backgroundColor: isDark ? '#34D399' : '#EA580C',
                   borderRadius: 3,
                 }}
               />
@@ -887,7 +867,6 @@ function SalesRevenueTrendChart({
             </View>
           ) : null}
         </View>
-      )}
 
       {/* Telemetry Summary Bar */}
       <View
@@ -1059,15 +1038,38 @@ export default function DashboardInsightsPanel({
   const periodSelector = (
     <View
       style={{
+        position: 'relative',
         flexDirection: 'row',
         backgroundColor: isDarkMode ? '#151C19' : '#F1F5F9',
         borderRadius: 9,
         padding: 3,
         borderWidth: 1,
         borderColor: isDarkMode ? (tokens?.border || '#26332E') : '#E2E8F0',
-        gap: 3,
+        width: isDesktop ? 220 : '100%',
       }}
     >
+      {/* Smooth animated active-state sliding indicator */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 3,
+          bottom: 3,
+          left: 3,
+          width: 'calc((100% - 6px) / 3)',
+          backgroundColor: '#EA580C',
+          borderRadius: 6,
+          boxShadow: '0 1px 4px rgba(234, 88, 12, 0.35)',
+          transition: 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)',
+          transform:
+            chartGranularity === 'daily'
+              ? 'translateX(0%)'
+              : chartGranularity === 'weekly'
+              ? 'translateX(100%)'
+              : 'translateX(200%)',
+          pointerEvents: 'none',
+          zIndex: 0,
+        }}
+      />
       {[
         { id: 'daily', label: 'Daily' },
         { id: 'weekly', label: 'Weekly' },
@@ -1078,14 +1080,16 @@ export default function DashboardInsightsPanel({
           <TouchableOpacity
             key={tab.id}
             onPress={() => setChartGranularity(tab.id)}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             style={{
-              paddingHorizontal: 11,
+              flex: 1,
               paddingVertical: 5,
-              borderRadius: 7,
-              backgroundColor: active
-                ? (isDarkMode ? '#10B981' : '#1D4533')
-                : 'transparent',
+              borderRadius: 6,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              zIndex: 1,
             }}
           >
             <Text
@@ -1095,6 +1099,7 @@ export default function DashboardInsightsPanel({
                 color: active
                   ? '#FFFFFF'
                   : (isDarkMode ? '#94A3B8' : '#64748B'),
+                transition: 'color 200ms ease',
               }}
             >
               {tab.label}

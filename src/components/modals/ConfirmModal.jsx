@@ -54,7 +54,7 @@ export default function ConfirmModal({
       ? (isDark ? 'rgba(245, 158, 11, 0.18)' : '#FFFBEB')
       : isSuccess
         ? (isDark ? 'rgba(16, 185, 129, 0.18)' : '#F0FDF4')
-        : (isDark ? 'rgba(29, 69, 51, 0.25)' : '#F0FDFA');
+        : (isDark ? 'rgba(234, 88, 12, 0.25)' : '#FFF7ED');
 
   const badgeBorder = isDanger
     ? (isDark ? 'rgba(239, 68, 68, 0.4)' : '#FEE2E2')
@@ -62,7 +62,7 @@ export default function ConfirmModal({
       ? (isDark ? 'rgba(245, 158, 11, 0.4)' : '#FEF3C7')
       : isSuccess
         ? (isDark ? 'rgba(16, 185, 129, 0.4)' : '#DCFCE7')
-        : (isDark ? 'rgba(29, 69, 51, 0.45)' : '#CCFBF1');
+        : (isDark ? 'rgba(234, 88, 12, 0.45)' : '#FED7AA');
 
   const iconColor = isDanger
     ? (isDark ? '#F87171' : '#EF4444')
@@ -70,12 +70,17 @@ export default function ConfirmModal({
       ? (isDark ? '#FBBF24' : '#F59E0B')
       : isSuccess
         ? (isDark ? '#34D399' : '#10B981')
-        : (isDark ? '#34D399' : '#1D4533');
+        : (isDark ? '#34D399' : '#EA580C');
 
-  const confirmBg = isDanger ? '#DC2626' : isWarning ? '#D97706' : isSuccess ? '#059669' : '#1D4533';
+  const confirmBg = isDanger ? '#DC2626' : isWarning ? '#D97706' : isSuccess ? '#059669' : '#EA580C';
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      onRequestClose={onCancel}
+    >
       <View style={styles.overlay}>
         {/* Backdrop Touchable */}
         <TouchableOpacity
@@ -86,7 +91,7 @@ export default function ConfirmModal({
 
         <View style={[styles.cardContainer, isDark && { backgroundColor: '#141A18', borderColor: 'rgba(255,255,255,0.1)' }]}>
           {/* Top Brand Accent Stripe */}
-          <View style={[styles.topAccentStripe, { backgroundColor: isDanger ? '#EF4444' : '#1D4533' }]} />
+          <View style={[styles.topAccentStripe, { backgroundColor: isDanger ? '#EF4444' : '#EA580C' }]} />
 
           <View style={styles.cardContent}>
             {/* Centered Glowing Icon Badge */}
@@ -103,7 +108,7 @@ export default function ConfirmModal({
             {/* Highlighted Item Badge (if provided) */}
             {itemName ? (
               <View style={[styles.itemHighlightBox, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
-                <BootstrapIcon name="box-seam" size={14} color={isDanger ? (isDark ? '#F87171' : '#DC2626') : (isDark ? '#34D399' : '#1D4533')} />
+                <BootstrapIcon name="box-seam" size={14} color={isDanger ? (isDark ? '#F87171' : '#DC2626') : (isDark ? '#34D399' : '#EA580C')} />
                 <Text
                   style={[styles.itemHighlightText, { color: isDanger ? (isDark ? '#FCA5A5' : '#991B1B') : (isDark ? '#A7F3D0' : '#064E3B') }]}
                   numberOfLines={2}
@@ -157,9 +162,9 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.68)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 18,
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    padding: Platform.OS === 'web' ? 18 : 0,
     ...(Platform.OS === 'web' ? { backdropFilter: 'blur(6px)' } : {}),
   },
   backdropClickArea: {
@@ -167,16 +172,19 @@ const styles = StyleSheet.create({
   },
   cardContainer: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 22,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 22 : 0,
+    borderBottomRightRadius: Platform.OS === 'web' ? 22 : 0,
     width: '100%',
-    maxWidth: 440,
+    maxWidth: Platform.OS === 'web' ? 440 : '100%',
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.22,
-    shadowRadius: 32,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
     elevation: 25,
   },
   topAccentStripe: {
@@ -186,7 +194,7 @@ const styles = StyleSheet.create({
   cardContent: {
     paddingHorizontal: 24,
     paddingTop: 24,
-    paddingBottom: 22,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 22,
     alignItems: 'center',
     textAlign: 'center',
   },
@@ -246,8 +254,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingVertical: 12.5,
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -258,8 +266,8 @@ const styles = StyleSheet.create({
   },
   confirmButton: {
     flex: 1,
-    borderRadius: 12,
-    paddingVertical: 12.5,
+    borderRadius: 14,
+    paddingVertical: 13,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000000',

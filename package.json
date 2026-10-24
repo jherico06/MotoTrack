@@ -14,7 +14,8 @@
     "server": "npm --prefix server run start",
     "server:dev": "npm --prefix server run dev",
     "lint": "expo lint",
-    "format": "prettier --write \"src/**/*.{js,jsx}\" \"App.js\" \"index.js\""
+    "format": "prettier --write \"src/**/*.{js,jsx}\" \"App.js\" \"index.js\"",
+    "postinstall": "node scripts/patch-css-interop.js"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",
@@ -44,10 +45,11 @@
     "gsap": "^3.15.0",
     "lucide-react": "^1.47.0",
     "multer": "^2.4.0",
-    "nativewind": "^4.2.6",
+    "nativewind": "^4.2.7",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "react-native": "^0.86.3",
+    "react-native-css-interop": "^0.2.7",
     "react-native-web": "^0.21.0",
     "react-native-webview": "^13.16.1",
     "tailwindcss": "^3.4.19",

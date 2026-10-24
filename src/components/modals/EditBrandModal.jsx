@@ -140,12 +140,12 @@ export default function EditBrandModal({
                   width: 42,
                   height: 42,
                   borderRadius: 12,
-                  backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                  backgroundColor: isDarkMode ? '#132A26' : '#FFF7ED',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <BootstrapIcon name="palette" size={20} color="#1D4533" />
+                <BootstrapIcon name="palette" size={20} color="#EA580C" />
               </View>
               <View>
                 <Text style={{ fontSize: 17, fontWeight: '800', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
@@ -295,11 +295,11 @@ export default function EditBrandModal({
                       width: 60,
                       height: 60,
                       borderRadius: 12,
-                      backgroundColor: isDarkMode ? '#132A26' : '#E8F0EC',
+                      backgroundColor: isDarkMode ? '#132A26' : '#FFF7ED',
                       alignItems: 'center',
                       justifyContent: 'center',
                       borderWidth: 1,
-                      borderColor: isDarkMode ? '#1D4533' : '#A7F3D0',
+                      borderColor: isDarkMode ? '#EA580C' : '#A7F3D0',
                     }}
                   >
                     <Image
@@ -328,7 +328,7 @@ export default function EditBrandModal({
                         paddingHorizontal: 14,
                         paddingVertical: 8,
                         borderRadius: 8,
-                        backgroundColor: '#1D4533',
+                        backgroundColor: '#EA580C',
                         cursor: 'pointer',
                       }}
                       activeOpacity={0.85}
@@ -429,8 +429,8 @@ export default function EditBrandModal({
                 paddingHorizontal: 22,
                 paddingVertical: 10,
                 borderRadius: 10,
-                backgroundColor: '#1D4533',
-                boxShadow: '0 4px 14px rgba(29, 69, 51, 0.28)',
+                backgroundColor: '#EA580C',
+                boxShadow: '0 4px 14px rgba(234, 88, 12, 0.28)',
                 cursor: 'pointer',
                 opacity: isSaving ? 0.7 : 1,
               }}

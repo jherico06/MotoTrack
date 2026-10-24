@@ -10,7 +10,7 @@ Roles:
 
 Mechanics are managed by Admin inside Garage and are **not** a separate login role.
 
-For a narrative description of each role, see [ROLES.md](./ROLES.md).
+For a narrative description of each role, see [ROLES.md](./ROLES.md). For system requirements analysis, see [ANALYSIS.md](./ANALYSIS.md).
 
 ---
 
@@ -25,21 +25,22 @@ For a narrative description of each role, see [ROLES.md](./ROLES.md).
 7. Manage Orders / COD Fulfillment
 8. Manage Sales (POS)
 9. Generate Receipt
-10. View Sales Reports / Analytics
+10. View Sales Reports 
 11. View Inventory Reports
-12. Manage Customers
-13. Manage Suppliers
-14. Manage Purchase Orders
-15. Manage Promo Vouchers
-16. Manage Garage Services & Bookings
-17. Manage Mechanics
-18. Manage Motorcycle Models
-19. Manage Product Compatibility
-20. Manage Riders / Delivery Staff
-21. Notifications
-22. Data Backup
-23. System Settings / Security
-24. Logout
+12. Sales Forecast & Stock Optimization
+13. Manage Customers
+14. Manage Suppliers
+15. Manage Purchase Orders
+16. Manage Promo Vouchers
+17. Manage Garage Services & Bookings
+18. Manage Mechanics
+19. Manage Motorcycle Models
+20. Manage Product Compatibility
+21. Manage Riders / Delivery Staff
+22. Notifications
+23. Data Backup
+24. System Settings / Security
+25. Logout
 
 ---
 
@@ -49,19 +50,18 @@ For a narrative description of each role, see [ROLES.md](./ROLES.md).
 2. Browse Store (search, filters, categories)
 3. Check Part Compatibility (My Motorcycle)
 4. Filter Compatible Products
-5. Add to Cart / Apply Promo
-6. Checkout & Pay (COD, GCash, Card)
+5. Add to Cart 
+6. Checkout & Pay (COD, GCash)
 7. Track Orders / Order History
 8. Cancel / Resubmit Orders
 9. Rate Delivered Orders
-10. Confirm Delivery (QR)
-11. AI Customizer / Save Setups
-12. Garage Bookings (PMS / services)
-13. Wishlist
-14. Manage Profile / Address
-15. Manage My Motorcycles
-16. Notifications
-17. Logout
+10. AI Customizer / Save Setups
+11. Garage Bookings (PMS / services)
+12. Wishlist
+13. Manage Profile / Address
+14. Manage My Motorcycles
+15. Notifications
+16. Logout
 
 ---
 

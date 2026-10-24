@@ -200,7 +200,7 @@ export default function ProductVariantPickerModal({
                 <View style={styles.perksRow}>
                   {isFreeShippingActive && (
                     <View style={styles.freeShippingBadge}>
-                      <BootstrapIcon name="truck" size={10} color="#1D4533" />
+                      <BootstrapIcon name="truck" size={10} color="#EA580C" />
                       <Text style={styles.freeShippingBadgeText}>Free shipping</Text>
                     </View>
                   )}
@@ -339,7 +339,7 @@ export default function ProductVariantPickerModal({
                     onPress={handleShowSizeGuide}
                     activeOpacity={0.8}
                   >
-                    <BootstrapIcon name="rulers" size={12} color="#1D4533" />
+                    <BootstrapIcon name="rulers" size={12} color="#EA580C" />
                     <Text style={styles.sizeGuideText}>Size guide</Text>
                   </TouchableOpacity>
                 </View>

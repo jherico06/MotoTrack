@@ -8,11 +8,11 @@ function toDraftRows(colors) {
   if (!Array.isArray(colors)) return [];
   return colors.map((raw) => {
     if (typeof raw === 'string') {
-      return { label: raw, hex: '#1D4533', image: '', stock: '' };
+      return { label: raw, hex: '#EA580C', image: '', stock: '' };
     }
     return {
       label: String(raw?.label ?? raw?.name ?? raw?.color ?? ''),
-      hex: String(raw?.hex ?? '#1D4533'),
+      hex: String(raw?.hex ?? '#EA580C'),
       image: String(raw?.image ?? ''),
       stock: raw?.stock === 0 || raw?.stock ? String(raw.stock) : '',
     };
@@ -74,7 +74,7 @@ export default function ProductColorsEditor({
         ...prev,
         {
           label: '',
-          hex: '#1D4533',
+          hex: '#EA580C',
           image: '',
           stock: '',
         },
@@ -260,7 +260,7 @@ export default function ProductColorsEditor({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 8,
-                    backgroundColor: '#1D4533',
+                    backgroundColor: '#EA580C',
                     paddingVertical: 10,
                     paddingHorizontal: 12,
                     borderRadius: 10,
@@ -328,14 +328,14 @@ export default function ProductColorsEditor({
           paddingHorizontal: 12,
           borderRadius: 10,
           borderWidth: 1.5,
-          borderColor: '#1D4533',
-          backgroundColor: '#F0FDFA',
+          borderColor: '#EA580C',
+          backgroundColor: '#FFF7ED',
           marginTop: 2,
         }}
         activeOpacity={0.85}
       >
-        <BootstrapIcon name="plus-lg" size={12} color="#1D4533" />
-        <Text style={{ fontSize: 12, fontWeight: '800', color: '#1D4533' }}>Add Color</Text>
+        <BootstrapIcon name="plus-lg" size={12} color="#EA580C" />
+        <Text style={{ fontSize: 12, fontWeight: '800', color: '#EA580C' }}>Add Color</Text>
       </TouchableOpacity>
     </View>
   );

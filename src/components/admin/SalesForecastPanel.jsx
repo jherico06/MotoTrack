@@ -514,7 +514,7 @@ export default function SalesForecastPanel({
                     width: 36,
                     height: 36,
                     borderRadius: 10,
-                    backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.25)' : '#E6F4F1',
+                    backgroundColor: isDarkMode ? 'rgba(36, 39, 43, 0.6)' : '#E6F4F1',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -666,7 +666,7 @@ export default function SalesForecastPanel({
                         minWidth: isDesktop ? 180 : 150,
                         backgroundColor: isSelected
                           ? isDarkMode
-                            ? 'rgba(29, 69, 51, 0.15)'
+                            ? 'rgba(234, 88, 12, 0.15)'
                             : '#F0FDF4'
                           : isDarkMode
                           ? '#1E2028'
@@ -912,7 +912,7 @@ export default function SalesForecastPanel({
                 styles.controlBtn,
                 forecastScope === 'category' && {
                   borderColor: tokens.primary,
-                  backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.2)' : '#E8F5EE',
+                  backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.2)' : '#E8F5EE',
                 },
               ]}
               onPress={() => {
@@ -1018,8 +1018,8 @@ export default function SalesForecastPanel({
                             paddingVertical: 11,
                             backgroundColor: active
                               ? isDarkMode
-                                ? 'rgba(29, 69, 51, 0.2)'
-                                : '#E8F0EC'
+                                ? 'rgba(234, 88, 12, 0.2)'
+                                : '#FFF7ED'
                               : 'transparent',
                             borderBottomWidth: idx < pickerCategories.length - 1 ? 1 : 0,
                             borderBottomColor: tokens.border,
@@ -1154,7 +1154,7 @@ export default function SalesForecastPanel({
                           justifyContent: 'space-between',
                           paddingHorizontal: 14,
                           paddingVertical: 11,
-                          backgroundColor: active ? (isDarkMode ? 'rgba(29, 69, 51,0.2)' : '#E8F0EC') : 'transparent',
+                          backgroundColor: active ? (isDarkMode ? 'rgba(234, 88, 12, 0.2)' : '#FFF7ED') : 'transparent',
                           borderBottomWidth: idx < chartLookback.length - 1 ? 1 : 0,
                           borderBottomColor: tokens.border,
                         }}
@@ -1165,7 +1165,7 @@ export default function SalesForecastPanel({
                         activeOpacity={0.7}
                       >
                         <View>
-                          <Text style={{ fontWeight: '700', fontSize: 13.5, color: active ? '#1D4533' : tokens.foreground }}>
+                          <Text style={{ fontWeight: '700', fontSize: 13.5, color: active ? '#EA580C' : tokens.foreground }}>
                             Lookback {opt.label}
                           </Text>
                           <Text style={{ fontSize: 11.5, color: tokens.mutedForeground, marginTop: 2 }}>
@@ -1173,7 +1173,7 @@ export default function SalesForecastPanel({
                           </Text>
                         </View>
                         {active && (
-                          <BootstrapIcon name="check-lg" size={15} color="#1D4533" />
+                          <BootstrapIcon name="check-lg" size={15} color="#EA580C" />
                         )}
                       </TouchableOpacity>
                     );
@@ -2034,35 +2034,38 @@ export default function SalesForecastPanel({
           <View
             style={{
               flexDirection: 'row',
-              backgroundColor: isDarkMode ? tokens.card : '#F1F5F9',
+              backgroundColor: isDarkMode ? '#1E2124' : '#1A1D20',
               borderRadius: 8,
               padding: 3,
+              gap: 2,
               borderWidth: 1,
-              borderColor: tokens.border,
+              borderColor: isDarkMode ? '#374151' : '#32373D',
             }}
           >
             <TouchableOpacity
               onPress={() => setForecastScope('product')}
               style={{
-                paddingHorizontal: 10,
-                paddingVertical: 5,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
                 borderRadius: 6,
-                backgroundColor: forecastScope === 'product' ? tokens.primary : 'transparent',
+                backgroundColor: forecastScope === 'product' ? '#EA580C' : 'transparent',
+                boxShadow: forecastScope === 'product' ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 5,
+                cursor: 'pointer',
               }}
             >
               <BootstrapIcon
                 name="box-seam"
                 size={11.5}
-                color={forecastScope === 'product' ? '#FFFFFF' : tokens.mutedForeground}
+                color={forecastScope === 'product' ? '#FFFFFF' : '#CBD5E1'}
               />
               <Text
                 style={{
                   fontSize: 12,
-                  fontWeight: '700',
-                  color: forecastScope === 'product' ? '#FFFFFF' : tokens.mutedForeground,
+                  fontWeight: forecastScope === 'product' ? '700' : '600',
+                  color: forecastScope === 'product' ? '#FFFFFF' : '#CBD5E1',
                 }}
               >
                 Parts ({tableRows.length})
@@ -2072,25 +2075,27 @@ export default function SalesForecastPanel({
             <TouchableOpacity
               onPress={() => setForecastScope('category')}
               style={{
-                paddingHorizontal: 10,
-                paddingVertical: 5,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
                 borderRadius: 6,
-                backgroundColor: forecastScope === 'category' ? tokens.primary : 'transparent',
+                backgroundColor: forecastScope === 'category' ? '#EA580C' : 'transparent',
+                boxShadow: forecastScope === 'category' ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 5,
+                cursor: 'pointer',
               }}
             >
               <BootstrapIcon
                 name="tags"
                 size={11.5}
-                color={forecastScope === 'category' ? '#FFFFFF' : tokens.mutedForeground}
+                color={forecastScope === 'category' ? '#FFFFFF' : '#CBD5E1'}
               />
               <Text
                 style={{
                   fontSize: 12,
-                  fontWeight: '700',
-                  color: forecastScope === 'category' ? '#FFFFFF' : tokens.mutedForeground,
+                  fontWeight: forecastScope === 'category' ? '700' : '600',
+                  color: forecastScope === 'category' ? '#FFFFFF' : '#CBD5E1',
                 }}
               >
                 Categories ({categoryTableRows.length})

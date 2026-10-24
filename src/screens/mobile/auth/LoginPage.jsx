@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -45,7 +45,10 @@ export default function LoginPage({
     }
   });
 
+  const passwordInputRef = useRef(null);
+
   const handleEmailLogin = async () => {
+    if (isLoading) return;
     if (!email.trim() || !password) {
       setErrorMessage('Please enter your email or username and password.');
       return;
@@ -115,7 +118,7 @@ export default function LoginPage({
       <StatusBar style="light" translucent backgroundColor="transparent" />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
-          style={{ flex: 1, backgroundColor: '#1D4533' }}
+          style={{ flex: 1, backgroundColor: '#24272B' }}
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -158,11 +161,11 @@ export default function LoginPage({
               {/* Email Input */}
               <View style={styles.inputGroup}>
                 <View style={[styles.inputPill, focusedField === 'email' && styles.inputPillFocused]}>
-                  <BootstrapIcon name="envelope" size={17} color="#88A9A3" />
+                  <BootstrapIcon name="envelope" size={17} color="#94A3B8" />
                   <TextInput
                     style={styles.textInput}
                     placeholder="Email or username"
-                    placeholderTextColor="#9FB9B5"
+                    placeholderTextColor="#94A3B8"
                     value={email}
                     onChangeText={(text) => {
                       setEmail(text);
@@ -173,6 +176,15 @@ export default function LoginPage({
                     autoCorrect={false}
                     onFocus={() => setFocusedField('email')}
                     onBlur={() => setFocusedField('')}
+                    returnKeyType="next"
+                    blurOnSubmit={false}
+                    onSubmitEditing={() => {
+                      if (password.trim()) {
+                        handleEmailLogin();
+                      } else {
+                        passwordInputRef.current?.focus();
+                      }
+                    }}
                   />
                 </View>
               </View>
@@ -180,11 +192,12 @@ export default function LoginPage({
               {/* Password Input */}
               <View style={styles.inputGroup}>
                 <View style={[styles.inputPill, focusedField === 'password' && styles.inputPillFocused]}>
-                  <BootstrapIcon name="lock" size={17} color="#88A9A3" />
+                  <BootstrapIcon name="lock" size={17} color="#94A3B8" />
                   <TextInput
+                    ref={passwordInputRef}
                     style={styles.textInput}
                     placeholder="Password"
-                    placeholderTextColor="#9FB9B5"
+                    placeholderTextColor="#94A3B8"
                     value={password}
                     onChangeText={(text) => {
                       setPassword(text);
@@ -195,12 +208,14 @@ export default function LoginPage({
                     autoCorrect={false}
                     onFocus={() => setFocusedField('password')}
                     onBlur={() => setFocusedField('')}
+                    returnKeyType="go"
+                    onSubmitEditing={handleEmailLogin}
                   />
                   <TouchableOpacity
                     onPress={() => setShowPassword(!showPassword)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                   >
-                    <BootstrapIcon name={showPassword ? 'eye-slash' : 'eye'} size={16} color="#88A9A3" />
+                    <BootstrapIcon name={showPassword ? 'eye-slash' : 'eye'} size={16} color="#94A3B8" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -263,11 +278,11 @@ export default function LoginPage({
                   gap: 10,
                   backgroundColor: '#FFFFFF',
                   borderWidth: 1.5,
-                  borderColor: '#E2ECE9',
-                  borderRadius: 25,
+                  borderColor: '#E5E7EB',
+                  borderRadius: 10,
                   height: 48,
                   paddingHorizontal: 16,
-                  shadowColor: '#1D4533',
+                  shadowColor: '#EA580C',
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.06,
                   shadowRadius: 6,
@@ -308,7 +323,7 @@ export default function LoginPage({
 
                   <TouchableOpacity
                     style={{
-                      backgroundColor: '#1D4533',
+                      backgroundColor: '#EA580C',
                       borderRadius: 10,
                       paddingVertical: 9,
                       paddingHorizontal: 12,
@@ -327,7 +342,7 @@ export default function LoginPage({
                     <Text style={{ fontSize: 10.5, color: '#64748B', marginBottom: 2 }}>
                       Your Supabase Redirect URI:
                     </Text>
-                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#1D4533' }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#EA580C' }}>
                       https://vtbdmurblidtdghaotne.supabase.co/auth/v1/callback
                     </Text>
                   </View>

@@ -6,24 +6,28 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
-import { BootstrapIcon, BrandLogo } from '../common';
+import { BootstrapIcon, BrandLogo, Skeleton } from '../common';
 
 /**
  * MotoTrack Enterprise Admin Sidebar
  *
- * Retains MotoTrack's signature dark green (#1D4533) brand identity.
+ * Retains MotoTrack's signature dark green (#EA580C) brand identity.
  * Features:
  * - Clean, compact visual hierarchy matching modern enterprise dashboards
  * - 6 distinct navigation groups (Operations, Store Management, Garage & Services, User Management, System & Settings, Quick Links)
  * - 38-40px menu-item heights with 8-10px rounded corners and 16-18px outline icons
  * - Darker green surface (#143124) with a slim emerald-green (#10B981) left accent for active state
  * - Subtle green-tinted hover & focus micro-interactions (150-180ms)
- * - Compact right-aligned count and warning badges (orange #F97316 for COD / Low Stock)
+ * - Compact right-aligned count and warning badges (orange #EA580C for COD / Low Stock)
  * - Independent scroll area with anchored bottom footer (System Live & Synced + Profile Card)
  * - Desktop collapsible behavior (240px expanded / 68px collapsed) with icon tooltips
  * - Mobile slide-out drawer with backdrop overlay
  */
 export default function AdminSidebar({
+  isLoading = false,
+  loading = false,
+  isOffline = false,
+  isLagging = false,
   activeNav,
   setActiveNav,
   isDarkMode = false,
@@ -57,53 +61,45 @@ export default function AdminSidebar({
   const [isCollapseHovered, setIsCollapseHovered] = useState(false);
   const [isProfileHovered, setIsProfileHovered] = useState(false);
 
-  // ─── Theme Colors: Preserving MotoTrack Dark Green Identity ───
+  // ─── Theme Colors: MotoTrack Charcoal (#24272B) + Racing Orange (#EA580C) ───
   const theme = useMemo(() => {
-    if (isDarkMode) {
-      return {
-        bg: '#0F1412',
-        border: '#1F2925',
-        divider: '#1E2824',
-        activeBg: '#182520',
-        activeAccent: '#10B981',
-        activeText: '#FFFFFF',
-        textPrimary: '#FFFFFF',
-        textSecondary: '#94A3B8',
-        sectionLabel: '#6B7C75',
-        hoverBg: 'rgba(255, 255, 255, 0.06)',
-        profileBg: '#151D19',
-        profileHoverBg: '#1B2621',
-        profileBorder: '#23322B',
-        badgeBg: 'rgba(255, 255, 255, 0.08)',
-        badgeActiveBg: 'rgba(255, 255, 255, 0.16)',
-        badgeBorder: 'rgba(255, 255, 255, 0.12)',
-        badgeText: '#CBD5E1',
-        warningBg: '#F97316',
-        dangerBg: '#EF4444',
-      };
-    }
     return {
-      bg: '#1D4533', // MotoTrack Brand Dark Green
+      bg: '#24272B', // Charcoal sidebar
       border: 'rgba(255, 255, 255, 0.10)',
       divider: 'rgba(255, 255, 255, 0.10)',
-      activeBg: '#143124', // Darker shade of existing green for active surface
-      activeAccent: '#10B981', // Slim emerald green left accent
+      activeBg: '#EA580C', // Racing Orange active item
+      activeAccent: '#EA580C', // Deep orange accent
       activeText: '#FFFFFF',
       textPrimary: '#FFFFFF',
-      textSecondary: '#A7C4B5', // Muted gray-green for secondary text
-      sectionLabel: '#7E9A8E', // Subtle letter-spaced uppercase labels
-      hoverBg: 'rgba(255, 255, 255, 0.08)', // Subtle green-tinted hover
-      profileBg: 'rgba(255, 255, 255, 0.10)', // Slightly lighter shade of green
-      profileHoverBg: 'rgba(255, 255, 255, 0.16)',
-      profileBorder: 'rgba(255, 255, 255, 0.14)',
+      textSecondary: '#FFFFFF', // White icons and text for inactive navigation items
+      sectionLabel: '#9CA3AF', // Muted section label
+      hoverBg: 'rgba(255, 255, 255, 0.08)',
+      profileBg: 'rgba(255, 255, 255, 0.08)',
+      profileHoverBg: 'rgba(255, 255, 255, 0.14)',
+      profileBorder: 'rgba(255, 255, 255, 0.12)',
       badgeBg: 'rgba(255, 255, 255, 0.14)',
-      badgeActiveBg: 'rgba(255, 255, 255, 0.24)',
+      badgeActiveBg: 'rgba(255, 255, 255, 0.25)',
       badgeBorder: 'rgba(255, 255, 255, 0.20)',
       badgeText: '#FFFFFF',
-      warningBg: '#F97316',
+      warningBg: '#EA580C',
       dangerBg: '#EF4444',
     };
   }, [isDarkMode]);
+
+  // If skeleton loading is active, return skeleton after all hooks have safely executed
+  if (isLoading || loading) {
+    return (
+      <AdminSidebarSkeleton
+        isCollapsed={isCollapsed}
+        isDarkMode={isDarkMode}
+        isMobile={isMobile}
+        isMobileOpen={isMobileOpen}
+        onCloseMobile={onCloseMobile}
+        isOffline={isOffline}
+        isLagging={isLagging}
+      />
+    );
+  }
 
   // ─── Cleanly Structured Navigation Groups ───
   const navGroups = [
@@ -149,11 +145,6 @@ export default function AdminSidebar({
           id: 'forecast',
           label: 'Forecast',
           icon: 'clipboard-data',
-        },
-        {
-          id: 'customizations',
-          label: 'Customizations',
-          icon: 'magic',
         },
         {
           id: 'moto_models',
@@ -236,7 +227,7 @@ export default function AdminSidebar({
         },
         {
           id: 'audit',
-          label: 'Audit',
+          label: 'Activity Logs',
           icon: 'journal-text',
           badge: auditLogs.length,
         },
@@ -304,9 +295,10 @@ export default function AdminSidebar({
         {!isCollapsed ? (
           <>
             {/* Logo and Brand Name */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, minWidth: 0, paddingLeft: 2 }}>
               <BrandLogo
-                size={28}
+                size={34}
+                textSize={15.5}
                 textColor="#FFFFFF"
                 accentColor={isDarkMode ? '#34D399' : '#6EE7B7'}
               />
@@ -320,8 +312,8 @@ export default function AdminSidebar({
                 <TouchableOpacity
                   onPress={onCloseMobile}
                   style={{
-                    width: 28,
-                    height: 28,
+                    width: 30,
+                    height: 30,
                     borderRadius: 7,
                     backgroundColor: 'rgba(255, 255, 255, 0.10)',
                     borderWidth: 1,
@@ -334,7 +326,7 @@ export default function AdminSidebar({
                   title="Close Navigation Drawer"
                   aria-label="Close Navigation Drawer"
                 >
-                  <BootstrapIcon name="x-lg" size={12} color="#FFFFFF" />
+                  <BootstrapIcon name="x-lg" size={13} color="#FFFFFF" />
                 </TouchableOpacity>
               ) : (
                 /* Desktop Collapse Button */
@@ -343,8 +335,8 @@ export default function AdminSidebar({
                   onMouseEnter={() => setIsCollapseHovered(true)}
                   onMouseLeave={() => setIsCollapseHovered(false)}
                   style={{
-                    width: 28,
-                    height: 28,
+                    width: 30,
+                    height: 30,
                     borderRadius: 7,
                     backgroundColor: isCollapseHovered ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.08)',
                     borderWidth: 1,
@@ -361,7 +353,7 @@ export default function AdminSidebar({
                 >
                   <BootstrapIcon
                     name="chevron-bar-left"
-                    size={13}
+                    size={14}
                     color={isCollapseHovered ? '#FFFFFF' : theme.textSecondary}
                   />
                 </TouchableOpacity>
@@ -420,7 +412,7 @@ export default function AdminSidebar({
                   marginBottom: 5,
                   paddingHorizontal: 9,
                   fontFamily: Platform.select({
-                    web: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
+                    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                     default: undefined,
                   }),
                 }}
@@ -465,10 +457,11 @@ export default function AdminSidebar({
       <View
         style={{
           flexShrink: 0,
-          paddingTop: 12,
+          paddingTop: 10,
           paddingBottom: 2,
           borderTopWidth: 1,
           borderTopColor: theme.divider,
+          justifyContent: 'center',
         }}
       >
         {/* Administrator Profile Row */}
@@ -488,12 +481,14 @@ export default function AdminSidebar({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            gap: 12,
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            gap: 10,
+            minHeight: 40,
             paddingVertical: 6,
-            paddingHorizontal: isCollapsed ? 0 : 4,
+            paddingLeft: isCollapsed ? 0 : 4,
+            paddingRight: 0,
             borderRadius: 8,
             backgroundColor: isProfileHovered ? theme.hoverBg : 'transparent',
-            justifyContent: isCollapsed ? 'center' : 'flex-start',
             cursor: 'pointer',
             transition: 'background-color 150ms ease',
           }}
@@ -504,9 +499,9 @@ export default function AdminSidebar({
           {/* Avatar Circle with Clean Person Icon */}
           <View
             style={{
-              width: 34,
-              height: 34,
-              borderRadius: 17,
+              width: 32,
+              height: 32,
+              borderRadius: 16,
               backgroundColor: 'rgba(255, 255, 255, 0.09)',
               alignItems: 'center',
               justifyContent: 'center',
@@ -515,7 +510,7 @@ export default function AdminSidebar({
           >
             <BootstrapIcon
               name="person"
-              size={17}
+              size={16}
               color="#FFFFFF"
             />
           </View>
@@ -526,9 +521,13 @@ export default function AdminSidebar({
                 style={{
                   color: '#FFFFFF',
                   fontWeight: '800',
-                  fontSize: 13.5,
+                  fontSize: 12.5,
                   letterSpacing: 0.15,
-                  lineHeight: 18,
+                  lineHeight: 16,
+                  fontFamily: Platform.select({
+                    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                    default: undefined,
+                  }),
                 }}
                 numberOfLines={1}
               >
@@ -537,10 +536,14 @@ export default function AdminSidebar({
               <Text
                 style={{
                   color: theme.textSecondary,
-                  fontSize: 11,
+                  fontSize: 10,
                   fontWeight: '500',
-                  lineHeight: 15,
+                  lineHeight: 13,
                   marginTop: 1,
+                  fontFamily: Platform.select({
+                    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                    default: undefined,
+                  }),
                 }}
                 numberOfLines={1}
               >
@@ -714,15 +717,15 @@ function SidebarNavItem({
           numberOfLines={1}
           style={{
             flex: 1,
-            fontSize: 12.5,
-            fontWeight: isActive ? '700' : '500',
+            fontSize: 13.5,
+            fontWeight: isActive ? '600' : '500',
             color: item.customColor
               ? item.customColor
               : isActive || isHovered
               ? theme.activeText
               : theme.textSecondary,
             fontFamily: Platform.select({
-              web: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
+              web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
               default: undefined,
             }),
             transition: 'color 180ms ease',
@@ -736,7 +739,7 @@ function SidebarNavItem({
       {/* Right side indicators (Badges / Warnings / Active dot) */}
       {!isCollapsed && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 'auto' }}>
-          {/* Warning badge (orange #F97316 for COD / Low Stock alerts) */}
+          {/* Warning badge (orange #EA580C for COD / Low Stock alerts) */}
           {hasWarning && (
             item.warningLabel === 'COD' ? (
               <View
@@ -762,7 +765,7 @@ function SidebarNavItem({
                   height: 8,
                   borderRadius: 4,
                   backgroundColor: theme.warningBg,
-                  boxShadow: '0 0 6px rgba(249, 115, 22, 0.65)',
+                  boxShadow: '0 0 6px rgba(234, 88, 12, 0.65)',
                 }}
                 title={item.warningTitle}
               />
@@ -827,7 +830,7 @@ function SidebarNavItem({
             height: 7,
             borderRadius: 3.5,
             backgroundColor: theme.warningBg,
-            boxShadow: '0 0 4px rgba(249, 115, 22, 0.65)',
+            boxShadow: '0 0 4px rgba(234, 88, 12, 0.65)',
           }}
           title={item.warningTitle}
         />
@@ -835,3 +838,403 @@ function SidebarNavItem({
     </TouchableOpacity>
   );
 }
+
+/**
+ * Admin Sidebar Skeleton Loading Animation
+ * Matches the exact visual hierarchy, spacing, badges, and brand green identity of MotoTrack Admin Sidebar.
+ */
+export function AdminSidebarSkeleton({
+  isCollapsed = false,
+  isDarkMode = false,
+  isMobile = false,
+  isMobileOpen = false,
+  onCloseMobile = () => {},
+  isOffline = false,
+  isLagging = false,
+  style,
+}) {
+  const theme = useMemo(() => {
+    return {
+      bg: '#24272B', // Charcoal
+      border: 'rgba(255, 255, 255, 0.10)',
+      divider: 'rgba(255, 255, 255, 0.10)',
+      baseColor: 'rgba(255, 255, 255, 0.15)',
+      highlightColor: 'rgba(255, 255, 255, 0.30)',
+      activePill: '#EA580C',
+      activeAccent: '#EA580C',
+      badgeBg: 'rgba(255, 255, 255, 0.22)',
+    };
+  }, [isDarkMode]);
+
+  // Section templates reflecting the exact UI hierarchy
+  const skeletonSections = [
+    {
+      headingWidth: 74,
+      items: [
+        { titleWidth: 76, hasActiveBg: true, hasDot: true }, // Dashboard (active)
+        { titleWidth: 50, badgeWidth: 22 },                 // Orders
+        { titleWidth: 68 },                                 // Inventory
+        { titleWidth: 76 },                                 // POS Cashier
+        { titleWidth: 54 },                                 // Reports
+        { titleWidth: 60 },                                 // Forecast
+        { titleWidth: 80 },                                 // Moto Models
+      ],
+    },
+    {
+      headingWidth: 112,
+      items: [
+        { titleWidth: 64, badgeWidth: 20 },                 // Products
+        { titleWidth: 52 },                                 // Promos
+        { titleWidth: 58, badgeWidth: 20, hasPillBg: true },// Supplier
+      ],
+    },
+    {
+      headingWidth: 118,
+      items: [
+        { titleWidth: 66, badgeWidth: 20 },                 // Bookings
+        { titleWidth: 74, badgeWidth: 20 },                 // Mechanics
+      ],
+    },
+  ];
+
+  const content = (
+    <View
+      style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        height: '100%',
+      }}
+    >
+      {/* ─── 1. HEADER ROW ─── */}
+      <View
+        style={{
+          flexShrink: 0,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: isCollapsed ? 'center' : 'space-between',
+          paddingBottom: 13,
+          marginBottom: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: theme.divider,
+        }}
+      >
+        {!isCollapsed ? (
+          <>
+            {/* Brand Logo & Wordmark Skeleton */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 2 }}>
+              <Skeleton
+                width={34}
+                height={34}
+                borderRadius={8}
+                baseColor={theme.baseColor}
+                highlightColor={theme.highlightColor}
+              />
+              <Skeleton
+                width={105}
+                height={17}
+                borderRadius={4}
+                baseColor={theme.baseColor}
+                highlightColor={theme.highlightColor}
+              />
+            </View>
+
+            {/* Collapse Button Skeleton */}
+            <Skeleton
+              width={30}
+              height={30}
+              borderRadius={7}
+              baseColor={theme.baseColor}
+              highlightColor={theme.highlightColor}
+            />
+          </>
+        ) : (
+          <Skeleton
+            width={36}
+            height={36}
+            borderRadius={8}
+            baseColor={theme.baseColor}
+            highlightColor={theme.highlightColor}
+          />
+        )}
+      </View>
+
+      {/* ─── 2. SCROLLABLE NAVIGATION ITEMS SKELETON ─── */}
+      <ScrollView
+        style={{
+          flex: 1,
+          marginHorizontal: isCollapsed ? -4 : -8,
+          paddingHorizontal: isCollapsed ? 4 : 8,
+        }}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 14 }}
+      >
+        {skeletonSections.map((section, sIdx) => (
+          <View key={sIdx} style={{ marginBottom: 12 }}>
+            {/* Section Heading or Divider */}
+            {!isCollapsed ? (
+              <View
+                style={{
+                  marginTop: sIdx === 0 ? 4 : 14,
+                  marginBottom: 6,
+                  paddingHorizontal: 9,
+                }}
+              >
+                <Skeleton
+                  width={section.headingWidth}
+                  height={9}
+                  borderRadius={3}
+                  baseColor={theme.baseColor}
+                  highlightColor={theme.highlightColor}
+                />
+              </View>
+            ) : sIdx > 0 ? (
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: theme.divider,
+                  marginVertical: 7,
+                  marginHorizontal: 6,
+                }}
+              />
+            ) : null}
+
+            {/* Nav Items List */}
+            <View style={{ gap: 3 }}>
+              {section.items.map((item, iIdx) => {
+                if (isCollapsed) {
+                  return (
+                    <View
+                      key={iIdx}
+                      style={{
+                        height: 38,
+                        borderRadius: 8,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        backgroundColor: item.hasActiveBg ? theme.activePill : 'transparent',
+                      }}
+                    >
+                      <Skeleton
+                        width={20}
+                        height={20}
+                        borderRadius={5}
+                        baseColor={theme.baseColor}
+                        highlightColor={theme.highlightColor}
+                      />
+                    </View>
+                  );
+                }
+
+                return (
+                  <View
+                    key={iIdx}
+                    style={{
+                      height: 38,
+                      borderRadius: 9,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingHorizontal: 10,
+                      backgroundColor: item.hasActiveBg
+                        ? theme.activePill
+                        : item.hasPillBg
+                          ? 'rgba(255, 255, 255, 0.05)'
+                          : 'transparent',
+                      borderLeftWidth: item.hasActiveBg ? 3 : 0,
+                      borderLeftColor: item.hasActiveBg ? theme.activeAccent : 'transparent',
+                    }}
+                  >
+                    {/* Icon + Title */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, flex: 1 }}>
+                      <Skeleton
+                        width={18}
+                        height={18}
+                        borderRadius={4}
+                        baseColor={theme.baseColor}
+                        highlightColor={theme.highlightColor}
+                      />
+                      <Skeleton
+                        width={item.titleWidth}
+                        height={13}
+                        borderRadius={4}
+                        baseColor={theme.baseColor}
+                        highlightColor={theme.highlightColor}
+                      />
+                    </View>
+
+                    {/* Active dot on right */}
+                    {item.hasDot && (
+                      <Skeleton
+                        circle
+                        size={6}
+                        baseColor="#FFFFFF"
+                        highlightColor="#EA580C"
+                      />
+                    )}
+
+                    {/* Right numeric badge pill */}
+                    {item.badgeWidth && (
+                      <Skeleton
+                        width={item.badgeWidth}
+                        height={18}
+                        borderRadius={9}
+                        baseColor={theme.badgeBg}
+                        highlightColor={theme.highlightColor}
+                      />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+
+
+
+      {/* ─── 3. ANCHORED STICKY FOOTER PROFILE ─── */}
+      <View
+        style={{
+          flexShrink: 0,
+          paddingTop: 10,
+          paddingBottom: 2,
+          borderTopWidth: 1,
+          borderTopColor: theme.divider,
+          justifyContent: 'center',
+        }}
+      >
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: isCollapsed ? 'center' : 'flex-start',
+            gap: 10,
+            minHeight: 40,
+            paddingVertical: 6,
+            paddingLeft: isCollapsed ? 0 : 4,
+            paddingRight: 0,
+          }}
+        >
+          {/* Avatar Skeleton */}
+          <Skeleton
+            circle
+            size={32}
+            baseColor={theme.baseColor}
+            highlightColor={theme.highlightColor}
+          />
+
+          {!isCollapsed && (
+            <View style={{ flex: 1, gap: 5, justifyContent: 'center' }}>
+              <Skeleton
+                width={95}
+                height={14}
+                borderRadius={4}
+                baseColor={theme.baseColor}
+                highlightColor={theme.highlightColor}
+              />
+              <Skeleton
+                width={86}
+                height={11}
+                borderRadius={3}
+                baseColor={theme.baseColor}
+                highlightColor={theme.highlightColor}
+              />
+            </View>
+          )}
+        </View>
+      </View>
+    </View>
+  );
+
+  // Mobile Drawer Container
+  if (isMobile) {
+    if (!isMobileOpen) return null;
+
+    return (
+      <View
+        style={{
+          position: Platform.OS === 'web' ? 'fixed' : 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 99999,
+          flexDirection: 'row',
+        }}
+      >
+        <TouchableOpacity
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.65)',
+            ...(Platform.OS === 'web' ? { backdropFilter: 'blur(3px)' } : {}),
+          }}
+          onPress={onCloseMobile}
+          activeOpacity={1}
+          accessibilityLabel="Close Navigation Drawer"
+        />
+        <View
+          style={[
+            {
+              width: 270,
+              maxWidth: '85%',
+              height: '100%',
+              backgroundColor: theme.bg,
+              zIndex: 100000,
+              display: 'flex',
+              flexDirection: 'column',
+              paddingHorizontal: 12,
+              paddingTop: 16,
+              paddingBottom: 14,
+              boxShadow: '4px 0 24px rgba(0, 0, 0, 0.35)',
+            },
+            style,
+          ]}
+          role="status"
+          aria-label="Loading admin navigation drawer"
+        >
+          {content}
+        </View>
+      </View>
+    );
+  }
+
+  // Desktop Container
+  return (
+    <View
+      className="mototrack-sidebar mototrack-sidebar-skeleton"
+      style={[
+        {
+          width: isCollapsed ? 68 : 240,
+          flexShrink: 0,
+          backgroundColor: theme.bg,
+          borderRightWidth: 1,
+          borderRightColor: theme.border,
+          paddingHorizontal: isCollapsed ? 8 : 12,
+          paddingTop: 16,
+          paddingBottom: 14,
+          height: Platform.OS === 'web' ? '100vh' : '100%',
+          maxHeight: Platform.OS === 'web' ? '100vh' : '100%',
+          position: Platform.OS === 'web' ? 'sticky' : 'relative',
+          top: 0,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          zIndex: 100,
+          transition: 'width 200ms cubic-bezier(0.4, 0, 0.2, 1), padding 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+        },
+        style,
+      ]}
+      role="status"
+      aria-label="Loading admin navigation"
+    >
+      {content}
+    </View>
+  );
+}
+
+AdminSidebar.Skeleton = AdminSidebarSkeleton;

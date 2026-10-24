@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  meta: { fontSize: 14, fontWeight: '800', color: '#1D4533', marginBottom: 6 },
+  meta: { fontSize: 14, fontWeight: '800', color: '#EA580C', marginBottom: 6 },
   hint: { fontSize: 12, color: '#64748B', lineHeight: 18, marginBottom: 10 },
   warn: { fontSize: 12, color: '#B45309', backgroundColor: '#FFFBEB', padding: 8, borderRadius: 8, marginTop: 8 },
   qr: { width: 220, height: 220, alignSelf: 'center', marginVertical: 8 },
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
   },
   actions: { gap: 8, marginTop: 12 },
   primaryBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     borderRadius: 12,
     height: 46,
     alignItems: 'center',
@@ -273,13 +273,13 @@ const styles = StyleSheet.create({
   primaryBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
   secondaryBtn: {
     borderWidth: 1.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     borderRadius: 12,
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryBtnText: { color: '#1D4533', fontWeight: '800', fontSize: 14 },
+  secondaryBtnText: { color: '#EA580C', fontWeight: '800', fontSize: 14 },
   ghostBtn: { height: 40, alignItems: 'center', justifyContent: 'center' },
   ghostBtnText: { color: '#64748B', fontWeight: '700', fontSize: 13 },
 });

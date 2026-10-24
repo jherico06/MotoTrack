@@ -6,6 +6,14 @@ function getStaffApiBaseUrl() {
   const fromEnv = String(
     process.env.EXPO_PUBLIC_CUSTOMIZE_API_URL || APP_CONFIG.customizeApiUrl || ''
   ).trim();
+  if (fromEnv && fromEnv.startsWith('https://')) return fromEnv.replace(/\/+$/, '');
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined' && window.location?.hostname) {
+      const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
+      return `${proto}//${window.location.hostname}:8787`;
+    }
+    return 'http://127.0.0.1:8787';
+  }
   if (fromEnv) return fromEnv.replace(/\/+$/, '');
   if (Platform.OS === 'android') return 'http://10.0.2.2:8787';
   return 'http://127.0.0.1:8787';

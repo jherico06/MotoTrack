@@ -18,6 +18,7 @@ import {
   TouchableOpacity,
   ScrollView,
   Modal,
+  Image,
   Platform,
   ActivityIndicator,
   StyleSheet,
@@ -31,10 +32,40 @@ import {
 } from '../../services/products/promoService.js';
 import { productService } from '../../services/products/productService.js';
 import { getThemeTokens } from '../../styles/theme.js';
+import { pickImageFromFile } from '../../utils/imagePickerHelper.js';
+import { uploadProductImage } from '../../utils/productImageUpload.js';
 
-const BRAND = '#1D4533';
-const BRAND_SOFT = '#E8F0EC';
-const BRAND_SOFT_DARK = 'rgba(29, 69, 51, 0.42)';
+const BRAND = '#EA580C';
+const BRAND_SOFT = '#FFF7ED';
+const BRAND_SOFT_DARK = 'rgba(36, 39, 43, 0.42)';
+
+export const BANNER_PRESETS = [
+  {
+    id: 'superbike-black',
+    title: 'Sport Superbike',
+    url: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1000&q=80',
+  },
+  {
+    id: 'sport-orange',
+    title: 'Orange Racer',
+    url: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=1000&q=80',
+  },
+  {
+    id: 'cruiser-night',
+    title: 'Cruiser Night',
+    url: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=1000&q=80',
+  },
+  {
+    id: 'streetfighter',
+    title: 'Streetfighter',
+    url: 'https://images.unsplash.com/photo-1609630875171-b1321377ee65?auto=format&fit=crop&w=1000&q=80',
+  },
+  {
+    id: 'garage-custom',
+    title: 'Garage Build',
+    url: 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=1000&q=80',
+  },
+];
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
@@ -135,10 +166,13 @@ function buildPromoModalStyles(tokens, isDark) {
     },
     typeRow: {
       flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 12,
     },
     typeCard: {
-      flex: 1,
+      flexGrow: 1,
+      flexBasis: '30%',
+      minWidth: 140,
       borderRadius: 12,
       borderWidth: 1.5,
       borderColor: borderStrong,
@@ -215,7 +249,7 @@ function buildPromoModalStyles(tokens, isDark) {
     inputFocused: {
       borderColor: BRAND,
       ...(Platform.OS === 'web'
-        ? { boxShadow: isDark ? '0 0 0 3px rgba(52, 211, 153, 0.18)' : '0 0 0 3px rgba(29, 69, 51, 0.14)' }
+        ? { boxShadow: isDark ? '0 0 0 3px rgba(52, 211, 153, 0.18)' : '0 0 0 3px rgba(234, 88, 12, 0.18)' }
         : {}),
     },
     inputError: {
@@ -237,6 +271,100 @@ function buildPromoModalStyles(tokens, isDark) {
       fontSize: 11.5,
       fontWeight: '600',
       marginTop: -2,
+    },
+    imagePreviewBox: {
+      width: '100%',
+      height: 140,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      borderColor: borderStrong,
+      backgroundColor: isDark ? tokens.bgSub : '#F8FAFC',
+      overflow: 'hidden',
+      position: 'relative',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    imagePreviewImg: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    imagePlaceholder: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      padding: 16,
+    },
+    imagePlaceholderText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: muted,
+      textAlign: 'center',
+    },
+    photoActionsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flexWrap: 'wrap',
+    },
+    uploadBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      borderRadius: 10,
+      backgroundColor: BRAND,
+    },
+    uploadBtnText: {
+      fontSize: 12.5,
+      fontWeight: '700',
+      color: '#FFFFFF',
+    },
+    removePhotoBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(239, 68, 68, 0.4)' : '#FCA5A5',
+      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2',
+    },
+    removePhotoBtnText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDark ? '#FCA5A5' : '#DC2626',
+    },
+    presetLabel: {
+      fontSize: 11.5,
+      fontWeight: '700',
+      color: muted,
+      marginTop: 2,
+    },
+    presetRow: {
+      flexDirection: 'row',
+      gap: 8,
+      flexWrap: 'wrap',
+    },
+    presetThumbBtn: {
+      width: 58,
+      height: 42,
+      borderRadius: 8,
+      borderWidth: 2,
+      borderColor: border,
+      overflow: 'hidden',
+      backgroundColor: isDark ? tokens.bgSub : '#E2E8F0',
+    },
+    presetThumbBtnActive: {
+      borderColor: BRAND,
+      borderWidth: 2.5,
+    },
+    presetThumbImg: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
     },
     segmentTrack: {
       flexDirection: 'row',
@@ -382,7 +510,7 @@ function buildPromoModalStyles(tokens, isDark) {
       borderRadius: 12,
       borderWidth: 1,
       borderColor: isDark ? 'rgba(143, 169, 154, 0.28)' : '#BBF7D0',
-      backgroundColor: isDark ? 'rgba(29, 69, 51, 0.28)' : '#F0FDF4',
+      backgroundColor: isDark ? 'rgba(234, 88, 12, 0.28)' : '#F0FDF4',
       padding: 14,
       gap: 8,
     },
@@ -453,7 +581,7 @@ function buildPromoModalStyles(tokens, isDark) {
       alignItems: 'center',
       justifyContent: 'center',
       ...(Platform.OS === 'web'
-        ? { boxShadow: '0 4px 12px rgba(29, 69, 51, 0.28)' }
+        ? { boxShadow: '0 4px 12px rgba(234, 88, 12, 0.28)' }
         : {}),
     },
     btnPrimaryText: {
@@ -468,6 +596,7 @@ function emptyForm() {
   return {
     code: '',
     description: '',
+    imageUrl: '',
     promoType: PROMO_TYPES.FREE_SHIPPING,
     discountPercent: '10',
     appliesTo: APPLIES_TO.ALL_PRODUCTS,
@@ -484,6 +613,7 @@ function formFromPromo(promo) {
   return {
     code: promo.code || '',
     description: promo.description || '',
+    imageUrl: promo.imageUrl || promo.image_url || promo.bannerImage || promo.banner_image || '',
     promoType: promo.promoType || PROMO_TYPES.PERCENT_OFF,
     discountPercent: String(promo.discountPercent ?? 10),
     appliesTo: promo.appliesTo || APPLIES_TO.ALL_PRODUCTS,
@@ -515,6 +645,7 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPromo, setEditingPromo] = useState(null);
@@ -643,17 +774,27 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
 
   const preview = useMemo(() => {
     const pct = Number(form.discountPercent || 0);
-    const isFree = form.promoType === PROMO_TYPES.FREE_SHIPPING;
+    const isFreeShip = form.promoType === PROMO_TYPES.FREE_SHIPPING;
+    const isFreeInstall = form.promoType === PROMO_TYPES.FREE_INSTALLATION;
+    const isNonPercent = isFreeShip || isFreeInstall;
     return {
       code: (form.code || 'CODE').trim().toUpperCase() || 'CODE',
-      headline: isFree
+      headline: isFreeShip
         ? 'Free Shipping'
-        : Number.isFinite(pct) && pct > 0
-          ? `${pct}% OFF`
-          : 'Percentage Off',
+        : isFreeInstall
+          ? 'Free Installation'
+          : Number.isFinite(pct) && pct > 0
+            ? `${pct}% OFF`
+            : 'Percentage Off',
       description:
         form.description ||
-        (isFree ? 'Free Shipping Promo' : pct > 0 ? `${pct}% discount` : ''),
+        (isFreeShip
+          ? 'Free Shipping Promo'
+          : isFreeInstall
+            ? 'Free Installation Promo'
+            : pct > 0
+              ? `${pct}% discount`
+              : ''),
       typeLabel: promoService.promoTypeLabel(form.promoType),
       appliesLabel:
         form.appliesTo === APPLIES_TO.ALL_PRODUCTS
@@ -663,14 +804,50 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
         form.startDate ? `${form.startDate}T00:00:00` : null,
         form.endDate ? `${form.endDate}T23:59:59` : null
       ),
-      discountLine: isFree ? null : Number.isFinite(pct) ? `${pct}%` : null,
+      discountLine: isNonPercent ? null : Number.isFinite(pct) ? `${pct}%` : null,
     };
   }, [form]);
+
+  const handlePickAndUploadPhoto = async () => {
+    try {
+      const res = await pickImageFromFile();
+      if (!res.success) {
+        if (res.error && res.error !== 'Selection cancelled' && res.error !== 'Capture cancelled') {
+          onToast?.(res.error);
+        }
+        return;
+      }
+
+      setUploadingImage(true);
+      const uploadRes = await uploadProductImage(res.uri, { folder: 'promos' });
+      if (uploadRes.success && uploadRes.url) {
+        setField('imageUrl', uploadRes.url);
+        onToast?.('Banner photo uploaded successfully!');
+      } else {
+        setField('imageUrl', res.uri);
+        onToast?.('Banner photo attached!');
+      }
+    } catch (e) {
+      console.warn('Banner image picker error:', e);
+      onToast?.(e?.message || 'Could not attach image');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleSelectPreset = (url) => {
+    setField('imageUrl', url);
+  };
+
+  const handleRemovePhoto = () => {
+    setField('imageUrl', '');
+  };
 
   const handleSave = async () => {
     const payload = {
       code: form.code,
       description: form.description,
+      imageUrl: form.imageUrl,
       promoType: form.promoType,
       discountPercent: form.discountPercent,
       appliesTo: form.appliesTo,
@@ -817,7 +994,7 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
           >
             <View style={{ width: '100%', minWidth: 1100, flexGrow: 1 }}>
               <View style={s.tableHeaderRow}>
-                <Text style={[s.tableHeaderCell, { flex: 1.6, minWidth: 140 }]}>Code & Discount</Text>
+                <Text style={[s.tableHeaderCell, { flex: 2, minWidth: 180 }]}>Promo & Photo</Text>
                 <Text style={[s.tableHeaderCell, { flex: 2, minWidth: 160 }]}>Description</Text>
                 <Text style={[s.tableHeaderCell, { flex: 1.2, minWidth: 110 }]}>Promo Type</Text>
                 <Text style={[s.tableHeaderCell, { flex: 1.3, minWidth: 120 }]}>Applies To</Text>
@@ -848,28 +1025,66 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
                       },
                     ]}
                   >
-                    <View style={{ flex: 1.6, minWidth: 140, paddingRight: 8 }}>
-                      <Text
-                        style={[
-                          s.tableTitle,
-                          {
-                            color: prm.isActive
-                              ? isDarkMode
-                                ? tokens.accentBrand
-                                : '#1D4533'
-                              : isDarkMode
-                                ? tokens.textMuted
-                                : '#64748B',
-                            fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                          },
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {prm.code}
-                      </Text>
-                      <Text style={s.tableSub} numberOfLines={1}>
-                        {promoService.discountLabel(prm)}
-                      </Text>
+                    <View
+                      style={{
+                        flex: 2,
+                        minWidth: 180,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 10,
+                        paddingRight: 8,
+                      }}
+                    >
+                      {prm.imageUrl ? (
+                        <Image
+                          source={{ uri: prm.imageUrl }}
+                          style={{
+                            width: 48,
+                            height: 36,
+                            borderRadius: 6,
+                            backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E2E8F0',
+                          }}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View
+                          style={{
+                            width: 48,
+                            height: 36,
+                            borderRadius: 6,
+                            backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+                          }}
+                        >
+                          <BootstrapIcon name="image" size={14} color={tokens.textMuted} />
+                        </View>
+                      )}
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text
+                          style={[
+                            s.tableTitle,
+                            {
+                              color: prm.isActive
+                                ? isDarkMode
+                                  ? tokens.accentBrand
+                                  : '#EA580C'
+                                : isDarkMode
+                                  ? tokens.textMuted
+                                  : '#64748B',
+                              fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                            },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {prm.code}
+                        </Text>
+                        <Text style={s.tableSub} numberOfLines={1}>
+                          {promoService.discountLabel(prm)}
+                        </Text>
+                      </View>
                     </View>
 
                     <View style={{ flex: 2, minWidth: 160, paddingRight: 8 }}>
@@ -962,7 +1177,7 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
                           justifyContent: 'center',
                           opacity: togglingId === prm.promo_id ? 0.7 : 1,
                           backgroundColor: prm.isActive
-                            ? '#1D4533'
+                            ? '#EA580C'
                             : isDarkMode
                               ? '#334155'
                               : '#CBD5E1',
@@ -1065,12 +1280,23 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
                       title: 'Percentage Off',
                       sub: 'Discount product price by a percentage.',
                     },
+                    {
+                      type: PROMO_TYPES.FREE_INSTALLATION,
+                      icon: 'tools',
+                      title: 'Free Installation',
+                      sub: 'Waive install fee when booking AI install for selected products.',
+                    },
                   ].map((opt) => {
                     const selected = form.promoType === opt.type;
                     return (
                       <TouchableOpacity
                         key={opt.type}
-                        onPress={() => setField('promoType', opt.type)}
+                        onPress={() => {
+                          setField('promoType', opt.type);
+                          if (opt.type === PROMO_TYPES.FREE_INSTALLATION) {
+                            setField('appliesTo', APPLIES_TO.SELECTED_PRODUCTS);
+                          }
+                        }}
                         activeOpacity={0.85}
                         accessibilityRole="radio"
                         accessibilityState={{ selected }}
@@ -1152,12 +1378,131 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
                       placeholder={
                         form.promoType === PROMO_TYPES.FREE_SHIPPING
                           ? 'Free shipping promo'
-                          : '10% discount on selected products'
+                          : form.promoType === PROMO_TYPES.FREE_INSTALLATION
+                            ? 'Free installation on selected product'
+                            : '10% discount on selected products'
                       }
                       placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
                       accessibilityLabel="Promo description"
                     />
                   </View>
+                </View>
+              </View>
+
+              {/* Banner Photo Section */}
+              <View style={ms.section}>
+                <View style={ms.sectionHead}>
+                  <Text style={ms.sectionTitle}>Banner Photo</Text>
+                  <Text style={ms.sectionHint}>
+                    Upload, choose, or link a motorcycle photo for the storefront hero banner.
+                  </Text>
+                </View>
+
+                <View style={ms.imagePreviewBox}>
+                  {form.imageUrl ? (
+                    <>
+                      <Image source={{ uri: form.imageUrl }} style={ms.imagePreviewImg} />
+                      <View
+                        style={{
+                          position: 'absolute',
+                          bottom: 8,
+                          left: 8,
+                          backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                          paddingHorizontal: 8,
+                          paddingVertical: 4,
+                          borderRadius: 6,
+                        }}
+                      >
+                        <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 }}>
+                          ACTIVE BANNER PHOTO
+                        </Text>
+                      </View>
+                    </>
+                  ) : (
+                    <View style={ms.imagePlaceholder}>
+                      <BootstrapIcon name="image" size={26} color={tokens.textMuted} />
+                      <Text style={ms.imagePlaceholderText}>
+                        No custom photo set (storefront will cycle default high-res motorcycle photos)
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Upload & Remove buttons */}
+                <View style={ms.photoActionsRow}>
+                  <TouchableOpacity
+                    style={[ms.uploadBtn, uploadingImage && { opacity: 0.7 }]}
+                    onPress={handlePickAndUploadPhoto}
+                    disabled={uploadingImage}
+                    activeOpacity={0.85}
+                    accessibilityRole="button"
+                    accessibilityLabel="Upload banner photo"
+                  >
+                    {uploadingImage ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                      <BootstrapIcon name="cloud-arrow-up-fill" size={14} color="#FFFFFF" />
+                    )}
+                    <Text style={ms.uploadBtnText}>
+                      {uploadingImage
+                        ? 'Uploading Photo...'
+                        : form.imageUrl
+                          ? 'Change / Upload Photo'
+                          : 'Upload Banner Photo'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {form.imageUrl ? (
+                    <TouchableOpacity
+                      style={ms.removePhotoBtn}
+                      onPress={handleRemovePhoto}
+                      disabled={uploadingImage}
+                      activeOpacity={0.85}
+                      accessibilityRole="button"
+                      accessibilityLabel="Remove banner photo"
+                    >
+                      <BootstrapIcon name="trash3" size={12} color={isDarkMode ? '#FCA5A5' : '#DC2626'} />
+                      <Text style={ms.removePhotoBtnText}>Remove Photo</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+
+                {/* Preset Motorcycle Photos */}
+                <View style={{ gap: 6 }}>
+                  <Text style={ms.presetLabel}>Quick Presets (Click to apply):</Text>
+                  <View style={ms.presetRow}>
+                    {BANNER_PRESETS.map((preset) => {
+                      const isSelected = form.imageUrl === preset.url;
+                      return (
+                        <TouchableOpacity
+                          key={preset.id}
+                          style={[ms.presetThumbBtn, isSelected && ms.presetThumbBtnActive]}
+                          onPress={() => handleSelectPreset(preset.url)}
+                          activeOpacity={0.8}
+                          accessibilityLabel={`Preset ${preset.title}`}
+                        >
+                          <Image source={{ uri: preset.url }} style={ms.presetThumbImg} />
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </View>
+
+                {/* Direct Image URL input */}
+                <View style={ms.field}>
+                  <Text style={ms.label}>Or Direct Image URL</Text>
+                  <TextInput
+                    style={inputStyle('imageUrl')}
+                    value={form.imageUrl}
+                    onChangeText={(v) => setField('imageUrl', v)}
+                    onFocus={() => setFocusedField('imageUrl')}
+                    onBlur={() => setFocusedField(null)}
+                    placeholder="https://images.unsplash.com/... or paste image URL"
+                    placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    accessibilityLabel="Direct image URL"
+                  />
                 </View>
               </View>
 
@@ -1350,6 +1695,55 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
               {/* Preview */}
               <View style={ms.previewCard}>
                 <Text style={ms.previewEyebrow}>Promo Preview</Text>
+
+                {form.imageUrl ? (
+                  <View
+                    style={{
+                      height: 90,
+                      borderRadius: 10,
+                      overflow: 'hidden',
+                      position: 'relative',
+                      marginVertical: 4,
+                      backgroundColor: '#20242B',
+                    }}
+                  >
+                    <Image
+                      source={{ uri: form.imageUrl }}
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: '52%',
+                        height: '100%',
+                      }}
+                      resizeMode="cover"
+                    />
+                    <View
+                      style={{
+                        flex: 1,
+                        padding: 10,
+                        justifyContent: 'center',
+                        maxWidth: '54%',
+                        zIndex: 2,
+                      }}
+                    >
+                      <Text style={{ fontSize: 9.5, fontWeight: '800', color: BRAND, letterSpacing: 0.5 }}>
+                        HERO BANNER PREVIEW
+                      </Text>
+                      <Text
+                        style={{ fontSize: 13, fontWeight: '900', color: '#FFFFFF', marginTop: 2 }}
+                        numberOfLines={1}
+                      >
+                        {preview.headline}
+                      </Text>
+                      <Text style={{ fontSize: 10, color: '#CBD5E1', marginTop: 2 }} numberOfLines={1}>
+                        Use code: {preview.code}
+                      </Text>
+                    </View>
+                  </View>
+                ) : null}
+
                 <Text style={ms.previewCode}>{preview.code}</Text>
                 <Text style={ms.previewHeadline}>{preview.headline}</Text>
                 {preview.description ? (

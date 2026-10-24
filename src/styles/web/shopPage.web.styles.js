@@ -1,18 +1,20 @@
 import { StyleSheet } from 'react-native';
 
 export function createShopWebStyles(isDark = false) {
-  const bgMain = isDark ? '#0F1412' : '#F1F5F9';
-  const bgCard = isDark ? '#151C19' : '#FFFFFF';
-  const bgSub = isDark ? '#1A2320' : '#F8FAFC';
-  const bgHover = isDark ? '#1E2824' : '#F1F5F9';
-  const border = isDark ? '#26332E' : '#E2E8F0';
-  const textPrimary = isDark ? '#F5F7F6' : '#0F172A';
-  const textSecondary = isDark ? '#E3E8E6' : '#334155';
-  const textMuted = isDark ? '#AAB4B0' : '#64748B';
-  const headerBg = isDark ? '#151C19' : '#1D4533';
-  const brandPrimary = isDark ? '#4DB896' : '#1D4533';
-  const footerBg = isDark ? '#151C19' : '#E2E8F0';
-  const footerBorder = isDark ? '#26332E' : '#CBD5E1';
+  const bgMain = isDark ? '#1E2124' : '#F3F4F6';
+  const bgCard = isDark ? '#24272B' : '#FFFFFF';
+  const bgSub = isDark ? '#2E3236' : '#F3F4F6';
+  const bgHover = isDark ? '#374151' : '#E5E7EB';
+  const border = isDark ? '#374151' : '#E5E7EB';
+  const textPrimary = isDark ? '#F9FAFB' : '#111827';
+  const textSecondary = isDark ? '#E5E7EB' : '#374151';
+  const textMuted = isDark ? '#9CA3AF' : '#6B7280';
+  const headerBg = '#24272B';
+  const brandPrimary = '#EA580C';
+  const footerBg = isDark ? '#1E2124' : '#24272B';
+  const footerBorder = isDark ? '#374151' : 'rgba(255, 255, 255, 0.10)';
+  const footerTextPrimary = '#FFFFFF';
+  const footerTextMuted = '#9CA3AF';
 
   return StyleSheet.create({
     container: {
@@ -25,6 +27,10 @@ export function createShopWebStyles(isDark = false) {
       WebkitBackdropFilter: 'blur(16px)',
       position: 'sticky',
       top: 0,
+      left: 0,
+      right: 0,
+      width: '100%',
+      alignSelf: 'stretch',
       zIndex: 1000,
       boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
       borderBottomWidth: 1,
@@ -53,10 +59,10 @@ export function createShopWebStyles(isDark = false) {
       width: 38,
       height: 38,
       borderRadius: 12,
-      backgroundImage: 'linear-gradient(135deg, #10B981 0%, #059669 100%)',
+      backgroundImage: 'linear-gradient(135deg, #EA580C 0%, #EA580C 100%)',
       alignItems: 'center',
       justifyContent: 'center',
-      boxShadow: '0 4px 12px rgba(16, 185, 129, 0.4)',
+      boxShadow: '0 4px 12px rgba(234, 88, 12, 0.4)',
     },
     logoText: {
       fontSize: 22,
@@ -119,9 +125,9 @@ export function createShopWebStyles(isDark = false) {
       width: 38,
       height: 38,
       borderRadius: 19,
-      backgroundColor: bgSub,
-      borderWidth: 1,
-      borderColor: border,
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      borderColor: 'transparent',
       alignItems: 'center',
       justifyContent: 'center',
       position: 'relative',
@@ -130,9 +136,9 @@ export function createShopWebStyles(isDark = false) {
       width: 38,
       height: 38,
       borderRadius: 19,
-      backgroundColor: isDark ? '#1C2622' : '#0F172A',
-      borderWidth: 1.5,
-      borderColor: brandPrimary,
+      backgroundColor: 'transparent',
+      borderWidth: 0,
+      borderColor: 'transparent',
       alignItems: 'center',
       justifyContent: 'center',
       position: 'relative',
@@ -244,7 +250,7 @@ export function createShopWebStyles(isDark = false) {
       justifyContent: 'center',
       paddingHorizontal: 4,
       borderWidth: 2,
-      borderColor: isDark ? '#151C19' : '#1D4533',
+      borderColor: '#24272B',
       zIndex: 10,
     },
     navBadgeText: {
@@ -307,7 +313,7 @@ export function createShopWebStyles(isDark = false) {
       gap: 6,
       paddingHorizontal: 16,
       paddingVertical: 9,
-      borderRadius: 20,
+      borderRadius: 8,
       backgroundColor: 'transparent',
       borderWidth: 1,
       borderColor: isDark ? '#26332E' : 'rgba(255, 255, 255, 0.5)',
@@ -323,7 +329,7 @@ export function createShopWebStyles(isDark = false) {
       gap: 6,
       paddingHorizontal: 16,
       paddingVertical: 9,
-      borderRadius: 20,
+      borderRadius: 8,
       backgroundColor: brandPrimary,
     },
     signUpHeaderBtnText: {
@@ -332,13 +338,16 @@ export function createShopWebStyles(isDark = false) {
       color: '#FFFFFF',
     },
     scrollContent: {
-      paddingVertical: 24,
-      paddingHorizontal: 24,
+      paddingTop: 0,
+      paddingBottom: 0,
+      paddingHorizontal: 0,
     },
     maxContainer: {
       maxWidth: 1360,
       marginHorizontal: 'auto',
       width: '100%',
+      paddingHorizontal: 24,
+      paddingTop: 24,
     },
     toolbarRow: {
       flexDirection: 'row',
@@ -482,8 +491,8 @@ export function createShopWebStyles(isDark = false) {
       borderColor: border,
     },
     catPillActive: {
-      backgroundColor: isDark ? '#1E3A2F' : '#1D4533',
-      borderColor: brandPrimary,
+      backgroundColor: '#EA580C',
+      borderColor: '#EA580C',
     },
     catPillText: {
       fontSize: 13,
@@ -676,13 +685,22 @@ export function createShopWebStyles(isDark = false) {
     },
     desktopFooter: {
       backgroundColor: footerBg,
-      borderRadius: 24,
-      paddingTop: 48,
-      paddingBottom: 32,
-      paddingHorizontal: 48,
-      marginTop: 32,
-      borderWidth: 1,
-      borderColor: footerBorder,
+      borderRadius: 0,
+      marginTop: 20,
+      borderTopWidth: 1,
+      borderTopColor: footerBorder,
+      borderBottomWidth: 0,
+      borderLeftWidth: 0,
+      borderRightWidth: 0,
+      width: '100%',
+    },
+    footerInner: {
+      maxWidth: 1360,
+      marginHorizontal: 'auto',
+      width: '100%',
+      paddingTop: 52,
+      paddingBottom: 36,
+      paddingHorizontal: 24,
     },
     footerColumnsRow: {
       flexDirection: 'row',
@@ -691,50 +709,72 @@ export function createShopWebStyles(isDark = false) {
       gap: 36,
       flexWrap: 'wrap',
     },
+    footerBrandCol: {
+      flex: 1.4,
+      minWidth: 260,
+      maxWidth: 360,
+    },
+    footerBrandTagline: {
+      fontSize: 13.5,
+      lineHeight: 21,
+      color: footerTextMuted,
+      marginTop: 12,
+      marginBottom: 16,
+    },
     footerCol: {
-      minWidth: 160,
+      flex: 1,
+      minWidth: 150,
+    },
+    footerColTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginBottom: 18,
+    },
+    footerColIcon: {
+      marginRight: 2,
     },
     footerColTitle: {
       fontSize: 12.5,
       fontWeight: '800',
-      color: textPrimary,
+      color: footerTextPrimary,
       letterSpacing: 0.8,
       textTransform: 'uppercase',
-      marginBottom: 22,
     },
     footerContactRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
-      marginBottom: 16,
+      gap: 10,
+      marginBottom: 12,
       cursor: 'pointer',
     },
     footerContactText: {
-      fontSize: 14,
+      fontSize: 13.5,
       fontWeight: '600',
-      color: textPrimary,
+      color: footerTextPrimary,
     },
     footerLinkItem: {
-      marginBottom: 14,
+      marginBottom: 13,
       cursor: 'pointer',
     },
     footerLinkText: {
-      fontSize: 14,
+      fontSize: 13.5,
       fontWeight: '500',
-      color: textMuted,
+      color: footerTextMuted,
     },
     footerSocialRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 14,
+      gap: 12,
+      marginTop: 14,
     },
     footerSocialBtn: {
       width: 36,
       height: 36,
       borderRadius: 18,
-      backgroundColor: bgCard,
+      backgroundColor: isDark ? '#2E3236' : 'rgba(255, 255, 255, 0.08)',
       borderWidth: 1,
-      borderColor: border,
+      borderColor: isDark ? '#374151' : 'rgba(255, 255, 255, 0.14)',
       alignItems: 'center',
       justifyContent: 'center',
       cursor: 'pointer',
@@ -753,19 +793,48 @@ export function createShopWebStyles(isDark = false) {
       flexWrap: 'wrap',
       gap: 16,
     },
+    footerBottomLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      flexWrap: 'wrap',
+    },
     footerCopyrightText: {
       fontSize: 13,
-      color: textMuted,
+      color: footerTextMuted,
       fontWeight: '500',
+    },
+    footerStatusPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      backgroundColor: 'rgba(16, 185, 129, 0.12)',
+      paddingHorizontal: 10,
+      paddingVertical: 4.5,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: 'rgba(16, 185, 129, 0.28)',
+    },
+    footerStatusDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
+      backgroundColor: '#10B981',
+    },
+    footerStatusText: {
+      fontSize: 11.5,
+      fontWeight: '700',
+      color: '#10B981',
+      letterSpacing: 0.2,
     },
     footerLegalLinksRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 28,
+      gap: 24,
     },
     footerLegalLinkText: {
       fontSize: 13,
-      color: textMuted,
+      color: footerTextMuted,
       fontWeight: '500',
       cursor: 'pointer',
     },

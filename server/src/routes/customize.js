@@ -130,8 +130,72 @@ router.post('/customize', uploadBikeAndPart, async (req, res) => {
     }
     lockedUserId = user.user_id;
 
-    const bikeFile = req.files?.bike?.[0];
-    const partFile = req.files?.part?.[0];
+    let bikeFile = req.files?.bike?.[0];
+    let partFile = req.files?.part?.[0];
+
+    // Fallback: If not sent as multipart file, download/decode from bikeUrl / bikeUri / bikeBase64
+    if (!bikeFile && (req.body?.bikeUrl || req.body?.bikeUri || req.body?.bikeBase64)) {
+      const bikeTarget = String(req.body?.bikeUrl || req.body?.bikeUri || req.body?.bikeBase64 || '').trim();
+      try {
+        if (bikeTarget.startsWith('data:')) {
+          const [meta, rawB64] = bikeTarget.split(',');
+          const mime = meta.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+          const buffer = Buffer.from(rawB64 || meta, 'base64');
+          bikeFile = {
+            buffer,
+            mimetype: mime,
+            originalname: 'bike.jpg',
+            size: buffer.length,
+          };
+        } else if (/^https?:\/\//i.test(bikeTarget)) {
+          const resp = await fetch(bikeTarget);
+          if (resp.ok) {
+            const arrayBuf = await resp.arrayBuffer();
+            const buffer = Buffer.from(arrayBuf);
+            bikeFile = {
+              buffer,
+              mimetype: resp.headers.get('content-type') || 'image/jpeg',
+              originalname: 'bike.jpg',
+              size: buffer.length,
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('[customize] Failed to fetch bikeUrl:', err?.message || err);
+      }
+    }
+
+    if (!partFile && (req.body?.partUrl || req.body?.partUri || req.body?.partBase64)) {
+      const partTarget = String(req.body?.partUrl || req.body?.partUri || req.body?.partBase64 || '').trim();
+      try {
+        if (partTarget.startsWith('data:')) {
+          const [meta, rawB64] = partTarget.split(',');
+          const mime = meta.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+          const buffer = Buffer.from(rawB64 || meta, 'base64');
+          partFile = {
+            buffer,
+            mimetype: mime,
+            originalname: 'part.jpg',
+            size: buffer.length,
+          };
+        } else if (/^https?:\/\//i.test(partTarget)) {
+          const resp = await fetch(partTarget);
+          if (resp.ok) {
+            const arrayBuf = await resp.arrayBuffer();
+            const buffer = Buffer.from(arrayBuf);
+            partFile = {
+              buffer,
+              mimetype: resp.headers.get('content-type') || 'image/jpeg',
+              originalname: 'part.jpg',
+              size: buffer.length,
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('[customize] Failed to fetch partUrl:', err?.message || err);
+      }
+    }
+
     const customRequest = req.body?.customRequest || req.body?.custom_request || '';
     const installationPrompt =
       req.body?.installationPrompt || req.body?.installation_prompt || customRequest || '';

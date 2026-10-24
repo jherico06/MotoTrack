@@ -416,7 +416,25 @@ export default function RiderDashboard({ onLogout }) {
   return (
     <View style={styles.root}>
       <SafeAreaView style={styles.safe}>
-        <StatusBar style="dark" translucent backgroundColor="transparent" />
+        <StatusBar style="light" translucent backgroundColor="transparent" />
+
+        {/* ─── FIXED MOBILE RIDER HEADER (CHARCOAL) ─── */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Rider Dashboard</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => setAccountOpen(true)}
+              style={styles.headerIconBtn}
+              accessibilityLabel="My Account"
+            >
+              <BootstrapIcon name="gear" size={16} color="#FFFFFF" />
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onLogout} style={styles.headerIconBtn} accessibilityLabel="Log out">
+              <BootstrapIcon name="box-arrow-right" size={16} color="#F87171" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <ScrollView
           contentContainerStyle={styles.body}
           showsVerticalScrollIndicator={false}
@@ -430,25 +448,6 @@ export default function RiderDashboard({ onLogout }) {
             />
           }
         >
-          <View style={styles.topRow}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={styles.brand}>MotoTrack Rider</Text>
-              <Text style={styles.title}>Hi, {currentUser?.name || 'Rider'}</Text>
-              <Text style={styles.sub}>Your route summary for this week</Text>
-            </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <TouchableOpacity
-                onPress={() => setAccountOpen(true)}
-                style={styles.logoutBtn}
-                accessibilityLabel="My Account"
-              >
-                <BootstrapIcon name="gear" size={16} color={colors.textMuted} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={onLogout} style={styles.logoutBtn} accessibilityLabel="Log out">
-                <BootstrapIcon name="box-arrow-right" size={16} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-          </View>
 
           {undelivered.length > 0 ? (
             <View style={styles.summaryRow}>
@@ -911,8 +910,46 @@ export default function RiderDashboard({ onLogout }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  safe: { flex: 1, backgroundColor: colors.bg, paddingTop: ANDROID_TOP_INSET },
-  body: { padding: 16, paddingBottom: 56, maxWidth: 560, width: '100%', alignSelf: 'center' },
+  safe: { flex: 1, backgroundColor: '#24272B', paddingTop: ANDROID_TOP_INSET },
+  header: {
+    backgroundColor: '#24272B',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerBrand: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#EA580C',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    marginTop: 2,
+    letterSpacing: -0.3,
+  },
+  headerSub: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  headerIconBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: '#1E2124',
+    borderWidth: 1,
+    borderColor: '#363C44',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  body: { padding: 16, paddingBottom: 56, maxWidth: 560, width: '100%', alignSelf: 'center', backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
   topRow: {
     flexDirection: 'row',

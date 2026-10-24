@@ -123,31 +123,34 @@ export default function EditCustomerSettingsModal({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
       <View
         style={{
           flex: 1,
           backgroundColor: 'rgba(15, 23, 42, 0.65)',
-          justifyContent: 'center',
-          alignItems: 'center',
-          padding: 16,
+          justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+          alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+          padding: Platform.OS === 'web' ? 16 : 0,
         }}
       >
         <View
           style={{
             backgroundColor: bgModal,
             width: '100%',
-            maxWidth: 640,
+            maxWidth: Platform.OS === 'web' ? 640 : '100%',
             maxHeight: '90%',
-            borderRadius: 20,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
+            borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
             borderWidth: 1,
             borderColor,
             overflow: 'hidden',
             shadowColor: '#000',
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.25,
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.18,
             shadowRadius: 20,
             elevation: 10,
           }}
@@ -158,34 +161,34 @@ export default function EditCustomerSettingsModal({
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              paddingHorizontal: 22,
-              paddingVertical: 18,
+              paddingHorizontal: 20,
+              paddingVertical: 16,
               borderBottomWidth: 1,
               borderBottomColor: borderColor,
-              backgroundColor: isDarkMode ? '#18211E' : '#FAFAFA',
+              backgroundColor: isDarkMode ? '#18211E' : '#FFFFFF',
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
               <View
                 style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 10,
-                  backgroundColor: isDarkMode ? 'rgba(29, 69, 51, 0.35)' : '#E8F0EC',
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  backgroundColor: '#FFF7ED',
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderWidth: 1,
-                  borderColor: isDarkMode ? 'rgba(29, 69, 51, 0.5)' : '#C8DDD3',
+                  borderColor: '#FED7AA',
                 }}
               >
-                <BootstrapIcon name="gear-fill" size={17} color="#1D4533" />
+                <BootstrapIcon name="gear-fill" size={17} color="#EA580C" />
               </View>
-              <View>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: textPrimary, letterSpacing: -0.2 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 16.5, fontWeight: '800', color: textPrimary, letterSpacing: -0.2 }} numberOfLines={1}>
                   Edit Customer Settings
                 </Text>
-                <Text style={{ fontSize: 12, color: textSecondary, marginTop: 1 }}>
-                  Update your contact details, delivery address, and notes
+                <Text style={{ fontSize: 12, color: textSecondary, marginTop: 1 }} numberOfLines={1}>
+                  Update contact details, delivery address, and notes
                 </Text>
               </View>
             </View>
@@ -193,9 +196,9 @@ export default function EditCustomerSettingsModal({
             <TouchableOpacity
               onPress={onClose}
               style={{
-                width: 32,
-                height: 32,
-                borderRadius: 8,
+                width: 34,
+                height: 34,
+                borderRadius: 17,
                 alignItems: 'center',
                 justifyContent: 'center',
                 backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
@@ -249,7 +252,7 @@ export default function EditCustomerSettingsModal({
               }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <BootstrapIcon name="envelope-fill" size={16} color="#1D4533" />
+                <BootstrapIcon name="envelope-fill" size={16} color="#EA580C" />
                 <View>
                   <Text style={{ fontSize: 11, fontWeight: '700', color: textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                     Account Login Email
@@ -370,9 +373,9 @@ export default function EditCustomerSettingsModal({
                       paddingHorizontal: 10,
                       paddingVertical: 4,
                       borderRadius: 16,
-                      backgroundColor: address === p.address ? '#1D4533' : (isDarkMode ? '#1C2422' : '#F1F5F9'),
+                      backgroundColor: address === p.address ? '#EA580C' : (isDarkMode ? '#1C2422' : '#F1F5F9'),
                       borderWidth: 1,
-                      borderColor: address === p.address ? '#1D4533' : borderColor,
+                      borderColor: address === p.address ? '#EA580C' : borderColor,
                     }}
                     activeOpacity={0.7}
                   >
@@ -517,25 +520,28 @@ export default function EditCustomerSettingsModal({
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              justifyContent: 'flex-end',
+              justifyContent: 'space-between',
               gap: 10,
-              paddingHorizontal: 22,
-              paddingVertical: 16,
+              paddingHorizontal: 20,
+              paddingTop: 14,
+              paddingBottom: Platform.OS === 'ios' ? 30 : 16,
               borderTopWidth: 1,
               borderTopColor: borderColor,
-              backgroundColor: isDarkMode ? '#18211E' : '#FAFAFA',
+              backgroundColor: isDarkMode ? '#18211E' : '#FFFFFF',
             }}
           >
             <TouchableOpacity
               onPress={onClose}
               disabled={isSaving}
               style={{
-                paddingHorizontal: 16,
-                paddingVertical: 9,
-                borderRadius: 10,
-                backgroundColor: isDarkMode ? '#1C2422' : '#FFFFFF',
+                flex: 1,
+                paddingVertical: 12,
+                borderRadius: 14,
+                backgroundColor: isDarkMode ? '#1C2422' : '#F1F5F9',
                 borderWidth: 1,
                 borderColor,
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
               activeOpacity={0.7}
             >
@@ -548,13 +554,14 @@ export default function EditCustomerSettingsModal({
               onPress={handleSave}
               disabled={isSaving}
               style={{
+                flex: 1,
                 flexDirection: 'row',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: 8,
-                paddingHorizontal: 20,
-                paddingVertical: 9,
-                borderRadius: 10,
-                backgroundColor: '#1D4533',
+                paddingVertical: 12,
+                borderRadius: 14,
+                backgroundColor: '#EA580C',
                 opacity: isSaving ? 0.7 : 1,
               }}
               activeOpacity={0.85}

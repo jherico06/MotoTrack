@@ -15,6 +15,14 @@ import { motorcycleService } from '../products/motorcycleService.js';
 
 const LOCAL_KEY = 'mototrack_customizations';
 const LISTENERS = new Set();
+/** Short TTL + in-flight dedupe to prevent UI remount storms from re-hitting Supabase. */
+const LIST_CACHE_TTL_MS = 15000;
+const listFetchCache = new Map(); // key -> { at, data }
+const listFetchInFlight = new Map(); // key -> Promise
+
+function listCacheKey({ customerId, userId, admin }) {
+  return `${admin ? 'admin' : 'user'}:${userId || ''}:${customerId || ''}`;
+}
 
 function notify() {
   const snapshot = getLocalCustomizations();
@@ -86,9 +94,18 @@ function getLocalCustomizations() {
   }
 }
 
-function saveLocalCustomizations(list) {
+/**
+ * Persist customizations locally.
+ * Pass { silent: true } when caching a remote LIST result — notifying listeners
+ * would re-trigger listCustomizations and create an infinite API/log storm.
+ */
+function saveLocalCustomizations(list, { silent = false } = {}) {
   appStorage.setItem(LOCAL_KEY, JSON.stringify(list));
-  notify();
+  if (!silent) notify();
+}
+
+function invalidateListCache() {
+  listFetchCache.clear();
 }
 
 function upsertLocal(customization) {
@@ -96,6 +113,7 @@ function upsertLocal(customization) {
   const idx = list.findIndex((c) => c.id === customization.id || c.customization_id === customization.customization_id);
   if (idx >= 0) list[idx] = customization;
   else list.unshift(customization);
+  invalidateListCache();
   saveLocalCustomizations(list);
   return customization;
 }
@@ -104,6 +122,7 @@ function removeLocal(id) {
   const list = getLocalCustomizations().filter(
     (c) => c.id !== id && c.customization_id !== id
   );
+  invalidateListCache();
   saveLocalCustomizations(list);
 }
 
@@ -467,51 +486,76 @@ export const customizationService = {
   },
 
   // ── CRUD ───────────────────────────────────────────────────────────────
-  async listCustomizations({ customerId, userId, admin = false } = {}) {
-    const client = getClient();
-    if (client) {
-      try {
-        let q = client
-          .from('customizations')
-          .select(
-            'customization_id,customer_id,user_id,motorcycle_id,motorcycle_brand,motorcycle_model,motorcycle_year,motorcycle_color,motorcycle_type,name,status,total_price,notes,compatibility_checked,compatibility_ok,created_at,updated_at,preview_image_url,motorcycle_photo_url'
-          )
-          .order('created_at', { ascending: false });
-        if (!admin) {
-          if (userId) q = q.eq('user_id', userId);
-          else if (customerId) q = q.eq('customer_id', customerId);
-        }
-        const { data, error } = await q.limit(admin ? 200 : 50);
-        if (!error && data) {
-          const ids = data.map((r) => r.customization_id);
-          let itemsByCust = {};
-          if (ids.length) {
-            const { data: items } = await client
-              .from('customization_items')
-              .select(
-                'item_id,customization_id,product_id,quantity,price,product_name,product_brand,product_category,size_label,color_label'
-              )
-              .in('customization_id', ids);
-            (items || []).forEach((it) => {
-              if (!itemsByCust[it.customization_id]) itemsByCust[it.customization_id] = [];
-              itemsByCust[it.customization_id].push(it);
-            });
-          }
-          const mapped = data.map((row) => mapCustomizationRow(row, itemsByCust[row.customization_id] || []));
-          if (!admin) saveLocalCustomizations(mapped);
-          return mapped;
-        }
-      } catch (err) {
-        console.warn('[customization] list:', err?.message || err);
+  async listCustomizations({ customerId, userId, admin = false, force = false } = {}) {
+    const cacheKey = listCacheKey({ customerId, userId, admin });
+    if (!force) {
+      const cached = listFetchCache.get(cacheKey);
+      if (cached && Date.now() - cached.at < LIST_CACHE_TTL_MS) {
+        return cached.data;
       }
+      const inflight = listFetchInFlight.get(cacheKey);
+      if (inflight) return inflight;
     }
 
-    let local = getLocalCustomizations();
-    if (!admin) {
-      if (userId) local = local.filter((c) => c.userId === userId || c.user_id === userId);
-      else if (customerId) local = local.filter((c) => c.customerId === customerId || c.customer_id === customerId);
+    const fetchPromise = (async () => {
+      const client = getClient();
+      if (client) {
+        try {
+          let q = client
+            .from('customizations')
+            .select(
+              'customization_id,customer_id,user_id,motorcycle_id,motorcycle_brand,motorcycle_model,motorcycle_year,motorcycle_color,motorcycle_type,name,status,total_price,notes,compatibility_checked,compatibility_ok,created_at,updated_at,preview_image_url,motorcycle_photo_url'
+            )
+            .order('created_at', { ascending: false });
+          if (!admin) {
+            if (userId) q = q.eq('user_id', userId);
+            else if (customerId) q = q.eq('customer_id', customerId);
+          }
+          const { data, error } = await q.limit(admin ? 200 : 50);
+          if (!error && data) {
+            const ids = data.map((r) => r.customization_id);
+            let itemsByCust = {};
+            if (ids.length) {
+              const { data: items } = await client
+                .from('customization_items')
+                .select(
+                  'item_id,customization_id,product_id,quantity,price,product_name,product_brand,product_category,size_label,color_label'
+                )
+                .in('customization_id', ids);
+              (items || []).forEach((it) => {
+                if (!itemsByCust[it.customization_id]) itemsByCust[it.customization_id] = [];
+                itemsByCust[it.customization_id].push(it);
+              });
+            }
+            const mapped = data.map((row) =>
+              mapCustomizationRow(row, itemsByCust[row.customization_id] || [])
+            );
+            // Silent cache write — MUST NOT notify subscribers (they call list again → log storm)
+            if (!admin) saveLocalCustomizations(mapped, { silent: true });
+            listFetchCache.set(cacheKey, { at: Date.now(), data: mapped });
+            return mapped;
+          }
+        } catch (err) {
+          console.warn('[customization] list:', err?.message || err);
+        }
+      }
+
+      let local = getLocalCustomizations();
+      if (!admin) {
+        if (userId) local = local.filter((c) => c.userId === userId || c.user_id === userId);
+        else if (customerId)
+          local = local.filter((c) => c.customerId === customerId || c.customer_id === customerId);
+      }
+      listFetchCache.set(cacheKey, { at: Date.now(), data: local });
+      return local;
+    })();
+
+    listFetchInFlight.set(cacheKey, fetchPromise);
+    try {
+      return await fetchPromise;
+    } finally {
+      listFetchInFlight.delete(cacheKey);
     }
-    return local;
   },
 
   async getCustomization(id) {
@@ -548,37 +592,56 @@ export const customizationService = {
     notes = '',
     previewImageUrl = '',
     previewPrompt = '',
+    skipCompatibilityCheck = false,
+    allowEmptyItems = false,
   }) {
     const bike = normalizeBike(motorcycle);
     if (!bike.brand || !bike.model) {
       return { success: false, error: 'Please select a motorcycle brand, model, and year.' };
     }
-    if (!items.length) {
+    if (!items.length && !allowEmptyItems && !previewImageUrl) {
       return { success: false, error: 'Select at least one motorcycle part.' };
     }
 
     const productIds = items.map((it) => it.productId || it.product_id || it.id).filter(Boolean);
-    const compat = await this.checkCompatibility({
-      customerId,
-      motorcycleId: bike.motorcycleId,
-      motorcycle: bike,
-      productIds,
-    });
-    if (!compat.compatible) {
-      return {
-        success: false,
-        error: 'One or more selected products are not compatible with your motorcycle.',
-        compatibility: compat,
-      };
+    if (productIds.length && !skipCompatibilityCheck) {
+      const compat = await this.checkCompatibility({
+        customerId,
+        motorcycleId: bike.motorcycleId,
+        motorcycle: bike,
+        productIds,
+      });
+      if (!compat.compatible) {
+        return {
+          success: false,
+          error: 'One or more selected products are not compatible with your motorcycle.',
+          compatibility: compat,
+        };
+      }
     }
 
     const liveProducts = await productService.getProducts();
     const byId = new Map((liveProducts || []).map((p) => [p.id || p.product_id, p]));
     const normalizedItems = [];
+    const localOnlyItems = [];
     for (const raw of items) {
       const pid = raw.productId || raw.product_id || raw.id;
       const live = byId.get(pid);
       if (!live) {
+        // AI upload / offline snapshots: keep locally, skip DB FK item row
+        if (allowEmptyItems || previewImageUrl) {
+          localOnlyItems.push({
+            product_id: pid || `upload-${Date.now()}`,
+            quantity: Math.max(1, Number(raw.quantity) || 1),
+            price: Number(raw.price) || 0,
+            product_name: raw.name || raw.product_name || 'Custom Part',
+            product_brand: raw.brand || raw.product_brand || '',
+            product_category: raw.category || raw.product_category || '',
+            size_label: raw.size || raw.size_label || '',
+            color_label: raw.color || raw.color_label || '',
+          });
+          continue;
+        }
         return { success: false, error: `Product ${pid} no longer exists.` };
       }
       if (live.status && String(live.status).toLowerCase() === 'inactive') {
@@ -596,6 +659,10 @@ export const customizationService = {
         size_label: raw.size || raw.size_label || '',
         color_label: raw.color || raw.color_label || '',
       });
+    }
+
+    if (!normalizedItems.length && !localOnlyItems.length && !allowEmptyItems && !previewImageUrl) {
+      return { success: false, error: 'Select at least one motorcycle part.' };
     }
 
     const total = this.calculateTotal(normalizedItems);
@@ -651,26 +718,51 @@ export const customizationService = {
       if (error) {
         console.warn('[customization] create:', error.message);
       } else {
-        const itemRows = normalizedItems.map((it) => ({
-          item_id: newId('czi'),
-          customization_id: customizationId,
-          ...it,
-        }));
-        const { error: itemErr } = await client.from('customization_items').insert(itemRows);
-        if (itemErr) console.warn('[customization] items:', itemErr.message);
+        if (normalizedItems.length) {
+          const itemRows = normalizedItems.map((it) => ({
+            item_id: newId('czi'),
+            customization_id: customizationId,
+            ...it,
+          }));
+          const { error: itemErr } = await client.from('customization_items').insert(itemRows);
+          if (itemErr) console.warn('[customization] items:', itemErr.message);
+        }
         const saved = await this.getCustomization(customizationId);
         if (saved) {
-          upsertLocal(saved);
+          // Merge local-only upload parts into the returned snapshot
+          if (localOnlyItems.length) {
+            saved.items = [
+              ...(saved.items || []),
+              ...localOnlyItems.map((it) => ({
+                id: newId('czi'),
+                item_id: newId('czi'),
+                productId: it.product_id,
+                product_id: it.product_id,
+                quantity: it.quantity,
+                price: it.price,
+                name: it.product_name,
+                brand: it.product_brand,
+                category: it.product_category,
+              })),
+            ];
+            upsertLocal(saved);
+          } else {
+            upsertLocal(saved);
+          }
           return { success: true, customization: saved };
         }
       }
     }
 
-    const local = mapCustomizationRow(row, normalizedItems.map((it, i) => ({
-      item_id: newId('czi'),
-      customization_id: customizationId,
-      ...it,
-    })));
+    const allLocalItems = [...normalizedItems, ...localOnlyItems];
+    const local = mapCustomizationRow(
+      row,
+      allLocalItems.map((it) => ({
+        item_id: newId('czi'),
+        customization_id: customizationId,
+        ...it,
+      }))
+    );
     upsertLocal(local);
     return { success: true, customization: local };
   },

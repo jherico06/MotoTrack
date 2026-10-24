@@ -138,7 +138,7 @@ export default function AdminStatCard({
   label,
   value,
   sub,
-  accent = 'teal',
+  accent = 'orange',
   valueColor,
   icon,
   trend,
@@ -157,18 +157,18 @@ export default function AdminStatCard({
       ? Boolean(isDark)
       : Boolean(themeContext?.isDarkMode);
 
-  const theme = ACCENT_THEMES[accent] || ACCENT_THEMES.teal;
+  const theme = ACCENT_THEMES[accent] || ACCENT_THEMES.orange;
   const resolvedIcon = icon || getAutoIcon(label);
 
   const iconBg = resolvedIsDark ? theme.iconBgDark : theme.iconBg;
   const iconColor = resolvedIsDark ? theme.iconColorDark : theme.iconColor;
-  const cardBorderColor = resolvedIsDark ? '#26332E' : '#E2E8F0';
-  const cardBg = resolvedIsDark ? '#0F1412' : '#FFFFFF';
+  const cardBorderColor = resolvedIsDark ? '#374151' : '#E5E7EB';
+  const cardBg = resolvedIsDark ? '#24272B' : '#FFFFFF';
 
   // Value color resolution
   const resolvedValueColor =
     valueColor ||
-    (resolvedIsDark ? '#F5F7F6' : '#0F172A');
+    (resolvedIsDark ? '#F9FAFB' : '#111827');
 
   // Badge resolution
   const badgeContent = badge || trend;
@@ -313,7 +313,7 @@ export default function AdminStatCard({
         style={{
           fontSize: 12.5,
           fontWeight: '600',
-          color: resolvedIsDark ? '#94A3B8' : '#64748B',
+          color: resolvedIsDark ? '#9CA3AF' : '#6B7280',
           marginBottom: 2,
           letterSpacing: -0.1,
         }}
@@ -325,14 +325,14 @@ export default function AdminStatCard({
       <Text
         numberOfLines={1}
         style={{
-          fontSize: 26,
+          fontSize: 28,
           fontWeight: '800',
-          letterSpacing: -0.6,
-          lineHeight: 32,
+          letterSpacing: -0.5,
+          lineHeight: 34,
           color: resolvedValueColor,
           fontVariant: ['tabular-nums'],
           fontFamily: Platform.select({
-            web: "'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif",
+            web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
             default: 'PlusJakartaSans-Bold',
           }),
         }}
@@ -346,7 +346,7 @@ export default function AdminStatCard({
           numberOfLines={1}
           style={{
             fontSize: 11.5,
-            fontWeight: '500',
+            fontWeight: '400',
             color: resolvedIsDark ? '#AAB4B0' : '#64748B',
             marginTop: 2,
             letterSpacing: -0.1,

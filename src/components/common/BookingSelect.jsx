@@ -1,22 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, Platform, ScrollView } from 'react-native';
 import BootstrapIcon from './BootstrapIcon.jsx';
-
-const SELECT_STYLE = {
-  width: '100%',
-  backgroundColor: '#FFFFFF',
-  border: '1.5px solid #94A3B8',
-  borderRadius: 12,
-  padding: '11px 14px',
-  fontSize: 13,
-  fontWeight: 700,
-  color: '#0F172A',
-  fontFamily: 'inherit',
-  outline: 'none',
-  cursor: 'pointer',
-  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-  transition: 'border-color 0.15s ease',
-};
+import { useTheme } from '../../context/ThemeContext.jsx';
+import { appStorage } from '../../services/system/storageAdapter.js';
 
 export default function BookingSelect({
   label,
@@ -25,20 +11,53 @@ export default function BookingSelect({
   onChange,
   placeholder = 'Select an option',
   emptyText = 'No options available',
-  accentColor = '#1D4533',
+  accentColor = '#EA580C',
+  isDarkMode: propIsDarkMode,
 }) {
+  let themeCtx = null;
+  try {
+    themeCtx = useTheme();
+  } catch (_e) {}
+  const isDark = propIsDarkMode !== undefined
+    ? Boolean(propIsDarkMode)
+    : Boolean(
+        themeCtx?.isDarkMode ||
+        (typeof document !== 'undefined' && document?.documentElement?.classList?.contains('dark')) ||
+        (typeof appStorage !== 'undefined' && (
+          appStorage.getItem('mototrack_admin_dark_mode') === 'true' ||
+          appStorage.getItem('mototrack_customer_dark_mode') === 'true' ||
+          appStorage.getItem('mototrack_theme_mode') === 'dark'
+        ))
+      );
+
   const [isOpen, setIsOpen] = useState(false);
   const selected = options.find((opt) => String(opt.value) === String(value));
+
+  const selectStyle = {
+    width: '100%',
+    backgroundColor: isDark ? '#1E2124' : '#FFFFFF',
+    border: `1.5px solid ${isDark ? '#374151' : '#94A3B8'}`,
+    borderRadius: 12,
+    padding: '11px 14px',
+    fontSize: 13,
+    fontWeight: 700,
+    color: selected ? (isDark ? '#F8FAFC' : '#0F172A') : (isDark ? '#94A3B8' : '#64748B'),
+    fontFamily: 'inherit',
+    outline: 'none',
+    cursor: 'pointer',
+    boxShadow: isDark ? '0 1px 3px rgba(0, 0, 0, 0.3)' : '0 1px 2px rgba(0, 0, 0, 0.05)',
+    transition: 'border-color 0.15s ease',
+  };
 
   if (!options.length) {
     return (
       <View style={{ marginBottom: 12 }}>
         {label ? (
-          <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#334155', marginBottom: 6 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '800', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 6 }}>
             {label}
           </Text>
         ) : null}
-        <Text style={{ fontSize: 12.5, color: '#64748B' }}>{emptyText}</Text>
+        <Text style={{ fontSize: 12.5, color: isDark ? '#94A3B8' : '#64748B' }}>{emptyText}</Text>
       </View>
     );
   }
@@ -46,7 +65,7 @@ export default function BookingSelect({
   return (
     <View style={{ marginBottom: 12, zIndex: isOpen ? 20 : 1 }}>
       {label ? (
-        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#334155', marginBottom: 6 }}>
+        <Text style={{ fontSize: 12.5, fontWeight: '800', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 6 }}>
           {label}
         </Text>
       ) : null}
@@ -55,15 +74,23 @@ export default function BookingSelect({
         <select
           value={value ?? ''}
           onChange={(e) => onChange?.(e.target.value)}
-          style={SELECT_STYLE}
+          style={selectStyle}
         >
           {!selected ? (
-            <option value="" disabled>
+            <option value="" disabled style={{ backgroundColor: isDark ? '#1E2124' : '#FFFFFF', color: isDark ? '#94A3B8' : '#64748B' }}>
               {placeholder}
             </option>
           ) : null}
           {options.map((opt) => (
-            <option key={String(opt.value)} value={String(opt.value)}>
+            <option
+              key={String(opt.value)}
+              value={String(opt.value)}
+              disabled={opt.disabled}
+              style={{
+                backgroundColor: isDark ? '#1E2124' : '#FFFFFF',
+                color: opt.disabled ? (isDark ? '#64748B' : '#94A3B8') : (isDark ? '#F8FAFC' : '#0F172A'),
+              }}
+            >
               {opt.label}
             </option>
           ))}
@@ -77,9 +104,9 @@ export default function BookingSelect({
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: isDark ? '#1E2124' : '#FFFFFF',
               borderWidth: 1.5,
-              borderColor: isOpen ? accentColor : '#94A3B8',
+              borderColor: isOpen ? accentColor : (isDark ? '#374151' : '#94A3B8'),
               borderRadius: 12,
               paddingHorizontal: 14,
               paddingVertical: 10,
@@ -91,22 +118,22 @@ export default function BookingSelect({
                 flex: 1,
                 fontSize: 13,
                 fontWeight: '700',
-                color: selected ? '#0F172A' : '#94A3B8',
+                color: selected ? (isDark ? '#F8FAFC' : '#0F172A') : (isDark ? '#94A3B8' : '#94A3B8'),
               }}
               numberOfLines={1}
             >
               {selected?.label || placeholder}
             </Text>
-            <BootstrapIcon name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} color="#64748B" />
+            <BootstrapIcon name={isOpen ? 'chevron-up' : 'chevron-down'} size={14} color={isDark ? '#94A3B8' : '#64748B'} />
           </TouchableOpacity>
 
           {isOpen ? (
             <View
               style={{
                 marginTop: 6,
-                backgroundColor: '#FFFFFF',
+                backgroundColor: isDark ? '#24272B' : '#FFFFFF',
                 borderWidth: 1.5,
-                borderColor: '#94A3B8',
+                borderColor: isDark ? '#374151' : '#94A3B8',
                 borderRadius: 12,
                 overflow: 'hidden',
               }}
@@ -117,23 +144,28 @@ export default function BookingSelect({
                   return (
                     <TouchableOpacity
                       key={String(opt.value)}
+                      disabled={opt.disabled}
                       onPress={() => {
+                        if (opt.disabled) return;
                         onChange?.(opt.value);
                         setIsOpen(false);
                       }}
                       style={{
                         paddingHorizontal: 14,
                         paddingVertical: 11,
-                        backgroundColor: active ? '#F0FDFA' : '#FFFFFF',
+                        backgroundColor: active
+                          ? (isDark ? '#382215' : '#FFF7ED')
+                          : (isDark ? '#24272B' : '#FFFFFF'),
                         borderBottomWidth: 1,
-                        borderBottomColor: '#F1F5F9',
+                        borderBottomColor: isDark ? '#2D3136' : '#F1F5F9',
+                        opacity: opt.disabled ? 0.5 : 1,
                       }}
                     >
                       <Text
                         style={{
                           fontSize: 13,
                           fontWeight: active ? '800' : '600',
-                          color: active ? accentColor : '#0F172A',
+                          color: active ? accentColor : (isDark ? '#F8FAFC' : '#0F172A'),
                         }}
                       >
                         {opt.label}

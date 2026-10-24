@@ -27,15 +27,15 @@ const ROUTE_WAYPOINTS = [
   { x: 42, y: 54, label: 'Cebu South Road & Toledo Junction' },
   { x: 56, y: 45, label: 'Inoburan Barangay Road' },
   { x: 72, y: 34, label: 'Avocado Street Corridor' },
-  { x: 86, y: 22, label: 'Purok Avocado 4, Inoburan, City of Naga' },
+  { x: 86, y: 22, label: 'Delivery address' },
 ];
 
 export function parseAddressComponents(address) {
   if (!address || typeof address !== 'string') {
     return {
-      destSummary: 'Inoburan, City of Naga',
-      destCity: 'City of Naga',
-      destArea: 'Inoburan Corridor',
+      destSummary: 'Address not set',
+      destCity: '',
+      destArea: '',
     };
   }
   const parts = address
@@ -44,9 +44,9 @@ export function parseAddressComponents(address) {
     .filter(Boolean);
   if (parts.length === 0) {
     return {
-      destSummary: 'Inoburan, City of Naga',
-      destCity: 'City of Naga',
-      destArea: 'Inoburan Corridor',
+      destSummary: 'Address not set',
+      destCity: '',
+      destArea: '',
     };
   }
   if (parts.length === 1) {
@@ -110,22 +110,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   const [webViewFailed, setWebViewFailed] = useState(false);
 
   // Safe fallback active order so the tracking modal never returns null if order is loading
-  const activeOrder = useMemo(() => {
-    if (order) return order;
-    return {
-      id: 'ord-live-tracking',
-      order_id: '585705280479659997',
-      status: 'In transit',
-      customer_name: currentUser?.name || 'Alex Rider',
-      customer_phone: currentUser?.phone || '(+63) 917 555 0192',
-      customer_address: currentUser?.address || 'Purok Avocado 4, Inoburan, City of Naga, Cebu, Philippines',
-      payment_method: 'Cash on Delivery (COD)',
-      grand_total: 1450.0,
-      total_amount: 1450.0,
-      items_summary: 'Brembo 19RCS Corsa Corta Radial Brake Master Cylinder (x1)',
-      estimated_delivery: 'Today (30-45 mins Express Courier)',
-    };
-  }, [order, currentUser]);
+  const activeOrder = order || {};
 
   // Interactive Rider Chat State
   const [chatMessages, setChatMessages] = useState([
@@ -230,9 +215,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
     const vehicle =
       activeOrder?.rider_vehicle || activeOrder?.vehicle_info || activeOrder?.rider_vehicle_info || null;
     const plateNumber = activeOrder?.rider_plate || null;
-    const avatar =
-      activeOrder?.rider_avatar ||
-      'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=200&q=80';
+    const avatar = activeOrder?.rider_avatar || null;
     if (!name) {
       return {
         name: null,
@@ -264,7 +247,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
       activeOrder?.customer_address ||
       activeOrder?.shipping_address ||
       currentUser?.address ||
-      'Purok Avocado 4, Inoburan, City of Naga, Cebu, Philippines'
+      ''
     );
   }, [customAddress, activeOrder?.customer_address, activeOrder?.shipping_address, currentUser?.address]);
 
@@ -379,7 +362,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
       background: #E2E8F0;
     }
     .custom-hub-pin {
-      background: #1D4533;
+      background: #EA580C;
       color: #FFF;
       border: 2px solid #FFFFFF;
       border-radius: 50%;
@@ -392,7 +375,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
     .hub-label {
       background: #0F172A !important;
       color: #FFFFFF !important;
-      border: 1px solid #1D4533 !important;
+      border: 1px solid #EA580C !important;
       border-radius: 6px !important;
       font-size: 11px !important;
       font-weight: 800 !important;
@@ -414,7 +397,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
     .custom-rider-badge {
       background: #0F172A;
       color: #FBBF24;
-      border: 2px solid #1D4533;
+      border: 2px solid #EA580C;
       border-radius: 20px;
       padding: 4px 10px;
       font-size: 11px;
@@ -458,7 +441,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
         ];
 
         var routeLine = L.polyline(routeCoords, {
-          color: '#1D4533',
+          color: '#EA580C',
           weight: 5,
           opacity: 0.9,
           dashArray: '8, 6'
@@ -473,7 +456,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
         });
         var hubMarker = L.marker([hubLat, hubLng], { icon: hubIcon }).addTo(map);
         hubMarker.bindTooltip("D'Blockchain Motorparts & Accessories", { permanent: true, direction: 'top', className: 'hub-label', offset: [0, -12] });
-        hubMarker.bindPopup("<b>D'Blockchain Motorparts and Accessories</b><br/>Natalio B. Bacalso S National Hwy, South Poblacion, Naga, 6037 Cebu<br/><span style='color:#1D4533;font-size:11px;font-weight:700;'>📍 Plus Code: 6Q44+MPQ</span>").openPopup();
+        hubMarker.bindPopup("<b>D'Blockchain Motorparts and Accessories</b><br/>Natalio B. Bacalso S National Hwy, South Poblacion, Naga, 6037 Cebu<br/><span style='color:#EA580C;font-size:11px;font-weight:700;'>📍 Plus Code: 6Q44+MPQ</span>").openPopup();
 
         // Destination Pin
         var destIcon = L.divIcon({
@@ -559,11 +542,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   // Dynamic arrival estimate (Unconditionally called before any return)
   const arrivalRangeText = useMemo(() => {
     if (activeOrder?.estimated_delivery) return activeOrder.estimated_delivery;
-    const d = new Date();
-    const d1 = new Date(d.getTime() + 2 * 24 * 3600 * 1000);
-    const d2 = new Date(d.getTime() + 4 * 24 * 3600 * 1000);
-    const opt = { month: 'short', day: 'numeric' };
-    return `Arriving ${d1.toLocaleDateString('en-US', opt)} - ${d2.toLocaleDateString('en-US', opt)}`;
+    return 'Delivery date not set';
   }, [activeOrder]);
 
   const isCOD =
@@ -573,7 +552,8 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
 
   // Determine active step index (0: Order placed, 1: Ready/Packing, 2: Out for Delivery, 3: Delivered)
   const getStepIndex = () => {
-    const st = (activeOrder.status || 'Out for Delivery').toLowerCase();
+    const st = String(activeOrder.status || '').toLowerCase();
+    if (!st) return 0;
     if (st.includes('pending') || st.includes('approval')) return 0;
     if (
       st === 'processing' ||
@@ -615,7 +595,11 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   ];
 
   const handleCopyOrderNumber = () => {
-    const num = activeOrder.order_id || activeOrder.id || '585705280479659997';
+    const num = activeOrder.order_id || activeOrder.id || '';
+    if (!num) {
+      showToast('No order number to copy');
+      return;
+    }
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
         navigator.clipboard.writeText(num);
@@ -699,7 +683,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
               onPress={() => setShowLiveMapDrawer(!showLiveMapDrawer)}
               activeOpacity={0.8}
             >
-              <BootstrapIcon name={showLiveMapDrawer ? 'receipt' : 'compass'} size={14} color="#1D4533" />
+              <BootstrapIcon name={showLiveMapDrawer ? 'receipt' : 'compass'} size={14} color="#EA580C" />
               <Text style={styles.headerGpsBtnText}>{showLiveMapDrawer ? 'Details' : 'Google Map'}</Text>
             </TouchableOpacity>
           </View>
@@ -770,10 +754,10 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
             {/* ─── 3. GUARANTEED ON-TIME DELIVERY BANNER ─── */}
             <View style={styles.guaranteeBanner}>
               <View style={styles.guaranteeIconWrap}>
-                <BootstrapIcon name="clock-history" size={17} color="#1D4533" />
+                <BootstrapIcon name="clock-history" size={17} color="#EA580C" />
               </View>
               <Text style={styles.guaranteeText}>
-                <Text style={{ fontWeight: '800', color: '#1D4533' }}>Guaranteed On-Time Delivery</Text>{' '}
+                <Text style={{ fontWeight: '800', color: '#EA580C' }}>Guaranteed On-Time Delivery</Text>{' '}
                 assures that a delivery will be attempted by {arrivalRangeText.replace('Arriving ', '')}. Get
                 a coupon if your order arrives late.
               </Text>
@@ -799,7 +783,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     onPress={handleOpenGoogleMapsApp}
                     activeOpacity={0.8}
                   >
-                    <BootstrapIcon name="box-arrow-up-right" size={11} color="#1D4533" />
+                    <BootstrapIcon name="box-arrow-up-right" size={11} color="#EA580C" />
                     <Text style={styles.openGoogleMapsBtnText}>Open in Google Maps</Text>
                   </TouchableOpacity>
                 </View>
@@ -828,8 +812,12 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     <View style={[styles.riderAvatarSmall, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0' }]}>
                       <BootstrapIcon name="person" size={16} color="#94A3B8" />
                     </View>
-                  ) : (
+                  ) : riderInfo.avatar ? (
                     <Image source={{ uri: riderInfo.avatar }} style={styles.riderAvatarSmall} />
+                  ) : (
+                    <View style={[styles.riderAvatarSmall, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0' }]}>
+                      <BootstrapIcon name="person" size={16} color="#94A3B8" />
+                    </View>
                   )}
                   <View style={{ flex: 1 }}>
                     {riderInfo.unassigned ? (
@@ -877,11 +865,11 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
             <View style={styles.addressCard}>
               <View style={styles.addressHeaderRow}>
                 <View style={styles.addressPinWrap}>
-                  <BootstrapIcon name="geo-alt-fill" size={16} color="#1D4533" />
+                  <BootstrapIcon name="geo-alt-fill" size={16} color="#EA580C" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.addressRecipientName}>
-                    {activeOrder?.customer_name || currentUser?.name || currentUser?.fullName || 'Alex Rider'}{' '}
+                    {activeOrder?.customer_name || currentUser?.name || currentUser?.fullName || 'Customer'}{' '}
                     <Text style={styles.addressPhone}>
                       {formatPHPhone(activeOrder?.customer_phone || currentUser?.phone, true)}
                     </Text>
@@ -905,7 +893,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
               <View style={styles.storeHeaderRow}>
                 <View style={styles.storeHeaderLeft}>
                   <View style={styles.storeAvatarCircle}>
-                    <BootstrapIcon name="shield-check" size={14} color="#1D4533" />
+                    <BootstrapIcon name="shield-check" size={14} color="#EA580C" />
                   </View>
                   <Text style={styles.storeNameText}>MotoTrack Motorparts and Accessories</Text>
                 </View>
@@ -992,7 +980,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                   activeOpacity={0.8}
                 >
                   <Text style={styles.orderNumberValue}>
-                    {activeOrder?.order_id || activeOrder?.id || '585705280479659997'}
+                    {activeOrder?.order_id || activeOrder?.id || '—'}
                   </Text>
                   <BootstrapIcon name="copy" size={13} color="#64748B" />
                 </TouchableOpacity>
@@ -1001,7 +989,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
               {/* Payment Method & Total Row */}
               <View style={styles.paymentMethodRow}>
                 <View style={styles.paymentBadgeWrap}>
-                  <View style={[styles.codIndicatorBadge, !isCOD && { backgroundColor: '#1D4533' }]}>
+                  <View style={[styles.codIndicatorBadge, !isCOD && { backgroundColor: '#EA580C' }]}>
                     <Text style={styles.codIndicatorText}>{isCOD ? 'COD' : 'GCASH'}</Text>
                   </View>
                   <Text style={styles.paymentMethodLabel}>
@@ -1035,7 +1023,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                   {Number(discountValue) > 0 && (
                     <View style={styles.priceBreakdownLine}>
                       <Text style={styles.priceBreakdownLabel}>Voucher Discount</Text>
-                      <Text style={[styles.priceBreakdownVal, { color: '#1D4533' }]}>-₱{discountValue}</Text>
+                      <Text style={[styles.priceBreakdownVal, { color: '#EA580C' }]}>-₱{discountValue}</Text>
                     </View>
                   )}
                   <View style={styles.priceBreakdownLine}>
@@ -1043,7 +1031,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     <Text
                       style={[
                         styles.priceBreakdownVal,
-                        shippingFeeNum === 0 ? { color: '#1D4533' } : null,
+                        shippingFeeNum === 0 ? { color: '#EA580C' } : null,
                       ]}
                     >
                       {shippingFeeNum > 0 ? `₱${shippingFeeValue}` : '₱0.00'}
@@ -1061,9 +1049,9 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
               activeOpacity={0.85}
             >
               <View style={styles.freeReturnsLeft}>
-                <BootstrapIcon name="bag-check-fill" size={15} color="#1D4533" />
+                <BootstrapIcon name="bag-check-fill" size={15} color="#EA580C" />
                 <Text style={styles.freeReturnsText}>
-                  <Text style={{ color: '#1D4533', fontWeight: '800' }}>Free returns</Text> at your
+                  <Text style={{ color: '#EA580C', fontWeight: '800' }}>Free returns</Text> at your
                   convenience (30-day policy)
                 </Text>
               </View>
@@ -1134,8 +1122,8 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     }}
                     activeOpacity={0.8}
                   >
-                    <BootstrapIcon name="geo-alt-fill" size={13} color="#1D4533" />
-                    <Text style={{ fontSize: 11.5, color: '#1D4533', fontWeight: '800', flex: 1 }}>
+                    <BootstrapIcon name="geo-alt-fill" size={13} color="#EA580C" />
+                    <Text style={{ fontSize: 11.5, color: '#EA580C', fontWeight: '800', flex: 1 }}>
                       Use Profile Address: {currentUser.address.slice(0, 35)}...
                     </Text>
                   </TouchableOpacity>
@@ -1250,7 +1238,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
             <View style={styles.editAddressOverlay}>
               <View style={styles.editAddressCard}>
                 <View style={{ alignItems: 'center', marginBottom: 10 }}>
-                  <BootstrapIcon name="arrow-counterclockwise" size={32} color="#1D4533" />
+                  <BootstrapIcon name="arrow-counterclockwise" size={32} color="#EA580C" />
                 </View>
                 <Text style={[styles.editAddressTitle, { textAlign: 'center' }]}>
                   Request Return & Refund
@@ -1282,7 +1270,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     <BootstrapIcon
                       name={returnReason === reason ? 'check-circle-fill' : 'circle'}
                       size={15}
-                      color={returnReason === reason ? '#1D4533' : '#94A3B8'}
+                      color={returnReason === reason ? '#EA580C' : '#94A3B8'}
                     />
                     <Text
                       style={{
@@ -1312,7 +1300,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     <Text style={styles.editAddressCancelText}>Back</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.editAddressSaveBtn, { backgroundColor: '#1D4533' }]}
+                    style={[styles.editAddressSaveBtn, { backgroundColor: '#EA580C' }]}
                     disabled={isSubmittingAction}
                     onPress={handleConfirmReturn}
                   >
@@ -1332,7 +1320,13 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
             <View style={styles.callDialogOverlay}>
               <View style={styles.callDialogCard}>
                 <View style={styles.callAvatarPulse}>
-                  <Image source={{ uri: riderInfo.avatar }} style={styles.callAvatarImg} />
+                  {riderInfo.avatar ? (
+                    <Image source={{ uri: riderInfo.avatar }} style={styles.callAvatarImg} />
+                  ) : (
+                    <View style={[styles.callAvatarImg, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0' }]}>
+                      <BootstrapIcon name="person" size={28} color="#94A3B8" />
+                    </View>
+                  )}
                 </View>
                 <Text style={styles.callRiderName}>{riderInfo.name}</Text>
                 <Text style={styles.callRiderPhone}>{riderInfo.phone}</Text>
@@ -1419,7 +1413,7 @@ const styles = StyleSheet.create({
   },
   headerSubtitleText: {
     fontSize: 13,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
     marginTop: 2,
   },
@@ -1435,7 +1429,7 @@ const styles = StyleSheet.create({
     borderColor: '#FDE68A',
   },
   headerGpsBtnText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 12,
     fontWeight: '800',
   },
@@ -1479,7 +1473,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     height: 2.5,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     top: 15,
     zIndex: 2,
   },
@@ -1492,10 +1486,10 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.35,
     shadowRadius: 6,
@@ -1505,7 +1499,7 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1530,7 +1524,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stepLabelTextActive: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '900',
   },
   stepLabelTextCompleted: {
@@ -1607,7 +1601,7 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   mapModePillTextActive: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '800',
   },
   openGoogleMapsBtn: {
@@ -1624,7 +1618,7 @@ const styles = StyleSheet.create({
   openGoogleMapsBtnText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
 
   mapCanvasWrapper: {
@@ -1816,12 +1810,12 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: '#FFFFFF',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.35,
     shadowRadius: 4,
@@ -1896,7 +1890,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 25,
-    backgroundColor: 'rgba(29, 69, 51, 0.25)',
+    backgroundColor: 'rgba(36, 39, 43, 0.6)',
     top: -7,
     left: -7,
   },
@@ -1905,7 +1899,7 @@ const styles = StyleSheet.create({
     height: 36,
     borderRadius: 18,
     borderWidth: 2.5,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#FFFFFF',
     overflow: 'visible',
     alignItems: 'center',
@@ -1920,7 +1914,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -3,
     right: -3,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     width: 14,
     height: 14,
     borderRadius: 7,
@@ -1936,7 +1930,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginTop: 3,
     borderWidth: 1,
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     alignItems: 'center',
   },
   riderTooltipNameRealistic: {
@@ -2024,7 +2018,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 10,
@@ -2076,7 +2070,7 @@ const styles = StyleSheet.create({
   changeAddressLinkText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
 
   // 7. Order Items Card
@@ -2187,7 +2181,7 @@ const styles = StyleSheet.create({
   },
   freeReturnsPillText: {
     fontSize: 9.5,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '800',
   },
   genuinePill: {
@@ -2267,7 +2261,7 @@ const styles = StyleSheet.create({
   totalPriceBig: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
 
   expandedPriceSummary: {
@@ -2409,7 +2403,7 @@ const styles = StyleSheet.create({
   },
   editAddressSaveBtn: {
     flex: 1,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 11,
     borderRadius: 10,
     alignItems: 'center',
@@ -2470,7 +2464,7 @@ const styles = StyleSheet.create({
   },
   callStatusText: {
     fontSize: 12,
-    color: '#1D4533',
+    color: '#EA580C',
     marginTop: 8,
     fontWeight: '700',
   },

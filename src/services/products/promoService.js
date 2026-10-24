@@ -4,6 +4,7 @@ import { appStorage } from '../system/storageAdapter.js';
 export const PROMO_TYPES = {
   FREE_SHIPPING: 'FREE_SHIPPING',
   PERCENT_OFF: 'PERCENT_OFF',
+  FREE_INSTALLATION: 'FREE_INSTALLATION',
 };
 
 export const APPLIES_TO = {
@@ -22,6 +23,7 @@ const DEFAULT_PROMOS = [
     promoType: PROMO_TYPES.PERCENT_OFF,
     discountPercent: 10,
     description: '10% Off Superbike Parts',
+    imageUrl: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1000&q=80',
     appliesTo: APPLIES_TO.ALL_PRODUCTS,
     productIds: [],
     startDate: null,
@@ -37,6 +39,7 @@ const DEFAULT_PROMOS = [
     promoType: PROMO_TYPES.FREE_SHIPPING,
     discountPercent: 0,
     description: 'Free Shipping Promo',
+    imageUrl: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=1000&q=80',
     appliesTo: APPLIES_TO.ALL_PRODUCTS,
     productIds: [],
     startDate: null,
@@ -137,10 +140,11 @@ function normalizePromo(row, productIds = []) {
     code: String(row.code || '').toUpperCase(),
     promoType,
     discountPercent:
-      promoType === PROMO_TYPES.FREE_SHIPPING
+      promoType === PROMO_TYPES.FREE_SHIPPING || promoType === PROMO_TYPES.FREE_INSTALLATION
         ? 0
         : Math.min(100, Math.max(0, Number(row.discount_percent ?? row.discountPercent ?? 0))),
     description: row.description || '',
+    imageUrl: row.image_url || row.imageUrl || row.banner_image || row.bannerImage || '',
     appliesTo,
     productIds: appliesTo === APPLIES_TO.SELECTED_PRODUCTS ? ids : [],
     startDate: row.start_date || row.startDate || null,
@@ -166,7 +170,9 @@ function normalizePromo(row, productIds = []) {
 }
 
 function promoTypeLabel(type) {
-  return type === PROMO_TYPES.FREE_SHIPPING ? 'Free Shipping' : 'Percentage Off';
+  if (type === PROMO_TYPES.FREE_SHIPPING) return 'Free Shipping';
+  if (type === PROMO_TYPES.FREE_INSTALLATION) return 'Free Installation';
+  return 'Percentage Off';
 }
 
 function appliesToLabel(promo) {
@@ -177,6 +183,7 @@ function appliesToLabel(promo) {
 
 function discountLabel(promo) {
   if (promo.promoType === PROMO_TYPES.FREE_SHIPPING) return 'Free Shipping';
+  if (promo.promoType === PROMO_TYPES.FREE_INSTALLATION) return 'Free Installation';
   return `${promo.discountPercent}% OFF`;
 }
 
@@ -243,7 +250,12 @@ function validateAdminPayload(payload, { existingCode = null, excludePromoId = n
     // uniqueness handled by caller against list / DB
   }
 
-  if (!promoType || ![PROMO_TYPES.FREE_SHIPPING, PROMO_TYPES.PERCENT_OFF].includes(promoType)) {
+  if (
+    !promoType ||
+    ![PROMO_TYPES.FREE_SHIPPING, PROMO_TYPES.PERCENT_OFF, PROMO_TYPES.FREE_INSTALLATION].includes(
+      promoType
+    )
+  ) {
     errors.promoType = 'Promo type must be selected.';
   }
 
@@ -255,7 +267,24 @@ function validateAdminPayload(payload, { existingCode = null, excludePromoId = n
     }
   }
 
-  if (appliesTo === APPLIES_TO.SELECTED_PRODUCTS && (!productIds || productIds.length === 0)) {
+  // Free Installation is intended for specific catalog products
+  const resolvedAppliesTo =
+    promoType === PROMO_TYPES.FREE_INSTALLATION
+      ? APPLIES_TO.SELECTED_PRODUCTS
+      : appliesTo;
+  if (
+    promoType === PROMO_TYPES.FREE_INSTALLATION &&
+    appliesTo !== APPLIES_TO.SELECTED_PRODUCTS &&
+    (!productIds || productIds.length === 0)
+  ) {
+    errors.appliesTo = 'Free Installation promos must target selected products.';
+  }
+
+  if (
+    (appliesTo === APPLIES_TO.SELECTED_PRODUCTS ||
+      promoType === PROMO_TYPES.FREE_INSTALLATION) &&
+    (!productIds || productIds.length === 0)
+  ) {
     errors.productIds = 'Select at least one product for this promo.';
   }
 
@@ -281,16 +310,27 @@ function validateAdminPayload(payload, { existingCode = null, excludePromoId = n
     }
   }
 
+  const imageUrl = String(
+    payload.imageUrl || payload.image_url || payload.bannerImage || payload.banner_image || ''
+  ).trim();
+
   return {
     valid: Object.keys(errors).length === 0,
     errors,
     normalized: {
       code,
       promoType,
-      appliesTo,
-      productIds: appliesTo === APPLIES_TO.SELECTED_PRODUCTS ? [...new Set(productIds.map(String))] : [],
-      discountPercent: promoType === PROMO_TYPES.FREE_SHIPPING ? 0 : discountPercent,
+      appliesTo: resolvedAppliesTo,
+      productIds:
+        resolvedAppliesTo === APPLIES_TO.SELECTED_PRODUCTS
+          ? [...new Set(productIds.map(String))]
+          : [],
+      discountPercent:
+        promoType === PROMO_TYPES.FREE_SHIPPING || promoType === PROMO_TYPES.FREE_INSTALLATION
+          ? 0
+          : discountPercent,
       description: String(payload.description || '').trim(),
+      imageUrl,
       startDate: toIsoDateStart(startDate),
       endDate: toIsoDateEnd(endDate),
       usageLimit:
@@ -338,6 +378,8 @@ function calculatePromoImpact(promo, cartItems = [], shippingFee = 0) {
   let shippingDiscount = 0;
   let freeShipping = false;
 
+  let freeInstallation = false;
+
   if (promo.promoType === PROMO_TYPES.PERCENT_OFF) {
     const pct = Math.min(100, Math.max(0, Number(promo.discountPercent || 0)));
     productDiscount = (eligibleSubtotal * pct) / 100;
@@ -346,6 +388,8 @@ function calculatePromoImpact(promo, cartItems = [], shippingFee = 0) {
       freeShipping = true;
       shippingDiscount = Math.max(0, Number(shippingFee || 0));
     }
+  } else if (promo.promoType === PROMO_TYPES.FREE_INSTALLATION) {
+    freeInstallation = eligible.length > 0;
   }
 
   return {
@@ -356,6 +400,7 @@ function calculatePromoImpact(promo, cartItems = [], shippingFee = 0) {
     productDiscount,
     shippingDiscount,
     freeShipping,
+    freeInstallation,
     discountPercent:
       promo.promoType === PROMO_TYPES.PERCENT_OFF ? Number(promo.discountPercent || 0) : 0,
   };
@@ -384,7 +429,7 @@ export const promoService = {
         const { data, error } = await client
           .from('promos')
           .select(
-            'promo_id,code,discount_percent,description,is_active,status,usage_limit,used_count,start_date,end_date,promo_type,applies_to,minimum_order_amount,created_at,updated_at'
+            'promo_id,code,discount_percent,description,image_url,is_active,status,usage_limit,used_count,start_date,end_date,promo_type,applies_to,minimum_order_amount,created_at,updated_at'
           )
           .order('created_at', { ascending: false });
 
@@ -462,7 +507,10 @@ export const promoService = {
           n.description ||
           (n.promoType === PROMO_TYPES.FREE_SHIPPING
             ? 'Free Shipping Promo'
-            : `${n.discountPercent}% OFF`),
+            : n.promoType === PROMO_TYPES.FREE_INSTALLATION
+              ? 'Free Installation Promo'
+              : `${n.discountPercent}% OFF`),
+        image_url: n.imageUrl || null,
         applies_to: n.appliesTo,
         start_date: n.startDate || new Date().toISOString(),
         end_date: n.endDate,
@@ -487,6 +535,7 @@ export const promoService = {
             promo_type: newPromo.promoType,
             discount_percent: newPromo.discountPercent,
             description: newPromo.description,
+            image_url: newPromo.imageUrl || null,
             applies_to: newPromo.appliesTo,
             start_date: newPromo.startDate || new Date().toISOString(),
             end_date: newPromo.endDate,
@@ -546,6 +595,12 @@ export const promoService = {
     const mergedPayload = {
       code: updates.code ?? existing.code,
       description: updates.description ?? existing.description,
+      imageUrl:
+        updates.imageUrl !== undefined
+          ? updates.imageUrl
+          : updates.image_url !== undefined
+            ? updates.image_url
+            : existing.imageUrl,
       promoType: updates.promoType ?? updates.promo_type ?? existing.promoType,
       discountPercent:
         updates.discountPercent ?? updates.discount_percent ?? existing.discountPercent,
@@ -591,7 +646,10 @@ export const promoService = {
           n.description ||
           (n.promoType === PROMO_TYPES.FREE_SHIPPING
             ? 'Free Shipping Promo'
-            : `${n.discountPercent}% OFF`),
+            : n.promoType === PROMO_TYPES.FREE_INSTALLATION
+              ? 'Free Installation Promo'
+              : `${n.discountPercent}% OFF`),
+        image_url: n.imageUrl !== undefined ? n.imageUrl : existing.imageUrl,
         applies_to: n.appliesTo,
         start_date: n.startDate || existing.startDate,
         end_date: n.endDate,
@@ -657,6 +715,7 @@ export const promoService = {
             promo_type: next.promoType,
             discount_percent: next.discountPercent,
             description: next.description,
+            image_url: next.imageUrl || null,
             applies_to: next.appliesTo,
             start_date: next.startDate || existing.startDate || new Date().toISOString(),
             end_date: next.endDate,
@@ -779,7 +838,9 @@ export const promoService = {
         ? match.appliesTo === APPLIES_TO.SELECTED_PRODUCTS
           ? 'Promo applied successfully. Free Shipping applied to eligible products.'
           : 'Promo applied successfully.'
-        : 'Promo applied successfully.';
+        : match.promoType === PROMO_TYPES.FREE_INSTALLATION
+          ? 'Promo applied successfully. Installation fee waived for eligible products.'
+          : 'Promo applied successfully.';
 
     return {
       valid: true,
@@ -793,6 +854,7 @@ export const promoService = {
       productDiscount: impact.productDiscount,
       shippingDiscount: impact.shippingDiscount,
       isFreeShipping: impact.freeShipping,
+      isFreeInstallation: impact.freeInstallation,
       eligibleCount: impact.eligibleCount,
       message: successMessage,
     };
@@ -868,5 +930,58 @@ export const promoService = {
     const fakeCart = [{ product: { id: pid, product_id: pid, price: 1 }, quantity: 1 }];
     const match = await this.findApplicableFreeShipping(fakeCart, 150);
     return Boolean(match);
+  },
+
+  /**
+   * Find an active FREE_INSTALLATION promo for the given product IDs.
+   * Used when booking AI install / customization services.
+   */
+  async findApplicableFreeInstallation(productIds = []) {
+    const ids = [...new Set((productIds || []).map(String).filter(Boolean))];
+    if (!ids.length) return null;
+
+    const cartItems = ids.map((pid) => ({
+      product: { id: pid, product_id: pid, price: 1 },
+      quantity: 1,
+    }));
+
+    const promos = await this.getPromos({ force: false });
+    const installPromos = (promos || []).filter(
+      (p) => p.isActive && p.promoType === PROMO_TYPES.FREE_INSTALLATION
+    );
+
+    for (const promo of installPromos) {
+      const dateCheck = isWithinDateWindow(promo);
+      if (!dateCheck.ok) continue;
+      if (
+        promo.usageLimit != null &&
+        Number.isFinite(Number(promo.usageLimit)) &&
+        Number(promo.usageCount || 0) >= Number(promo.usageLimit)
+      ) {
+        continue;
+      }
+      const impact = calculatePromoImpact(promo, cartItems, 0);
+      if (impact.freeInstallation && impact.eligibleCount > 0) {
+        return {
+          valid: true,
+          promoId: promo.promo_id,
+          code: promo.code,
+          description: promo.description,
+          promoType: promo.promoType,
+          productIds: promo.productIds || [],
+          isFreeInstallation: true,
+          eligibleCount: impact.eligibleCount,
+          message: 'Free installation applies to this product.',
+        };
+      }
+    }
+    return null;
+  },
+
+  async productHasActiveFreeInstallation(productId) {
+    const pid = String(productId || '').trim();
+    if (!pid) return false;
+    const match = await this.findApplicableFreeInstallation([pid]);
+    return Boolean(match?.isFreeInstallation);
   },
 };

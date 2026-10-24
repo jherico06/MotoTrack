@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { wishlistService } from '../services/products/wishlistService.js';
 import { useAuth } from './AuthContext.jsx';
 
@@ -7,19 +7,38 @@ const WishlistContext = createContext(null);
 export function WishlistProvider({ children }) {
   const { currentUser } = useAuth();
   const [wishlist, setWishlist] = useState({});
+  const [customizations, setCustomizations] = useState([]);
 
-  const syncWishlist = (userId) => {
-    const ids = wishlistService.getWishlistIds(userId || 'guest');
+  const applyState = useCallback((state) => {
     const map = {};
-    ids.forEach((id) => {
+    (state?.productIds || []).forEach((id) => {
       map[id] = true;
     });
     setWishlist(map);
-  };
+    setCustomizations(state?.customizations || []);
+  }, []);
+
+  const syncWishlist = useCallback(
+    async (userId) => {
+      const uid = userId || currentUser?.id || 'guest';
+      // Local first for instant UI
+      applyState(wishlistService.getWishlistState(uid));
+      // Then merge remote (AI installs survive refresh / new tabs)
+      if (uid && uid !== 'guest') {
+        try {
+          const remote = await wishlistService.hydrateFromRemote(uid);
+          applyState(remote);
+        } catch (e) {
+          console.warn('[WishlistContext] hydrate failed:', e?.message || e);
+        }
+      }
+    },
+    [applyState, currentUser?.id]
+  );
 
   useEffect(() => {
     syncWishlist(currentUser?.id || 'guest');
-  }, [currentUser]);
+  }, [currentUser?.id, syncWishlist]);
 
   const toggleWishlist = (productId) => {
     const res = wishlistService.toggleWishlist(currentUser?.id || 'guest', productId);
@@ -46,25 +65,53 @@ export function WishlistProvider({ children }) {
     }));
   };
 
+  const addCustomizationToWishlist = (payload) => {
+    const uid = currentUser?.id || 'guest';
+    const res = wishlistService.addCustomizationToWishlist(uid, payload);
+    if (res?.success) {
+      applyState(wishlistService.getWishlistState(uid));
+    }
+    return res;
+  };
+
+  const removeCustomizationFromWishlist = (customizationId) => {
+    const uid = currentUser?.id || 'guest';
+    const res = wishlistService.removeCustomizationFromWishlist(uid, customizationId);
+    applyState(wishlistService.getWishlistState(uid));
+    return res;
+  };
+
   const clearWishlist = () => {
     wishlistService.clearWishlist(currentUser?.id || 'guest');
     setWishlist({});
+    setCustomizations([]);
   };
 
   const isWishlisted = (productId) => Boolean(wishlist[productId]);
 
+  const isCustomizationWishlisted = (customizationId) =>
+    wishlistService.isCustomizationWishlisted(
+      currentUser?.id || 'guest',
+      customizationId
+    );
+
   const wishlistCount = useMemo(() => {
-    return Object.values(wishlist).filter(Boolean).length;
-  }, [wishlist]);
+    const productCount = Object.values(wishlist).filter(Boolean).length;
+    return productCount + (customizations?.length || 0);
+  }, [wishlist, customizations]);
 
   const value = {
     wishlist,
+    customizations,
     wishlistCount,
     toggleWishlist,
     addToWishlist,
     removeFromWishlist,
+    addCustomizationToWishlist,
+    removeCustomizationFromWishlist,
     clearWishlist,
     isWishlisted,
+    isCustomizationWishlisted,
     syncWishlist,
   };
 

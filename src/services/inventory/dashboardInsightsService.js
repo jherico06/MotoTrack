@@ -65,6 +65,152 @@ function isValidOrder(order) {
   return !EXCLUDED.has(status);
 }
 
+/** Revenue and averages include only non-cancelled, non-refunded orders. */
+export function isRecognizedSalesOrder(order) {
+  return isValidOrder(order);
+}
+
+export function recognizedOrderAmount(order) {
+  return isValidOrder(order) ? orderRevenue(order) : 0;
+}
+
+function startOfLocalWeek(date) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+function localWeekKey(date) {
+  const monday = startOfLocalWeek(date);
+  const yearStart = new Date(monday.getFullYear(), 0, 1);
+  const week = Math.floor((monday - yearStart) / (7 * 24 * 60 * 60 * 1000)) + 1;
+  return `${monday.getFullYear()}-W${String(Math.max(1, week)).padStart(2, '0')}`;
+}
+
+/**
+ * Local-calendar weekly orders, revenue, and average order value.
+ * Cancelled and refunded orders are excluded.
+ */
+export function computeWeeklyKpiSeries(orders = [], weeks = 8) {
+  const count = Math.max(1, Number(weeks) || 8);
+  const buckets = [];
+  const thisMonday = startOfLocalWeek(new Date());
+  for (let i = count - 1; i >= 0; i -= 1) {
+    const d = new Date(thisMonday);
+    d.setDate(d.getDate() - i * 7);
+    buckets.push({ key: localWeekKey(d), orders: 0, revenue: 0, aov: 0 });
+  }
+  const index = new Map(buckets.map((bucket, i) => [bucket.key, i]));
+  (orders || []).forEach((order) => {
+    if (!isValidOrder(order)) return;
+    const dated = orderDate(order);
+    if (!dated) return;
+    const slot = index.get(localWeekKey(dated));
+    if (slot == null) return;
+    buckets[slot].orders += 1;
+    buckets[slot].revenue += orderRevenue(order);
+  });
+  buckets.forEach((bucket) => {
+    bucket.aov = bucket.orders > 0 ? bucket.revenue / bucket.orders : 0;
+  });
+  return buckets;
+}
+
+function recordedLineCost(item, product) {
+  const raw =
+    item?.unit_cost != null && item.unit_cost !== ''
+      ? item.unit_cost
+      : (product?.unit_cost ?? product?.unitCost ?? product?.cost_price ?? 0);
+  const cost = Number(raw);
+  return Number.isFinite(cost) ? cost : 0;
+}
+
+/** Weekly recognized profit: order total minus recorded line cost. */
+export function computeWeeklyProfitSeries(orders = [], products = [], weeks = 8) {
+  const buckets = computeWeeklyKpiSeries(orders, weeks).map((bucket) => ({
+    ...bucket,
+    profit: bucket.revenue,
+  }));
+  const index = new Map(buckets.map((bucket, i) => [bucket.key, i]));
+  const productMap = new Map();
+  (products || []).forEach((product) => {
+    const id = product?.product_id || product?.id;
+    if (id) productMap.set(String(id), product);
+  });
+  (orders || []).forEach((order) => {
+    if (!isValidOrder(order)) return;
+    const dated = orderDate(order);
+    if (!dated) return;
+    const slot = index.get(localWeekKey(dated));
+    if (slot == null) return;
+    const items = Array.isArray(order.items) ? order.items : [];
+    items.forEach((item) => {
+      const qty = Number(item.quantity || 1);
+      const product = productMap.get(String(item.product_id || item.id || ''));
+      buckets[slot].profit -= recordedLineCost(item, product) * (Number.isFinite(qty) ? qty : 0);
+    });
+  });
+  return buckets;
+}
+
+/** SVG path for a KPI sparkline. Empty when every point is zero. */
+export function sparklinePath(values, width = 100, height = 20) {
+  const nums = (values || []).map((value) => Number(value) || 0);
+  if (!nums.length || nums.every((value) => value === 0)) return '';
+  const max = Math.max(...nums);
+  const min = Math.min(...nums);
+  const span = Math.max(max - min, 1);
+  return nums
+    .map((value, index) => {
+      const x = nums.length === 1 ? width / 2 : (index / (nums.length - 1)) * (width - 4) + 2;
+      const y = height - 3 - ((value - min) / span) * (height - 6);
+      return `${index === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+    })
+    .join(' ');
+}
+
+/**
+ * Inventory KPIs. Value is stock × recorded unit cost.
+ * Archived, deleted, and inactive products are omitted.
+ */
+export function computeInventoryKpis(products = []) {
+  const eligible = (products || []).filter((product) => {
+    const status = String(product?.status || 'active').toLowerCase();
+    return status !== 'archived' && status !== 'deleted' && status !== 'inactive';
+  });
+  let inStockCount = 0;
+  let lowStockCount = 0;
+  let outOfStockCount = 0;
+  let totalUnits = 0;
+  let totalValue = 0;
+  let retailValue = 0;
+
+  eligible.forEach((product) => {
+    const stock = Number(product?.stock ?? product?.stock_quantity ?? 0);
+    const price = Number(product?.price || 0);
+    const costRaw = product?.unit_cost ?? product?.unitCost ?? product?.cost_price;
+    const cost = Number(costRaw);
+    totalUnits += Number.isFinite(stock) ? stock : 0;
+    retailValue += price * (Number.isFinite(stock) ? stock : 0);
+    totalValue += (Number.isFinite(cost) ? cost : 0) * (Number.isFinite(stock) ? stock : 0);
+    if (isOutOfStock(product)) outOfStockCount += 1;
+    else if (isLowStock(product, 5)) lowStockCount += 1;
+    else inStockCount += 1;
+  });
+
+  return {
+    totalSkus: eligible.length,
+    inStockCount,
+    lowStockCount,
+    outOfStockCount,
+    totalUnits,
+    totalValue,
+    retailValue,
+  };
+}
+
 function startOfDay(d) {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
@@ -212,7 +358,12 @@ export function computeInventoryHealth(products = []) {
   let out = 0;
   let overstocked = 0;
 
-  (products || []).forEach((p) => {
+  const eligible = (products || []).filter((p) => {
+    const status = String(p?.status || 'active').toLowerCase();
+    return status !== 'archived' && status !== 'deleted' && status !== 'inactive';
+  });
+
+  eligible.forEach((p) => {
     const stock = Number(p.stock ?? p.stock_quantity ?? 0);
     const reorder = resolveReorderLevel(p, 5);
     if (stock <= 0) {
@@ -236,7 +387,7 @@ export function computeInventoryHealth(products = []) {
     low,
     out,
     overstocked,
-    total: (products || []).length,
+    total: eligible.length,
   };
 }
 
@@ -456,37 +607,9 @@ export function computeRestockRecommendations(orders = [], products = [], { limi
  * Real weekly sparkline points from orders (replaces hardcoded SVG paths).
  */
 export function computeRevenueSparkline(orders = [], weeks = 12) {
-  const weekBuckets = new Map();
-  const now = new Date();
-  for (let i = weeks - 1; i >= 0; i -= 1) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i * 7));
-    const day = d.getUTCDay();
-    const diff = day === 0 ? -6 : 1 - day;
-    d.setUTCDate(d.getUTCDate() + diff);
-    const key = `${d.getUTCFullYear()}-W${String(
-      Math.floor((d - new Date(Date.UTC(d.getUTCFullYear(), 0, 1))) / (7 * 24 * 60 * 60 * 1000)) + 1
-    ).padStart(2, '0')}`;
-    weekBuckets.set(key, 0);
-  }
-  (orders || []).forEach((o) => {
-    if (!isValidOrder(o)) return;
-    const d = orderDate(o);
-    if (!d) return;
-    const day = d.getUTCDay();
-    const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-    const diff = day === 0 ? -6 : 1 - day;
-    monday.setUTCDate(monday.getUTCDate() + diff);
-    const key = `${monday.getUTCFullYear()}-W${String(
-      Math.floor(
-        (monday - new Date(Date.UTC(monday.getUTCFullYear(), 0, 1))) / (7 * 24 * 60 * 60 * 1000)
-      ) + 1
-    ).padStart(2, '0')}`;
-    if (!weekBuckets.has(key)) return;
-    weekBuckets.set(key, (weekBuckets.get(key) || 0) + orderRevenue(o));
-  });
-  const bars = Array.from(weekBuckets.values());
-  const max = Math.max(...bars, 1);
-  return { bars, max, hasData: bars.some((v) => v > 0) };
+  const bars = computeWeeklyKpiSeries(orders, weeks).map((bucket) => bucket.revenue);
+  const max = Math.max(...bars, 0);
+  return { bars, max: max || 1, hasData: bars.some((value) => value > 0) };
 }
 
 /**

@@ -436,7 +436,7 @@ export default function AdminPinLockScreen({
               <BootstrapIcon
                 name={isLockedOut ? 'lock-fill' : 'shield-lock-fill'}
                 size={32}
-                color={isLockedOut ? '#DC2626' : '#1D4533'}
+                color={isLockedOut ? '#DC2626' : '#EA580C'}
               />
             </View>
           </Animated.View>
@@ -601,7 +601,7 @@ export default function AdminPinLockScreen({
               }}
               activeOpacity={0.7}
             >
-              <BootstrapIcon name="question-circle-fill" size={13} color="#1D4533" />
+              <BootstrapIcon name="question-circle-fill" size={13} color="#EA580C" />
               <Text style={styles.changePinLinkText}>Forgot PIN?</Text>
             </TouchableOpacity>
 
@@ -758,7 +758,7 @@ export default function AdminPinLockScreen({
               <View style={styles.changePinModalHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={styles.changePinIconWrap}>
-                    <BootstrapIcon name="shield-lock" size={18} color="#1D4533" />
+                    <BootstrapIcon name="shield-lock" size={18} color="#EA580C" />
                   </View>
                   <View>
                     <Text style={styles.changePinModalTitle}>Change Security PIN</Text>
@@ -927,7 +927,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981',
   },
   supabaseBadgeText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 11.5,
     fontWeight: '800',
   },
@@ -941,7 +941,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#C8DDD3',
     marginBottom: 14,
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
@@ -1023,13 +1023,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pinSlotFilled: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#F3F7F6',
   },
   pinSlotActive: {
-    borderColor: '#1D4533',
+    borderColor: '#EA580C',
     backgroundColor: '#F3F7F6',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
@@ -1038,7 +1038,7 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   pinDotEmpty: {
     width: 8,
@@ -1049,7 +1049,7 @@ const styles = StyleSheet.create({
   pinDigitText: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   revealEyeBtn: {
     padding: 8,
@@ -1068,12 +1068,12 @@ const styles = StyleSheet.create({
     borderColor: '#C8DDD3',
   },
   attemptsIndicatorText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 11.5,
     fontWeight: '700',
   },
   unlockBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1082,7 +1082,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 14,
     marginBottom: 16,
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 10,
@@ -1110,7 +1110,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   changePinLinkText: {
-    color: '#1D4533',
+    color: '#EA580C',
     fontSize: 12.5,
     fontWeight: '800',
   },
@@ -1204,7 +1204,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 18,
     borderRadius: 12,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   modalSaveText: {
     color: '#FFFFFF',

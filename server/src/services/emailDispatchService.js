@@ -69,7 +69,7 @@ async function sendViaSmtp({ to, subject, html }) {
     host,
     port: Number(process.env.SMTP_PORT || 465),
     secure: String(process.env.SMTP_SECURE || 'true') !== 'false',
-    auth: { user, pass },
+    auth: { user, pass: (pass || '').replace(/\s+/g, '') },
   });
 
   const from = process.env.EMAIL_FROM || `MotoTrack <${user}>`;

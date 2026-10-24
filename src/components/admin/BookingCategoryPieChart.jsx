@@ -488,9 +488,9 @@ export default function BookingCategoryPieChart({
               bottom: 3,
               left: 3,
               width: 'calc((100% - 6px) / 3)',
-              backgroundColor: '#0F172A',
+              backgroundColor: '#EA580C',
               borderRadius: 6,
-              boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+              boxShadow: '0 1px 4px rgba(234, 88, 12, 0.35)',
               transition: 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)',
               transform:
                 filterMode === 'all'

@@ -96,7 +96,7 @@ export function canonicalizeStatus(status) {
   if (s === 'delivery failed' || s === 'delivery issue' || s === 'failed') return ORDER_STATUSES.FAILED;
   if (s === 'rescheduled') return ORDER_STATUSES.RESCHEDULED;
   if (s === 'delivered' || s === 'completed') return ORDER_STATUSES.DELIVERED;
-  if (s === 'cancelled') return ORDER_STATUSES.CANCELLED;
+  if (s === 'cancelled' || s === 'canceled') return ORDER_STATUSES.CANCELLED;
   if (s === 'return requested') return ORDER_STATUSES.RETURN_REQUESTED;
   if (s === 'refunded') return ORDER_STATUSES.REFUNDED;
   return String(status || '').trim();
@@ -306,187 +306,10 @@ function orderBelongsToUser(order, user) {
   return false;
 }
 
-const INITIAL_DEMO_ORDERS = [
-  {
-    order_id: 'ORD-ON-2026-00001',
-    id: 'ORD-ON-2026-00001',
-    customer_id: 'cust-02',
-    customer_name: 'Carlos Mendoza',
-    customer_phone: '+63 (918) 723-9014',
-    customer_address: 'Blk 12 Lot 4, Silvercrest Homes, Taguig City, Metro Manila',
-    delivery_notes: 'Please call 10 mins before arrival. Prepare change for ₱70,000.',
-    payment_method: 'Cash on Delivery (COD)',
-    cod_change_for: '70000',
-    total_amount: 68500.0,
-    discount_amount: 0.0,
-    grand_total: 68500.0,
-    items_summary: 'Öhlins TTX GP Rear Shock Absorber (x1)',
-    items_count: 1,
-    status: 'Pending Approval',
-    channel: 'Online Store',
-    created_at: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    order_date: 'Today, 10:15 AM',
-    estimated_delivery: 'Today (Awaiting Verification)',
-    tracking_number: 'MOTO-TRK-9104882',
-    courier: 'MotoTrack Express SuperAir',
-    items: [
-      {
-        product_id: 'prod-03',
-        name: 'Öhlins TTX GP Rear Shock Absorber',
-        brand: 'Öhlins',
-        category: 'Suspension',
-        quantity: 1,
-        price: 68500.0,
-        image: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
-      },
-    ],
-  },
-  {
-    order_id: 'ORD-ON-2026-00002',
-    id: 'ORD-ON-2026-00002',
-    customer_id: 'cust-03',
-    customer_name: 'Dave Bautista',
-    customer_phone: '+63 (927) 419-8821',
-    customer_address: 'Unit 8B Tower 2, Pioneer Woodlands, Mandaluyong City',
-    delivery_notes: 'Leave with lobby reception if unavailable.',
-    payment_method: 'Cash on Delivery (COD)',
-    cod_change_for: '30000',
-    total_amount: 27450.0,
-    discount_amount: 500.0,
-    grand_total: 26950.0,
-    items_summary: 'Brembo 19RCS Corsa Corta (x1), D.I.D 520VR46 Gold Chain (x1)',
-    items_count: 2,
-    status: 'Pending Approval',
-    channel: 'Online Store',
-    created_at: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    order_date: 'Today, 09:30 AM',
-    estimated_delivery: 'Today (Awaiting Verification)',
-    tracking_number: 'MOTO-TRK-9052119',
-    courier: 'MotoTrack Express SuperAir',
-    items: [
-      {
-        product_id: 'prod-02',
-        name: 'Brembo 19RCS Corsa Corta Radial Master Cylinder',
-        brand: 'Brembo',
-        category: 'Brakes',
-        quantity: 1,
-        price: 18500.0,
-        image: 'https://images.unsplash.com/photo-1609630875171-b1321377ee65?auto=format&fit=crop&w=800&q=80',
-      },
-      {
-        product_id: 'prod-05',
-        name: 'D.I.D 520VR46 Rossi Edition Gold X-Ring Chain',
-        brand: 'D.I.D',
-        category: 'Transmission',
-        quantity: 1,
-        price: 8950.0,
-        image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
-      },
-    ],
-  },
-  {
-    order_id: 'ORD-ON-2026-00003',
-    id: 'ORD-ON-2026-00003',
-    customer_id: 'cust-04',
-    customer_name: 'Samantha Cruz',
-    customer_phone: '+63 (917) 832-1145',
-    customer_address: '14 Acacia Ave, Ayala Alabang Village, Muntinlupa',
-    delivery_notes: 'Fragile carbon helmet. Handle with care.',
-    payment_method: 'GCash',
-    gcash_reference: 'MP-GCASH-981442',
-    total_amount: 85000.0,
-    discount_amount: 2500.0,
-    grand_total: 82500.0,
-    items_summary: 'AGV Pista GP RR Full Carbon Track Helmet (x1)',
-    items_count: 1,
-    status: 'Processing',
-    channel: 'Online Store',
-    created_at: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-    order_date: 'Today, 07:15 AM',
-    estimated_delivery: 'In 1-2 Business Days',
-    tracking_number: 'MOTO-TRK-8975412',
-    courier: 'MotoTrack Express SuperAir',
-    items: [
-      {
-        product_id: 'prod-06',
-        name: 'AGV Pista GP RR Full Carbon Track Helmet',
-        brand: 'AGV',
-        category: 'Accessories',
-        quantity: 1,
-        price: 85000.0,
-        image: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
-      },
-    ],
-  },
-  {
-    order_id: 'ORD-ON-2026-00004',
-    id: 'ORD-ON-2026-00004',
-    customer_id: 'cust-01',
-    customer_name: 'Alex Rider',
-    customer_phone: '+63 (917) 582-9410',
-    customer_address: '742 Evergreen Terrace, Pasig City, Metro Manila',
-    payment_method: 'Credit Card / Apple Pay',
-    total_amount: 59500.0,
-    discount_amount: 1500.0,
-    grand_total: 58000.0,
-    items_summary: 'Akrapovič Titanium Slip-On Racing Exhaust (x1)',
-    items_count: 1,
-    status: 'Out for Delivery',
-    channel: 'Online Store',
-    created_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-    order_date: 'Yesterday',
-    estimated_delivery: 'Today (Out for Delivery)',
-    tracking_number: 'MOTO-TRK-7891024',
-    courier: 'MotoTrack Express SuperAir',
-    items: [
-      {
-        product_id: 'prod-01',
-        name: 'Akrapovič Titanium Slip-On Racing Exhaust',
-        brand: 'Akrapovič',
-        category: 'Exhaust',
-        quantity: 1,
-        price: 59500.0,
-        image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
-      },
-    ],
-  },
-  {
-    order_id: 'ORD-ON-2026-00005',
-    id: 'ORD-ON-2026-00005',
-    customer_id: 'cust-05',
-    customer_name: 'Miguel Tan',
-    customer_phone: '+63 (905) 124-7789',
-    customer_address: '88 Katipunan Ave, Loyola Heights, Quezon City',
-    payment_method: 'Cash on Delivery (COD)',
-    total_amount: 24000.0,
-    discount_amount: 0.0,
-    grand_total: 24000.0,
-    items_summary: 'Dynojet Power Commander V Fuel & Ignition (x1)',
-    items_count: 1,
-    status: 'Delivered',
-    channel: 'Online Store',
-    created_at: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString(),
-    order_date: 'Aug 21, 2026',
-    estimated_delivery: 'Delivered Aug 22, 2026',
-    tracking_number: 'MOTO-TRK-8710554',
-    courier: 'MotoTrack Express SuperAir',
-    items: [
-      {
-        product_id: 'prod-04',
-        name: 'Dynojet Power Commander V Fuel & Ignition',
-        brand: 'Dynojet',
-        category: 'Engine',
-        quantity: 1,
-        price: 24000.0,
-        image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80',
-      },
-    ],
-  },
-];
-
 class OrderService {
   constructor() {
     this.listeners = new Set();
+    this._approvingCodOrders = new Set();
     this.initLocalStorage();
   }
 
@@ -904,7 +727,7 @@ class OrderService {
         let query = client
           .from('orders')
           .select(
-            'order_id,customer_id,customer_name,customer_phone,customer_address,delivery_notes,payment_method,total_amount,discount_amount,shipping_fee,grand_total,items_summary,items_count,status,channel,created_at,updated_at,estimated_delivery,tracking_number,courier,cancel_reason,return_status,return_reason,return_notes,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,customers(user_id,name,email,contact_number),order_items(order_item_id,product_id,quantity,cost,size,unit_cost,products(product_id,id,name,brand,price,categories(name))),order_deliveries(delivery_id,order_id,rider_id,rider_name,rider_contact,vehicle_info,delivery_status,delivery_notes,expected_delivery_at,expected_delivery_end_at,shipping_fee,rider_earning,rider_earning_credited,rider_earning_credited_at,rider_reported_delivered,rider_reported_at,rider_reported_by,rider_report_notes,admin_confirmed,admin_confirmed_at,confirmed_by_admin,admin_confirmed_reason,delivered_at,token_verified,confirmation_token_used_at,proof_uploaded_by,proof_uploaded_at,updated_at,created_at,customer_confirmed,customer_confirmed_at,riders(id,name,phone,vehicle_info,plate_number,status))'
+            'order_id,customer_id,customer_name,customer_phone,customer_email,customer_address,delivery_notes,payment_method,total_amount,discount_amount,shipping_fee,grand_total,items_summary,items_count,status,channel,created_at,updated_at,estimated_delivery,tracking_number,courier,cancel_reason,return_status,return_reason,return_notes,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,cod_approval_email_sent,cod_approval_email_at,cod_approval_email_status,cod_approval_email_error,cod_approval_email_recipient,customers(user_id,name,email,contact_number),order_items(order_item_id,product_id,quantity,cost,size,unit_cost,products(product_id,id,name,brand,price,categories(name))),order_deliveries(delivery_id,order_id,rider_id,rider_name,rider_contact,vehicle_info,delivery_status,delivery_notes,expected_delivery_at,expected_delivery_end_at,shipping_fee,rider_earning,rider_earning_credited,rider_earning_credited_at,rider_reported_delivered,rider_reported_at,rider_reported_by,rider_report_notes,admin_confirmed,admin_confirmed_at,confirmed_by_admin,admin_confirmed_reason,delivered_at,token_verified,confirmation_token_used_at,proof_uploaded_by,proof_uploaded_at,updated_at,created_at,customer_confirmed,customer_confirmed_at,riders(id,name,phone,vehicle_info,plate_number,status))'
           )
           .order('created_at', { ascending: false })
           .limit(150);
@@ -956,6 +779,7 @@ class OrderService {
               customer_id: o.customer_id,
               customer_name: o.customer_name,
               customer_phone: o.customer_phone,
+              customer_email: o.customer_email || o.customers?.email || null,
               customer_address: o.customer_address,
               delivery_notes: o.delivery_notes,
               payment_method: o.payment_method || 'Cash on Delivery (COD)',
@@ -1007,6 +831,11 @@ class OrderService {
               admin_confirmed: Boolean(deliveryRow?.admin_confirmed),
               admin_confirmed_at: deliveryRow?.admin_confirmed_at || null,
               admin_confirmed_reason: deliveryRow?.admin_confirmed_reason || '',
+              cod_approval_email_sent: Boolean(o.cod_approval_email_sent),
+              cod_approval_email_at: o.cod_approval_email_at || null,
+              cod_approval_email_status: o.cod_approval_email_status || null,
+              cod_approval_email_error: o.cod_approval_email_error || null,
+              cod_approval_email_recipient: o.cod_approval_email_recipient || null,
             };
           });
         }
@@ -1182,6 +1011,7 @@ class OrderService {
     customerId = null,
     customerName,
     customerPhone,
+    customerEmail = null,
     customerAddress,
     deliveryNotes = '',
     paymentMethod,
@@ -1283,6 +1113,13 @@ class OrderService {
     const itemsSummary = normalizedItems.map((i) => `${i.name} (x${i.quantity})`).join(', ');
     const itemsCount = normalizedItems.reduce((sum, i) => sum + (i.quantity || 1), 0);
 
+    const resolvedCustomerEmail = await emailService.resolveCustomerEmail({
+      customerEmail,
+      phone: customerPhone,
+      userId,
+      customerId: resolvedCustomerId || customerId,
+    });
+
     const newOrder = {
       order_id: orderId,
       id: orderId,
@@ -1290,6 +1127,7 @@ class OrderService {
       customer_id: resolvedCustomerId || customerId || null,
       customer_name: customerName,
       customer_phone: customerPhone,
+      customer_email: resolvedCustomerEmail || null,
       customer_address: customerAddress,
       delivery_notes: deliveryNotes,
       delivery_landmark: deliveryNotes || '',
@@ -1354,6 +1192,14 @@ class OrderService {
           totalAmount: newOrder.grand_total,
           paymentMethod: newOrder.payment_method,
         });
+        notificationService.notifyCustomerPaymentConfirmed({
+          userId: newOrder.user_id || newOrder.customer_id,
+          customerEmail: newOrder.customer_email,
+          customerName: newOrder.customer_name,
+          orderId: newOrder.order_id,
+          totalAmount: newOrder.grand_total,
+          paymentMethod: newOrder.payment_method,
+        });
       }
     } catch (_notifErr) {
       console.warn('[OrderService] Order notification failed:', _notifErr);
@@ -1393,6 +1239,7 @@ class OrderService {
       promo_id: promoId || null,
       customer_name: customerName,
       customer_phone: customerPhone,
+      customer_email: resolvedCustomerEmail || null,
       customer_address: customerAddress,
       delivery_notes: deliveryNotes,
       delivery_landmark: deliveryNotes || null,
@@ -1538,7 +1385,7 @@ class OrderService {
     try {
       await emailService.sendOrderConfirmationEmail({
         order: newOrder,
-        customerEmail: customerPhone?.includes('@') ? customerPhone : null,
+        customerEmail: resolvedCustomerEmail,
         customerName,
       });
     } catch (e) {
@@ -1671,116 +1518,339 @@ class OrderService {
   }
 
   /**
+   * Dispatch COD approval email notification, prevent duplicates, and record delivery outcome.
+   * Preserves database order status even if email service encounters an error.
+   */
+  async dispatchCodApprovalEmail(targetOrder) {
+    if (!targetOrder) return { success: false, emailSent: false, error: 'Order not found.' };
+    const orderId = targetOrder.order_id || targetOrder.id;
+
+    if (!isCodPaymentMethod(targetOrder.payment_method)) {
+      return { success: false, emailSent: false, error: 'Not a Cash on Delivery order.' };
+    }
+
+    // Duplicate check: if already sent successfully, do not send again
+    if (targetOrder.cod_approval_email_sent && targetOrder.cod_approval_email_status === 'sent') {
+      console.log(`[OrderService] COD approval email already sent for #${orderId}. Skipping duplicate.`);
+      return {
+        success: true,
+        emailSent: true,
+        skippedDuplicate: true,
+        recipient: targetOrder.cod_approval_email_recipient || targetOrder.customer_email,
+      };
+    }
+
+    const client = supabaseManager.getClient();
+
+    // If order has no items populated in memory, retrieve them from order_items table
+    if ((!targetOrder.items || targetOrder.items.length === 0) && client) {
+      try {
+        const { data: oiData } = await client
+          .from('order_items')
+          .select('*, products(product_id,id,name,product_name,brand,price)')
+          .eq('order_id', orderId);
+        if (Array.isArray(oiData) && oiData.length > 0) {
+          targetOrder.items = oiData.map((oi) => ({
+            product_id: oi.product_id,
+            name: oi.products?.name || oi.products?.product_name || 'Motorcycle Part',
+            brand: oi.products?.brand || 'MotoTrack',
+            quantity: Number(oi.quantity || 1),
+            price: Number(oi.cost || oi.products?.price || 0),
+            subtotal: Number(oi.cost || 0),
+          }));
+        }
+      } catch (_e) {}
+    }
+
+    // Resolve customer email strictly from database records
+    let customerEmail = targetOrder.customer_email;
+    if (!customerEmail && client && targetOrder.customer_id) {
+      try {
+        const { data: custData } = await client
+          .from('customers')
+          .select('email')
+          .eq('customer_id', targetOrder.customer_id)
+          .maybeSingle();
+        if (custData?.email) customerEmail = custData.email;
+      } catch (_e) {}
+    }
+
+    const emailResult = await emailService.sendCodOrderApprovedEmail({
+      order: targetOrder,
+      customerEmail,
+      customerName: targetOrder.customer_name,
+    });
+
+    const nowIso = new Date().toISOString();
+
+    if (emailResult.success && emailResult.dispatched) {
+      targetOrder.cod_approval_email_sent = true;
+      targetOrder.cod_approval_email_at = nowIso;
+      targetOrder.cod_approval_email_status = 'sent';
+      targetOrder.cod_approval_email_recipient = emailResult.recipient;
+      targetOrder.cod_approval_email_error = null;
+
+      if (client) {
+        try {
+          await client
+            .from('orders')
+            .update({
+              cod_approval_email_sent: true,
+              cod_approval_email_at: nowIso,
+              cod_approval_email_status: 'sent',
+              cod_approval_email_recipient: emailResult.recipient,
+              cod_approval_email_error: null,
+            })
+            .eq('order_id', orderId);
+        } catch (dbErr) {
+          console.warn('[OrderService] Could not persist email status to Supabase:', dbErr);
+        }
+      }
+
+      const orders = this.getLocalOrders();
+      this.saveLocalOrders(
+        orders.map((o) =>
+          o.order_id === orderId || o.id === orderId
+            ? {
+                ...o,
+                cod_approval_email_sent: true,
+                cod_approval_email_at: nowIso,
+                cod_approval_email_status: 'sent',
+                cod_approval_email_recipient: emailResult.recipient,
+                cod_approval_email_error: null,
+              }
+            : o
+        )
+      );
+
+      auditLogService.logOrderAction({
+        action: 'COD_APPROVAL_EMAIL_SENT',
+        target: `Order #${orderId}`,
+        details: `Sent Cash on Delivery approval confirmation email to ${emailResult.recipient} for Order #${orderId}.`,
+        severity: 'SUCCESS',
+        metadata: { orderId, recipient: emailResult.recipient },
+      });
+
+      return {
+        success: true,
+        emailSent: true,
+        recipient: emailResult.recipient,
+      };
+    } else {
+      const errorMsg = emailResult.error || 'Email dispatch failed';
+      targetOrder.cod_approval_email_sent = false;
+      targetOrder.cod_approval_email_status = 'failed';
+      targetOrder.cod_approval_email_error = errorMsg;
+
+      if (client) {
+        try {
+          await client
+            .from('orders')
+            .update({
+              cod_approval_email_sent: false,
+              cod_approval_email_status: 'failed',
+              cod_approval_email_error: errorMsg,
+            })
+            .eq('order_id', orderId);
+        } catch (dbErr) {
+          console.warn('[OrderService] Could not persist email failure to Supabase:', dbErr);
+        }
+      }
+
+      const orders = this.getLocalOrders();
+      this.saveLocalOrders(
+        orders.map((o) =>
+          o.order_id === orderId || o.id === orderId
+            ? {
+                ...o,
+                cod_approval_email_sent: false,
+                cod_approval_email_status: 'failed',
+                cod_approval_email_error: errorMsg,
+              }
+            : o
+        )
+      );
+
+      auditLogService.logOrderAction({
+        action: 'COD_APPROVAL_EMAIL_FAILED',
+        target: `Order #${orderId}`,
+        details: `Failed to dispatch COD approval email for Order #${orderId}: ${errorMsg}. Order status remains Approved.`,
+        severity: 'WARNING',
+        metadata: { orderId, error: errorMsg },
+      });
+
+      return {
+        success: true,
+        emailSent: false,
+        emailError: errorMsg,
+      };
+    }
+  }
+
+  /**
    * Admin 1-Click Approve for Cash on Delivery Orders
    */
   async approveCODOrder(orderId) {
-    const orders = this.getLocalOrders();
-    const existing = orders.find((o) => o.order_id === orderId || o.id === orderId);
-    if (!existing) return { success: false, error: 'Order not found.' };
-    if (!isCodPaymentMethod(existing.payment_method)) {
-      return { success: false, error: 'Only Cash on Delivery orders can be approved this way.' };
+    if (this._approvingCodOrders.has(orderId)) {
+      return { success: false, error: 'Approval already in progress for this order.' };
     }
-    const from = canonicalizeStatus(existing.status);
-    if (from === ORDER_STATUSES.PROCESSING) {
-      return { success: true, order: existing };
-    }
-    if (from !== ORDER_STATUSES.PENDING_APPROVAL) {
-      return {
-        success: false,
-        error: `Cannot approve COD while the order is "${existing.status}".`,
-      };
-    }
+    this._approvingCodOrders.add(orderId);
 
-    const nowIso = new Date().toISOString();
-    const client = supabaseManager.getClient();
-    let synced = false;
-    if (client) {
-      try {
-        const { data, error } = await client
-          .from('orders')
-          .update({ status: ORDER_STATUSES.PROCESSING, updated_at: nowIso })
-          .eq('order_id', orderId)
-          .select('order_id');
-        if (!error && Array.isArray(data) && data.length > 0) synced = true;
-        else if (error) console.warn('Supabase approve COD error:', error);
-        try {
-          await client.from('payments').update({ status: 'Completed' }).eq('order_id', orderId);
-        } catch (payErr) {
-          console.warn('[OrderService] COD payment status update failed:', payErr);
-        }
-      } catch (e) {
-        console.warn('Supabase approve COD error:', e);
+    try {
+      const orders = this.getLocalOrders();
+      const existing = orders.find((o) => o.order_id === orderId || o.id === orderId);
+      if (!existing) return { success: false, error: 'Order not found.' };
+      if (!isCodPaymentMethod(existing.payment_method)) {
+        return { success: false, error: 'Only Cash on Delivery orders can be approved this way.' };
       }
-    }
+      const from = canonicalizeStatus(existing.status);
+      if (from === ORDER_STATUSES.PROCESSING) {
+        return { success: true, order: existing, alreadyApproved: true, emailSent: false };
+      }
+      if (from !== ORDER_STATUSES.PENDING_APPROVAL) {
+        return {
+          success: false,
+          error: `Cannot approve COD while the order is "${existing.status}".`,
+        };
+      }
 
-    if (!synced) {
-      this.enqueueOfflineAction({
-        type: 'update_status',
-        orderId,
-        status: ORDER_STATUSES.PROCESSING,
-      });
-    }
+      const nowIso = new Date().toISOString();
+      const client = supabaseManager.getClient();
+      let synced = false;
+      if (client) {
+        try {
+          const { data, error } = await client
+            .from('orders')
+            .update({ status: ORDER_STATUSES.PROCESSING, updated_at: nowIso })
+            .eq('order_id', orderId)
+            .select('order_id');
+          if (!error && Array.isArray(data) && data.length > 0) synced = true;
+          else if (error) console.warn('Supabase approve COD error:', error);
+          try {
+            await client.from('payments').update({ status: 'Completed' }).eq('order_id', orderId);
+          } catch (payErr) {
+            console.warn('[OrderService] COD payment status update failed:', payErr);
+          }
+        } catch (e) {
+          console.warn('Supabase approve COD error:', e);
+        }
+      }
 
-    let targetOrder = null;
-    let found = false;
-    const updated = orders.map((o) => {
-      if (o.order_id === orderId || o.id === orderId) {
-        found = true;
-        targetOrder = {
-          ...o,
+      if (!synced) {
+        this.enqueueOfflineAction({
+          type: 'update_status',
+          orderId,
           status: ORDER_STATUSES.PROCESSING,
-          payment_status: 'Completed',
+        });
+      }
+
+      let targetOrder = null;
+      let found = false;
+      const updated = orders.map((o) => {
+        if (o.order_id === orderId || o.id === orderId) {
+          found = true;
+          targetOrder = {
+            ...o,
+            status: ORDER_STATUSES.PROCESSING,
+            payment_status: 'Completed',
+            cod_approved_at: nowIso,
+            estimated_delivery: 'In 1-2 Business Days (Packing)',
+            updated_at: nowIso,
+          };
+          return targetOrder;
+        }
+        return o;
+      });
+      if (!found) {
+        targetOrder = {
+          order_id: orderId,
+          id: orderId,
+          status: 'Processing',
           cod_approved_at: nowIso,
           estimated_delivery: 'In 1-2 Business Days (Packing)',
           updated_at: nowIso,
+          created_at: nowIso,
         };
-        return targetOrder;
+        updated.unshift(targetOrder);
       }
-      return o;
-    });
-    if (!found) {
-      targetOrder = {
-        order_id: orderId,
-        id: orderId,
-        status: 'Processing',
-        cod_approved_at: nowIso,
-        estimated_delivery: 'In 1-2 Business Days (Packing)',
-        updated_at: nowIso,
-        created_at: nowIso,
+      this.saveLocalOrders(updated);
+
+      // Admin notification & audit log for successful approval
+      try {
+        if (targetOrder) {
+          notificationService.notifyAdminPaymentConfirmed({
+            orderId,
+            customerName: targetOrder.customer_name,
+            totalAmount: targetOrder.grand_total || targetOrder.total_amount || 0,
+            paymentMethod: 'COD (Approved & Verified)',
+          });
+          notificationService.notifyCustomerOrderStatus({
+            userId: targetOrder.user_id || targetOrder.customer_id,
+            customerEmail: targetOrder.customer_email,
+            customerName: targetOrder.customer_name,
+            orderId,
+            status: ORDER_STATUSES.PROCESSING,
+            message: `Your Cash on Delivery Order #${orderId} was approved & verified. We are now preparing and packing your items.`,
+          });
+          auditLogService.logOrderAction({
+            action: 'COD_ORDER_APPROVED',
+            target: `Order #${orderId}`,
+            details: `Admin approved Cash on Delivery order for ${targetOrder.customer_name} (₱${Number(targetOrder.grand_total || targetOrder.total_amount || 0).toLocaleString()}). Queued for warehouse packing.`,
+            severity: 'SUCCESS',
+            metadata: { orderId, customer: targetOrder.customer_name, grand_total: targetOrder.grand_total },
+          });
+        }
+      } catch (logErr) {
+        console.warn('[OrderService] Approval logging note:', logErr);
+      }
+
+      // Automatically send customer confirmation email
+      let emailResult = { emailSent: false };
+      try {
+        if (targetOrder) {
+          emailResult = await this.dispatchCodApprovalEmail(targetOrder);
+        }
+      } catch (emailErr) {
+        console.warn('[OrderService] COD approval email dispatch failed:', emailErr);
+        emailResult = { emailSent: false, emailError: emailErr.message || 'Email dispatch failed' };
+      }
+
+      return {
+        success: true,
+        order: targetOrder,
+        emailSent: Boolean(emailResult.emailSent),
+        emailError: emailResult.emailError,
+        recipient: emailResult.recipient,
       };
-      updated.unshift(targetOrder);
+    } finally {
+      this._approvingCodOrders.delete(orderId);
     }
-    this.saveLocalOrders(updated);
+  }
 
-    // Notification
-    try {
-      if (targetOrder) {
-        notificationService.notifyAdminPaymentConfirmed({
-          orderId,
-          customerName: targetOrder.customer_name,
-          totalAmount: targetOrder.grand_total || targetOrder.total_amount || 0,
-          paymentMethod: 'COD (Approved & Verified)',
-        });
-        auditLogService.logOrderAction({
-          action: 'COD_ORDER_APPROVED',
-          target: `Order #${orderId}`,
-          details: `Admin approved Cash on Delivery order for ${targetOrder.customer_name} (₱${Number(targetOrder.grand_total || targetOrder.total_amount || 0).toLocaleString()}). Queued for warehouse packing.`,
-          severity: 'SUCCESS',
-          metadata: { orderId, customer: targetOrder.customer_name, grand_total: targetOrder.grand_total },
-        });
-        await emailService.sendOrderStatusNotification({
-          orderId,
-          oldStatus: 'Pending Approval',
-          newStatus: 'Processing',
-          customerEmail: targetOrder.customer_phone?.includes('@') ? targetOrder.customer_phone : null,
-          customerName: targetOrder.customer_name,
-          trackingNumber: targetOrder.tracking_number,
-          notes: 'Your COD order has been approved by our admin team.',
-        });
-      }
-    } catch (e) {}
+  /**
+   * Retry sending COD approval email notification without re-approving the order.
+   */
+  async retryCodApprovalEmail(orderId) {
+    const orders = this.getLocalOrders();
+    const order = orders.find((o) => o.order_id === orderId || o.id === orderId);
+    if (!order) return { success: false, error: 'Order not found.' };
 
-    return { success: true, order: targetOrder };
+    if (!isCodPaymentMethod(order.payment_method)) {
+      return { success: false, error: 'Only Cash on Delivery orders support COD approval notifications.' };
+    }
+
+    const status = canonicalizeStatus(order.status);
+    if (status !== ORDER_STATUSES.PROCESSING && status !== ORDER_STATUSES.READY && status !== ORDER_STATUSES.OUT) {
+      return {
+        success: false,
+        error: `Cannot send approval email for order currently in "${order.status}".`,
+      };
+    }
+
+    // Force dispatch (override duplicate guard on explicit retry)
+    const cloned = { ...order, cod_approval_email_sent: false, cod_approval_email_status: null };
+    const emailRes = await this.dispatchCodApprovalEmail(cloned);
+    return emailRes;
   }
 
   /**
@@ -1950,15 +2020,30 @@ class OrderService {
           severity: canonicalNew === ORDER_STATUSES.CANCELLED ? 'WARNING' : 'INFO',
           metadata: { orderId, oldStatus, newStatus: canonicalNew, customer: targetOrder.customer_name, notes },
         });
-        await emailService.sendOrderStatusNotification({
-          orderId,
-          oldStatus,
-          newStatus: canonicalNew,
-          customerEmail: targetOrder.customer_phone?.includes('@') ? targetOrder.customer_phone : null,
-          customerName: targetOrder.customer_name,
-          trackingNumber: targetOrder.tracking_number,
-          notes,
-        });
+        if (
+          isCodPaymentMethod(targetOrder.payment_method) &&
+          oldStatus === ORDER_STATUSES.PENDING_APPROVAL &&
+          canonicalNew === ORDER_STATUSES.PROCESSING
+        ) {
+          // Trigger specialized COD approval confirmation email if not already sent
+          if (!targetOrder.cod_approval_email_sent && targetOrder.cod_approval_email_status !== 'sent') {
+            await this.dispatchCodApprovalEmail(targetOrder);
+          }
+        } else if (
+          !(isCodPaymentMethod(targetOrder.payment_method) && canonicalNew === ORDER_STATUSES.CANCELLED)
+        ) {
+          // Send standard status update for non-COD orders
+          await emailService.sendOrderStatusNotification({
+            orderId,
+            oldStatus,
+            newStatus: canonicalNew,
+            order: targetOrder,
+            customerEmail: targetOrder.customer_email,
+            customerName: targetOrder.customer_name,
+            trackingNumber: targetOrder.tracking_number,
+            notes,
+          });
+        }
       }
     } catch (e) {
       console.warn('[OrderService] Status notification failed:', e);
@@ -2064,7 +2149,8 @@ class OrderService {
         orderId,
         oldStatus,
         newStatus: 'Cancelled',
-        customerEmail: targetOrder.customer_phone?.includes('@') ? targetOrder.customer_phone : null,
+        order: targetOrder,
+        customerEmail: targetOrder.customer_email,
         customerName: targetOrder.customer_name,
         trackingNumber: targetOrder.tracking_number,
         notes: cleanReason,
@@ -2181,6 +2267,8 @@ class OrderService {
           orderId,
           oldStatus: 'Delivered',
           newStatus: 'Return Requested',
+          order: targetOrder,
+          customerEmail: targetOrder.customer_email,
           customerName: targetOrder.customer_name,
           notes: `Reason: ${reason}`,
         });

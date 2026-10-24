@@ -2,6 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import BootstrapIcon from './BootstrapIcon.jsx';
 import { localYmd } from '../../utils/deliveryDate.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
+import { appStorage } from '../../services/system/storageAdapter.js';
 
 const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -36,8 +38,23 @@ export default function OrderDeliveryCalendar({
   onRangeChange,
   mode = 'single',
   minDate,
-  isDarkMode = false,
+  isDarkMode: propIsDarkMode,
 }) {
+  let themeCtx = null;
+  try {
+    themeCtx = useTheme();
+  } catch (_e) {}
+  const isDarkMode = propIsDarkMode !== undefined
+    ? Boolean(propIsDarkMode)
+    : Boolean(
+        themeCtx?.isDarkMode ||
+        (typeof document !== 'undefined' && document?.documentElement?.classList?.contains('dark')) ||
+        (typeof appStorage !== 'undefined' && (
+          appStorage.getItem('mototrack_admin_dark_mode') === 'true' ||
+          appStorage.getItem('mototrack_customer_dark_mode') === 'true' ||
+          appStorage.getItem('mototrack_theme_mode') === 'dark'
+        ))
+      );
   const today = useMemo(() => new Date(), []);
   const todayStr = useMemo(() => localYmd(today), [today]);
   const rangeMode = mode === 'range';
@@ -160,10 +177,10 @@ export default function OrderDeliveryCalendar({
           {/* Prev Month */}
           <TouchableOpacity
             onPress={handlePrevMonth}
-            style={[styles.navBtn, isDarkMode && { backgroundColor: '#1C2422', borderColor: '#334155' }]}
+            style={styles.navBtn}
             activeOpacity={0.7}
           >
-            <BootstrapIcon name="chevron-left" size={11} color={isDarkMode ? '#CBD5E1' : '#1D4533'} />
+            <BootstrapIcon name="chevron-left" size={11} color={isDarkMode ? '#CBD5E1' : '#EA580C'} />
           </TouchableOpacity>
 
           {/* Month & Year Title */}
@@ -179,10 +196,10 @@ export default function OrderDeliveryCalendar({
           {/* Next Month */}
           <TouchableOpacity
             onPress={handleNextMonth}
-            style={[styles.navBtn, isDarkMode && { backgroundColor: '#1C2422', borderColor: '#334155' }]}
+            style={styles.navBtn}
             activeOpacity={0.7}
           >
-            <BootstrapIcon name="chevron-right" size={11} color={isDarkMode ? '#CBD5E1' : '#1D4533'} />
+            <BootstrapIcon name="chevron-right" size={11} color={isDarkMode ? '#CBD5E1' : '#EA580C'} />
           </TouchableOpacity>
         </View>
 
@@ -248,21 +265,21 @@ export default function OrderDeliveryCalendar({
               let statusLabel = isSunday ? 'Rest' : 'Open';
 
               if (isSelected) {
-                cardBg = isDarkMode ? '#1D4533' : '#E8F0EC';
-                cardBorder = '#1D4533';
+                cardBg = isDarkMode ? '#EA580C' : '#FFF7ED';
+                cardBorder = '#EA580C';
                 borderWidth = 1.8;
                 numColor = isDarkMode ? '#FFFFFF' : '#143325';
-                dotColor = '#1D4533';
+                dotColor = '#EA580C';
                 statusLabel = rangeMode
                   ? cell.dateStr === rangeStart
                     ? 'Start'
                     : 'End'
                   : 'Selected';
               } else if (isInRange) {
-                cardBg = isDarkMode ? 'rgba(29, 69, 51, 0.35)' : '#F0FDF4';
-                cardBorder = isDarkMode ? '#1D4533' : '#86EFAC';
+                cardBg = isDarkMode ? 'rgba(36, 39, 43, 0.5)' : '#F0FDF4';
+                cardBorder = isDarkMode ? '#EA580C' : '#86EFAC';
                 numColor = isDarkMode ? '#A7F3D0' : '#143325';
-                dotColor = '#1D4533';
+                dotColor = '#EA580C';
                 statusLabel = 'In range';
               } else if (isToday && !isSelected) {
                 cardBg = isDarkMode ? '#064E3B' : '#F0FDF4';
@@ -325,7 +342,7 @@ export default function OrderDeliveryCalendar({
                         styles.cellStatus,
                         {
                           color: isSelected
-                            ? (isDarkMode ? '#A7F3D0' : '#1D4533')
+                            ? (isDarkMode ? '#A7F3D0' : '#EA580C')
                             : (isDarkMode ? '#94A3B8' : '#64748B'),
                           fontWeight: isSelected ? '800' : '600',
                         },
@@ -370,9 +387,9 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: 'transparent',
+    borderWidth: 0,
+    borderColor: 'transparent',
     alignItems: 'center',
     justifyContent: 'center',
   },

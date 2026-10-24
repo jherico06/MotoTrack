@@ -12,7 +12,7 @@ import {
   ActivityIndicator,
   Modal,
 } from 'react-native';
-import { BootstrapIcon } from './';
+import BootstrapIcon from './BootstrapIcon.jsx';
 import { compatibilityService } from '../../services/products/compatibilityService.js';
 
 export default function MyMotorcyclePanel({

@@ -13,7 +13,6 @@ import {
   DeliveryConfirmPage,
   RiderRunPage,
   RiderDashboard,
-  MechanicDashboard,
   ProductDetailsPage,
   StaffVerifyEmailPage,
   ForceChangePasswordPage,
@@ -37,9 +36,9 @@ import ErrorBoundary from '../components/common/ErrorBoundary.jsx';
 import { adminSecurityService } from '../services/auth/adminSecurityService.js';
 import { authService } from '../services/auth/authService.js';
 import { systemSettingsService } from '../services/system/systemSettingsService.js';
-import { garageService } from '../services/bookings/garageService.js';
 import { APP_ROLES } from '../constants/roles.js';
 import {
+  LEGACY_MECHANIC_BLOCKED_MESSAGE,
   homeScreenForRole,
   isAdmin,
   isMechanic,
@@ -152,20 +151,32 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
       }
-      /* Modern subtle scrollbar */
+      /* Modern subtle orange scrollbar matching brand */
       ::-webkit-scrollbar {
-        width: 7px;
-        height: 7px;
+        width: 6px;
+        height: 6px;
       }
       ::-webkit-scrollbar-track {
         background: transparent;
       }
       ::-webkit-scrollbar-thumb {
-        background: rgba(148, 163, 184, 0.4);
+        background: #EA580C;
         border-radius: 9999px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: rgba(100, 116, 139, 0.6);
+        background: #C2410C;
+      }
+      ::-webkit-scrollbar-corner {
+        background: transparent;
+      }
+      ::-webkit-scrollbar-button {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+      html, body, #root, #__next, [data-reactroot], * {
+        scrollbar-width: thin;
+        scrollbar-color: #EA580C transparent;
       }
       /* Subtle custom scrollbars for table containers */
       [data-table-scroll="true"]::-webkit-scrollbar {
@@ -177,11 +188,11 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
         border-radius: 9999px;
       }
       [data-table-scroll="true"]::-webkit-scrollbar-thumb {
-        background: rgba(148, 163, 184, 0.5);
+        background: #EA580C;
         border-radius: 9999px;
       }
       [data-table-scroll="true"]::-webkit-scrollbar-thumb:hover {
-        background: rgba(100, 116, 139, 0.7);
+        background: #C2410C;
       }
       /* Utility to hide scrollbar if specifically requested */
       .no-scrollbar::-webkit-scrollbar {
@@ -192,6 +203,24 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
       .no-scrollbar {
         scrollbar-width: none !important;
         -ms-overflow-style: none !important;
+      }
+      /* Hide native browser password reveal eye (Edge / IE / Chromium) & clear buttons */
+      input::-ms-reveal,
+      input::-ms-clear {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+        visibility: hidden !important;
+        pointer-events: none !important;
+      }
+      input::-webkit-contacts-auto-fill-button,
+      input::-webkit-credentials-auto-fill-button {
+        visibility: hidden !important;
+        display: none !important;
+        pointer-events: none !important;
+        height: 0 !important;
+        width: 0 !important;
+        margin: 0 !important;
       }
     `;
     document.head.appendChild(style);
@@ -267,13 +296,32 @@ function MainAppRouter() {
       const { screen: s } = parsePublicRoute();
       if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
         const tab = new URLSearchParams(window.location.search).get('tab');
-        if (s === 'orders' || tab === 'orders') return 'orders';
-        if (s === 'notifications' || tab === 'notifications') return 'notifications';
-        if (tab) return tab;
+        if (s === 'orders' || tab === 'orders') return { tab: 'orders', key: 1 };
+        if (s === 'notifications' || tab === 'notifications') return { tab: 'notifications', key: 1 };
+        if (tab) return { tab, key: 1 };
       }
     } catch (_e) {}
-    return 'overview';
+    return { tab: 'overview', key: 0 };
   });
+
+  const [visitedScreens, setVisitedScreens] = useState(() => {
+    const s = getInitialScreen();
+    const canonical = s === 'services' ? 'garage' : s === 'orders' ? 'profile' : s;
+    return new Set(['shop', canonical]);
+  });
+
+  useEffect(() => {
+    if (['shop', 'garage', 'services', 'customizer', 'profile', 'orders'].includes(currentScreen)) {
+      const canonical = currentScreen === 'services' ? 'garage' : currentScreen === 'orders' ? 'profile' : currentScreen;
+      setVisitedScreens((prev) => {
+        if (prev.has(canonical)) return prev;
+        const next = new Set(prev);
+        next.add(canonical);
+        return next;
+      });
+    }
+  }, [currentScreen]);
+
   const [allowMobileAdmin, setAllowMobileAdmin] = useState(false);
   const { currentUser, logout, adminLogin, redirectReason, setRedirectReason } = useAuth();
   const { addToCart, cartItemCount, cartTotal, showToast } = useCart();
@@ -302,10 +350,9 @@ function MainAppRouter() {
     applyBrandMeta(systemSettingsService.getSettings());
     systemSettingsService.fetchRemoteSettings();
     const unsub = systemSettingsService.subscribe(applyBrandMeta);
-    try {
-      // Throttled with cross-tab cache & 15m cooldown to prevent API log flooding
-      garageService.startDownpaymentExpiryWatcher?.(15 * 60 * 1000);
-    } catch (_e) {}
+    // Downpayment expiry is handled by Postgres pg_cron only
+    // (expire_unpaid_downpayment_bookings). Do NOT poll that RPC from the client —
+    // it flooded Supabase API/log ingestion when every open tab called it.
     return unsub;
   }, []);
 
@@ -352,24 +399,23 @@ function MainAppRouter() {
   };
 
   const handleNavigateToProfile = (tab = 'overview') => {
-    if (!currentUser) {
+    const tabName = typeof tab === 'object' && tab !== null ? tab.tab : tab;
+    if (!currentUser && tabName !== 'orders' && tabName !== 'garage') {
       setRedirectReason(
-        tab === 'orders'
-          ? 'Please sign in to view your orders in your Customer Dashboard.'
-          : tab === 'notifications'
-            ? 'Please sign in to view your notifications in your Customer Dashboard.'
-            : 'Please sign in to view your Customer Dashboard.'
+        tabName === 'notifications'
+          ? 'Please sign in to view your notifications in your Customer Dashboard.'
+          : 'Please sign in to view your Customer Dashboard.'
       );
       navigateScreen('login');
     } else {
-      setProfileInitialTab(tab);
+      setProfileInitialTab({ tab: tabName, key: Date.now() });
       setCurrentScreen('profile');
       if (Platform.OS === 'web' && typeof window !== 'undefined' && window.history?.pushState) {
         try {
           const url = new URL(window.location.href);
           url.searchParams.set('screen', 'profile');
-          if (tab && tab !== 'overview') {
-            url.searchParams.set('tab', tab);
+          if (tabName && tabName !== 'overview') {
+            url.searchParams.set('tab', tabName);
           } else {
             url.searchParams.delete('tab');
           }
@@ -425,16 +471,16 @@ function MainAppRouter() {
     }
   }, [currentUser, currentScreen]);
 
-  useEffect(() => {
-    if (isMechanic(currentUser) && currentScreen !== 'mechanic-dashboard') {
-      const t = setTimeout(() => navigateScreen('mechanic-dashboard'), 0);
-      return () => clearTimeout(t);
-    }
-  }, [currentUser, currentScreen]);
+  // Mechanic is a retired role: legacy mechanic sessions are blocked (see "Account unavailable" below).
+  // There is no mechanic-dashboard route; ?screen=mechanic-dashboard falls back to the storefront.
 
   // 2. If user is already authenticated and on login/signup, route appropriately
   useEffect(() => {
-    if (currentUser && (currentScreen === 'login' || currentScreen === 'signup')) {
+    if (
+      currentUser &&
+      !isMechanic(currentUser) &&
+      (currentScreen === 'login' || currentScreen === 'signup')
+    ) {
       const t = setTimeout(() => {
         const next = homeScreenForRole(currentUser.role);
         if (next !== 'shop' || !redirectReason) {
@@ -484,11 +530,12 @@ function MainAppRouter() {
 
   // If user logs out or session ends while on protected screen (profile, orders), return to storefront
   useEffect(() => {
-    if (!currentUser && (currentScreen === 'profile' || currentScreen === 'orders')) {
+    const rawTab = typeof profileInitialTab === 'object' && profileInitialTab !== null ? profileInitialTab.tab : profileInitialTab;
+    if (!currentUser && currentScreen === 'profile' && rawTab !== 'orders') {
       const t = setTimeout(() => navigateScreen('shop'), 0);
       return () => clearTimeout(t);
     }
-  }, [currentUser, currentScreen]);
+  }, [currentUser, currentScreen, profileInitialTab]);
 
   // Staff must change temporary password before accessing role dashboards
   if (mustChangeStaffPassword(currentUser)) {
@@ -497,8 +544,7 @@ function MainAppRouter() {
         onCompleted={() => {
           showToast('Password updated. Welcome to MotoTrack.');
           const role = authService.getCurrentUser()?.role || currentUser.role;
-          if (role === APP_ROLES.RIDER) navigateScreen('rider-dashboard');
-          else navigateScreen('mechanic-dashboard');
+          navigateScreen(role === APP_ROLES.RIDER ? 'rider-dashboard' : homeScreenForRole(role));
         }}
         onLogout={() => {
           logout();
@@ -534,16 +580,85 @@ function MainAppRouter() {
     );
   }
 
-  // Authenticated mechanic dashboard
+  // Legacy mechanic accounts: the role was retired, so never render any dashboard.
   if (isMechanic(currentUser)) {
+    const leaveBlockedAccount = () => {
+      logout();
+      navigateScreen('login');
+    };
     return (
-      <MechanicDashboard
-        onLogout={() => {
-          logout();
-          navigateScreen('login');
-          showToast('Mechanic logged out');
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: '#F6F8FC',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 24,
         }}
-      />
+      >
+        <View
+          style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 24,
+            padding: 32,
+            maxWidth: 460,
+            width: '100%',
+            alignItems: 'center',
+            borderWidth: 1,
+            borderColor: '#E2E8F0',
+          }}
+        >
+          <View
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: 32,
+              backgroundColor: '#FEF2F2',
+              justifyContent: 'center',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}
+          >
+            <BootstrapIcon name="person-x-fill" size={30} color="#DC2626" />
+          </View>
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: '900',
+              color: '#0F172A',
+              textAlign: 'center',
+              marginBottom: 8,
+            }}
+          >
+            Account unavailable
+          </Text>
+          <Text
+            style={{
+              fontSize: 13.5,
+              color: '#64748B',
+              textAlign: 'center',
+              lineHeight: 20,
+              marginBottom: 24,
+            }}
+          >
+            {LEGACY_MECHANIC_BLOCKED_MESSAGE}
+          </Text>
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#EA580C',
+              paddingVertical: 14,
+              paddingHorizontal: 24,
+              borderRadius: 14,
+              width: '100%',
+              alignItems: 'center',
+            }}
+            onPress={leaveBlockedAccount}
+            activeOpacity={0.85}
+          >
+            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Sign out</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -620,10 +735,14 @@ function MainAppRouter() {
               alignItems: 'center',
               borderWidth: 1,
               borderColor: '#E2E8F0',
-              shadowColor: '#0F172A',
-              shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.08,
-              shadowRadius: 16,
+              ...(Platform.OS === 'web'
+                ? { boxShadow: '0 8px 16px rgba(15, 23, 42, 0.08)' }
+                : {
+                    shadowColor: '#0F172A',
+                    shadowOffset: { width: 0, height: 8 },
+                    shadowOpacity: 0.08,
+                    shadowRadius: 16,
+                  }),
               elevation: 6,
             }}
           >
@@ -638,7 +757,7 @@ function MainAppRouter() {
                 marginBottom: 16,
               }}
             >
-              <BootstrapIcon name="display" size={30} color="#1D4533" />
+              <BootstrapIcon name="display" size={30} color="#EA580C" />
             </View>
             <Text
               style={{
@@ -664,7 +783,7 @@ function MainAppRouter() {
             </Text>
             <TouchableOpacity
               style={{
-                backgroundColor: '#1D4533',
+                backgroundColor: '#EA580C',
                 paddingVertical: 14,
                 paddingHorizontal: 24,
                 borderRadius: 14,
@@ -812,83 +931,6 @@ function MainAppRouter() {
     );
   }
 
-  if (currentScreen === 'orders') {
-    if (!currentUser) {
-      setRedirectReason('Please sign in to view your orders in your Customer Dashboard.');
-      navigateScreen('login');
-      return null;
-    }
-    return (
-      <ProfilePage
-        initialTab="orders"
-        onNavigateToStore={() => navigateScreen('shop')}
-        onNavigateToGarage={() => navigateScreen('garage')}
-        onNavigateToOrders={() => handleNavigateToProfile('orders')}
-        onNavigateToWishlist={() => navigateScreen('wishlist')}
-        onNavigateToCustomizer={() => navigateScreen('customizer')}
-        onNavigateToAdmin={() => navigateScreen('admin')}
-        onNavigateToLogin={() => navigateScreen('login')}
-        onLogout={handleLogout}
-      />
-    );
-  }
-
-  if (currentScreen === 'garage') {
-    return (
-      <GaragePage
-        onNavigateToStore={() => navigateScreen('shop')}
-        onNavigateToWishlist={() => navigateScreen('wishlist')}
-        onNavigateToOrders={() => handleNavigateToProfile('orders')}
-        onNavigateToCustomizer={() => navigateScreen('customizer')}
-        onNavigateToCustomize={() => navigateScreen('customizer')}
-        onNavigateToLogin={() => {
-          setRedirectReason('Please sign in to book your garage appointment.');
-          navigateScreen('login');
-        }}
-        onNavigateToProfile={(tab) => handleNavigateToProfile(tab || 'profile')}
-        onNavigateToAdmin={() => navigateScreen('admin')}
-        onOpenCart={() => setIsCartOpen(true)}
-        onLogout={handleLogout}
-      />
-    );
-  }
-
-  if (currentScreen === 'customizer') {
-    return (
-      <CustomizerPage
-        initialSelectedProduct={customizerProduct}
-        onNavigateToStore={() => navigateScreen('shop')}
-        onNavigateToGarage={() => navigateScreen('garage')}
-        onNavigateToWishlist={() => navigateScreen('wishlist')}
-        onNavigateToOrders={() => handleNavigateToProfile('orders')}
-        onNavigateToLogin={() => {
-          setRedirectReason('Please sign in to book your customized build.');
-          navigateScreen('login');
-        }}
-        onNavigateToProfile={(tab) => handleNavigateToProfile(tab || 'profile')}
-        onNavigateToAdmin={() => navigateScreen('admin')}
-        onOpenCart={() => setIsCartOpen(true)}
-        onLogout={handleLogout}
-      />
-    );
-  }
-
-  if (currentScreen === 'profile') {
-    return (
-      <ProfilePage
-        initialTab={profileInitialTab}
-        onNavigateToStore={() => navigateScreen('shop')}
-        onNavigateToGarage={() => navigateScreen('garage')}
-        onNavigateToOrders={() => handleNavigateToProfile('orders')}
-        onNavigateToWishlist={() => navigateScreen('wishlist')}
-        onNavigateToCustomizer={() => navigateScreen('customizer')}
-        onNavigateToAdmin={() => navigateScreen('admin')}
-        onNavigateToLogin={() => navigateScreen('login')}
-        onLogout={handleLogout}
-      />
-    );
-  }
-
   if (currentScreen === 'notifications') {
     if (Platform.OS === 'web') {
       return (
@@ -929,29 +971,146 @@ function MainAppRouter() {
     );
   }
 
-  // Default: Main Shop Page (Storefront)
+  // ─── CORE CUSTOMER TABS (Persistent Tab Container with 0-latency instant switching) ───
+  const activeTabScreen =
+    currentScreen === 'services'
+      ? 'garage'
+      : currentScreen === 'orders'
+      ? 'profile'
+      : currentScreen === 'profile'
+      ? 'profile'
+      : currentScreen === 'garage'
+      ? 'garage'
+      : currentScreen === 'customizer'
+      ? 'customizer'
+      : 'shop';
+
+  const isShopActive = activeTabScreen === 'shop';
+  const isGarageActive = activeTabScreen === 'garage';
+  const isCustomizerActive = activeTabScreen === 'customizer';
+  const isProfileActive = activeTabScreen === 'profile';
+
   return (
-    <ShopPage
-      onNavigateToWishlist={() => navigateScreen('wishlist')}
-      onNavigateToScreen={(screen, params) => {
-        if (params?.product) {
-          if (screen === 'customizer') {
-            setCustomizerProduct(params.product);
-          } else if (screen === 'product-details') {
-            setSelectedProductDetails(params.product);
-          }
-        }
-        if (screen === 'profile') {
-          handleNavigateToProfile(params?.tab || 'profile');
-        } else if (screen === 'orders') {
-          handleNavigateToProfile('orders');
-        } else if (screen === 'wishlist') {
-          navigateScreen('wishlist');
-        } else {
-          navigateScreen(screen, params);
-        }
-      }}
-    />
+    <View style={tabShellStyles.container}>
+      {/* 1. Shop Screen */}
+      {visitedScreens.has('shop') && (
+        <View
+          key="tab-layer-shop"
+          style={[
+            tabShellStyles.tabLayer,
+            isShopActive ? tabShellStyles.tabActive : tabShellStyles.tabInactive,
+          ]}
+          pointerEvents={isShopActive ? 'auto' : 'none'}
+          aria-hidden={!isShopActive}
+        >
+          <ShopPage
+            onNavigateToWishlist={() => navigateScreen('wishlist')}
+            onNavigateToScreen={(screen, params) => {
+              if (params?.product) {
+                if (screen === 'customizer') {
+                  setCustomizerProduct(params.product);
+                } else if (screen === 'product-details') {
+                  setSelectedProductDetails(params.product);
+                }
+              }
+              if (screen === 'profile') {
+                handleNavigateToProfile(params?.tab || 'profile');
+              } else if (screen === 'orders') {
+                handleNavigateToProfile('orders');
+              } else if (screen === 'wishlist') {
+                navigateScreen('wishlist');
+              } else {
+                navigateScreen(screen, params);
+              }
+            }}
+          />
+        </View>
+      )}
+
+      {/* 2. Services Screen (Garage / Pit Bay Booking) */}
+      {visitedScreens.has('garage') && (
+        <View
+          key="tab-layer-garage"
+          style={[
+            tabShellStyles.tabLayer,
+            isGarageActive ? tabShellStyles.tabActive : tabShellStyles.tabInactive,
+          ]}
+          pointerEvents={isGarageActive ? 'auto' : 'none'}
+          aria-hidden={!isGarageActive}
+        >
+          <GaragePage
+            onNavigateToStore={() => navigateScreen('shop')}
+            onNavigateToWishlist={() => navigateScreen('wishlist')}
+            onNavigateToOrders={() => handleNavigateToProfile('orders')}
+            onNavigateToCustomizer={() => navigateScreen('customizer')}
+            onNavigateToCustomize={() => navigateScreen('customizer')}
+            onNavigateToLogin={() => {
+              setRedirectReason('Please sign in to book your garage appointment.');
+              navigateScreen('login');
+            }}
+            onNavigateToProfile={(tab) => handleNavigateToProfile(tab || 'profile')}
+            onNavigateToAdmin={() => navigateScreen('admin')}
+            onOpenCart={() => setIsCartOpen(true)}
+            onLogout={handleLogout}
+          />
+        </View>
+      )}
+
+      {/* 3. Customizer Screen */}
+      {visitedScreens.has('customizer') && (
+        <View
+          key="tab-layer-customizer"
+          style={[
+            tabShellStyles.tabLayer,
+            isCustomizerActive ? tabShellStyles.tabActive : tabShellStyles.tabInactive,
+          ]}
+          pointerEvents={isCustomizerActive ? 'auto' : 'none'}
+          aria-hidden={!isCustomizerActive}
+        >
+          <CustomizerPage
+            initialSelectedProduct={customizerProduct}
+            onNavigateToStore={() => navigateScreen('shop')}
+            onNavigateToGarage={() => navigateScreen('garage')}
+            onNavigateToWishlist={() => navigateScreen('wishlist')}
+            onNavigateToOrders={() => handleNavigateToProfile('orders')}
+            onNavigateToLogin={() => {
+              setRedirectReason('Please sign in to book your customized build.');
+              navigateScreen('login');
+            }}
+            onNavigateToProfile={(tab) => handleNavigateToProfile(tab || 'profile')}
+            onNavigateToAdmin={() => navigateScreen('admin')}
+            onOpenCart={() => setIsCartOpen(true)}
+            onLogout={handleLogout}
+          />
+        </View>
+      )}
+
+      {/* 4. Profile Screen (Customer Garage Fleet, Orders, More Menu, Bookings) */}
+      {visitedScreens.has('profile') && (
+        <View
+          key="tab-layer-profile"
+          style={[
+            tabShellStyles.tabLayer,
+            isProfileActive ? tabShellStyles.tabActive : tabShellStyles.tabInactive,
+          ]}
+          pointerEvents={isProfileActive ? 'auto' : 'none'}
+          aria-hidden={!isProfileActive}
+        >
+          <ProfilePage
+            initialTab={profileInitialTab}
+            onNavigateToStore={() => navigateScreen('shop')}
+            onNavigateToGarage={() => navigateScreen('garage')}
+            onNavigateToOrders={() => handleNavigateToProfile('orders')}
+            onNavigateToWishlist={() => navigateScreen('wishlist')}
+            onNavigateToCustomizer={() => navigateScreen('customizer')}
+            onNavigateToAdmin={() => navigateScreen('admin')}
+            onNavigateToLogin={() => navigateScreen('login')}
+            onNavigateToProductDetails={(product) => navigateScreen('product-details', { product })}
+            onLogout={handleLogout}
+          />
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -1042,5 +1201,43 @@ const styles = StyleSheet.create({
     ...(Platform.OS === 'web' ? { minHeight: '100vh' } : {}),
     backgroundColor: '#F8FAFC',
   },
+});
+
+const tabShellStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  tabLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+  },
+  tabActive: Platform.OS === 'web'
+    ? {
+        opacity: 1,
+        zIndex: 2,
+        visibility: 'visible',
+      }
+    : {
+        display: 'flex',
+      },
+  tabInactive: Platform.OS === 'web'
+    ? {
+        opacity: 0,
+        zIndex: -1,
+        visibility: 'hidden',
+      }
+    : {
+        display: 'none',
+      },
 });
 

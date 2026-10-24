@@ -5,6 +5,7 @@ import { uploadProductImage } from '../../utils/productImageUpload.js';
 export const DEFAULT_SYSTEM_SETTINGS = {
   // Store Identity & Branding
   storeName: 'MotoTrack',
+  hubName: "D'Blockchain Motorparts and Accessories",
   storeTagline: 'MOTORPARTS & ACCESSORIES',
   contactEmail: '',
   contactPhone: '',
@@ -314,6 +315,10 @@ class SystemSettingsService {
 
   getSettings() {
     return { ...this.settings };
+  }
+
+  getBrandSettings() {
+    return this.getSettings();
   }
 
   saveSettings(partial) {

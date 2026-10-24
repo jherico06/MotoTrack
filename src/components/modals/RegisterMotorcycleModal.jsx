@@ -142,7 +142,12 @@ export default function RegisterMotorcycleModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
+      onRequestClose={onClose}
+    >
       <View style={styles.overlay}>
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
@@ -152,18 +157,23 @@ export default function RegisterMotorcycleModal({
           <View style={[styles.header, { borderBottomColor: borderCol }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
               <View style={styles.iconCircle}>
-                <BootstrapIcon name="bicycle" size={18} color="#1D4533" />
+                <BootstrapIcon name="bicycle" size={18} color="#EA580C" />
               </View>
-              <Text style={[styles.title, { color: textMain }]}>
-                {isEditing ? 'Edit Motorcycle' : 'Register Motorcycle'}
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.title, { color: textMain }]} numberOfLines={1}>
+                  {isEditing ? 'Edit Motorcycle' : 'Register Motorcycle'}
+                </Text>
+                <Text style={[styles.subtitle, { color: textMuted }]} numberOfLines={1}>
+                  {isEditing ? 'Update motorcycle details and specifications' : 'Add your bike to verify parts compatibility & booking'}
+                </Text>
+              </View>
             </View>
             <TouchableOpacity
               onPress={onClose}
               style={[styles.closeBtn, { backgroundColor: bgInput }]}
               activeOpacity={0.8}
             >
-              <BootstrapIcon name="x-lg" size={16} color={textMuted} />
+              <BootstrapIcon name="x-lg" size={14} color={textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -194,10 +204,10 @@ export default function RegisterMotorcycleModal({
                   ) : (
                     <View style={styles.photoEmpty}>
                       {isUploadingPhoto ? (
-                        <ActivityIndicator color="#1D4533" />
+                        <ActivityIndicator color="#EA580C" />
                       ) : (
                         <>
-                          <BootstrapIcon name="cloud-upload" size={28} color="#1D4533" />
+                          <BootstrapIcon name="cloud-upload" size={28} color="#EA580C" />
                           <Text style={[styles.photoEmptyTitle, { color: textMain }]}>
                             Upload photo
                           </Text>
@@ -466,9 +476,9 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    padding: Platform.OS === 'web' ? 16 : 0,
     ...Platform.select({
       web: { backdropFilter: 'blur(6px)' },
     }),
@@ -478,23 +488,26 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    maxWidth: 560,
+    maxWidth: Platform.OS === 'web' ? 560 : '100%',
     maxHeight: '90%',
-    borderRadius: 18,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 24 : 0,
+    borderBottomRightRadius: Platform.OS === 'web' ? 24 : 0,
     borderWidth: 1,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.24,
-    shadowRadius: 24,
-    elevation: 16,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 20,
+    elevation: 20,
     display: 'flex',
     flexDirection: 'column',
   },
   accentBar: {
     height: 4,
     width: '100%',
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   header: {
     flexDirection: 'row',
@@ -505,21 +518,27 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   iconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#C8DDD3',
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFF7ED',
+    borderWidth: 1,
+    borderColor: '#FED7AA',
     alignItems: 'center',
     justifyContent: 'center',
   },
   title: {
-    fontSize: 16,
+    fontSize: 16.5,
     fontWeight: '800',
   },
+  subtitle: {
+    fontSize: 11.5,
+    marginTop: 1,
+  },
   closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -594,7 +613,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   uploadBtn: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
@@ -628,8 +647,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   brandPillActive: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   brandPillText: {
     fontSize: 12,
@@ -696,29 +715,35 @@ const styles = StyleSheet.create({
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     gap: 10,
     paddingHorizontal: 18,
-    paddingVertical: 14,
+    paddingTop: 14,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
     borderTopWidth: 1,
   },
   cancelBtn: {
-    paddingVertical: 10,
+    flex: 1,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 10,
+    borderRadius: 14,
     borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cancelBtnText: {
     fontSize: 13,
     fontWeight: '700',
   },
   saveBtn: {
-    backgroundColor: '#1D4533',
-    paddingVertical: 10,
+    flex: 1,
+    backgroundColor: '#EA580C',
+    paddingVertical: 12,
     paddingHorizontal: 18,
-    borderRadius: 10,
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 8,
   },
   saveBtnText: {

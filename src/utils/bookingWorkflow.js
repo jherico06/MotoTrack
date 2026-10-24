@@ -9,6 +9,7 @@ export { FLEX_BOOKING_STATUS, normalizeBookingStatus, formatPhp, formatPhpDecima
 export const BOOKING_ROLES = Object.freeze({
   CUSTOMER: 'customer',
   ADMIN: 'admin',
+  /** @deprecated Mechanic role is retired. Kept only so historical timeline rows still resolve. */
   MECHANIC: 'mechanic',
   SYSTEM: 'system',
 });
@@ -48,8 +49,9 @@ export const TIMELINE_EVENTS = Object.freeze({
 /**
  * Lifecycle:
  * Pending Review → Approved/Payment Required → Confirmed → Scheduled →
- * Inspection → Quotation → Customer Approved → In Service → Completed →
- * Final Payment → Ready for Pickup → Completed (via QR scan).
+ * In Service → Service Completed → Final Payment → Ready for Pickup →
+ * Completed (via QR scan). All steps are admin-driven (no mechanic role).
+ * Repair flows may still go Scheduled → Inspection → Quotation → Customer Approved → In Service.
  * Cancel only before service starts. Customer decline / expiry are terminal.
  */
 export const STATUS_TRANSITIONS = Object.freeze({
@@ -78,6 +80,7 @@ export const STATUS_TRANSITIONS = Object.freeze({
     FLEX_BOOKING_STATUS.CANCELLED,
   ],
   [FLEX_BOOKING_STATUS.SCHEDULED]: [
+    FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS,
     FLEX_BOOKING_STATUS.UNDER_INSPECTION,
     FLEX_BOOKING_STATUS.CANCELLED,
   ],
@@ -143,14 +146,9 @@ export const ROLE_ALLOWED_TARGETS = Object.freeze({
     FLEX_BOOKING_STATUS.CUSTOMER_DECLINED,
     FLEX_BOOKING_STATUS.CANCELLED,
   ]),
-  [BOOKING_ROLES.MECHANIC]: new Set([
-    FLEX_BOOKING_STATUS.UNDER_INSPECTION,
-    FLEX_BOOKING_STATUS.ESTIMATE_SUBMITTED,
-    FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS,
-    FLEX_BOOKING_STATUS.ADDITIONAL_APPROVAL_REQUIRED,
-    FLEX_BOOKING_STATUS.SERVICE_COMPLETED,
-    FLEX_BOOKING_STATUS.FOR_FINAL_BILLING,
-  ]),
+  // Mechanic role is retired: explicit empty set so legacy callers are denied
+  // (instead of falling back to the permissive SYSTEM set in canRoleTransition).
+  [BOOKING_ROLES.MECHANIC]: new Set(),
   [BOOKING_ROLES.ADMIN]: new Set(Object.values(FLEX_BOOKING_STATUS)),
   [BOOKING_ROLES.SYSTEM]: new Set(Object.values(FLEX_BOOKING_STATUS)),
 });
@@ -189,27 +187,27 @@ export const STATUS_LABELS = Object.freeze({
 });
 
 export const STATUS_COLORS = Object.freeze({
-  [FLEX_BOOKING_STATUS.PENDING_REVIEW]: { bg: '#FEF3C7', fg: '#D97706' },
-  [FLEX_BOOKING_STATUS.NEEDS_INFORMATION]: { bg: '#FFEDD5', fg: '#C2410C' },
-  [FLEX_BOOKING_STATUS.APPROVED]: { bg: '#FFEDD5', fg: '#EA580C' },
-  [FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT]: { bg: '#FFEDD5', fg: '#EA580C' },
-  [FLEX_BOOKING_STATUS.CONFIRMED]: { bg: '#C8DDD3', fg: '#1D4533' },
-  [FLEX_BOOKING_STATUS.SCHEDULED]: { bg: '#E0F2FE', fg: '#0284C7' },
-  [FLEX_BOOKING_STATUS.UNDER_INSPECTION]: { bg: '#EDE9FE', fg: '#7C3AED' },
+  [FLEX_BOOKING_STATUS.PENDING_REVIEW]: { bg: '#FEF3C7', fg: '#92400E' },
+  [FLEX_BOOKING_STATUS.NEEDS_INFORMATION]: { bg: '#FEF3C7', fg: '#92400E' },
+  [FLEX_BOOKING_STATUS.APPROVED]: { bg: '#DCFCE7', fg: '#166534' },
+  [FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT]: { bg: '#FEF3C7', fg: '#92400E' },
+  [FLEX_BOOKING_STATUS.CONFIRMED]: { bg: '#DCFCE7', fg: '#166534' },
+  [FLEX_BOOKING_STATUS.SCHEDULED]: { bg: '#E0F2FE', fg: '#075985' },
+  [FLEX_BOOKING_STATUS.UNDER_INSPECTION]: { bg: '#EDE9FE', fg: '#6D28D9' },
   [FLEX_BOOKING_STATUS.ESTIMATE_SUBMITTED]: { bg: '#E0E7FF', fg: '#4338CA' },
-  [FLEX_BOOKING_STATUS.QUOTATION_SENT]: { bg: '#E0F2FE', fg: '#0284C7' },
-  [FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL]: { bg: '#FEF3C7', fg: '#D97706' },
-  [FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS]: { bg: '#FEF3C7', fg: '#B45309' },
-  [FLEX_BOOKING_STATUS.SERVICE_COMPLETED]: { bg: '#DCFCE7', fg: '#16A34A' },
-  [FLEX_BOOKING_STATUS.FOR_FINAL_BILLING]: { bg: '#FFEDD5', fg: '#C2410C' },
-  [FLEX_BOOKING_STATUS.AWAITING_FINAL_PAYMENT]: { bg: '#FFEDD5', fg: '#C2410C' },
-  [FLEX_BOOKING_STATUS.FULLY_PAID]: { bg: '#D1FAE5', fg: '#059669' },
-  [FLEX_BOOKING_STATUS.READY_FOR_PICKUP]: { bg: '#C8DDD3', fg: '#1D4533' },
-  [FLEX_BOOKING_STATUS.COMPLETED]: { bg: '#F1F5F9', fg: '#475569' },
-  [FLEX_BOOKING_STATUS.REJECTED]: { bg: '#FEE2E2', fg: '#DC2626' },
-  [FLEX_BOOKING_STATUS.CANCELLED]: { bg: '#FEE2E2', fg: '#DC2626' },
-  [FLEX_BOOKING_STATUS.CUSTOMER_DECLINED]: { bg: '#FEE2E2', fg: '#B91C1C' },
-  [FLEX_BOOKING_STATUS.ADDITIONAL_APPROVAL_REQUIRED]: { bg: '#FEE2E2', fg: '#DC2626' },
+  [FLEX_BOOKING_STATUS.QUOTATION_SENT]: { bg: '#E0F2FE', fg: '#075985' },
+  [FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL]: { bg: '#FEF3C7', fg: '#92400E' },
+  [FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS]: { bg: '#E0F2FE', fg: '#075985' },
+  [FLEX_BOOKING_STATUS.SERVICE_COMPLETED]: { bg: '#DCFCE7', fg: '#166534' },
+  [FLEX_BOOKING_STATUS.FOR_FINAL_BILLING]: { bg: '#FEF3C7', fg: '#92400E' },
+  [FLEX_BOOKING_STATUS.AWAITING_FINAL_PAYMENT]: { bg: '#FEF3C7', fg: '#92400E' },
+  [FLEX_BOOKING_STATUS.FULLY_PAID]: { bg: '#DCFCE7', fg: '#166534' },
+  [FLEX_BOOKING_STATUS.READY_FOR_PICKUP]: { bg: '#DCFCE7', fg: '#166534' },
+  [FLEX_BOOKING_STATUS.COMPLETED]: { bg: '#DCFCE7', fg: '#166534' },
+  [FLEX_BOOKING_STATUS.REJECTED]: { bg: '#FEE2E2', fg: '#991B1B' },
+  [FLEX_BOOKING_STATUS.CANCELLED]: { bg: '#FEE2E2', fg: '#991B1B' },
+  [FLEX_BOOKING_STATUS.CUSTOMER_DECLINED]: { bg: '#FEE2E2', fg: '#991B1B' },
+  [FLEX_BOOKING_STATUS.ADDITIONAL_APPROVAL_REQUIRED]: { bg: '#FEF3C7', fg: '#92400E' },
   [FLEX_BOOKING_STATUS.BOOKING_EXPIRED]: { bg: '#FEE2E2', fg: '#991B1B' },
 });
 
@@ -231,6 +229,16 @@ export function canTransition(fromStatus, toStatus) {
 export function canRoleTransition(fromStatus, toStatus, role) {
   if (!canTransition(fromStatus, toStatus)) return false;
   const r = String(role || BOOKING_ROLES.SYSTEM).toLowerCase();
+  // Customers may only start service by accepting a quotation. The admin-driven
+  // SCHEDULED → SERVICE_IN_PROGRESS shortcut must never be available to them.
+  if (
+    r === BOOKING_ROLES.CUSTOMER &&
+    normalizeBookingStatus(toStatus) === FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS &&
+    normalizeBookingStatus(fromStatus) !== FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS &&
+    normalizeBookingStatus(fromStatus) !== FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL
+  ) {
+    return false;
+  }
   const allowed = ROLE_ALLOWED_TARGETS[r] || ROLE_ALLOWED_TARGETS[BOOKING_ROLES.SYSTEM];
   return allowed.has(normalizeBookingStatus(toStatus));
 }
@@ -346,13 +354,22 @@ export function getAdminActionsForStatus(currentStatus) {
   if (n === FLEX_BOOKING_STATUS.APPROVED || n === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT) {
     actions.add('record_payment');
   }
+  // Admin-only workflow: the admin schedules the job and drives it through the bay.
   if (n === FLEX_BOOKING_STATUS.CONFIRMED) {
-    actions.add('assign_mechanic');
+    actions.add('schedule');
     actions.add('reschedule');
   }
   if (n === FLEX_BOOKING_STATUS.SCHEDULED) {
     actions.add('reschedule');
-    actions.add('assign_mechanic');
+    actions.add('start_service');
+    actions.add('mark_in_progress');
+    // Repair flows can still go through an admin-driven inspection + quotation.
+    actions.add('start_inspection');
+  }
+  if (n === FLEX_BOOKING_STATUS.UNDER_INSPECTION) {
+    actions.add('save_inspection');
+    actions.add('submit_estimate');
+    actions.add('create_quotation');
   }
   if (n === FLEX_BOOKING_STATUS.ESTIMATE_SUBMITTED) {
     actions.add('review_estimate');
@@ -366,7 +383,10 @@ export function getAdminActionsForStatus(currentStatus) {
     actions.add('send_quotation');
   }
   if (n === FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS) {
+    actions.add('update_progress');
+    actions.add('create_additional');
     actions.add('review_additional');
+    actions.add('complete_service');
   }
   if (n === FLEX_BOOKING_STATUS.ADDITIONAL_APPROVAL_REQUIRED) {
     actions.add('send_additional');
@@ -393,28 +413,17 @@ export function canAdminAction(currentStatus, actionKey) {
   return getAdminActionsForStatus(currentStatus).has(actionKey);
 }
 
-/** Mechanic action keys by status */
-export function getMechanicActionsForStatus(currentStatus) {
-  const n = normalizeBookingStatus(currentStatus);
-  const actions = new Set();
-  if (n === FLEX_BOOKING_STATUS.SCHEDULED) {
-    actions.add('start_inspection');
-  }
-  if (n === FLEX_BOOKING_STATUS.UNDER_INSPECTION) {
-    actions.add('save_inspection');
-    actions.add('submit_estimate');
-    actions.add('create_quotation');
-  }
-  if (n === FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS) {
-    actions.add('update_progress');
-    actions.add('create_additional');
-    actions.add('complete_service');
-  }
-  return actions;
+/**
+ * @deprecated Mechanic role is retired; the admin drives the whole workflow
+ * (see getAdminActionsForStatus). Always returns an empty set.
+ */
+export function getMechanicActionsForStatus(_currentStatus) {
+  return new Set();
 }
 
-export function canMechanicAction(currentStatus, actionKey) {
-  return getMechanicActionsForStatus(currentStatus).has(actionKey);
+/** @deprecated Mechanic role is retired. Always returns false. */
+export function canMechanicAction(_currentStatus, _actionKey) {
+  return false;
 }
 
 /** Customer-friendly labels */
@@ -448,18 +457,36 @@ export function customerStatusLabel(status) {
   return CUSTOMER_STATUS_LABELS[n] || statusLabel(status);
 }
 
+/**
+ * Simple admin-driven path:
+ * submitted → approved → downpayment → scheduled → in_progress →
+ * service_completed → final_payment → ready → completed.
+ */
 export const CUSTOMER_PROGRESS_STEPS = Object.freeze([
   { key: 'submitted', label: 'Booking Submitted' },
   { key: 'approved', label: 'Admin Approved' },
   { key: 'downpayment', label: 'Downpayment Paid' },
   { key: 'scheduled', label: 'Scheduled' },
-  { key: 'inspected', label: 'Inspection' },
-  { key: 'quotation_accepted', label: 'Quotation Approved' },
   { key: 'in_progress', label: 'Service In Progress' },
   { key: 'service_completed', label: 'Service Completed' },
   { key: 'final_payment', label: 'Final Payment' },
   { key: 'ready', label: 'Ready for Pickup' },
   { key: 'completed', label: 'Completed' },
+]);
+
+/** Repair flows keep the quotation step between Scheduled and In Progress. */
+export const CUSTOMER_PROGRESS_STEPS_WITH_QUOTATION = Object.freeze([
+  ...CUSTOMER_PROGRESS_STEPS.slice(0, 4),
+  { key: 'quotation_accepted', label: 'Quotation Approved' },
+  ...CUSTOMER_PROGRESS_STEPS.slice(4),
+]);
+
+const QUOTATION_STATUSES = new Set([
+  FLEX_BOOKING_STATUS.UNDER_INSPECTION,
+  FLEX_BOOKING_STATUS.ESTIMATE_SUBMITTED,
+  FLEX_BOOKING_STATUS.QUOTATION_SENT,
+  FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL,
+  FLEX_BOOKING_STATUS.CUSTOMER_DECLINED,
 ]);
 
 const STATUS_RANK = Object.freeze({
@@ -483,15 +510,21 @@ const STATUS_RANK = Object.freeze({
   [FLEX_BOOKING_STATUS.COMPLETED]: 10,
 });
 
-export function getCustomerProgress(status) {
+/**
+ * @param {string} status
+ * @param {{ includeQuotation?: boolean }} [options] Repair bookings with a quotation
+ *   pass `includeQuotation: true` to show the "Quotation Approved" step.
+ */
+export function getCustomerProgress(status, { includeQuotation } = {}) {
   const n = normalizeBookingStatus(status);
   const rank = STATUS_RANK[n];
+  const showQuotationStep = includeQuotation ?? QUOTATION_STATUSES.has(n);
+  const steps = showQuotationStep ? CUSTOMER_PROGRESS_STEPS_WITH_QUOTATION : CUSTOMER_PROGRESS_STEPS;
   const stepRank = {
     submitted: 0,
     approved: 1,
     downpayment: 2,
     scheduled: 3,
-    inspected: 4,
     quotation_accepted: 5,
     in_progress: 6,
     service_completed: 7,
@@ -504,11 +537,13 @@ export function getCustomerProgress(status) {
     n === FLEX_BOOKING_STATUS.CANCELLED ||
     n === FLEX_BOOKING_STATUS.CUSTOMER_DECLINED ||
     n === FLEX_BOOKING_STATUS.BOOKING_EXPIRED;
-  return CUSTOMER_PROGRESS_STEPS.map((s) => ({
+  const withDone = steps.map((s) => ({
     ...s,
     done: negative ? s.key === 'submitted' : rank != null && rank >= stepRank[s.key],
-    current: !negative && rank != null && rank < stepRank[s.key] && rank >= stepRank[s.key] - 1,
   }));
+  // The next not-yet-done step is "current" (the simplified path has gaps between ranks).
+  const currentIdx = negative || rank == null ? -1 : withDone.findIndex((s) => !s.done);
+  return withDone.map((s, i) => ({ ...s, current: i === currentIdx }));
 }
 
 /** Build a timeline row payload for insert */

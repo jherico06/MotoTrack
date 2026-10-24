@@ -138,7 +138,7 @@ export default function NotificationsPage({
   const [notifications, setNotifications] = useState(() =>
     isAdmin
       ? notificationService.getAdminNotifications()
-      : notificationService.getCustomerNotifications(currentUser?.id)
+      : notificationService.getCustomerNotifications(currentUser)
   );
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all');
@@ -188,13 +188,11 @@ export default function NotificationsPage({
         setNotifications(data?.admin || notificationService.getAdminNotifications());
         setDbAlertCount(notificationService.getDatabaseAlertsCount());
       } else {
-        setNotifications(
-          data?.customer || notificationService.getCustomerNotifications(currentUser?.id)
-        );
+        setNotifications(notificationService.getCustomerNotifications(currentUser));
       }
     });
     return () => unsub?.();
-  }, [isAdmin, currentUser?.id]);
+  }, [isAdmin, currentUser?.id, currentUser?.customer_id, currentUser?.email]);
 
   useEffect(() => {
     if (isAdmin) {
@@ -212,8 +210,8 @@ export default function NotificationsPage({
       await notificationService.markAllAdminAsRead();
       setNotifications(notificationService.getAdminNotifications());
     } else {
-      await notificationService.markAllCustomerAsRead(currentUser?.id);
-      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+      await notificationService.markAllCustomerAsRead(currentUser);
+      setNotifications(notificationService.getCustomerNotifications(currentUser));
     }
     showToast('✓ All notifications marked as read');
   };
@@ -224,7 +222,7 @@ export default function NotificationsPage({
       setNotifications(notificationService.getAdminNotifications());
     } else {
       await notificationService.markCustomerAsRead(id);
-      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+      setNotifications(notificationService.getCustomerNotifications(currentUser));
     }
   };
 
@@ -235,7 +233,7 @@ export default function NotificationsPage({
       setNotifications(notificationService.getAdminNotifications());
     } else {
       await notificationService.deleteCustomerNotification(id);
-      setNotifications(notificationService.getCustomerNotifications(currentUser?.id));
+      setNotifications(notificationService.getCustomerNotifications(currentUser));
     }
     showToast('Notification dismissed');
   };

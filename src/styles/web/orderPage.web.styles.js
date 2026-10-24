@@ -3,10 +3,10 @@ import { StyleSheet } from 'react-native';
 export const orderWebStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F3F4F6',
   },
   headerWrapper: {
-    backgroundColor: '#1D4533',
+    backgroundColor: '#24272B',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
     borderBottomWidth: 1,
@@ -38,14 +38,14 @@ export const orderWebStyles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoText: {
     fontSize: 22,
     fontWeight: '900',
-    color: '#0F172A',
+    color: '#FFFFFF',
   },
   headerNavLinks: {
     flexDirection: 'row',
@@ -163,8 +163,8 @@ export const orderWebStyles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   tabBtnActive: {
-    backgroundColor: '#1D4533',
-    borderColor: '#1D4533',
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
   },
   tabBtnText: {
     fontSize: 13,
@@ -212,8 +212,8 @@ export const orderWebStyles = StyleSheet.create({
     boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
   },
   orderCardSelected: {
-    borderColor: '#1D4533',
-    backgroundColor: '#F8FAF9',
+    borderColor: '#EA580C',
+    backgroundColor: '#FFFFFF',
   },
   orderCardTop: {
     flexDirection: 'row',
@@ -224,7 +224,7 @@ export const orderWebStyles = StyleSheet.create({
   orderNumber: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   orderDate: {
     fontSize: 12,
@@ -237,10 +237,10 @@ export const orderWebStyles = StyleSheet.create({
     borderRadius: 12,
   },
   statusProcessing: {
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#E0F2FE',
   },
   statusTextProcessing: {
-    color: '#1D4533',
+    color: '#075985',
     fontSize: 11.5,
     fontWeight: '800',
   },
@@ -278,14 +278,14 @@ export const orderWebStyles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
-    backgroundColor: '#F3F7F6',
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
-    borderColor: '#C8DDD3',
+    borderColor: '#FED7AA',
   },
   trackBtnText: {
     fontSize: 12,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   invoiceDrawerCol: {
     flex: 1.2,
@@ -314,7 +314,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   invoiceSub: {
     fontSize: 12.5,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
     marginTop: 2,
   },
@@ -322,7 +322,7 @@ export const orderWebStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 14,
@@ -348,7 +348,7 @@ export const orderWebStyles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
   },
   timelineDotPending: {
     width: 10,
@@ -445,7 +445,7 @@ export const orderWebStyles = StyleSheet.create({
   grandTotalVal: {
     fontSize: 18,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
   },
 });
 

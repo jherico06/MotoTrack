@@ -23,6 +23,7 @@ import { garageService } from '../../services/bookings/garageService.js';
 import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../../services/products/motorcycleService.js';
 import BootstrapIcon from './BootstrapIcon.jsx';
 import BookingWorkflowTracker from './BookingWorkflowTracker.jsx';
+import ServiceReceiptModal from '../modals/ServiceReceiptModal.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
 import { getOptimizedImageUrl } from '../../utils/imageUrl.js';
 import {
@@ -33,6 +34,7 @@ import {
   normalizeBookingStatus,
   calcLaborCost,
 } from '../../utils/serviceQuotation.js';
+import { isPmsFixedBooking } from '../../utils/pmsCcPricing.js';
 import {
   customerStatusLabel,
   getCustomerProgress,
@@ -178,7 +180,7 @@ function Section({ title, icon, children, defaultOpen = true, badge }) {
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
           {icon ? (
             <View style={styles.sectionIconBadge}>
-              <BootstrapIcon name={icon} size={14} color="#1D4533" />
+              <BootstrapIcon name={icon} size={14} color="#EA580C" />
             </View>
           ) : null}
           <Text style={styles.sectionTitle}>{title}</Text>
@@ -252,6 +254,7 @@ export default function CustomerServiceBookingCard({
   const [showDeclineBox, setShowDeclineBox] = useState(false);
   const [infoReply, setInfoReply] = useState('');
   const [nowTick, setNowTick] = useState(() => Date.now());
+  const [receiptVisible, setReceiptVisible] = useState(false);
 
   const toast = (m) => onToast?.(m);
 
@@ -390,12 +393,28 @@ export default function CustomerServiceBookingCard({
     [approvedCharges]
   );
 
+  // Multi-service catalog bookings carry a snapshot of each selected service + labor rate.
+  const serviceLineItems = useMemo(() => {
+    const raw = booking?.service_line_items || booking?.serviceLineItems;
+    return Array.isArray(raw) ? raw.filter(Boolean) : [];
+  }, [booking]);
+  const laborSubtotalValue = Number(
+    booking?.labor_subtotal ?? booking?.quoted_service_rate ?? booking?.package_price ?? 0
+  );
+
   const media = useMemo(() => {
     const raw = booking?.media_urls || booking?.photos || [];
     return Array.isArray(raw) ? raw.filter(Boolean) : [];
   }, [booking]);
 
-  const progress = useMemo(() => getCustomerProgress(status), [status]);
+  const progress = useMemo(
+    () =>
+      getCustomerProgress(
+        status,
+        effectiveQuotation?.items?.length ? { includeQuotation: true } : undefined
+      ),
+    [status, effectiveQuotation]
+  );
 
   const parts = (effectiveQuotation?.items || []).filter((i) => i.item_type === 'part');
   const others = (effectiveQuotation?.items || []).filter((i) => i.item_type !== 'part');
@@ -677,14 +696,21 @@ export default function CustomerServiceBookingCard({
               statusColorInfo={semanticColors}
             />
             <GridKV label="BOOKED ON" value={fmtDate(booking?.created_at || booking?.createdAt)} />
-            <GridKV
-              label="ASSIGNED MECHANIC"
-              value={
-                booking?.mechanic && !String(booking.mechanic).toLowerCase().includes('pending')
-                  ? booking.mechanic
-                  : 'Master Tech Jayson (Yamaha & Honda Certified)'
-              }
-            />
+            {booking?.quoted_service_rate != null || booking?.booking_mode === 'pms_fixed' ? (
+              <GridKV
+                label="FIXED SERVICE RATE"
+                value={
+                  booking?.quoted_service_rate != null
+                    ? `₱${Number(booking.quoted_service_rate).toLocaleString('en-PH')}`
+                    : booking?.package_price != null
+                      ? `₱${Number(booking.package_price).toLocaleString('en-PH')}`
+                      : '—'
+                }
+              />
+            ) : null}
+            {booking?.cc_category_name ? (
+              <GridKV label="CC CATEGORY" value={booking.cc_category_name} />
+            ) : null}
           </View>
         </View>
       </Section>
@@ -708,13 +734,46 @@ export default function CustomerServiceBookingCard({
       <Section title="Your Service Request" icon="chat-left-text" defaultOpen={false}>
         <View style={styles.twoColumnGrid}>
           <View style={styles.gridColumn}>
-            <GridKV label="REQUESTED SERVICE" value={booking?.service_title || booking?.package_name || 'Standard Service'} />
+            <GridKV
+              label={serviceLineItems.length > 1 ? 'REQUESTED SERVICES' : 'REQUESTED SERVICE'}
+              value={
+                serviceLineItems.length > 1
+                  ? `${serviceLineItems.length} services`
+                  : booking?.service_title || booking?.package_name || 'Standard Service'
+              }
+            />
+            {booking?.booking_mode === 'pms_fixed' && Number(laborSubtotalValue) > 0 ? (
+              <GridKV
+                label={serviceLineItems.length > 1 ? 'LABOR SUBTOTAL' : 'FIXED LABOR RATE'}
+                value={formatPhp(laborSubtotalValue)}
+              />
+            ) : null}
             <GridKV label="PROBLEM DESCRIPTION" value={booking?.problem_description || booking?.repair_type || 'General PMS check'} />
           </View>
           <View style={styles.gridColumn}>
+            {booking?.booking_mode === 'pms_fixed' && booking?.cc_category_name ? (
+              <GridKV
+                label="CC CATEGORY"
+                value={`${booking.cc_category_name}${booking.motorcycle_cc ? ` (${booking.motorcycle_cc}cc)` : ''}`}
+              />
+            ) : null}
             <GridKV label="SPECIAL NOTES" value={booking?.notes || 'None'} />
           </View>
         </View>
+        {serviceLineItems.length > 1 ? (
+          <View style={{ marginTop: 10 }}>
+            <Text style={styles.subhead}>Selected Services</Text>
+            {serviceLineItems.map((item, idx) => (
+              <Line
+                key={`${item.serviceId || item.service_id || item.id || idx}`}
+                label={item.serviceName || item.service_name || item.name || 'Service'}
+                value={formatPhp(item.lineTotalPhp ?? item.laborRatePhp ?? item.labor_rate_php ?? item.price ?? 0)}
+              />
+            ))}
+            <View style={styles.divider} />
+            <Line label="Labor subtotal" value={formatPhp(laborSubtotalValue)} bold />
+          </View>
+        ) : null}
         {media.length > 0 ? (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
             {media.map((url, i) => (
@@ -728,7 +787,7 @@ export default function CustomerServiceBookingCard({
         ) : null}
       </Section>
 
-      {loading ? <ActivityIndicator color="#1D4533" style={{ marginVertical: 8 }} /> : null}
+      {loading ? <ActivityIndicator color="#EA580C" style={{ marginVertical: 8 }} /> : null}
 
       {/* 5. Quotation Breakdown */}
       {effectiveQuotation ? (
@@ -977,7 +1036,7 @@ export default function CustomerServiceBookingCard({
             {/* Remaining Balance Note */}
             <View style={[styles.receiptRow, { marginTop: 10 }]}>
               <Text style={styles.receiptMetaLabel}>Remaining Balance Due at Bay</Text>
-              <Text style={[styles.receiptMetaValue, { fontWeight: '800', color: '#1D4533' }]}>
+              <Text style={[styles.receiptMetaValue, { fontWeight: '800', color: '#EA580C' }]}>
                 {formatPhp(
                   Number(booking?.remaining_balance) > 0
                     ? booking.remaining_balance
@@ -1122,34 +1181,112 @@ export default function CustomerServiceBookingCard({
         </Section>
       ) : null}
 
-      {/* Final bill */}
-      {showFinalBill && quotation ? (
-        <Section title="Final Bill" icon="calculator">
-          <Line
-            label={`${actualHours != null ? 'Actual' : 'Estimated'} labor (${laborHours} hrs × ${formatPhp(rate)})`}
-            value={formatPhp(laborCost)}
-          />
-          <Line label="Parts" value={formatPhp(partsTotal)} />
-          {approvedCharges.length > 0 ? (
-            <Line label={`Approved additional work (${approvedCharges.length})`} value={formatPhp(approvedAdditionalTotal)} />
-          ) : null}
-          <Line label="Other charges" value={formatPhp(otherTotal)} />
-          {discount > 0 ? <Line label="Discount" value={formatPhp(discount)} negative /> : null}
-          <View style={styles.divider} />
-          <Line label="Final Total" value={formatPhp(finalTotal)} bold />
-          <Line label="Downpayment paid" value={formatPhpDecimals(paidSoFar)} negative />
-          <View style={styles.divider} />
-          <Line label="Remaining Balance" value={formatPhp(remaining)} bold />
-          {showFinalPay && remaining > 0 ? (
-            <View style={styles.noteBox}>
-              <Text style={styles.noteText}>
-                Please settle the remaining balance at the shop. Admin will record Cash or Other
-                payment before your motorcycle is released.
+      {/* Final bill + official service receipt */}
+      {showFinalBill && (quotation || Number(booking?.final_service_total || 0) > 0) ? (
+        <Section title="Official Service Receipt" icon="receipt-cutoff" defaultOpen={true}>
+          <View style={styles.receiptCard}>
+            <Text style={styles.receiptBrand}>MOTOTRACK SERVICE HUB</Text>
+            <Text style={styles.receiptSubhead}>Service Completion Receipt</Text>
+            <View style={styles.receiptVerifiedBadge}>
+              <BootstrapIcon name="shield-check" size={12} color="#166534" />
+              <Text style={styles.receiptVerifiedText}>
+                {remaining <= 0 ? 'READY FOR PICKUP' : 'FINAL BILL READY'}
               </Text>
             </View>
-          ) : null}
+
+            <View style={styles.receiptDashedLine} />
+
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptMetaLabel}>Receipt Ref #</Text>
+              <Text style={styles.receiptMetaValue}>SRV-{bookingId}</Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptMetaLabel}>Service</Text>
+              <Text style={styles.receiptMetaValue}>
+                {booking?.service_title || booking?.package_name || 'Motorcycle Service'}
+              </Text>
+            </View>
+
+            <View style={styles.receiptDashedLine} />
+
+            <Line
+              label={
+                isPmsFixedBooking(booking)
+                  ? 'Service rate (fixed)'
+                  : `${actualHours != null ? 'Actual' : 'Estimated'} labor (${laborHours} hrs × ${formatPhp(rate)})`
+              }
+              value={formatPhp(laborCost)}
+            />
+            {parts.length > 0
+              ? parts.map((i, idx) => (
+                  <Line
+                    key={`rp-${idx}`}
+                    label={`Part: ${i.product_name || 'Item'} × ${i.quantity || 1}`}
+                    value={formatPhp(i.line_total ?? Number(i.quantity || 1) * Number(i.unit_price || 0))}
+                  />
+                ))
+              : <Line label="Parts" value={formatPhp(partsTotal)} />}
+            {others.length > 0
+              ? others.map((i, idx) => (
+                  <Line
+                    key={`ro-${idx}`}
+                    label={i.description || i.product_name || 'Other'}
+                    value={formatPhp(i.line_total ?? i.unit_price ?? 0)}
+                  />
+                ))
+              : otherTotal > 0
+                ? <Line label="Other charges" value={formatPhp(otherTotal)} />
+                : null}
+            {approvedCharges.length > 0 ? (
+              <Line
+                label={`Approved additional work (${approvedCharges.length})`}
+                value={formatPhp(approvedAdditionalTotal)}
+              />
+            ) : null}
+            {discount > 0 ? <Line label="Discount" value={formatPhp(discount)} negative /> : null}
+
+            <View style={styles.receiptHighlightCard}>
+              <View>
+                <Text style={styles.receiptHighlightLabel}>FINAL TOTAL</Text>
+                <Text style={styles.receiptHighlightSub}>
+                  Paid {formatPhpDecimals(paidSoFar)} · Remaining {formatPhp(remaining)}
+                </Text>
+              </View>
+              <Text style={styles.receiptHighlightValue}>{formatPhp(finalTotal)}</Text>
+            </View>
+
+            {showFinalPay && remaining > 0 ? (
+              <View style={[styles.noteBox, { marginTop: 10 }]}>
+                <Text style={styles.noteText}>
+                  Please settle the remaining balance at the shop. Admin will record Cash or Other
+                  payment before your motorcycle is released.
+                </Text>
+              </View>
+            ) : (
+              <Text style={styles.receiptNotice}>
+                ✓ Your service is complete. Open the full receipt anytime, or present your pickup QR at the shop.
+              </Text>
+            )}
+
+            <TouchableOpacity
+              style={styles.btnAccept}
+              onPress={() => setReceiptVisible(true)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.btnAcceptText}>View Full Official Receipt</Text>
+            </TouchableOpacity>
+          </View>
         </Section>
       ) : null}
+
+      <ServiceReceiptModal
+        visible={receiptVisible}
+        onClose={() => setReceiptVisible(false)}
+        booking={booking}
+        quotation={effectiveQuotation || quotation}
+        payments={payments}
+        isDarkMode={isDarkMode}
+      />
 
       {/* Payments */}
       {payments.length > 0 ? (
@@ -1167,7 +1304,7 @@ export default function CustomerServiceBookingCard({
               </View>
               <View style={{ alignItems: 'flex-end' }}>
                 <Text style={styles.payAmt}>{formatPhp(p.amount)}</Text>
-                <Text style={[styles.muted, p.status === 'Completed' && { color: '#1D4533', fontWeight: '700' }]}>
+                <Text style={[styles.muted, p.status === 'Completed' && { color: '#166534', fontWeight: '700' }]}>
                   {p.status}
                 </Text>
               </View>
@@ -1204,7 +1341,7 @@ export default function CustomerServiceBookingCard({
         <Section title="Service Timeline" icon="clock-history" defaultOpen={false}>
           {timeline.map((ev) => (
             <View key={ev.history_id} style={styles.stepRow}>
-              <BootstrapIcon name="circle-fill" size={8} color="#1D4533" />
+              <BootstrapIcon name="circle-fill" size={8} color="#EA580C" />
               <View style={{ flex: 1 }}>
                 <Text style={styles.stepDone}>
                   {ev.description || ev.event_type || ev.to_status}
@@ -1235,7 +1372,7 @@ export default function CustomerServiceBookingCard({
         style={[
           styles.listCard,
           {
-            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#C8DDD3'),
+            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#FED7AA'),
             backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
             cursor: 'pointer',
           },
@@ -1272,7 +1409,7 @@ export default function CustomerServiceBookingCard({
             </Text>
 
             <View style={[styles.listMotoBadge, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
-              <BootstrapIcon name="bicycle" size={13} color={isDarkMode ? '#4DB896' : '#1D4533'} />
+              <BootstrapIcon name="bicycle" size={13} color={isDarkMode ? '#EA580C' : '#EA580C'} />
               <Text style={[styles.listMotoText, isDarkMode && { color: '#CBDCEE' }]} numberOfLines={1}>
                 {bikeLabel || 'Registered Motorcycle'}
                 {plate ? ` • ${plate}` : ''}
@@ -1314,7 +1451,7 @@ export default function CustomerServiceBookingCard({
             {finalTotal > 0 ? (
               <View style={styles.listPriceBox}>
                 <Text style={styles.listPriceLabel}>Total Quote</Text>
-                <Text style={[styles.listPriceValue, isDarkMode && { color: '#4DB896' }]}>{formatPhp(finalTotal)}</Text>
+                <Text style={[styles.listPriceValue, isDarkMode && { color: '#EA580C' }]}>{formatPhp(finalTotal)}</Text>
               </View>
             ) : (
               <View style={styles.listPriceBox}>
@@ -1585,7 +1722,7 @@ export default function CustomerServiceBookingCard({
         style: [
           styles.card,
           {
-            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#C8DDD3'),
+            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#FED7AA'),
             backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
           },
           style,
@@ -1595,7 +1732,7 @@ export default function CustomerServiceBookingCard({
         style: [
           styles.card,
           {
-            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#C8DDD3'),
+            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#FED7AA'),
             backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
             cursor: 'pointer',
           },
@@ -1634,14 +1771,14 @@ export default function CustomerServiceBookingCard({
           {booking?.service_title || booking?.package_name || 'Service Booking'}
         </Text>
         {finalTotal > 0 ? (
-          <Text style={[styles.headTotal, isDarkMode && { color: '#4DB896' }]}>{formatPhp(finalTotal)}</Text>
+          <Text style={[styles.headTotal, isDarkMode && { color: '#EA580C' }]}>{formatPhp(finalTotal)}</Text>
         ) : null}
       </View>
 
       {/* 3. Motorcycle Info Badge */}
       <View style={[styles.motoInfoBox, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
         <View style={[styles.motoIconWrap, isDarkMode && { backgroundColor: '#23302B' }]}>
-          <BootstrapIcon name="bicycle" size={14} color={isDarkMode ? '#4DB896' : '#1D4533'} />
+          <BootstrapIcon name="bicycle" size={14} color={isDarkMode ? '#EA580C' : '#EA580C'} />
         </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.motoName, isDarkMode && { color: '#F5F7F6' }]} numberOfLines={1}>
@@ -1926,7 +2063,7 @@ const styles = StyleSheet.create({
   listPriceValue: {
     fontSize: 16,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
     fontVariant: ['tabular-nums'],
   },
   listPricePending: {
@@ -1943,12 +2080,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingHorizontal: 13,
     paddingVertical: 7,
     borderRadius: 8,
     cursor: 'pointer',
-    shadowColor: '#1D4533',
+    shadowColor: '#EA580C',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 2,
@@ -2033,7 +2170,7 @@ const styles = StyleSheet.create({
   headTotal: {
     fontSize: 15,
     fontWeight: '900',
-    color: '#1D4533',
+    color: '#EA580C',
     fontVariant: ['tabular-nums'],
   },
   motoInfoBox: {
@@ -2052,7 +2189,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 7,
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2129,7 +2266,7 @@ const styles = StyleSheet.create({
   expandToggleText: {
     fontSize: 12.5,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   cancelActionBtn: {
     flexDirection: 'row',
@@ -2146,10 +2283,10 @@ const styles = StyleSheet.create({
     color: '#DC2626',
   },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  ref: { fontSize: 11, fontWeight: '800', color: '#1D4533', letterSpacing: 0.3 },
+  ref: { fontSize: 11, fontWeight: '800', color: '#EA580C', letterSpacing: 0.3 },
   title: { fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 2 },
   meta: { fontSize: 12, color: '#64748B', marginTop: 2 },
-  stage: { fontSize: 12, color: '#1D4533', marginTop: 8 },
+  stage: { fontSize: 12, color: '#EA580C', marginTop: 8 },
   noteBox: {
     backgroundColor: '#F0FDF9',
     borderWidth: 1,
@@ -2171,7 +2308,7 @@ const styles = StyleSheet.create({
   ctaBtn: {
     marginTop: 8,
     marginBottom: 4,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 10,
@@ -2209,7 +2346,7 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 7,
-    backgroundColor: '#E8F0EC',
+    backgroundColor: '#FFF7ED',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2232,8 +2369,8 @@ const styles = StyleSheet.create({
   sectionBody: {
     padding: 14,
   },
-  badge: { backgroundColor: '#C8DDD3', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-  badgeText: { fontSize: 10, fontWeight: '800', color: '#1D4533' },
+  badge: { backgroundColor: '#FED7AA', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
+  badgeText: { fontSize: 10, fontWeight: '800', color: '#EA580C' },
 
   // Stepper Styles
   stepperWrap: {
@@ -2436,7 +2573,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 8, marginTop: 10 },
   btnAccept: {
     flex: 1,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
@@ -2454,7 +2591,7 @@ const styles = StyleSheet.create({
   btnDeclineText: { color: '#DC2626', fontWeight: '800' },
   btnPay: {
     marginTop: 10,
-    backgroundColor: '#1D4533',
+    backgroundColor: '#EA580C',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
@@ -2486,7 +2623,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 18,
     borderWidth: 1.5,
-    borderColor: '#C8DDD3',
+    borderColor: '#FED7AA',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -2602,7 +2739,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#C8DDD3',
+    borderColor: '#FED7AA',
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
@@ -2615,7 +2752,7 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 12.5,
     letterSpacing: 0.8,
-    color: '#1D4533',
+    color: '#EA580C',
     marginBottom: 12,
   },
   tableHeaderDivider: {
@@ -2660,7 +2797,7 @@ const styles = StyleSheet.create({
   totalsTotalValue: {
     fontSize: 17,
     fontWeight: '800',
-    color: '#1D4533',
+    color: '#EA580C',
   },
   breakdownSubBox: {
     marginTop: 10,
@@ -2681,7 +2818,7 @@ const styles = StyleSheet.create({
   },
   tableSubValueRem: {
     fontSize: 13,
-    color: '#1D4533',
+    color: '#EA580C',
     fontWeight: '700',
   },
   statusMetaContainer: {

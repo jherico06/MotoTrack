@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { customizationService } from '../services/bookings/customizationService.js';
 import { motorcycleService } from '../services/products/motorcycleService.js';
+import { notificationService } from '../services/notifications/notificationService.js';
 import {
   CUSTOMIZATION_CATEGORIES,
   getCatalogBrands,
@@ -296,6 +297,13 @@ export function useCustomizationBuilder({ currentUser, initialProduct } = {}) {
       setActiveCustomization(result.customization);
       setInfo('Customization saved.');
       setStep('saved');
+      try {
+        notificationService.notifyCustomerCustomizationSaved({
+          userId: currentUser.id || currentUser.user_id,
+          customerEmail: currentUser.email,
+          setupName: result.customization?.name || saveName || `My ${brand} ${model} Setup`,
+        });
+      } catch (_notifErr) {}
       await refreshMyCustomizations();
       return result;
     } finally {

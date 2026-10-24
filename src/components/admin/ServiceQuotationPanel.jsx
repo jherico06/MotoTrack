@@ -26,12 +26,14 @@ import {
   normalizeBookingStatus,
 } from '../../utils/serviceQuotation.js';
 import { canAdminAction } from '../../utils/bookingWorkflow.js';
+import { isPmsFixedBooking } from '../../utils/pmsCcPricing.js';
 import { getThemeTokens } from '../../styles/theme.js';
+import ServiceReceiptModal from '../modals/ServiceReceiptModal.jsx';
 
 function getFieldProps(t, isDark) {
   return {
     placeholderTextColor: isDark ? t.placeholder : '#94A3B8',
-    selectionColor: isDark ? t.accentBrand : '#1D4533',
+    selectionColor: isDark ? t.accentBrand : '#EA580C',
     underlineColorAndroid: 'transparent',
   };
 }
@@ -63,6 +65,7 @@ export default function ServiceQuotationPanel({
     canAdminAction(booking?.status, 'send_additional');
   const canFinalize = canAdminAction(booking?.status, 'finalize_bill');
   const canRecordPayment = canAdminAction(booking?.status, 'record_payment');
+  const isPmsFixed = isPmsFixedBooking(booking);
   const [mechanics, setMechanics] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,9 +75,19 @@ export default function ServiceQuotationPanel({
   const [payMethod, setPayMethod] = useState('cash');
   const [payRef, setPayRef] = useState('');
   const [payNotes, setPayNotes] = useState('');
+  const [receiptVisible, setReceiptVisible] = useState(false);
+  const [receiptSnapshot, setReceiptSnapshot] = useState(null);
 
   const [mechanicId, setMechanicId] = useState(booking?.mechanic_id || '');
   const [hourlyRate, setHourlyRate] = useState(String(booking?.quoted_hourly_rate || 150));
+  const [serviceRate, setServiceRate] = useState(
+    String(
+      booking?.quoted_service_rate ||
+        booking?.package_price ||
+        booking?.estimated_service_total ||
+        ''
+    )
+  );
   const [estimatedHours, setEstimatedHours] = useState(
     String(booking?.estimated_labor_hours || '3')
   );
@@ -117,6 +130,11 @@ export default function ServiceQuotationPanel({
         if (source) {
           setMechanicId(source.mechanic_id || '');
           setHourlyRate(String(source.hourly_rate ?? 150));
+          if (source.labor_cost != null && Number(source.hourly_rate || 0) <= 0) {
+            setServiceRate(String(source.labor_cost));
+          } else if (booking?.quoted_service_rate != null) {
+            setServiceRate(String(booking.quoted_service_rate));
+          }
           setEstimatedHours(String(source.estimated_labor_hours ?? 3));
           if (source.actual_labor_hours != null) {
             setActualHours(String(source.actual_labor_hours));
@@ -142,10 +160,6 @@ export default function ServiceQuotationPanel({
               amount: Number(i.line_total || i.unit_price || 0),
             }))
           );
-        } else if (mechs?.length && !mechanicId) {
-          const first = mechs[0];
-          setMechanicId(first.id);
-          setHourlyRate(String(first.hourlyRate ?? first.hourly_rate ?? 150));
         }
       } finally {
         if (mounted) setLoading(false);
@@ -172,8 +186,9 @@ export default function ServiceQuotationPanel({
 
   const estimated = useMemo(() => {
     const totals = calcServiceTotals({
-      hourlyRate: Number(hourlyRate || 0),
-      laborHours: Number(estimatedHours || 0),
+      hourlyRate: isPmsFixed ? 0 : Number(hourlyRate || 0),
+      laborHours: isPmsFixed ? 0 : Number(estimatedHours || 0),
+      laborCost: isPmsFixed ? Number(serviceRate || 0) : undefined,
       partsTotal,
       otherChargesTotal: otherTotal,
       discountType,
@@ -187,6 +202,8 @@ export default function ServiceQuotationPanel({
     });
     return { ...totals, ...dp };
   }, [
+    isPmsFixed,
+    serviceRate,
     hourlyRate,
     estimatedHours,
     partsTotal,
@@ -199,6 +216,15 @@ export default function ServiceQuotationPanel({
   ]);
 
   const actualPreview = useMemo(() => {
+    if (isPmsFixed) {
+      return calcServiceTotals({
+        laborCost: Number(serviceRate || 0),
+        partsTotal,
+        otherChargesTotal: otherTotal,
+        discountType,
+        discountValue: Number(discountValue || 0),
+      });
+    }
     if (actualHours === '') return null;
     return calcServiceTotals({
       hourlyRate: Number(hourlyRate || 0),
@@ -208,7 +234,16 @@ export default function ServiceQuotationPanel({
       discountType,
       discountValue: Number(discountValue || 0),
     });
-  }, [actualHours, hourlyRate, partsTotal, otherTotal, discountType, discountValue]);
+  }, [
+    isPmsFixed,
+    serviceRate,
+    actualHours,
+    hourlyRate,
+    partsTotal,
+    otherTotal,
+    discountType,
+    discountValue,
+  ]);
 
   const filteredProducts = useMemo(() => {
     const q = productSearch.trim().toLowerCase();
@@ -227,7 +262,7 @@ export default function ServiceQuotationPanel({
 
   const onSelectMechanic = (mech) => {
     setMechanicId(mech.id);
-    setHourlyRate(String(mech.hourlyRate ?? mech.hourly_rate ?? 150));
+    // Pricing uses fixed service rates / booking quote — not per-mechanic hourly rates.
   };
 
   const addPart = (product) => {
@@ -275,30 +310,35 @@ export default function ServiceQuotationPanel({
     })),
   ];
 
+  const persistQuotationPayload = async () => {
+    return serviceQuotationService.upsertCustomerQuotation(bookingId, {
+      mechanic_id: mechanicId || null,
+      mechanic_name: selectedMechanic?.shortName || selectedMechanic?.name || booking?.mechanic,
+      hourly_rate: isPmsFixed ? 0 : Number(hourlyRate || 0),
+      estimated_labor_hours: isPmsFixed ? 0 : Number(estimatedHours || 0),
+      fixed_service_rate: isPmsFixed ? Number(serviceRate || 0) : undefined,
+      items: buildItemsPayload(),
+      discount_type: discountType,
+      discount_value: Number(discountValue || 0),
+      downpayment_type: downpaymentType,
+      downpayment_percent: Number(downpaymentPercent || 0),
+      downpayment_amount: Number(downpaymentFixed || 0),
+      source_quotation_id: mechanicEstimate?.quotation_id || null,
+      status: 'draft',
+      created_by: 'admin',
+    });
+  };
+
   const saveQuotation = async () => {
     if (!bookingId) return;
     setSaving(true);
     try {
-      const result = await serviceQuotationService.upsertCustomerQuotation(bookingId, {
-        mechanic_id: mechanicId || null,
-        mechanic_name: selectedMechanic?.shortName || selectedMechanic?.name || booking?.mechanic,
-        hourly_rate: Number(hourlyRate || 0),
-        estimated_labor_hours: Number(estimatedHours || 0),
-        items: buildItemsPayload(),
-        discount_type: discountType,
-        discount_value: Number(discountValue || 0),
-        downpayment_type: downpaymentType,
-        downpayment_percent: Number(downpaymentPercent || 0),
-        downpayment_amount: Number(downpaymentFixed || 0),
-        source_quotation_id: mechanicEstimate?.quotation_id || null,
-        status: 'draft',
-        created_by: 'admin',
-      });
+      const result = await persistQuotationPayload();
       if (!result.success) {
         toast(result.error || 'Failed to save quotation');
         return;
       }
-      toast('Customer quotation saved (mechanic estimate preserved)');
+      toast(isPmsFixed ? 'Service rate & parts saved' : 'Customer quotation saved');
       onUpdated?.(result.quotation);
     } finally {
       setSaving(false);
@@ -308,7 +348,11 @@ export default function ServiceQuotationPanel({
   const sendQuotation = async () => {
     setSaving(true);
     try {
-      await saveQuotation();
+      const saved = await persistQuotationPayload();
+      if (!saved.success) {
+        toast(saved.error || 'Failed to save quotation');
+        return;
+      }
       const result = await serviceQuotationService.sendQuotationToCustomer(bookingId, {
         customerId: booking?.customer_id,
         customerUserId: booking?.user_id || booking?.customer_id,
@@ -371,6 +415,11 @@ export default function ServiceQuotationPanel({
   const finalizeBill = async () => {
     setSaving(true);
     try {
+      const saved = await persistQuotationPayload();
+      if (!saved.success) {
+        toast(saved.error || 'Could not save service rate / parts before finalize');
+        return;
+      }
       const result = await serviceQuotationService.finalizeBilling(bookingId);
       if (!result.success) {
         toast(result.error || 'Finalize failed');
@@ -378,9 +427,37 @@ export default function ServiceQuotationPanel({
       }
       toast(
         result.remaining > 0
-          ? `Final bill ${formatPhp(result.finalTotal)} • Remaining ${formatPhp(result.remaining)}`
-          : `Final bill ${formatPhp(result.finalTotal)} • Ready for pickup`
+          ? `Receipt generated ${formatPhp(result.finalTotal)} • Remaining ${formatPhp(result.remaining)} • Customer notified`
+          : `Receipt generated ${formatPhp(result.finalTotal)} • Customer notified • Ready for pickup`
       );
+      setReceiptSnapshot({
+        booking: {
+          ...booking,
+          final_service_total: result.finalTotal,
+          remaining_balance: result.remaining,
+          actual_labor_cost: result.laborCost,
+          parts_total: result.partsTotal,
+          other_charges_total: result.otherChargesTotal,
+        },
+        quotation: {
+          ...(saved.quotation || {}),
+          labor_cost: result.laborCost,
+          parts_total: result.partsTotal,
+          other_charges_total: result.otherChargesTotal,
+          additional_charges_total: result.additionalChargesTotal,
+          total_amount: result.finalTotal,
+          remaining_balance: result.remaining,
+          items: buildItemsPayload().map((i, idx) => ({
+            ...i,
+            line_total:
+              i.item_type === 'part'
+                ? Number(i.quantity || 1) * Number(i.unit_price || 0)
+                : Number(i.unit_price || 0),
+            sort_order: idx,
+          })),
+        },
+      });
+      setReceiptVisible(true);
       onUpdated?.(result);
     } finally {
       setSaving(false);
@@ -398,7 +475,7 @@ export default function ServiceQuotationPanel({
   if (loading) {
     return (
       <View style={[styles.wrap, styles.center, style]}>
-        <ActivityIndicator color={isDarkMode ? t.accentBrand : '#1D4533'} />
+        <ActivityIndicator color={isDarkMode ? t.accentBrand : '#EA580C'} />
       </View>
     );
   }
@@ -413,9 +490,9 @@ export default function ServiceQuotationPanel({
 
       {mechanicEstimate ? (
         <View style={styles.estimateBox}>
-          <Text style={styles.estimateTitle}>Mechanic Estimate (read-only)</Text>
+          <Text style={styles.estimateTitle}>Previous Estimate (read-only)</Text>
           <Text style={styles.sub}>
-            {mechanicEstimate.mechanic_name || 'Mechanic'} ·{' '}
+            {mechanicEstimate.mechanic_name || 'Legacy estimate'} ·{' '}
             {formatPhp(mechanicEstimate.total_amount)} · submitted{' '}
             {mechanicEstimate.status || 'submitted'}
           </Text>
@@ -425,59 +502,61 @@ export default function ServiceQuotationPanel({
             {formatPhp(mechanicEstimate.other_charges_total)}
           </Text>
           <Text style={styles.muted}>
-            Adjust below to create the customer quotation. The mechanic estimate is never overwritten.
+            Adjust below to create the customer quotation. The previous estimate is never overwritten.
           </Text>
         </View>
       ) : null}
 
-      <Text style={styles.section}>Assigned Mechanic (internal)</Text>
-      {mechanics.length === 0 ? (
-        <Text style={[styles.muted, { marginBottom: 12 }]}>No mechanics registered yet.</Text>
+      {/* Admin sets service rate + inventory products for parts/other */}
+      {isPmsFixed ? (
+        <View style={styles.field}>
+          <Text style={styles.label}>Service Rate (₱) — fixed catalog / adjustable</Text>
+          <TextInput
+            style={styles.input}
+            keyboardType="decimal-pad"
+            value={serviceRate}
+            onChangeText={setServiceRate}
+            placeholder="0"
+            {...fieldProps}
+          />
+          <Text style={styles.calcLine}>Service labor (fixed): {formatPhp(Number(serviceRate || 0))}</Text>
+          <Text style={styles.muted}>
+            Add inventory products below for parts replaced or other shop charges. Customer is notified when you finalize and generate the receipt.
+          </Text>
+        </View>
       ) : (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipRow}>
-          {mechanics.map((m) => (
-            <TouchableOpacity
-              key={m.id}
-              style={[styles.chip, mechanicId === m.id && styles.chipActive]}
-              onPress={() => onSelectMechanic(m)}
-            >
-              <Text style={[styles.chipText, mechanicId === m.id && styles.chipTextActive]}>
-                {m.shortName || m.name} · {formatPhp(m.hourlyRate ?? m.hourly_rate ?? 150)}/hr
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        <>
+          <View style={styles.row}>
+            <View style={styles.field}>
+              <Text style={styles.label}>Hourly Rate (₱)</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={hourlyRate}
+                onChangeText={setHourlyRate}
+                placeholder="150"
+                {...fieldProps}
+              />
+            </View>
+            <View style={styles.field}>
+              <Text style={styles.label}>Estimated Hours</Text>
+              <TextInput
+                style={styles.input}
+                keyboardType="decimal-pad"
+                value={estimatedHours}
+                onChangeText={setEstimatedHours}
+                placeholder="3"
+                {...fieldProps}
+              />
+            </View>
+          </View>
+          <Text style={styles.calcLine}>
+            ESTIMATED Labor: {formatLaborLine(estimatedHours, hourlyRate)}
+          </Text>
+        </>
       )}
 
-      <View style={styles.row}>
-        <View style={styles.field}>
-          <Text style={styles.label}>Hourly Rate (₱)</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={hourlyRate}
-            onChangeText={setHourlyRate}
-            placeholder="150"
-            {...fieldProps}
-          />
-        </View>
-        <View style={styles.field}>
-          <Text style={styles.label}>Estimated Hours</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="decimal-pad"
-            value={estimatedHours}
-            onChangeText={setEstimatedHours}
-            placeholder="3"
-            {...fieldProps}
-          />
-        </View>
-      </View>
-      <Text style={styles.calcLine}>
-        ESTIMATED Labor: {formatLaborLine(estimatedHours, hourlyRate)}
-      </Text>
-
-      <Text style={styles.section}>Parts (inventory snapshot)</Text>
+      <Text style={styles.section}>Parts (inventory products replaced)</Text>
       <TextInput
         style={styles.input}
         placeholder="Search products…"
@@ -658,7 +737,7 @@ export default function ServiceQuotationPanel({
           </>
         ) : (
           <Text style={styles.muted}>
-            Quotation editing unlocks when a mechanic estimate is submitted (or during inspection).
+            Quotation editing unlocks once the admin starts the inspection (Repair bookings).
           </Text>
         )}
       </View>
@@ -829,16 +908,52 @@ export default function ServiceQuotationPanel({
 
       {canFinalize ? (
         <TouchableOpacity style={[styles.btnPrimary, { marginTop: 16 }]} onPress={finalizeBill} disabled={saving}>
-          <Text style={styles.btnPrimaryText}>Finalize Billing</Text>
+          <Text style={styles.btnPrimaryText}>Finalize & Generate Receipt</Text>
         </TouchableOpacity>
       ) : null}
 
+      <TouchableOpacity
+        style={[styles.btnSecondary, { marginTop: 10 }]}
+        onPress={() => {
+          setReceiptSnapshot({
+            booking,
+            quotation: {
+              labor_cost: estimated.laborCost,
+              parts_total: partsTotal,
+              other_charges_total: otherTotal,
+              total_amount: estimated.totalAmount,
+              discount_amount: estimated.discountAmount,
+              remaining_balance: estimated.remainingBalance,
+              items: buildItemsPayload().map((i, idx) => ({
+                ...i,
+                line_total:
+                  i.item_type === 'part'
+                    ? Number(i.quantity || 1) * Number(i.unit_price || 0)
+                    : Number(i.unit_price || 0),
+                sort_order: idx,
+              })),
+            },
+          });
+          setReceiptVisible(true);
+        }}
+      >
+        <Text style={styles.btnSecondaryText}>Preview Service Receipt</Text>
+      </TouchableOpacity>
+
       {saving && (
         <View style={styles.savingRow}>
-          <ActivityIndicator color={isDarkMode ? t.accentBrand : '#1D4533'} />
+          <ActivityIndicator color={isDarkMode ? t.accentBrand : '#EA580C'} />
           <Text style={styles.muted}> Saving…</Text>
         </View>
       )}
+
+      <ServiceReceiptModal
+        visible={receiptVisible}
+        onClose={() => setReceiptVisible(false)}
+        booking={receiptSnapshot?.booking || booking}
+        quotation={receiptSnapshot?.quotation}
+        isDarkMode={isDarkMode}
+      />
     </ScrollView>
   );
 }
@@ -855,7 +970,7 @@ function createStyles(t, isDark) {
       marginBottom: 8,
       fontSize: 13,
       fontWeight: '700',
-      color: isDark ? t.accentBrand : '#1D4533',
+      color: isDark ? t.accentBrand : '#EA580C',
       textTransform: 'uppercase',
       letterSpacing: 0.4,
     },
@@ -867,7 +982,7 @@ function createStyles(t, isDark) {
       borderRadius: 8,
       marginRight: 8,
     },
-    chipActive: { backgroundColor: isDark ? '#1F6B52' : '#1D4533' },
+    chipActive: { backgroundColor: isDark ? '#EA580C' : '#EA580C' },
     chipText: { fontSize: 12, color: isDark ? t.textSecondary : '#334155', fontWeight: '600' },
     chipTextActive: { color: '#FFFFFF' },
     row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
@@ -905,7 +1020,7 @@ function createStyles(t, isDark) {
     },
     lineText: { fontSize: 13, color: isDark ? t.textSecondary : '#334155', flex: 1 },
     smallBtn: {
-      backgroundColor: isDark ? '#1F6B52' : '#1D4533',
+      backgroundColor: isDark ? '#EA580C' : '#EA580C',
       paddingHorizontal: 12,
       paddingVertical: 10,
       borderRadius: 8,
@@ -928,7 +1043,7 @@ function createStyles(t, isDark) {
       fontWeight: '800',
       fontSize: 12.5,
       letterSpacing: 0.8,
-      color: isDark ? t.accentBrand : '#1D4533',
+      color: isDark ? t.accentBrand : '#EA580C',
       marginBottom: 12,
     },
     tableHeaderRow: {
@@ -991,7 +1106,7 @@ function createStyles(t, isDark) {
     totalsTotalValue: {
       fontSize: 17,
       fontWeight: '800',
-      color: isDark ? t.money : '#1D4533',
+      color: isDark ? t.money : '#EA580C',
     },
     breakdownSubBox: {
       marginTop: 10,
@@ -1012,13 +1127,13 @@ function createStyles(t, isDark) {
     },
     tableSubValueRem: {
       fontSize: 13,
-      color: isDark ? t.money : '#1D4533',
+      color: isDark ? t.money : '#EA580C',
       fontWeight: '700',
     },
     actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
     btnPrimary: {
       flex: 1,
-      backgroundColor: isDark ? '#1F6B52' : '#1D4533',
+      backgroundColor: isDark ? '#EA580C' : '#EA580C',
       paddingVertical: 12,
       borderRadius: 10,
       alignItems: 'center',
@@ -1028,13 +1143,13 @@ function createStyles(t, isDark) {
       flex: 1,
       backgroundColor: isDark ? t.bgCard : '#FFFFFF',
       borderWidth: 1,
-      borderColor: isDark ? t.accentBorder : '#1D4533',
+      borderColor: isDark ? t.accentBorder : '#EA580C',
       paddingVertical: 12,
       borderRadius: 10,
       alignItems: 'center',
       marginTop: 8,
     },
-    btnSecondaryText: { color: isDark ? t.accentBrand : '#1D4533', fontWeight: '700', fontSize: 13 },
+    btnSecondaryText: { color: isDark ? t.accentBrand : '#EA580C', fontWeight: '700', fontSize: 13 },
     muted: { fontSize: 12, color: isDark ? t.textMuted : '#94A3B8', marginTop: 4 },
     savingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
     estimateBox: {

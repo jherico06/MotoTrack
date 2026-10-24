@@ -266,10 +266,11 @@ export default function ProductDetailsPage({
     ? getSizeStock(product, selectedSize) ?? product?.stock ?? 20
     : Number(product?.stock) || 20;
 
-  // ─── ADMIN FREE SHIPPING LOGIC ──────────────────────────────────────────
+  // ─── ADMIN FREE SHIPPING / FREE INSTALLATION LOGIC ───────────────────────
   // Free shipping when: system setting, product flag, OR active FREE_SHIPPING promo covers this product
   const [promoFreeShipping, setPromoFreeShipping] = useState(false);
   const [freeShippingPromoId, setFreeShippingPromoId] = useState(null);
+  const [promoFreeInstallation, setPromoFreeInstallation] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -278,23 +279,38 @@ export default function ProductDetailsPage({
         if (!cancelled) {
           setPromoFreeShipping(false);
           setFreeShippingPromoId(null);
+          setPromoFreeInstallation(false);
         }
         return;
       }
       try {
         const pid = product.id || product.product_id;
-        const match = await promoService.findApplicableFreeShipping(
-          [{ product: { id: pid, product_id: pid, price: Number(currentPrice || product.price || 0) }, quantity: 1 }],
-          150
-        );
+        const [match, installMatch] = await Promise.all([
+          promoService.findApplicableFreeShipping(
+            [
+              {
+                product: {
+                  id: pid,
+                  product_id: pid,
+                  price: Number(currentPrice || product.price || 0),
+                },
+                quantity: 1,
+              },
+            ],
+            150
+          ),
+          promoService.findApplicableFreeInstallation([String(pid)]),
+        ]);
         if (!cancelled) {
           setPromoFreeShipping(Boolean(match));
           setFreeShippingPromoId(match?.promoId || null);
+          setPromoFreeInstallation(Boolean(installMatch?.isFreeInstallation));
         }
       } catch {
         if (!cancelled) {
           setPromoFreeShipping(false);
           setFreeShippingPromoId(null);
+          setPromoFreeInstallation(false);
         }
       }
     };
@@ -477,6 +493,7 @@ export default function ProductDetailsPage({
         customerId: currentUser?.customer_id || currentUser?.user_id || currentUser?.id || null,
         customerName: orderFormData.customerName,
         customerPhone: orderFormData.customerPhone,
+        customerEmail: currentUser?.email || null,
         customerAddress: orderFormData.customerAddress,
         deliveryNotes: orderFormData.deliveryNotes,
         paymentMethod: orderFormData.paymentMethod,
@@ -517,27 +534,29 @@ export default function ProductDetailsPage({
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" backgroundColor="#FFFFFF" translucent={false} />
+      <StatusBar style="light" backgroundColor="#24272B" translucent={false} />
 
       {/* Toast Notification */}
       <ToastNotification message={toastMessage} />
 
-      {/* ─── TOP STICKY APP BAR ─── */}
+      {/* ─── TOP STICKY APP BAR (CHARCOAL) ─── */}
       <View style={styles.topBar}>
         <TouchableOpacity
           style={styles.topBarIconButton}
           onPress={onNavigateBack || onNavigateToStore}
           activeOpacity={0.8}
+          accessibilityLabel="Back"
         >
-          <BootstrapIcon name="chevron-left" size={18} color="#0F172A" />
+          <BootstrapIcon name="chevron-left" size={18} color="#FFFFFF" />
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.topSearchPill}
           onPress={onNavigateToStore}
           activeOpacity={0.85}
+          accessibilityLabel="Search product in store"
         >
-          <BootstrapIcon name="search" size={13} color="#64748B" />
+          <BootstrapIcon name="search" size={13} color="#94A3B8" />
           <Text style={styles.topSearchText} numberOfLines={1}>
             {product.name}
           </Text>
@@ -555,8 +574,9 @@ export default function ProductDetailsPage({
               }
             }}
             activeOpacity={0.8}
+            accessibilityLabel="Shopping Cart"
           >
-            <BootstrapIcon name="cart-fill" size={17} color="#0F172A" />
+            <BootstrapIcon name="cart-fill" size={17} color="#FFFFFF" />
             {cartItemCount > 0 && (
               <View style={styles.cartBadge}>
                 <Text style={styles.cartBadgeText}>{cartItemCount > 99 ? '99+' : cartItemCount}</Text>
@@ -586,7 +606,7 @@ export default function ProductDetailsPage({
 
           {/* Top Tag Pill */}
           <View style={styles.topTagPill}>
-            <BootstrapIcon name="patch-check-fill" size={12} color="#1D4533" />
+            <BootstrapIcon name="patch-check-fill" size={12} color="#EA580C" />
             <Text style={styles.topTagText}>Genuine MotoTrack Part</Text>
           </View>
 
@@ -607,6 +627,17 @@ export default function ProductDetailsPage({
                 <Text style={styles.promoRibbonText}>Free Shipping Activated</Text>
               </View>
               <Text style={styles.promoRibbonSubtext}>100% Authentic</Text>
+            </View>
+          )}
+          {promoFreeInstallation && (
+            <View style={[styles.promoRibbon, { marginTop: isFreeShippingActive ? 6 : 0 }]}>
+              <View style={styles.promoRibbonLeft}>
+                <View style={[styles.promoBadgeHighlight, { backgroundColor: '#166534' }]}>
+                  <Text style={styles.promoBadgeHighlightText}>FREE INSTALL</Text>
+                </View>
+                <Text style={styles.promoRibbonText}>Free Installation on AI booking</Text>
+              </View>
+              <Text style={styles.promoRibbonSubtext}>Shop Fitting</Text>
             </View>
           )}
         </View>
@@ -630,7 +661,7 @@ export default function ProductDetailsPage({
           {/* PayLater / COD installment notice */}
           <TouchableOpacity style={styles.perkRow} activeOpacity={0.8}>
             <View style={styles.perkRowLeft}>
-              <BootstrapIcon name="wallet2" size={14} color="#1D4533" />
+              <BootstrapIcon name="wallet2" size={14} color="#EA580C" />
               <Text style={styles.perkText}>Cash on Delivery & GCash Accepted</Text>
             </View>
             <BootstrapIcon name="chevron-right" size={12} color="#64748B" />
@@ -751,7 +782,7 @@ export default function ProductDetailsPage({
         <View style={styles.shippingCard}>
           <View style={styles.shippingHeaderRow}>
             <View style={styles.shippingIconWrap}>
-              <BootstrapIcon name="truck" size={17} color="#1D4533" />
+              <BootstrapIcon name="truck" size={17} color="#EA580C" />
             </View>
             <View style={styles.shippingInfoColumn}>
               <Text style={styles.guaranteedDeliveryDate}>
@@ -809,7 +840,7 @@ export default function ProductDetailsPage({
                 <Text style={styles.sectionBoxSub}>
                   {selectedColor || 'Choose a color option'}
                 </Text>
-                <BootstrapIcon name="chevron-right" size={12} color="#1D4533" />
+                <BootstrapIcon name="chevron-right" size={12} color="#EA580C" />
               </View>
             </TouchableOpacity>
             <View style={styles.variantChipsWrap}>
@@ -872,7 +903,7 @@ export default function ProductDetailsPage({
                 <Text style={styles.sectionBoxSub}>
                   {selectedSize || 'Choose a size specification'}
                 </Text>
-                <BootstrapIcon name="chevron-right" size={12} color="#1D4533" />
+                <BootstrapIcon name="chevron-right" size={12} color="#EA580C" />
               </View>
             </TouchableOpacity>
             <View style={styles.variantChipsWrap}>
@@ -948,7 +979,7 @@ export default function ProductDetailsPage({
         <View style={styles.sectionBox}>
           <View style={styles.sectionBoxTitleRow}>
             <Text style={styles.sectionBoxTitle}>Specifications</Text>
-            <BootstrapIcon name="shield-check" size={15} color="#1D4533" />
+            <BootstrapIcon name="shield-check" size={15} color="#EA580C" />
           </View>
 
           <View style={styles.specRow}>
@@ -1029,7 +1060,7 @@ export default function ProductDetailsPage({
               </Text>
               {product.features.map((feat, idx) => (
                 <View key={idx} style={styles.featureItem}>
-                  <BootstrapIcon name="check2" size={14} color="#1D4533" />
+                  <BootstrapIcon name="check2" size={14} color="#EA580C" />
                   <Text style={styles.featureText}>{feat}</Text>
                 </View>
               ))}
@@ -1079,7 +1110,7 @@ export default function ProductDetailsPage({
 
           {reviewsLoading ? (
             <View style={{ paddingVertical: 16, alignItems: 'center' }}>
-              <ActivityIndicator color="#1D4533" />
+              <ActivityIndicator color="#EA580C" />
             </View>
           ) : reviews.length === 0 ? (
             <View style={{ paddingVertical: 12, alignItems: 'center' }}>
@@ -1133,7 +1164,7 @@ export default function ProductDetailsPage({
           <BootstrapIcon
             name="cart-plus"
             size={22}
-            color={productSoldOut || sizeSoldOut ? '#94A3B8' : '#1D4533'}
+            color={productSoldOut || sizeSoldOut ? '#94A3B8' : '#EA580C'}
           />
         </TouchableOpacity>
 
