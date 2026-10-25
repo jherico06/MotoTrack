@@ -162,7 +162,7 @@ export default function ProductSpecsModal({
             </View>
 
             <ScrollView
-              style={{ maxHeight: 520 }}
+              style={{ maxHeight: 'calc(88vh - 140px)' }}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: 8 }}
             >

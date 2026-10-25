@@ -25,6 +25,7 @@ import {
   SegmentedToggle,
   CustomerServiceBookingCard,
   ServiceCategoryIcon,
+  CustomerMobileNavDrawer,
 } from '../../../components';
 import { isFlexibleBooking, normalizeBookingStatus } from '../../../utils/serviceQuotation.js';
 import {
@@ -143,6 +144,7 @@ export default function GaragePageWeb({
     currentUser ? notificationService.getUnreadCount(currentUser) : 0
   );
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [brandSettings, setBrandSettings] = useState(() => systemSettingsService.getSettings());
 
   useEffect(() => {
@@ -1059,14 +1061,32 @@ export default function GaragePageWeb({
             windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 },
           ]}
         >
-          {/* Left: Logo */}
+          {/* Left: Mobile Nav Toggle + Logo */}
           <View style={gStyles.headerLeft}>
+            {windowWidth < 768 && (
+              <TouchableOpacity
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 8,
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 6,
+                }}
+                onPress={() => setIsMobileNavOpen(true)}
+                activeOpacity={0.8}
+                accessibilityLabel="Open Navigation Menu"
+              >
+                <BootstrapIcon name="list" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={gStyles.logoWrap}
               onPress={() => onNavigateToStore?.()}
               activeOpacity={0.8}
             >
-              <BrandLogo size={windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
+              <BrandLogo size={windowWidth < 400 ? 28 : windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
@@ -4256,6 +4276,23 @@ export default function GaragePageWeb({
           </View>
         </View>
       </Modal>
+
+      {/* Mobile Customer Navigation Drawer */}
+      <CustomerMobileNavDrawer
+        isOpen={isMobileNavOpen}
+        onClose={() => setIsMobileNavOpen(false)}
+        currentScreen="garage"
+        onNavigateToScreen={(screen, params) => {
+          if (screen === 'shop') onNavigateToStore?.();
+          else if (screen === 'garage') setActiveTab('All');
+          else if (screen === 'customizer') onNavigateToCustomizer ? onNavigateToCustomizer() : onNavigateToCustomize?.();
+          else if (screen === 'wishlist') onNavigateToWishlist?.();
+          else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
+          else if (screen === 'login') onNavigateToLogin?.();
+          else if (screen === 'admin') onNavigateToAdmin?.();
+        }}
+        unreadNotifCount={unreadNotifCount}
+      />
     </View>
   );
 }

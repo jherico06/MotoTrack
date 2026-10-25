@@ -152,7 +152,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                 )}
               </View>
 
-              <ScrollView style={{ maxHeight: 320 }} showsVerticalScrollIndicator={false}>
+              <ScrollView style={{ maxHeight: 'min(380px, calc(80vh - 220px))' }} showsVerticalScrollIndicator={false}>
                 {cart.map(({ product, quantity, size }, cIdx) => {
                   const lineSize = size || product.selectedSize || '';
                   const isChecked = isItemSelected(product.id, lineSize);

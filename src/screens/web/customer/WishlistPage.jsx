@@ -21,6 +21,7 @@ import {
   UserProfileButton,
   BrandLogo,
   NotificationDropdown,
+  CustomerMobileNavDrawer,
 } from '../../../components/common';
 import { LiveOrderTrackingMapModal, ProductSpecsModal, CartModal, CheckoutModal, BookInstallationModal } from '../../../components/modals';
 import { createWishlistWebStyles, wishlistWebStyles } from '../../../styles/web/wishlistPage.web.styles.js';
@@ -80,6 +81,7 @@ export default function WishlistPageWeb({
     currentUser ? notificationService.getUnreadCount(currentUser) : 0
   );
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
@@ -205,9 +207,9 @@ export default function WishlistPageWeb({
     }
   };
 
-  // Balanced grid columns: not too big, not too small
-  const numColumns = windowWidth >= 1250 ? 5 : windowWidth >= 980 ? 4 : windowWidth >= 680 ? 3 : 2;
-  const gapSize = 16;
+  // Balanced grid columns: 1 column on <360px, 2 on mobile, 3 on tablet, 4 on desktop, 5 on wide
+  const numColumns = windowWidth >= 1250 ? 5 : windowWidth >= 980 ? 4 : windowWidth >= 680 ? 3 : windowWidth < 360 ? 1 : 2;
+  const gapSize = windowWidth < 480 ? 8 : windowWidth < 768 ? 10 : 14;
   const cardWidth = `calc(${100 / numColumns}% - ${((numColumns - 1) * gapSize) / numColumns}px)`;
 
   return (
@@ -230,14 +232,32 @@ export default function WishlistPageWeb({
         {/* ─── RESPONSIVE TOP STICKY NAVBAR ─── */}
         <View style={wStyles.headerWrapper}>
         <View style={[wStyles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
-          {/* Left: Logo */}
+          {/* Left: Mobile Nav Toggle + Logo */}
           <View style={wStyles.headerLeft}>
+            {windowWidth < 768 && (
+              <TouchableOpacity
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 8,
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 6,
+                }}
+                onPress={() => setIsMobileNavOpen(true)}
+                activeOpacity={0.8}
+                accessibilityLabel="Open Navigation Menu"
+              >
+                <BootstrapIcon name="list" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={wStyles.logoWrap}
               onPress={() => onNavigateToStore?.()}
               activeOpacity={0.8}
             >
-              <BrandLogo size={windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
+              <BrandLogo size={windowWidth < 400 ? 28 : windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
@@ -486,7 +506,7 @@ export default function WishlistPageWeb({
               >
                 Saved from Install Studio — book shop installation for these builds.
               </Text>
-              <View style={wStyles.productGrid}>
+              <View style={[wStyles.productGrid, { gap: gapSize }]}>
                 {aiInstalls.map((entry) => (
                   <View
                     key={entry.id || entry.customizationId}
@@ -618,7 +638,7 @@ export default function WishlistPageWeb({
               </View>
             </View>
           ) : wishlistedProducts.length > 0 ? (
-            <View style={wStyles.productGrid}>
+            <View style={[wStyles.productGrid, { gap: gapSize }]}>
               {wishlistedProducts.map((product) => (
                 <TouchableOpacity
                   key={product.id}
@@ -896,6 +916,22 @@ export default function WishlistPageWeb({
         order={selectedOrderForTracking}
         onClose={() => setIsLiveTrackingOpen(false)}
         showToast={showToast}
+      />
+      {/* Mobile Customer Navigation Drawer */}
+      <CustomerMobileNavDrawer
+        isOpen={isMobileNavOpen}
+        onClose={() => setIsMobileNavOpen(false)}
+        currentScreen="wishlist"
+        onNavigateToScreen={(screen, params) => {
+          if (screen === 'shop') onNavigateToStore?.();
+          else if (screen === 'garage') onNavigateToGarage?.();
+          else if (screen === 'customizer') onNavigateToCustomizer ? onNavigateToCustomizer() : onNavigateToCustomize?.();
+          else if (screen === 'wishlist') { /* already here */ }
+          else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
+          else if (screen === 'login') onNavigateToLogin?.();
+          else if (screen === 'admin') onNavigateToAdmin?.();
+        }}
+        unreadNotifCount={unreadNotifCount}
       />
     </View>
   );

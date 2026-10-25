@@ -6,6 +6,7 @@ import {
   ScrollView,
   Platform,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import { BootstrapIcon, Skeleton } from '../common';
 import BookingCategoryPieChart from './BookingCategoryPieChart.jsx';
@@ -185,6 +186,7 @@ export default function ModernOverviewDashboard({
   isDesktop = true,
   tokens = {},
 }) {
+  const { width: windowWidth } = useWindowDimensions();
   // Telemetry Granularity: 'daily' | 'weekly' | 'monthly'
   const [granularity, setGranularity] = useState('daily');
   // Interactive chart hover
@@ -920,13 +922,12 @@ export default function ModernOverviewDashboard({
           </View>
         </View>
 
-        {/* RIGHT COLUMN: 4 EXECUTIVE KPI CARDS (2x2 GRID KEEPING ORIGINAL INFO) */}
+        {/* RIGHT COLUMN: 4 EXECUTIVE KPI CARDS (RESPONSIVE GRID) */}
         <View
           style={{
             flex: 1,
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gridTemplateRows: 'repeat(2, 1fr)',
+            gridTemplateColumns: windowWidth < 420 ? '1fr' : 'repeat(2, 1fr)',
             gap: 14,
             height: '100%',
             alignSelf: 'stretch',
@@ -1235,7 +1236,7 @@ export default function ModernOverviewDashboard({
         <View
           style={{
             display: 'grid',
-            gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : 'repeat(2, 1fr)',
+            gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : windowWidth < 420 ? '1fr' : 'repeat(2, 1fr)',
             gap: 14,
           }}
         >
@@ -2131,6 +2132,7 @@ export default function ModernOverviewDashboard({
  * Matches exact geometry of the live overview cards, charts, and recent orders table.
  */
 export function ModernOverviewDashboardSkeleton({ isDarkMode = false, isDesktop = true }) {
+  const { width: windowWidth } = useWindowDimensions();
   const baseColor = isDarkMode ? '#1E2824' : '#E2E8F0';
   const highlightColor = isDarkMode ? '#2A3A33' : '#F1F5F9';
   const cardBg = isDarkMode ? '#151D19' : '#FFFFFF';
@@ -2201,7 +2203,7 @@ export function ModernOverviewDashboardSkeleton({ isDarkMode = false, isDesktop 
           style={{
             flex: 1,
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
+            gridTemplateColumns: windowWidth < 420 ? '1fr' : 'repeat(2, 1fr)',
             gap: 14,
           }}
         >

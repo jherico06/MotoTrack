@@ -199,7 +199,7 @@ export default function CheckoutModal({
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={{ maxHeight: 500 }} showsVerticalScrollIndicator={false}>
+          <ScrollView style={{ maxHeight: 'calc(88vh - 140px)' }} showsVerticalScrollIndicator={false}>
             {/* ─── 1. PROFILE SAVED DELIVERY ADDRESS CARD (AUTOMATIC FROM PROFILE) ─── */}
             <View style={checkoutStyles.addressCardContainer}>
               <View style={checkoutStyles.addressCardHeader}>

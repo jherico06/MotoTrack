@@ -1,6 +1,7 @@
 export { default as BootstrapIcon } from './BootstrapIcon.jsx';
 export { default as AdminStatCard } from './AdminStatCard.jsx';
 export { default as BottomNavBar } from './BottomNavBar.jsx';
+export { default as CustomerMobileNavDrawer } from './CustomerMobileNavDrawer.jsx';
 export { default as ToastNotification } from './ToastNotification.jsx';
 export { default as UserProfileDropdown } from './UserProfileDropdown.jsx';
 export { default as UserProfileButton } from './UserProfileButton.jsx';

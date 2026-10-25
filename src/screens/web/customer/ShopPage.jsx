@@ -48,6 +48,7 @@ import {
   BrandLogo,
   NotificationDropdown,
   ProductCardSkeleton,
+  CustomerMobileNavDrawer,
 } from '../../../components/common';
 import HeroBanner from '../../../components/shop/HeroBanner.jsx';
 import CompatibilityIndicator from '../../../components/shop/CompatibilityIndicator.jsx';
@@ -102,6 +103,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
   const [compatMap, setCompatMap] = useState(null);
   const [compatOnly, setCompatOnly] = useState(false);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   // Modal states
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -499,9 +501,9 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
     }
   };
 
-  // Balanced grid columns: not too big, not too small
-  const numColumns = windowWidth >= 1250 ? 5 : windowWidth >= 980 ? 4 : windowWidth >= 680 ? 3 : 2;
-  const gapSize = 16;
+  // Balanced grid columns: 1 column on <360px, 2 on mobile, 3 on tablet, 4 on desktop, 5 on wide
+  const numColumns = windowWidth >= 1250 ? 5 : windowWidth >= 980 ? 4 : windowWidth >= 680 ? 3 : windowWidth < 360 ? 1 : 2;
+  const gapSize = windowWidth < 480 ? 8 : windowWidth < 768 ? 10 : 14;
   const cardWidth = `calc(${100 / numColumns}% - ${((numColumns - 1) * gapSize) / numColumns}px)`;
 
   return (
@@ -523,9 +525,20 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
       >
         {/* ─── 1. FULL-WIDTH RESPONSIVE STICKY NAVBAR (Pinned at top: 0, hardware accelerated) ─── */}
         <View style={webStyles.headerWrapper}>
-        <View style={[webStyles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
-          {/* Left: Logo + Desktop Search */}
+        <View style={[webStyles.headerInner, windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8 }]}>
+          {/* Left: Mobile Nav Toggle + Logo + Desktop Search */}
           <View style={webStyles.headerLeft}>
+            {windowWidth < 768 && (
+              <TouchableOpacity
+                style={webStyles.mobileNavToggleBtn}
+                onPress={() => setIsMobileNavOpen(true)}
+                activeOpacity={0.8}
+                accessibilityLabel="Open Navigation Menu"
+              >
+                <BootstrapIcon name="list" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
+
             <TouchableOpacity
               style={webStyles.logoWrap}
               onPress={() => {
@@ -534,7 +547,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               }}
               activeOpacity={0.8}
             >
-              <BrandLogo size={windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
+              <BrandLogo size={windowWidth < 400 ? 28 : windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
             </TouchableOpacity>
 
             {/* Search Bar centered between MOTOTRACK and Shop */}
@@ -720,6 +733,27 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
             )}
           </View>
         </View>
+
+        {/* Dedicated Mobile Search Row */}
+        {windowWidth < 768 && (
+          <View style={webStyles.mobileSearchRow}>
+            <View style={webStyles.mobileSearchInputWrap}>
+              <BootstrapIcon name="search" size={14} color="#94A3B8" />
+              <TextInput
+                style={webStyles.mobileSearchInput}
+                placeholder="Search products, brands, parts..."
+                placeholderTextColor="#94A3B8"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              {searchQuery.length > 0 && (
+                <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
+                  <BootstrapIcon name="x-circle-fill" size={14} color="#94A3B8" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
       </View>
 
       {/* ─── 2. MAIN STOREFRONT CONTENT ─── */}
@@ -1142,7 +1176,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
           </View>
 
           {/* Product Multi-Column Grid */}
-          <View style={webStyles.productGrid}>
+          <View style={[webStyles.productGrid, { gap: gapSize }]}>
             {isLoadingProducts ? (
               [1, 2, 3, 4, 5, 6, 7, 8].map((k) => (
                 <ProductCardSkeleton key={k} width={cardWidth} />
@@ -1727,6 +1761,14 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
           currentUser={currentUser}
         />
       )}
+      {/* Mobile Customer Navigation Drawer */}
+      <CustomerMobileNavDrawer
+        isOpen={isMobileNavOpen}
+        onClose={() => setIsMobileNavOpen(false)}
+        currentScreen="shop"
+        onNavigateToScreen={onNavigateToScreen}
+        unreadNotifCount={unreadNotifCount}
+      />
     </View>
   );
 }

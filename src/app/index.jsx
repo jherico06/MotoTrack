@@ -100,6 +100,16 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
   document.title = initSet?.storeName
     ? `${initSet.storeName}${initSet.storeTagline ? ' - ' + initSet.storeTagline : ''}`
     : 'MotoTrack - Motorparts and Accessories';
+
+  // Ensure responsive viewport meta tag with viewport-fit=cover
+  let viewportMeta = document.querySelector('meta[name="viewport"]');
+  if (!viewportMeta) {
+    viewportMeta = document.createElement('meta');
+    viewportMeta.name = 'viewport';
+    document.head.appendChild(viewportMeta);
+  }
+  viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover';
+
   if (!document.getElementById('bootstrap-icons-cdn')) {
     const bsLink = document.createElement('link');
     bsLink.id = 'bootstrap-icons-cdn';
@@ -121,12 +131,25 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     style.innerHTML = `
       *, *::before, *::after {
         font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+        box-sizing: border-box;
       }
       html, body, #root, #__next, [data-reactroot] {
         font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
+        overflow-x: hidden !important;
+        max-width: 100vw !important;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-text-size-adjust: 100% !important;
+      }
+      /* Prevent unwanted zoom on iPhone / Safari input focus (min 16px) */
+      @media screen and (max-width: 767px) {
+        input, select, textarea {
+          font-size: 16px !important;
+        }
       }
       div, span, p, a, button, input, textarea, select, label, h1, h2, h3, h4, h5, h6,
       [class*="css-text"], [class*="r-fontFamily"], [dir="auto"], [dir] {

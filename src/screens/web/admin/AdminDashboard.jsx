@@ -268,7 +268,7 @@ const STOCK_FILTER_OPTIONS = [
 export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const promosPanelRef = useRef(null);
   const { width: windowWidth } = useWindowDimensions();
-  const isDesktop = windowWidth >= 768;
+  const isDesktop = windowWidth >= 1024;
 
   // ─── THEME & DARK MODE STATE ───
   const [isDarkMode, setIsDarkMode] = useState(() => {

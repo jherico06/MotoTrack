@@ -28,6 +28,7 @@ import {
   UserProfileButton,
   BrandLogo,
   NotificationDropdown,
+  CustomerMobileNavDrawer,
 } from '../../../components/common';
 import {
   LiveOrderTrackingMapModal,
@@ -77,6 +78,7 @@ export default function CustomizerPageWeb({
     currentUser ? notificationService.getUnreadCount(currentUser) : 0
   );
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
@@ -551,10 +553,28 @@ export default function CustomizerPageWeb({
         {/* ─── 1. NAVBAR ─── */}
         <View style={[styles.headerWrapper, isDarkMode && { backgroundColor: '#151C19', borderBottomColor: '#26332E' }]}>
         <View style={[styles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
-          {/* Left: Logo */}
+          {/* Left: Mobile Nav Toggle + Logo */}
           <View style={styles.headerLeft}>
+            {windowWidth < 768 && (
+              <TouchableOpacity
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 8,
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 6,
+                }}
+                onPress={() => setIsMobileNavOpen(true)}
+                activeOpacity={0.8}
+                accessibilityLabel="Open Navigation Menu"
+              >
+                <BootstrapIcon name="list" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            )}
             <TouchableOpacity style={styles.logoWrap} onPress={() => onNavigateToStore?.()} activeOpacity={0.8}>
-              <BrandLogo size={windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
+              <BrandLogo size={windowWidth < 400 ? 28 : windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
             </TouchableOpacity>
           </View>
 
@@ -920,6 +940,23 @@ export default function CustomizerPageWeb({
           currentUser={currentUser}
         />
       )}
+
+      {/* Mobile Customer Navigation Drawer */}
+      <CustomerMobileNavDrawer
+        isOpen={isMobileNavOpen}
+        onClose={() => setIsMobileNavOpen(false)}
+        currentScreen="customizer"
+        onNavigateToScreen={(screen, params) => {
+          if (screen === 'shop') onNavigateToStore?.();
+          else if (screen === 'garage') onNavigateToGarage?.();
+          else if (screen === 'customizer') { /* already here */ }
+          else if (screen === 'wishlist') onNavigateToWishlist?.();
+          else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
+          else if (screen === 'login') onNavigateToLogin?.();
+          else if (screen === 'admin') onNavigateToAdmin?.();
+        }}
+        unreadNotifCount={unreadNotifCount}
+      />
     </View>
   );
 }
