@@ -16,7 +16,6 @@ import { StatusBar } from 'expo-status-bar';
 import {
   BootstrapIcon,
   ToastNotification,
-  BottomNavBar,
   UserProfileDropdown,
   UserProfileButton,
   BrandLogo,
@@ -844,71 +843,6 @@ export default function WishlistPageWeb({
           onNavigateToProfile?.('profile');
         }}
       />
-
-      {/* Persistent Mobile Bottom Navigation Bar on smaller screens */}
-      {windowWidth < 768 && (
-        <BottomNavBar
-          activeTab="Favorites"
-          onTabChange={(tab) => {
-            if (tab === 'Home') {
-              onNavigateToStore?.();
-            } else if (tab === 'Services') {
-              onNavigateToGarage?.();
-            } else if (tab === 'Customize') {
-              if (onNavigateToCustomizer) onNavigateToCustomizer();
-              else if (onNavigateToCustomize) onNavigateToCustomize();
-              else onNavigateToStore?.();
-            } else if (tab === 'Garage') {
-              if (!currentUser) {
-                setRedirectReason?.('Please sign in to access your motorcycle garage fleet.');
-                onNavigateToLogin?.();
-              } else {
-                onNavigateToProfile?.('garage');
-              }
-            } else if (tab === 'Orders') {
-              onNavigateToOrders?.();
-            } else if (tab === 'Wishlist' || tab === 'Favorites') {
-              // already on wishlist
-            } else if (tab === 'More') {
-              if (!currentUser) {
-                setRedirectReason('');
-                onNavigateToLogin?.();
-              } else {
-                onNavigateToProfile?.('menu');
-              }
-            } else if (tab === 'Dashboard') {
-              if (!currentUser) {
-                setRedirectReason('');
-                onNavigateToLogin?.();
-              } else {
-                onNavigateToProfile?.('overview');
-              }
-            } else if (tab === 'Bookings') {
-              if (!currentUser) {
-                setRedirectReason('');
-                onNavigateToLogin?.();
-              } else {
-                onNavigateToProfile?.('bookings');
-              }
-            } else if (tab === 'Notifications') {
-              onNavigateToProfile?.('notifications');
-            } else if (tab === 'Admin') {
-              if (currentUser?.role === 'admin') {
-                onNavigateToAdmin?.();
-              }
-            } else if (tab === 'Profile') {
-              if (!currentUser) {
-                setRedirectReason('');
-                onNavigateToLogin?.();
-              } else {
-                onNavigateToProfile?.('profile');
-              }
-            }
-          }}
-          wishlistCount={wishlistCount}
-          currentUser={currentUser}
-        />
-      )}
 
       {/* Live Order Tracking Modal */}
       <LiveOrderTrackingMapModal

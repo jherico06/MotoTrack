@@ -31,7 +31,6 @@ import { getRatedScore, productHasCustomerRatings } from '../../../utils/product
 // ─── COMPONENTS & MODALS ───────────────────────────────────────────────────
 import {
   BootstrapIcon,
-  BottomNavBar,
   ToastNotification,
   ProductSpecsModal,
   CartModal,
@@ -518,7 +517,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
           width: '100%',
           ...(Platform.OS === 'web' ? { overscrollBehavior: 'none', overscrollBehaviorY: 'none' } : {}),
         }}
-        contentContainerStyle={[webStyles.scrollContent, windowWidth < 768 && { paddingBottom: 100 }]}
+        contentContainerStyle={webStyles.scrollContent}
         stickyHeaderIndices={[0]}
         showsVerticalScrollIndicator={true}
         scrollEventThrottle={16}
@@ -1351,7 +1350,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         </View>
 
         {/* ─── FULL-WIDTH FOOTER (Flush: No Space Left/Right/Bottom, No Radius) ─── */}
-        <View style={[webStyles.desktopFooter, windowWidth < 768 && { paddingBottom: 88 }]}>
+        <View style={webStyles.desktopFooter}>
           <View style={webStyles.footerInner}>
             <View style={webStyles.footerColumnsRow}>
               {/* Column 1: Brand Info, Contact & Social Links */}
@@ -1696,71 +1695,6 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         showToast={showToast}
       />
 
-      {/* Persistent Mobile Bottom Navigation Bar on smaller screens */}
-      {windowWidth < 768 && (
-        <BottomNavBar
-          activeTab="Home"
-          onTabChange={(tab) => {
-            if (tab === 'Home') {
-              setSelectedCategory('All');
-              setSearchQuery('');
-            } else if (tab === 'Services') {
-              onNavigateToScreen?.('garage');
-            } else if (tab === 'Customize') {
-              onNavigateToScreen?.('customizer');
-            } else if (tab === 'Garage') {
-              if (!currentUser) {
-                setRedirectReason?.('Please sign in to access your motorcycle garage fleet.');
-                onNavigateToScreen?.('login');
-              } else {
-                onNavigateToScreen?.('profile', { tab: 'garage' });
-              }
-            } else if (tab === 'Orders') {
-              onNavigateToScreen?.('orders');
-            } else if (tab === 'Wishlist' || tab === 'Favorites') {
-              onNavigateToScreen?.('wishlist');
-            } else if (tab === 'More') {
-              if (!currentUser) {
-                setRedirectReason('Please sign in to access your Customer Dashboard.');
-                onNavigateToScreen?.('login');
-              } else {
-                onNavigateToScreen?.('profile', { tab: 'menu' });
-              }
-            } else if (tab === 'Dashboard') {
-              if (!currentUser) {
-                setRedirectReason('Please sign in to access your Customer Dashboard.');
-                onNavigateToScreen?.('login');
-              } else {
-                onNavigateToScreen?.('profile', { tab: 'overview' });
-              }
-            } else if (tab === 'Bookings') {
-              if (!currentUser) {
-                setRedirectReason('Please sign in to view your pit bookings.');
-                onNavigateToScreen?.('login');
-              } else {
-                onNavigateToScreen?.('profile', { tab: 'bookings' });
-              }
-            } else if (tab === 'Notifications') {
-              onNavigateToScreen?.('profile', { tab: 'notifications' });
-            } else if (tab === 'Admin') {
-              if (currentUser?.role === 'admin') {
-                onNavigateToScreen?.('admin');
-              } else {
-                setIsAccessDeniedModalOpen(true);
-              }
-            } else if (tab === 'Profile') {
-              if (!currentUser) {
-                setRedirectReason('');
-                onNavigateToScreen?.('login');
-              } else {
-                setIsProfileOpen(true);
-              }
-            }
-          }}
-          wishlistCount={wishlistCount}
-          currentUser={currentUser}
-        />
-      )}
       {/* Mobile Customer Navigation Drawer */}
       <CustomerMobileNavDrawer
         isOpen={isMobileNavOpen}

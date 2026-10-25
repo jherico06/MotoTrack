@@ -22,7 +22,6 @@ import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../../../services/p
 import { notificationService } from '../../../services/notifications/notificationService.js';
 import {
   BootstrapIcon,
-  BottomNavBar,
   ToastNotification,
   UserProfileDropdown,
   UserProfileButton,
@@ -886,60 +885,6 @@ export default function CustomizerPageWeb({
         onClose={() => setIsLiveTrackingOpen(false)}
         showToast={showToast}
       />
-
-      {/* Mobile Bottom Navigation Bar on smaller screens */}
-      {windowWidth < 768 && (
-        <BottomNavBar
-          activeTab="Customize"
-          onTabChange={(tab) => {
-            if (tab === 'Home') onNavigateToStore?.();
-            else if (tab === 'Services') onNavigateToGarage?.();
-            else if (tab === 'Customize') {
-              // Already on Customizer
-            } else if (tab === 'Garage') {
-              if (!currentUser) {
-                setRedirectReason?.('Please sign in to access your motorcycle garage fleet.');
-                onNavigateToLogin?.();
-              } else {
-                onNavigateToProfile?.('garage');
-              }
-            } else if (tab === 'Orders') onNavigateToOrders?.();
-            else if (tab === 'Wishlist' || tab === 'Favorites') onNavigateToWishlist?.();
-            else if (tab === 'More') {
-              if (!currentUser) {
-                setRedirectReason('');
-                onNavigateToLogin?.();
-              } else {
-                onNavigateToProfile?.('menu');
-              }
-            } else if (tab === 'Dashboard') {
-              if (!currentUser) {
-                setRedirectReason('');
-                onNavigateToLogin?.();
-              } else {
-                onNavigateToProfile?.('overview');
-              }
-            } else if (tab === 'Bookings') {
-              if (!currentUser) {
-                setRedirectReason('');
-                onNavigateToLogin?.();
-              } else {
-                onNavigateToProfile?.('bookings');
-              }
-            } else if (tab === 'Notifications') {
-              onNavigateToProfile?.('notifications');
-            } else if (tab === 'Profile') {
-              if (!currentUser) {
-                setRedirectReason('');
-                onNavigateToLogin?.();
-              } else {
-                onNavigateToProfile?.('profile');
-              }
-            }
-          }}
-          currentUser={currentUser}
-        />
-      )}
 
       {/* Mobile Customer Navigation Drawer */}
       <CustomerMobileNavDrawer

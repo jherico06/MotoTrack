@@ -37,7 +37,6 @@ import {
   UserProfileButton,
   UserProfileDropdown,
   CustomerServiceBookingCard,
-  BottomNavBar,
 } from '../../../components/common';
 import { normalizeBookingStatus } from '../../../utils/bookingWorkflow.js';
 import {
@@ -1508,7 +1507,7 @@ export default function ProfilePage({
               { maxWidth: 1360, width: '100%', alignSelf: 'center' },
               isDesktop && { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 60 },
               isTablet && { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 60 },
-              isMobile && { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 100 },
+              isMobile && { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 40 },
             ]}
           >
             {/* ───────────────────────────────────────────────────────── */}
@@ -6953,36 +6952,6 @@ export default function ProfilePage({
         }}
       />
 
-      {/* Mobile Bottom Navigation Bar on smaller screens */}
-      {windowWidth < 768 && (
-        <BottomNavBar
-          activeTab={
-            activeTab === 'garage'
-              ? 'Garage'
-              : activeTab === 'orders'
-              ? 'Orders'
-              : activeTab === 'bookings'
-              ? 'Bookings'
-              : activeTab === 'notifications'
-              ? 'Notifications'
-              : 'More'
-          }
-          onTabChange={(tab) => {
-            if (tab === 'Home') onNavigateToStore?.();
-            else if (tab === 'Services') onNavigateToGarage?.();
-            else if (tab === 'Customize') onNavigateToCustomizer?.();
-            else if (tab === 'Garage') setActiveTab('garage');
-            else if (tab === 'Orders') setActiveTab('orders');
-            else if (tab === 'Bookings') setActiveTab('bookings');
-            else if (tab === 'Wishlist' || tab === 'Favorites') onNavigateToWishlist?.();
-            else if (tab === 'More' || tab === 'Dashboard') setActiveTab('overview');
-            else if (tab === 'Notifications') setActiveTab('notifications');
-            else if (tab === 'Profile') setActiveTab('profile');
-          }}
-          wishlistCount={wishlistCount}
-          currentUser={currentUser}
-        />
-      )}
     </SafeAreaView>
   );
 }
