@@ -55,6 +55,7 @@ import {
   compatibilityService,
   COMPAT_STATUS,
 } from '../../../services/products/compatibilityService.js';
+import { promoService, PROMO_TYPES } from '../../../services/products/promoService.js';
 import { createShopWebStyles } from '../../../styles/web/shopPage.web.styles.js';
 
 // Default motorcycle selection matching reference UI
@@ -151,10 +152,14 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
     shippingRate,
     isFreeShipping,
     appliedPromoId,
+    applyPromo,
     toastMessage,
     showToast,
   } = useCart();
   const { isWishlisted, toggleWishlist, wishlistCount } = useWishlist();
+
+  // Active Admin Promos
+  const [activePromos, setActivePromos] = useState([]);
 
   // Products & Filter state
   const [productsList, setProductsList] = useState([]);
@@ -254,6 +259,55 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
       cancelled = true;
     };
   }, [isBuyNowCheckout, buyNowItems, shippingRate]);
+
+  // Sync active promos configured and activated by admin
+  useEffect(() => {
+    let isMounted = true;
+    const fetchPromos = async () => {
+      try {
+        const list = await promoService.getActivePromos({ force: true });
+        if (isMounted) setActivePromos(list || []);
+      } catch (_e) {}
+    };
+    fetchPromos();
+    const unsub = promoService.subscribe(() => {
+      fetchPromos();
+    });
+    return () => {
+      isMounted = false;
+      unsub();
+    };
+  }, []);
+
+  const handlePromoCardAction = (promo) => {
+    if (!promo) {
+      setSelectedCategory('All');
+      if (typeof document !== 'undefined') {
+        const target = document.getElementById('catalog-products-section');
+        if (target) target.scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
+
+    if (promo.code) {
+      if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.clipboard) {
+        navigator.clipboard.writeText(promo.code).catch(() => {});
+      }
+      if (typeof applyPromo === 'function') {
+        applyPromo(promo.code);
+      }
+      showToast?.(`✓ Promo code "${promo.code}" copied & applied to cart!`);
+    }
+
+    if (promo.appliesTo === 'SELECTED_PRODUCTS' && Array.isArray(promo.productIds) && promo.productIds.length > 0) {
+      setSelectedCategory('All');
+    }
+
+    if (typeof document !== 'undefined') {
+      const target = document.getElementById('catalog-products-section');
+      if (target) target.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
@@ -1740,111 +1794,292 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
           </View>
         </View>
 
-        {/* ─── 7. THREE PROMOTIONAL CARDS (Special Offer, Free Shipping, Genuine Parts) ─── */}
+        {/* ─── 7. PROMOTIONAL CARDS (DYNAMICALLY LOADED FROM ACTIVE ADMIN PROMOS) ─── */}
         <View style={webStyles.promoCardsRow}>
-          {/* Card 1: Special Offer */}
-          <View style={webStyles.promoCard}>
-            <Image
-              source={{
-                uri: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=400&q=80',
-              }}
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: '45%',
-                opacity: 0.32,
-              }}
-              resizeMode="cover"
-            />
-            <View style={{ zIndex: 2 }}>
-              <Text style={webStyles.promoCardTag}>SPECIAL OFFER</Text>
-              <Text style={webStyles.promoCardTitle}>Up to 20% Off on Helmets</Text>
-              <Text style={webStyles.promoCardSub}>Ride safe, ride in style.</Text>
-            </View>
-            <TouchableOpacity
-              style={webStyles.promoCardLink}
-              onPress={() => setSelectedCategory('Helmets')}
-              activeOpacity={0.85}
-            >
-              <Text style={webStyles.promoCardLinkText}>Shop Now</Text>
-              <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
-            </TouchableOpacity>
-          </View>
+          {activePromos && activePromos.length > 0 ? (
+            <>
+              {activePromos.slice(0, 3).map((promo) => (
+                <View key={promo.promo_id || promo.code} style={webStyles.promoCard}>
+                  <Image
+                    source={{
+                      uri:
+                        promo.imageUrl ||
+                        promo.image_url ||
+                        (promo.promoType === PROMO_TYPES.FREE_SHIPPING
+                          ? 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80'
+                          : promo.promoType === PROMO_TYPES.FREE_INSTALLATION
+                            ? 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=400&q=80'
+                            : 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=400&q=80'),
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: '45%',
+                      opacity: 0.3,
+                    }}
+                    resizeMode="cover"
+                  />
+                  <View style={{ zIndex: 2 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      {promo.promoType === PROMO_TYPES.FREE_SHIPPING ? (
+                        <BootstrapIcon name="truck" size={12} color="#FF5A0A" />
+                      ) : promo.promoType === PROMO_TYPES.FREE_INSTALLATION ? (
+                        <BootstrapIcon name="tools" size={12} color="#FF5A0A" />
+                      ) : (
+                        <BootstrapIcon name="tag-fill" size={12} color="#FF5A0A" />
+                      )}
+                      <Text style={webStyles.promoCardTag}>
+                        {promo.promoType === PROMO_TYPES.FREE_SHIPPING
+                          ? 'FREE SHIPPING'
+                          : promo.promoType === PROMO_TYPES.FREE_INSTALLATION
+                            ? 'FREE INSTALLATION'
+                            : promo.discountPercent
+                              ? `SPECIAL OFFER • ${promo.discountPercent}% OFF`
+                              : 'SPECIAL OFFER'}
+                      </Text>
+                    </View>
+                    <Text style={webStyles.promoCardTitle}>
+                      {promo.description ||
+                        (promo.promoType === PROMO_TYPES.FREE_SHIPPING
+                          ? 'Free Shipping Nationwide'
+                          : promo.promoType === PROMO_TYPES.FREE_INSTALLATION
+                            ? 'Free Pitstop Installation'
+                            : `${promo.discountPercent}% Off On Products`)}
+                    </Text>
+                    <Text style={webStyles.promoCardSub}>
+                      {promo.minimumOrderAmount
+                        ? `For orders over ₱${Number(promo.minimumOrderAmount).toLocaleString()} • Use code ${promo.code}`
+                        : `Use promo code ${promo.code} at checkout`}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={webStyles.promoCardLink}
+                    onPress={() => handlePromoCardAction(promo)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={webStyles.promoCardLinkText}>
+                      Apply Code ({promo.code})
+                    </Text>
+                    <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
+                  </TouchableOpacity>
+                </View>
+              ))}
 
-          {/* Card 2: Free Shipping Nationwide */}
-          <View style={webStyles.promoCard}>
-            <Image
-              source={{
-                uri: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80',
-              }}
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: '45%',
-                opacity: 0.25,
-              }}
-              resizeMode="cover"
-            />
-            <View style={{ zIndex: 2 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <BootstrapIcon name="truck" size={12} color="#FF5A0A" />
-                <Text style={webStyles.promoCardTag}>FREE SHIPPING</Text>
-              </View>
-              <Text style={webStyles.promoCardTitle}>Free Shipping Nationwide</Text>
-              <Text style={webStyles.promoCardSub}>For orders over ₱1,000</Text>
-            </View>
-            <TouchableOpacity
-              style={webStyles.promoCardLink}
-              onPress={() => {
-                setSelectedCategory('All');
-                showToast?.('Free shipping applied on orders over ₱1,000!');
-              }}
-              activeOpacity={0.85}
-            >
-              <Text style={webStyles.promoCardLinkText}>Shop Now</Text>
-              <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
-            </TouchableOpacity>
-          </View>
+              {/* Supplementary Card when 1 active promo: show Genuine Parts and Expert Service */}
+              {activePromos.length === 1 && (
+                <>
+                  <View style={webStyles.promoCard}>
+                    <Image
+                      source={{
+                        uri: 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=400&q=80',
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: '45%',
+                        opacity: 0.3,
+                      }}
+                      resizeMode="cover"
+                    />
+                    <View style={{ zIndex: 2 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <BootstrapIcon name="tools" size={12} color="#FF5A0A" />
+                        <Text style={webStyles.promoCardTag}>CERTIFIED PITSTOP</Text>
+                      </View>
+                      <Text style={webStyles.promoCardTitle}>Expert Service & Tuning</Text>
+                      <Text style={webStyles.promoCardSub}>Book certified mechanics for your machine.</Text>
+                    </View>
+                    <TouchableOpacity
+                      style={webStyles.promoCardLink}
+                      onPress={() => onNavigateToScreen?.('garage')}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={webStyles.promoCardLinkText}>Book Service</Text>
+                      <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
+                    </TouchableOpacity>
+                  </View>
 
-          {/* Card 3: Genuine Parts Only */}
-          <View style={webStyles.promoCard}>
-            <Image
-              source={{
-                uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=80',
-              }}
-              style={{
-                position: 'absolute',
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: '45%',
-                opacity: 0.28,
-              }}
-              resizeMode="cover"
-            />
-            <View style={{ zIndex: 2 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                <BootstrapIcon name="gear-fill" size={12} color="#FF5A0A" />
-                <Text style={webStyles.promoCardTag}>GENUINE PARTS ONLY</Text>
+                  <View style={webStyles.promoCard}>
+                    <Image
+                      source={{
+                        uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=80',
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: '45%',
+                        opacity: 0.28,
+                      }}
+                      resizeMode="cover"
+                    />
+                    <View style={{ zIndex: 2 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                        <BootstrapIcon name="gear-fill" size={12} color="#FF5A0A" />
+                        <Text style={webStyles.promoCardTag}>GENUINE PARTS ONLY</Text>
+                      </View>
+                      <Text style={webStyles.promoCardTitle}>Genuine Parts Only</Text>
+                      <Text style={webStyles.promoCardSub}>
+                        100% original and trusted brands for your peace of mind.
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={webStyles.promoCardLink}
+                      onPress={() => handleOpenCompanyInfo('about')}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={webStyles.promoCardLinkText}>Learn More</Text>
+                      <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )}
+
+              {/* Supplementary Card when 2 active promos: show Genuine Parts */}
+              {activePromos.length === 2 && (
+                <View style={webStyles.promoCard}>
+                  <Image
+                    source={{
+                      uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=80',
+                    }}
+                    style={{
+                      position: 'absolute',
+                      right: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: '45%',
+                      opacity: 0.28,
+                    }}
+                    resizeMode="cover"
+                  />
+                  <View style={{ zIndex: 2 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                      <BootstrapIcon name="gear-fill" size={12} color="#FF5A0A" />
+                      <Text style={webStyles.promoCardTag}>GENUINE PARTS ONLY</Text>
+                    </View>
+                    <Text style={webStyles.promoCardTitle}>Genuine Parts Only</Text>
+                    <Text style={webStyles.promoCardSub}>
+                      100% original and trusted brands for your peace of mind.
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={webStyles.promoCardLink}
+                    onPress={() => handleOpenCompanyInfo('about')}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={webStyles.promoCardLinkText}>Learn More</Text>
+                    <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </>
+          ) : (
+            <>
+              {/* Default fallback cards when no promo is activated by admin yet */}
+              <View style={webStyles.promoCard}>
+                <Image
+                  source={{
+                    uri: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=400&q=80',
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: '45%',
+                    opacity: 0.32,
+                  }}
+                  resizeMode="cover"
+                />
+                <View style={{ zIndex: 2 }}>
+                  <Text style={webStyles.promoCardTag}>SPECIAL OFFERS</Text>
+                  <Text style={webStyles.promoCardTitle}>Rider Deals & Discounts</Text>
+                  <Text style={webStyles.promoCardSub}>Quality motorcycle parts, ride in style.</Text>
+                </View>
+                <TouchableOpacity
+                  style={webStyles.promoCardLink}
+                  onPress={() => setSelectedCategory('All')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={webStyles.promoCardLinkText}>Shop Now</Text>
+                  <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
+                </TouchableOpacity>
               </View>
-              <Text style={webStyles.promoCardTitle}>Genuine Parts Only</Text>
-              <Text style={webStyles.promoCardSub}>
-                100% original and trusted brands for your peace of mind.
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={webStyles.promoCardLink}
-              onPress={() => handleOpenCompanyInfo('about')}
-              activeOpacity={0.85}
-            >
-              <Text style={webStyles.promoCardLinkText}>Learn More</Text>
-              <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
-            </TouchableOpacity>
-          </View>
+
+              <View style={webStyles.promoCard}>
+                <Image
+                  source={{
+                    uri: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80',
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: '45%',
+                    opacity: 0.25,
+                  }}
+                  resizeMode="cover"
+                />
+                <View style={{ zIndex: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <BootstrapIcon name="truck" size={12} color="#FF5A0A" />
+                    <Text style={webStyles.promoCardTag}>FREE SHIPPING</Text>
+                  </View>
+                  <Text style={webStyles.promoCardTitle}>Free Shipping Nationwide</Text>
+                  <Text style={webStyles.promoCardSub}>Available on eligible orders</Text>
+                </View>
+                <TouchableOpacity
+                  style={webStyles.promoCardLink}
+                  onPress={() => setSelectedCategory('All')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={webStyles.promoCardLinkText}>Shop Now</Text>
+                  <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={webStyles.promoCard}>
+                <Image
+                  source={{
+                    uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=80',
+                  }}
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: '45%',
+                    opacity: 0.28,
+                  }}
+                  resizeMode="cover"
+                />
+                <View style={{ zIndex: 2 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <BootstrapIcon name="gear-fill" size={12} color="#FF5A0A" />
+                    <Text style={webStyles.promoCardTag}>GENUINE PARTS ONLY</Text>
+                  </View>
+                  <Text style={webStyles.promoCardTitle}>Genuine Parts Only</Text>
+                  <Text style={webStyles.promoCardSub}>
+                    100% original and trusted brands for your peace of mind.
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={webStyles.promoCardLink}
+                  onPress={() => handleOpenCompanyInfo('about')}
+                  activeOpacity={0.85}
+                >
+                  <Text style={webStyles.promoCardLinkText}>Learn More</Text>
+                  <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
         </View>
         </View>
 

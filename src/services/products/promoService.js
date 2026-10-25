@@ -15,6 +15,7 @@ export const APPLIES_TO = {
 const STORAGE_KEY = 'mototrack_promos_db_v2';
 let promosFetchCache = null;
 const PROMOS_FETCH_TTL_MS = 15000;
+const promoListeners = new Set();
 
 const DEFAULT_PROMOS = [
   {
@@ -418,6 +419,44 @@ export const promoService = {
   calculatePromoImpact,
   eligibleCartItems,
 
+  subscribe(callback) {
+    if (typeof callback !== 'function') return () => {};
+    promoListeners.add(callback);
+    return () => promoListeners.delete(callback);
+  },
+
+  notify() {
+    promoListeners.forEach((fn) => {
+      try {
+        fn();
+      } catch (err) {
+        console.warn('[promoService] listener error:', err);
+      }
+    });
+  },
+
+  async getActivePromos({ force = false } = {}) {
+    const list = await this.getPromos({ force });
+    const now = new Date();
+    return (list || []).filter((p) => {
+      const active = Boolean(p.isActive ?? p.is_active);
+      const notInactive = p.status !== 'inactive';
+      if (!active || !notInactive) return false;
+      if (p.startDate) {
+        const start = new Date(p.startDate);
+        if (now < start) return false;
+      }
+      if (p.endDate) {
+        const end = new Date(p.endDate);
+        if (now > end) return false;
+      }
+      if (p.usageLimit != null && p.usageLimit > 0 && (p.usedCount || 0) >= p.usageLimit) {
+        return false;
+      }
+      return true;
+    });
+  },
+
   async getPromos({ force = false } = {}) {
     if (!force && promosFetchCache && Date.now() - promosFetchCache.at < PROMOS_FETCH_TTL_MS) {
       return promosFetchCache.data;
@@ -562,6 +601,7 @@ export const promoService = {
     const updated = [newPromo, ...current.filter((p) => p.code !== newPromo.code)];
     persistLocal(updated);
     promosFetchCache = { at: Date.now(), data: updated };
+    this.notify();
     return { success: true, promo: newPromo };
   },
 
@@ -701,6 +741,7 @@ export const promoService = {
     const finalList = base.map((p) => (p.promo_id === existing.promo_id ? next : p));
     persistLocal(finalList);
     promosFetchCache = { at: Date.now(), data: finalList };
+    this.notify();
     return { success: true, promo: next };
   },
 
@@ -749,6 +790,7 @@ export const promoService = {
     const finalList = ensured.map((p) => (p.promo_id === existing.promo_id ? next : p));
     persistLocal(finalList);
     promosFetchCache = { at: Date.now(), data: finalList };
+    this.notify();
     return { success: true, promo: next };
   },
 
@@ -774,6 +816,7 @@ export const promoService = {
     const updated = current.filter((p) => p.promo_id !== target.promo_id);
     persistLocal(updated);
     promosFetchCache = { at: Date.now(), data: updated };
+    this.notify();
     return { success: true };
   },
 
