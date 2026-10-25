@@ -36,6 +36,9 @@ export function createShopWebStyles(isDark = false) {
       borderBottomWidth: 1,
       borderBottomColor: isDark ? '#26332E' : 'rgba(255, 255, 255, 0.10)',
       minHeight: 67,
+      transform: 'translateZ(0)',
+      WebkitTransform: 'translateZ(0)',
+      willChange: 'transform',
     },
     headerInner: {
       maxWidth: 1360,

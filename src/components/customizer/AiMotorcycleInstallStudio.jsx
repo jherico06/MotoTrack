@@ -26,7 +26,6 @@ import { compatibilityService } from '../../services/products/compatibilityServi
 import { customizationService } from '../../services/bookings/customizationService.js';
 import {
   aiCustomizerService,
-  BIKE_PRESETS,
   AI_INSTALLATION_FEE_USD,
 } from '../../services/ai/aiCustomizerService.js';
 import { GARAGE_BRANCHES, TIME_SLOTS } from '../../services/bookings/garageService.js';
@@ -82,11 +81,18 @@ function productImage(product) {
 
 function bikeIdentity(bike) {
   const nickname = String(bike?.nickname || '').trim();
-  const spec = [bike?.year, bike?.brand, bike?.model].filter(Boolean).join(' ');
-  const shortName = [bike?.brand, bike?.model].filter(Boolean).join(' ');
+  const brand = String(bike?.brand || '').trim();
+  const model = String(bike?.model || bike?.name || bike?.motorcycle_name || '').trim();
+  const year = String(bike?.year || '').trim();
+
+  let combined = model;
+  if (brand && (!model || !model.toLowerCase().startsWith(brand.toLowerCase()))) {
+    combined = `${brand} ${model}`.trim();
+  }
+  const spec = [year, combined].filter(Boolean).join(' ');
   return {
-    title: nickname || shortName || spec || 'Motorcycle',
-    spec: nickname ? spec : '',
+    title: nickname || combined || spec || 'Motorcycle',
+    spec: nickname ? spec : (year || ''),
     summary: spec || nickname || 'Motorcycle',
     color: String(bike?.color || '').trim(),
     plate: String(bike?.plate_number || '').trim(),
@@ -95,15 +101,16 @@ function bikeIdentity(bike) {
 
 function filterUserBikes(all, user) {
   const userId = user?.id || user?.user_id;
+  const customerId = user?.customer_id;
   const email = String(user?.email || '').trim().toLowerCase();
+  if (!userId && !customerId && !email) return [];
   return (Array.isArray(all) ? all : []).filter((b) => {
     if (String(b.motorcycle_id || '').startsWith('moto-seed-')) return false;
-    if (!userId && !email) return false;
     const sameUser =
       (userId &&
         (b.user_id === userId ||
           b.customer_id === userId ||
-          b.customer_id === user?.customer_id)) ||
+          (customerId && b.customer_id === customerId))) ||
       (email && String(b.customer_email || '').toLowerCase() === email);
     return Boolean(sameUser);
   });
@@ -150,32 +157,19 @@ export default function AiMotorcycleInstallStudio({
   const currentUserId = currentUser?.id || currentUser?.user_id;
   const currentUserEmail = currentUser?.email ? String(currentUser.email).trim().toLowerCase() : '';
   const currentUserRef = useRef(currentUser);
-  currentUserRef.current = currentUser;
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
 
-  // Selection state - initialized synchronously from local memory cache so bikes never flash or disappear
+  // Selection state - initialized from user's registered motorcycles (no synthetic mock bikes)
   const [bikes, setBikes] = useState(() => {
     const all = motorcycleService.getMotorcycles() || [];
-    const userBikes = filterUserBikes(all, currentUser);
-    if (userBikes.length > 0) return userBikes;
-    return BIKE_PRESETS.map((p) => ({
-      motorcycle_id: p.id,
-      id: p.id,
-      brand: p.brand,
-      model: p.name,
-      motorcycle_name: p.name,
-      name: p.name,
-      color: p.color,
-      photo_url: p.image,
-      image: p.image,
-      motorcycle_image: p.image,
-      is_preset: true,
-    }));
+    return filterUserBikes(all, currentUser);
   });
   const [selectedBikeId, setSelectedBikeId] = useState(() => {
     const all = motorcycleService.getMotorcycles() || [];
     const userBikes = filterUserBikes(all, currentUser);
-    const initialList = userBikes.length > 0 ? userBikes : BIKE_PRESETS;
-    const primary = initialList.find((b) => b.is_primary) || initialList[0];
+    const primary = userBikes.find((b) => b.is_primary) || userBikes[0];
     return primary?.motorcycle_id || primary?.id || '';
   });
   const [bikeOverrideUri, setBikeOverrideUri] = useState(null);
@@ -492,23 +486,10 @@ export default function AiMotorcycleInstallStudio({
       }
       const all = motorcycleService.getMotorcycles() || [];
       const userBikes = filterUserBikes(all, currentUserRef.current);
-      const effectiveBikes = userBikes.length > 0 ? userBikes : BIKE_PRESETS.map((p) => ({
-        motorcycle_id: p.id,
-        id: p.id,
-        brand: p.brand,
-        model: p.name,
-        motorcycle_name: p.name,
-        name: p.name,
-        color: p.color,
-        photo_url: p.image,
-        image: p.image,
-        motorcycle_image: p.image,
-        is_preset: true,
-      }));
-      setBikes(effectiveBikes);
+      setBikes(userBikes);
       setSelectedBikeId((prev) => {
-        if (prev && effectiveBikes.some((b) => b.motorcycle_id === prev)) return prev;
-        const primary = effectiveBikes.find((b) => b.is_primary) || effectiveBikes[0];
+        if (prev && userBikes.some((b) => b.motorcycle_id === prev)) return prev;
+        const primary = userBikes.find((b) => b.is_primary) || userBikes[0];
         return primary?.motorcycle_id || primary?.id || '';
       });
     } catch (_err) {
@@ -528,23 +509,10 @@ export default function AiMotorcycleInstallStudio({
         all || motorcycleService.getMotorcycles() || [],
         currentUserRef.current
       );
-      const effectiveBikes = userBikes.length > 0 ? userBikes : BIKE_PRESETS.map((p) => ({
-        motorcycle_id: p.id,
-        id: p.id,
-        brand: p.brand,
-        model: p.name,
-        motorcycle_name: p.name,
-        name: p.name,
-        color: p.color,
-        photo_url: p.image,
-        image: p.image,
-        motorcycle_image: p.image,
-        is_preset: true,
-      }));
-      setBikes(effectiveBikes);
+      setBikes(userBikes);
       setSelectedBikeId((prev) => {
-        if (prev && effectiveBikes.some((b) => b.motorcycle_id === prev)) return prev;
-        const primary = effectiveBikes.find((b) => b.is_primary) || effectiveBikes[0];
+        if (prev && userBikes.some((b) => b.motorcycle_id === prev)) return prev;
+        const primary = userBikes.find((b) => b.is_primary) || userBikes[0];
         return primary?.motorcycle_id || primary?.id || '';
       });
       setLoadingBikes(false);
@@ -1470,10 +1438,21 @@ export default function AiMotorcycleInstallStudio({
           <ActivityIndicator color={BRAND} style={{ marginVertical: 18 }} />
         ) : bikes.length === 0 ? (
           <View style={styles.emptySidebar}>
-            <BootstrapIcon name="bicycle" size={20} color={BRAND} />
+            <BootstrapIcon name="bicycle" size={24} color={BRAND} />
             <Text style={styles.emptySidebarTitle}>No registered motorcycles</Text>
-            <TouchableOpacity style={styles.emptyRegisterBtn} onPress={openRegister} activeOpacity={0.85}>
-              <Text style={styles.emptyRegisterBtnText}>+ Register Motorcycle</Text>
+            <Text style={styles.emptySidebarSubtext}>
+              {currentUser
+                ? 'Register your motorcycle to test aftermarket parts and generate AI installation previews.'
+                : 'Sign in to access your registered garage motorcycles.'}
+            </Text>
+            <TouchableOpacity
+              style={styles.emptyRegisterBtn}
+              onPress={openRegister}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.emptyRegisterBtnText}>
+                {currentUser ? '+ Register Motorcycle' : 'Sign In to Register'}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -1874,7 +1853,11 @@ export default function AiMotorcycleInstallStudio({
           }
         }}
         activeOpacity={0.88}
-        accessibilityLabel={`Selected part: ${partDisplayName || 'Accessory'}, ${partBrand} · ${partPrice || '₱800'}. Status: Preview Ready.`}
+        accessibilityLabel={
+          sessionProduct
+            ? `Selected part: ${partDisplayName || 'Accessory'}, ${partBrand} · ${partPrice || ''}. Status: ${readyToGenerate ? 'Preview Ready' : 'Incomplete Selection'}.`
+            : 'No part selected. Tap to browse catalog or upload a part.'
+        }
       >
         <View style={styles.partInfoLeft}>
           {resolvedPartUri ? (
@@ -1886,18 +1869,28 @@ export default function AiMotorcycleInstallStudio({
           )}
           <View style={styles.partInfoMeta}>
             <Text style={styles.partInfoName} numberOfLines={1}>
-              {partDisplayName || 'Akrapovič RIM'}
+              {sessionProduct ? (partDisplayName || 'Accessory') : 'No Part Selected'}
             </Text>
             <Text style={styles.partInfoBrandPrice} numberOfLines={1}>
-              {partBrand || 'Akrapovič'} · {partPrice || '₱800'}
+              {sessionProduct
+                ? `${partBrand}${partPrice ? ` · ${partPrice}` : ''}`
+                : 'Select from catalog or upload a photo below'}
             </Text>
           </View>
         </View>
 
         <View style={styles.partInfoRight}>
-          <View style={styles.statusReadyBadge}>
-            <View style={styles.statusReadyDot} />
-            <Text style={styles.statusReadyText}>Preview Ready</Text>
+          <View style={[styles.statusReadyBadge, !readyToGenerate && styles.statusPendingBadge]}>
+            <View style={[styles.statusReadyDot, !readyToGenerate && styles.statusPendingDot]} />
+            <Text style={[styles.statusReadyText, !readyToGenerate && styles.statusPendingText]}>
+              {readyToGenerate
+                ? 'Preview Ready'
+                : !selectedBike
+                ? 'Select Motorcycle'
+                : !sessionProduct
+                ? 'Select Part'
+                : 'Setup Incomplete'}
+            </Text>
           </View>
           <BootstrapIcon name="chevron-right" size={15} color="#94A3B8" />
         </View>
@@ -2059,20 +2052,38 @@ export default function AiMotorcycleInstallStudio({
             <View style={styles.canvasEmptyIcon}>
               <BootstrapIcon
                 name={previewMode === 'after' ? 'stars' : 'bicycle'}
-                size={36}
+                size={38}
                 color={BRAND}
               />
             </View>
             <Text style={styles.canvasEmptyTitle}>
               {previewMode === 'after'
                 ? 'No AI Installation Result Yet'
-                : 'No Motorcycle Selected'}
+                : !selectedBike
+                ? 'No Motorcycle Selected'
+                : 'No Photo Available'}
             </Text>
             <Text style={styles.canvasEmptyText}>
               {previewMode === 'after'
                 ? 'Click "Generate Preview" below to view the AI installation result, or switch to "Before" to view the original motorcycle.'
-                : 'Select your registered motorcycle on the left to preview it here.'}
+                : !selectedBike
+                ? (currentUser
+                    ? 'Register or select your motorcycle on the left to preview it here.'
+                    : 'Sign in and register your motorcycle to see it on the preview canvas.')
+                : 'Please add a photo of your registered motorcycle to view it on the canvas.'}
             </Text>
+            {!selectedBike && (
+              <TouchableOpacity
+                style={styles.emptyCanvasRegisterBtn}
+                onPress={openRegister}
+                activeOpacity={0.85}
+              >
+                <BootstrapIcon name={currentUser ? "plus-circle" : "person-fill"} size={14} color="#FFFFFF" />
+                <Text style={styles.emptyCanvasRegisterBtnText}>
+                  {currentUser ? 'Register Motorcycle' : 'Sign In to Register'}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
       </View>
@@ -2835,6 +2846,18 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       fontWeight: '700',
       color: isDark ? '#34D399' : '#065F46',
     },
+    statusPendingBadge: {
+      backgroundColor: isDark ? 'rgba(234, 88, 12, 0.12)' : '#FFF7ED',
+      borderColor: isDark ? 'rgba(234, 88, 12, 0.35)' : '#FFEDD5',
+    },
+    statusPendingDot: {
+      backgroundColor: '#EA580C',
+    },
+    statusPendingText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: isDark ? '#FB923C' : '#C2410C',
+    },
     // Mobile tab switcher
     mobileTabBar: {
       flexDirection: 'row',
@@ -3014,6 +3037,15 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       fontSize: 12,
       fontWeight: '700',
       color: INK,
+    },
+    emptySidebarSubtext: {
+      fontSize: 11,
+      color: MUTED,
+      textAlign: 'center',
+      paddingHorizontal: 12,
+      lineHeight: 15,
+      marginTop: 2,
+      marginBottom: 4,
     },
     emptyRegisterBtn: {
       paddingVertical: 6,
@@ -3705,6 +3737,21 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       textAlign: 'center',
       maxWidth: 360,
       lineHeight: 18,
+    },
+    emptyCanvasRegisterBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 8,
+      paddingVertical: 8,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: BRAND,
+    },
+    emptyCanvasRegisterBtnText: {
+      color: '#FFFFFF',
+      fontSize: 12.5,
+      fontWeight: '700',
     },
     // Loading overlay
     canvasLoadingOverlay: {

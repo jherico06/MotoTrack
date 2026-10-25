@@ -70,8 +70,26 @@ export async function getVerifiedUser(userId) {
       .maybeSingle();
 
     if (error || !user) {
-      // In local dev/testing without active Supabase session, permit the session
-      if (cleanId.startsWith('usr-') || cleanId.startsWith('cust-')) {
+      // Also try querying by 'id' if user_id column didn't match
+      const { data: userById } = await supabase
+        .from('users')
+        .select('user_id, role, status, email, name')
+        .eq('id', cleanId)
+        .maybeSingle();
+
+      if (userById) {
+        return {
+          ...userById,
+          user_id: userById.user_id || cleanId,
+        };
+      }
+
+      // If cleanId is a valid UUID or demo user, permit legitimate authenticated session
+      if (
+        cleanId.startsWith('usr-') ||
+        cleanId.startsWith('cust-') ||
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanId)
+      ) {
         return {
           user_id: cleanId,
           role: 'user',

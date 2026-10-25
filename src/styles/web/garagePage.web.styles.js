@@ -20,6 +20,9 @@ export const garageWebStyles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.10)',
     minHeight: 67,
+    transform: 'translateZ(0)',
+    WebkitTransform: 'translateZ(0)',
+    willChange: 'transform',
   },
   headerInner: {
     maxWidth: 1360,

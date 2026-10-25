@@ -1270,13 +1270,19 @@ export default function ProfilePage({
         </View>
       ) : null}
 
-      {/* ─── FULL-HEIGHT PROFILE SCROLLVIEW (Scrollbar extends through header from top: 0) ─── */}
+      {/* ─── FULL-HEIGHT PROFILE SCROLLVIEW (Scrollbar extends to top: 0 through header, matching Image 1) ─── */}
       <ScrollView
-        style={{ flex: 1, width: '100%' }}
+        style={{
+          flex: 1,
+          width: '100%',
+          ...(Platform.OS === 'web' ? { overscrollBehavior: 'none', overscrollBehaviorY: 'none' } : {}),
+        }}
         contentContainerStyle={{ flexGrow: 1, width: '100%' }}
+        stickyHeaderIndices={[0]}
         showsVerticalScrollIndicator={true}
+        scrollEventThrottle={16}
       >
-        {/* ─── 1. SINGLE TOP GREEN NAVBAR (Pinned at top: 0, does not scroll away) ─── */}
+        {/* ─── 1. SINGLE TOP NAVBAR ─── */}
         <View style={styles.headerWrapper}>
         <View style={[styles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
           {/* LEFT: MotoTrack Logo + Mobile Menu Toggle */}

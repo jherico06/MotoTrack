@@ -1034,19 +1034,25 @@ export default function GaragePageWeb({
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── FULL-HEIGHT GARAGE SCROLLVIEW (Scrollbar extends through header from top: 0) ─── */}
+      {/* ─── FULL-HEIGHT GARAGE SCROLLVIEW (Scrollbar extends to top: 0 through header, matching Image 1) ─── */}
       <ScrollView
-        style={{ flex: 1, width: '100%' }}
+        style={{
+          flex: 1,
+          width: '100%',
+          ...(Platform.OS === 'web' ? { overscrollBehavior: 'none', overscrollBehaviorY: 'none' } : {}),
+        }}
         contentContainerStyle={gStyles.scrollContent}
+        stickyHeaderIndices={[0]}
         showsVerticalScrollIndicator={true}
+        scrollEventThrottle={16}
       >
-        {/* ─── DESKTOP TOP STICKY NAVBAR (Pinned at top: 0, does not scroll away) ─── */}
+        {/* ─── DESKTOP TOP STICKY NAVBAR ─── */}
         <View
           style={[
             gStyles.headerWrapper,
-          isDarkMode && { backgroundColor: '#151C19', borderBottomColor: '#26332E' },
-        ]}
-      >
+            isDarkMode && { backgroundColor: '#151C19', borderBottomColor: '#26332E' },
+          ]}
+        >
         <View
           style={[
             gStyles.headerInner,

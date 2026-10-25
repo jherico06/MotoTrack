@@ -215,13 +215,19 @@ export default function WishlistPageWeb({
       <StatusBar style={isDarkMode ? "light" : "dark"} />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── FULL-HEIGHT WISHLIST SCROLLVIEW (Scrollbar extends through header from top: 0) ─── */}
+      {/* ─── FULL-HEIGHT WISHLIST SCROLLVIEW (Scrollbar extends to top: 0 through header, matching Image 1) ─── */}
       <ScrollView
-        style={{ flex: 1, width: '100%' }}
+        style={{
+          flex: 1,
+          width: '100%',
+          ...(Platform.OS === 'web' ? { overscrollBehavior: 'none', overscrollBehaviorY: 'none' } : {}),
+        }}
         contentContainerStyle={wStyles.scrollContent}
+        stickyHeaderIndices={[0]}
         showsVerticalScrollIndicator={true}
+        scrollEventThrottle={16}
       >
-        {/* ─── RESPONSIVE TOP STICKY NAVBAR (Pinned at top: 0, does not scroll away) ─── */}
+        {/* ─── RESPONSIVE TOP STICKY NAVBAR ─── */}
         <View style={wStyles.headerWrapper}>
         <View style={[wStyles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
           {/* Left: Logo */}

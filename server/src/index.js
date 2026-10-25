@@ -58,9 +58,21 @@ app.get('/', (_req, res) => {
   });
 });
 
+app.get(['/health', '/api/health'], (_req, res) => {
+  res.json({
+    status: 'ok',
+    name: 'MotoTrack AI API',
+    hasGeminiKey: Boolean(process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY),
+    env: process.env.NODE_ENV || 'production',
+  });
+});
+
 app.use('/api', customizeRouter);
+app.use('/', customizeRouter);
 app.use('/api/staff', staffRouter);
+app.use('/staff', staffRouter);
 app.use('/api/notify', notifyRouter);
+app.use('/notify', notifyRouter);
 app.use(multerErrorHandler);
 
 app.use((err, _req, res, _next) => {
@@ -83,33 +95,44 @@ function listLanIPv4() {
   return results;
 }
 
-app.listen(PORT, HOST, () => {
-  const lan = listLanIPv4();
-  console.log(`MotoTrack AI Customizer API listening on http://${HOST}:${PORT}`);
-  console.log(`Local:   http://127.0.0.1:${PORT}`);
-  lan.forEach((ip) => console.log(`LAN/device: http://${ip}:${PORT}`));
-  console.log(`Health:  http://127.0.0.1:${PORT}/api/health`);
-  if (!process.env.GEMINI_API_KEY) {
-    console.warn('WARNING: GEMINI_API_KEY is not set. Copy server/.env.example → server/.env');
-  }
-  const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY);
-  const hasAnon = Boolean(process.env.SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
-  if (!hasServiceRole && !hasAnon) {
-    console.warn(
-      'WARNING: Set SUPABASE_SERVICE_ROLE_KEY (preferred) or SUPABASE_ANON_KEY in server/.env for staff APIs.'
-    );
-  } else if (!hasServiceRole) {
-    console.warn(
-      'NOTE: Using SUPABASE_ANON_KEY for staff APIs. For production, set SUPABASE_SERVICE_ROLE_KEY.'
-    );
-  }
-  if (!process.env.RESEND_API_KEY && !process.env.SMTP_USER && !process.env.GMAIL_USER) {
-    if (String(process.env.ALLOW_EMAIL_DEV_FALLBACK || '').toLowerCase() === 'true') {
-      console.warn(
-        'WARNING: No email provider — OTP/temp passwords are printed in THIS console only. Set RESEND_API_KEY or Gmail SMTP to send to Gmail.'
-      );
-    } else {
-      console.warn('WARNING: Set RESEND_API_KEY or SMTP_USER/SMTP_PASS for staff OTP/credential emails.');
+const isServerless =
+  process.env.VERCEL === '1' ||
+  Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+  Boolean(process.env.LAMBDA_TASK_ROOT);
+
+if (!isServerless && process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, HOST, () => {
+    const lan = listLanIPv4();
+    console.log(`MotoTrack AI Customizer API listening on http://${HOST}:${PORT}`);
+    console.log(`Local:   http://127.0.0.1:${PORT}`);
+    lan.forEach((ip) => console.log(`LAN/device: http://${ip}:${PORT}`));
+    console.log(`Health:  http://127.0.0.1:${PORT}/api/health`);
+    const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY);
+    if (!hasGeminiKey) {
+      console.warn('WARNING: GEMINI_API_KEY is not set. Copy server/.env.example → server/.env');
     }
-  }
-});
+    const hasServiceRole = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY);
+    const hasAnon = Boolean(process.env.SUPABASE_ANON_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY);
+    if (!hasServiceRole && !hasAnon) {
+      console.warn(
+        'WARNING: Set SUPABASE_SERVICE_ROLE_KEY (preferred) or SUPABASE_ANON_KEY in server/.env for staff APIs.'
+      );
+    } else if (!hasServiceRole) {
+      console.warn(
+        'NOTE: Using SUPABASE_ANON_KEY for staff APIs. For production, set SUPABASE_SERVICE_ROLE_KEY.'
+      );
+    }
+    if (!process.env.RESEND_API_KEY && !process.env.SMTP_USER && !process.env.GMAIL_USER) {
+      if (String(process.env.ALLOW_EMAIL_DEV_FALLBACK || '').toLowerCase() === 'true') {
+        console.warn(
+          'WARNING: No email provider — OTP/temp passwords are printed in THIS console only. Set RESEND_API_KEY or Gmail SMTP to send to Gmail.'
+        );
+      } else {
+        console.warn('WARNING: Set RESEND_API_KEY or SMTP_USER/SMTP_PASS for staff OTP/credential emails.');
+      }
+    }
+  });
+}
+
+export default app;
+export { app };

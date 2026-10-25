@@ -96,7 +96,7 @@ export function createProfileWebStyles(isDark = false) {
       backgroundColor: '#24272B',
       backdropFilter: 'blur(16px)',
       WebkitBackdropFilter: 'blur(16px)',
-      position: Platform.OS === 'web' ? 'sticky' : 'relative',
+      position: 'sticky',
       top: 0,
       left: 0,
       right: 0,
@@ -107,6 +107,9 @@ export function createProfileWebStyles(isDark = false) {
       borderBottomColor: isDark ? '#26332E' : 'rgba(255, 255, 255, 0.10)',
       boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.45)' : '0 4px 16px rgba(0, 0, 0, 0.25)',
       minHeight: 67,
+      transform: 'translateZ(0)',
+      WebkitTransform: 'translateZ(0)',
+      willChange: 'transform',
     },
     headerInner: {
       maxWidth: 1360,

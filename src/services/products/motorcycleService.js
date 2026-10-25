@@ -155,13 +155,16 @@ class MotorcycleService {
     if (!userId && !customerId && !customerEmail) {
       return [...this.motorcycles];
     }
-    const filtered = this.motorcycles.filter(
-      (m) =>
-        (userId && (m.user_id === userId || m.user_id === 'usr-customer-01' || m.user_id === 'usr-rider-01' || m.customer_id === userId || m.customer_id === 'cust-01')) ||
-        (customerId && (m.customer_id === customerId || m.customer_id === 'cust-01')) ||
-        (customerEmail && m.customer_email === customerEmail)
-    );
-    return filtered.length > 0 ? filtered : [...this.motorcycles];
+    const cleanUid = userId ? String(userId).trim() : '';
+    const cleanCid = customerId ? String(customerId).trim() : '';
+    const cleanEmail = customerEmail ? String(customerEmail).trim().toLowerCase() : '';
+
+    return this.motorcycles.filter((m) => {
+      if (cleanUid && (m.user_id === cleanUid || m.customer_id === cleanUid)) return true;
+      if (cleanCid && m.customer_id === cleanCid) return true;
+      if (cleanEmail && String(m.customer_email || '').trim().toLowerCase() === cleanEmail) return true;
+      return false;
+    });
   }
 
   getMotorcycleById(id) {

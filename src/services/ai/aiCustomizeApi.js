@@ -17,12 +17,31 @@ export function getCustomizeApiBaseUrl() {
   }
 
   // 1. Web browser runtime: dynamically match the current origin host (e.g. localhost, 127.0.0.1, or local LAN IP)
-  // This guarantees web will always reach the local AI server even if Wi-Fi IP or .env is out of sync.
+  // On localhost, it connects to local Express server port 8787.
+  // On production (e.g. Vercel), it uses same-origin window.location.origin (unless an explicit HTTPS URL is provided).
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location?.hostname) {
-      const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
-      const host = window.location.hostname;
-      return `${proto}//${host}:8787`;
+      const hostname = window.location.hostname;
+      const isLocalhost =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '0.0.0.0';
+
+      if (isLocalhost) {
+        if (fromEnv && fromEnv.startsWith('http://') && !fromEnv.includes('192.168.')) {
+          return fromEnv.replace(/\/+$/, '');
+        }
+        const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        return `${proto}//${hostname}:8787`;
+      }
+
+      // Production web environment (e.g. Vercel deployment)
+      if (fromEnv && fromEnv.startsWith('https://')) {
+        return fromEnv.replace(/\/+$/, '');
+      }
+
+      // Default to same origin for Vercel Serverless /api
+      return window.location.origin;
     }
     if (fromEnv) return fromEnv.replace(/\/+$/, '');
     return 'http://127.0.0.1:8787';
@@ -303,12 +322,14 @@ export async function requestMotorcycleCustomization({
     };
   } catch (err) {
     if (timer) clearTimeout(timer);
-    const aborted = err?.name === 'AbortError';
+    const errorMsg = aborted
+      ? 'Request timed out. Image generation can take up to a minute — try again.'
+      : Platform.OS === 'web'
+        ? `Cannot reach AI server at ${base || window?.location?.origin || ''}. Please ensure the server API is active.`
+        : `Network request failed. On a physical phone use your PC LAN IP in EXPO_PUBLIC_CUSTOMIZE_API_URL (current: ${base}). ${err?.message || ''}`.trim();
     return {
       success: false,
-      error: aborted
-        ? 'Request timed out. Image generation can take up to a minute — try again.'
-        : `Network request failed. On a physical phone use your PC LAN IP in EXPO_PUBLIC_CUSTOMIZE_API_URL (current: ${base}). ${err?.message || ''}`.trim(),
+      error: errorMsg,
     };
   }
 }

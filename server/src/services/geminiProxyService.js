@@ -1,9 +1,11 @@
 import { GoogleGenAI } from '@google/genai';
 
 function getApiKey() {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
   if (!apiKey || apiKey.trim().length < 10) {
-    const err = new Error('GEMINI_API_KEY is missing. Set it in server/.env');
+    const err = new Error(
+      'GEMINI_API_KEY is missing. Set it in server/.env or Vercel Environment Variables.'
+    );
     err.status = 500;
     err.code = 'MISSING_API_KEY';
     throw err;

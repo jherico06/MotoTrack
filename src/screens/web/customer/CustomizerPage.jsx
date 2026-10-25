@@ -93,14 +93,14 @@ export default function CustomizerPageWeb({
 
   // ─── 2. MOTORCYCLE STATE ───
   const [registeredBikes, setRegisteredBikes] = useState(() => {
-    const list = motorcycleService.getMotorcycles(currentUser?.id);
-    return Array.isArray(list) && list.length > 0 ? list : motorcycleService.getMotorcycles();
+    if (!currentUser?.id) return [];
+    return motorcycleService.getMotorcycles(currentUser?.id) || [];
   });
   const [bikeSourceMode, setBikeSourceMode] = useState('all'); // 'all' | 'registered' | 'presets' | 'upload'
   const [selectedRegisteredBike, setSelectedRegisteredBike] = useState(() => {
-    const list = motorcycleService.getMotorcycles(currentUser?.id);
-    const validList = Array.isArray(list) && list.length > 0 ? list : motorcycleService.getMotorcycles();
-    return validList.find((b) => b.is_primary) || validList[0] || null;
+    if (!currentUser?.id) return null;
+    const list = motorcycleService.getMotorcycles(currentUser?.id) || [];
+    return list.find((b) => b.is_primary) || list[0] || null;
   });
   const [selectedPreset, setSelectedPreset] = useState(null);
   const [customPhotoUri, setCustomPhotoUri] = useState(null);
@@ -110,13 +110,17 @@ export default function CustomizerPageWeb({
 
   useEffect(() => {
     const unsub = motorcycleService.subscribe(() => {
-      const userBikes = motorcycleService.getMotorcycles(currentUser?.id);
-      const bikes =
-        Array.isArray(userBikes) && userBikes.length > 0 ? userBikes : motorcycleService.getMotorcycles();
-      setRegisteredBikes(bikes);
-      if (!selectedRegisteredBike && bikes.length > 0) {
-        setSelectedRegisteredBike(bikes.find((b) => b.is_primary) || bikes[0]);
+      if (!currentUser?.id) {
+        setRegisteredBikes([]);
+        setSelectedRegisteredBike(null);
+        return;
       }
+      const userBikes = motorcycleService.getMotorcycles(currentUser.id) || [];
+      setRegisteredBikes(userBikes);
+      setSelectedRegisteredBike((prev) => {
+        if (prev && userBikes.some((b) => b.motorcycle_id === prev.motorcycle_id)) return prev;
+        return userBikes.find((b) => b.is_primary) || userBikes[0] || null;
+      });
     });
     return () => unsub?.();
   }, [currentUser]);
@@ -532,13 +536,19 @@ export default function CustomizerPageWeb({
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── FULL-HEIGHT CUSTOMIZER SCROLLVIEW (Scrollbar extends through header from top: 0) ─── */}
+      {/* ─── FULL-HEIGHT CUSTOMIZER SCROLLVIEW (Scrollbar extends to top: 0 through header, matching Image 1) ─── */}
       <ScrollView
-        style={[styles.container, isDarkMode && { backgroundColor: '#0F1412' }]}
+        style={[
+          styles.container,
+          isDarkMode && { backgroundColor: '#0F1412' },
+          Platform.OS === 'web' ? { overscrollBehavior: 'none', overscrollBehaviorY: 'none' } : {},
+        ]}
         contentContainerStyle={styles.scrollContent}
+        stickyHeaderIndices={[0]}
         showsVerticalScrollIndicator={true}
+        scrollEventThrottle={16}
       >
-        {/* ─── 1. NAVBAR (Pinned at top: 0, does not scroll away) ─── */}
+        {/* ─── 1. NAVBAR ─── */}
         <View style={[styles.headerWrapper, isDarkMode && { backgroundColor: '#151C19', borderBottomColor: '#26332E' }]}>
         <View style={[styles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
           {/* Left: Logo */}

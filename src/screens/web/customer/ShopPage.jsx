@@ -509,13 +509,19 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── FULL-HEIGHT STOREFRONT SCROLLVIEW (Scrollbar extends through header from top: 0) ─── */}
+      {/* ─── FULL-HEIGHT STOREFRONT SCROLLVIEW (Scrollbar extends to top: 0 through header, matching Image 1) ─── */}
       <ScrollView
-        style={{ flex: 1, width: '100%' }}
+        style={{
+          flex: 1,
+          width: '100%',
+          ...(Platform.OS === 'web' ? { overscrollBehavior: 'none', overscrollBehaviorY: 'none' } : {}),
+        }}
         contentContainerStyle={[webStyles.scrollContent, windowWidth < 768 && { paddingBottom: 100 }]}
+        stickyHeaderIndices={[0]}
         showsVerticalScrollIndicator={true}
+        scrollEventThrottle={16}
       >
-        {/* ─── 1. FULL-WIDTH RESPONSIVE STICKY NAVBAR (Pinned at top: 0, does not scroll away) ─── */}
+        {/* ─── 1. FULL-WIDTH RESPONSIVE STICKY NAVBAR (Pinned at top: 0, hardware accelerated) ─── */}
         <View style={webStyles.headerWrapper}>
         <View style={[webStyles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
           {/* Left: Logo + Desktop Search */}
