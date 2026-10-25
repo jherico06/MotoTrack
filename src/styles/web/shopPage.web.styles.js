@@ -1,20 +1,20 @@
 import { StyleSheet } from 'react-native';
 
 export function createShopWebStyles(isDark = false) {
-  const bgMain = isDark ? '#1E2124' : '#F3F4F6';
-  const bgCard = isDark ? '#24272B' : '#FFFFFF';
-  const bgSub = isDark ? '#2E3236' : '#F3F4F6';
-  const bgHover = isDark ? '#374151' : '#E5E7EB';
-  const border = isDark ? '#374151' : '#E5E7EB';
+  const bgMain = isDark ? '#11151A' : '#F3F6FA';
+  const bgCard = isDark ? '#1C2229' : '#FFFFFF';
+  const bgSub = isDark ? '#262D36' : '#F1F5F9';
+  const bgHover = isDark ? '#2D3742' : '#E2E8F0';
+  const border = isDark ? '#2D3742' : '#E2E8F0';
   const textPrimary = isDark ? '#F9FAFB' : '#111827';
-  const textSecondary = isDark ? '#E5E7EB' : '#374151';
-  const textMuted = isDark ? '#9CA3AF' : '#6B7280';
-  const headerBg = '#24272B';
-  const brandPrimary = '#EA580C';
-  const footerBg = isDark ? '#1E2124' : '#24272B';
-  const footerBorder = isDark ? '#374151' : 'rgba(255, 255, 255, 0.10)';
+  const textSecondary = isDark ? '#CBD5E1' : '#475569';
+  const textMuted = isDark ? '#94A3B8' : '#64748B';
+  const headerBg = '#171C22';
+  const brandPrimary = '#FF5A0A';
+  const footerBg = '#171C22';
+  const footerBorder = isDark ? '#242D36' : 'rgba(255, 255, 255, 0.10)';
   const footerTextPrimary = '#FFFFFF';
-  const footerTextMuted = '#9CA3AF';
+  const footerTextMuted = '#94A3B8';
 
   return StyleSheet.create({
     container: {
@@ -881,6 +881,309 @@ export function createShopWebStyles(isDark = false) {
       color: footerTextMuted,
       fontWeight: '500',
       cursor: 'pointer',
+    },
+    // ─── 8 MOTORCYCLE CATEGORIES ROW ───
+    categoryRowWrap: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 32,
+      marginTop: 4,
+      width: '100%',
+    },
+    categoryCard: {
+      flex: 1,
+      minWidth: 80,
+      backgroundColor: bgCard,
+      borderRadius: 16,
+      borderWidth: 1.5,
+      borderColor: border,
+      paddingVertical: 14,
+      paddingHorizontal: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(15,23,42,0.04)',
+      transition: 'all 0.2s ease',
+    },
+    categoryCardActive: {
+      borderColor: brandPrimary,
+      backgroundColor: isDark ? '#261F1A' : '#FFF7ED',
+      boxShadow: '0 4px 14px rgba(255, 90, 10, 0.16)',
+    },
+    categoryCardImgWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+      backgroundColor: isDark ? '#242D36' : '#F8FAFC',
+      overflow: 'hidden',
+    },
+    categoryCardImg: {
+      width: 44,
+      height: 44,
+      borderRadius: 8,
+    },
+    categoryCardLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: textPrimary,
+      textAlign: 'center',
+      lineHeight: 15,
+    },
+    categoryCardLabelActive: {
+      color: brandPrimary,
+    },
+
+    // ─── PRODUCT CARD ACTIONS ───
+    productCardAddBtn: {
+      backgroundColor: brandPrimary,
+      borderRadius: 10,
+      paddingVertical: 9,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      marginTop: 8,
+      cursor: 'pointer',
+      boxShadow: '0 4px 12px rgba(255, 90, 10, 0.25)',
+      width: '100%',
+    },
+    productCardAddBtnText: {
+      fontSize: 12.5,
+      fontWeight: '800',
+      color: '#FFFFFF',
+    },
+    productCardStockBadge: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      backgroundColor: '#ECFDF5',
+      borderWidth: 1,
+      borderColor: '#A7F3D0',
+      paddingHorizontal: 7,
+      paddingVertical: 2.5,
+      borderRadius: 6,
+      zIndex: 4,
+    },
+    productCardStockBadgeText: {
+      color: '#059669',
+      fontSize: 10,
+      fontWeight: '800',
+    },
+    productCardDiscountBadge: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      backgroundColor: '#FF5A0A',
+      paddingHorizontal: 7,
+      paddingVertical: 2.5,
+      borderRadius: 6,
+      zIndex: 4,
+    },
+    productCardDiscountBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 10,
+      fontWeight: '800',
+    },
+    productCardFitmentText: {
+      fontSize: 11,
+      color: textMuted,
+      fontWeight: '600',
+      marginTop: 2,
+      marginBottom: 3,
+    },
+
+    // ─── PROFESSIONAL SERVICE BANNER ───
+    serviceBannerWrap: {
+      backgroundColor: '#171C22',
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: '#26313B',
+      overflow: 'hidden',
+      marginTop: 20,
+      marginBottom: 36,
+      boxShadow: '0 12px 32px rgba(0,0,0,0.3)',
+      position: 'relative',
+    },
+    serviceBannerInner: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      justifyContent: 'space-between',
+      gap: 24,
+      padding: 32,
+      flexWrap: 'wrap',
+    },
+    serviceBannerLeft: {
+      flex: 1.4,
+      minWidth: 280,
+      justifyContent: 'center',
+    },
+    serviceBannerEyebrow: {
+      color: brandPrimary,
+      fontSize: 11,
+      fontWeight: '900',
+      letterSpacing: 2,
+      textTransform: 'uppercase',
+      marginBottom: 8,
+    },
+    serviceBannerTitle: {
+      color: '#FFFFFF',
+      fontSize: 30,
+      fontWeight: '900',
+      lineHeight: 36,
+      marginBottom: 10,
+    },
+    serviceBannerSub: {
+      color: '#94A3B8',
+      fontSize: 13.5,
+      lineHeight: 20,
+      maxWidth: 440,
+      marginBottom: 24,
+    },
+    serviceBannerBtns: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flexWrap: 'wrap',
+    },
+    serviceBannerPrimaryBtn: {
+      backgroundColor: brandPrimary,
+      paddingHorizontal: 22,
+      paddingVertical: 12,
+      borderRadius: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      cursor: 'pointer',
+      boxShadow: '0 6px 18px rgba(255, 90, 10, 0.4)',
+    },
+    serviceBannerPrimaryBtnText: {
+      color: '#FFFFFF',
+      fontSize: 13.5,
+      fontWeight: '800',
+    },
+    serviceBannerSecondaryBtn: {
+      backgroundColor: 'rgba(255, 255, 255, 0.08)',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.2)',
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 12,
+      cursor: 'pointer',
+    },
+    serviceBannerSecondaryBtnText: {
+      color: '#FFFFFF',
+      fontSize: 13.5,
+      fontWeight: '700',
+    },
+    serviceBannerCenter: {
+      flex: 1,
+      minWidth: 220,
+      backgroundColor: 'rgba(255, 255, 255, 0.03)',
+      borderRadius: 16,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.08)',
+      justifyContent: 'center',
+    },
+    servicePopularTitle: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '800',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      marginBottom: 14,
+    },
+    servicePopularList: {
+      gap: 10,
+    },
+    servicePopularItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    servicePopularItemText: {
+      color: '#E2E8F0',
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    serviceBannerRight: {
+      flex: 0.9,
+      minWidth: 200,
+      borderRadius: 16,
+      overflow: 'hidden',
+      position: 'relative',
+      minHeight: 200,
+      justifyContent: 'flex-end',
+      padding: 20,
+      backgroundColor: '#1E252B',
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    serviceBannerRightTitle: {
+      color: '#FFFFFF',
+      fontSize: 20,
+      fontWeight: '900',
+      lineHeight: 26,
+    },
+
+    // ─── 3 PROMOTIONAL CARDS ───
+    promoCardsRow: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      justifyContent: 'space-between',
+      gap: 16,
+      marginBottom: 44,
+      flexWrap: 'wrap',
+    },
+    promoCard: {
+      flex: 1,
+      minWidth: 260,
+      backgroundColor: '#171C22',
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: '#26313B',
+      padding: 24,
+      position: 'relative',
+      overflow: 'hidden',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.25)',
+      justifyContent: 'space-between',
+      minHeight: 165,
+    },
+    promoCardTag: {
+      color: brandPrimary,
+      fontSize: 10,
+      fontWeight: '900',
+      letterSpacing: 1.5,
+      textTransform: 'uppercase',
+      marginBottom: 6,
+    },
+    promoCardTitle: {
+      color: '#FFFFFF',
+      fontSize: 18,
+      fontWeight: '900',
+      marginBottom: 4,
+    },
+    promoCardSub: {
+      color: '#94A3B8',
+      fontSize: 12.5,
+      lineHeight: 18,
+      marginBottom: 16,
+    },
+    promoCardLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      cursor: 'pointer',
+    },
+    promoCardLinkText: {
+      color: brandPrimary,
+      fontSize: 13,
+      fontWeight: '800',
     },
   });
 }
