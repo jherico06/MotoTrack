@@ -62,7 +62,7 @@ function normalizeGeminiError(err) {
     lower.includes('access_token_type_unsupported')
   ) {
     const friendly = new Error(
-      'Gemini API key is invalid. Put a Google AI Studio key in server/.env as GEMINI_API_KEY, then restart the server.'
+      'Gemini API key is invalid or unauthorized. Please use a valid Google AI Studio key (starts with AIzaSy) from https://aistudio.google.com/apikey.'
     );
     friendly.status = 401;
     friendly.code = 'INVALID_API_KEY';
@@ -201,6 +201,7 @@ export async function generateCustomMotorcycleImage(prompt, { bikeFile = null, p
   const ai = getClient();
   const bikePart = toInlinePart(bikeFile);
   const partPart = toInlinePart(partFile);
+  let lastError = null;
 
   if (bikePart && partPart) {
     for (const chosenModel of IMAGE_CANDIDATE_MODELS) {
@@ -251,6 +252,11 @@ export async function generateCustomMotorcycleImage(prompt, { bikeFile = null, p
         );
         if (fromRefs) return fromRefs;
       } catch (refErr) {
+        const norm = normalizeGeminiError(refErr);
+        if (norm.code === 'INVALID_API_KEY' || norm.code === 'QUOTA_EXCEEDED') {
+          throw norm;
+        }
+        lastError = refErr;
         console.warn(
           `[aiCustomize] Reference-image generation (${chosenModel}) failed, trying next:`,
           refErr?.message || refErr
@@ -282,6 +288,11 @@ export async function generateCustomMotorcycleImage(prompt, { bikeFile = null, p
       };
     }
   } catch (imagenErr) {
+    const norm = normalizeGeminiError(imagenErr);
+    if (norm.code === 'INVALID_API_KEY' || norm.code === 'QUOTA_EXCEEDED') {
+      throw norm;
+    }
+    lastError = imagenErr;
     console.warn(
       `[aiCustomize] Imagen (${IMAGEN_MODEL}) unavailable, falling back:`,
       imagenErr?.message || imagenErr
@@ -313,8 +324,16 @@ export async function generateCustomMotorcycleImage(prompt, { bikeFile = null, p
       );
       if (fromText) return fromText;
     } catch (_fallbackErr) {
-      // try next
+      const norm = normalizeGeminiError(_fallbackErr);
+      if (norm.code === 'INVALID_API_KEY' || norm.code === 'QUOTA_EXCEEDED') {
+        throw norm;
+      }
+      lastError = _fallbackErr;
     }
+  }
+
+  if (lastError) {
+    throw normalizeGeminiError(lastError);
   }
 
   const err = new Error('Image generation returned no image data.');
