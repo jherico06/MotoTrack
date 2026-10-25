@@ -13,7 +13,9 @@ import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import EditBrandModal from '../modals/EditBrandModal.jsx';
 import { systemSettingsService } from '../../services/system/systemSettingsService.js';
 import { auditLogService } from '../../services/system/auditLogService.js';
+import { marketingBannerService } from '../../services/marketing/marketingBannerService.js';
 import { pickImageFromFile } from '../../utils/imagePickerHelper.js';
+import AdminMarketingBannerSettings from './AdminMarketingBannerSettings.jsx';
 
 /**
  * AdminSystemSettingsPanel
@@ -37,6 +39,7 @@ export default function AdminSystemSettingsPanel({
   toggleDarkMode = () => {},
 }) {
   const [settings, setSettings] = useState(() => systemSettingsService.getSettings());
+  const [marketingBanner, setMarketingBanner] = useState(() => marketingBannerService.getBanner());
   const [activeSubTab, setActiveSubTab] = useState('general');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isBrandModalOpen, setIsBrandModalOpen] = useState(false);
@@ -51,7 +54,13 @@ export default function AdminSystemSettingsPanel({
     const unsub = systemSettingsService.subscribe((updated) => {
       setSettings({ ...updated });
     });
-    return unsub;
+    const unsubBanner = marketingBannerService.subscribe((updated) => {
+      setMarketingBanner({ ...updated });
+    });
+    return () => {
+      unsub();
+      unsubBanner();
+    };
   }, []);
 
   const openSectionModal = (sectionKey) => {
@@ -226,6 +235,7 @@ export default function AdminSystemSettingsPanel({
 
   const subTabs = [
     { id: 'general', label: 'Store Identity & Theme', icon: 'shop', desc: 'Branding, contact details & schedule' },
+    { id: 'marketing', label: 'Marketing Banner', icon: 'image', desc: 'Hero banner copy, graphics & live preview' },
     { id: 'store', label: 'Store & Business Configuration', icon: 'building', desc: 'Hours, delivery, pickup & status' },
     { id: 'checkout', label: 'Checkout & Payment Settings', icon: 'credit-card', desc: 'COD, online payment & fees' },
     { id: 'garage', label: 'Pitstop Garage Rules', icon: 'tools', desc: 'Operating hours & booking capacities' },
@@ -855,6 +865,110 @@ export default function AdminSystemSettingsPanel({
             />
           </View>
 
+          {/* Section: Marketing Banner */}
+          <View
+            style={{
+              backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+              padding: 24,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+              boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.05)',
+              gap: 16,
+            }}
+          >
+            <SectionHeader
+              icon="image"
+              title="Marketing Banner"
+              subtitle="Configure the landing page hero banner title, subtitle, marketing description, and background image for the public storefront."
+              onEdit={() => setActiveSubTab('marketing')}
+            />
+
+            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Banner Title"
+                  value={marketingBanner.title || 'Everything Your Ride Needs'}
+                  icon="type-h1"
+                  description="Primary headline rendered with motorcycle brand accent."
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Banner Subtitle"
+                  value={marketingBanner.subtitle || 'Ride More Worry Less'}
+                  icon="type"
+                  description="Short supporting heading and promotional accent."
+                />
+              </View>
+            </View>
+
+            <ReadOnlyField
+              title="Banner Description"
+              value={marketingBanner.description || 'Quality motorcycle parts, accessories, and professional service — all in one place.'}
+              icon="text-paragraph"
+              description="Marketing copy displayed directly under the hero headline."
+            />
+
+            <ReadOnlyField
+              title="Hero Background Image"
+              icon="image"
+              description="High-resolution motorcycle background photo displayed in the storefront hero card."
+              displayValue={
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  {marketingBanner.image ? (
+                    <Image
+                      source={{ uri: marketingBanner.image }}
+                      style={{
+                        width: 80,
+                        height: 48,
+                        borderRadius: 8,
+                        backgroundColor: '#1E252D',
+                        borderWidth: 1,
+                        borderColor: '#334155',
+                      }}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View
+                      style={{
+                        width: 80,
+                        height: 48,
+                        borderRadius: 8,
+                        backgroundColor: '#1E252D',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <BootstrapIcon name="image" size={20} color="#64748B" />
+                    </View>
+                  )}
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '700',
+                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      }}
+                      numberOfLines={1}
+                    >
+                      {marketingBanner.image ? 'Custom Hero Banner Image Configured' : 'Default Hero Image'}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => setActiveSubTab('marketing')}
+                      style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#EA580C' }}>
+                        Edit in Marketing Banner Studio →
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              }
+            />
+          </View>
+
           {/* Section 2: Contact & Headquarters */}
           <View
             style={{
@@ -989,6 +1103,16 @@ export default function AdminSystemSettingsPanel({
             </View>
           </View>
         </View>
+      )}
+
+      {/* ─── SUBTAB: MARKETING BANNER ─── */}
+      {canonicalTabId === 'marketing' && (
+        <AdminMarketingBannerSettings
+          isDarkMode={isDarkMode}
+          tokens={tokens}
+          showToast={showToast}
+          isDesktop={isDesktop}
+        />
       )}
 
       {/* ─── SUBTAB 2: STORE & BUSINESS CONFIGURATION ─── */}

@@ -5,6 +5,7 @@ import os from 'os';
 import customizeRouter from './routes/customize.js';
 import staffRouter from './routes/staff.js';
 import notifyRouter from './routes/notify.js';
+import bannerRouter from './routes/banner.js';
 import { multerErrorHandler } from './middleware/upload.js';
 
 const app = express();
@@ -73,6 +74,8 @@ app.use('/api/staff', staffRouter);
 app.use('/staff', staffRouter);
 app.use('/api/notify', notifyRouter);
 app.use('/notify', notifyRouter);
+app.use('/api/banner', bannerRouter);
+app.use('/banner', bannerRouter);
 app.use(multerErrorHandler);
 
 app.use((err, _req, res, _next) => {

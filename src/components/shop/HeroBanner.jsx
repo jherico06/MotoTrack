@@ -1,10 +1,55 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, Image, useWindowDimensions, Platform } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { fontFamily } from '../../styles/typography.js';
+import { marketingBannerService } from '../../services/marketing/marketingBannerService.js';
 
-const HERO_RIDER_IMAGE =
-  'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=1600&q=80';
+function renderBannerHeading(title) {
+  const clean = String(title || '').trim();
+  if (!clean) {
+    return (
+      <>
+        Motorcycle Parts{'\n'}
+        <Text style={{ color: '#FF5A0A' }}>& Accessories</Text>
+      </>
+    );
+  }
+
+  // If author explicitly put a newline \n:
+  if (clean.includes('\n')) {
+    const parts = clean.split('\n');
+    return (
+      <>
+        {parts[0]}
+        {'\n'}
+        <Text style={{ color: '#FF5A0A' }}>{parts.slice(1).join(' ')}</Text>
+      </>
+    );
+  }
+
+  // Split words: if >= 3 words, last 2 words in orange; if 2 words, second word in orange; if 1 word, in orange
+  const words = clean.split(/\s+/);
+  if (words.length <= 1) {
+    return <Text style={{ color: '#FF5A0A' }}>{clean}</Text>;
+  }
+  if (words.length === 2) {
+    return (
+      <>
+        {words[0]} <Text style={{ color: '#FF5A0A' }}>{words[1]}</Text>
+      </>
+    );
+  }
+  const splitIdx = words.length > 3 ? words.length - 2 : words.length - 1;
+  const firstPart = words.slice(0, splitIdx).join(' ');
+  const accentPart = words.slice(splitIdx).join(' ');
+
+  return (
+    <>
+      {firstPart}{'\n'}
+      <Text style={{ color: '#FF5A0A' }}>{accentPart}</Text>
+    </>
+  );
+}
 
 export default function HeroBanner({
   onSelectCategory,
@@ -17,6 +62,34 @@ export default function HeroBanner({
   const isTablet = width >= 768 && width < 1024;
   const isMobile = width < 768;
   const isSmallMobile = width < 420;
+
+  const [banner, setBanner] = useState(() => marketingBannerService.getBanner());
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+    const unsub = marketingBannerService.subscribe((updated) => {
+      if (isMounted) {
+        setBanner(updated);
+        setImageError(false);
+      }
+    });
+
+    marketingBannerService
+      .fetchBanner()
+      .then((res) => {
+        if (isMounted && res.banner) {
+          setBanner(res.banner);
+          setImageError(false);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+      unsub();
+    };
+  }, []);
 
   const handleShopParts = () => {
     onSelectCategory?.('All');
@@ -65,15 +138,26 @@ export default function HeroBanner({
           zIndex: 1,
         }}
       >
-        <Image
-          source={{ uri: HERO_RIDER_IMAGE }}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-          }}
-          resizeMode="cover"
-        />
+        {banner?.image && !imageError ? (
+          <Image
+            source={{ uri: banner.image }}
+            onError={() => setImageError(true)}
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+            }}
+            resizeMode="cover"
+          />
+        ) : (
+          <View
+            style={{
+              width: '100%',
+              height: '100%',
+              backgroundColor: '#171C22',
+            }}
+          />
+        )}
 
         {/* Cinematic Gradient Overlays for perfect text contrast on left */}
         {Platform.OS === 'web' && (
@@ -93,7 +177,7 @@ export default function HeroBanner({
         )}
       </View>
 
-      {/* ─── TOP RIGHT GEOMETRIC ACCENT & RIDE MORE WORRY LESS TAGLINE (matching reference UI) ─── */}
+      {/* ─── TOP RIGHT GEOMETRIC ACCENT & SUBTITLE (matching reference UI) ─── */}
       {isDesktop && (
         <View
           style={{
@@ -126,60 +210,26 @@ export default function HeroBanner({
             </svg>
           )}
 
-          <View style={{ alignItems: 'flex-end', marginTop: 12, marginRight: 8 }}>
-            <Text
-              style={{
-                color: '#FF5A0A',
-                fontSize: 13,
-                fontWeight: '900',
-                letterSpacing: 2.5,
-                lineHeight: 16,
-                fontFamily: fontFamily.sans,
-                textTransform: 'uppercase',
-              }}
-            >
-              RIDE
-            </Text>
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 13,
-                fontWeight: '900',
-                letterSpacing: 2.5,
-                lineHeight: 16,
-                fontFamily: fontFamily.sans,
-                textTransform: 'uppercase',
-              }}
-            >
-              MORE
-            </Text>
-            <Text
-              style={{
-                color: '#FF5A0A',
-                fontSize: 13,
-                fontWeight: '900',
-                letterSpacing: 2.5,
-                lineHeight: 16,
-                fontFamily: fontFamily.sans,
-                textTransform: 'uppercase',
-              }}
-            >
-              WORRY
-            </Text>
-            <Text
-              style={{
-                color: '#FFFFFF',
-                fontSize: 13,
-                fontWeight: '900',
-                letterSpacing: 2.5,
-                lineHeight: 16,
-                fontFamily: fontFamily.sans,
-                textTransform: 'uppercase',
-              }}
-            >
-              LESS
-            </Text>
-          </View>
+          {banner?.subtitle ? (
+            <View style={{ alignItems: 'flex-end', marginTop: 12, marginRight: 8 }}>
+              {banner.subtitle.split(/\s+/).slice(0, 4).map((w, idx) => (
+                <Text
+                  key={idx}
+                  style={{
+                    color: idx % 2 === 0 ? '#FF5A0A' : '#FFFFFF',
+                    fontSize: 13,
+                    fontWeight: '900',
+                    letterSpacing: 2.5,
+                    lineHeight: 16,
+                    fontFamily: fontFamily.sans,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {w}
+                </Text>
+              ))}
+            </View>
+          ) : null}
 
           {/* Dot Grid Pattern Accent at Bottom Right */}
           <View
@@ -224,7 +274,7 @@ export default function HeroBanner({
       >
         {/* Top: Eyebrow + Headline + Subtitle + CTAs */}
         <View>
-          {/* Eyebrow Label */}
+          {/* Eyebrow / Subtitle Label */}
           <View
             style={{
               flexDirection: 'row',
@@ -243,11 +293,11 @@ export default function HeroBanner({
                 fontFamily: fontFamily.sans,
               }}
             >
-              MOTOTRACK
+              {banner?.subtitle || 'MOTOTRACK'}
             </Text>
           </View>
 
-          {/* Headline: "Everything Your Ride Needs" with "Ride Needs" in Bright Orange */}
+          {/* Headline: Dynamic banner title */}
           <Text
             style={{
               fontSize: isDesktop ? 46 : isTablet ? 38 : isSmallMobile ? 28 : 34,
@@ -259,11 +309,10 @@ export default function HeroBanner({
               marginBottom: 14,
             }}
           >
-            Everything Your{'\n'}
-            <Text style={{ color: '#FF5A0A' }}>Ride Needs</Text>
+            {renderBannerHeading(banner?.title)}
           </Text>
 
-          {/* Subtitle / Description */}
+          {/* Description */}
           <Text
             style={{
               fontSize: isDesktop ? 15 : 13.5,
@@ -274,7 +323,7 @@ export default function HeroBanner({
               marginBottom: isDesktop ? 28 : 22,
             }}
           >
-            Quality motorcycle parts, accessories, and professional service — all in one place.
+            {banner?.description || ''}
           </Text>
 
           {/* CTAs Row */}

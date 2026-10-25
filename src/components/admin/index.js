@@ -19,3 +19,4 @@ export { default as SalesAnalyticsPanel } from './SalesAnalyticsPanel.jsx';
 export { default as AdminSidebar, AdminSidebarSkeleton } from './AdminSidebar.jsx';
 export { default as AdminProfileLogsPanel } from './AdminProfileLogsPanel.jsx';
 export { default as ModernOverviewDashboard } from './ModernOverviewDashboard.jsx';
+export { default as AdminMarketingBannerSettings } from './AdminMarketingBannerSettings.jsx';
