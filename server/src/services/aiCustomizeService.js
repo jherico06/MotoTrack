@@ -75,7 +75,9 @@ function normalizeGeminiError(err) {
 
 function getClient() {
   const apiKey = String(
-    process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY || ''
+    process.env.GEMINI_API_KEY ||
+    process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
+    ''
   ).trim();
   if (!apiKey || apiKey.length < 10) {
     const err = new Error(
