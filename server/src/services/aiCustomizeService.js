@@ -6,7 +6,6 @@ const IMAGE_FALLBACK_MODEL = process.env.GEMINI_IMAGE_FALLBACK_MODEL || 'gemini-
 const IMAGE_CANDIDATE_MODELS = [
   process.env.GEMINI_IMAGE_FALLBACK_MODEL,
   'gemini-3.1-flash-image',
-  'gemini-3-pro-image',
   'gemini-2.5-flash-image',
 ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
