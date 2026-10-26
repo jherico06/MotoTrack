@@ -928,8 +928,9 @@ export default function ModernOverviewDashboard({
             flex: 1,
             display: 'grid',
             gridTemplateColumns: windowWidth < 420 ? '1fr' : 'repeat(2, 1fr)',
+            gridTemplateRows: isDesktop && windowWidth >= 420 ? 'repeat(2, 1fr)' : undefined,
             gap: 14,
-            height: '100%',
+            height: isDesktop ? '100%' : 'auto',
             alignSelf: 'stretch',
           }}
         >
@@ -1103,7 +1104,7 @@ export default function ModernOverviewDashboard({
               <BootstrapIcon name="chevron-right" size={11} color={theme.textMuted} />
             </View>
 
-            <View style={{ marginVertical: 6 }}>
+            <View style={{ marginVertical: 10 }}>
               <Text style={{ fontSize: 28, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
                 {(invStats.lowStockCount || 0) + (invStats.outOfStockCount || 0)}
               </Text>
@@ -2204,7 +2205,10 @@ export function ModernOverviewDashboardSkeleton({ isDarkMode = false, isDesktop 
             flex: 1,
             display: 'grid',
             gridTemplateColumns: windowWidth < 420 ? '1fr' : 'repeat(2, 1fr)',
+            gridTemplateRows: isDesktop && windowWidth >= 420 ? 'repeat(2, 1fr)' : undefined,
             gap: 14,
+            height: isDesktop ? '100%' : 'auto',
+            alignSelf: 'stretch',
           }}
         >
           {[1, 2, 3, 4].map((k) => (
@@ -2217,7 +2221,8 @@ export function ModernOverviewDashboardSkeleton({ isDarkMode = false, isDesktop 
                 borderColor: cardBorder,
                 padding: 16,
                 justifyContent: 'space-between',
-                minHeight: 150,
+                height: '100%',
+                boxSizing: 'border-box',
                 gap: 12,
               }}
             >
