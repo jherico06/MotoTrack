@@ -94,13 +94,13 @@ export default function CustomizerPageWeb({
 
   // ─── 2. MOTORCYCLE STATE ───
   const [registeredBikes, setRegisteredBikes] = useState(() => {
-    if (!currentUser?.id) return [];
-    return motorcycleService.getMotorcycles(currentUser?.id) || [];
+    if (!currentUser) return [];
+    return motorcycleService.getMotorcycles(currentUser) || [];
   });
   const [bikeSourceMode, setBikeSourceMode] = useState('all'); // 'all' | 'registered' | 'presets' | 'upload'
   const [selectedRegisteredBike, setSelectedRegisteredBike] = useState(() => {
-    if (!currentUser?.id) return null;
-    const list = motorcycleService.getMotorcycles(currentUser?.id) || [];
+    if (!currentUser) return null;
+    const list = motorcycleService.getMotorcycles(currentUser) || [];
     return list.find((b) => b.is_primary) || list[0] || null;
   });
   const [selectedPreset, setSelectedPreset] = useState(null);
@@ -110,13 +110,16 @@ export default function CustomizerPageWeb({
   const [isRegisterBikeModalOpen, setIsRegisterBikeModalOpen] = useState(false);
 
   useEffect(() => {
+    if (currentUser) {
+      motorcycleService.syncFromSupabase(currentUser).catch(() => {});
+    }
     const unsub = motorcycleService.subscribe(() => {
-      if (!currentUser?.id) {
+      if (!currentUser) {
         setRegisteredBikes([]);
         setSelectedRegisteredBike(null);
         return;
       }
-      const userBikes = motorcycleService.getMotorcycles(currentUser.id) || [];
+      const userBikes = motorcycleService.getMotorcycles(currentUser) || [];
       setRegisteredBikes(userBikes);
       setSelectedRegisteredBike((prev) => {
         if (prev && userBikes.some((b) => b.motorcycle_id === prev.motorcycle_id)) return prev;
@@ -341,7 +344,7 @@ export default function CustomizerPageWeb({
       if (res?.success && res.motorcycle) {
         setSelectedRegisteredBike(res.motorcycle);
         setBikeSourceMode('registered');
-        setRegisteredBikes(motorcycleService.getMotorcycles(currentUser?.id));
+        setRegisteredBikes(motorcycleService.getMotorcycles(currentUser));
         showToast(`✓ ${res.motorcycle.brand} ${res.motorcycle.model} registered!`);
       }
     } catch (_err) {

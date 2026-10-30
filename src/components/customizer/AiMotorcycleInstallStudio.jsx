@@ -101,17 +101,16 @@ function bikeIdentity(bike) {
 
 function filterUserBikes(all, user) {
   const userId = user?.id || user?.user_id;
-  const customerId = user?.customer_id;
-  const email = String(user?.email || '').trim().toLowerCase();
+  const customerId = user?.customer_id || user?.customerId;
+  const email = String(user?.email || user?.customer_email || '').trim().toLowerCase();
   if (!userId && !customerId && !email) return [];
   return (Array.isArray(all) ? all : []).filter((b) => {
     if (String(b.motorcycle_id || '').startsWith('moto-seed-')) return false;
+    const bikeEmail = String(b.customer_email || '').trim().toLowerCase();
     const sameUser =
-      (userId &&
-        (b.user_id === userId ||
-          b.customer_id === userId ||
-          (customerId && b.customer_id === customerId))) ||
-      (email && String(b.customer_email || '').toLowerCase() === email);
+      (userId && (b.user_id === userId || b.customer_id === userId)) ||
+      (customerId && (b.customer_id === customerId || b.user_id === customerId)) ||
+      (email && bikeEmail === email);
     return Boolean(sameUser);
   });
 }
@@ -163,12 +162,10 @@ export default function AiMotorcycleInstallStudio({
 
   // Selection state - initialized from user's registered motorcycles (no synthetic mock bikes)
   const [bikes, setBikes] = useState(() => {
-    const all = motorcycleService.getMotorcycles() || [];
-    return filterUserBikes(all, currentUser);
+    return motorcycleService.getMotorcycles(currentUser) || [];
   });
   const [selectedBikeId, setSelectedBikeId] = useState(() => {
-    const all = motorcycleService.getMotorcycles() || [];
-    const userBikes = filterUserBikes(all, currentUser);
+    const userBikes = motorcycleService.getMotorcycles(currentUser) || [];
     const primary = userBikes.find((b) => b.is_primary) || userBikes[0];
     return primary?.motorcycle_id || primary?.id || '';
   });
@@ -189,8 +186,7 @@ export default function AiMotorcycleInstallStudio({
   const [notesOpen, setNotesOpen] = useState(false);
   const [generationState, setGenerationState] = useState(GENERATION_STATES.IDLE);
   const [loadingBikes, setLoadingBikes] = useState(() => {
-    const all = motorcycleService.getMotorcycles() || [];
-    const userBikes = filterUserBikes(all, currentUser);
+    const userBikes = motorcycleService.getMotorcycles(currentUser) || [];
     // Only show loading indicator if user is authenticated and we have zero cached bikes yet
     return userBikes.length === 0 && Boolean(currentUser?.id || currentUser?.email);
   });
@@ -481,11 +477,11 @@ export default function AiMotorcycleInstallStudio({
 
   const refreshBikes = useCallback(async () => {
     try {
-      if (currentUserId || currentUserEmail) {
-        await motorcycleService.syncFromSupabase(currentUserId, currentUserEmail);
+      const user = currentUserRef.current;
+      if (user) {
+        await motorcycleService.syncFromSupabase(user);
       }
-      const all = motorcycleService.getMotorcycles() || [];
-      const userBikes = filterUserBikes(all, currentUserRef.current);
+      const userBikes = motorcycleService.getMotorcycles(user) || [];
       setBikes(userBikes);
       setSelectedBikeId((prev) => {
         if (prev && userBikes.some((b) => b.motorcycle_id === prev)) return prev;
@@ -497,16 +493,28 @@ export default function AiMotorcycleInstallStudio({
     } finally {
       setLoadingBikes(false);
     }
-  }, [currentUserId, currentUserEmail]);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
-    // 1. Subscribe to local updates in motorcycleService (never call syncFromSupabase inside subscribe!)
+    // Immediately load any currently available motorcycles from service cache
+    const initialUserBikes = motorcycleService.getMotorcycles(currentUser) || [];
+    if (initialUserBikes.length > 0) {
+      setBikes(initialUserBikes);
+      setSelectedBikeId((prev) => {
+        if (prev && initialUserBikes.some((b) => b.motorcycle_id === prev)) return prev;
+        const primary = initialUserBikes.find((b) => b.is_primary) || initialUserBikes[0];
+        return primary?.motorcycle_id || primary?.id || '';
+      });
+      setLoadingBikes(false);
+    }
+
+    // 1. Subscribe to updates in motorcycleService
     const unsub = motorcycleService.subscribe((all) => {
       if (!isMounted) return;
       const userBikes = filterUserBikes(
-        all || motorcycleService.getMotorcycles() || [],
+        all || motorcycleService.getAllMotorcycles() || [],
         currentUserRef.current
       );
       setBikes(userBikes);
@@ -518,10 +526,20 @@ export default function AiMotorcycleInstallStudio({
       setLoadingBikes(false);
     });
 
-    // 2. Perform background sync from Supabase silently without clearing displayed bikes
-    if (currentUserId || currentUserEmail) {
+    // 2. Perform background sync from Supabase and immediately set bikes when resolved
+    if (currentUser) {
       motorcycleService
-        .syncFromSupabase(currentUserId, currentUserEmail)
+        .syncFromSupabase(currentUser)
+        .then(() => {
+          if (!isMounted) return;
+          const fresh = motorcycleService.getMotorcycles(currentUserRef.current);
+          setBikes(fresh);
+          setSelectedBikeId((prev) => {
+            if (prev && fresh.some((b) => b.motorcycle_id === prev)) return prev;
+            const primary = fresh.find((b) => b.is_primary) || fresh[0];
+            return primary?.motorcycle_id || primary?.id || '';
+          });
+        })
         .catch((err) => console.warn('[InstallStudio] background sync warning:', err))
         .finally(() => {
           if (isMounted) setLoadingBikes(false);
@@ -534,7 +552,7 @@ export default function AiMotorcycleInstallStudio({
       isMounted = false;
       unsub?.();
     };
-  }, [currentUserId, currentUserEmail]);
+  }, [currentUserId, currentUserEmail, currentUser]);
 
   useEffect(() => {
     if (!loading) {
@@ -704,6 +722,9 @@ export default function AiMotorcycleInstallStudio({
       setSavedToGarage(false);
       setSaveNotice('');
       setPreviewFailed(false);
+      if (selectedBike?.motorcycle_id) {
+        motorcycleService.updateMotorcycle(selectedBike.motorcycle_id, { photo_url: res.uri }).catch(() => {});
+      }
     } else if (res?.error && !/cancel/i.test(res.error)) {
       setError(res.error);
     }
@@ -2072,7 +2093,7 @@ export default function AiMotorcycleInstallStudio({
                     : 'Sign in and register your motorcycle to see it on the preview canvas.')
                 : 'Please add a photo of your registered motorcycle to view it on the canvas.'}
             </Text>
-            {!selectedBike && (
+            {!selectedBike ? (
               <TouchableOpacity
                 style={styles.emptyCanvasRegisterBtn}
                 onPress={openRegister}
@@ -2081,6 +2102,17 @@ export default function AiMotorcycleInstallStudio({
                 <BootstrapIcon name={currentUser ? "plus-circle" : "person-fill"} size={14} color="#FFFFFF" />
                 <Text style={styles.emptyCanvasRegisterBtnText}>
                   {currentUser ? 'Register Motorcycle' : 'Sign In to Register'}
+                </Text>
+              </TouchableOpacity>
+            ) : !bikeUri && (
+              <TouchableOpacity
+                style={styles.emptyCanvasRegisterBtn}
+                onPress={pickBikeOverride}
+                activeOpacity={0.85}
+              >
+                <BootstrapIcon name="camera-fill" size={14} color="#FFFFFF" />
+                <Text style={styles.emptyCanvasRegisterBtnText}>
+                  Upload Photo for this Motorcycle
                 </Text>
               </TouchableOpacity>
             )}

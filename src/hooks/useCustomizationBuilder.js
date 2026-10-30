@@ -67,7 +67,7 @@ export function useCustomizationBuilder({ currentUser, initialProduct } = {}) {
 
   const refreshGarageBikes = useCallback(() => {
     try {
-      const list = motorcycleService.getMotorcycles(currentUser?.id) || [];
+      const list = motorcycleService.getMotorcycles(currentUser) || [];
       setGarageBikes(Array.isArray(list) ? list : []);
     } catch (_e) {
       setGarageBikes([]);

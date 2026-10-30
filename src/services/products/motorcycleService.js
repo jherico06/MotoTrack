@@ -103,8 +103,30 @@ class MotorcycleService {
     };
   }
 
-  async syncFromSupabase(userId, customerEmail, { allowAll = false } = {}) {
-    if (!userId && !customerEmail && !allowAll) {
+  async syncFromSupabase(userOrUserId, customerEmail, options = {}) {
+    let uid = '';
+    let email = '';
+    let cid = '';
+    let allowAll = false;
+
+    if (userOrUserId && typeof userOrUserId === 'object') {
+      const u = userOrUserId;
+      uid = u.id || u.user_id || '';
+      cid = u.customer_id || u.customerId || '';
+      email = u.email || u.customer_email || '';
+      allowAll = Boolean(options?.allowAll || u.allowAll);
+    } else {
+      uid = userOrUserId || '';
+      email = customerEmail || '';
+      cid = options?.customerId || '';
+      allowAll = Boolean(options?.allowAll);
+    }
+
+    const cleanUid = uid ? String(uid).trim() : '';
+    const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+    const cleanCid = cid ? String(cid).trim() : '';
+
+    if (!cleanUid && !cleanEmail && !cleanCid && !allowAll) {
       return [];
     }
 
@@ -123,23 +145,37 @@ class MotorcycleService {
           .order('is_primary', { ascending: false })
           .order('created_at', { ascending: false });
 
-        if (userId && customerEmail) {
-          query = query.or(`user_id.eq.${userId},customer_email.eq.${customerEmail}`);
-        } else if (userId) {
-          query = query.eq('user_id', userId);
-        } else if (customerEmail) {
-          query = query.eq('customer_email', customerEmail);
+        if (!allowAll) {
+          const orClauses = [];
+          if (cleanUid) {
+            orClauses.push(`user_id.eq.${cleanUid}`);
+            orClauses.push(`customer_id.eq.${cleanUid}`);
+          }
+          if (cleanCid && cleanCid !== cleanUid) {
+            orClauses.push(`customer_id.eq.${cleanCid}`);
+            orClauses.push(`user_id.eq.${cleanCid}`);
+          }
+          if (cleanEmail) {
+            orClauses.push(`customer_email.ilike.${cleanEmail}`);
+          }
+          if (orClauses.length > 1) {
+            query = query.or(orClauses.join(','));
+          } else if (orClauses.length === 1) {
+            const single = orClauses[0];
+            const [col, op, val] = single.split('.');
+            if (op === 'ilike') query = query.ilike(col, val);
+            else query = query.eq(col, val);
+          }
         }
 
         const { data, error } = await query;
 
         if (!error && Array.isArray(data)) {
           let nextList = [];
-          if (userId || customerEmail) {
-            const cleanUid = userId ? String(userId).trim() : '';
-            const cleanEmail = customerEmail ? String(customerEmail).trim().toLowerCase() : '';
+          if (cleanUid || cleanEmail || cleanCid) {
             const others = this.motorcycles.filter((m) => {
               if (cleanUid && (m.user_id === cleanUid || m.customer_id === cleanUid)) return false;
+              if (cleanCid && (m.customer_id === cleanCid || m.user_id === cleanCid)) return false;
               if (cleanEmail && String(m.customer_email || '').trim().toLowerCase() === cleanEmail) return false;
               return true;
             });
@@ -148,10 +184,7 @@ class MotorcycleService {
             nextList = data;
           }
 
-          const hasChanged = JSON.stringify(this.motorcycles) !== JSON.stringify(nextList);
-          if (hasChanged) {
-            this._saveLocal(nextList);
-          }
+          this._saveLocal(nextList);
           return data;
         }
       } catch (_e) {
@@ -168,18 +201,32 @@ class MotorcycleService {
   /**
    * Get list of motorcycles for the current user/customer
    */
-  getMotorcycles(userId, customerId, customerEmail) {
-    if (!userId && !customerId && !customerEmail) {
+  getMotorcycles(userOrUserId, customerId, customerEmail) {
+    let cleanUid = '';
+    let cleanCid = '';
+    let cleanEmail = '';
+
+    if (userOrUserId && typeof userOrUserId === 'object') {
+      const u = userOrUserId;
+      cleanUid = String(u.id || u.user_id || '').trim();
+      cleanCid = String(u.customer_id || u.customerId || '').trim();
+      cleanEmail = String(u.email || u.customer_email || '').trim().toLowerCase();
+    } else {
+      cleanUid = userOrUserId ? String(userOrUserId).trim() : '';
+      cleanCid = customerId ? String(customerId).trim() : '';
+      cleanEmail = customerEmail ? String(customerEmail).trim().toLowerCase() : '';
+    }
+
+    if (!cleanUid && !cleanCid && !cleanEmail) {
       return [];
     }
-    const cleanUid = userId ? String(userId).trim() : '';
-    const cleanCid = customerId ? String(customerId).trim() : '';
-    const cleanEmail = customerEmail ? String(customerEmail).trim().toLowerCase() : '';
 
     return this.motorcycles.filter((m) => {
+      if (String(m.motorcycle_id || '').startsWith('moto-seed-')) return false;
+      const mEmail = String(m.customer_email || '').trim().toLowerCase();
       if (cleanUid && (m.user_id === cleanUid || m.customer_id === cleanUid)) return true;
-      if (cleanCid && m.customer_id === cleanCid) return true;
-      if (cleanEmail && String(m.customer_email || '').trim().toLowerCase() === cleanEmail) return true;
+      if (cleanCid && (m.customer_id === cleanCid || m.user_id === cleanCid)) return true;
+      if (cleanEmail && mEmail === cleanEmail) return true;
       return false;
     });
   }
@@ -195,9 +242,8 @@ class MotorcycleService {
     return this.motorcycles.find((m) => m.motorcycle_id === id) || null;
   }
 
-  getPrimaryMotorcycle(userId, customerId, customerEmail) {
-    if (!userId && !customerId && !customerEmail) return null;
-    const list = this.getMotorcycles(userId, customerId, customerEmail);
+  getPrimaryMotorcycle(userOrUserId, customerId, customerEmail) {
+    const list = this.getMotorcycles(userOrUserId, customerId, customerEmail);
     return list.find((m) => m.is_primary) || list[0] || null;
   }
 
