@@ -45,8 +45,23 @@ export function saveInstallStudioSession(userId, sessionData) {
   if (!sessionData) return;
   const key = getStorageKey(userId);
 
+  let cleanSelected = undefined;
+  if (Array.isArray(sessionData.selectedProducts)) {
+    const seen = new Set();
+    cleanSelected = [];
+    for (const item of sessionData.selectedProducts) {
+      if (!item) continue;
+      const pid = String(item.product_id ?? item.id ?? '').trim();
+      if (pid && seen.has(pid)) continue;
+      if (pid) seen.add(pid);
+      cleanSelected.push(item);
+      if (cleanSelected.length >= 3) break;
+    }
+  }
+
   const payload = {
     ...sessionData,
+    ...(cleanSelected !== undefined ? { selectedProducts: cleanSelected } : {}),
     updatedAt: Date.now(),
   };
 
@@ -55,14 +70,24 @@ export function saveInstallStudioSession(userId, sessionData) {
 
   // Try persisting to storage (gracefully handle quota limits for large base64 strings)
   try {
-    appStorage.setItem(key, JSON.stringify(payload));
-  } catch (err) {
-    // If base64 image exceeds web sessionStorage quota (typically 5MB),
-    // save a lightweight version to storage while memory retains full image.
+    const storageCopy = { ...payload };
+    // Never write multi-MB data: URIs into web sessionStorage
+    if (typeof storageCopy.resultUri === 'string' && storageCopy.resultUri.startsWith('data:')) {
+      delete storageCopy.resultUri;
+    }
+    if (typeof storageCopy.partUri === 'string' && storageCopy.partUri.startsWith('data:') && storageCopy.partUri.length > 250000) {
+      delete storageCopy.partUri;
+    }
+    appStorage.setItem(key, JSON.stringify(storageCopy));
+  } catch (_err) {
+    // Fallback lightweight snapshot while memory store retains full objects
     try {
       const light = { ...payload };
-      if (typeof light.resultUri === 'string' && light.resultUri.length > 500000) {
-        delete light.resultUri;
+      delete light.resultUri;
+      delete light.partUri;
+      delete light.bikeOverrideUri;
+      if (Array.isArray(light.selectedProducts)) {
+        light.selectedProducts = light.selectedProducts.map(({ raw: _raw, ...rest }) => rest);
       }
       appStorage.setItem(key, JSON.stringify(light));
     } catch (_fallbackErr) {

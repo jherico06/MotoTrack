@@ -2,6 +2,8 @@ import { APP_CONFIG } from '../../config/index.js';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
+const MAX_SELECTED_PRODUCTS = 3;
+
 /**
  * Base URL for the Express AI Customizer API.
  * Dynamically resolves LAN host IP on physical mobile devices.
@@ -214,20 +216,36 @@ export async function getCustomizeUsage({ userId }) {
 }
 
 /**
- * POST /api/customize with multipart bike + part images.
- * bikeUri = motorcycle identity reference; partUri = product identity reference.
+ * POST /api/customize with multipart bike + 1..3 selected product images.
+ * bikeUri = motorcycle identity reference; partUris (or partUri) = 1 to 3 product identity references.
  */
 export async function requestMotorcycleCustomization({
   userId = '',
   bikeUri,
   partUri,
+  partUris = [],
   customRequest = '',
   installationPrompt = '',
   selectionMeta = null,
   timeoutMs = 120000,
 }) {
-  if (!bikeUri || !partUri) {
-    return { success: false, error: 'Select both a motorcycle photo and a part photo.' };
+  const resolvedPartUris =
+    Array.isArray(partUris) && partUris.length > 0
+      ? partUris.filter(Boolean)
+      : partUri
+        ? [partUri]
+        : [];
+
+  if (!bikeUri || resolvedPartUris.length === 0) {
+    return { success: false, error: 'Select both a motorcycle photo and at least one part photo.' };
+  }
+
+  if (resolvedPartUris.length > MAX_SELECTED_PRODUCTS) {
+    return {
+      success: false,
+      code: 'MAX_PRODUCTS_EXCEEDED',
+      error: 'You can select a maximum of 3 products.',
+    };
   }
 
   const base = getCustomizeApiBaseUrl();
@@ -242,7 +260,16 @@ export async function requestMotorcycleCustomization({
     form.append('userId', resolvedUserId);
   }
   await appendImage(form, 'bike', bikeUri, 'bike.jpg');
-  await appendImage(form, 'part', partUri, 'part.jpg');
+  for (let idx = 0; idx < resolvedPartUris.length; idx += 1) {
+    await appendImage(form, `part_${idx}`, resolvedPartUris[idx], `part_${idx + 1}.jpg`);
+  }
+  const remotePartUrls = resolvedPartUris.map((u) =>
+    typeof u === 'string' && /^https?:\/\//i.test(u) ? u : ''
+  );
+  if (remotePartUrls.some(Boolean)) {
+    form.append('partUrls', JSON.stringify(remotePartUrls));
+  }
+
   const promptText = String(installationPrompt || customRequest || '').trim();
   form.append('customRequest', promptText);
   form.append('installationPrompt', promptText);
@@ -317,11 +344,13 @@ export async function requestMotorcycleCustomization({
       promptUsed: data.promptUsed,
       model: data.model,
       note: data.note,
+      partsInstalledCount: data.partsInstalledCount || resolvedPartUris.length,
       apiBase: base,
       usage: data.usage || null,
     };
   } catch (err) {
     if (timer) clearTimeout(timer);
+    const aborted = err?.name === 'AbortError' || Boolean(controller?.signal?.aborted);
     const errorMsg = aborted
       ? 'Request timed out. Image generation can take up to a minute — try again.'
       : Platform.OS === 'web'

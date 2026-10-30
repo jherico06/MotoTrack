@@ -4133,7 +4133,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     inventory: 'Inventory Telemetry',
     pos: 'Point of Sale (POS) Cashier Terminal',
     analytics: 'Sales Analytics',
-    forecast: 'Sales Forecast Optimization',
+    forecast: 'Inventory Forecasting',
     products: 'Products & Price Management',
     promos: 'Promo Vouchers & Discounts',
     suppliers: 'Suppliers & Parts Vendors',
@@ -10998,5421 +10998,339 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                               }}
                               onPress={() => handleOpenEditMechanic(mech)}
                             >
-                              <BootstrapIcon
-                                name="pencil-square"
-                                size={12}
-                                color={isDarkMode ? tokens.textMuted : '#475569'}
-                              />
-                              <Text
-                                style={{
-                                  fontSize: 11.5,
-                                  fontWeight: '700',
-                                  color: isDarkMode ? '#E2E8F0' : '#475569',
-                                }}
-                              >
-                                Edit Details
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
+                            <BootstrapIcon
+                              name="pencil-square"
+                              size={12}
+                              color={isDarkMode ? tokens.textMuted : '#475569'}
+                            />
+                            <Text
                               style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 5,
-                                paddingHorizontal: 12,
-                                paddingVertical: 6,
-                                borderRadius: 8,
-                                borderWidth: 1,
-                                borderColor: isDarkMode ? tokens.chipBorder : '#FCA5A5',
-                                backgroundColor: isDarkMode ? tokens.statusDangerBg : '#FEF2F2',
+                                fontSize: 11.5,
+                                fontWeight: '700',
+                                color: isDarkMode ? '#E2E8F0' : '#475569',
                               }}
-                              onPress={() => handleDeleteMechanic(mech)}
                             >
-                              <BootstrapIcon name="trash3-fill" size={12} color={isDarkMode ? tokens.statusDangerText : "#DC2626"} />
-                              <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? tokens.statusDangerText : '#DC2626' }}>
-                                Remove
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
+                              Edit Details
+                            </Text>
+                          </TouchableOpacity>
+
+                          <TouchableOpacity
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 5,
+                              paddingHorizontal: 12,
+                              paddingVertical: 6,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? tokens.chipBorder : '#FCA5A5',
+                              backgroundColor: isDarkMode ? tokens.statusDangerBg : '#FEF2F2',
+                            }}
+                            onPress={() => handleDeleteMechanic(mech)}
+                          >
+                            <BootstrapIcon name="trash3-fill" size={12} color={isDarkMode ? tokens.statusDangerText : "#DC2626"} />
+                            <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? tokens.statusDangerText : '#DC2626' }}>
+                              Remove
+                            </Text>
+                          </TouchableOpacity>
                         </View>
-                      );
+                        </View>
+                );
                     })}
-                  </View>
-                )}
               </View>
             )}
-
-            {/* ─── TAB: RIDERS / DELIVERY STAFF ─── */}
-            {activeNav === 'riders' && (
-              <View>
-                {/* 1. Rider KPI Stats Telemetry Grid */}
-                <View style={styles.statsGrid}>
-                  <AdminStatCard
-                    styles={styles}
-                    accent="teal"
-                    label="Total Delivery Fleet"
-                    value={riderStats.total}
-                    sub={`${riderStats.active} active accounts enrolled`}
-                    isDark={isDarkMode}
-                  />
-                  <AdminStatCard
-                    styles={styles}
-                    accent="blue"
-                    label="Available on Duty"
-                    value={riderStats.available}
-                    valueColor={isDarkMode ? tokens.statusSuccessText : "#10B981"}
-                    sub="Ready for dispatch"
-                    isDark={isDarkMode}
-                  />
-                  <AdminStatCard
-                    styles={styles}
-                    accent={riderStats.onDelivery > 0 ? 'amber' : 'teal'}
-                    label="On Delivery"
-                    value={riderStats.onDelivery}
-                    valueColor={riderStats.onDelivery > 0 ? '#D97706' : undefined}
-                    sub="Currently fulfilling orders"
-                    isDark={isDarkMode}
-                  />
-                  <AdminStatCard
-                    styles={styles}
-                    accent="teal"
-                    label="Total Fleet Earnings"
-                    value={`₱${riderStats.totalEarnings.toLocaleString(undefined, {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    })}`}
-                    valueColor={isDarkMode ? tokens.accentBrand : "#EA580C"}
-                    sub="Shipping fee revenue pool"
-                    isDark={isDarkMode}
-                  />
-                </View>
-
-                {/* 2. Toolbar: Search Input + Add Rider Button */}
-                <View style={styles.toolbarRow}>
-                  <View style={styles.searchInputBox}>
-                    <BootstrapIcon name="search" size={14} color={isDarkMode ? tokens.textMuted : "#64748B"} style={{ marginRight: 8 }} />
-                    <TextInput
-                      style={styles.searchInput}
-                      placeholder="Search rider by name, phone, email, vehicle, or plate..."
-                      placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                      value={riderSearchQuery}
-                      onChangeText={setRiderSearchQuery}
-                    />
-                    {riderSearchQuery ? (
-                      <TouchableOpacity onPress={() => setRiderSearchQuery('')}>
-                        <BootstrapIcon name="x-circle-fill" size={14} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-                  <TouchableOpacity
-                    style={styles.addBtnPrimary}
-                    onPress={handleOpenAddRider}
-                    activeOpacity={0.85}
-                  >
-                    <BootstrapIcon name="person-plus-fill" size={15} color="#FFFFFF" />
-                    <Text style={styles.addBtnPrimaryText}>+ Add Rider</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* 3. Filter Category Dropdown & View Mode Switcher (List vs Grid) */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    marginBottom: 16,
-                    flexWrap: 'wrap',
-                    position: 'relative',
-                    zIndex: isRiderFilterDropdownOpen ? 99999 : 10,
-                  }}
-                >
-                  {/* Category Status Dropdown */}
-                  <View
-                    style={{
-                      position: 'relative',
-                      zIndex: isRiderFilterDropdownOpen ? 99999 : 10,
-                    }}
-                  >
-                    {(() => {
-                      const riderCategoryOptions = [
-                        { id: 'All', label: 'All Riders', count: riderStats.total, icon: 'people-fill', color: isDarkMode ? tokens.accentBrand : '#EA580C' },
-                        { id: RIDER_ACCOUNT_STATUSES.ACTIVE, label: 'Active Fleet', count: riderStats.active, icon: 'shield-check', color: isDarkMode ? tokens.statusSuccessText : '#10B981' },
-                        { id: RIDER_ACCOUNT_STATUSES.INACTIVE, label: 'Inactive Riders', count: riderStats.inactive, icon: 'shield-slash', color: isDarkMode ? tokens.textMuted : '#64748B' },
-                        { id: RIDER_STATUSES.AVAILABLE, label: 'Available on Duty', count: riderStats.available, icon: 'check-circle-fill', color: isDarkMode ? tokens.statusSuccessText : '#16A34A' },
-                        { id: RIDER_STATUSES.ON_DELIVERY, label: 'On Delivery', count: riderStats.onDelivery, icon: 'box-seam-fill', color: isDarkMode ? tokens.statusWarningText : '#D97706' },
-                        { id: RIDER_STATUSES.OFF_DUTY, label: 'Off Duty', count: riderStats.offDuty, icon: 'moon-fill', color: isDarkMode ? tokens.textMuted : '#64748B' },
-                      ];
-                      const activeOpt = riderCategoryOptions.find((o) => o.id === riderFilterStatus) || riderCategoryOptions[0];
-
-                      return (
-                        <>
-                          <TouchableOpacity
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: 10,
-                              backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                              borderWidth: 1.5,
-                              borderColor: isRiderFilterDropdownOpen
-                                ? '#EA580C'
-                                : riderFilterStatus !== 'All'
-                                  ? '#EA580C'
-                                  : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                              borderRadius: 12,
-                              paddingHorizontal: 14,
-                              paddingVertical: 9,
-                              minWidth: 210,
-                              cursor: 'pointer',
-                              boxShadow: isRiderFilterDropdownOpen
-                                ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
-                                : '0 1px 3px rgba(0, 0, 0, 0.04)',
-                            }}
-                            onPress={() => setIsRiderFilterDropdownOpen((prev) => !prev)}
-                            activeOpacity={0.85}
-                          >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <BootstrapIcon
-                                name={activeOpt.icon}
-                                size={14}
-                                color={riderFilterStatus !== 'All' ? activeOpt.color : '#64748B'}
-                              />
-                              <Text
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: '700',
-                                  color: riderFilterStatus !== 'All' ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#0F172A',
-                                }}
-                              >
-                                {activeOpt.label}
-                              </Text>
-                              <View
-                                style={{
-                                  backgroundColor: riderFilterStatus !== 'All' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                                  paddingHorizontal: 6,
-                                  paddingVertical: 1,
-                                  borderRadius: 8,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: '600',
-                                    color: riderFilterStatus !== 'All' ? '#FFFFFF' : isDarkMode ? '#CBD5E1' : '#475569',
-                                  }}
-                                >
-                                  {activeOpt.count}
-                                </Text>
-                              </View>
-                            </View>
-                            <BootstrapIcon
-                              name={isRiderFilterDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                              size={12}
-                              color={isRiderFilterDropdownOpen ? '#EA580C' : '#64748B'}
-                            />
-                          </TouchableOpacity>
-
-                          {/* Backdrop for outside click */}
-                          {isRiderFilterDropdownOpen && (
-                            <TouchableOpacity
-                              style={{
-                                position: 'fixed',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                zIndex: 99998,
-                                backgroundColor: 'transparent',
-                                cursor: 'default',
-                              }}
-                              onPress={() => setIsRiderFilterDropdownOpen(false)}
-                              activeOpacity={1}
-                            />
-                          )}
-
-                          {/* Floating Dropdown Menu */}
-                          {isRiderFilterDropdownOpen && (
-                            <View
-                              style={{
-                                position: 'absolute',
-                                top: '100%',
-                                left: 0,
-                                marginTop: 6,
-                                minWidth: 240,
-                                backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                                borderRadius: 14,
-                                borderWidth: 1.5,
-                                borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                                boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
-                                zIndex: 99999,
-                                padding: 6,
-                                gap: 3,
-                                maxHeight: 300,
-                                overflowY: 'auto',
-                              }}
-                            >
-                              {riderCategoryOptions.map((option) => {
-                                const isSelected = riderFilterStatus === option.id;
-                                return (
-                                  <TouchableOpacity
-                                    key={option.id}
-                                    style={{
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      paddingHorizontal: 12,
-                                      paddingVertical: 9,
-                                      borderRadius: 9,
-                                      backgroundColor: isSelected
-                                        ? isDarkMode ? '#132A26' : '#E8F0EC'
-                                        : 'transparent',
-                                      cursor: 'pointer',
-                                    }}
-                                    onPress={() => {
-                                      setRiderFilterStatus(option.id);
-                                      setIsRiderFilterDropdownOpen(false);
-                                    }}
-                                    activeOpacity={0.8}
-                                  >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                      <BootstrapIcon
-                                        name={option.icon}
-                                        size={14}
-                                        color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
-                                      />
-                                      <Text
-                                        style={{
-                                          fontSize: 13,
-                                          fontWeight: isSelected ? '600' : '500',
-                                          color: isSelected
-                                            ? isDarkMode
-                                              ? tokens.accentBrand
-                                              : '#EA580C'
-                                            : isDarkMode
-                                              ? tokens.textSecondary
-                                              : '#334155',
-                                        }}
-                                      >
-                                        {option.label}
-                                      </Text>
-                                    </View>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                      <View
-                                        style={{
-                                          backgroundColor: isSelected
-                                            ? '#EA580C'
-                                            : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                                          paddingHorizontal: 6,
-                                          paddingVertical: 1,
-                                          borderRadius: 6,
-                                        }}
-                                      >
-                                        <Text
-                                          style={{
-                                            fontSize: 10.5,
-                                            fontWeight: '600',
-                                            color: isSelected ? '#FFFFFF' : isDarkMode ? '#CBD5E1' : '#475569',
-                                          }}
-                                        >
-                                          {option.count}
-                                        </Text>
-                                      </View>
-                                      {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />}
-                                    </View>
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </View>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </View>
-
-                  {/* View Mode Toggle (List vs Grid) */}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
-                      borderRadius: 8,
-                      padding: 3,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                    }}
-                  >
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 5,
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 6,
-                        backgroundColor: riderViewMode === 'list' ? '#EA580C' : 'transparent',
-                        cursor: 'pointer',
-                      }}
-                      onPress={() => setRiderViewMode('list')}
-                    >
-                      <BootstrapIcon
-                        name="list-ul"
-                        size={13}
-                        color={riderViewMode === 'list' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
-                      />
-                      <Text
-                        style={{
-                          fontSize: 11.5,
-                          fontWeight: '700',
-                          color: riderViewMode === 'list' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B',
-                        }}
-                      >
-                        List
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 5,
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 6,
-                        backgroundColor: riderViewMode === 'grid' ? '#EA580C' : 'transparent',
-                        cursor: 'pointer',
-                      }}
-                      onPress={() => setRiderViewMode('grid')}
-                    >
-                      <BootstrapIcon
-                        name="grid"
-                        size={12}
-                        color={riderViewMode === 'grid' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
-                      />
-                      <Text
-                        style={{
-                          fontSize: 11.5,
-                          fontWeight: '700',
-                          color: riderViewMode === 'grid' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B',
-                        }}
-                      >
-                        Grid
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* 4. Content Area: Empty State vs List vs Grid */}
-                {filteredRiders.length === 0 ? (
-                  <View
-                    style={{
-                      alignItems: 'center',
-                      paddingVertical: 48,
-                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                      borderRadius: 14,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                    }}
-                  >
-                    <BootstrapIcon name="bicycle" size={32} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? '#F1F5F9' : '#0F172A', marginTop: 10 }}>
-                      No riders found
-                    </Text>
-                    <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 4, marginBottom: 16 }}>
-                      {riderSearchQuery
-                        ? `No matches for "${riderSearchQuery}"`
-                        : 'Add your first delivery rider to the fleet.'}
-                    </Text>
-                    <TouchableOpacity style={styles.addBtnPrimary} onPress={handleOpenAddRider}>
-                      <BootstrapIcon name="person-plus-fill" size={14} color="#FFFFFF" />
-                      <Text style={styles.addBtnPrimaryText}>+ Add Rider</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : riderViewMode === 'list' ? (
-                  /* ─── LIST (TABLE) VIEW ─── */
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    showsVerticalScrollIndicator={false}
-                    dataSet={{ tableScroll: 'true' }}
-                    style={{ width: '100%', ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}) }}
-                    contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
-                  >
-                    <View style={[styles.tableCard, { width: '100%', minWidth: '100%', flexGrow: 1 }]}>
-                      <View style={styles.tableHeaderRow}>
-                        <Text style={[styles.tableHeaderCell, { flex: 2.3, minWidth: 200 }]}>Rider & Contact</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 160 }]}>Vehicle & Plate</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130, textAlign: 'center' }]}>Duty Status</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 120 }]}>Earnings</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 120, textAlign: 'center' }]}>Actions</Text>
-                      </View>
-
-                      <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        showsHorizontalScrollIndicator={false}
-                        nestedScrollEnabled={true}
-                        dataSet={{ tableScroll: 'true' }}
-                        style={{
-                          maxHeight: 560,
-                          width: '100%',
-                          ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}),
-                        }}
-                        contentContainerStyle={{ flexGrow: 1 }}
-                      >
-                        {filteredRiders.map((rider) => {
-                          const statusColor =
-                            rider.status === RIDER_STATUSES.AVAILABLE
-                              ? { bg: '#DCFCE7', text: '#16A34A', border: '#86EFAC', dot: '#10B981', icon: 'check-circle-fill' }
-                              : rider.status === RIDER_STATUSES.ON_DELIVERY
-                                ? { bg: '#FEF3C7', text: '#D97706', border: '#FCD34D', dot: '#F59E0B', icon: 'box-seam-fill' }
-                                : { bg: '#F1F5F9', text: '#64748B', border: '#CBD5E1', dot: '#94A3B8', icon: 'moon-fill' };
-
-                          const isInactive = (rider.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.INACTIVE;
-
-                          return (
-                            <View key={rider.id} style={styles.tableRow}>
-                              <View style={{ flex: 2.3, minWidth: 200, flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 8 }}>
-                                <View style={{ position: 'relative' }}>
-                                  <Image
-                                    source={{ uri: rider.avatar || RIDER_AVATAR_PRESETS[0] }}
-                                    style={{
-                                      width: 40,
-                                      height: 40,
-                                      borderRadius: 20,
-                                      borderWidth: 1.5,
-                                      borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
-                                      backgroundColor: '#E2E8F0',
-                                    }}
-                                  />
-                                  <View
-                                    style={{
-                                      position: 'absolute',
-                                      bottom: -1,
-                                      right: -1,
-                                      width: 12,
-                                      height: 12,
-                                      borderRadius: 6,
-                                      backgroundColor: statusColor.dot,
-                                      borderWidth: 2,
-                                      borderColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                                    }}
-                                  />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                  <Text style={styles.tableTitle} numberOfLines={1}>
-                                    {rider.name}
-                                    {rider.username ? ` · @${rider.username}` : ''}
-                                  </Text>
-                                  <Text style={styles.tableSub} numberOfLines={1}>
-                                    {rider.phone || 'No phone'}
-                                    {isInactive ? ' · Inactive account' : ''}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              <View style={{ flex: 1.8, minWidth: 160, paddingRight: 8 }}>
-                                <Text style={styles.tableTitle} numberOfLines={1}>
-                                  {rider.vehicleInfo || 'No vehicle assigned'}
-                                </Text>
-                                <Text
-                                  style={[
-                                    styles.tableSub,
-                                    { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
-                                  ]}
-                                  numberOfLines={1}
-                                >
-                                  {rider.plateNumber || 'NO PLATE'}
-                                </Text>
-                              </View>
-
-                              <View style={{ flex: 1.5, minWidth: 130, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                <TouchableOpacity
-                                  onPress={() => handleToggleRiderStatus(rider)}
-                                  style={[
-                                    styles.tableStatusPill,
-                                    {
-                                      backgroundColor: statusColor.bg,
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      gap: 5,
-                                    },
-                                  ]}
-                                  activeOpacity={0.8}
-                                >
-                                  <BootstrapIcon name={statusColor.icon} size={11} color={statusColor.text} />
-                                  <Text style={[styles.tableStatusPillText, { color: statusColor.text }]}>
-                                    {rider.status || RIDER_STATUSES.AVAILABLE}
-                                  </Text>
-                                </TouchableOpacity>
-                                <Text style={styles.tableStatusSub}>Tap to toggle</Text>
-                              </View>
-
-                              <View style={{ flex: 1.4, minWidth: 120, paddingRight: 8 }}>
-                                <Text
-                                  style={[
-                                    styles.tableTitle,
-                                    { color: isDarkMode ? tokens.money : '#EA580C' },
-                                  ]}
-                                  numberOfLines={1}
-                                >
-                                  ₱{Number(rider.totalEarnings || 0).toLocaleString(undefined, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </Text>
-                                <Text style={styles.tableSub} numberOfLines={1}>
-                                  From shipping
-                                </Text>
-                              </View>
-
-                              <View style={{ flex: 1.3, minWidth: 120, flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
-                                <TouchableOpacity
-                                  style={styles.tableOutlineBtn}
-                                  onPress={() => handleOpenEditRider(rider)}
-                                  activeOpacity={0.8}
-                                >
-                                  <Text style={styles.tableOutlineBtnText}>Edit</Text>
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={[styles.actionIconBtn]}
-                                  onPress={() =>
-                                    setRiderAccessModal({
-                                      rider,
-                                      bundle: null,
-                                    })
-                                  }
-                                >
-                                  <BootstrapIcon name="geo-alt-fill" size={13} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
-                                </TouchableOpacity>
-                                <TouchableOpacity
-                                  style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
-                                  onPress={() => handleDeleteRider(rider)}
-                                >
-                                  <BootstrapIcon name="trash3" size={14} color={isDarkMode ? tokens.statusDangerText : '#EF4444'} />
-                                </TouchableOpacity>
-                              </View>
-                            </View>
-                          );
-                        })}
-                      </ScrollView>
-                    </View>
-                  </ScrollView>
-                ) : (
-                  /* ─── GRID (CARD) VIEW ─── */
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
-                    {filteredRiders.map((rider) => (
-                      <RiderProfileCard
-                        key={rider.id}
-                        rider={rider}
-                        isDarkMode={isDarkMode}
-                        onToggleStatus={handleToggleRiderStatus}
-                        onOpenLiveMap={(r) => setRiderAccessModal({ rider: r, bundle: null })}
-                        onEdit={handleOpenEditRider}
-                        onDelete={handleDeleteRider}
-                      />
-                    ))}
-                  </View>
-                )}
-              </View>
+        </View>
             )}
 
-            {/* ─── TAB: SUPPLIERS & VENDORS MANAGEMENT ─── */}
-            {activeNav === 'suppliers' && (
-              <View>
-                {/* Live Database Sync Bar */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    backgroundColor: isDarkMode ? '#0F2922' : '#F0FDF9',
-                    borderColor: isDarkMode ? '#063D37' : '#99F6E4',
-                    borderWidth: 1,
-                    borderRadius: 10,
-                    paddingHorizontal: 14,
-                    paddingVertical: 10,
-                    marginBottom: 16,
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
-                        backgroundColor: isDarkMode ? '#EA580C' : '#10B981',
-                      }}
-                    />
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontWeight: '700',
-                        color: isDarkMode ? '#5EEAD4' : '#143325',
-                      }}
-                    >
-                      Live Database Connected (Supabase public.suppliers)
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 5,
-                      paddingHorizontal: 10,
-                      paddingVertical: 5,
-                      borderRadius: 6,
-                      backgroundColor: isDarkMode ? '#134E48' : '#FED7AA',
-                    }}
-                    onPress={async () => {
-                      try {
-                        setIsSuppliersLoading(true);
-                        const fresh = await supplierService.fetchSuppliers();
-                        setSuppliers(fresh || []);
-                        showToast('✓ Suppliers synced from database');
-                      } finally {
-                        setIsSuppliersLoading(false);
-                      }
-                    }}
-                    disabled={isSuppliersLoading}
-                  >
-                    <BootstrapIcon name="arrow-clockwise" size={13} color="#143325" />
-                    <Text
-                      style={{
-                        fontSize: 11.5,
-                        fontWeight: '700',
-                        color: isDarkMode ? '#5EEAD4' : '#143325',
-                      }}
-                    >
-                      {isSuppliersLoading ? 'Syncing...' : 'Sync with DB'}
-                    </Text>
+        {/* ─── TAB: RIDERS / DELIVERY STAFF ─── */}
+        {activeNav === 'riders' && (
+          <View>
+            {/* 1. Rider KPI Stats Telemetry Grid */}
+            <View style={styles.statsGrid}>
+              <AdminStatCard
+                styles={styles}
+                accent="teal"
+                label="Total Delivery Fleet"
+                value={riderStats.total}
+                sub={`${riderStats.active} active accounts enrolled`}
+                isDark={isDarkMode}
+              />
+              <AdminStatCard
+                styles={styles}
+                accent="blue"
+                label="Available on Duty"
+                value={riderStats.available}
+                valueColor={isDarkMode ? tokens.statusSuccessText : "#10B981"}
+                sub="Ready for dispatch"
+                isDark={isDarkMode}
+              />
+              <AdminStatCard
+                styles={styles}
+                accent={riderStats.onDelivery > 0 ? 'amber' : 'teal'}
+                label="On Delivery"
+                value={riderStats.onDelivery}
+                valueColor={riderStats.onDelivery > 0 ? '#D97706' : undefined}
+                sub="Currently fulfilling orders"
+                isDark={isDarkMode}
+              />
+              <AdminStatCard
+                styles={styles}
+                accent="teal"
+                label="Total Fleet Earnings"
+                value={`₱${riderStats.totalEarnings.toLocaleString(undefined, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}`}
+                valueColor={isDarkMode ? tokens.accentBrand : "#EA580C"}
+                sub="Shipping fee revenue pool"
+                isDark={isDarkMode}
+              />
+            </View>
+
+            {/* 2. Toolbar: Search Input + Add Rider Button */}
+            <View style={styles.toolbarRow}>
+              <View style={styles.searchInputBox}>
+                <BootstrapIcon name="search" size={14} color={isDarkMode ? tokens.textMuted : "#64748B"} style={{ marginRight: 8 }} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search rider by name, phone, email, vehicle, or plate..."
+                  placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                  value={riderSearchQuery}
+                  onChangeText={setRiderSearchQuery}
+                />
+                {riderSearchQuery ? (
+                  <TouchableOpacity onPress={() => setRiderSearchQuery('')}>
+                    <BootstrapIcon name="x-circle-fill" size={14} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
                   </TouchableOpacity>
-                </View>
+                ) : null}
+              </View>
+              <TouchableOpacity
+                style={styles.addBtnPrimary}
+                onPress={handleOpenAddRider}
+                activeOpacity={0.85}
+              >
+                <BootstrapIcon name="person-plus-fill" size={15} color="#FFFFFF" />
+                <Text style={styles.addBtnPrimaryText}>+ Add Rider</Text>
+              </TouchableOpacity>
+            </View>
 
-                {/* Supplier Stats Telemetry */}
-                <View style={styles.statsGrid}>
-                  <AdminStatCard
-                    styles={styles}
-                    accent="teal"
-                    label="Total Suppliers"
-                    value={supplierStats.total}
-                    sub="Catalogued Part Vendors"
-                    isDark={isDarkMode}
-                  />
-                  <AdminStatCard
-                    styles={styles}
-                    accent="blue"
-                    label="Active Sourcing"
-                    value={supplierStats.active}
-                    valueColor={isDarkMode ? tokens.accentBrand : "#EA580C"}
-                    sub="Fulfilling Purchase Orders"
-                    isDark={isDarkMode}
-                  />
-                  <AdminStatCard
-                    styles={styles}
-                    accent={supplierStats.pending > 0 ? 'amber' : 'teal'}
-                    label="Pending Review"
-                    value={supplierStats.pending}
-                    valueColor={supplierStats.pending > 0 ? '#D97706' : undefined}
-                    sub="Onboarding Contracts"
-                    isDark={isDarkMode}
-                  />
-                  <AdminStatCard
-                    styles={styles}
-                    accent="amber"
-                    label="Top Rated Partners"
-                    value={supplierStats.topRated}
-                    sub="4.8+ Quality Score"
-                    isDark={isDarkMode}
-                  />
-                </View>
+            {/* 3. Filter Category Dropdown & View Mode Switcher (List vs Grid) */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                marginBottom: 16,
+                flexWrap: 'wrap',
+                position: 'relative',
+                zIndex: isRiderFilterDropdownOpen ? 99999 : 10,
+              }}
+            >
+              {/* Category Status Dropdown */}
+              <View
+                style={{
+                  position: 'relative',
+                  zIndex: isRiderFilterDropdownOpen ? 99999 : 10,
+                }}
+              >
+                {(() => {
+                  const riderCategoryOptions = [
+                    { id: 'All', label: 'All Riders', count: riderStats.total, icon: 'people-fill', color: isDarkMode ? tokens.accentBrand : '#EA580C' },
+                    { id: RIDER_ACCOUNT_STATUSES.ACTIVE, label: 'Active Fleet', count: riderStats.active, icon: 'shield-check', color: isDarkMode ? tokens.statusSuccessText : '#10B981' },
+                    { id: RIDER_ACCOUNT_STATUSES.INACTIVE, label: 'Inactive Riders', count: riderStats.inactive, icon: 'shield-slash', color: isDarkMode ? tokens.textMuted : '#64748B' },
+                    { id: RIDER_STATUSES.AVAILABLE, label: 'Available on Duty', count: riderStats.available, icon: 'check-circle-fill', color: isDarkMode ? tokens.statusSuccessText : '#16A34A' },
+                    { id: RIDER_STATUSES.ON_DELIVERY, label: 'On Delivery', count: riderStats.onDelivery, icon: 'box-seam-fill', color: isDarkMode ? tokens.statusWarningText : '#D97706' },
+                    { id: RIDER_STATUSES.OFF_DUTY, label: 'Off Duty', count: riderStats.offDuty, icon: 'moon-fill', color: isDarkMode ? tokens.textMuted : '#64748B' },
+                  ];
+                  const activeOpt = riderCategoryOptions.find((o) => o.id === riderFilterStatus) || riderCategoryOptions[0];
 
-                {/* Toolbar & Search Bar */}
-                <View style={styles.toolbarRow}>
-                  <View style={styles.searchInputBox}>
-                    <BootstrapIcon
-                      name="search"
-                      size={14}
-                      color={isDarkMode ? tokens.textMuted : "#64748B"}
-                      style={{ marginRight: 8 }}
-                    />
-                    <TextInput
-                      style={styles.searchInput}
-                      placeholder="Search supplier by company, contact person, category, address..."
-                      placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                      value={supplierSearchQuery}
-                      onChangeText={setSupplierSearchQuery}
-                    />
-                    {supplierSearchQuery ? (
-                      <TouchableOpacity onPress={() => setSupplierSearchQuery('')}>
-                        <BootstrapIcon name="x-circle-fill" size={14} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                      </TouchableOpacity>
-                    ) : null}
-                  </View>
-
-                  <TouchableOpacity
-                    style={styles.addBtnPrimary}
-                    onPress={handleOpenAddSupplier}
-                    activeOpacity={0.85}
-                  >
-                    <BootstrapIcon name="plus-lg" size={15} color="#FFFFFF" />
-                    <Text style={styles.addBtnPrimaryText}>Add New Supplier</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Filter Status Dropdown & View Mode Switch */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    gap: 12,
-                    marginBottom: 16,
-                    flexWrap: 'wrap',
-                    position: 'relative',
-                    zIndex: isSupplierFilterDropdownOpen ? 99999 : 10,
-                  }}
-                >
-                  {/* Suppliers Status Filter Dropdown */}
-                  <View
-                    style={{
-                      position: 'relative',
-                      zIndex: isSupplierFilterDropdownOpen ? 99999 : 10,
-                    }}
-                  >
-                    {(() => {
-                      const supplierStatusOptions = [
-                        { id: 'All', label: 'All Suppliers', count: supplierStats.total, icon: 'building', color: isDarkMode ? tokens.accentBrand : '#EA580C' },
-                        { id: 'Active', label: 'Active Partners', count: supplierStats.active, icon: 'check-circle-fill', color: isDarkMode ? tokens.statusSuccessText : '#16A34A' },
-                        { id: 'Pending', label: 'Pending Review', count: supplierStats.pending, icon: 'hourglass-split', color: isDarkMode ? tokens.statusWarningText : '#D97706', highlight: supplierStats.pending > 0 },
-                        { id: 'Inactive', label: 'Inactive / On Hold', count: supplierStats.inactive, icon: 'pause-circle-fill', color: isDarkMode ? tokens.textMuted : '#64748B' },
-                      ];
-                      const activeOpt = supplierStatusOptions.find((o) => o.id === supplierFilterStatus) || supplierStatusOptions[0];
-
-                      return (
-                        <>
-                          <TouchableOpacity
+                  return (
+                    <>
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                          borderWidth: 1.5,
+                          borderColor: isRiderFilterDropdownOpen
+                            ? '#EA580C'
+                            : riderFilterStatus !== 'All'
+                              ? '#EA580C'
+                              : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                          borderRadius: 12,
+                          paddingHorizontal: 14,
+                          paddingVertical: 9,
+                          minWidth: 210,
+                          cursor: 'pointer',
+                          boxShadow: isRiderFilterDropdownOpen
+                            ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
+                            : '0 1px 3px rgba(0, 0, 0, 0.04)',
+                        }}
+                        onPress={() => setIsRiderFilterDropdownOpen((prev) => !prev)}
+                        activeOpacity={0.85}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <BootstrapIcon
+                            name={activeOpt.icon}
+                            size={14}
+                            color={riderFilterStatus !== 'All' ? activeOpt.color : '#64748B'}
+                          />
+                          <Text
                             style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              gap: 8,
-                              backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                              borderWidth: 1.5,
-                              borderColor: isSupplierFilterDropdownOpen
-                                ? '#EA580C'
-                                : activeOpt.highlight
-                                  ? '#F59E0B'
-                                  : supplierFilterStatus !== 'All'
-                                    ? '#EA580C'
-                                    : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                              borderRadius: 12,
-                              paddingHorizontal: 14,
-                              paddingVertical: 9,
-                              minWidth: 185,
-                              cursor: 'pointer',
-                              boxShadow: isSupplierFilterDropdownOpen
-                                ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
-                                : '0 1px 3px rgba(0, 0, 0, 0.04)',
+                              fontSize: 13,
+                              fontWeight: '700',
+                              color: riderFilterStatus !== 'All' ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#0F172A',
                             }}
-                            onPress={() => setIsSupplierFilterDropdownOpen((prev) => !prev)}
-                            activeOpacity={0.85}
                           >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                              <BootstrapIcon
-                                name={activeOpt.icon}
-                                size={13}
-                                color={
-                                  activeOpt.highlight
-                                    ? '#D97706'
-                                    : supplierFilterStatus !== 'All'
-                                      ? activeOpt.color
-                                      : '#64748B'
-                                }
-                              />
-                              <Text
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: '700',
-                                  color:
-                                    activeOpt.highlight
-                                      ? '#B45309'
-                                      : supplierFilterStatus !== 'All'
-                                        ? '#EA580C'
-                                        : isDarkMode ? tokens.textPrimary : '#0F172A',
-                                }}
-                              >
-                                {activeOpt.label}
-                              </Text>
-                              <View
-                                style={{
-                                  backgroundColor:
-                                    activeOpt.highlight
-                                      ? '#FEF3C7'
-                                      : supplierFilterStatus !== 'All'
-                                        ? '#EA580C'
-                                        : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                                  paddingHorizontal: 6,
-                                  paddingVertical: 1,
-                                  borderRadius: 8,
-                                  marginLeft: 2,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: '600',
-                                    color:
-                                      activeOpt.highlight
-                                        ? '#B45309'
-                                        : supplierFilterStatus !== 'All'
-                                          ? '#FFFFFF'
-                                          : isDarkMode ? '#CBD5E1' : '#475569',
-                                  }}
-                                >
-                                  {activeOpt.count}
-                                </Text>
-                              </View>
-                            </View>
-                            <BootstrapIcon
-                              name={isSupplierFilterDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                              size={12}
-                              color={isSupplierFilterDropdownOpen ? '#EA580C' : '#64748B'}
-                            />
-                          </TouchableOpacity>
-
-                          {/* Transparent backdrop for outside click */}
-                          {isSupplierFilterDropdownOpen && (
-                            <TouchableOpacity
+                            {activeOpt.label}
+                          </Text>
+                          <View
+                            style={{
+                              backgroundColor: riderFilterStatus !== 'All' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                              paddingHorizontal: 6,
+                              paddingVertical: 1,
+                              borderRadius: 8,
+                            }}
+                          >
+                            <Text
                               style={{
-                                position: 'fixed',
-                                top: 0,
-                                left: 0,
-                                right: 0,
-                                bottom: 0,
-                                zIndex: 99998,
-                                backgroundColor: 'transparent',
-                                cursor: 'default',
-                              }}
-                              onPress={() => setIsSupplierFilterDropdownOpen(false)}
-                              activeOpacity={1}
-                            />
-                          )}
-
-                          {/* Floating Dropdown Menu */}
-                          {isSupplierFilterDropdownOpen && (
-                            <View
-                              style={{
-                                position: 'absolute',
-                                top: '100%',
-                                left: 0,
-                                marginTop: 6,
-                                minWidth: 230,
-                                backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                                borderRadius: 14,
-                                borderWidth: 1.5,
-                                borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                                boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
-                                zIndex: 99999,
-                                padding: 6,
-                                gap: 3,
-                                maxHeight: 280,
-                                overflowY: 'auto',
+                                fontSize: 11,
+                                fontWeight: '600',
+                                color: riderFilterStatus !== 'All' ? '#FFFFFF' : isDarkMode ? '#CBD5E1' : '#475569',
                               }}
                             >
-                              {supplierStatusOptions.map((option) => {
-                                const isSelected = supplierFilterStatus === option.id;
-                                return (
-                                  <TouchableOpacity
-                                    key={option.id}
-                                    style={{
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      justifyContent: 'space-between',
-                                      paddingHorizontal: 12,
-                                      paddingVertical: 9,
-                                      borderRadius: 9,
-                                      backgroundColor: isSelected
-                                        ? isDarkMode ? '#132A26' : '#E8F0EC'
-                                        : 'transparent',
-                                      cursor: 'pointer',
-                                    }}
-                                    onPress={() => {
-                                      setSupplierFilterStatus(option.id);
-                                      setIsSupplierFilterDropdownOpen(false);
-                                    }}
-                                    activeOpacity={0.8}
-                                  >
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                      <BootstrapIcon
-                                        name={option.icon}
-                                        size={14}
-                                        color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
-                                      />
-                                      <Text
-                                        style={{
-                                          fontSize: 13,
-                                          fontWeight: isSelected ? '600' : '500',
-                                          color: isSelected
-                                            ? isDarkMode
-                                              ? tokens.accentBrand
-                                              : '#EA580C'
-                                            : isDarkMode
-                                              ? tokens.textSecondary
-                                              : '#334155',
-                                        }}
-                                      >
-                                        {option.label}
-                                      </Text>
-                                    </View>
-                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                      <View
-                                        style={{
-                                          backgroundColor: option.highlight
-                                            ? isDarkMode
-                                              ? 'rgba(251, 191, 36, 0.2)'
-                                              : '#FEF3C7'
-                                            : isSelected
-                                              ? isDarkMode
-                                                ? 'rgba(16, 185, 129, 0.22)'
-                                                : '#EA580C'
-                                              : isDarkMode
-                                                ? tokens.bgSub
-                                                : '#E2E8F0',
-                                          paddingHorizontal: 6,
-                                          paddingVertical: 1,
-                                          borderRadius: 6,
-                                        }}
-                                      >
-                                        <Text
-                                          style={{
-                                            fontSize: 10.5,
-                                            fontWeight: '600',
-                                            color: option.highlight
-                                              ? isDarkMode
-                                                ? tokens.statusWarningText
-                                                : '#B45309'
-                                              : isSelected
-                                                ? isDarkMode
-                                                  ? tokens.accentBrand
-                                                  : '#FFFFFF'
-                                                : isDarkMode
-                                                  ? tokens.textMuted
-                                                  : '#475569',
-                                          }}
-                                        >
-                                          {option.count}
-                                        </Text>
-                                      </View>
-                                      {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />}
-                                    </View>
-                                  </TouchableOpacity>
-                                );
-                              })}
-                            </View>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </View>
-
-                  {/* View Mode Toggle (List vs Grid) */}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
-                      borderRadius: 8,
-                      padding: 3,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                    }}
-                  >
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 5,
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 6,
-                        backgroundColor: supplierViewMode === 'list' ? '#EA580C' : 'transparent',
-                      }}
-                      onPress={() => setSupplierViewMode('list')}
-                    >
-                      <BootstrapIcon
-                        name="list-ul"
-                        size={13}
-                        color={supplierViewMode === 'list' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
-                      />
-                      <Text
-                        style={{
-                          fontSize: 11.5,
-                          fontWeight: '700',
-                          color: supplierViewMode === 'list' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B',
-                        }}
-                      >
-                        List
-                      </Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 5,
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 6,
-                        backgroundColor: supplierViewMode === 'grid' ? '#EA580C' : 'transparent',
-                      }}
-                      onPress={() => setSupplierViewMode('grid')}
-                    >
-                      <BootstrapIcon
-                        name="grid"
-                        size={12}
-                        color={supplierViewMode === 'grid' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
-                      />
-                      <Text
-                        style={{
-                          fontSize: 11.5,
-                          fontWeight: '700',
-                          color: supplierViewMode === 'grid' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B',
-                        }}
-                      >
-                        Grid
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* Loading State or Empty State */}
-                {isSuppliersLoading ? (
-                  <View style={styles.tableCard}>
-                    <View style={styles.tableHeaderRow}>
-                      <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 190 }]}>Supplier & Contact</Text>
-                      <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130 }]}>Category & Lead Time</Text>
-                      <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 170 }]}>Contact & Address</Text>
-                      <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 120, textAlign: 'center' }]}>Status</Text>
-                      <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 120, textAlign: 'center' }]}>Actions</Text>
-                    </View>
-                    {[1, 2, 3, 4, 5].map((k) => (
-                      <View
-                        key={k}
-                        style={[
-                          styles.tableRow,
-                          {
-                            borderBottomColor: isDarkMode ? tokens.borderLight : '#F1F5F9',
-                            paddingVertical: 14,
-                            paddingHorizontal: 16,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                          },
-                        ]}
-                      >
-                        <View style={{ flex: 2.2, minWidth: 190, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                          <Skeleton circle size={36} />
-                          <View style={{ flex: 1, gap: 6 }}>
-                            <Skeleton width="75%" height={14} borderRadius={4} />
-                            <Skeleton width="45%" height={10} borderRadius={3} />
+                              {activeOpt.count}
+                            </Text>
                           </View>
                         </View>
-                        <View style={{ flex: 1.5, minWidth: 130, gap: 4 }}>
-                          <Skeleton width={80} height={20} borderRadius={6} />
-                          <Skeleton width={50} height={10} borderRadius={3} />
-                        </View>
-                        <View style={{ flex: 2.0, minWidth: 170, gap: 4 }}>
-                          <Skeleton width="85%" height={12} borderRadius={3} />
-                          <Skeleton width="60%" height={10} borderRadius={3} />
-                        </View>
-                        <View style={{ flex: 1.4, minWidth: 120, alignItems: 'center' }}>
-                          <Skeleton width={70} height={22} borderRadius={6} />
-                        </View>
-                        <View style={{ flex: 1.3, minWidth: 120, alignItems: 'center' }}>
-                          <Skeleton width={56} height={26} borderRadius={6} />
-                        </View>
-                      </View>
-                    ))}
-                  </View>
-                ) : filteredSuppliers.length === 0 ? (
-                  <View
-                    style={{
-                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                      borderRadius: 14,
-                      padding: 36,
-                      alignItems: 'center',
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                    }}
-                  >
-                    <BootstrapIcon name="truck" size={40} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                    <Text
-                      style={{
-                        fontSize: 15,
-                        fontWeight: '600',
-                        color: isDarkMode ? '#F1F5F9' : '#0F172A',
-                        marginTop: 12,
-                      }}
-                    >
-                      {supplierSearchQuery ? 'No matching suppliers found' : 'No suppliers in database'}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 12.5,
-                        color: isDarkMode ? tokens.textMuted : '#64748B',
-                        marginTop: 4,
-                        marginBottom: 16,
-                        textAlign: 'center',
-                        maxWidth: 440,
-                      }}
-                    >
-                      {supplierSearchQuery
-                        ? `No supplier in the database matches "${supplierSearchQuery}"`
-                        : 'Your supplier directory is connected directly to Supabase. Register your first vendor or manufacturing partner to populate the database.'}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.addBtnPrimary}
-                      onPress={handleOpenAddSupplier}
-                    >
-                      <BootstrapIcon name="plus-lg" size={14} color="#FFFFFF" />
-                      <Text style={styles.addBtnPrimaryText}>Add New Supplier</Text>
-                    </TouchableOpacity>
-                  </View>
-                ) : supplierViewMode === 'list' ? (
-                  /* ─── LIST / TABLE VIEW ─── */
-                  <View style={styles.tableCard}>
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      showsVerticalScrollIndicator={false}
-                      dataSet={{ tableScroll: 'true' }}
-                      style={{ width: '100%', ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}) }}
-                      contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
-                    >
-                      <View style={{ width: '100%', minWidth: 1040, flexGrow: 1 }}>
-                        <View style={styles.tableHeaderRow}>
-                          <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 190 }]}>Supplier & Contact</Text>
-                          <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130 }]}>Category & Lead Time</Text>
-                          <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 170 }]}>Contact & Address</Text>
-                          <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 120, textAlign: 'center' }]}>Status</Text>
-                          <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 120, textAlign: 'center' }]}>Actions</Text>
-                        </View>
+                        <BootstrapIcon
+                          name={isRiderFilterDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                          size={12}
+                          color={isRiderFilterDropdownOpen ? '#EA580C' : '#64748B'}
+                        />
+                      </TouchableOpacity>
 
-                        <ScrollView
-                          showsVerticalScrollIndicator={false}
-                          showsHorizontalScrollIndicator={false}
-                          nestedScrollEnabled={true}
-                          dataSet={{ tableScroll: 'true' }}
+                      {/* Backdrop for outside click */}
+                      {isRiderFilterDropdownOpen && (
+                        <TouchableOpacity
                           style={{
-                            maxHeight: 560,
-                            width: '100%',
-                            ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}),
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            zIndex: 99998,
+                            backgroundColor: 'transparent',
+                            cursor: 'default',
                           }}
-                          contentContainerStyle={{ flexGrow: 1 }}
+                          onPress={() => setIsRiderFilterDropdownOpen(false)}
+                          activeOpacity={1}
+                        />
+                      )}
+
+                      {/* Floating Dropdown Menu */}
+                      {isRiderFilterDropdownOpen && (
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            marginTop: 6,
+                            minWidth: 240,
+                            backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                            borderRadius: 14,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                            boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
+                            zIndex: 99999,
+                            padding: 6,
+                            gap: 3,
+                            maxHeight: 300,
+                            overflowY: 'auto',
+                          }}
                         >
-                          {filteredSuppliers.map((sup) => {
-                            const supId = sup.supplier_id || sup.id;
-                            const status = sup.status || 'Active';
-                            const isActive = status.toLowerCase() === 'active';
-                            const isPending = status.toLowerCase() === 'pending';
-
+                          {riderCategoryOptions.map((option) => {
+                            const isSelected = riderFilterStatus === option.id;
                             return (
-                              <View key={supId} style={styles.tableRow}>
-                                <View style={{ flex: 2.2, minWidth: 190, flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 8 }}>
-                                  <View
-                                    style={{
-                                      width: 38,
-                                      height: 38,
-                                      borderRadius: 10,
-                                      backgroundColor: isDarkMode ? '#1E293B' : '#FFF7ED',
-                                      borderWidth: 1.5,
-                                      borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
-                                      alignItems: 'center',
-                                      justifyContent: 'center',
-                                    }}
-                                  >
-                                    <BootstrapIcon name="building" size={18} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
-                                  </View>
-                                  <View style={{ flex: 1 }}>
-                                    <Text style={styles.tableTitle} numberOfLines={1}>
-                                      {sup.name}
-                                    </Text>
-                                    <Text style={styles.tableSub} numberOfLines={1}>
-                                      {sup.contact_person || 'Purchasing Rep'} · ★ {sup.rating || '5.0'}
-                                    </Text>
-                                  </View>
-                                </View>
-
-                                <View style={{ flex: 1.5, minWidth: 130, paddingRight: 8 }}>
-                                  <Text style={styles.tableTitle} numberOfLines={1}>
-                                    {sup.categories || 'Exhaust & Performance'}
-                                  </Text>
-                                  <Text style={styles.tableSub} numberOfLines={1}>
-                                    Lead {sup.lead_time || '3-5 Days'}
-                                  </Text>
-                                </View>
-
-                                <View style={{ flex: 2.0, minWidth: 170, paddingRight: 8 }}>
-                                  <Text style={styles.tableTitle} numberOfLines={1}>
-                                    {sup.email || sup.phone || 'No contact'}
-                                  </Text>
-                                  <Text style={styles.tableSub} numberOfLines={1}>
-                                    {sup.address || (sup.phone && sup.email ? sup.phone : 'No address')}
-                                  </Text>
-                                </View>
-
-                                <View style={{ flex: 1.4, minWidth: 120, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                  <View
-                                    style={[
-                                      styles.tableStatusPill,
-                                      {
-                                        backgroundColor: isActive
-                                          ? '#2E7D32'
-                                          : isPending
-                                            ? isDarkMode
-                                              ? 'rgba(245, 158, 11, 0.18)'
-                                              : '#FEF3C7'
-                                            : isDarkMode
-                                              ? tokens.badgeNeutralBg
-                                              : '#F1F5F9',
-                                        borderRadius: isActive ? 6 : 999,
-                                        ...(isActive
-                                          ? {
-                                            shadowColor: '#1B5E20',
-                                            shadowOffset: { width: 0, height: 1 },
-                                            shadowOpacity: 0.28,
-                                            shadowRadius: 2,
-                                            elevation: 2,
-                                          }
-                                          : null),
-                                      },
-                                    ]}
-                                  >
-                                    <Text
-                                      style={[
-                                        styles.tableStatusPillText,
-                                        {
-                                          color: isActive
-                                            ? '#FFFFFF'
-                                            : isPending
-                                              ? isDarkMode
-                                                ? '#FBBF24'
-                                                : '#B45309'
-                                              : isDarkMode
-                                                ? tokens.badgeNeutralText
-                                                : '#334155',
-                                        },
-                                      ]}
-                                    >
-                                      {status}
-                                    </Text>
-                                  </View>
-                                  <Text style={styles.tableStatusSub} numberOfLines={1}>
-                                    {isActive ? 'Approved vendor' : isPending ? 'Awaiting review' : 'Inactive'}
-                                  </Text>
-                                </View>
-
-                                <View
-                                  style={{
-                                    flex: 1.3,
-                                    minWidth: 120,
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 8,
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  <TouchableOpacity
-                                    style={styles.tableOutlineBtn}
-                                    onPress={() => handleOpenEditSupplier(sup)}
-                                    activeOpacity={0.8}
-                                  >
-                                    <Text style={styles.tableOutlineBtnText}>Edit</Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
-                                    onPress={() => handleDeleteSupplier(sup)}
-                                  >
-                                    <BootstrapIcon name="trash3" size={14} color={isDarkMode ? tokens.statusDangerText : '#DC2626'} />
-                                  </TouchableOpacity>
-                                </View>
-                              </View>
-                            );
-                          })}
-                        </ScrollView>
-                      </View>
-                    </ScrollView>
-                  </View>
-                ) : (
-                  /* ─── GRID VIEW ─── */
-                  <View style={styles.mechanicsGrid}>
-                    {filteredSuppliers.map((sup) => {
-                      const supId = sup.supplier_id || sup.id;
-                      const status = sup.status || 'Active';
-                      const isActive = status.toLowerCase() === 'active';
-                      const isPending = status.toLowerCase() === 'pending';
-
-                      return (
-                        <View key={supId} style={styles.mechanicCard}>
-                          {/* Card Header: Icon + Info + Status */}
-                          <View style={styles.mechanicCardHeader}>
-                            <View
-                              style={{
-                                width: 44,
-                                height: 44,
-                                borderRadius: 12,
-                                backgroundColor: isDarkMode ? '#1E293B' : '#FFF7ED',
-                                borderWidth: 1.5,
-                                borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              <BootstrapIcon name="truck" size={20} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                            </View>
-                            <View style={styles.mechanicHeaderInfo}>
-                              <View
+                              <TouchableOpacity
+                                key={option.id}
                                 style={{
                                   flexDirection: 'row',
                                   alignItems: 'center',
                                   justifyContent: 'space-between',
-                                  gap: 6,
-                                  marginBottom: 4,
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 9,
+                                  borderRadius: 9,
+                                  backgroundColor: isSelected
+                                    ? isDarkMode ? '#132A26' : '#E8F0EC'
+                                    : 'transparent',
+                                  cursor: 'pointer',
                                 }}
+                                onPress={() => {
+                                  setRiderFilterStatus(option.id);
+                                  setIsRiderFilterDropdownOpen(false);
+                                }}
+                                activeOpacity={0.8}
                               >
-                                <View
-                                  style={[
-                                    styles.mechanicStatusBadge,
-                                    isActive
-                                      ? styles.mechanicStatusAvailable
-                                      : isPending
-                                        ? styles.mechanicStatusBusy
-                                        : { backgroundColor: isDarkMode ? tokens.borderInput : '#F1F5F9', borderColor: '#94A3B8' },
-                                  ]}
-                                >
-                                  <View
-                                    style={{
-                                      width: 6,
-                                      height: 6,
-                                      borderRadius: 3,
-                                      backgroundColor: isActive ? '#10B981' : isPending ? '#D97706' : '#94A3B8',
-                                    }}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                  <BootstrapIcon
+                                    name={option.icon}
+                                    size={14}
+                                    color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
                                   />
                                   <Text
-                                    style={
-                                      isActive
-                                        ? styles.mechanicStatusAvailableText
-                                        : isPending
-                                          ? styles.mechanicStatusBusyText
-                                          : { fontSize: 10.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B' }
-                                    }
-                                  >
-                                    {status}
-                                  </Text>
-                                </View>
-
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                                  <BootstrapIcon name="star-fill" size={11} color={isDarkMode ? tokens.statusWarningText : "#F59E0B"} />
-                                  <Text
                                     style={{
-                                      fontSize: 11,
-                                      fontWeight: '600',
-                                      color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                                      fontSize: 13,
+                                      fontWeight: isSelected ? '600' : '500',
+                                      color: isSelected
+                                        ? isDarkMode
+                                          ? tokens.accentBrand
+                                          : '#EA580C'
+                                        : isDarkMode
+                                          ? tokens.textSecondary
+                                          : '#334155',
                                     }}
                                   >
-                                    {sup.rating || '5.0'}
+                                    {option.label}
                                   </Text>
                                 </View>
-                              </View>
-
-                              <Text style={styles.mechanicName} numberOfLines={2}>
-                                {sup.name}
-                              </Text>
-                              <Text style={styles.mechanicShortName}>
-                                Contact: {sup.contact_person || 'Purchasing Rep'}
-                              </Text>
-                            </View>
-                          </View>
-
-                          {/* Category Badge & Lead Time */}
-                          <View
-                            style={{
-                              flexDirection: 'row',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              marginVertical: 10,
-                              gap: 8,
-                            }}
-                          >
-                            <View
-                              style={{
-                                backgroundColor: isDarkMode ? 'rgba(234, 88, 12,0.2)' : '#E8F0EC',
-                                paddingHorizontal: 9,
-                                paddingVertical: 4,
-                                borderRadius: 6,
-                                flex: 1,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 11,
-                                  fontWeight: '700',
-                                  color: isDarkMode ? '#5EEAD4' : '#EA580C',
-                                }}
-                                numberOfLines={1}
-                              >
-                                {sup.categories || 'Exhaust & Performance'}
-                              </Text>
-                            </View>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 4,
-                                backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                                paddingHorizontal: 8,
-                                paddingVertical: 4,
-                                borderRadius: 6,
-                                borderWidth: 1,
-                                borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                              }}
-                            >
-                              <BootstrapIcon name="clock" size={11} color={isDarkMode ? tokens.textMuted : "#64748B"} />
-                              <Text
-                                style={{
-                                  fontSize: 10.5,
-                                  fontWeight: '700',
-                                  color: isDarkMode ? '#CBD5E1' : '#475569',
-                                }}
-                              >
-                                {sup.lead_time || '3-5 Days'}
-                              </Text>
-                            </View>
-                          </View>
-
-                          {/* Contact Details */}
-                          <View style={styles.mechanicInfoRow}>
-                            <BootstrapIcon name="envelope-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                            <Text style={styles.mechanicInfoText} numberOfLines={1}>
-                              {sup.email || 'No email provided'}
-                            </Text>
-                          </View>
-                          <View style={styles.mechanicInfoRow}>
-                            <BootstrapIcon name="telephone-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                            <Text style={styles.mechanicInfoText} numberOfLines={1}>
-                              {sup.phone || 'No phone number'}
-                            </Text>
-                          </View>
-                          {sup.address ? (
-                            <View style={styles.mechanicInfoRow}>
-                              <BootstrapIcon name="geo-alt-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                              <Text style={styles.mechanicInfoText} numberOfLines={1}>
-                                {sup.address}
-                              </Text>
-                            </View>
-                          ) : null}
-
-                          {/* Card Footer: Edit & Remove */}
-                          <View style={styles.mechanicCardFooter}>
-                            <TouchableOpacity
-                              style={{
-                                flex: 1,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                gap: 6,
-                                paddingVertical: 7,
-                                borderRadius: 8,
-                                borderWidth: 1,
-                                borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
-                                backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
-                              }}
-                              onPress={() => handleOpenEditSupplier(sup)}
-                            >
-                              <BootstrapIcon
-                                name="pencil-square"
-                                size={12}
-                                color={isDarkMode ? tokens.textMuted : '#475569'}
-                              />
-                              <Text
-                                style={{
-                                  fontSize: 11.5,
-                                  fontWeight: '700',
-                                  color: isDarkMode ? '#E2E8F0' : '#475569',
-                                }}
-                              >
-                                Edit Details
-                              </Text>
-                            </TouchableOpacity>
-
-                            <TouchableOpacity
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 5,
-                                paddingHorizontal: 12,
-                                paddingVertical: 6,
-                                borderRadius: 8,
-                                borderWidth: 1,
-                                borderColor: isDarkMode ? tokens.chipBorder : '#FCA5A5',
-                                backgroundColor: isDarkMode ? tokens.statusDangerBg : '#FEF2F2',
-                              }}
-                              onPress={() => handleDeleteSupplier(sup)}
-                            >
-                              <BootstrapIcon name="trash3-fill" size={12} color={isDarkMode ? tokens.statusDangerText : "#DC2626"} />
-                              <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? tokens.statusDangerText : '#DC2626' }}>
-                                Remove
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-              </View>
-            )}
-
-            {/* ─── TAB 8: USER ACCOUNTS ─── */}
-            {activeNav === 'users' && (
-              <View>
-                <View style={styles.toolbarRow}>
-                  <View style={styles.searchInputBox}>
-                    <BootstrapIcon name="search" size={14} color={isDarkMode ? tokens.textMuted : "#64748B"} style={{ marginRight: 8 }} />
-                    <TextInput
-                      style={styles.searchInput}
-                      placeholder="Search users by name, email or phone..."
-                      placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                      value={userSearchQuery}
-                      onChangeText={setUserSearchQuery}
-                    />
-                  </View>
-                </View>
-
-                <View style={styles.tableCard}>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    showsVerticalScrollIndicator={false}
-                    dataSet={{ tableScroll: 'true' }}
-                    style={{ width: '100%', ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}) }}
-                    contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
-                  >
-                    <View style={{ width: '100%', minWidth: 920, flexGrow: 1 }}>
-                      <View style={styles.tableHeaderRow}>
-                        <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 180 }]}>User & Email</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110 }]}>Role</Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130, textAlign: 'center' }]}>
-                          Status
-                        </Text>
-                        <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 180, textAlign: 'center' }]}>
-                          Actions
-                        </Text>
-                      </View>
-
-                      <ScrollView
-                        showsVerticalScrollIndicator={false}
-                        showsHorizontalScrollIndicator={false}
-                        nestedScrollEnabled={true}
-                        dataSet={{ tableScroll: 'true' }}
-                        style={{
-                          maxHeight: 560,
-                          width: '100%',
-                          ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}),
-                        }}
-                        contentContainerStyle={{ flexGrow: 1 }}
-                      >
-                        {usersList
-                          .filter(
-                            (u) =>
-                              !userSearchQuery ||
-                              u.name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-                              u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
-                          )
-                          .map((u) => {
-                            const isDisabled = u.status === 'disabled' || u.status === 'inactive';
-                            const isPending = u.status === 'pending_verification';
-                            const currentAdminId = currentUser?.user_id || currentUser?.id;
-                            const rowUserId = u.user_id || u.id;
-                            const isSelf = Boolean(currentAdminId && rowUserId && currentAdminId === rowUserId);
-                            const isAdminRole = u.role === 'admin';
-                            const roleLabel =
-                              u.role === 'admin'
-                                ? 'Admin'
-                                : u.role === 'rider'
-                                  ? 'Rider'
-                                  : u.role === 'mechanic'
-                                    ? 'Mechanic'
-                                    : 'Customer';
-                            const roleSub =
-                              u.role === 'admin'
-                                ? 'Full access'
-                                : u.role === 'rider'
-                                  ? 'Delivery staff'
-                                  : u.role === 'mechanic'
-                                    ? 'Garage staff'
-                                    : 'Store account';
-                            const avatarBg =
-                              u.role === 'admin'
-                                ? '#EA580C'
-                                : u.role === 'rider'
-                                  ? '#0F766E'
-                                  : u.role === 'mechanic'
-                                    ? '#B45309'
-                                    : '#3B82F6';
-                            return (
-                              <View
-                                key={u.id}
-                                style={[
-                                  styles.tableRow,
-                                  (isDisabled || isPending) && { opacity: 0.75, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC' },
-                                ]}
-                              >
-                                <View style={{ flex: 2.2, minWidth: 180, flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 8 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                   <View
                                     style={{
-                                      width: 34,
-                                      height: 34,
-                                      borderRadius: 17,
-                                      backgroundColor: avatarBg,
-                                      justifyContent: 'center',
-                                      alignItems: 'center',
+                                      backgroundColor: isSelected
+                                        ? '#EA580C'
+                                        : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                                      paddingHorizontal: 6,
+                                      paddingVertical: 1,
+                                      borderRadius: 6,
                                     }}
-                                  >
-                                    <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13 }}>
-                                      {(u.name || 'U').charAt(0).toUpperCase()}
-                                    </Text>
-                                  </View>
-                                  <View style={{ flex: 1 }}>
-                                    <Text style={styles.tableTitle} numberOfLines={1}>
-                                      {u.name || 'Anonymous User'}
-                                      {isSelf ? ' (You)' : ''}
-                                    </Text>
-                                    <Text style={styles.tableSub} numberOfLines={1}>
-                                      {u.email || 'No email provided'}
-                                    </Text>
-                                  </View>
-                                </View>
-
-                                <View style={{ flex: 1.3, minWidth: 110, paddingRight: 8 }}>
-                                  <Text style={styles.tableTitle} numberOfLines={1}>
-                                    {roleLabel}
-                                  </Text>
-                                  <Text style={styles.tableSub} numberOfLines={1}>
-                                    {roleSub}
-                                  </Text>
-                                </View>
-
-                                <View style={{ flex: 1.5, minWidth: 130, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                  <View
-                                    style={[
-                                      styles.tableStatusPill,
-                                      {
-                                        backgroundColor: isPending
-                                          ? isDarkMode
-                                            ? 'rgba(245, 158, 11, 0.18)'
-                                            : '#FEF3C7'
-                                          : isDisabled
-                                            ? isDarkMode
-                                              ? 'rgba(239, 68, 68, 0.16)'
-                                              : '#FEE2E2'
-                                            : '#2E7D32',
-                                        borderRadius: isDisabled || isPending ? 999 : 6,
-                                        ...(!isDisabled && !isPending
-                                          ? {
-                                            shadowColor: '#1B5E20',
-                                            shadowOffset: { width: 0, height: 1 },
-                                            shadowOpacity: 0.28,
-                                            shadowRadius: 2,
-                                            elevation: 2,
-                                          }
-                                          : null),
-                                      },
-                                    ]}
                                   >
                                     <Text
-                                      style={[
-                                        styles.tableStatusPillText,
-                                        {
-                                          color: isPending
-                                            ? isDarkMode
-                                              ? '#FCD34D'
-                                              : '#B45309'
-                                            : isDisabled
-                                              ? isDarkMode
-                                                ? '#FCA5A5'
-                                                : '#B91C1C'
-                                              : '#FFFFFF',
-                                        },
-                                      ]}
+                                      style={{
+                                        fontSize: 10.5,
+                                        fontWeight: '600',
+                                        color: isSelected ? '#FFFFFF' : isDarkMode ? '#CBD5E1' : '#475569',
+                                      }}
                                     >
-                                      {isPending ? 'Pending' : isDisabled ? 'Disabled' : 'Active'}
+                                      {option.count}
                                     </Text>
                                   </View>
-                                  <Text style={styles.tableStatusSub} numberOfLines={1}>
-                                    {isPending ? 'Awaiting OTP' : isDisabled ? 'Login blocked' : 'Can sign in'}
-                                  </Text>
+                                  {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />}
                                 </View>
-
-                                <View
-                                  style={{
-                                    flex: 1.8,
-                                    minWidth: 180,
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    gap: 8,
-                                    flexShrink: 0,
-                                  }}
-                                >
-                                  <TouchableOpacity
-                                    style={[styles.tableOutlineBtn, isSelf && { opacity: 0.45 }]}
-                                    onPress={() => handleToggleUserStatus(u.id, u.name, u.status)}
-                                    disabled={isSelf}
-                                    activeOpacity={0.8}
-                                  >
-                                    <Text style={styles.tableOutlineBtnText}>
-                                      {isDisabled ? 'Enable' : 'Disable'}
-                                    </Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    style={[styles.tableOutlineBtn, isSelf && { opacity: 0.45 }]}
-                                    onPress={() => handleToggleUserRole(u.id, u.role)}
-                                    disabled={isSelf}
-                                    activeOpacity={0.8}
-                                  >
-                                    <Text style={styles.tableOutlineBtnText}>
-                                      {isAdminRole ? 'Demote' : 'Promote'}
-                                    </Text>
-                                  </TouchableOpacity>
-                                  <TouchableOpacity
-                                    style={[
-                                      styles.actionIconBtn,
-                                      styles.actionIconBtnDanger,
-                                      (isSelf || isAdminRole) && { opacity: 0.45 },
-                                    ]}
-                                    onPress={() => handleDeleteUser(u.id, u.name, u.role)}
-                                    disabled={isSelf || isAdminRole}
-                                  >
-                                    <BootstrapIcon name="trash3" size={14} color={isDarkMode ? tokens.statusDangerText : '#EF4444'} />
-                                  </TouchableOpacity>
-                                </View>
-                              </View>
+                              </TouchableOpacity>
                             );
                           })}
-                      </ScrollView>
-                    </View>
-                  </ScrollView>
-                </View>
-              </View>
-            )}
-
-            {/* ─── TAB: CUSTOMER RATINGS AND REPORTS MANAGEMENT ─── */}
-            {activeNav === 'ratings_reports' && (
-              <AdminCustomerRatingsReportsPanel
-                isDarkMode={isDarkMode}
-                tokens={tokens}
-                isDesktop={isDesktop}
-                currentUser={currentUser}
-                showToast={showToast}
-              />
-            )}
-
-            {/* ─── TAB 9: SUPABASE SETTINGS ─── */}
-            {activeNav === 'supabase' && (
-              <View>
-                <View style={[styles.tableCard, { padding: 24 }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                    <View
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 18,
-                        backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <BootstrapIcon name="database-fill-check" size={20} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                    </View>
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                      Cloud Database Connection (Supabase)
-                    </Text>
-                  </View>
-                  <Text style={{ color: isDarkMode ? tokens.textMuted : '#64748B', fontSize: 13, marginBottom: 18, lineHeight: 20 }}>
-                    Configure the live PostgreSQL database URL and public anon key for real-time order and
-                    product synchronization. Note: Supabase project URLs always end with{' '}
-                    <Text style={{ fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>.supabase.co</Text>.
-                  </Text>
-
-                  <Text style={styles.formLabel}>Supabase Project URL</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={supabaseUrl}
-                    onChangeText={setSupabaseUrl}
-                    placeholder="https://vtbdmurblidtdghaotne.supabase.co"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    autoCapitalize="none"
-                  />
-                  <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 3, marginBottom: 14 }}>
-                    Correct format:{' '}
-                    <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '600' }}>
-                      https://vtbdmurblidtdghaotne.supabase.co
-                    </Text>
-                  </Text>
-
-                  <Text style={styles.formLabel}>Supabase Public Anon Key</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={supabaseKey}
-                    onChangeText={setSupabaseKey}
-                    placeholder="eyJhbGciOi..."
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    autoCapitalize="none"
-                  />
-                  <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 3, marginBottom: 18 }}>
-                    Use the client <Text style={{ fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>anon/public</Text>{' '}
-                    JWT key (starts with eyJhbGci...).
-                  </Text>
-
-                  <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-                    <TouchableOpacity
-                      style={styles.addBtnPrimary}
-                      onPress={async () => {
-                        const saved = supabaseManager.saveCredentials(supabaseUrl, supabaseKey);
-                        setSupabaseUrl(saved.url);
-                        setSupabaseKey(saved.key);
-                        const res = await supabaseManager.testConnection();
-                        setConnectionStatus({ tested: true, connected: res.connected, message: res.message });
-                        showToast(res.connected ? 'Supabase Connected Live!' : res.message);
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <BootstrapIcon name="plug-fill" size={14} color="#FFFFFF" />
-                      <Text style={styles.addBtnPrimaryText}>Save & Test Live Connection</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity
-                      style={[
-                        styles.addBtnPrimary,
-                        { backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7', borderWidth: 1, borderColor: isDarkMode ? tokens.accentBorder : '#EA580C' },
-                      ]}
-                      onPress={async () => {
-                        const defs = supabaseManager.resetToDefaults();
-                        setSupabaseUrl(defs.url);
-                        setSupabaseKey(defs.key);
-                        const res = await supabaseManager.testConnection();
-                        setConnectionStatus({ tested: true, connected: res.connected, message: res.message });
-                        showToast(res.connected ? 'Restored Project Defaults!' : res.message);
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <BootstrapIcon name="arrow-counterclockwise" size={14} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                      <Text style={[styles.addBtnPrimaryText, { color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}>
-                        Restore Default Project Credentials
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {connectionStatus.tested && (
-                    <View
-                      style={{
-                        marginTop: 18,
-                        padding: 14,
-                        borderRadius: 12,
-                        backgroundColor: connectionStatus.connected ? '#ECFDF5' : '#FEF2F2',
-                        borderWidth: 1,
-                        borderColor: connectionStatus.connected ? '#A7F3D0' : '#FECACA',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: connectionStatus.connected ? '#065F46' : '#991B1B',
-                          fontWeight: '700',
-                          fontSize: 13.5,
-                          lineHeight: 20,
-                        }}
-                      >
-                        {connectionStatus.connected ? 'Connection Active: ' : 'Error: '}{' '}
-                        {connectionStatus.message}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
-
-            {/* ─── TAB 10: NOTIFICATIONS & ALERTS CENTER ─── */}
-            {activeNav === 'notifications' && (
-              <NotificationsPage
-                isAdmin={true}
-                isDarkMode={isDarkMode}
-                onNavigateToOrders={() => setActiveNav('orders')}
-                onNavigateToGarage={() => {
-                  setActiveNav('garage');
-                  setGarageSubTab('bookings');
-                }}
-                onNavigateToAdmin={() => setActiveNav('overview')}
-                onNavigateToShop={handleBackToStorefront}
-                onNavigateToInventory={() => setActiveNav('inventory')}
-                onNavigateToSuppliers={() => setActiveNav('suppliers')}
-                onNavigateToUsers={() => setActiveNav('users')}
-                onNavigateToSettings={() => setActiveNav('settings')}
-              />
-            )}
-
-            {/* ─── TAB 11: SYSTEM & PLATFORM SETTINGS ─── */}
-            {activeNav === 'settings' && (
-              <AdminSystemSettingsPanel
-                isDarkMode={isDarkMode}
-                tokens={tokens}
-                showToast={showToast}
-                showConfirm={showConfirm}
-                isDesktop={isDesktop}
-                products={products}
-                orders={orders}
-                garageBookings={garageBookings}
-                usersList={usersList}
-                mechanicsList={garageMechanics}
-                suppliers={suppliers}
-                toggleDarkMode={toggleDarkMode}
-              />
-            )}
-
-            {/* ─── TAB 12: ACTIVITY LOGS & AUDIT DASHBOARD ─── */}
-            {activeNav === 'audit' && (
-              <View>
-                {/* Click-outside backdrop for open dropdowns */}
-                {(isDateRangeDropdownOpen || isAuditCategoryDropdownOpen || isAuditSeverityDropdownOpen) && (
-                  <TouchableOpacity
-                    style={{
-                      position: 'fixed',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      zIndex: 99998,
-                      backgroundColor: 'transparent',
-                      cursor: 'default',
-                    }}
-                    onPress={() => {
-                      setIsDateRangeDropdownOpen(false);
-                      setIsAuditCategoryDropdownOpen(false);
-                      setIsAuditSeverityDropdownOpen(false);
-                    }}
-                    activeOpacity={1}
-                  />
-                )}
-
-                {/* ─── 1. Page Header Card ─── */}
-                <View
-                  style={[
-                    styles.tableCard,
-                    {
-                      padding: 20,
-                      marginBottom: 16,
-                      borderRadius: 14,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
-                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                      boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
-                    },
-                  ]}
-                >
-                  <View
-                    style={{
-                      flexDirection: isDesktop ? 'row' : 'column',
-                      alignItems: isDesktop ? 'center' : 'flex-start',
-                      justifyContent: 'space-between',
-                      gap: 14,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <View
-                        style={{
-                          width: 42,
-                          height: 42,
-                          borderRadius: 10,
-                          backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <BootstrapIcon name="journal-text" size={20} color={isDarkMode ? tokens.accentBrand : '#059669'} />
-                      </View>
-                      <View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text
-                            style={{
-                              fontSize: 19,
-                              fontWeight: '600',
-                              color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                              letterSpacing: -0.3,
-                            }}
-                          >
-                            Activity Logs
-                          </Text>
-                          <View
-                            style={{
-                              backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
-                              paddingHorizontal: 7,
-                              paddingVertical: 2,
-                              borderRadius: 6,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 10,
-                                fontWeight: '700',
-                                color: isDarkMode ? tokens.accentBrand : '#059669',
-                                letterSpacing: 0.3,
-                              }}
-                            >
-                              IMMUTABLE
-                            </Text>
-                          </View>
                         </View>
-                        <Text
-                          style={{
-                            fontSize: 12.5,
-                            color: isDarkMode ? tokens.textMuted : '#64748B',
-                            marginTop: 3,
-                          }}
-                        >
-                          Track administrative actions, inventory changes, approvals, and security events.
-                        </Text>
-                      </View>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <TouchableOpacity
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          paddingHorizontal: 14,
-                          paddingVertical: 8,
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
-                          backgroundColor: isDarkMode ? '#132A26' : '#FFFFFF',
-                          cursor: 'pointer',
-                        }}
-                        onPress={handleExportAuditLogs}
-                        activeOpacity={0.8}
-                      >
-                        <BootstrapIcon name="download" size={13} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
-                        <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '700', fontSize: 12.5 }}>
-                          Export CSV
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-
-                {/* ─── 2. Four KPI Summary Cards ─── */}
-                <View
-                  style={{
-                    flexDirection: isDesktop ? 'row' : 'column',
-                    gap: 12,
-                    marginBottom: 16,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  {/* 1. Total Events */}
-                  <View
-                    style={{
-                      flex: 1,
-                      minWidth: 160,
-                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                      padding: 16,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                    }}
-                  >
-                    <View style={{ gap: 4 }}>
-                      <Text style={{ fontSize: 24, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                        {totalEventsCount}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
-                        Total Events
-                      </Text>
-                    </View>
-                    <View
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 10,
-                        backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <BootstrapIcon name="file-earmark-text" size={18} color={isDarkMode ? '#94A3B8' : '#475569'} />
-                    </View>
-                  </View>
-
-                  {/* 2. Successful */}
-                  <View
-                    style={{
-                      flex: 1,
-                      minWidth: 160,
-                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                      padding: 16,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                    }}
-                  >
-                    <View style={{ gap: 4 }}>
-                      <Text style={{ fontSize: 24, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                        {successfulEventsCount}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
-                        Successful
-                      </Text>
-                    </View>
-                    <View
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 20,
-                        backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <BootstrapIcon name="check2-circle" size={18} color="#059669" />
-                    </View>
-                  </View>
-
-                  {/* 3. Warnings */}
-                  <View
-                    style={{
-                      flex: 1,
-                      minWidth: 160,
-                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                      padding: 16,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                    }}
-                  >
-                    <View style={{ gap: 4 }}>
-                      <Text style={{ fontSize: 24, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                        {warningEventsCount}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
-                        Warnings
-                      </Text>
-                    </View>
-                    <View
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 10,
-                        backgroundColor: isDarkMode ? '#2D2012' : '#FFFBEB',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <BootstrapIcon name="exclamation-triangle-fill" size={18} color="#D97706" />
-                    </View>
-                  </View>
-
-                  {/* 4. Critical */}
-                  <View
-                    style={{
-                      flex: 1,
-                      minWidth: 160,
-                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                      padding: 16,
-                      borderRadius: 12,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                    }}
-                  >
-                    <View style={{ gap: 4 }}>
-                      <Text style={{ fontSize: 24, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                        {criticalEventsCount}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
-                        Critical
-                      </Text>
-                    </View>
-                    <View
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: 10,
-                        backgroundColor: isDarkMode ? '#341515' : '#FEF2F2',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <BootstrapIcon name="shield-fill-x" size={18} color="#DC2626" />
-                    </View>
-                  </View>
-                </View>
-
-                {/* ─── 3. Search & Filtering Toolbar ─── */}
-                <View
-                  style={{
-                    backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                    padding: 12,
-                    marginBottom: 16,
-                    position: 'relative',
-                    zIndex: isDateRangeDropdownOpen || isAuditCategoryDropdownOpen || isAuditSeverityDropdownOpen ? 99999 : 10,
-                    elevation: 2,
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: isDesktop ? 'row' : 'column',
-                      alignItems: isDesktop ? 'center' : 'stretch',
-                      gap: 10,
-                    }}
-                  >
-                    {/* Search Field */}
-                    <View
-                      style={{
-                        flex: 1,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 10,
-                        backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                        borderRadius: 9,
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                      }}
-                    >
-                      <BootstrapIcon name="search" size={13} color={isDarkMode ? tokens.textMuted : '#64748B'} />
-                      <TextInput
-                        style={{
-                          flex: 1,
-                          fontSize: 13,
-                          color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                          outlineStyle: 'none',
-                        }}
-                        placeholder="Search action, admin, target, or details..."
-                        value={auditSearchQuery}
-                        onChangeText={(txt) => {
-                          setAuditSearchQuery(txt);
-                          setAuditCurrentPage(1);
-                        }}
-                        placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
-                      />
-                      {Boolean(auditSearchQuery) && (
-                        <TouchableOpacity onPress={() => setAuditSearchQuery('')}>
-                          <BootstrapIcon name="x-circle-fill" size={13} color={isDarkMode ? tokens.textMuted : '#94A3B8'} />
-                        </TouchableOpacity>
                       )}
-                    </View>
-
-                    {/* Filter Controls Row */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      {/* Date Range Dropdown */}
-                      <View style={{ position: 'relative', zIndex: isDateRangeDropdownOpen ? 99999 : 10 }}>
-                        <TouchableOpacity
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                            backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
-                            borderWidth: 1,
-                            borderColor: auditDateRangeFilter !== '7d' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                            borderRadius: 9,
-                            paddingHorizontal: 12,
-                            paddingVertical: 8,
-                            cursor: 'pointer',
-                          }}
-                          onPress={() => {
-                            setIsDateRangeDropdownOpen((prev) => !prev);
-                            setIsAuditCategoryDropdownOpen(false);
-                            setIsAuditSeverityDropdownOpen(false);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <BootstrapIcon name="calendar3" size={12} color="#64748B" />
-                          <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
-                            {DATE_RANGE_OPTIONS.find((d) => d.id === auditDateRangeFilter)?.label || 'Last 7 days'}
-                          </Text>
-                          <BootstrapIcon name="chevron-down" size={10} color="#64748B" />
-                        </TouchableOpacity>
-
-                        {isDateRangeDropdownOpen && (
-                          <View
-                            style={{
-                              position: 'absolute',
-                              top: '100%',
-                              left: 0,
-                              marginTop: 6,
-                              minWidth: 160,
-                              backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                              borderRadius: 10,
-                              borderWidth: 1,
-                              borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                              boxShadow: '0 10px 25px -4px rgba(0,0,0,0.15)',
-                              zIndex: 99999,
-                              padding: 4,
-                            }}
-                          >
-                            {DATE_RANGE_OPTIONS.map((opt) => (
-                              <TouchableOpacity
-                                key={opt.id}
-                                style={{
-                                  paddingHorizontal: 10,
-                                  paddingVertical: 7,
-                                  borderRadius: 6,
-                                  backgroundColor: auditDateRangeFilter === opt.id ? (isDarkMode ? '#132A26' : '#ECFDF5') : 'transparent',
-                                  cursor: 'pointer',
-                                }}
-                                onPress={() => {
-                                  setAuditDateRangeFilter(opt.id);
-                                  setAuditCurrentPage(1);
-                                  setIsDateRangeDropdownOpen(false);
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 12.5,
-                                    fontWeight: auditDateRangeFilter === opt.id ? '700' : '500',
-                                    color: auditDateRangeFilter === opt.id ? '#059669' : isDarkMode ? tokens.textPrimary : '#334155',
-                                  }}
-                                >
-                                  {opt.label}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Category Dropdown */}
-                      <View style={{ position: 'relative', zIndex: isAuditCategoryDropdownOpen ? 99999 : 10 }}>
-                        <TouchableOpacity
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                            backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
-                            borderWidth: 1,
-                            borderColor: auditCategoryFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                            borderRadius: 9,
-                            paddingHorizontal: 12,
-                            paddingVertical: 8,
-                            cursor: 'pointer',
-                          }}
-                          onPress={() => {
-                            setIsAuditCategoryDropdownOpen((prev) => !prev);
-                            setIsDateRangeDropdownOpen(false);
-                            setIsAuditSeverityDropdownOpen(false);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <BootstrapIcon name="grid" size={12} color="#64748B" />
-                          <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
-                            {AUDIT_CATEGORIES.find((c) => c.id.toLowerCase() === auditCategoryFilter.toLowerCase())?.label || 'All categories'}
-                          </Text>
-                          <BootstrapIcon name="chevron-down" size={10} color="#64748B" />
-                        </TouchableOpacity>
-
-                        {isAuditCategoryDropdownOpen && (
-                          <View
-                            style={{
-                              position: 'absolute',
-                              top: '100%',
-                              left: 0,
-                              marginTop: 6,
-                              minWidth: 175,
-                              backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                              borderRadius: 10,
-                              borderWidth: 1,
-                              borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                              boxShadow: '0 10px 25px -4px rgba(0,0,0,0.15)',
-                              zIndex: 99999,
-                              padding: 4,
-                            }}
-                          >
-                            {AUDIT_CATEGORIES.map((cat) => (
-                              <TouchableOpacity
-                                key={cat.id}
-                                style={{
-                                  paddingHorizontal: 10,
-                                  paddingVertical: 7,
-                                  borderRadius: 6,
-                                  backgroundColor: auditCategoryFilter.toLowerCase() === cat.id.toLowerCase() ? (isDarkMode ? '#132A26' : '#ECFDF5') : 'transparent',
-                                  cursor: 'pointer',
-                                }}
-                                onPress={() => {
-                                  setAuditCategoryFilter(cat.id);
-                                  setAuditCurrentPage(1);
-                                  setIsAuditCategoryDropdownOpen(false);
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 12.5,
-                                    fontWeight: auditCategoryFilter.toLowerCase() === cat.id.toLowerCase() ? '700' : '500',
-                                    color: auditCategoryFilter.toLowerCase() === cat.id.toLowerCase() ? '#059669' : isDarkMode ? tokens.textPrimary : '#334155',
-                                  }}
-                                >
-                                  {cat.label}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Severity Dropdown */}
-                      <View style={{ position: 'relative', zIndex: isAuditSeverityDropdownOpen ? 99999 : 10 }}>
-                        <TouchableOpacity
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                            backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
-                            borderWidth: 1,
-                            borderColor: auditSeverityFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                            borderRadius: 9,
-                            paddingHorizontal: 12,
-                            paddingVertical: 8,
-                            cursor: 'pointer',
-                          }}
-                          onPress={() => {
-                            setIsAuditSeverityDropdownOpen((prev) => !prev);
-                            setIsDateRangeDropdownOpen(false);
-                            setIsAuditCategoryDropdownOpen(false);
-                          }}
-                          activeOpacity={0.8}
-                        >
-                          <BootstrapIcon name="shield-check" size={12} color="#64748B" />
-                          <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
-                            {auditSeverityFilter === 'All' ? 'All severities' : auditSeverityFilter}
-                          </Text>
-                          <BootstrapIcon name="chevron-down" size={10} color="#64748B" />
-                        </TouchableOpacity>
-
-                        {isAuditSeverityDropdownOpen && (
-                          <View
-                            style={{
-                              position: 'absolute',
-                              top: '100%',
-                              left: 0,
-                              marginTop: 6,
-                              minWidth: 160,
-                              backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                              borderRadius: 10,
-                              borderWidth: 1,
-                              borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                              boxShadow: '0 10px 25px -4px rgba(0,0,0,0.15)',
-                              zIndex: 99999,
-                              padding: 4,
-                            }}
-                          >
-                            {AUDIT_SEVERITIES.map((sev) => (
-                              <TouchableOpacity
-                                key={sev.id}
-                                style={{
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  gap: 6,
-                                  paddingHorizontal: 10,
-                                  paddingVertical: 7,
-                                  borderRadius: 6,
-                                  backgroundColor: auditSeverityFilter === sev.id ? (isDarkMode ? '#132A26' : '#ECFDF5') : 'transparent',
-                                  cursor: 'pointer',
-                                }}
-                                onPress={() => {
-                                  setAuditSeverityFilter(sev.id);
-                                  setAuditCurrentPage(1);
-                                  setIsAuditSeverityDropdownOpen(false);
-                                }}
-                              >
-                                {sev.dotColor && (
-                                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sev.dotColor }} />
-                                )}
-                                <Text
-                                  style={{
-                                    fontSize: 12.5,
-                                    fontWeight: auditSeverityFilter === sev.id ? '700' : '500',
-                                    color: auditSeverityFilter === sev.id ? '#059669' : isDarkMode ? tokens.textPrimary : '#334155',
-                                  }}
-                                >
-                                  {sev.label}
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        )}
-                      </View>
-
-                      {/* Filter / Reset Action Button */}
-                      <TouchableOpacity
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          backgroundColor: hasActiveAuditFilters ? (isDarkMode ? '#2D1616' : '#FEF2F2') : isDarkMode ? tokens.bgMain : '#F8FAFC',
-                          borderWidth: 1,
-                          borderColor: hasActiveAuditFilters ? '#F87171' : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                          borderRadius: 9,
-                          paddingHorizontal: 12,
-                          paddingVertical: 8,
-                          cursor: 'pointer',
-                        }}
-                        onPress={hasActiveAuditFilters ? handleResetAuditFilters : undefined}
-                        activeOpacity={hasActiveAuditFilters ? 0.75 : 1}
-                      >
-                        <BootstrapIcon
-                          name={hasActiveAuditFilters ? 'arrow-counterclockwise' : 'funnel'}
-                          size={12}
-                          color={hasActiveAuditFilters ? '#DC2626' : '#64748B'}
-                        />
-                        <Text
-                          style={{
-                            fontSize: 12.5,
-                            fontWeight: '600',
-                            color: hasActiveAuditFilters ? '#DC2626' : isDarkMode ? tokens.textPrimary : '#334155',
-                          }}
-                        >
-                          {hasActiveAuditFilters ? 'Reset' : 'Filter'}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-
-                {/* ─── 4. Activity Logs Table / List Container ─── */}
-                <View
-                  style={{
-                    backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                    borderRadius: 14,
-                    borderWidth: 1,
-                    borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                    position: 'relative',
-                  }}
-                >
-                  {/* Table Column Headers (Desktop) */}
-                  {isDesktop && (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        paddingHorizontal: 20,
-                        paddingVertical: 12,
-                        backgroundColor: '#24272B',
-                        borderTopLeftRadius: 13,
-                        borderTopRightRadius: 13,
-                        borderBottomWidth: 1,
-                        borderBottomColor: isDarkMode ? '#374151' : '#32373D',
-                      }}
-                    >
-                      <Text style={{ flex: 2.2, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5 }}>
-                        EVENT
-                      </Text>
-                      <Text style={{ flex: 1.7, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5 }}>
-                        ACTOR / TARGET
-                      </Text>
-                      <Text style={{ flex: 1.1, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5 }}>
-                        IP ADDRESS
-                      </Text>
-                      <Text style={{ flex: 0.9, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5 }}>
-                        TIME
-                      </Text>
-                      <Text style={{ flex: 0.9, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5 }}>
-                        STATUS
-                      </Text>
-                      <Text style={{ width: 110, textAlign: 'right', fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5, paddingRight: 6 }}>
-                        ACTION
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Empty State */}
-                  {filteredAuditLogs.length === 0 ? (
-                    <View style={{ padding: 48, alignItems: 'center', justifyContent: 'center' }}>
-                      <View
-                        style={{
-                          width: 56,
-                          height: 56,
-                          borderRadius: 28,
-                          backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginBottom: 12,
-                        }}
-                      >
-                        <BootstrapIcon name="journal-check" size={26} color={isDarkMode ? tokens.textMuted : '#94A3B8'} />
-                      </View>
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#1E293B' }}>
-                        No Activity Log Entries
-                      </Text>
-                      <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 4, textAlign: 'center' }}>
-                        {auditSearchQuery || hasActiveAuditFilters
-                          ? 'No activity log entries match your current search and filters.'
-                          : 'No recorded actions found for this period.'}
-                      </Text>
-                      {hasActiveAuditFilters && (
-                        <TouchableOpacity
-                          style={{
-                            marginTop: 14,
-                            paddingHorizontal: 14,
-                            paddingVertical: 7,
-                            borderRadius: 8,
-                            backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
-                            borderWidth: 1,
-                            borderColor: isDarkMode ? tokens.accentBorder : '#A7F3D0',
-                          }}
-                          onPress={handleResetAuditFilters}
-                        >
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#059669' }}>
-                            Reset All Filters
-                          </Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  ) : (
-                    /* Table / Cards Body */
-                    paginatedAuditLogs.map((log, index) => {
-                      const isLast = index === paginatedAuditLogs.length - 1;
-                      const sev = (log.severity || 'INFO').toUpperCase();
-
-                      // Status Badge Colors
-                      const statusMeta = {
-                        CRITICAL: { label: 'CRITICAL', color: '#DC2626', dot: '#EF4444', bg: isDarkMode ? '#341515' : '#FEF2F2' },
-                        WARNING: { label: 'WARNING', color: '#D97706', dot: '#F59E0B', bg: isDarkMode ? '#2D2012' : '#FFFBEB' },
-                        SUCCESS: { label: 'SUCCESS', color: '#059669', dot: '#10B981', bg: isDarkMode ? '#132A26' : '#ECFDF5' },
-                        INFO: { label: 'INFO', color: '#2563EB', dot: '#3B82F6', bg: isDarkMode ? '#1E293B' : '#EFF6FF' },
-                      }[sev] || { label: sev, color: '#475569', dot: '#94A3B8', bg: isDarkMode ? '#1E293B' : '#F1F5F9' };
-
-                      // Action Title & Icon presentation
-                      const getPresentation = (action) => {
-                        switch (action) {
-                          case 'ORDER_APPROVED':
-                          case 'COD_ORDER_APPROVED':
-                            return { title: 'Order Approved', icon: 'check2', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
-                          case 'INVENTORY_RESTOCKED':
-                          case 'STOCK_REPLENISHED':
-                            return { title: 'Inventory Restocked', icon: 'box-seam', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
-                          case 'BOOKING_BAY_UPDATED':
-                          case 'BOOKING_STATUS_CHANGED':
-                            return { title: 'Booking Bay Updated', icon: 'calendar-check', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
-                          case 'SECURITY_PIN_VERIFIED':
-                            return { title: 'Security PIN Verified', icon: 'shield-lock', color: '#D97706', bg: isDarkMode ? '#2D2012' : '#FFFBEB' };
-                          case 'FAILED_LOGIN_ATTEMPT':
-                            return { title: 'Failed Login Attempt', icon: 'shield-x', color: '#DC2626', bg: isDarkMode ? '#341515' : '#FEF2F2' };
-                          case 'ORDER_STATUS_CHANGED':
-                            return { title: 'Order Status Changed', icon: 'truck', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
-                          case 'PROMO_CREATED':
-                            return { title: 'Promo Code Published', icon: 'ticket-perforated', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
-                          case 'SYSTEM_SETTINGS_UPDATED':
-                          case 'SYSTEM_SETTINGS_SAVED':
-                            return { title: 'System Settings Updated', icon: 'sliders', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
-                          case 'SUPPLIER_PO_SIGNED':
-                            return { title: 'Supplier PO Signed', icon: 'file-earmark-check', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
-                          case 'DATABASE_BACKUP_EXPORTED':
-                            return { title: 'Database Backup Exported', icon: 'database', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
-                          case 'USER_PERMISSIONS_MODIFIED':
-                            return { title: 'User Permissions Modified', icon: 'person-gear', color: '#D97706', bg: isDarkMode ? '#2D2012' : '#FFFBEB' };
-                          default: {
-                            const readable = (action || 'Operation')
-                              .replace(/_/g, ' ')
-                              .toLowerCase()
-                              .replace(/\b\w/g, (c) => c.toUpperCase());
-                            if (sev === 'CRITICAL') return { title: readable, icon: 'shield-x', color: '#DC2626', bg: isDarkMode ? '#341515' : '#FEF2F2' };
-                            if (sev === 'WARNING') return { title: readable, icon: 'shield-lock', color: '#D97706', bg: isDarkMode ? '#2D2012' : '#FFFBEB' };
-                            if (sev === 'SUCCESS') return { title: readable, icon: 'check2', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
-                            return { title: readable, icon: 'info-circle', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
-                          }
-                        }
-                      };
-
-                      const meta = getPresentation(log.action);
-
-                      // Relative timestamp formatter
-                      const formatTime = (iso) => {
-                        if (!iso) return 'Just now';
-                        try {
-                          const diff = Date.now() - new Date(iso).getTime();
-                          const m = Math.floor(diff / 60000);
-                          const h = Math.floor(m / 60);
-                          const d = Math.floor(h / 24);
-                          if (m < 1) return 'Just now';
-                          if (m === 1) return '1 min ago';
-                          if (m < 60) return `${m} min ago`;
-                          if (h === 1) return '1 hour ago';
-                          if (h < 24) return `${h} hours ago`;
-                          if (d === 1) return 'Yesterday';
-                          return `${d} days ago`;
-                        } catch (_e) {
-                          return 'Recent';
-                        }
-                      };
-
-                      const isHovered = hoveredAuditRowId === (log.id || index);
-
-                      if (!isDesktop) {
-                        /* ─── Mobile Card View ─── */
-                        return (
-                          <TouchableOpacity
-                            key={log.id || index}
-                            style={{
-                              padding: 16,
-                              borderBottomWidth: isLast ? 0 : 1,
-                              borderBottomColor: isHovered
-                                ? (isDarkMode ? '#10B98133' : '#05966928')
-                                : (isDarkMode ? tokens.borderInput : '#F1F5F9'),
-                              borderLeftWidth: 5,
-                              borderLeftColor: isHovered ? (isDarkMode ? '#10B981' : '#059669') : 'transparent',
-                              backgroundColor: isHovered
-                                ? (isDarkMode ? '#1C4434' : '#E2EFE7')
-                                : (isDarkMode ? 'transparent' : '#FFFFFF'),
-                              gap: 10,
-                              cursor: 'pointer',
-                              boxShadow: isHovered
-                                ? (isDarkMode ? '0 4px 16px rgba(0,0,0,0.45)' : '0 4px 14px rgba(234, 88, 12, 0.12)')
-                                : 'none',
-                              transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
-                            }}
-                            onMouseEnter={() => setHoveredAuditRowId(log.id || index)}
-                            onMouseLeave={() => setHoveredAuditRowId(null)}
-                            onPress={() => setSelectedAuditLogForModal(log)}
-                            activeOpacity={0.75}
-                          >
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                                <View
-                                  style={{
-                                    width: 32,
-                                    height: 32,
-                                    borderRadius: 16,
-                                    backgroundColor: isHovered ? (isDarkMode ? '#132A26' : '#DCFCE7') : meta.bg,
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
-                                  }}
-                                >
-                                  <BootstrapIcon name={meta.icon} size={15} color={meta.color} />
-                                </View>
-                                <Text
-                                  style={{
-                                    fontSize: 14,
-                                    fontWeight: isHovered ? '700' : '600',
-                                    color: isHovered
-                                      ? (isDarkMode ? '#34D399' : '#0F442A')
-                                      : (isDarkMode ? tokens.textPrimary : '#0F172A'),
-                                  }}
-                                >
-                                  {meta.title}
-                                </Text>
-                              </View>
-
-                              {/* Status Pill */}
-                              <View
-                                style={{
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  gap: 5,
-                                  backgroundColor: statusMeta.bg,
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 3,
-                                  borderRadius: 9999,
-                                }}
-                              >
-                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusMeta.dot }} />
-                                <Text style={{ fontSize: 10, fontWeight: '500', color: statusMeta.color }}>
-                                  {statusMeta.label}
-                                </Text>
-                              </View>
-                            </View>
-
-                            <Text style={{ fontSize: 12.5, color: isDarkMode ? '#CBD5E1' : '#475569', lineHeight: 18 }}>
-                              {log.details}
-                            </Text>
-
-                            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                                <BootstrapIcon name="person" size={12} color="#64748B" />
-                                <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
-                                  {log.admin_name}
-                                </Text>
-                                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
-                                  • {log.target}
-                                </Text>
-                              </View>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
-                                  {formatTime(log.timestamp)}
-                                </Text>
-                                <View
-                                  style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 5,
-                                    backgroundColor: isHovered
-                                      ? (isDarkMode ? '#10B981' : '#EA580C')
-                                      : (isDarkMode ? '#1E293B' : '#F1F5F9'),
-                                    paddingHorizontal: 8,
-                                    paddingVertical: 4,
-                                    borderRadius: 6,
-                                    boxShadow: isHovered
-                                      ? (isDarkMode ? '0 2px 8px rgba(16,185,129,0.35)' : '0 2px 8px rgba(234, 88, 12,0.22)')
-                                      : 'none',
-                                    transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
-                                  }}
-                                >
-                                  <BootstrapIcon
-                                    name="eye"
-                                    size={11}
-                                    color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
-                                  />
-                                  <Text
-                                    style={{
-                                      fontSize: 10.5,
-                                      fontWeight: '700',
-                                      color: isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B'),
-                                    }}
-                                  >
-                                    Details
-                                  </Text>
-                                  <BootstrapIcon
-                                    name="arrow-right"
-                                    size={10}
-                                    color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
-                                  />
-                                </View>
-                              </View>
-                            </View>
-                          </TouchableOpacity>
-                        );
-                      }
-
-                      /* ─── Desktop Table Row View ─── */
-                      return (
-                        <TouchableOpacity
-                          key={log.id || index}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            paddingHorizontal: 20,
-                            paddingLeft: 16,
-                            paddingVertical: 14,
-                            borderBottomWidth: isLast ? 0 : 1,
-                            borderBottomColor: isHovered
-                              ? (isDarkMode ? '#10B98133' : '#05966928')
-                              : (isDarkMode ? tokens.borderInput : '#F1F5F9'),
-                            borderLeftWidth: 5,
-                            borderLeftColor: isHovered ? (isDarkMode ? '#10B981' : '#059669') : 'transparent',
-                            backgroundColor: isHovered
-                              ? (isDarkMode ? '#1C4434' : '#E2EFE7')
-                              : (isDarkMode ? 'transparent' : '#FFFFFF'),
-                            cursor: 'pointer',
-                            boxShadow: isHovered
-                              ? (isDarkMode ? '0 4px 16px rgba(0,0,0,0.45)' : '0 4px 14px rgba(234, 88, 12, 0.12)')
-                              : 'none',
-                            transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
-                          }}
-                          onMouseEnter={() => setHoveredAuditRowId(log.id || index)}
-                          onMouseLeave={() => setHoveredAuditRowId(null)}
-                          onPress={() => setSelectedAuditLogForModal(log)}
-                          activeOpacity={0.75}
-                        >
-                          {/* Column 1: EVENT */}
-                          <View style={{ flex: 2.2, flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 10 }}>
-                            <View
-                              style={{
-                                width: 34,
-                                height: 34,
-                                borderRadius: 17,
-                                backgroundColor: isHovered ? (isDarkMode ? '#132A26' : '#DCFCE7') : meta.bg,
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                flexShrink: 0,
-                                transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
-                              }}
-                            >
-                              <BootstrapIcon name={meta.icon} size={15} color={meta.color} />
-                            </View>
-                            <View style={{ minWidth: 0, flex: 1 }}>
-                              <Text
-                                numberOfLines={1}
-                                style={{
-                                  fontSize: 13.5,
-                                  fontWeight: isHovered ? '700' : '600',
-                                  color: isHovered
-                                    ? isDarkMode ? '#34D399' : '#0F442A'
-                                    : isDarkMode ? tokens.textPrimary : '#0F172A',
-                                  transition: Platform.OS === 'web' ? 'color 0.15s ease' : undefined,
-                                }}
-                              >
-                                {meta.title}
-                              </Text>
-                              <Text
-                                numberOfLines={1}
-                                style={{
-                                  fontSize: 12,
-                                  color: isDarkMode ? tokens.textMuted : '#64748B',
-                                  marginTop: 2,
-                                }}
-                              >
-                                {log.details}
-                              </Text>
-                            </View>
-                          </View>
-
-                          {/* Column 2: ACTOR / TARGET */}
-                          <View style={{ flex: 1.7, paddingRight: 10 }}>
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-                              <BootstrapIcon name="person" size={12} color="#64748B" />
-                              <Text
-                                numberOfLines={1}
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: '600',
-                                  color: isHovered
-                                    ? isDarkMode ? tokens.textPrimary : '#0F172A'
-                                    : isDarkMode ? tokens.textPrimary : '#1E293B',
-                                }}
-                              >
-                                {log.admin_name}
-                              </Text>
-                            </View>
-                            <Text
-                              numberOfLines={1}
-                              style={{
-                                fontSize: 11.5,
-                                color: isDarkMode ? tokens.textMuted : '#64748B',
-                                marginTop: 2,
-                              }}
-                            >
-                              {log.target}
-                            </Text>
-                          </View>
-
-                          {/* Column 3: IP ADDRESS */}
-                          <View style={{ flex: 1.1, paddingRight: 10 }}>
-                            <Text
-                              style={{
-                                fontSize: 12.5,
-                                color: isDarkMode ? tokens.textMuted : '#475569',
-                                fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
-                              }}
-                            >
-                              {log.ip_address || '192.168.1.104'}
-                            </Text>
-                          </View>
-
-                          {/* Column 4: TIME */}
-                          <View style={{ flex: 0.9, paddingRight: 10 }}>
-                            <Text
-                              style={{
-                                fontSize: 12,
-                                color: isDarkMode ? tokens.textMuted : '#64748B',
-                              }}
-                            >
-                              {formatTime(log.timestamp)}
-                            </Text>
-                          </View>
-
-                          {/* Column 5: STATUS */}
-                          <View style={{ flex: 0.9, paddingRight: 10 }}>
-                            <View
-                              style={{
-                                alignSelf: 'flex-start',
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 5,
-                                backgroundColor: statusMeta.bg,
-                                paddingHorizontal: 9,
-                                paddingVertical: 3.5,
-                                borderRadius: 9999,
-                              }}
-                            >
-                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusMeta.dot }} />
-                              <Text
-                                style={{
-                                  fontSize: 10.5,
-                                  fontWeight: '500',
-                                  color: statusMeta.color,
-                                  letterSpacing: 0.2,
-                                }}
-                              >
-                                {statusMeta.label}
-                              </Text>
-                            </View>
-                          </View>
-
-                          {/* Column 6: ACTION / VIEW DETAILS */}
-                          <View style={{ width: 110, alignItems: 'flex-end', paddingRight: 6 }}>
-                            <View
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 6,
-                                backgroundColor: isHovered
-                                  ? (isDarkMode ? '#10B981' : '#EA580C')
-                                  : (isDarkMode ? '#1E293B' : '#F1F5F9'),
-                                borderWidth: 1,
-                                borderColor: isHovered
-                                  ? (isDarkMode ? '#34D399' : '#EA580C')
-                                  : (isDarkMode ? tokens.borderInput : '#E2E8F0'),
-                                paddingHorizontal: 10,
-                                paddingVertical: 5,
-                                borderRadius: 7,
-                                boxShadow: isHovered
-                                  ? (isDarkMode ? '0 2px 8px rgba(16,185,129,0.35)' : '0 2px 8px rgba(234, 88, 12,0.22)')
-                                  : 'none',
-                                transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
-                              }}
-                            >
-                              <BootstrapIcon
-                                name="eye"
-                                size={12}
-                                color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
-                              />
-                              <Text
-                                style={{
-                                  fontSize: 11.5,
-                                  fontWeight: '700',
-                                  color: isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#475569'),
-                                  letterSpacing: 0.2,
-                                }}
-                              >
-                                Details
-                              </Text>
-                              <BootstrapIcon
-                                name="arrow-right"
-                                size={11}
-                                color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
-                              />
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })
-                  )}
-
-                  {/* ─── 5. Table Pagination Footer ─── */}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingHorizontal: 20,
-                      paddingVertical: 14,
-                      borderTopWidth: 1,
-                      borderTopColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                      backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                      flexWrap: 'wrap',
-                      gap: 12,
-                    }}
-                  >
-                    <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                      {filteredAuditLogs.length === 0
-                        ? 'Showing 0 of 0 events'
-                        : `Showing ${(auditCurrentPage - 1) * auditItemsPerPage + 1}–${Math.min(auditCurrentPage * auditItemsPerPage, filteredAuditLogs.length)} of ${filteredAuditLogs.length} events`}
-                    </Text>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      {/* Previous Button */}
-                      <TouchableOpacity
-                        disabled={auditCurrentPage <= 1}
-                        onPress={() => setAuditCurrentPage((prev) => Math.max(1, prev - 1))}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                          paddingHorizontal: 10,
-                          paddingVertical: 6,
-                          borderRadius: 7,
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                          backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                          opacity: auditCurrentPage <= 1 ? 0.45 : 1,
-                          cursor: auditCurrentPage <= 1 ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        <BootstrapIcon name="chevron-left" size={10} color={isDarkMode ? tokens.textPrimary : '#334155'} />
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
-                          Previous
-                        </Text>
-                      </TouchableOpacity>
-
-                      {/* Numbered Page Buttons */}
-                      {Array.from({ length: totalAuditPages }, (_, i) => i + 1).map((pageNum) => {
-                        const isActive = pageNum === auditCurrentPage;
-                        return (
-                          <TouchableOpacity
-                            key={pageNum}
-                            onPress={() => setAuditCurrentPage(pageNum)}
-                            style={{
-                              minWidth: 32,
-                              height: 32,
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              borderRadius: 7,
-                              backgroundColor: isActive ? '#EA580C' : isDarkMode ? '#1E293B' : '#FFFFFF',
-                              borderWidth: 1,
-                              borderColor: isActive ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                              cursor: 'pointer',
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 12,
-                                fontWeight: isActive ? '600' : '500',
-                                color: isActive ? '#FFFFFF' : isDarkMode ? tokens.textPrimary : '#334155',
-                              }}
-                            >
-                              {pageNum}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
-
-                      {/* Next Button */}
-                      <TouchableOpacity
-                        disabled={auditCurrentPage >= totalAuditPages}
-                        onPress={() => setAuditCurrentPage((prev) => Math.min(totalAuditPages, prev + 1))}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                          paddingHorizontal: 10,
-                          paddingVertical: 6,
-                          borderRadius: 7,
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                          backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
-                          opacity: auditCurrentPage >= totalAuditPages ? 0.45 : 1,
-                          cursor: auditCurrentPage >= totalAuditPages ? 'not-allowed' : 'pointer',
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
-                          Next
-                        </Text>
-                        <BootstrapIcon name="chevron-right" size={10} color={isDarkMode ? tokens.textPrimary : '#334155'} />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              </View>
-            )}
-
-            {/* ─── TAB 13: ADMINISTRATOR PROFILE ─── */}
-            {activeNav === 'profile' && (
-              <AdminProfileLogsPanel
-                isDarkMode={isDarkMode}
-                tokens={tokens}
-                showToast={showToast}
-                showConfirm={showConfirm}
-                isDesktop={isDesktop}
-                onNavigate={setActiveNav}
-              />
-            )}
-          </ScrollView>
-        </View>
-      </View>
-
-      {/* ─── MODAL: DEDICATED BRAND IDENTITY MODAL ─── */}
-      <EditBrandModal
-        visible={isBrandModalOpen}
-        onClose={() => setIsBrandModalOpen(false)}
-        isDarkMode={isDarkMode}
-        showToast={showToast}
-      />
-
-      {/* ─── MODAL: AUDIT LOG INSPECTION MODAL ─── */}
-      <Modal
-        visible={Boolean(selectedAuditLogForModal)}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelectedAuditLogForModal(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View
-            style={[
-              styles.modalCard,
-              {
-                maxWidth: 640,
-                width: '100%',
-                backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                borderRadius: 16,
-                padding: 22,
-                gap: 14,
-              },
-            ]}
-          >
-            {/* Modal Header */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingBottom: 14,
-                borderBottomWidth: 1,
-                borderBottomColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View
-                  style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: 10,
-                    backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <BootstrapIcon name="journal-text" size={18} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                </View>
-                <View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        fontWeight: '600',
-                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                      }}
-                    >
-                      Activity Log Details
-                    </Text>
-                    <View
-                      style={{
-                        backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
-                        paddingHorizontal: 6,
-                        paddingVertical: 2,
-                        borderRadius: 4,
-                      }}
-                    >
-                      <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#059669', letterSpacing: 0.3 }}>
-                        IMMUTABLE
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                    <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8', fontFamily: Platform.OS === 'web' ? 'monospace' : undefined }}>
-                      ID: {selectedAuditLogForModal?.id}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (selectedAuditLogForModal?.id && typeof navigator !== 'undefined' && navigator.clipboard) {
-                          navigator.clipboard.writeText(selectedAuditLogForModal.id);
-                          showToast('✓ Event ID copied to clipboard');
-                        }
-                      }}
-                      style={{ padding: 2 }}
-                    >
-                      <BootstrapIcon name="clipboard" size={11} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setSelectedAuditLogForModal(null)}
-                style={{
-                  padding: 6,
-                  borderRadius: 8,
-                  backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
-                }}
-              >
-                <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? tokens.textMuted : '#64748B'} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Modal Content */}
-            {selectedAuditLogForModal && (
-              <ScrollView style={{ maxHeight: 480 }}>
-                <View style={{ gap: 12 }}>
-                  {/* Action & Status Card */}
-                  <View
-                    style={{
-                      backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
-                      padding: 14,
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: 10,
-                    }}
-                  >
-                    <View>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
-                        Action Event
-                      </Text>
-                      <Text style={{ fontSize: 14.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A', marginTop: 2 }}>
-                        {selectedAuditLogForModal.action}
-                      </Text>
-                    </View>
-
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <View
-                        style={{
-                          backgroundColor:
-                            selectedAuditLogForModal.severity === 'CRITICAL'
-                              ? isDarkMode ? '#341515' : '#FEE2E2'
-                              : selectedAuditLogForModal.severity === 'WARNING'
-                                ? isDarkMode ? '#2D2012' : '#FEF3C7'
-                                : selectedAuditLogForModal.severity === 'SUCCESS'
-                                  ? isDarkMode ? '#132A26' : '#D1FAE5'
-                                  : isDarkMode ? '#1E293B' : '#DBEAFE',
-                          paddingHorizontal: 8,
-                          paddingVertical: 3,
-                          borderRadius: 6,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 10.5,
-                            fontWeight: '600',
-                            color:
-                              selectedAuditLogForModal.severity === 'CRITICAL'
-                                ? '#DC2626'
-                                : selectedAuditLogForModal.severity === 'WARNING'
-                                  ? '#D97706'
-                                  : selectedAuditLogForModal.severity === 'SUCCESS'
-                                    ? '#059669'
-                                    : '#2563EB',
-                          }}
-                        >
-                          {selectedAuditLogForModal.severity}
-                        </Text>
-                      </View>
-
-                      <View
-                        style={{
-                          backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
-                          paddingHorizontal: 8,
-                          paddingVertical: 3,
-                          borderRadius: 6,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 10.5,
-                            fontWeight: '700',
-                            color: isDarkMode ? tokens.textMuted : '#475569',
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          {selectedAuditLogForModal.category}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Target & Details */}
-                  <View
-                    style={{
-                      backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
-                      padding: 14,
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                      gap: 8,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B', textTransform: 'uppercase' }}>
-                        Target Resource:
-                      </Text>
-                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
-                        {selectedAuditLogForModal.target}
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: 13, color: isDarkMode ? '#CBD5E1' : '#334155', lineHeight: 19 }}>
-                      {selectedAuditLogForModal.details}
-                    </Text>
-                  </View>
-
-                  {/* Operator & Network Info */}
-                  <View
-                    style={{
-                      flexDirection: isDesktop ? 'row' : 'column',
-                      gap: 10,
-                      backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
-                      padding: 12,
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
-                        Actor / Operator
-                      </Text>
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A', marginTop: 2 }}>
-                        {selectedAuditLogForModal.admin_name}
-                      </Text>
-                      <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 1 }}>
-                        Role: {selectedAuditLogForModal.admin_role || 'Administrator'}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
-                        Network Telemetry
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 11.5,
-                          color: isDarkMode ? '#CBD5E1' : '#475569',
-                          marginTop: 2,
-                          fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
-                        }}
-                      >
-                        IP: {selectedAuditLogForModal.ip_address || '127.0.0.1'}
-                      </Text>
-                      <Text style={{ fontSize: 10.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 1 }}>
-                        {selectedAuditLogForModal.client || 'Admin Dashboard'}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1.1 }}>
-                      <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
-                        Timestamp
-                      </Text>
-                      <Text style={{ fontSize: 11.5, color: isDarkMode ? '#CBD5E1' : '#475569', marginTop: 2 }}>
-                        {new Date(selectedAuditLogForModal.timestamp).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                          second: '2-digit',
-                        })}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 10,
-                          color: isDarkMode ? tokens.textMuted : '#94A3B8',
-                          marginTop: 1,
-                          fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
-                        }}
-                      >
-                        {selectedAuditLogForModal.timestamp}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* JSON Metadata Payload (if present) */}
-                  {Boolean(selectedAuditLogForModal.metadata && Object.keys(selectedAuditLogForModal.metadata).length > 0) && (
-                    <View style={{ gap: 6 }}>
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B', textTransform: 'uppercase' }}>
-                        Payload Metadata
-                      </Text>
-                      <View
-                        style={{
-                          backgroundColor: isDarkMode ? '#0A0F1D' : '#F1F5F9',
-                          padding: 12,
-                          borderRadius: 8,
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
-                            fontSize: 11,
-                            color: isDarkMode ? '#38BDF8' : '#0369A1',
-                            lineHeight: 17,
-                          }}
-                        >
-                          {JSON.stringify(selectedAuditLogForModal.metadata, null, 2)}
-                        </Text>
-                      </View>
-                    </View>
-                  )}
-                </View>
-              </ScrollView>
-            )}
-
-            {/* Modal Footer */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingTop: 12,
-                borderTopWidth: 1,
-                borderTopColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                flexWrap: 'wrap',
-                gap: 8,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <BootstrapIcon name="shield-lock-fill" size={13} color="#059669" />
-                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '500' }}>
-                  Immutable Audit Ledger • Tamper-evident record
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={{
-                  paddingHorizontal: 16,
-                  paddingVertical: 8,
-                  borderRadius: 8,
-                  backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
-                }}
-                onPress={() => setSelectedAuditLogForModal(null)}
-              >
-                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12.5 }}>Close</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL: ADD NEW CATEGORY ─── */}
-      <Modal
-        visible={isAddCategoryModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          if (!isSavingCategory) setIsAddCategoryModalOpen(false);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxWidth: 520 }]}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 10,
-                    backgroundColor: isDarkMode ? '#1E293B' : '#FFF7ED',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    borderWidth: 1,
-                    borderColor: '#EA580C',
-                  }}
-                >
-                  <BootstrapIcon name="folder-plus" size={18} color="#EA580C" />
-                </View>
-                <View>
-                  <Text style={styles.modalTitle}>Add Product Category</Text>
-                  <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                    Create a custom catalog category for parts & gear
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  if (!isSavingCategory) setIsAddCategoryModalOpen(false);
-                }}
-                disabled={isSavingCategory}
-              >
-                <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : '#64748B'} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
-              <Text style={styles.formLabel}>Category Name *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={newCatName}
-                onChangeText={setNewCatName}
-                placeholder="e.g. Helmets, Carbon Fairings, Riding Boots"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
-                autoFocus
-              />
-
-              <Text style={styles.formLabel}>Description (Optional)</Text>
-              <TextInput
-                style={[styles.formInput, { height: 72, textAlignVertical: 'top', paddingTop: 8 }]}
-                value={newCatDesc}
-                onChangeText={setNewCatDesc}
-                placeholder="Brief summary of components or gear belonging to this category..."
-                placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
-                multiline
-                numberOfLines={3}
-              />
-
-              <Text style={styles.formLabel}>Category Icon</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-                {[
-                  { icon: 'shield-shaded', label: 'Shield / Gear' },
-                  { icon: 'circle', label: 'Tires' },
-                  { icon: 'disc', label: 'Brakes' },
-                  { icon: 'gear-fill', label: 'Engine' },
-                  { icon: 'lightning-charge-fill', label: 'Electrical' },
-                  { icon: 'droplet-fill', label: 'Oils / Lubes' },
-                  { icon: 'bag-fill', label: 'Accessories' },
-                  { icon: 'fire', label: 'Exhaust' },
-                  { icon: 'tools', label: 'Suspension' },
-                  { icon: 'gear-wide-connected', label: 'Drivetrain' },
-                  { icon: 'fuel-pump-fill', label: 'Fuel' },
-                  { icon: 'speedometer2', label: 'Cockpit' },
-                  { icon: 'box-seam', label: 'Box / Parts' },
-                  { icon: 'tag-fill', label: 'Tag' },
-                ].map((item) => {
-                  const isSelected = newCatIcon === item.icon;
-                  return (
-                    <TouchableOpacity
-                      key={item.icon}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
-                        paddingHorizontal: 10,
-                        paddingVertical: 6,
-                        borderRadius: 8,
-                        borderWidth: 1.5,
-                        borderColor: isSelected ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                        backgroundColor: isSelected
-                          ? isDarkMode ? '#132A26' : '#FFF7ED'
-                          : isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                        cursor: 'pointer',
-                      }}
-                      onPress={() => setNewCatIcon(item.icon)}
-                    >
-                      <BootstrapIcon
-                        name={item.icon}
-                        size={13}
-                        color={isSelected ? '#EA580C' : isDarkMode ? tokens.textMuted : '#64748B'}
-                      />
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: isSelected ? '700' : '500',
-                          color: isSelected ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#334155',
-                        }}
-                      >
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
+                    </>
                   );
-                })}
+                })()}
               </View>
 
-              <Text style={styles.formLabel}>Cover Image URL (Optional)</Text>
-              <TextInput
-                style={styles.formInput}
-                value={newCatImage}
-                onChangeText={setNewCatImage}
-                placeholder="https://... (or leave blank to use iconic category icon)"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
-              />
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.quickStoreBtn}
-                onPress={() => {
-                  if (!isSavingCategory) setIsAddCategoryModalOpen(false);
-                }}
-                disabled={isSavingCategory}
-              >
-                <Text style={styles.quickStoreBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.addBtnPrimary, isSavingCategory && { opacity: 0.7 }]}
-                onPress={handleAddCategory}
-                disabled={isSavingCategory}
-              >
-                <BootstrapIcon name="check-lg" size={14} color="#FFFFFF" />
-                <Text style={styles.addBtnPrimaryText}>
-                  {isSavingCategory ? 'Creating Category...' : 'Create Category'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL 1: ADD NEW PRODUCT ─── */}
-      <Modal
-        visible={isAddProductOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsAddProductOpen(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Performance Part SKU</Text>
-              <TouchableOpacity onPress={() => setIsAddProductOpen(false)}>
-                <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody}>
-              <Text style={styles.formLabel}>Part Name</Text>
-              <TextInput
-                style={styles.formInput}
-                value={newProdName}
-                onChangeText={setNewProdName}
-                placeholder="e.g. Akrapovič Slip-On Exhaust"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-
-              <Text style={styles.formLabel}>Brand Name</Text>
-              <TextInput
-                style={styles.formInput}
-                value={newProdBrand}
-                onChangeText={setNewProdBrand}
-                placeholder="e.g. Brembo, Öhlins, Akrapovič"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Cost / Purchase (₱)</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    keyboardType="numeric"
-                    value={newProdCost}
-                    onChangeText={setNewProdCost}
-                    placeholder="25000"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Selling Price (₱)</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    keyboardType="numeric"
-                    value={newProdPrice}
-                    onChangeText={setNewProdPrice}
-                    placeholder="39000"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Initial Stock</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    keyboardType="numeric"
-                    value={newProdStock}
-                    onChangeText={setNewProdStock}
-                    placeholder="15"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-              </View>
-              {Number(newProdPrice) > 0 && (
-                Number(newProdCost || 0) > 0 ? (
-                  <Text style={{ fontSize: 12, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '700', marginBottom: 8 }}>
-                    Profit per unit: ₱
-                    {(Number(newProdPrice) - Number(newProdCost || 0)).toLocaleString()} (
-                    {(
-                      ((Number(newProdPrice) - Number(newProdCost || 0)) / Number(newProdPrice)) *
-                      100
-                    ).toFixed(1)}
-                    % margin)
-                  </Text>
-                ) : (
-                  <Text style={{ fontSize: 12, color: isDarkMode ? '#FBBF24' : '#D97706', fontWeight: '700', marginBottom: 8 }}>
-                    ⚠️ Enter purchase cost above to calculate accurate profit & margin
-                  </Text>
-                )
-              )}
-
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={styles.formLabel}>Category</Text>
-                <TouchableOpacity
-                  onPress={() => setIsAddCategoryModalOpen(true)}
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: 6 }}
-                  activeOpacity={0.7}
-                >
-                  <BootstrapIcon name="plus-circle-fill" size={12} color="#EA580C" />
-                  <Text style={{ color: '#EA580C', fontSize: 12, fontWeight: '700' }}>+ New Category</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                {availableCategoryNames.filter((c) => c !== 'All').map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[styles.filterPill, newProdCategory === cat && styles.filterPillActive]}
-                    onPress={() => setNewProdCategory(cat)}
-                  >
-                    <Text
-                      style={[styles.filterPillText, newProdCategory === cat && styles.filterPillTextActive]}
-                    >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <ProductSizesEditor
-                sizes={newProdSizes}
-                basePrice={parseFloat(newProdPrice) || 0}
-                onChange={setNewProdSizes}
-                formInputStyle={styles.formInput}
-                formLabelStyle={styles.formLabel}
-                productKey={isAddProductOpen ? 'new-open' : 'new-closed'}
-              />
-
-              <ProductColorsEditor
-                colors={newProdColors}
-                onChange={setNewProdColors}
-                formInputStyle={styles.formInput}
-                formLabelStyle={styles.formLabel}
-                onToast={showToast}
-                productKey={isAddProductOpen ? 'new-open' : 'new-closed'}
-              />
-
-              <Text style={[styles.formLabel, { marginTop: 8 }]}>Compatible Motorcycles</Text>
-              <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 8 }}>
-                Save the product first, then open Edit to select compatible motorcycle models.
-              </Text>
-
-              {/* Image Selection: File Picker / URL / Presets */}
-              <Text style={styles.formLabel}>Product Image</Text>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  gap: 14,
-                  alignItems: 'center',
-                  marginBottom: 12,
-                  padding: 12,
-                  backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: tokens.border,
-                }}
-              >
-                <View style={{ flex: 1, gap: 6 }}>
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 8,
-                      backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
-                      paddingVertical: 10,
-                      paddingHorizontal: 14,
-                      borderRadius: 10,
-                    }}
-                    onPress={async () => {
-                      const res = await pickImageFromFile();
-                      if (res.success && res.uri) {
-                        setNewProdImage(res.uri);
-                        showToast('Image selected from device files!');
-                      } else if (res.error && res.error !== 'Selection cancelled') {
-                        showAlert('Image Picker', res.error);
-                      }
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <BootstrapIcon name="folder2-open" size={15} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
-                      Choose Image from File
-                    </Text>
-                  </TouchableOpacity>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                    Upload PNG, JPG, WEBP from your local PC or phone
-                  </Text>
-                </View>
-              </View>
-
-              <Text style={[styles.formLabel, { fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B' }]}>
-                Or Paste Direct Image URL
-              </Text>
-              <TextInput
-                style={styles.formInput}
-                value={newProdImage}
-                onChangeText={setNewProdImage}
-                placeholder="https://..."
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.quickStoreBtn} onPress={() => setIsAddProductOpen(false)}>
-                <Text style={styles.quickStoreBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.addBtnPrimary} onPress={handleCreateProduct}>
-                <Text style={styles.addBtnPrimaryText}>Save Product to Inventory</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL 2: EDIT PRODUCT ─── */}
-      {editingProduct && (
-        <Modal
-          visible={Boolean(editingProduct)}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setEditingProduct(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalSheet}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Edit Product Part</Text>
-                <TouchableOpacity onPress={() => setEditingProduct(null)}>
-                  <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView style={styles.modalBody}>
-                <Text style={styles.formLabel}>Part Name</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={editingProduct.name}
-                  onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, name: val }))}
-                />
-
-                <Text style={styles.formLabel}>Brand</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={editingProduct.brand}
-                  onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, brand: val }))}
-                />
-
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>Cost / Purchase (₱)</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      keyboardType="numeric"
-                      value={String(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0)}
-                      onChangeText={(val) => {
-                        const cost = parseFloat(val) || 0;
-                        setEditingProduct((prev) => ({
-                          ...prev,
-                          unit_cost: cost,
-                          unitCost: cost,
-                        }));
-                      }}
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>Selling Price (₱)</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      keyboardType="numeric"
-                      value={String(editingProduct.price)}
-                      onChangeText={(val) =>
-                        setEditingProduct((prev) => ({ ...prev, price: parseFloat(val) || 0 }))
-                      }
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>Stock</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      keyboardType="numeric"
-                      value={String(editingProduct.stock)}
-                      onChangeText={(val) =>
-                        setEditingProduct((prev) => ({ ...prev, stock: parseInt(val, 10) || 0 }))
-                      }
-                    />
-                  </View>
-                </View>
-                {Number(editingProduct.price) > 0 && (
-                  Number(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0) > 0 ? (
-                    <Text style={{ fontSize: 12, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '700', marginBottom: 8 }}>
-                      Profit per unit: ₱
-                      {(
-                        Number(editingProduct.price) -
-                        Number(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0)
-                      ).toLocaleString()}{' '}
-                      (
-                      {(
-                        ((Number(editingProduct.price) -
-                          Number(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0)) /
-                          Number(editingProduct.price)) *
-                        100
-                      ).toFixed(1)}
-                      % margin)
-                    </Text>
-                  ) : (
-                    <Text style={{ fontSize: 12, color: isDarkMode ? '#FBBF24' : '#D97706', fontWeight: '700', marginBottom: 8 }}>
-                      ⚠️ Enter purchase cost above to calculate accurate profit & margin
-                    </Text>
-                  )
-                )}
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={styles.formLabel}>Category</Text>
-                  <TouchableOpacity
-                    onPress={() => setIsAddCategoryModalOpen(true)}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: 6 }}
-                    activeOpacity={0.7}
-                  >
-                    <BootstrapIcon name="plus-circle-fill" size={12} color="#EA580C" />
-                    <Text style={{ color: '#EA580C', fontSize: 12, fontWeight: '700' }}>+ New Category</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-                  {availableCategoryNames.filter((c) => c !== 'All').map((cat) => (
-                    <TouchableOpacity
-                      key={cat}
-                      style={[
-                        styles.filterPill,
-                        (editingProduct.category || '').toLowerCase() === cat.toLowerCase() && styles.filterPillActive,
-                      ]}
-                      onPress={() => setEditingProduct((prev) => ({ ...prev, category: cat }))}
-                    >
-                      <Text
-                        style={[
-                          styles.filterPillText,
-                          (editingProduct.category || '').toLowerCase() === cat.toLowerCase() && styles.filterPillTextActive,
-                        ]}
-                      >
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-
-                <ProductSizesEditor
-                  sizes={editingProduct.sizes || []}
-                  basePrice={Number(editingProduct.price) || 0}
-                  onChange={(next) => setEditingProduct((prev) => ({ ...prev, sizes: next }))}
-                  formInputStyle={styles.formInput}
-                  formLabelStyle={styles.formLabel}
-                  productKey={editingProduct.id || editingProduct.product_id || 'edit'}
-                />
-
-                <ProductColorsEditor
-                  colors={editingProduct.colors || []}
-                  onChange={(next) => setEditingProduct((prev) => ({ ...prev, colors: next }))}
-                  formInputStyle={styles.formInput}
-                  formLabelStyle={styles.formLabel}
-                  onToast={showToast}
-                  productKey={editingProduct.id || editingProduct.product_id || 'edit'}
-                />
-
-                <ProductCompatibilityPicker
-                  productId={editingProduct.id || editingProduct.product_id}
-                  onToast={showToast}
-                  isDarkMode={isDarkMode}
-                />
-
-                {/* Edit Product Image with File Picker */}
-                <Text style={styles.formLabel}>Product Image</Text>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    gap: 14,
-                    alignItems: 'center',
-                    marginBottom: 12,
-                    padding: 12,
-                    backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
-                    borderRadius: 14,
-                    borderWidth: 1,
-                    borderColor: tokens.border,
-                  }}
-                >
-                  <Image
-                    source={{
-                      uri:
-                        editingProduct.image ||
-                        'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
-                    }}
-                    style={{
-                      width: 68,
-                      height: 68,
-                      borderRadius: 12,
-                      backgroundColor: '#E2E8F0',
-                      borderWidth: 1.5,
-                      borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
-                    }}
-                    resizeMode="cover"
-                  />
-                  <View style={{ flex: 1, gap: 6 }}>
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 8,
-                        backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
-                        paddingVertical: 10,
-                        paddingHorizontal: 14,
-                        borderRadius: 10,
-                      }}
-                      onPress={async () => {
-                        const res = await pickImageFromFile();
-                        if (res.success && res.uri) {
-                          setEditingProduct((prev) => ({ ...prev, image: res.uri }));
-                          showToast('Image updated from file!');
-                        } else if (res.error && res.error !== 'Selection cancelled') {
-                          showAlert('Image Picker', res.error);
-                        }
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <BootstrapIcon name="folder2-open" size={15} color="#FFFFFF" />
-                      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
-                        Choose New Image File
-                      </Text>
-                    </TouchableOpacity>
-                    <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                      Pick replacement image from your computer or phone
-                    </Text>
-                  </View>
-                </View>
-
-                <Text style={[styles.formLabel, { fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B' }]}>Or Paste Image URL</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={editingProduct.image || ''}
-                  onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, image: val }))}
-                  placeholder="https://..."
-                  placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                />
-
-                <Text style={styles.formLabel}>Description</Text>
-                <TextInput
-                  style={[styles.formInput, { height: 60 }]}
-                  multiline
-                  value={editingProduct.description}
-                  onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, description: val }))}
-                />
-              </ScrollView>
-
-              <View style={styles.modalFooter}>
-                <TouchableOpacity style={styles.quickStoreBtn} onPress={() => setEditingProduct(null)}>
-                  <Text style={styles.quickStoreBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveProductEdit}>
-                  <Text style={styles.addBtnPrimaryText}>Save Changes</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* ─── MODAL 3: SUPPLIER PURCHASE / RESTOCK (same form style as Add Product) ─── */}
-      <Modal
-        visible={isRestockModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={closeRestockModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxWidth: 560 }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Purchase from Supplier</Text>
-              <TouchableOpacity onPress={closeRestockModal}>
-                <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
-              <Text style={styles.formLabel}>Select Product SKU</Text>
-              <TextInput
-                style={styles.formInput}
-                value={restockSearchQuery}
-                onChangeText={setRestockSearchQuery}
-                placeholder="Search by name, brand, or category…"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-
-              {!restockModalProduct || restockSearchQuery.trim() ? (
-                <View
-                  style={{
-                    maxHeight: 180,
-                    borderWidth: 1,
-                    borderColor: tokens.border,
-                    borderRadius: 12,
-                    marginBottom: 12,
-                    overflow: 'hidden',
-                  }}
-                >
-                  <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
-                    {(products || [])
-                      .filter((p) => {
-                        const q = restockSearchQuery.toLowerCase().trim();
-                        if (!q) return true;
-                        return (
-                          (p.name || '').toLowerCase().includes(q) ||
-                          (p.brand || '').toLowerCase().includes(q) ||
-                          (p.category || '').toLowerCase().includes(q)
-                        );
-                      })
-                      .slice(0, 12)
-                      .map((p) => (
-                        <TouchableOpacity
-                          key={p.id || p.product_id}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 10,
-                            paddingHorizontal: 12,
-                            paddingVertical: 10,
-                            borderBottomWidth: 1,
-                            borderBottomColor: tokens.border,
-                            backgroundColor:
-                              restockModalProduct?.id === p.id
-                                ? (isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#FFF7ED')
-                                : (isDarkMode ? '#141A18' : '#FFFFFF'),
-                          }}
-                          onPress={() => selectRestockProduct(p)}
-                          activeOpacity={0.85}
-                        >
-                          <Image
-                            source={{
-                              uri:
-                                p.image ||
-                                'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=200&q=80',
-                            }}
-                            style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: isDarkMode ? tokens.bgSub : '#E2E8F0' }}
-                          />
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 13, fontWeight: '600', color: tokens.textPrimary }} numberOfLines={1}>
-                              {p.name}
-                            </Text>
-                            <Text style={{ fontSize: 11, color: tokens.textMuted }} numberOfLines={1}>
-                              {p.brand} · Stock {p.stock || 0} · ₱{Number(p.price || 0).toLocaleString()}
-                            </Text>
-                          </View>
-                          <BootstrapIcon name="plus-circle" size={16} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
-                        </TouchableOpacity>
-                      ))}
-                  </ScrollView>
-                </View>
-              ) : null}
-
-              {restockModalProduct ? (
-                <>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      gap: 14,
-                      alignItems: 'center',
-                      marginBottom: 14,
-                      padding: 12,
-                      backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
-                      borderRadius: 14,
-                      borderWidth: 1,
-                      borderColor: tokens.border,
-                    }}
-                  >
-                    <Image
-                      source={{
-                        uri:
-                          restockModalProduct.image ||
-                          'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=200&q=80',
-                      }}
-                      style={{
-                        width: 68,
-                        height: 68,
-                        borderRadius: 12,
-                        backgroundColor: isDarkMode ? tokens.bgSub : '#E2E8F0',
-                        borderWidth: 1.5,
-                        borderColor: tokens.borderInput,
-                      }}
-                      resizeMode="cover"
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 15, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                        {restockModalProduct.name}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
-                        {restockModalProduct.brand} · {restockModalProduct.category}
-                      </Text>
-                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '700', marginTop: 4 }}>
-                        Current stock: {restockModalProduct.stock || 0} · Cost ₱
-                        {Number(
-                          restockModalProduct.unit_cost ?? restockModalProduct.unitCost ?? 0
-                        ).toLocaleString()}{' '}
-                        · Price ₱{Number(restockModalProduct.price || 0).toLocaleString()}
-                      </Text>
-                      <TouchableOpacity
-                        onPress={() => {
-                          setRestockModalProduct(null);
-                          setRestockSizeAdds([]);
-                          setRestockSelectedSize('');
-                          setRestockColorAdds([]);
-                          setRestockSelectedColor('');
-                          setRestockSearchQuery('');
-                        }}
-                        style={{ marginTop: 6 }}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.statusWarningText : '#B45309' }}>
-                          Change product
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <Text style={styles.formLabel}>Supplier</Text>
-                  <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
-                    <TouchableOpacity
-                      style={[styles.filterPill, !restockSupplierId && styles.filterPillActive]}
-                      onPress={() => setRestockSupplierId('')}
-                    >
-                      <Text
-                        style={[
-                          styles.filterPillText,
-                          !restockSupplierId && styles.filterPillTextActive,
-                        ]}
-                      >
-                        No supplier
-                      </Text>
-                    </TouchableOpacity>
-                    {(suppliers || []).slice(0, 12).map((s) => {
-                      const sid = s.supplier_id || s.id;
-                      return (
-                        <TouchableOpacity
-                          key={sid}
-                          style={[
-                            styles.filterPill,
-                            restockSupplierId === sid && styles.filterPillActive,
-                          ]}
-                          onPress={() => setRestockSupplierId(sid)}
-                        >
-                          <Text
-                            style={[
-                              styles.filterPillText,
-                              restockSupplierId === sid && styles.filterPillTextActive,
-                            ]}
-                          >
-                            {s.name}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-
-                  {/* ─── SIZE PICKER SECTION (if product has sizes) ─── */}
-                  {(() => {
-                    const availSizes = normalizeProductSizes(restockModalProduct);
-                    if (!availSizes.length) return null;
-
-                    return (
-                      <View style={{ marginBottom: 12 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <Text style={styles.formLabel}>Select Size to Restock</Text>
-                          <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                            {availSizes.length} variant{availSizes.length !== 1 ? 's' : ''} available
-                          </Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                          {availSizes.map((sz) => {
-                            const isSelected = restockSelectedSize === sz.label;
-                            const currentStock =
-                              sz.stock === null || sz.stock === undefined
-                                ? Number(restockModalProduct.stock || 0)
-                                : Number(sz.stock || 0);
-                            return (
-                              <TouchableOpacity
-                                key={sz.label}
-                                style={[
-                                  styles.filterPill,
-                                  isSelected && styles.filterPillActive,
-                                  {
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 6,
-                                    paddingVertical: 7,
-                                    paddingHorizontal: 12,
-                                    borderRadius: 10,
-                                    borderColor: isSelected ? '#EA580C' : tokens.borderInput,
-                                    borderWidth: 1.5,
-                                    backgroundColor: isSelected ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
-                                  },
-                                ]}
-                                onPress={() => {
-                                  setRestockSelectedSize(sz.label);
-                                  if (sz.price) {
-                                    setRestockSellPrice(String(sz.price));
-                                  }
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 13,
-                                    fontWeight: '600',
-                                    color: isSelected ? '#FFFFFF' : tokens.textPrimary,
-                                  }}
-                                >
-                                  {sz.label}
-                                </Text>
-                                <View
-                                  style={{
-                                    backgroundColor: isSelected ? 'rgba(255,255,255,0.22)' : '#E2E8F0',
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 2,
-                                    borderRadius: 6,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 10,
-                                      fontWeight: '700',
-                                      color: isSelected ? '#FFFFFF' : '#475569',
-                                    }}
-                                  >
-                                    {currentStock} in stock
-                                  </Text>
-                                </View>
-                              </TouchableOpacity>
-                            );
-                          })}
-                          <TouchableOpacity
-                            style={[
-                              styles.filterPill,
-                              restockSelectedSize === 'all' && styles.filterPillActive,
-                              {
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 6,
-                                paddingVertical: 7,
-                                paddingHorizontal: 12,
-                                borderRadius: 10,
-                                borderColor: restockSelectedSize === 'all' ? '#EA580C' : tokens.borderInput,
-                                borderWidth: 1.5,
-                                backgroundColor: restockSelectedSize === 'all' ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
-                              },
-                            ]}
-                            onPress={() => setRestockSelectedSize('all')}
-                          >
-                            <BootstrapIcon
-                              name="grid-3x3-gap-fill"
-                              size={12}
-                              color={restockSelectedSize === 'all' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
-                            />
-                            <Text
-                              style={{
-                                fontSize: 13,
-                                fontWeight: '600',
-                                color: restockSelectedSize === 'all' ? '#FFFFFF' : '#0F172A',
-                              }}
-                            >
-                              All Sizes (Multi-restock)
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-
-                        {restockSelectedSize && restockSelectedSize !== 'all' && (() => {
-                          const activeSize = availSizes.find((s) => s.label === restockSelectedSize);
-                          const curStock =
-                            activeSize?.stock === null || activeSize?.stock === undefined
-                              ? Number(restockModalProduct.stock || 0)
-                              : Number(activeSize?.stock || 0);
-                          const addQty = parseInt(restockAmount, 10) || 0;
-                          return (
-                            <View
-                              style={{
-                                marginTop: 8,
-                                paddingHorizontal: 12,
-                                paddingVertical: 8,
-                                borderRadius: 8,
-                                backgroundColor: '#FFF7ED',
-                                borderWidth: 1,
-                                borderColor: '#FED7AA',
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                              }}
-                            >
-                              <Text style={{ fontSize: 12, color: '#0F766E', fontWeight: '700' }}>
-                                Restocking: <Text style={{ fontWeight: '600' }}>{restockSelectedSize}</Text> (Current: {curStock} units)
-                              </Text>
-                              <Text style={{ fontSize: 12, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '600' }}>
-                                → Will become: {curStock + addQty} units
-                              </Text>
-                            </View>
-                          );
-                        })()}
-                      </View>
-                    );
-                  })()}
-
-                  {/* ─── COLOR PICKER SECTION (if product has colors and no sizes) ─── */}
-                  {(() => {
-                    const availColors = normalizeProductColors(restockModalProduct);
-                    const availSizes = normalizeProductSizes(restockModalProduct);
-                    // Only show color picker when there are colors and no sizes (sizes take priority)
-                    if (!availColors.length || availSizes.length > 0) return null;
-                    return (
-                      <View style={{ marginBottom: 12 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                          <Text style={styles.formLabel}>Select Color to Restock</Text>
-                          <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                            {availColors.length} color{availColors.length !== 1 ? 's' : ''} available
-                          </Text>
-                        </View>
-                        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-                          {availColors.map((c) => {
-                            const isSelected = restockSelectedColor === c.label;
-                            const currentStock =
-                              c.stock === null || c.stock === undefined
-                                ? Number(restockModalProduct.stock || 0)
-                                : Number(c.stock || 0);
-                            return (
-                              <TouchableOpacity
-                                key={c.label}
-                                style={[
-                                  styles.filterPill,
-                                  isSelected && styles.filterPillActive,
-                                  {
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 6,
-                                    paddingVertical: 7,
-                                    paddingHorizontal: 12,
-                                    borderRadius: 10,
-                                    borderColor: isSelected ? '#EA580C' : tokens.borderInput,
-                                    borderWidth: 1.5,
-                                    backgroundColor: isSelected ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
-                                  },
-                                ]}
-                                onPress={() => setRestockSelectedColor(c.label)}
-                              >
-                                {/* Color swatch */}
-                                {c.image ? (
-                                  <Image
-                                    source={{ uri: c.image }}
-                                    style={{
-                                      width: 18,
-                                      height: 18,
-                                      borderRadius: 4,
-                                      borderWidth: 1,
-                                      borderColor: 'rgba(0,0,0,0.12)',
-                                    }}
-                                    resizeMode="cover"
-                                  />
-                                ) : c.hex ? (
-                                  <View
-                                    style={{
-                                      width: 14,
-                                      height: 14,
-                                      borderRadius: 3,
-                                      backgroundColor: c.hex,
-                                      borderWidth: 1,
-                                      borderColor: 'rgba(0,0,0,0.15)',
-                                    }}
-                                  />
-                                ) : null}
-                                <Text
-                                  style={{
-                                    fontSize: 13,
-                                    fontWeight: '600',
-                                    color: isSelected ? '#FFFFFF' : tokens.textPrimary,
-                                  }}
-                                >
-                                  {c.label}
-                                </Text>
-                                <View
-                                  style={{
-                                    backgroundColor: isSelected ? 'rgba(255,255,255,0.22)' : '#E2E8F0',
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 2,
-                                    borderRadius: 6,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 10,
-                                      fontWeight: '700',
-                                      color: isSelected ? '#FFFFFF' : '#475569',
-                                    }}
-                                  >
-                                    {currentStock} in stock
-                                  </Text>
-                                </View>
-                              </TouchableOpacity>
-                            );
-                          })}
-                          {/* All Colors button */}
-                          <TouchableOpacity
-                            style={[
-                              styles.filterPill,
-                              restockSelectedColor === 'all' && styles.filterPillActive,
-                              {
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 6,
-                                paddingVertical: 7,
-                                paddingHorizontal: 12,
-                                borderRadius: 10,
-                                borderColor: restockSelectedColor === 'all' ? '#EA580C' : tokens.borderInput,
-                                borderWidth: 1.5,
-                                backgroundColor: restockSelectedColor === 'all' ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
-                              },
-                            ]}
-                            onPress={() => setRestockSelectedColor('all')}
-                          >
-                            <BootstrapIcon
-                              name="grid-3x3-gap-fill"
-                              size={12}
-                              color={restockSelectedColor === 'all' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
-                            />
-                            <Text
-                              style={{
-                                fontSize: 13,
-                                fontWeight: '600',
-                                color: restockSelectedColor === 'all' ? '#FFFFFF' : tokens.textPrimary,
-                              }}
-                            >
-                              All Colors (Multi-restock)
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-
-                        {restockSelectedColor && restockSelectedColor !== 'all' && (() => {
-                          const activeColor = availColors.find((c) => c.label === restockSelectedColor);
-                          const curStock =
-                            activeColor?.stock === null || activeColor?.stock === undefined
-                              ? Number(restockModalProduct.stock || 0)
-                              : Number(activeColor?.stock || 0);
-                          const addQty = parseInt(restockAmount, 10) || 0;
-                          return (
-                            <View
-                              style={{
-                                marginTop: 8,
-                                paddingHorizontal: 12,
-                                paddingVertical: 8,
-                                borderRadius: 8,
-                                backgroundColor: '#FFF7ED',
-                                borderWidth: 1,
-                                borderColor: '#FED7AA',
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                              }}
-                            >
-                              <Text style={{ fontSize: 12, color: '#0F766E', fontWeight: '700' }}>
-                                Restocking: <Text style={{ fontWeight: '600' }}>{restockSelectedColor}</Text> (Current: {curStock} units)
-                              </Text>
-                              <Text style={{ fontSize: 12, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '600' }}>
-                                → Will become: {curStock + addQty} units
-                              </Text>
-                            </View>
-                          );
-                        })()}
-                      </View>
-                    );
-                  })()}
-
-                  {/* ─── QUANTITY SECTION ─── */}
-                  {(() => {
-                    const availSizes = normalizeProductSizes(restockModalProduct);
-                    const availColors = normalizeProductColors(restockModalProduct);
-                    const hasSizesQ = availSizes.length > 0;
-                    const hasColorsQ = availColors.length > 0 && !hasSizesQ;
-                    const isAll = hasSizesQ && restockSelectedSize === 'all';
-                    const isAllColors = hasColorsQ && restockSelectedColor === 'all';
-
-                    if (isAllColors) {
-                      return (
-                        <>
-                          <Text style={styles.formLabel}>Restock by color (add units)</Text>
-                          <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 8 }}>
-                            Enter how many units to add for each color.
-                          </Text>
-                          {restockColorAdds.map((row, idx) => (
-                            <View
-                              key={row.label}
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 8,
-                                marginBottom: 8,
-                              }}
-                            >
-                              <View style={{ flex: 1.2 }}>
-                                {row.hex ? (
-                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                    <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: row.hex, borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)' }} />
-                                    <Text style={{ fontSize: 13, fontWeight: '500', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>{row.label}</Text>
-                                  </View>
-                                ) : (
-                                  <Text style={{ fontSize: 13, fontWeight: '500', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>{row.label}</Text>
-                                )}
-                                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>Now: {row.currentStock}</Text>
-                              </View>
-                              <TextInput
-                                style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
-                                keyboardType="numeric"
-                                value={row.addQty}
-                                placeholder="+ qty"
-                                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                                onChangeText={(val) => {
-                                  setRestockColorAdds((prev) =>
-                                    prev.map((r, i) => (i === idx ? { ...r, addQty: val } : r))
-                                  );
-                                }}
-                              />
-                            </View>
-                          ))}
-                          <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
-                            {[5, 10, 25].map((qty) => (
-                              <TouchableOpacity
-                                key={qty}
-                                style={{
-                                  flex: 1,
-                                  backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
-                                  paddingVertical: 6,
-                                  borderRadius: 8,
-                                  alignItems: 'center',
-                                  borderWidth: 1,
-                                  borderColor: isDarkMode ? tokens.chipBorder : '#FDE68A',
-                                }}
-                                onPress={() =>
-                                  setRestockColorAdds((prev) =>
-                                    prev.map((r) => ({ ...r, addQty: String(qty) }))
-                                  )
-                                }
-                              >
-                                <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
-                                  +{qty} all
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        </>
-                      );
-                    }
-
-                    if (isAll) {
-                      return (
-                        <>
-                          <Text style={styles.formLabel}>Restock by size (add units)</Text>
-                          <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 8 }}>
-                            Enter how many units to add for each size.
-                          </Text>
-                          {restockSizeAdds.map((row, idx) => (
-                            <View
-                              key={row.label}
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 8,
-                                marginBottom: 8,
-                              }}
-                            >
-                              <View style={{ flex: 1.2 }}>
-                                <Text style={{ fontSize: 13, fontWeight: '500', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                                  {row.label}
-                                </Text>
-                                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                                  Now: {row.currentStock}
-                                </Text>
-                              </View>
-                              <TextInput
-                                style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
-                                keyboardType="numeric"
-                                value={row.addQty}
-                                placeholder="+ qty"
-                                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                                onChangeText={(val) => {
-                                  setRestockSizeAdds((prev) =>
-                                    prev.map((r, i) => (i === idx ? { ...r, addQty: val } : r))
-                                  );
-                                }}
-                              />
-                            </View>
-                          ))}
-                          <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
-                            {[5, 10, 25].map((qty) => (
-                              <TouchableOpacity
-                                key={qty}
-                                style={{
-                                  flex: 1,
-                                  backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
-                                  paddingVertical: 6,
-                                  borderRadius: 8,
-                                  alignItems: 'center',
-                                  borderWidth: 1,
-                                  borderColor: isDarkMode ? tokens.chipBorder : '#FDE68A',
-                                }}
-                                onPress={() =>
-                                  setRestockSizeAdds((prev) =>
-                                    prev.map((r) => ({ ...r, addQty: String(qty) }))
-                                  )
-                                }
-                              >
-                                <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
-                                  +{qty} all
-                                </Text>
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        </>
-                      );
-                    }
-
-                    return (
-                      <>
-                        <Text style={styles.formLabel}>Quantity purchased</Text>
-                        <TextInput
-                          style={[styles.formInput, { fontSize: 16, fontWeight: '500', color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}
-                          keyboardType="numeric"
-                          value={restockAmount}
-                          onChangeText={setRestockAmount}
-                          placeholder="10"
-                          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                        />
-                        <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
-                          {[5, 10, 25, 50].map((qty) => (
-                            <TouchableOpacity
-                              key={qty}
-                              style={{
-                                flex: 1,
-                                backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
-                                paddingVertical: 6,
-                                borderRadius: 8,
-                                alignItems: 'center',
-                                borderWidth: 1,
-                                borderColor: isDarkMode ? tokens.chipBorder : '#FDE68A',
-                              }}
-                              onPress={() => setRestockAmount(String(qty))}
-                            >
-                              <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
-                                +{qty}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      </>
-                    );
-                  })()}
-
-                  <View style={{ flexDirection: 'row', gap: 10 }}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.formLabel}>Cost / Purchase (₱)</Text>
-                      <TextInput
-                        style={styles.formInput}
-                        keyboardType="numeric"
-                        value={restockUnitCost}
-                        onChangeText={setRestockUnitCost}
-                        placeholder="What you paid the supplier"
-                        placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                      />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.formLabel}>Selling Price (₱)</Text>
-                      <TextInput
-                        style={styles.formInput}
-                        keyboardType="numeric"
-                        value={restockSellPrice}
-                        onChangeText={setRestockSellPrice}
-                        placeholder="Customer price"
-                        placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                      />
-                    </View>
-                  </View>
-
-                  {(() => {
-                    const availSizes = normalizeProductSizes(restockModalProduct);
-                    const availColors = normalizeProductColors(restockModalProduct);
-                    const hasSizesP = availSizes.length > 0;
-                    const hasColorsP = availColors.length > 0 && !hasSizesP;
-                    const isAll = hasSizesP && restockSelectedSize === 'all';
-                    const isAllColors = hasColorsP && restockSelectedColor === 'all';
-                    const sizeTotal = (restockSizeAdds || []).reduce(
-                      (sum, r) => sum + (parseInt(String(r.addQty || '0'), 10) || 0),
-                      0
-                    );
-                    const colorTotal = (restockColorAdds || []).reduce(
-                      (sum, r) => sum + (parseInt(String(r.addQty || '0'), 10) || 0),
-                      0
-                    );
-                    const qty = isAll ? sizeTotal : isAllColors ? colorTotal : Number(restockAmount) || 0;
-                    const cost = Number(restockUnitCost) || 0;
-                    const price = Number(restockSellPrice) || 0;
-                    const expense = qty * cost;
-                    const profitUnit = price - cost;
-                    const expected = profitUnit * qty;
-                    const margin = price > 0 ? (profitUnit / price) * 100 : 0;
-                    if (qty <= 0 && price <= 0) return null;
-                    return (
-                      <View
-                        style={{
-                          marginTop: 8,
-                          marginBottom: 8,
-                          padding: 12,
-                          borderRadius: 12,
-                          backgroundColor: '#FFF7ED',
-                          borderWidth: 1,
-                          borderColor: '#99F6E4',
-                          gap: 6,
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F766E' }}>
-                          Expense & Profit preview
-                        </Text>
-                        {Number(price) > 0 && (
-                          <Text style={{ fontSize: 12, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '700' }}>
-                            Profit per unit: ₱{profitUnit.toLocaleString()} ({margin.toFixed(1)}%
-                            margin)
-                          </Text>
-                        )}
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? tokens.statusWarningText : '#B45309' }}>
-                          Expense (paid to supplier): ₱{expense.toLocaleString()}
-                        </Text>
-                        <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#475569' }}>
-                          If all {qty || 0} units sell: ₱{expected.toLocaleString()} profit
-                        </Text>
-                      </View>
-                    );
-                  })()}
-                </>
-              ) : (
-                <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 4, marginBottom: 12 }}>
-                  Pick a product above — same flow as adding stock when creating an SKU, then enter
-                  quantity and cost.
-                </Text>
-              )}
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.quickStoreBtn} onPress={closeRestockModal}>
-                <Text style={styles.quickStoreBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.addBtnPrimary, !restockModalProduct && { opacity: 0.5 }]}
-                onPress={handleExecuteRestock}
-                disabled={!restockModalProduct}
-              >
-                <BootstrapIcon name="box-arrow-in-down" size={14} color="#FFFFFF" />
-                <Text style={styles.addBtnPrimaryText}>Confirm Purchase</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── POS SIZE PICKER (tires / rims) ─── */}
-      {posSizePickerProduct && (
-        <Modal
-          visible={Boolean(posSizePickerProduct)}
-          transparent
-          animationType="fade"
-          onRequestClose={() => {
-            setPosSizePickerProduct(null);
-            setPosSelectedSize('');
-          }}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={[styles.modalSheet, { maxWidth: 420 }]}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select Size</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setPosSizePickerProduct(null);
-                    setPosSelectedSize('');
-                  }}
-                >
-                  <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.modalBody}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A', marginBottom: 4 }}>
-                  {posSizePickerProduct.name}
-                </Text>
-                <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 12 }}>
-                  Choose a size before adding to the POS cart.
-                </Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {getProductSizeEntries(posSizePickerProduct).map((entry) => {
-                    const soldOut = isSizeSoldOut(posSizePickerProduct, entry.label);
-                    const active = posSelectedSize === entry.label;
-                    return (
-                      <TouchableOpacity
-                        key={entry.label}
-                        disabled={soldOut}
-                        onPress={() => setPosSelectedSize(entry.label)}
-                        style={{
-                          paddingHorizontal: 12,
-                          paddingVertical: 8,
-                          borderRadius: 10,
-                          borderWidth: 1.5,
-                          borderColor: soldOut ? (isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#FECACA') : active ? '#EA580C' : tokens.border,
-                          backgroundColor: soldOut ? (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2') : active ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
-                          minWidth: 110,
-                          opacity: soldOut ? 0.7 : 1,
-                        }}
-                        activeOpacity={0.85}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: '500',
-                            color: soldOut ? (isDarkMode ? tokens.statusDangerText : '#991B1B') : active ? '#FFFFFF' : tokens.textPrimary,
-                            textDecorationLine: soldOut ? 'line-through' : 'none',
-                          }}
-                        >
-                          {entry.label}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            fontWeight: '700',
-                            marginTop: 2,
-                            color: soldOut ? '#DC2626' : active ? '#FED7AA' : '#EA580C',
-                          }}
-                        >
-                          {soldOut ? 'Sold Out' : `₱${Number(entry.price || 0).toLocaleString()}`}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-              <View style={styles.modalFooter}>
-                <TouchableOpacity
-                  style={styles.quickStoreBtn}
-                  onPress={() => {
-                    setPosSizePickerProduct(null);
-                    setPosSelectedSize('');
-                  }}
-                >
-                  <Text style={styles.quickStoreBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.addBtnPrimary, !posSelectedSize && { opacity: 0.5 }]}
-                  onPress={handlePOSConfirmSize}
-                  disabled={!posSelectedSize}
-                >
-                  <Text style={styles.addBtnPrimaryText}>Add to Cart</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* ─── MODAL 4: DIGITAL POS THERMAL RECEIPT ─── */}
-      {posReceiptOrder && (
-        <Modal
-          visible={Boolean(posReceiptOrder)}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setPosReceiptOrder(null)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.receiptSheet}>
-              <Text style={styles.receiptLogo}>MotoTrack Motorparts & Accessories</Text>
-              <Text style={styles.receiptSub}>Official Counter POS Sales Invoice</Text>
-              <Text style={styles.receiptSub}>
-                Receipt No: {posReceiptOrder.order_id} • {posReceiptOrder.order_date}
-              </Text>
-
-              <View style={styles.receiptDivider} />
-
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptText}>Customer:</Text>
-                <Text style={styles.receiptTextBold}>{posReceiptOrder.customer_name}</Text>
-              </View>
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptText}>Cashier:</Text>
-                <Text style={styles.receiptTextBold}>{posReceiptOrder.cashier || 'Admin Cashier'}</Text>
-              </View>
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptText}>Channel:</Text>
-                <Text style={styles.receiptTextBold}>Direct In-Store Counter</Text>
-              </View>
-
-              <View style={styles.receiptDivider} />
-
-              {/* Items */}
-              {(posReceiptOrder.items || []).map((it, idx) => (
-                <View key={idx} style={{ marginVertical: 3 }}>
-                  <Text style={[styles.receiptTextBold, { fontSize: 11.5 }]} numberOfLines={1}>
-                    {it.name}
-                  </Text>
-                  <View style={styles.receiptRow}>
-                    <Text style={styles.receiptText}>
-                      {' '}
-                      {it.quantity} x ₱{it.price?.toLocaleString()}
-                    </Text>
-                    <Text style={styles.receiptTextBold}>₱{(it.price * it.quantity).toLocaleString()}</Text>
-                  </View>
-                </View>
-              ))}
-
-              <View style={styles.receiptDivider} />
-
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptText}>Subtotal:</Text>
-                <Text style={styles.receiptTextBold}>₱{posReceiptOrder.total_amount?.toLocaleString()}</Text>
-              </View>
-
-              {posReceiptOrder.discount_amount > 0 && (
-                <View style={styles.receiptRow}>
-                  <Text style={[styles.receiptText, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>Voucher Discount:</Text>
-                  <Text style={[styles.receiptTextBold, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>
-                    -₱{posReceiptOrder.discount_amount?.toLocaleString()}
-                  </Text>
-                </View>
-              )}
-
-              <View style={[styles.receiptRow, { marginTop: 4 }]}>
-                <Text style={[styles.receiptTextBold, { fontSize: 14 }]}>TOTAL PAID:</Text>
-                <Text style={[styles.receiptTextBold, { fontSize: 16, color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}>
-                  ₱{posReceiptOrder.grand_total?.toLocaleString()}
-                </Text>
-              </View>
-
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptText}>Payment Method:</Text>
-                <Text style={styles.receiptTextBold}>{posReceiptOrder.payment_method}</Text>
-              </View>
-
-              {posReceiptOrder.payment_method === 'Cash' && (
-                <>
-                  <View style={styles.receiptRow}>
-                    <Text style={styles.receiptText}>Tendered:</Text>
-                    <Text style={styles.receiptTextBold}>
-                      ₱{posReceiptOrder.amount_tendered?.toLocaleString()}
-                    </Text>
-                  </View>
-                  <View style={styles.receiptRow}>
-                    <Text style={styles.receiptText}>Change Given:</Text>
-                    <Text style={[styles.receiptTextBold, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>
-                      ₱{posReceiptOrder.change_amount?.toLocaleString()}
-                    </Text>
-                  </View>
-                </>
-              )}
-
-              <View style={styles.receiptBarcode}>
-                <Text style={styles.receiptBarcodeText}>|||||||| | ||||| |||| | |||||||</Text>
-              </View>
-
-              <Text style={[styles.receiptSub, { marginTop: 6 }]}>
-                Thank you for choosing MotoTrack! Drive safe.
-              </Text>
-
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-                <TouchableOpacity
-                  style={[styles.addBtnPrimary, { flex: 1, justifyContent: 'center' }]}
-                  onPress={() => {
-                    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                      window.print?.();
-                    }
-                    setPosReceiptOrder(null);
-                  }}
-                >
-                  <BootstrapIcon name="printer-fill" size={14} color="#FFFFFF" />
-                  <Text style={styles.addBtnPrimaryText}>Print / Close</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* ─── MODAL: MANAGE BOOKING / WORK ORDER ─── */}
-      {selectedBookingForModal && (
-        <Modal
-          visible={isBookingModalOpen}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setIsBookingModalOpen(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View
-              style={[
-                styles.modalSheet,
-                {
-                  maxWidth: 860,
-                  maxHeight: '92%',
-                  borderRadius: 24,
-                  overflow: 'hidden',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
-                  borderWidth: 1,
-                  borderColor: isDarkMode ? tokens.border : '#E2E8F0',
-                  shadowColor: '#000000',
-                  shadowOffset: { width: 0, height: 12 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 28,
-                  elevation: 12,
-                },
-              ]}
-            >
-              {/* Fixed Modal Header */}
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  paddingHorizontal: 20,
-                  paddingVertical: 10,
-                  borderBottomWidth: 1,
-                  borderBottomColor: isDarkMode ? tokens.border : '#E2E8F0',
-                  backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                  <View
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.chipBorder : '#FDE68A',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <BootstrapIcon name="tools" size={15} color="#B45309" />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A', letterSpacing: -0.3 }}>
-                        Work Order #{selectedBookingForModal.booking_id || selectedBookingForModal.id}
-                      </Text>
-                      <View
-                        style={{
-                          backgroundColor: selectedBookingForModal.status === 'Cancelled' ? '#FEF2F2' : '#ECFDF5',
-                          paddingHorizontal: 7,
-                          paddingVertical: 2,
-                          borderRadius: 5,
-                          borderWidth: 1,
-                          borderColor: selectedBookingForModal.status === 'Cancelled' ? '#FECACA' : '#A7F3D0',
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 10.5,
-                            fontWeight: '600',
-                            color: selectedBookingForModal.status === 'Cancelled' ? '#DC2626' : '#047857',
-                          }}
-                        >
-                          {selectedBookingForModal.status === 'Cancelled'
-                            ? 'DP Forfeited'
-                            : `20% DP ₱${(selectedBookingForModal.downpayment_amount !== undefined ? selectedBookingForModal.downpayment_amount : Math.round((selectedBookingForModal.pricePhp || 2500) * 0.20)).toLocaleString()} Paid (${selectedBookingForModal.downpayment_method || 'GCash'})`}
-                        </Text>
-                      </View>
-                    </View>
-
-                    <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '500', marginTop: 1 }}>
-                      {selectedBookingForModal.category || 'PMS'} Service Appointment •{' '}
-                      {selectedBookingForModal.branch?.replace('MotoTrack ', '') || 'D\'Blockchain Motorparts and Accessories'}
-                    </Text>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  onPress={() => setIsBookingModalOpen(false)}
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 7,
-                    backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
-                    borderWidth: 1,
-                    borderColor: isDarkMode ? tokens.border : '#E2E8F0',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <BootstrapIcon name="x-lg" size={12} color={isDarkMode ? tokens.textMuted : "#64748B"} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Organized Booking Details & Operational Workflow Modal */}
-              <AdminBookingDetailsPanel
-                booking={selectedBookingForModal}
-                onClose={() => setIsBookingModalOpen(false)}
-                onDeleteBooking={handleDeleteBooking}
-                mechanics={garageMechanics}
-                onToast={showToast}
-                isDarkMode={isDarkMode}
-                tokens={tokens}
-                showConfirm={showConfirm}
-                isDesktop={true}
-                onBookingUpdated={(next, list) => {
-                  if (Array.isArray(list)) setGarageBookings(list);
-                  if (next) {
-                    setSelectedBookingForModal(next);
-                    setEditBkStatus(next.status || editBkStatus);
-                    setEditBkMechanic(next.mechanic || editBkMechanic);
-                  } else {
-                    garageService.fetchBookings().then((fresh) => {
-                      if (Array.isArray(fresh)) {
-                        setGarageBookings(fresh);
-                        const id = selectedBookingForModal?.booking_id || selectedBookingForModal?.id;
-                        const found = fresh.find((b) => b.booking_id === id || b.id === id);
-                        if (found) {
-                          setSelectedBookingForModal(found);
-                          setEditBkStatus(found.status || editBkStatus);
-                        }
-                      }
-                    });
-                  }
-                }}
-              />
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* ─── MODAL: CREATE WALK-IN / NEW BOOKING ─── */}
-      <Modal
-        visible={isNewBookingModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsNewBookingModalOpen(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxWidth: 640, maxHeight: '90%' }]}>
-            <View style={styles.modalHeader}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                  }}
-                >
-                  <BootstrapIcon name="calendar-plus-fill" size={18} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                </View>
-                <View>
-                  <Text style={styles.modalTitle}>Book Walk-in / Phone-in Service</Text>
-                  <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                    Schedule new garage appointment and assign lift bay
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity onPress={() => setIsNewBookingModalOpen(false)}>
-                <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {/* Category selector */}
-              <Text style={styles.formLabel}>Service Type</Text>
+              {/* View Mode Toggle (List vs Grid) */}
               <View
                 style={{
                   flexDirection: 'row',
@@ -16421,2522 +11339,7615 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   borderRadius: 8,
                   padding: 3,
                   borderWidth: 1,
-                  borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                  marginBottom: 12,
+                  borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
                 }}
               >
-                {[
-                  { key: 'Repair', label: 'Mechanical Repair' },
-                  { key: 'PMS', label: 'Preventive Maintenance (PMS)' },
-                  { key: 'Installation', label: 'Installation' },
-                ].map((c) => {
-                  const isSelected = newBkCategory === c.key;
-                  return (
-                    <TouchableOpacity
-                      key={c.key}
-                      style={{
-                        flex: 1,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        paddingVertical: 7,
-                        borderRadius: 6,
-                        backgroundColor: isSelected ? '#EA580C' : 'transparent',
-                        boxShadow: isSelected ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                      onPress={() => {
-                        setNewBkCategory(c.key);
-                        const match = garageServices.find((pkg) => pkg.category === c.key);
-                        if (match) {
-                          setNewBkServiceTitle(match.title);
-                          setNewBkPrice(String(getPackagePricePhp(match) || match.pricePhp || ''));
-                        } else if (c.key === 'Repair') {
-                          setNewBkServiceTitle('Track Diagnostic & Mechanical Repair');
-                          setNewBkPrice('1500');
-                        } else if (c.key === 'PMS') {
-                          setNewBkServiceTitle('Pro Performance Full PMS');
-                          setNewBkPrice('3750');
-                        } else {
-                          setNewBkServiceTitle('Parts / Accessory Installation');
-                          setNewBkPrice('1500');
-                        }
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: isSelected ? '700' : '600',
-                          color: isSelected ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
-                          transition: 'color 0.15s ease',
-                        }}
-                      >
-                        {c.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Service Title & Price */}
-              <Text style={styles.formLabel}>Shop Service Package</Text>
-              <View style={{ gap: 8, marginBottom: 12 }}>
-                {garageServices
-                  .filter((pkg) => {
-                    if (!newBkCategory) return true;
-                    if (pkg.category === newBkCategory) return true;
-                    // Legacy packages labeled Customization map to Installation
-                    if (
-                      newBkCategory === 'Installation' &&
-                      /customization|tuning|install/i.test(String(pkg.category || ''))
-                    ) {
-                      return true;
-                    }
-                    return false;
-                  })
-                  .map((pkg) => {
-                    const selected = newBkServiceTitle === pkg.title;
-                    const price = getPackagePricePhp(pkg);
-                    return (
-                      <TouchableOpacity
-                        key={pkg.id || pkg.service_id}
-                        onPress={() => {
-                          setNewBkServiceTitle(pkg.title);
-                          setNewBkPrice(String(price));
-                          const pkgCat = pkg.category || newBkCategory;
-                          setNewBkCategory(
-                            /customization|tuning/i.test(String(pkgCat || ''))
-                              ? 'Installation'
-                              : pkgCat
-                          );
-                        }}
-                        style={{
-                          padding: 10,
-                          borderRadius: 10,
-                          borderWidth: 1.5,
-                          borderColor: selected ? '#EA580C' : tokens.border,
-                          backgroundColor: selected ? (isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#F0FDF4') : (isDarkMode ? tokens.bgSub : '#FFFFFF'),
-                        }}
-                      >
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: selected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : tokens.textPrimary, flex: 1 }}>
-                            {pkg.title}
-                          </Text>
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>₱{price.toLocaleString()}</Text>
-                        </View>
-                        <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
-                          {pkg.category} • {pkg.duration || '60 mins'}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-              </View>
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 2 }}>
-                  <Text style={styles.formLabel}>Service Package Name</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={newBkServiceTitle}
-                    onChangeText={setNewBkServiceTitle}
-                    placeholder="e.g. Pro Performance Full PMS"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Service Price (₱)</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    keyboardType="numeric"
-                    value={newBkPrice}
-                    onChangeText={setNewBkPrice}
-                    placeholder="3750"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-              </View>
-
-              {/* Customer Info */}
-              <Text style={[styles.formLabel, { marginTop: 4 }]}>Customer Full Name *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={newBkCustomerName}
-                onChangeText={setNewBkCustomerName}
-                placeholder="e.g. Juan dela Cruz"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Contact Phone</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={newBkCustomerPhone}
-                    onChangeText={setNewBkCustomerPhone}
-                    placeholder="+63 9XX XXX XXXX"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Email (Optional)</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={newBkCustomerEmail}
-                    onChangeText={setNewBkCustomerEmail}
-                    placeholder="juan@example.com"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              {/* Motorcycle Details */}
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Bike Brand</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={newBkBikeBrand}
-                    onChangeText={setNewBkBikeBrand}
-                    placeholder="Yamaha, Honda, Kawasaki..."
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Bike Model</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={newBkBikeModel}
-                    onChangeText={setNewBkBikeModel}
-                    placeholder="NMAX 155, Ninja 400..."
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Plate Number</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={newBkPlate}
-                    onChangeText={setNewBkPlate}
-                    placeholder="ABC-1234"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Odometer (km)</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={newBkOdo}
-                    onChangeText={setNewBkOdo}
-                    placeholder="8,500 km"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-              </View>
-
-              {/* Appointment Date & Slot */}
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Appointment Date</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={newBkDate}
-                    onChangeText={setNewBkDate}
-                    placeholder="Today / Tomorrow"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Time Slot</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={newBkTimeSlot}
-                    onChangeText={setNewBkTimeSlot}
-                    placeholder="10:30 AM - 12:00 PM"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-              </View>
-
-              <Text style={styles.formLabel}>Garage Branch</Text>
-              <TextInput
-                style={styles.formInput}
-                value={newBkBranch}
-                onChangeText={setNewBkBranch}
-                placeholder="MotoTrack Flagship Central Hub & Pit Bays"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-
-              <Text style={styles.formLabel}>Assigned Technician</Text>
-              <TextInput
-                style={styles.formInput}
-                value={newBkMechanic}
-                onChangeText={setNewBkMechanic}
-                placeholder="Assigned technician (optional / pending)"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-
-              {/* Mandatory 20% Non-Refundable Downpayment Notice */}
-              <View style={{ backgroundColor: '#F0FDF4', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: isDarkMode ? tokens.chipBorder : '#BBF7D0', marginVertical: 8 }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.statusSuccessText : '#166534' }}>
-                    Mandatory 20% Downpayment (Collected):
-                  </Text>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: isDarkMode ? tokens.statusSuccessText : '#166534' }}>
-                    ₱{Math.round((Number(newBkPrice) || (newBkCategory === 'PMS' ? 3750 : 6000)) * 0.20).toLocaleString()}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.statusSuccessText : '#166534', marginTop: 2 }}>
-                  Anti-fake booking policy: 20% advance downpayment is collected and strictly non-refundable.
-                </Text>
-              </View>
-
-              <Text style={styles.formLabel}>Special Notes & Requests</Text>
-              <TextInput
-                style={[styles.formInput, { height: 60 }]}
-                multiline
-                value={newBkNotes}
-                onChangeText={setNewBkNotes}
-                placeholder="Customer symptoms, requests, pre-existing scratches..."
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity style={styles.quickStoreBtn} onPress={() => setIsNewBookingModalOpen(false)}>
-                <Text style={styles.quickStoreBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.addBtnPrimary} onPress={handleCreateAdminBooking}>
-                <BootstrapIcon name="check2-circle" size={14} color="#FFFFFF" />
-                <Text style={styles.addBtnPrimaryText}>Confirm & Book Service</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL: ADD / EDIT PMS FIXED RATE (BY CC) ─── */}
-      <Modal
-        visible={isAddPmsRateOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          if (pmsRateSaving) return;
-          setIsAddPmsRateOpen(false);
-          resetPmsRateForm();
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxWidth: 520, maxHeight: '90%' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingPmsRate ? 'Edit Service' : 'Add Service'}
-              </Text>
-              <TouchableOpacity
-                disabled={pmsRateSaving}
-                onPress={() => {
-                  setIsAddPmsRateOpen(false);
-                  resetPmsRateForm();
-                }}
-              >
-                <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : '#64748B'} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <Text style={styles.formLabel}>Service name *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={pmsRateName}
-                onChangeText={setPmsRateName}
-                placeholder="e.g. Replace Clutch Cable"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
-              />
-
-              <Text style={styles.formLabel}>Category *</Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                {[
-                  { key: CATALOG_CATEGORIES.PMS, label: 'PMS' },
-                  { key: CATALOG_CATEGORIES.REPAIR, label: 'Repair Services' },
-                ].map((opt) => {
-                  const active = pmsRateCatalogCategory === opt.key;
-                  return (
-                    <TouchableOpacity
-                      key={opt.key}
-                      onPress={() => setPmsRateCatalogCategory(opt.key)}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 10,
-                        borderRadius: 10,
-                        borderWidth: 1.5,
-                        borderColor: active
-                          ? isDarkMode
-                            ? tokens.accentBrand
-                            : '#EA580C'
-                          : isDarkMode
-                            ? tokens.borderInput
-                            : '#E2E8F0',
-                        backgroundColor: active
-                          ? isDarkMode
-                            ? '#132A26'
-                            : '#E8F0EC'
-                          : isDarkMode
-                            ? tokens.bgElevated
-                            : '#FFFFFF',
-                        alignItems: 'center',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12.5,
-                          fontWeight: '600',
-                          color: active
-                            ? isDarkMode
-                              ? tokens.accentBrand
-                              : '#EA580C'
-                            : isDarkMode
-                              ? tokens.textMuted
-                              : '#64748B',
-                        }}
-                      >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-              <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 12 }}>
-                {CATALOG_CATEGORY_LABELS[pmsRateCatalogCategory] || pmsRateCatalogCategory}. Category is for browsing — shops may reclassify services like cable/fork/chain work.
-              </Text>
-
-              <Text style={[styles.formLabel, { marginTop: 4 }]}>
-                Labor prices by motorcycle tier (₱)
-              </Text>
-              <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 10 }}>
-                Mark a tier as Price not configured when it does not apply. Never use ₱0 for missing prices — those bookings will be blocked.
-              </Text>
-
-              {[
-                {
-                  key: '125',
-                  label: 'Tier 1 · 125cc and Below',
-                  value: pmsRate125,
-                  setValue: setPmsRate125,
-                  na: pmsRate125Na,
-                  setNa: setPmsRate125Na,
-                },
-                {
-                  key: '150',
-                  label: 'Tier 2 · 150cc–160cc',
-                  value: pmsRate150,
-                  setValue: setPmsRate150,
-                  na: pmsRate150Na,
-                  setNa: setPmsRate150Na,
-                },
-                {
-                  key: 'big',
-                  label: 'Tier 3 · Big bikes (200cc+)',
-                  value: pmsRateBig,
-                  setValue: setPmsRateBig,
-                  na: pmsRateBigNa,
-                  setNa: setPmsRateBigNa,
-                },
-              ].map((row) => (
-                <View
-                  key={row.key}
-                  style={{
-                    marginBottom: 12,
-                    padding: 12,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                    backgroundColor: isDarkMode ? tokens.bgElevated : '#F8FAFC',
-                  }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                      {row.label}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => {
-                        const next = !row.na;
-                        row.setNa(next);
-                        if (next) row.setValue('');
-                      }}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderRadius: 999,
-                        backgroundColor: row.na
-                          ? isDarkMode
-                            ? '#3F1D1D'
-                            : '#FEE2E2'
-                          : isDarkMode
-                            ? '#132A26'
-                            : '#E8F0EC',
-                        borderWidth: 1,
-                        borderColor: row.na
-                          ? isDarkMode
-                            ? '#7F1D1D'
-                            : '#FECACA'
-                          : isDarkMode
-                            ? tokens.borderInput
-                            : '#C8DDD3',
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          fontWeight: '600',
-                          color: row.na
-                            ? isDarkMode
-                              ? tokens.statusDangerText
-                              : '#B91C1C'
-                            : isDarkMode
-                              ? tokens.accentBrand
-                              : '#EA580C',
-                        }}
-                      >
-                        {row.na ? 'Price not configured' : 'Configured'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                  <TextInput
-                    style={[
-                      styles.formInput,
-                      row.na && { opacity: 0.45 },
-                      { marginBottom: 0 },
-                    ]}
-                    keyboardType="numeric"
-                    editable={!row.na && !pmsRateSaving}
-                    value={row.value}
-                    onChangeText={row.setValue}
-                    placeholder={row.na ? 'Price not configured' : 'e.g. 450'}
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
-                  />
-                </View>
-              ))}
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.btnSecondary}
-                disabled={pmsRateSaving}
-                onPress={() => {
-                  setIsAddPmsRateOpen(false);
-                  resetPmsRateForm();
-                }}
-              >
-                <Text style={styles.btnSecondaryText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.btnPrimary, pmsRateSaving && { opacity: 0.7 }]}
-                disabled={pmsRateSaving}
-                onPress={handleSavePmsFixedRate}
-                activeOpacity={0.85}
-              >
-                {pmsRateSaving ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.btnPrimaryText}>
-                    {editingPmsRate ? 'Save Changes' : 'Add Service'}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL: ADD / EDIT GARAGE SERVICE PACKAGE ─── */}
-      <Modal
-        visible={isAddGarageOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setIsAddGarageOpen(false);
-          setEditingGarageService(null);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxWidth: 540, maxHeight: '90%' }]}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingGarageService ? 'Edit Service Package' : 'Add New Service Package'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setIsAddGarageOpen(false);
-                  setEditingGarageService(null);
-                }}
-              >
-                <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <Text style={styles.formLabel}>Service Title *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={servTitle}
-                onChangeText={setServTitle}
-                placeholder="e.g. Master Brake System Flush & Bleed"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-
-              <Text style={styles.formLabel}>Subtitle / Short Tagline</Text>
-              <TextInput
-                style={styles.formInput}
-                value={servSubtitle}
-                onChangeText={setServSubtitle}
-                placeholder="e.g. High Temp Motul RBF 660 Fluid Bleed"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Category</Text>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
-                      borderRadius: 8,
-                      padding: 3,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                    }}
-                  >
-                    {['PMS', 'Repair', 'Installation'].map((cat) => {
-                      const isSelected = servCategory === cat;
-                      return (
-                        <TouchableOpacity
-                          key={cat}
-                          style={{
-                            flex: 1,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            paddingVertical: 7,
-                            borderRadius: 6,
-                            backgroundColor: isSelected ? '#EA580C' : 'transparent',
-                            boxShadow: isSelected ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
-                            cursor: 'pointer',
-                            transition: 'all 0.15s ease',
-                          }}
-                          onPress={() => setServCategory(cat)}
-                          activeOpacity={0.85}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 12,
-                              fontWeight: isSelected ? '700' : '600',
-                              color: isSelected ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
-                              transition: 'color 0.15s ease',
-                            }}
-                          >
-                            {cat}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Price (₱) *</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    keyboardType="numeric"
-                    value={servPrice}
-                    onChangeText={setServPrice}
-                    placeholder="3750"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Est. Duration</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={servDuration}
-                    onChangeText={setServDuration}
-                    placeholder="60 mins"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Badge Tag</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={servBadge}
-                    onChangeText={setServBadge}
-                    placeholder="Popular / Express"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-              </View>
-
-              {/* Service Package Image */}
-              <Text style={[styles.formLabel, { marginTop: 10 }]}>Package Image</Text>
-              <View
-                style={{
-                  flexDirection: 'row',
-                  gap: 14,
-                  alignItems: 'center',
-                  marginBottom: 10,
-                  padding: 10,
-                  backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: tokens.border,
-                }}
-              >
-                {servImage ? (
-                  <Image
-                    source={{ uri: servImage }}
-                    style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: isDarkMode ? tokens.bgSub : '#E2E8F0' }}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View
-                    style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: isDarkMode ? tokens.bgSub : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <BootstrapIcon name="tools" size={20} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                  </View>
-                )}
-                <View style={{ flex: 1, gap: 4 }}>
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
-                      paddingVertical: 8,
-                      paddingHorizontal: 12,
-                      borderRadius: 8,
-                    }}
-                    onPress={async () => {
-                      const res = await pickImageFromFile();
-                      if (res.success && res.uri) {
-                        setServImage(res.uri);
-                        showToast('Service image selected!');
-                      }
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <BootstrapIcon name="folder2-open" size={13} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
-                      Choose Image File
-                    </Text>
-                  </TouchableOpacity>
-                  <TextInput
-                    style={[styles.formInput, { marginBottom: 0, paddingVertical: 4, fontSize: 11 }]}
-                    value={servImage}
-                    onChangeText={setServImage}
-                    placeholder="Or paste image URL"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-              </View>
-
-              <Text style={styles.formLabel}>Service Description</Text>
-              <TextInput
-                style={[styles.formInput, { height: 60 }]}
-                multiline
-                value={servDesc}
-                onChangeText={setServDesc}
-                placeholder="Full description of what this service entails..."
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-
-              <Text style={styles.formLabel}>Inclusions (One per line)</Text>
-              <TextInput
-                style={[styles.formInput, { height: 80 }]}
-                multiline
-                value={servInclusions}
-                onChangeText={setServInclusions}
-                placeholder="e.g. Complete Fluid Change&#10;System Pressure Test"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-              />
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.btnSecondary}
-                onPress={() => {
-                  setIsAddGarageOpen(false);
-                  setEditingGarageService(null);
-                }}
-              >
-                <Text style={styles.btnSecondaryText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.btnPrimary} onPress={handleSaveGarageService}>
-                <Text style={styles.btnPrimaryText}>
-                  {editingGarageService ? 'Save Changes' : 'Add Service'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL: ADD / EDIT CERTIFIED TECHNICIAN ─── */}
-      <Modal
-        visible={isAddMechanicModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setIsAddMechanicModalOpen(false);
-          setEditingMechanic(null);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxWidth: 620, maxHeight: '92%' }]}>
-            {/* Header (Fixed) */}
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>
-                  {editingMechanic ? 'Edit Mechanic' : 'Add Mechanic to Roster'}
-                </Text>
-                <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
-                  Admin-managed pit bay roster only — technicians do not get a login account
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  setIsAddMechanicModalOpen(false);
-                  setEditingMechanic(null);
-                }}
-              >
-                <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Scrollable Form Body */}
-            <ScrollView
-              style={styles.modalBody}
-              contentContainerStyle={{ gap: 18, paddingBottom: 16 }}
-              showsVerticalScrollIndicator={true}
-            >
-              {/* SECTION 1 — TECHNICIAN PHOTO */}
-              <View style={{ gap: 10 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C', letterSpacing: 0.6 }}>
-                  TECHNICIAN PHOTO
-                </Text>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                  {/* Photo Placeholder / Selected Image Container */}
-                  {mechAvatar ? (
-                    <View style={{ position: 'relative' }}>
-                      <Image
-                        source={{ uri: mechAvatar }}
-                        style={{
-                          width: 72,
-                          height: 72,
-                          borderRadius: 16,
-                          borderWidth: 2,
-                          borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
-                          backgroundColor: isDarkMode ? tokens.bgSub : '#F1F5F9',
-                        }}
-                      />
-                      <TouchableOpacity
-                        style={{
-                          position: 'absolute',
-                          top: -6,
-                          right: -6,
-                          backgroundColor: '#DC2626',
-                          width: 22,
-                          height: 22,
-                          borderRadius: 11,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderWidth: 1.5,
-                          borderColor: '#FFFFFF',
-                        }}
-                        onPress={() => setMechAvatar('')}
-                        title="Remove photo"
-                      >
-                        <BootstrapIcon name="x-lg" size={11} color="#FFFFFF" />
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View
-                      style={{
-                        width: 72,
-                        height: 72,
-                        borderRadius: 16,
-                        borderWidth: 1.5,
-                        borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
-                        borderStyle: 'dashed',
-                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 2,
-                      }}
-                    >
-                      <BootstrapIcon name="person-fill" size={26} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                      <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
-                        No photo
-                      </Text>
-                    </View>
-                  )}
-
-                  {/* Actions Column */}
-                  <View style={{ flex: 1, gap: 8 }}>
-                    <TouchableOpacity
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 8,
-                        backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
-                        paddingVertical: 8,
-                        paddingHorizontal: 14,
-                        borderRadius: 8,
-                        alignSelf: 'flex-start',
-                      }}
-                      onPress={async () => {
-                        const res = await pickImageFromFile();
-                        if (res.success && res.uri) {
-                          setMechAvatar(res.uri);
-                          showToast('Technician photo selected!');
-                        }
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <BootstrapIcon name="camera-fill" size={13} color="#FFFFFF" />
-                      <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
-                        Upload Device Photo
-                      </Text>
-                    </TouchableOpacity>
-
-                    {mechAvatar ? (
-                      <Text style={{ fontSize: 11, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '600' }}>
-                        ✓ Photo attached
-                      </Text>
-                    ) : (
-                      <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                        Upload a device photo for the technician
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              </View>
-
-              <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 2 }} />
-
-              {/* SECTION 2 — TECHNICIAN INFORMATION */}
-              <View style={{ gap: 10 }}>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C', letterSpacing: 0.6 }}>
-                  TECHNICIAN INFORMATION
-                </Text>
-
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>Full Name & Credentials *</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={mechName}
-                      onChangeText={(txt) => {
-                        setMechName(txt);
-                        if (!editingMechanic && !mechShortName) {
-                          const parts = txt.split('(')[0].trim();
-                          setMechShortName(parts);
-                        }
-                      }}
-                      placeholder="e.g. Master Tech Roberto (Ducati Certified)"
-                      placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    />
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>Short Name / Nickname</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={mechShortName}
-                      onChangeText={setMechShortName}
-                      placeholder="e.g. Tech Roberto"
-                      placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    />
-                  </View>
-                </View>
-
-                <Text style={styles.formLabel}>Contact Number</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={mechPhone}
-                  onChangeText={setMechPhone}
-                  placeholder="e.g. 09171234567"
-                  placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
-                  keyboardType="phone-pad"
-                />
-
-                <Text style={styles.formLabel}>Contact email (optional)</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={mechEmail}
-                  onChangeText={setMechEmail}
-                  placeholder="shop-contact@example.com"
-                  placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
-                  autoCapitalize="none"
-                  keyboardType="email-address"
-                />
-                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                  Contact only. Mechanics cannot sign in — only admins manage the roster and bookings.
-                </Text>
-              </View>
-
-              <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 2 }} />
-
-              {/* SECTION 3 — CERTIFICATIONS & SPECIALIZATIONS */}
-              <View style={{ gap: 10 }}>
-                <Text style={{ fontSize: 11, fontWeight: '500', color: isDarkMode ? tokens.accentBrand : '#EA580C', letterSpacing: 0.6 }}>
-                  CERTIFICATIONS & SPECIALIZATIONS
-                </Text>
-
-                {/* Primary Specialization (Aligned 2-Column Grid) */}
-                <Text style={styles.formLabel}>Primary Specialization</Text>
-                <View
+                <TouchableOpacity
                   style={{
                     flexDirection: 'row',
-                    flexWrap: 'wrap',
-                    justifyContent: 'space-between',
-                    gap: 8,
-                    marginBottom: 10,
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 6,
+                    backgroundColor: riderViewMode === 'list' ? '#EA580C' : 'transparent',
+                    cursor: 'pointer',
                   }}
+                  onPress={() => setRiderViewMode('list')}
                 >
-                  {MECHANIC_SPECIALIZATION_PRESETS.map((spec) => {
-                    const isMatch =
-                      mechSpecialization?.trim().toLowerCase() === spec.toLowerCase();
-                    return (
-                      <TouchableOpacity
-                        key={spec}
-                        activeOpacity={0.75}
-                        style={{
-                          width: Platform.OS === 'web' ? 'calc(50% - 4px)' : '48.8%',
-                          paddingHorizontal: 12,
-                          paddingVertical: 9,
-                          borderRadius: 8,
-                          backgroundColor: isMatch
-                            ? '#EA580C'
-                            : isDarkMode
-                              ? '#1E293B'
-                              : '#F8FAFC',
-                          borderWidth: 1.5,
-                          borderColor: isMatch
-                            ? '#EA580C'
-                            : isDarkMode
-                              ? '#334155'
-                              : '#CBD5E1',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          cursor: 'pointer',
-                        }}
-                        onPress={() => setMechSpecialization(spec)}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: isMatch ? '700' : '600',
-                            color: isMatch
-                              ? '#FFFFFF'
-                              : isDarkMode
-                                ? '#E2E8F0'
-                                : '#334155',
-                            flex: 1,
-                            marginRight: 6,
-                          }}
-                          numberOfLines={1}
-                        >
-                          {spec}
-                        </Text>
-                        {isMatch ? (
-                          <BootstrapIcon name="check-circle-fill" size={14} color="#10B981" />
-                        ) : (
-                          <View
-                            style={{
-                              width: 14,
-                              height: 14,
-                              borderRadius: 7,
-                              borderWidth: 1.5,
-                              borderColor: isDarkMode ? '#475569' : '#CBD5E1',
-                            }}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                <TextInput
-                  style={styles.formInput}
-                  value={mechSpecialization}
-                  onChangeText={setMechSpecialization}
-                  placeholder="e.g. Desmo Valve Clearance & Superbike Electronics"
-                  placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                />
-
-                {/* Certifications & Experience */}
-                <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>OEM Certifications & Badges</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={mechCertifications}
-                      onChangeText={setMechCertifications}
-                      placeholder="e.g. Yamaha YTA Gold • Öhlins Factory Center"
-                      placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    />
-                  </View>
-
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.formLabel}>Experience</Text>
-                    <TextInput
-                      style={styles.formInput}
-                      value={mechExperience}
-                      onChangeText={setMechExperience}
-                      placeholder="e.g. 7 Years Pro Tech"
-                      placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    />
-                  </View>
-                </View>
-
-                {/* Status */}
-                <Text style={styles.formLabel}>Initial Status</Text>
-                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 4 }}>
-                  {[
-                    { id: 'Available', label: '🟢 Available on Duty', desc: 'Ready for booking assignment' },
-                    { id: 'In Pit Bay', label: '🟠 In Pit Bay', desc: 'Currently working on bike' },
-                  ].map((st) => {
-                    const isSelected = mechStatus === st.id;
-                    return (
-                      <TouchableOpacity
-                        key={st.id}
-                        style={{
-                          flex: 1,
-                          padding: 10,
-                          borderRadius: 8,
-                          borderWidth: 1.5,
-                          borderColor: isSelected ? '#EA580C' : tokens.borderInput,
-                          backgroundColor: isSelected ? (isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#F3F7F6') : (isDarkMode ? tokens.bgSub : '#FFFFFF'),
-                        }}
-                        onPress={() => setMechStatus(st.id)}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: '600',
-                            color: isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : tokens.textPrimary,
-                            marginBottom: 2,
-                          }}
-                        >
-                          {st.label}
-                        </Text>
-                        <Text style={{ fontSize: 10.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{st.desc}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              </View>
-            </ScrollView>
-
-            {/* Footer (Fixed) */}
-            <View style={[styles.modalFooter, { borderTopWidth: 1, borderColor: isDarkMode ? tokens.border : '#E2E8F0', paddingTop: 14 }]}>
-              <TouchableOpacity
-                style={styles.quickStoreBtn}
-                onPress={() => {
-                  setIsAddMechanicModalOpen(false);
-                  setEditingMechanic(null);
-                }}
-              >
-                <Text style={styles.quickStoreBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveMechanic}>
-                <BootstrapIcon
-                  name={editingMechanic ? 'check-lg' : 'person-plus-fill'}
-                  size={14}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.addBtnPrimaryText}>
-                  {editingMechanic ? 'Save Changes' : 'Add to Roster'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL: ADD / EDIT DELIVERY RIDER ─── */}
-      <Modal
-        visible={isAddRiderModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setIsAddRiderModalOpen(false);
-          setEditingRider(null);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxWidth: 520, maxHeight: '90%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }]}>
-            <View style={[styles.modalHeader, { flexShrink: 0 }]}>
-              <Text style={styles.modalTitle}>
-                {editingRider ? 'Edit Rider Account' : 'Invite Rider Account'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setIsAddRiderModalOpen(false);
-                  setEditingRider(null);
-                }}
-              >
-                <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={[styles.modalBody, { flex: 1, minHeight: 0, maxHeight: undefined }]}
-              contentContainerStyle={{ paddingBottom: 16 }}
-              showsVerticalScrollIndicator={true}
-            >
-              <Text style={styles.formLabel}>Rider Photo / Avatar</Text>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 }}>
-                {riderAvatar ? (
-                  <Image
-                    source={{ uri: riderAvatar }}
-                    style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
-                      borderWidth: 2,
-                      borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
-                      backgroundColor: isDarkMode ? tokens.bgSub : '#F1F5F9',
-                    }}
+                  <BootstrapIcon
+                    name="list-ul"
+                    size={13}
+                    color={riderViewMode === 'list' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
                   />
-                ) : (
-                  <View
+                  <Text
                     style={{
-                      width: 56,
-                      height: 56,
-                      borderRadius: 28,
-                      borderWidth: 2,
-                      borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
-                      borderStyle: 'dashed',
-                      backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
-                      alignItems: 'center',
-                      justifyContent: 'center',
+                      fontSize: 11.5,
+                      fontWeight: '700',
+                      color: riderViewMode === 'list' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B',
                     }}
                   >
-                    <BootstrapIcon name="person-fill" size={24} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                  </View>
-                )}
+                    List
+                  </Text>
+                </TouchableOpacity>
 
-                <View style={{ flex: 1, gap: 6 }}>
-                  <TouchableOpacity
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 6,
+                    backgroundColor: riderViewMode === 'grid' ? '#EA580C' : 'transparent',
+                    cursor: 'pointer',
+                  }}
+                  onPress={() => setRiderViewMode('grid')}
+                >
+                  <BootstrapIcon
+                    name="grid"
+                    size={12}
+                    color={riderViewMode === 'grid' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
+                  />
+                  <Text
                     style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
-                      paddingVertical: 7,
-                      paddingHorizontal: 12,
-                      borderRadius: 8,
-                      alignSelf: 'flex-start',
+                      fontSize: 11.5,
+                      fontWeight: '700',
+                      color: riderViewMode === 'grid' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B',
                     }}
-                    onPress={async () => {
-                      const res = await pickImageFromFile();
-                      if (res.success && res.uri) {
-                        setRiderAvatar(res.uri);
-                        showToast('Rider photo selected!');
-                      }
-                    }}
-                    activeOpacity={0.85}
                   >
-                    <BootstrapIcon name="camera-fill" size={13} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
-                      Upload Device Photo
-                    </Text>
-                  </TouchableOpacity>
-                  <TextInput
-                    style={[styles.formInput, { marginBottom: 0, paddingVertical: 4, fontSize: 11 }]}
-                    value={riderAvatar}
-                    onChangeText={setRiderAvatar}
-                    placeholder="Or paste image URL"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
+                    Grid
+                  </Text>
+                </TouchableOpacity>
               </View>
-
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Full Name *</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={riderName}
-                    onChangeText={(txt) => {
-                      setRiderName(txt);
-                      if (!editingRider && !riderShortName) {
-                        setRiderShortName(txt.trim().split(' ')[0] || '');
-                      }
-                    }}
-                    placeholder="e.g. Juan Dela Cruz"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Short Name</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={riderShortName}
-                    onChangeText={setRiderShortName}
-                    placeholder="e.g. Juan"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-              </View>
-
-              <Text style={styles.formLabel}>Phone *</Text>
-              <TextInput
-                style={styles.formInput}
-                value={riderPhone}
-                onChangeText={setRiderPhone}
-                placeholder="e.g. 09171234567"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                keyboardType="phone-pad"
-              />
-
-              <Text style={styles.formLabel}>Rider ID</Text>
-              <TextInput
-                style={[styles.formInput, editingRider && { backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC' }]}
-                value={riderIdInput}
-                onChangeText={setRiderIdInput}
-                placeholder="e.g. rider-juan (optional, auto if blank)"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                autoCapitalize="none"
-                editable={!editingRider}
-              />
-
-              {editingRider ? (
-                <>
-                  <Text style={styles.formLabel}>Login email</Text>
-                  <TextInput
-                    style={[styles.formInput, { backgroundColor: isDarkMode ? tokens.bgSub : '#F1F5F9' }]}
-                    value={riderEmail}
-                    editable={false}
-                  />
-                </>
-              ) : (
-                <>
-                  <Text style={styles.formLabel}>Email *</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={riderEmail}
-                    onChangeText={setRiderEmail}
-                    placeholder="rider@store.com"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                  />
-                </>
-              )}
-
-              <Text style={styles.formLabel}>Account status (login)</Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-                {Object.values(RIDER_ACCOUNT_STATUSES).map((st) => {
-                  const isSelected = riderAccountStatus === st;
-                  return (
-                    <TouchableOpacity
-                      key={st}
-                      activeOpacity={0.75}
-                      onPress={() => setRiderAccountStatus(st)}
-                      style={{
-                        flex: 1,
-                        paddingHorizontal: 12,
-                        paddingVertical: 9,
-                        borderRadius: 8,
-                        borderWidth: 1.5,
-                        borderColor: isSelected ? '#EA580C' : isDarkMode ? '#334155' : '#CBD5E1',
-                        backgroundColor: isSelected ? '#EA580C' : isDarkMode ? '#1E293B' : '#F8FAFC',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: isSelected ? '700' : '600',
-                          color: isSelected ? '#FFFFFF' : isDarkMode ? '#E2E8F0' : '#334155',
-                          flex: 1,
-                        }}
-                      >
-                        {st}
-                      </Text>
-                      {isSelected ? (
-                        <BootstrapIcon name="check-circle-fill" size={14} color="#10B981" />
-                      ) : (
-                        <View
-                          style={{
-                            width: 14,
-                            height: 14,
-                            borderRadius: 7,
-                            borderWidth: 1.5,
-                            borderColor: isDarkMode ? '#475569' : '#CBD5E1',
-                          }}
-                        />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <View style={{ flexDirection: 'row', gap: 10 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Vehicle</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={riderVehicle}
-                    onChangeText={setRiderVehicle}
-                    placeholder="e.g. Yamaha NMAX 155"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Plate Number</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={riderPlate}
-                    onChangeText={setRiderPlate}
-                    placeholder="e.g. NMX-1001"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    autoCapitalize="characters"
-                  />
-                </View>
-              </View>
-
-              <Text style={styles.formLabel}>Fleet Delivery Status</Text>
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                {Object.values(RIDER_STATUSES).map((st) => {
-                  const isSelected = riderStatus === st;
-                  return (
-                    <TouchableOpacity
-                      key={st}
-                      activeOpacity={0.75}
-                      onPress={() => setRiderStatus(st)}
-                      style={{
-                        flex: 1,
-                        paddingHorizontal: 10,
-                        paddingVertical: 9,
-                        borderRadius: 8,
-                        borderWidth: 1.5,
-                        borderColor: isSelected ? '#EA580C' : isDarkMode ? '#334155' : '#CBD5E1',
-                        backgroundColor: isSelected ? '#EA580C' : isDarkMode ? '#1E293B' : '#F8FAFC',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 6,
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: isSelected ? '700' : '600',
-                          color: isSelected ? '#FFFFFF' : isDarkMode ? '#E2E8F0' : '#334155',
-                        }}
-                      >
-                        {st}
-                      </Text>
-                      {isSelected && (
-                        <BootstrapIcon name="check-circle-fill" size={12} color="#10B981" />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <Text style={styles.formLabel}>Notes</Text>
-              <TextInput
-                style={[styles.formInput, { minHeight: 64, textAlignVertical: 'top' }]}
-                value={riderNotes}
-                onChangeText={setRiderNotes}
-                placeholder="Optional notes..."
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                multiline
-              />
-            </ScrollView>
-
-            <View style={[styles.modalFooter, { flexShrink: 0, marginTop: 12 }]}>
-              <TouchableOpacity
-                style={styles.quickStoreBtn}
-                onPress={() => {
-                  setIsAddRiderModalOpen(false);
-                  setEditingRider(null);
-                }}
-              >
-                <Text style={styles.quickStoreBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveRider}>
-                <BootstrapIcon
-                  name={editingRider ? 'check-lg' : 'person-plus-fill'}
-                  size={14}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.addBtnPrimaryText}>
-                  {editingRider ? 'Save Changes' : 'Send OTP Invite'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ─── MODAL: ADD / EDIT SUPPLIER PARTNER ─── */}
-      <Modal
-        visible={isAddSupplierModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setIsAddSupplierModalOpen(false);
-          setEditingSupplier(null);
-        }}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxWidth: 580, maxHeight: '92%' }]}>
-            <View style={styles.modalHeader}>
-              <View>
-                <Text style={styles.modalTitle}>
-                  {editingSupplier ? 'Edit Supplier Partner' : 'Add New Supplier Partner'}
-                </Text>
-                <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
-                  Procurement source, catalog categories, and fulfillment logistics
-                </Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => {
-                  setIsAddSupplierModalOpen(false);
-                  setEditingSupplier(null);
-                }}
-              >
-                <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
-              </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              {/* Supplier / Company Name */}
-              <Text style={styles.formLabel}>Supplier / Company Name *</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="e.g. Akrapovič Racing Exhausts, Brembo SpA..."
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                value={supName}
-                onChangeText={setSupName}
-              />
-
-              {/* Contact Person */}
-              <Text style={styles.formLabel}>Account Executive / Contact Person</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="e.g. Matteo Rossi, Regional Sales Manager"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                value={supContactPerson}
-                onChangeText={setSupContactPerson}
-              />
-
-              {/* Two Column: Email & Phone */}
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Contact Email</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="supply@company.com"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    keyboardType="email-address"
-                    value={supEmail}
-                    onChangeText={setSupEmail}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Phone / Hotline</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="+63 917 123 4567"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    keyboardType="phone-pad"
-                    value={supPhone}
-                    onChangeText={setSupPhone}
-                  />
-                </View>
-              </View>
-
-              {/* Address / Headquarters */}
-              <Text style={styles.formLabel}>Warehouse / Distribution Address</Text>
-              <TextInput
-                style={styles.formInput}
-                placeholder="e.g. Bergamo, Italy / Laguna Technopark, PH"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                value={supAddress}
-                onChangeText={setSupAddress}
-              />
-
-              {/* Supplied Category Field & Presets */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, marginBottom: 6 }}>
-                <Text style={[styles.formLabel, { marginTop: 0, marginBottom: 0 }]}>
-                  Supplied Category *
-                </Text>
-                {Boolean(
-                  supCategories?.trim() &&
-                  !SUPPLIER_CATEGORY_PRESETS.some(
-                    (c) => c.toLowerCase() === supCategories.trim().toLowerCase()
-                  )
-                ) && (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 4,
-                        backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.15)' : '#F0F9FF',
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                        borderRadius: 12,
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? '#0284C7' : '#BAE6FD',
-                      }}
-                    >
-                      <BootstrapIcon name="pencil" size={10} color={isDarkMode ? '#38BDF8' : '#0284C7'} />
-                      <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? '#38BDF8' : '#0284C7' }}>
-                        Custom Category
-                      </Text>
-                    </View>
-                  )}
-              </View>
-
-              <View style={{ position: 'relative', marginBottom: 10 }}>
-                <TextInput
-                  style={[
-                    styles.formInput,
-                    {
-                      paddingRight: supCategories ? 38 : 14,
-                      marginBottom: 0,
-                    },
-                  ]}
-                  placeholder="e.g. Exhaust & Performance, Custom Helmets, Gear..."
-                  placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                  value={supCategories}
-                  onChangeText={setSupCategories}
-                />
-                {Boolean(supCategories) && (
-                  <TouchableOpacity
-                    activeOpacity={0.7}
-                    onPress={() => setSupCategories('')}
-                    style={{
-                      position: 'absolute',
-                      right: 10,
-                      top: '50%',
-                      transform: [{ translateY: -11 }],
-                      width: 22,
-                      height: 22,
-                      borderRadius: 11,
-                      backgroundColor: isDarkMode ? '#334155' : '#E2E8F0',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                    title="Clear category"
-                  >
-                    <BootstrapIcon name="x" size={14} color={isDarkMode ? '#CBD5E1' : '#64748B'} />
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              {/* Category Presets Header */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, marginTop: 2 }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B', letterSpacing: 0.3, textTransform: 'uppercase' }}>
-                  Category Presets
-                </Text>
-                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
-                  Select preset or type custom above
-                </Text>
-              </View>
-
-              {/* Aligned 2-Column Grid */}
+            {/* 4. Content Area: Empty State vs List vs Grid */}
+            {filteredRiders.length === 0 ? (
               <View
                 style={{
-                  flexDirection: 'row',
-                  flexWrap: 'wrap',
-                  justifyContent: 'space-between',
-                  gap: 8,
-                  marginBottom: 14,
+                  alignItems: 'center',
+                  paddingVertical: 48,
+                  backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
                 }}
               >
-                {SUPPLIER_CATEGORY_PRESETS.map((cat) => {
-                  const isSelected =
-                    supCategories?.trim().toLowerCase() === cat.toLowerCase();
-                  return (
-                    <TouchableOpacity
-                      key={cat}
-                      activeOpacity={0.75}
-                      style={{
-                        width: Platform.OS === 'web' ? 'calc(50% - 4px)' : '48.8%',
-                        paddingHorizontal: 12,
-                        paddingVertical: 9,
-                        borderRadius: 8,
-                        backgroundColor: isSelected
-                          ? '#EA580C'
-                          : isDarkMode
-                            ? '#1E293B'
-                            : '#F8FAFC',
-                        borderWidth: 1.5,
-                        borderColor: isSelected
-                          ? '#EA580C'
-                          : isDarkMode
-                            ? '#334155'
-                            : '#CBD5E1',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        cursor: 'pointer',
-                      }}
-                      onPress={() => setSupCategories(cat)}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 11.5,
-                          fontWeight: isSelected ? '700' : '600',
-                          color: isSelected
-                            ? '#FFFFFF'
-                            : isDarkMode
-                              ? '#E2E8F0'
-                              : '#475569',
-                          flex: 1,
-                          marginRight: 6,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {cat}
-                      </Text>
-                      <View
-                        style={{
-                          width: 16,
-                          height: 16,
-                          borderRadius: 8,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          backgroundColor: isSelected
-                            ? '#22C55E'
-                            : isDarkMode
-                              ? '#334155'
-                              : '#E2E8F0',
-                        }}
-                      >
-                        {isSelected ? (
-                          <BootstrapIcon name="check" size={12} color="#FFFFFF" />
-                        ) : (
-                          <View
-                            style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: 3,
-                              backgroundColor: isDarkMode ? '#64748B' : '#94A3B8',
-                            }}
-                          />
-                        )}
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Two Column: Lead Time & Reliability Rating */}
-              <View style={{ flexDirection: 'row', gap: 12 }}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Restock Lead Time</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="e.g. 3-5 Days, 1-2 Weeks"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    value={supLeadTime}
-                    onChangeText={setSupLeadTime}
-                  />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.formLabel}>Quality Score (1.0 - 5.0)</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    placeholder="5.0"
-                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                    keyboardType="numeric"
-                    value={supRating}
-                    onChangeText={setSupRating}
-                  />
-                </View>
-              </View>
-
-              {/* Status Radio Pills */}
-              <Text style={styles.formLabel}>Vendor Status</Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
-                {[
-                  { id: 'Active', label: 'Active Partner', color: isDarkMode ? tokens.statusSuccessText : '#10B981' },
-                  { id: 'Pending', label: 'Pending Review', color: isDarkMode ? tokens.statusWarningText : '#F59E0B' },
-                  { id: 'Inactive', label: 'Inactive / On Hold', color: isDarkMode ? tokens.textMuted : '#64748B' },
-                ].map((st) => {
-                  const selected = supStatus === st.id;
-                  return (
-                    <TouchableOpacity
-                      key={st.id}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 9,
-                        paddingHorizontal: 8,
-                        borderRadius: 8,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: selected
-                          ? isDarkMode
-                            ? 'rgba(234, 88, 12,0.3)'
-                            : '#E8F0EC'
-                          : isDarkMode
-                            ? '#1E293B'
-                            : '#F8FAFC',
-                        borderWidth: 1.5,
-                        borderColor: selected
-                          ? '#EA580C'
-                          : isDarkMode
-                            ? '#334155'
-                            : '#E2E8F0',
-                      }}
-                      onPress={() => setSupStatus(st.id)}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <View
-                          style={{
-                            width: 7,
-                            height: 7,
-                            borderRadius: 3.5,
-                            backgroundColor: st.color,
-                          }}
-                        />
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            fontWeight: selected ? '600' : '500',
-                            color: selected
-                              ? '#EA580C'
-                              : isDarkMode
-                                ? '#94A3B8'
-                                : '#475569',
-                          }}
-                        >
-                          {st.label}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Notes & Contract Terms */}
-              <Text style={styles.formLabel}>Procurement Notes & Terms (Optional)</Text>
-              <TextInput
-                style={[styles.formInput, { height: 70, textAlignVertical: 'top', paddingTop: 8 }]}
-                placeholder="e.g. OEM Certified Direct Importer, NET 30 payment term, minimum batch order of 10 units..."
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                multiline
-                numberOfLines={3}
-                value={supNotes}
-                onChangeText={setSupNotes}
-              />
-            </ScrollView>
-
-            <View style={styles.modalFooter}>
-              <TouchableOpacity
-                style={styles.quickStoreBtn}
-                onPress={() => {
-                  setIsAddSupplierModalOpen(false);
-                  setEditingSupplier(null);
-                }}
-              >
-                <Text style={styles.quickStoreBtnText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveSupplier}>
-                <BootstrapIcon
-                  name={editingSupplier ? 'check-lg' : 'plus-lg'}
-                  size={14}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.addBtnPrimaryText}>
-                  {editingSupplier ? 'Save Changes' : 'Register Supplier'}
+                <BootstrapIcon name="bicycle" size={32} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
+                <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? '#F1F5F9' : '#0F172A', marginTop: 10 }}>
+                  No riders found
                 </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+                <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 4, marginBottom: 16 }}>
+                  {riderSearchQuery
+                    ? `No matches for "${riderSearchQuery}"`
+                    : 'Add your first delivery rider to the fleet.'}
+                </Text>
+                <TouchableOpacity style={styles.addBtnPrimary} onPress={handleOpenAddRider}>
+                  <BootstrapIcon name="person-plus-fill" size={14} color="#FFFFFF" />
+                  <Text style={styles.addBtnPrimaryText}>+ Add Rider</Text>
+                </TouchableOpacity>
+              </View>
+            ) : riderViewMode === 'list' ? (
+              /* ─── LIST (TABLE) VIEW ─── */
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                showsVerticalScrollIndicator={false}
+                dataSet={{ tableScroll: 'true' }}
+                style={{ width: '100%', ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}) }}
+                contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
+              >
+                <View style={[styles.tableCard, { width: '100%', minWidth: '100%', flexGrow: 1 }]}>
+                  <View style={styles.tableHeaderRow}>
+                    <Text style={[styles.tableHeaderCell, { flex: 2.3, minWidth: 200 }]}>Rider & Contact</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 160 }]}>Vehicle & Plate</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130, textAlign: 'center' }]}>Duty Status</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 120 }]}>Earnings</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 120, textAlign: 'center' }]}>Actions</Text>
+                  </View>
 
-      {/* ─── MODAL 6: MOBILE ADMIN MORE MENU SHEET ─── */}
-      <Modal
-        visible={isMobileMoreOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsMobileMoreOpen(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={{ flex: 1 }}
-            activeOpacity={1}
-            onPress={() => setIsMobileMoreOpen(false)}
-          />
-          <View style={styles.mobileMoreSheet}>
-            <View style={styles.modalHeader}>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    showsHorizontalScrollIndicator={false}
+                    nestedScrollEnabled={true}
+                    dataSet={{ tableScroll: 'true' }}
+                    style={{
+                      maxHeight: 560,
+                      width: '100%',
+                      ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}),
+                    }}
+                    contentContainerStyle={{ flexGrow: 1 }}
+                  >
+                    {filteredRiders.map((rider) => {
+                      const statusColor =
+                        rider.status === RIDER_STATUSES.AVAILABLE
+                          ? { bg: '#DCFCE7', text: '#16A34A', border: '#86EFAC', dot: '#10B981', icon: 'check-circle-fill' }
+                          : rider.status === RIDER_STATUSES.ON_DELIVERY
+                            ? { bg: '#FEF3C7', text: '#D97706', border: '#FCD34D', dot: '#F59E0B', icon: 'box-seam-fill' }
+                            : { bg: '#F1F5F9', text: '#64748B', border: '#CBD5E1', dot: '#94A3B8', icon: 'moon-fill' };
+
+                      const isInactive = (rider.accountStatus || 'Active') === RIDER_ACCOUNT_STATUSES.INACTIVE;
+
+                      return (
+                        <View key={rider.id} style={styles.tableRow}>
+                          <View style={{ flex: 2.3, minWidth: 200, flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 8 }}>
+                            <View style={{ position: 'relative' }}>
+                              <Image
+                                source={{ uri: rider.avatar || RIDER_AVATAR_PRESETS[0] }}
+                                style={{
+                                  width: 40,
+                                  height: 40,
+                                  borderRadius: 20,
+                                  borderWidth: 1.5,
+                                  borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
+                                  backgroundColor: '#E2E8F0',
+                                }}
+                              />
+                              <View
+                                style={{
+                                  position: 'absolute',
+                                  bottom: -1,
+                                  right: -1,
+                                  width: 12,
+                                  height: 12,
+                                  borderRadius: 6,
+                                  backgroundColor: statusColor.dot,
+                                  borderWidth: 2,
+                                  borderColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                                }}
+                              />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.tableTitle} numberOfLines={1}>
+                                {rider.name}
+                                {rider.username ? ` · @${rider.username}` : ''}
+                              </Text>
+                              <Text style={styles.tableSub} numberOfLines={1}>
+                                {rider.phone || 'No phone'}
+                                {isInactive ? ' · Inactive account' : ''}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <View style={{ flex: 1.8, minWidth: 160, paddingRight: 8 }}>
+                            <Text style={styles.tableTitle} numberOfLines={1}>
+                              {rider.vehicleInfo || 'No vehicle assigned'}
+                            </Text>
+                            <Text
+                              style={[
+                                styles.tableSub,
+                                { fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              {rider.plateNumber || 'NO PLATE'}
+                            </Text>
+                          </View>
+
+                          <View style={{ flex: 1.5, minWidth: 130, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <TouchableOpacity
+                              onPress={() => handleToggleRiderStatus(rider)}
+                              style={[
+                                styles.tableStatusPill,
+                                {
+                                  backgroundColor: statusColor.bg,
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 5,
+                                },
+                              ]}
+                              activeOpacity={0.8}
+                            >
+                              <BootstrapIcon name={statusColor.icon} size={11} color={statusColor.text} />
+                              <Text style={[styles.tableStatusPillText, { color: statusColor.text }]}>
+                                {rider.status || RIDER_STATUSES.AVAILABLE}
+                              </Text>
+                            </TouchableOpacity>
+                            <Text style={styles.tableStatusSub}>Tap to toggle</Text>
+                          </View>
+
+                          <View style={{ flex: 1.4, minWidth: 120, paddingRight: 8 }}>
+                            <Text
+                              style={[
+                                styles.tableTitle,
+                                { color: isDarkMode ? tokens.money : '#EA580C' },
+                              ]}
+                              numberOfLines={1}
+                            >
+                              ₱{Number(rider.totalEarnings || 0).toLocaleString(undefined, {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              })}
+                            </Text>
+                            <Text style={styles.tableSub} numberOfLines={1}>
+                              From shipping
+                            </Text>
+                          </View>
+
+                          <View style={{ flex: 1.3, minWidth: 120, flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+                            <TouchableOpacity
+                              style={styles.tableOutlineBtn}
+                              onPress={() => handleOpenEditRider(rider)}
+                              activeOpacity={0.8}
+                            >
+                              <Text style={styles.tableOutlineBtnText}>Edit</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.actionIconBtn]}
+                              onPress={() =>
+                                setRiderAccessModal({
+                                  rider,
+                                  bundle: null,
+                                })
+                              }
+                            >
+                              <BootstrapIcon name="geo-alt-fill" size={13} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
+                              onPress={() => handleDeleteRider(rider)}
+                            >
+                              <BootstrapIcon name="trash3" size={14} color={isDarkMode ? tokens.statusDangerText : '#EF4444'} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              </ScrollView>
+            ) : (
+              /* ─── GRID (CARD) VIEW ─── */
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                {filteredRiders.map((rider) => (
+                  <RiderProfileCard
+                    key={rider.id}
+                    rider={rider}
+                    isDarkMode={isDarkMode}
+                    onToggleStatus={handleToggleRiderStatus}
+                    onOpenLiveMap={(r) => setRiderAccessModal({ rider: r, bundle: null })}
+                    onEdit={handleOpenEditRider}
+                    onDelete={handleDeleteRider}
+                  />
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ─── TAB: SUPPLIERS & VENDORS MANAGEMENT ─── */}
+        {activeNav === 'suppliers' && (
+          <View>
+            {/* Live Database Sync Bar */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                backgroundColor: isDarkMode ? '#0F2922' : '#F0FDF9',
+                borderColor: isDarkMode ? '#063D37' : '#99F6E4',
+                borderWidth: 1,
+                borderRadius: 10,
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                marginBottom: 16,
+              }}
+            >
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <View
                   style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 16,
-                    backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
-                    justifyContent: 'center',
-                    alignItems: 'center',
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: isDarkMode ? '#EA580C' : '#10B981',
+                  }}
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: '700',
+                    color: isDarkMode ? '#5EEAD4' : '#143325',
                   }}
                 >
-                  <BootstrapIcon name="grid-fill" size={16} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                </View>
-                <Text style={styles.modalTitle}>Admin Management Menu</Text>
+                  Live Database Connected (Supabase public.suppliers)
+                </Text>
               </View>
-              <TouchableOpacity onPress={() => setIsMobileMoreOpen(false)}>
-                <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 6,
+                  backgroundColor: isDarkMode ? '#134E48' : '#FED7AA',
+                }}
+                onPress={async () => {
+                  try {
+                    setIsSuppliersLoading(true);
+                    const fresh = await supplierService.fetchSuppliers();
+                    setSuppliers(fresh || []);
+                    showToast('✓ Suppliers synced from database');
+                  } finally {
+                    setIsSuppliersLoading(false);
+                  }
+                }}
+                disabled={isSuppliersLoading}
+              >
+                <BootstrapIcon name="arrow-clockwise" size={13} color="#143325" />
+                <Text
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: '700',
+                    color: isDarkMode ? '#5EEAD4' : '#143325',
+                  }}
+                >
+                  {isSuppliersLoading ? 'Syncing...' : 'Sync with DB'}
+                </Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.mobileMoreGrid}>
-              {/* Products */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'products' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('products');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="tag-fill"
-                  size={20}
-                  color={activeNav === 'products' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Products</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{products.length} products</Text>
-                </View>
-              </TouchableOpacity>
+            {/* Supplier Stats Telemetry */}
+            <View style={styles.statsGrid}>
+              <AdminStatCard
+                styles={styles}
+                accent="teal"
+                label="Total Suppliers"
+                value={supplierStats.total}
+                sub="Catalogued Part Vendors"
+                isDark={isDarkMode}
+              />
+              <AdminStatCard
+                styles={styles}
+                accent="blue"
+                label="Active Sourcing"
+                value={supplierStats.active}
+                valueColor={isDarkMode ? tokens.accentBrand : "#EA580C"}
+                sub="Fulfilling Purchase Orders"
+                isDark={isDarkMode}
+              />
+              <AdminStatCard
+                styles={styles}
+                accent={supplierStats.pending > 0 ? 'amber' : 'teal'}
+                label="Pending Review"
+                value={supplierStats.pending}
+                valueColor={supplierStats.pending > 0 ? '#D97706' : undefined}
+                sub="Onboarding Contracts"
+                isDark={isDarkMode}
+              />
+              <AdminStatCard
+                styles={styles}
+                accent="amber"
+                label="Top Rated Partners"
+                value={supplierStats.topRated}
+                sub="4.8+ Quality Score"
+                isDark={isDarkMode}
+              />
+            </View>
 
-              {/* Orders & Fulfillment */}
+            {/* Toolbar & Search Bar */}
+            <View style={styles.toolbarRow}>
+              <View style={styles.searchInputBox}>
+                <BootstrapIcon
+                  name="search"
+                  size={14}
+                  color={isDarkMode ? tokens.textMuted : "#64748B"}
+                  style={{ marginRight: 8 }}
+                />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search supplier by company, contact person, category, address..."
+                  placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                  value={supplierSearchQuery}
+                  onChangeText={setSupplierSearchQuery}
+                />
+                {supplierSearchQuery ? (
+                  <TouchableOpacity onPress={() => setSupplierSearchQuery('')}>
+                    <BootstrapIcon name="x-circle-fill" size={14} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+
               <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'orders' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('orders');
-                  setIsMobileMoreOpen(false);
+                style={styles.addBtnPrimary}
+                onPress={handleOpenAddSupplier}
+                activeOpacity={0.85}
+              >
+                <BootstrapIcon name="plus-lg" size={15} color="#FFFFFF" />
+                <Text style={styles.addBtnPrimaryText}>Add New Supplier</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Filter Status Dropdown & View Mode Switch */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: 12,
+                marginBottom: 16,
+                flexWrap: 'wrap',
+                position: 'relative',
+                zIndex: isSupplierFilterDropdownOpen ? 99999 : 10,
+              }}
+            >
+              {/* Suppliers Status Filter Dropdown */}
+              <View
+                style={{
+                  position: 'relative',
+                  zIndex: isSupplierFilterDropdownOpen ? 99999 : 10,
                 }}
               >
-                <BootstrapIcon
-                  name="receipt"
-                  size={20}
-                  color={activeNav === 'orders' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Orders & COD</Text>
+                {(() => {
+                  const supplierStatusOptions = [
+                    { id: 'All', label: 'All Suppliers', count: supplierStats.total, icon: 'building', color: isDarkMode ? tokens.accentBrand : '#EA580C' },
+                    { id: 'Active', label: 'Active Partners', count: supplierStats.active, icon: 'check-circle-fill', color: isDarkMode ? tokens.statusSuccessText : '#16A34A' },
+                    { id: 'Pending', label: 'Pending Review', count: supplierStats.pending, icon: 'hourglass-split', color: isDarkMode ? tokens.statusWarningText : '#D97706', highlight: supplierStats.pending > 0 },
+                    { id: 'Inactive', label: 'Inactive / On Hold', count: supplierStats.inactive, icon: 'pause-circle-fill', color: isDarkMode ? tokens.textMuted : '#64748B' },
+                  ];
+                  const activeOpt = supplierStatusOptions.find((o) => o.id === supplierFilterStatus) || supplierStatusOptions[0];
+
+                  return (
+                    <>
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 8,
+                          backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                          borderWidth: 1.5,
+                          borderColor: isSupplierFilterDropdownOpen
+                            ? '#EA580C'
+                            : activeOpt.highlight
+                              ? '#F59E0B'
+                              : supplierFilterStatus !== 'All'
+                                ? '#EA580C'
+                                : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                          borderRadius: 12,
+                          paddingHorizontal: 14,
+                          paddingVertical: 9,
+                          minWidth: 185,
+                          cursor: 'pointer',
+                          boxShadow: isSupplierFilterDropdownOpen
+                            ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
+                            : '0 1px 3px rgba(0, 0, 0, 0.04)',
+                        }}
+                        onPress={() => setIsSupplierFilterDropdownOpen((prev) => !prev)}
+                        activeOpacity={0.85}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+                          <BootstrapIcon
+                            name={activeOpt.icon}
+                            size={13}
+                            color={
+                              activeOpt.highlight
+                                ? '#D97706'
+                                : supplierFilterStatus !== 'All'
+                                  ? activeOpt.color
+                                  : '#64748B'
+                            }
+                          />
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              fontWeight: '700',
+                              color:
+                                activeOpt.highlight
+                                  ? '#B45309'
+                                  : supplierFilterStatus !== 'All'
+                                    ? '#EA580C'
+                                    : isDarkMode ? tokens.textPrimary : '#0F172A',
+                            }}
+                          >
+                            {activeOpt.label}
+                          </Text>
+                          <View
+                            style={{
+                              backgroundColor:
+                                activeOpt.highlight
+                                  ? '#FEF3C7'
+                                  : supplierFilterStatus !== 'All'
+                                    ? '#EA580C'
+                                    : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                              paddingHorizontal: 6,
+                              paddingVertical: 1,
+                              borderRadius: 8,
+                              marginLeft: 2,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: '600',
+                                color:
+                                  activeOpt.highlight
+                                    ? '#B45309'
+                                    : supplierFilterStatus !== 'All'
+                                      ? '#FFFFFF'
+                                      : isDarkMode ? '#CBD5E1' : '#475569',
+                              }}
+                            >
+                              {activeOpt.count}
+                            </Text>
+                          </View>
+                        </View>
+                        <BootstrapIcon
+                          name={isSupplierFilterDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                          size={12}
+                          color={isSupplierFilterDropdownOpen ? '#EA580C' : '#64748B'}
+                        />
+                      </TouchableOpacity>
+
+                      {/* Transparent backdrop for outside click */}
+                      {isSupplierFilterDropdownOpen && (
+                        <TouchableOpacity
+                          style={{
+                            position: 'fixed',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            zIndex: 99998,
+                            backgroundColor: 'transparent',
+                            cursor: 'default',
+                          }}
+                          onPress={() => setIsSupplierFilterDropdownOpen(false)}
+                          activeOpacity={1}
+                        />
+                      )}
+
+                      {/* Floating Dropdown Menu */}
+                      {isSupplierFilterDropdownOpen && (
+                        <View
+                          style={{
+                            position: 'absolute',
+                            top: '100%',
+                            left: 0,
+                            marginTop: 6,
+                            minWidth: 230,
+                            backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                            borderRadius: 14,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                            boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
+                            zIndex: 99999,
+                            padding: 6,
+                            gap: 3,
+                            maxHeight: 280,
+                            overflowY: 'auto',
+                          }}
+                        >
+                          {supplierStatusOptions.map((option) => {
+                            const isSelected = supplierFilterStatus === option.id;
+                            return (
+                              <TouchableOpacity
+                                key={option.id}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 9,
+                                  borderRadius: 9,
+                                  backgroundColor: isSelected
+                                    ? isDarkMode ? '#132A26' : '#E8F0EC'
+                                    : 'transparent',
+                                  cursor: 'pointer',
+                                }}
+                                onPress={() => {
+                                  setSupplierFilterStatus(option.id);
+                                  setIsSupplierFilterDropdownOpen(false);
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                  <BootstrapIcon
+                                    name={option.icon}
+                                    size={14}
+                                    color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
+                                  />
+                                  <Text
+                                    style={{
+                                      fontSize: 13,
+                                      fontWeight: isSelected ? '600' : '500',
+                                      color: isSelected
+                                        ? isDarkMode
+                                          ? tokens.accentBrand
+                                          : '#EA580C'
+                                        : isDarkMode
+                                          ? tokens.textSecondary
+                                          : '#334155',
+                                    }}
+                                  >
+                                    {option.label}
+                                  </Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <View
+                                    style={{
+                                      backgroundColor: option.highlight
+                                        ? isDarkMode
+                                          ? 'rgba(251, 191, 36, 0.2)'
+                                          : '#FEF3C7'
+                                        : isSelected
+                                          ? isDarkMode
+                                            ? 'rgba(16, 185, 129, 0.22)'
+                                            : '#EA580C'
+                                          : isDarkMode
+                                            ? tokens.bgSub
+                                            : '#E2E8F0',
+                                      paddingHorizontal: 6,
+                                      paddingVertical: 1,
+                                      borderRadius: 6,
+                                    }}
+                                  >
+                                    <Text
+                                      style={{
+                                        fontSize: 10.5,
+                                        fontWeight: '600',
+                                        color: option.highlight
+                                          ? isDarkMode
+                                            ? tokens.statusWarningText
+                                            : '#B45309'
+                                          : isSelected
+                                            ? isDarkMode
+                                              ? tokens.accentBrand
+                                              : '#FFFFFF'
+                                            : isDarkMode
+                                              ? tokens.textMuted
+                                              : '#475569',
+                                      }}
+                                    >
+                                      {option.count}
+                                    </Text>
+                                  </View>
+                                  {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />}
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      )}
+                    </>
+                  );
+                })()}
+              </View>
+
+              {/* View Mode Toggle (List vs Grid) */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                  borderRadius: 8,
+                  padding: 3,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                }}
+              >
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 6,
+                    backgroundColor: supplierViewMode === 'list' ? '#EA580C' : 'transparent',
+                  }}
+                  onPress={() => setSupplierViewMode('list')}
+                >
+                  <BootstrapIcon
+                    name="list-ul"
+                    size={13}
+                    color={supplierViewMode === 'list' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
+                  />
                   <Text
                     style={{
-                      fontSize: 11,
-                      color: pendingCodCount > 0 ? '#D97706' : '#64748B',
-                      fontWeight: pendingCodCount > 0 ? '700' : '400',
+                      fontSize: 11.5,
+                      fontWeight: '700',
+                      color: supplierViewMode === 'list' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B',
                     }}
                   >
-                    {pendingCodCount > 0 ? `${pendingCodCount} Pending COD` : `${orders.length} orders`}
+                    List
                   </Text>
-                </View>
-              </TouchableOpacity>
+                </TouchableOpacity>
 
-              {/* Promos */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'promos' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('promos');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="ticket-perforated-fill"
-                  size={20}
-                  color={activeNav === 'promos' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Promo Codes</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{promos.length} active vouchers</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Suppliers */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'suppliers' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('suppliers');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="truck"
-                  size={20}
-                  color={activeNav === 'suppliers' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Supplier</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{suppliers.length} vendors</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Garage */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'garage' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('garage');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="tools"
-                  size={20}
-                  color={activeNav === 'garage' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Pitstop Services</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>PMS & Tuning</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Mechanics */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'mechanics' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('mechanics');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="person-badge-fill"
-                  size={20}
-                  color={activeNav === 'mechanics' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Mechanics & Crew</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{garageMechanics.length} certified</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Riders */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'riders' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('riders');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="bicycle"
-                  size={20}
-                  color={activeNav === 'riders' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Riders</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{deliveryRiders.length} delivery staff</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Users */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'users' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('users');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="people-fill"
-                  size={20}
-                  color={activeNav === 'users' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>User Accounts</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{usersList.length} registered</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Ratings & Reports */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'ratings_reports' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('ratings_reports');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="star"
-                  size={20}
-                  color={activeNav === 'ratings_reports' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Ratings & reports</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                    {newReportsCount > 0 ? `${newReportsCount} new reports` : 'Customer feedback'}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Supabase DB */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'supabase' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('supabase');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="database-fill-gear"
-                  size={20}
-                  color={activeNav === 'supabase' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Supabase DB</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>Cloud Database</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Forecast & Stock */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'forecast' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('forecast');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="clipboard-data"
-                  size={20}
-                  color={activeNav === 'forecast' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Forecast & Stock</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>Demand & restock planner</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Activity Logs */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'audit' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('audit');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="journal-text"
-                  size={20}
-                  color={activeNav === 'audit' ? '#EA580C' : '#475569'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Activity Logs</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{auditLogs.length} tracked records</Text>
-                </View>
-              </TouchableOpacity>
-
-              {/* Notifications Center */}
-              <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'notifications' && styles.mobileMoreCardActive]}
-                onPress={() => {
-                  setActiveNav('notifications');
-                  setIsMobileMoreOpen(false);
-                }}
-              >
-                <BootstrapIcon
-                  name="bell-fill"
-                  size={20}
-                  color={activeNav === 'notifications' ? '#EA580C' : '#475569'}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Notifications</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                    {unreadNotificationsCount > 0 ? `${unreadNotificationsCount} unread alerts` : 'All alerts read'}
-                  </Text>
-                </View>
-                {unreadNotificationsCount > 0 && (
-                  <View
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 6,
+                    backgroundColor: supplierViewMode === 'grid' ? '#EA580C' : 'transparent',
+                  }}
+                  onPress={() => setSupplierViewMode('grid')}
+                >
+                  <BootstrapIcon
+                    name="grid"
+                    size={12}
+                    color={supplierViewMode === 'grid' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
+                  />
+                  <Text
                     style={{
-                      backgroundColor: '#E11D48',
-                      borderRadius: 10,
-                      paddingHorizontal: 7,
-                      paddingVertical: 2,
+                      fontSize: 11.5,
+                      fontWeight: '700',
+                      color: supplierViewMode === 'grid' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B',
                     }}
                   >
-                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '600' }}>
-                      {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+                    Grid
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Loading State or Empty State */}
+            {isSuppliersLoading ? (
+              <View style={styles.tableCard}>
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 190 }]}>Supplier & Contact</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130 }]}>Category & Lead Time</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 170 }]}>Contact & Address</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 120, textAlign: 'center' }]}>Status</Text>
+                  <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 120, textAlign: 'center' }]}>Actions</Text>
+                </View>
+                {[1, 2, 3, 4, 5].map((k) => (
+                  <View
+                    key={k}
+                    style={[
+                      styles.tableRow,
+                      {
+                        borderBottomColor: isDarkMode ? tokens.borderLight : '#F1F5F9',
+                        paddingVertical: 14,
+                        paddingHorizontal: 16,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                      },
+                    ]}
+                  >
+                    <View style={{ flex: 2.2, minWidth: 190, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Skeleton circle size={36} />
+                      <View style={{ flex: 1, gap: 6 }}>
+                        <Skeleton width="75%" height={14} borderRadius={4} />
+                        <Skeleton width="45%" height={10} borderRadius={3} />
+                      </View>
+                    </View>
+                    <View style={{ flex: 1.5, minWidth: 130, gap: 4 }}>
+                      <Skeleton width={80} height={20} borderRadius={6} />
+                      <Skeleton width={50} height={10} borderRadius={3} />
+                    </View>
+                    <View style={{ flex: 2.0, minWidth: 170, gap: 4 }}>
+                      <Skeleton width="85%" height={12} borderRadius={3} />
+                      <Skeleton width="60%" height={10} borderRadius={3} />
+                    </View>
+                    <View style={{ flex: 1.4, minWidth: 120, alignItems: 'center' }}>
+                      <Skeleton width={70} height={22} borderRadius={6} />
+                    </View>
+                    <View style={{ flex: 1.3, minWidth: 120, alignItems: 'center' }}>
+                      <Skeleton width={56} height={26} borderRadius={6} />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : filteredSuppliers.length === 0 ? (
+              <View
+                style={{
+                  backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                  borderRadius: 14,
+                  padding: 36,
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                }}
+              >
+                <BootstrapIcon name="truck" size={40} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: '600',
+                    color: isDarkMode ? '#F1F5F9' : '#0F172A',
+                    marginTop: 12,
+                  }}
+                >
+                  {supplierSearchQuery ? 'No matching suppliers found' : 'No suppliers in database'}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    color: isDarkMode ? tokens.textMuted : '#64748B',
+                    marginTop: 4,
+                    marginBottom: 16,
+                    textAlign: 'center',
+                    maxWidth: 440,
+                  }}
+                >
+                  {supplierSearchQuery
+                    ? `No supplier in the database matches "${supplierSearchQuery}"`
+                    : 'Your supplier directory is connected directly to Supabase. Register your first vendor or manufacturing partner to populate the database.'}
+                </Text>
+                <TouchableOpacity
+                  style={styles.addBtnPrimary}
+                  onPress={handleOpenAddSupplier}
+                >
+                  <BootstrapIcon name="plus-lg" size={14} color="#FFFFFF" />
+                  <Text style={styles.addBtnPrimaryText}>Add New Supplier</Text>
+                </TouchableOpacity>
+              </View>
+            ) : supplierViewMode === 'list' ? (
+              /* ─── LIST / TABLE VIEW ─── */
+              <View style={styles.tableCard}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  showsVerticalScrollIndicator={false}
+                  dataSet={{ tableScroll: 'true' }}
+                  style={{ width: '100%', ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}) }}
+                  contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
+                >
+                  <View style={{ width: '100%', minWidth: 1040, flexGrow: 1 }}>
+                    <View style={styles.tableHeaderRow}>
+                      <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 190 }]}>Supplier & Contact</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130 }]}>Category & Lead Time</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 2.0, minWidth: 170 }]}>Contact & Address</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.4, minWidth: 120, textAlign: 'center' }]}>Status</Text>
+                      <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 120, textAlign: 'center' }]}>Actions</Text>
+                    </View>
+
+                    <ScrollView
+                      showsVerticalScrollIndicator={false}
+                      showsHorizontalScrollIndicator={false}
+                      nestedScrollEnabled={true}
+                      dataSet={{ tableScroll: 'true' }}
+                      style={{
+                        maxHeight: 560,
+                        width: '100%',
+                        ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}),
+                      }}
+                      contentContainerStyle={{ flexGrow: 1 }}
+                    >
+                      {filteredSuppliers.map((sup) => {
+                        const supId = sup.supplier_id || sup.id;
+                        const status = sup.status || 'Active';
+                        const isActive = status.toLowerCase() === 'active';
+                        const isPending = status.toLowerCase() === 'pending';
+
+                        return (
+                          <View key={supId} style={styles.tableRow}>
+                            <View style={{ flex: 2.2, minWidth: 190, flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 8 }}>
+                              <View
+                                style={{
+                                  width: 38,
+                                  height: 38,
+                                  borderRadius: 10,
+                                  backgroundColor: isDarkMode ? '#1E293B' : '#FFF7ED',
+                                  borderWidth: 1.5,
+                                  borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <BootstrapIcon name="building" size={18} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.tableTitle} numberOfLines={1}>
+                                  {sup.name}
+                                </Text>
+                                <Text style={styles.tableSub} numberOfLines={1}>
+                                  {sup.contact_person || 'Purchasing Rep'} · ★ {sup.rating || '5.0'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View style={{ flex: 1.5, minWidth: 130, paddingRight: 8 }}>
+                              <Text style={styles.tableTitle} numberOfLines={1}>
+                                {sup.categories || 'Exhaust & Performance'}
+                              </Text>
+                              <Text style={styles.tableSub} numberOfLines={1}>
+                                Lead {sup.lead_time || '3-5 Days'}
+                              </Text>
+                            </View>
+
+                            <View style={{ flex: 2.0, minWidth: 170, paddingRight: 8 }}>
+                              <Text style={styles.tableTitle} numberOfLines={1}>
+                                {sup.email || sup.phone || 'No contact'}
+                              </Text>
+                              <Text style={styles.tableSub} numberOfLines={1}>
+                                {sup.address || (sup.phone && sup.email ? sup.phone : 'No address')}
+                              </Text>
+                            </View>
+
+                            <View style={{ flex: 1.4, minWidth: 120, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                              <View
+                                style={[
+                                  styles.tableStatusPill,
+                                  {
+                                    backgroundColor: isActive
+                                      ? '#2E7D32'
+                                      : isPending
+                                        ? isDarkMode
+                                          ? 'rgba(245, 158, 11, 0.18)'
+                                          : '#FEF3C7'
+                                        : isDarkMode
+                                          ? tokens.badgeNeutralBg
+                                          : '#F1F5F9',
+                                    borderRadius: isActive ? 6 : 999,
+                                    ...(isActive
+                                      ? {
+                                        shadowColor: '#1B5E20',
+                                        shadowOffset: { width: 0, height: 1 },
+                                        shadowOpacity: 0.28,
+                                        shadowRadius: 2,
+                                        elevation: 2,
+                                      }
+                                      : null),
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.tableStatusPillText,
+                                    {
+                                      color: isActive
+                                        ? '#FFFFFF'
+                                        : isPending
+                                          ? isDarkMode
+                                            ? '#FBBF24'
+                                            : '#B45309'
+                                          : isDarkMode
+                                            ? tokens.badgeNeutralText
+                                            : '#334155',
+                                    },
+                                  ]}
+                                >
+                                  {status}
+                                </Text>
+                              </View>
+                              <Text style={styles.tableStatusSub} numberOfLines={1}>
+                                {isActive ? 'Approved vendor' : isPending ? 'Awaiting review' : 'Inactive'}
+                              </Text>
+                            </View>
+
+                            <View
+                              style={{
+                                flex: 1.3,
+                                minWidth: 120,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 8,
+                                flexShrink: 0,
+                              }}
+                            >
+                              <TouchableOpacity
+                                style={styles.tableOutlineBtn}
+                                onPress={() => handleOpenEditSupplier(sup)}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.tableOutlineBtnText}>Edit</Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
+                                onPress={() => handleDeleteSupplier(sup)}
+                              >
+                                <BootstrapIcon name="trash3" size={14} color={isDarkMode ? tokens.statusDangerText : '#DC2626'} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                </ScrollView>
+              </View>
+            ) : (
+              /* ─── GRID VIEW ─── */
+              <View style={styles.mechanicsGrid}>
+                {filteredSuppliers.map((sup) => {
+                  const supId = sup.supplier_id || sup.id;
+                  const status = sup.status || 'Active';
+                  const isActive = status.toLowerCase() === 'active';
+                  const isPending = status.toLowerCase() === 'pending';
+
+                  return (
+                    <View key={supId} style={styles.mechanicCard}>
+                      {/* Card Header: Icon + Info + Status */}
+                      <View style={styles.mechanicCardHeader}>
+                        <View
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 12,
+                            backgroundColor: isDarkMode ? '#1E293B' : '#FFF7ED',
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <BootstrapIcon name="truck" size={20} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
+                        </View>
+                        <View style={styles.mechanicHeaderInfo}>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              gap: 6,
+                              marginBottom: 4,
+                            }}
+                          >
+                            <View
+                              style={[
+                                styles.mechanicStatusBadge,
+                                isActive
+                                  ? styles.mechanicStatusAvailable
+                                  : isPending
+                                    ? styles.mechanicStatusBusy
+                                    : { backgroundColor: isDarkMode ? tokens.borderInput : '#F1F5F9', borderColor: '#94A3B8' },
+                              ]}
+                            >
+                              <View
+                                style={{
+                                  width: 6,
+                                  height: 6,
+                                  borderRadius: 3,
+                                  backgroundColor: isActive ? '#10B981' : isPending ? '#D97706' : '#94A3B8',
+                                }}
+                              />
+                              <Text
+                                style={
+                                  isActive
+                                    ? styles.mechanicStatusAvailableText
+                                    : isPending
+                                      ? styles.mechanicStatusBusyText
+                                      : { fontSize: 10.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B' }
+                                }
+                              >
+                                {status}
+                              </Text>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
+                              <BootstrapIcon name="star-fill" size={11} color={isDarkMode ? tokens.statusWarningText : "#F59E0B"} />
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: '600',
+                                  color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                                }}
+                              >
+                                {sup.rating || '5.0'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <Text style={styles.mechanicName} numberOfLines={2}>
+                            {sup.name}
+                          </Text>
+                          <Text style={styles.mechanicShortName}>
+                            Contact: {sup.contact_person || 'Purchasing Rep'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Category Badge & Lead Time */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          marginVertical: 10,
+                          gap: 8,
+                        }}
+                      >
+                        <View
+                          style={{
+                            backgroundColor: isDarkMode ? 'rgba(234, 88, 12,0.2)' : '#E8F0EC',
+                            paddingHorizontal: 9,
+                            paddingVertical: 4,
+                            borderRadius: 6,
+                            flex: 1,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: '700',
+                              color: isDarkMode ? '#5EEAD4' : '#EA580C',
+                            }}
+                            numberOfLines={1}
+                          >
+                            {sup.categories || 'Exhaust & Performance'}
+                          </Text>
+                        </View>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 4,
+                            backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                            paddingHorizontal: 8,
+                            paddingVertical: 4,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                          }}
+                        >
+                          <BootstrapIcon name="clock" size={11} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+                          <Text
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: '700',
+                              color: isDarkMode ? '#CBD5E1' : '#475569',
+                            }}
+                          >
+                            {sup.lead_time || '3-5 Days'}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Contact Details */}
+                      <View style={styles.mechanicInfoRow}>
+                        <BootstrapIcon name="envelope-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
+                        <Text style={styles.mechanicInfoText} numberOfLines={1}>
+                          {sup.email || 'No email provided'}
+                        </Text>
+                      </View>
+                      <View style={styles.mechanicInfoRow}>
+                        <BootstrapIcon name="telephone-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
+                        <Text style={styles.mechanicInfoText} numberOfLines={1}>
+                          {sup.phone || 'No phone number'}
+                        </Text>
+                      </View>
+                      {sup.address ? (
+                        <View style={styles.mechanicInfoRow}>
+                          <BootstrapIcon name="geo-alt-fill" size={12} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
+                          <Text style={styles.mechanicInfoText} numberOfLines={1}>
+                            {sup.address}
+                          </Text>
+                        </View>
+                      ) : null}
+
+                      {/* Card Footer: Edit & Remove */}
+                      <View style={styles.mechanicCardFooter}>
+                        <TouchableOpacity
+                          style={{
+                            flex: 1,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            paddingVertical: 7,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            backgroundColor: isDarkMode ? '#1E293B' : '#F8FAFC',
+                          }}
+                          onPress={() => handleOpenEditSupplier(sup)}
+                        >
+                          <BootstrapIcon
+                            name="pencil-square"
+                            size={12}
+                            color={isDarkMode ? tokens.textMuted : '#475569'}
+                          />
+                          <Text
+                            style={{
+                              fontSize: 11.5,
+                              fontWeight: '700',
+                              color: isDarkMode ? '#E2E8F0' : '#475569',
+                            }}
+                          >
+                            Edit Details
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                            borderRadius: 8,
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? tokens.chipBorder : '#FCA5A5',
+                            backgroundColor: isDarkMode ? tokens.statusDangerBg : '#FEF2F2',
+                          }}
+                          onPress={() => handleDeleteSupplier(sup)}
+                        >
+                          <BootstrapIcon name="trash3-fill" size={12} color={isDarkMode ? tokens.statusDangerText : "#DC2626"} />
+                          <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? tokens.statusDangerText : '#DC2626' }}>
+                            Remove
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        )}
+
+        {/* ─── TAB 8: USER ACCOUNTS ─── */}
+        {activeNav === 'users' && (
+          <View>
+            <View style={styles.toolbarRow}>
+              <View style={styles.searchInputBox}>
+                <BootstrapIcon name="search" size={14} color={isDarkMode ? tokens.textMuted : "#64748B"} style={{ marginRight: 8 }} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search users by name, email or phone..."
+                  placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                  value={userSearchQuery}
+                  onChangeText={setUserSearchQuery}
+                />
+              </View>
+            </View>
+
+            <View style={styles.tableCard}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                showsVerticalScrollIndicator={false}
+                dataSet={{ tableScroll: 'true' }}
+                style={{ width: '100%', ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}) }}
+                contentContainerStyle={{ minWidth: '100%', flexGrow: 1 }}
+              >
+                <View style={{ width: '100%', minWidth: 920, flexGrow: 1 }}>
+                  <View style={styles.tableHeaderRow}>
+                    <Text style={[styles.tableHeaderCell, { flex: 2.2, minWidth: 180 }]}>User & Email</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1.3, minWidth: 110 }]}>Role</Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1.5, minWidth: 130, textAlign: 'center' }]}>
+                      Status
+                    </Text>
+                    <Text style={[styles.tableHeaderCell, { flex: 1.8, minWidth: 180, textAlign: 'center' }]}>
+                      Actions
                     </Text>
                   </View>
-                )}
-              </TouchableOpacity>
 
-              {/* System Settings */}
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    showsHorizontalScrollIndicator={false}
+                    nestedScrollEnabled={true}
+                    dataSet={{ tableScroll: 'true' }}
+                    style={{
+                      maxHeight: 560,
+                      width: '100%',
+                      ...(Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {}),
+                    }}
+                    contentContainerStyle={{ flexGrow: 1 }}
+                  >
+                    {usersList
+                      .filter(
+                        (u) =>
+                          !userSearchQuery ||
+                          u.name?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+                          u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
+                      )
+                      .map((u) => {
+                        const isDisabled = u.status === 'disabled' || u.status === 'inactive';
+                        const isPending = u.status === 'pending_verification';
+                        const currentAdminId = currentUser?.user_id || currentUser?.id;
+                        const rowUserId = u.user_id || u.id;
+                        const isSelf = Boolean(currentAdminId && rowUserId && currentAdminId === rowUserId);
+                        const isAdminRole = u.role === 'admin';
+                        const roleLabel =
+                          u.role === 'admin'
+                            ? 'Admin'
+                            : u.role === 'rider'
+                              ? 'Rider'
+                              : u.role === 'mechanic'
+                                ? 'Mechanic'
+                                : 'Customer';
+                        const roleSub =
+                          u.role === 'admin'
+                            ? 'Full access'
+                            : u.role === 'rider'
+                              ? 'Delivery staff'
+                              : u.role === 'mechanic'
+                                ? 'Garage staff'
+                                : 'Store account';
+                        const avatarBg =
+                          u.role === 'admin'
+                            ? '#EA580C'
+                            : u.role === 'rider'
+                              ? '#0F766E'
+                              : u.role === 'mechanic'
+                                ? '#B45309'
+                                : '#3B82F6';
+                        return (
+                          <View
+                            key={u.id}
+                            style={[
+                              styles.tableRow,
+                              (isDisabled || isPending) && { opacity: 0.75, backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC' },
+                            ]}
+                          >
+                            <View style={{ flex: 2.2, minWidth: 180, flexDirection: 'row', alignItems: 'center', gap: 10, paddingRight: 8 }}>
+                              <View
+                                style={{
+                                  width: 34,
+                                  height: 34,
+                                  borderRadius: 17,
+                                  backgroundColor: avatarBg,
+                                  justifyContent: 'center',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13 }}>
+                                  {(u.name || 'U').charAt(0).toUpperCase()}
+                                </Text>
+                              </View>
+                              <View style={{ flex: 1 }}>
+                                <Text style={styles.tableTitle} numberOfLines={1}>
+                                  {u.name || 'Anonymous User'}
+                                  {isSelf ? ' (You)' : ''}
+                                </Text>
+                                <Text style={styles.tableSub} numberOfLines={1}>
+                                  {u.email || 'No email provided'}
+                                </Text>
+                              </View>
+                            </View>
+
+                            <View style={{ flex: 1.3, minWidth: 110, paddingRight: 8 }}>
+                              <Text style={styles.tableTitle} numberOfLines={1}>
+                                {roleLabel}
+                              </Text>
+                              <Text style={styles.tableSub} numberOfLines={1}>
+                                {roleSub}
+                              </Text>
+                            </View>
+
+                            <View style={{ flex: 1.5, minWidth: 130, alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                              <View
+                                style={[
+                                  styles.tableStatusPill,
+                                  {
+                                    backgroundColor: isPending
+                                      ? isDarkMode
+                                        ? 'rgba(245, 158, 11, 0.18)'
+                                        : '#FEF3C7'
+                                      : isDisabled
+                                        ? isDarkMode
+                                          ? 'rgba(239, 68, 68, 0.16)'
+                                          : '#FEE2E2'
+                                        : '#2E7D32',
+                                    borderRadius: isDisabled || isPending ? 999 : 6,
+                                    ...(!isDisabled && !isPending
+                                      ? {
+                                        shadowColor: '#1B5E20',
+                                        shadowOffset: { width: 0, height: 1 },
+                                        shadowOpacity: 0.28,
+                                        shadowRadius: 2,
+                                        elevation: 2,
+                                      }
+                                      : null),
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.tableStatusPillText,
+                                    {
+                                      color: isPending
+                                        ? isDarkMode
+                                          ? '#FCD34D'
+                                          : '#B45309'
+                                        : isDisabled
+                                          ? isDarkMode
+                                            ? '#FCA5A5'
+                                            : '#B91C1C'
+                                          : '#FFFFFF',
+                                    },
+                                  ]}
+                                >
+                                  {isPending ? 'Pending' : isDisabled ? 'Disabled' : 'Active'}
+                                </Text>
+                              </View>
+                              <Text style={styles.tableStatusSub} numberOfLines={1}>
+                                {isPending ? 'Awaiting OTP' : isDisabled ? 'Login blocked' : 'Can sign in'}
+                              </Text>
+                            </View>
+
+                            <View
+                              style={{
+                                flex: 1.8,
+                                minWidth: 180,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 8,
+                                flexShrink: 0,
+                              }}
+                            >
+                              <TouchableOpacity
+                                style={[styles.tableOutlineBtn, isSelf && { opacity: 0.45 }]}
+                                onPress={() => handleToggleUserStatus(u.id, u.name, u.status)}
+                                disabled={isSelf}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.tableOutlineBtnText}>
+                                  {isDisabled ? 'Enable' : 'Disable'}
+                                </Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[styles.tableOutlineBtn, isSelf && { opacity: 0.45 }]}
+                                onPress={() => handleToggleUserRole(u.id, u.role)}
+                                disabled={isSelf}
+                                activeOpacity={0.8}
+                              >
+                                <Text style={styles.tableOutlineBtnText}>
+                                  {isAdminRole ? 'Demote' : 'Promote'}
+                                </Text>
+                              </TouchableOpacity>
+                              <TouchableOpacity
+                                style={[
+                                  styles.actionIconBtn,
+                                  styles.actionIconBtnDanger,
+                                  (isSelf || isAdminRole) && { opacity: 0.45 },
+                                ]}
+                                onPress={() => handleDeleteUser(u.id, u.name, u.role)}
+                                disabled={isSelf || isAdminRole}
+                              >
+                                <BootstrapIcon name="trash3" size={14} color={isDarkMode ? tokens.statusDangerText : '#EF4444'} />
+                              </TouchableOpacity>
+                            </View>
+                          </View>
+                        );
+                      })}
+                  </ScrollView>
+                </View>
+              </ScrollView>
+            </View>
+          </View>
+        )}
+
+        {/* ─── TAB: CUSTOMER RATINGS AND REPORTS MANAGEMENT ─── */}
+        {activeNav === 'ratings_reports' && (
+          <AdminCustomerRatingsReportsPanel
+            isDarkMode={isDarkMode}
+            tokens={tokens}
+            isDesktop={isDesktop}
+            currentUser={currentUser}
+            showToast={showToast}
+          />
+        )}
+
+        {/* ─── TAB 9: SUPABASE SETTINGS ─── */}
+        {activeNav === 'supabase' && (
+          <View>
+            <View style={[styles.tableCard, { padding: 24 }]}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BootstrapIcon name="database-fill-check" size={20} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
+                </View>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                  Cloud Database Connection (Supabase)
+                </Text>
+              </View>
+              <Text style={{ color: isDarkMode ? tokens.textMuted : '#64748B', fontSize: 13, marginBottom: 18, lineHeight: 20 }}>
+                Configure the live PostgreSQL database URL and public anon key for real-time order and
+                product synchronization. Note: Supabase project URLs always end with{' '}
+                <Text style={{ fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>.supabase.co</Text>.
+              </Text>
+
+              <Text style={styles.formLabel}>Supabase Project URL</Text>
+              <TextInput
+                style={styles.formInput}
+                value={supabaseUrl}
+                onChangeText={setSupabaseUrl}
+                placeholder="https://vtbdmurblidtdghaotne.supabase.co"
+                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                autoCapitalize="none"
+              />
+              <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 3, marginBottom: 14 }}>
+                Correct format:{' '}
+                <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '600' }}>
+                  https://vtbdmurblidtdghaotne.supabase.co
+                </Text>
+              </Text>
+
+              <Text style={styles.formLabel}>Supabase Public Anon Key</Text>
+              <TextInput
+                style={styles.formInput}
+                value={supabaseKey}
+                onChangeText={setSupabaseKey}
+                placeholder="eyJhbGciOi..."
+                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                autoCapitalize="none"
+              />
+              <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 3, marginBottom: 18 }}>
+                Use the client <Text style={{ fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>anon/public</Text>{' '}
+                JWT key (starts with eyJhbGci...).
+              </Text>
+
+              <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
+                <TouchableOpacity
+                  style={styles.addBtnPrimary}
+                  onPress={async () => {
+                    const saved = supabaseManager.saveCredentials(supabaseUrl, supabaseKey);
+                    setSupabaseUrl(saved.url);
+                    setSupabaseKey(saved.key);
+                    const res = await supabaseManager.testConnection();
+                    setConnectionStatus({ tested: true, connected: res.connected, message: res.message });
+                    showToast(res.connected ? 'Supabase Connected Live!' : res.message);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="plug-fill" size={14} color="#FFFFFF" />
+                  <Text style={styles.addBtnPrimaryText}>Save & Test Live Connection</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.addBtnPrimary,
+                    { backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7', borderWidth: 1, borderColor: isDarkMode ? tokens.accentBorder : '#EA580C' },
+                  ]}
+                  onPress={async () => {
+                    const defs = supabaseManager.resetToDefaults();
+                    setSupabaseUrl(defs.url);
+                    setSupabaseKey(defs.key);
+                    const res = await supabaseManager.testConnection();
+                    setConnectionStatus({ tested: true, connected: res.connected, message: res.message });
+                    showToast(res.connected ? 'Restored Project Defaults!' : res.message);
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="arrow-counterclockwise" size={14} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
+                  <Text style={[styles.addBtnPrimaryText, { color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}>
+                    Restore Default Project Credentials
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {connectionStatus.tested && (
+                <View
+                  style={{
+                    marginTop: 18,
+                    padding: 14,
+                    borderRadius: 12,
+                    backgroundColor: connectionStatus.connected ? '#ECFDF5' : '#FEF2F2',
+                    borderWidth: 1,
+                    borderColor: connectionStatus.connected ? '#A7F3D0' : '#FECACA',
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: connectionStatus.connected ? '#065F46' : '#991B1B',
+                      fontWeight: '700',
+                      fontSize: 13.5,
+                      lineHeight: 20,
+                    }}
+                  >
+                    {connectionStatus.connected ? 'Connection Active: ' : 'Error: '}{' '}
+                    {connectionStatus.message}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* ─── TAB 10: NOTIFICATIONS & ALERTS CENTER ─── */}
+        {activeNav === 'notifications' && (
+          <NotificationsPage
+            isAdmin={true}
+            isDarkMode={isDarkMode}
+            onNavigateToOrders={() => setActiveNav('orders')}
+            onNavigateToGarage={() => {
+              setActiveNav('garage');
+              setGarageSubTab('bookings');
+            }}
+            onNavigateToAdmin={() => setActiveNav('overview')}
+            onNavigateToShop={handleBackToStorefront}
+            onNavigateToInventory={() => setActiveNav('inventory')}
+            onNavigateToSuppliers={() => setActiveNav('suppliers')}
+            onNavigateToUsers={() => setActiveNav('users')}
+            onNavigateToSettings={() => setActiveNav('settings')}
+          />
+        )}
+
+        {/* ─── TAB 11: SYSTEM & PLATFORM SETTINGS ─── */}
+        {activeNav === 'settings' && (
+          <AdminSystemSettingsPanel
+            isDarkMode={isDarkMode}
+            tokens={tokens}
+            showToast={showToast}
+            showConfirm={showConfirm}
+            isDesktop={isDesktop}
+            products={products}
+            orders={orders}
+            garageBookings={garageBookings}
+            usersList={usersList}
+            mechanicsList={garageMechanics}
+            suppliers={suppliers}
+            toggleDarkMode={toggleDarkMode}
+          />
+        )}
+
+        {/* ─── TAB 12: ACTIVITY LOGS & AUDIT DASHBOARD ─── */}
+        {activeNav === 'audit' && (
+          <View>
+            {/* Click-outside backdrop for open dropdowns */}
+            {(isDateRangeDropdownOpen || isAuditCategoryDropdownOpen || isAuditSeverityDropdownOpen) && (
               <TouchableOpacity
-                style={[styles.mobileMoreCard, activeNav === 'settings' && styles.mobileMoreCardActive]}
+                style={{
+                  position: 'fixed',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  zIndex: 99998,
+                  backgroundColor: 'transparent',
+                  cursor: 'default',
+                }}
                 onPress={() => {
-                  setActiveNav('settings');
-                  setIsMobileMoreOpen(false);
+                  setIsDateRangeDropdownOpen(false);
+                  setIsAuditCategoryDropdownOpen(false);
+                  setIsAuditSeverityDropdownOpen(false);
+                }}
+                activeOpacity={1}
+              />
+            )}
+
+            {/* ─── 1. Page Header Card ─── */}
+            <View
+              style={[
+                styles.tableCard,
+                {
+                  padding: 20,
+                  marginBottom: 16,
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+                  backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
+                },
+              ]}
+            >
+              <View
+                style={{
+                  flexDirection: isDesktop ? 'row' : 'column',
+                  alignItems: isDesktop ? 'center' : 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: 14,
                 }}
               >
-                <BootstrapIcon
-                  name="gear-fill"
-                  size={20}
-                  color={activeNav === 'settings' ? '#EA580C' : '#475569'}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>System Settings</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>Store rules & maintenance</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View
+                    style={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 10,
+                      backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <BootstrapIcon name="journal-text" size={20} color={isDarkMode ? tokens.accentBrand : '#059669'} />
+                  </View>
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text
+                        style={{
+                          fontSize: 19,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          letterSpacing: -0.3,
+                        }}
+                      >
+                        Activity Logs
+                      </Text>
+                      <View
+                        style={{
+                          backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
+                          paddingHorizontal: 7,
+                          paddingVertical: 2,
+                          borderRadius: 6,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: '700',
+                            color: isDarkMode ? tokens.accentBrand : '#059669',
+                            letterSpacing: 0.3,
+                          }}
+                        >
+                          IMMUTABLE
+                        </Text>
+                      </View>
+                    </View>
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        color: isDarkMode ? tokens.textMuted : '#64748B',
+                        marginTop: 3,
+                      }}
+                    >
+                      Track administrative actions, inventory changes, approvals, and security events.
+                    </Text>
+                  </View>
                 </View>
-              </TouchableOpacity>
 
-              {/* Change Password */}
-              <TouchableOpacity
-                style={[
-                  styles.mobileMoreCard,
-                  { backgroundColor: isDarkMode ? '#142826' : '#F3F7F6', borderColor: isDarkMode ? '#1F4742' : '#C8DDD3' },
-                ]}
-                onPress={() => {
-                  setIsMobileMoreOpen(false);
-                  setIsAdminAccountOpen(true);
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      paddingHorizontal: 14,
+                      paddingVertical: 8,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
+                      backgroundColor: isDarkMode ? '#132A26' : '#FFFFFF',
+                      cursor: 'pointer',
+                    }}
+                    onPress={handleExportAuditLogs}
+                    activeOpacity={0.8}
+                  >
+                    <BootstrapIcon name="download" size={13} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+                    <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '700', fontSize: 12.5 }}>
+                      Export CSV
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* ─── 2. Four KPI Summary Cards ─── */}
+            <View
+              style={{
+                flexDirection: isDesktop ? 'row' : 'column',
+                gap: 12,
+                marginBottom: 16,
+                flexWrap: 'wrap',
+              }}
+            >
+              {/* 1. Total Events */}
+              <View
+                style={{
+                  flex: 1,
+                  minWidth: 160,
+                  backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                  padding: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                 }}
               >
-                <BootstrapIcon name="key-fill" size={20} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
-                    Change Password
+                <View style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 24, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                    {totalEventsCount}
                   </Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
-                    Account & login password
+                  <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
+                    Total Events
                   </Text>
                 </View>
-              </TouchableOpacity>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BootstrapIcon name="file-earmark-text" size={18} color={isDarkMode ? '#94A3B8' : '#475569'} />
+                </View>
+              </View>
 
-              {/* Change Security PIN */}
-              <TouchableOpacity
-                style={[
-                  styles.mobileMoreCard,
-                  { backgroundColor: isDarkMode ? '#142826' : '#FFF7ED', borderColor: isDarkMode ? '#1F4742' : '#FED7AA' },
-                ]}
-                onPress={() => {
-                  setIsMobileMoreOpen(false);
-                  setIsAdminPinModalOpen(true);
+              {/* 2. Successful */}
+              <View
+                style={{
+                  flex: 1,
+                  minWidth: 160,
+                  backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                  padding: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                 }}
               >
-                <BootstrapIcon name="shield-lock-fill" size={20} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
-                    Change Security PIN
+                <View style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 24, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                    {successfulEventsCount}
                   </Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
-                    Console lock PIN
+                  <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
+                    Successful
                   </Text>
                 </View>
-              </TouchableOpacity>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 20,
+                    backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BootstrapIcon name="check2-circle" size={18} color="#059669" />
+                </View>
+              </View>
 
-              {/* Dark Mode Toggle */}
-              <TouchableOpacity
-                style={[
-                  styles.mobileMoreCard,
-                  isDarkMode && { backgroundColor: '#1E293B', borderColor: '#334155' },
-                ]}
-                onPress={() => {
-                  toggleDarkMode();
-                  showToast(isDarkMode ? 'Switched to Light Theme' : 'Switched to Dark Theme');
+              {/* 3. Warnings */}
+              <View
+                style={{
+                  flex: 1,
+                  minWidth: 160,
+                  backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                  padding: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                 }}
               >
-                <BootstrapIcon
-                  name={isDarkMode ? 'sun-fill' : 'moon-stars-fill'}
-                  size={20}
-                  color={isDarkMode ? tokens.statusWarningText : '#64748B'}
-                />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                    {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+                <View style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 24, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                    {warningEventsCount}
                   </Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                    {isDarkMode ? 'Switch Theme' : 'Night Display'}
+                  <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
+                    Warnings
                   </Text>
                 </View>
-              </TouchableOpacity>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    backgroundColor: isDarkMode ? '#2D2012' : '#FFFBEB',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BootstrapIcon name="exclamation-triangle-fill" size={18} color="#D97706" />
+                </View>
+              </View>
 
-              {/* Live Storefront */}
-              <TouchableOpacity
-                style={[
-                  styles.mobileMoreCard,
-                  {
-                    backgroundColor: isDarkMode ? '#142826' : '#FEF3C7',
-                    borderColor: isDarkMode ? '#1F4742' : '#FDE68A',
-                  },
-                ]}
-                onPress={() => {
-                  setIsMobileMoreOpen(false);
-                  onNavigateToStore?.();
+              {/* 4. Critical */}
+              <View
+                style={{
+                  flex: 1,
+                  minWidth: 160,
+                  backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                  padding: 16,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
                 }}
               >
-                <BootstrapIcon name="shop" size={20} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>Live Storefront</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>View Store</Text>
+                <View style={{ gap: 4 }}>
+                  <Text style={{ fontSize: 24, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                    {criticalEventsCount}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '600' }}>
+                    Critical
+                  </Text>
                 </View>
-              </TouchableOpacity>
+                <View
+                  style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    backgroundColor: isDarkMode ? '#341515' : '#FEF2F2',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BootstrapIcon name="shield-fill-x" size={18} color="#DC2626" />
+                </View>
+              </View>
+            </View>
 
-              {/* Log Out */}
+            {/* ─── 3. Search & Filtering Toolbar ─── */}
+            <View
+              style={{
+                backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                padding: 12,
+                marginBottom: 16,
+                position: 'relative',
+                zIndex: isDateRangeDropdownOpen || isAuditCategoryDropdownOpen || isAuditSeverityDropdownOpen ? 99999 : 10,
+                elevation: 2,
+                boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: isDesktop ? 'row' : 'column',
+                  alignItems: isDesktop ? 'center' : 'stretch',
+                  gap: 10,
+                }}
+              >
+                {/* Search Field */}
+                <View
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 10,
+                    backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                    borderRadius: 9,
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                  }}
+                >
+                  <BootstrapIcon name="search" size={13} color={isDarkMode ? tokens.textMuted : '#64748B'} />
+                  <TextInput
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      outlineStyle: 'none',
+                    }}
+                    placeholder="Search action, admin, target, or details..."
+                    value={auditSearchQuery}
+                    onChangeText={(txt) => {
+                      setAuditSearchQuery(txt);
+                      setAuditCurrentPage(1);
+                    }}
+                    placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+                  />
+                  {Boolean(auditSearchQuery) && (
+                    <TouchableOpacity onPress={() => setAuditSearchQuery('')}>
+                      <BootstrapIcon name="x-circle-fill" size={13} color={isDarkMode ? tokens.textMuted : '#94A3B8'} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {/* Filter Controls Row */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  {/* Date Range Dropdown */}
+                  <View style={{ position: 'relative', zIndex: isDateRangeDropdownOpen ? 99999 : 10 }}>
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: auditDateRangeFilter !== '7d' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                        borderRadius: 9,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        cursor: 'pointer',
+                      }}
+                      onPress={() => {
+                        setIsDateRangeDropdownOpen((prev) => !prev);
+                        setIsAuditCategoryDropdownOpen(false);
+                        setIsAuditSeverityDropdownOpen(false);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <BootstrapIcon name="calendar3" size={12} color="#64748B" />
+                      <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                        {DATE_RANGE_OPTIONS.find((d) => d.id === auditDateRangeFilter)?.label || 'Last 7 days'}
+                      </Text>
+                      <BootstrapIcon name="chevron-down" size={10} color="#64748B" />
+                    </TouchableOpacity>
+
+                    {isDateRangeDropdownOpen && (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          marginTop: 6,
+                          minWidth: 160,
+                          backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                          boxShadow: '0 10px 25px -4px rgba(0,0,0,0.15)',
+                          zIndex: 99999,
+                          padding: 4,
+                        }}
+                      >
+                        {DATE_RANGE_OPTIONS.map((opt) => (
+                          <TouchableOpacity
+                            key={opt.id}
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 7,
+                              borderRadius: 6,
+                              backgroundColor: auditDateRangeFilter === opt.id ? (isDarkMode ? '#132A26' : '#ECFDF5') : 'transparent',
+                              cursor: 'pointer',
+                            }}
+                            onPress={() => {
+                              setAuditDateRangeFilter(opt.id);
+                              setAuditCurrentPage(1);
+                              setIsDateRangeDropdownOpen(false);
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 12.5,
+                                fontWeight: auditDateRangeFilter === opt.id ? '700' : '500',
+                                color: auditDateRangeFilter === opt.id ? '#059669' : isDarkMode ? tokens.textPrimary : '#334155',
+                              }}
+                            >
+                              {opt.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Category Dropdown */}
+                  <View style={{ position: 'relative', zIndex: isAuditCategoryDropdownOpen ? 99999 : 10 }}>
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: auditCategoryFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                        borderRadius: 9,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        cursor: 'pointer',
+                      }}
+                      onPress={() => {
+                        setIsAuditCategoryDropdownOpen((prev) => !prev);
+                        setIsDateRangeDropdownOpen(false);
+                        setIsAuditSeverityDropdownOpen(false);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <BootstrapIcon name="grid" size={12} color="#64748B" />
+                      <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                        {AUDIT_CATEGORIES.find((c) => c.id.toLowerCase() === auditCategoryFilter.toLowerCase())?.label || 'All categories'}
+                      </Text>
+                      <BootstrapIcon name="chevron-down" size={10} color="#64748B" />
+                    </TouchableOpacity>
+
+                    {isAuditCategoryDropdownOpen && (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          marginTop: 6,
+                          minWidth: 175,
+                          backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                          boxShadow: '0 10px 25px -4px rgba(0,0,0,0.15)',
+                          zIndex: 99999,
+                          padding: 4,
+                        }}
+                      >
+                        {AUDIT_CATEGORIES.map((cat) => (
+                          <TouchableOpacity
+                            key={cat.id}
+                            style={{
+                              paddingHorizontal: 10,
+                              paddingVertical: 7,
+                              borderRadius: 6,
+                              backgroundColor: auditCategoryFilter.toLowerCase() === cat.id.toLowerCase() ? (isDarkMode ? '#132A26' : '#ECFDF5') : 'transparent',
+                              cursor: 'pointer',
+                            }}
+                            onPress={() => {
+                              setAuditCategoryFilter(cat.id);
+                              setAuditCurrentPage(1);
+                              setIsAuditCategoryDropdownOpen(false);
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 12.5,
+                                fontWeight: auditCategoryFilter.toLowerCase() === cat.id.toLowerCase() ? '700' : '500',
+                                color: auditCategoryFilter.toLowerCase() === cat.id.toLowerCase() ? '#059669' : isDarkMode ? tokens.textPrimary : '#334155',
+                              }}
+                            >
+                              {cat.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Severity Dropdown */}
+                  <View style={{ position: 'relative', zIndex: isAuditSeverityDropdownOpen ? 99999 : 10 }}>
+                    <TouchableOpacity
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: isDarkMode ? tokens.bgMain : '#F8FAFC',
+                        borderWidth: 1,
+                        borderColor: auditSeverityFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                        borderRadius: 9,
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        cursor: 'pointer',
+                      }}
+                      onPress={() => {
+                        setIsAuditSeverityDropdownOpen((prev) => !prev);
+                        setIsDateRangeDropdownOpen(false);
+                        setIsAuditCategoryDropdownOpen(false);
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <BootstrapIcon name="shield-check" size={12} color="#64748B" />
+                      <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                        {auditSeverityFilter === 'All' ? 'All severities' : auditSeverityFilter}
+                      </Text>
+                      <BootstrapIcon name="chevron-down" size={10} color="#64748B" />
+                    </TouchableOpacity>
+
+                    {isAuditSeverityDropdownOpen && (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          top: '100%',
+                          left: 0,
+                          marginTop: 6,
+                          minWidth: 160,
+                          backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                          boxShadow: '0 10px 25px -4px rgba(0,0,0,0.15)',
+                          zIndex: 99999,
+                          padding: 4,
+                        }}
+                      >
+                        {AUDIT_SEVERITIES.map((sev) => (
+                          <TouchableOpacity
+                            key={sev.id}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                              paddingHorizontal: 10,
+                              paddingVertical: 7,
+                              borderRadius: 6,
+                              backgroundColor: auditSeverityFilter === sev.id ? (isDarkMode ? '#132A26' : '#ECFDF5') : 'transparent',
+                              cursor: 'pointer',
+                            }}
+                            onPress={() => {
+                              setAuditSeverityFilter(sev.id);
+                              setAuditCurrentPage(1);
+                              setIsAuditSeverityDropdownOpen(false);
+                            }}
+                          >
+                            {sev.dotColor && (
+                              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sev.dotColor }} />
+                            )}
+                            <Text
+                              style={{
+                                fontSize: 12.5,
+                                fontWeight: auditSeverityFilter === sev.id ? '700' : '500',
+                                color: auditSeverityFilter === sev.id ? '#059669' : isDarkMode ? tokens.textPrimary : '#334155',
+                              }}
+                            >
+                              {sev.label}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Filter / Reset Action Button */}
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6,
+                      backgroundColor: hasActiveAuditFilters ? (isDarkMode ? '#2D1616' : '#FEF2F2') : isDarkMode ? tokens.bgMain : '#F8FAFC',
+                      borderWidth: 1,
+                      borderColor: hasActiveAuditFilters ? '#F87171' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                      borderRadius: 9,
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      cursor: 'pointer',
+                    }}
+                    onPress={hasActiveAuditFilters ? handleResetAuditFilters : undefined}
+                    activeOpacity={hasActiveAuditFilters ? 0.75 : 1}
+                  >
+                    <BootstrapIcon
+                      name={hasActiveAuditFilters ? 'arrow-counterclockwise' : 'funnel'}
+                      size={12}
+                      color={hasActiveAuditFilters ? '#DC2626' : '#64748B'}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: '600',
+                        color: hasActiveAuditFilters ? '#DC2626' : isDarkMode ? tokens.textPrimary : '#334155',
+                      }}
+                    >
+                      {hasActiveAuditFilters ? 'Reset' : 'Filter'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+
+            {/* ─── 4. Activity Logs Table / List Container ─── */}
+            <View
+              style={{
+                backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                position: 'relative',
+              }}
+            >
+              {/* Table Column Headers (Desktop) */}
+              {isDesktop && (
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 20,
+                    paddingVertical: 12,
+                    backgroundColor: '#24272B',
+                    borderTopLeftRadius: 13,
+                    borderTopRightRadius: 13,
+                    borderBottomWidth: 1,
+                    borderBottomColor: isDarkMode ? '#374151' : '#32373D',
+                  }}
+                >
+                  <Text style={{ flex: 2.2, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5 }}>
+                    EVENT
+                  </Text>
+                  <Text style={{ flex: 1.7, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5 }}>
+                    ACTOR / TARGET
+                  </Text>
+                  <Text style={{ flex: 1.1, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5 }}>
+                    IP ADDRESS
+                  </Text>
+                  <Text style={{ flex: 0.9, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5 }}>
+                    TIME
+                  </Text>
+                  <Text style={{ flex: 0.9, fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5 }}>
+                    STATUS
+                  </Text>
+                  <Text style={{ width: 110, textAlign: 'right', fontSize: 11, fontWeight: '600', color: '#CBD5E1', letterSpacing: 0.5, paddingRight: 6 }}>
+                    ACTION
+                  </Text>
+                </View>
+              )}
+
+              {/* Empty State */}
+              {filteredAuditLogs.length === 0 ? (
+                <View style={{ padding: 48, alignItems: 'center', justifyContent: 'center' }}>
+                  <View
+                    style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginBottom: 12,
+                    }}
+                  >
+                    <BootstrapIcon name="journal-check" size={26} color={isDarkMode ? tokens.textMuted : '#94A3B8'} />
+                  </View>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#1E293B' }}>
+                    No Activity Log Entries
+                  </Text>
+                  <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 4, textAlign: 'center' }}>
+                    {auditSearchQuery || hasActiveAuditFilters
+                      ? 'No activity log entries match your current search and filters.'
+                      : 'No recorded actions found for this period.'}
+                  </Text>
+                  {hasActiveAuditFilters && (
+                    <TouchableOpacity
+                      style={{
+                        marginTop: 14,
+                        paddingHorizontal: 14,
+                        paddingVertical: 7,
+                        borderRadius: 8,
+                        backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? tokens.accentBorder : '#A7F3D0',
+                      }}
+                      onPress={handleResetAuditFilters}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#059669' }}>
+                        Reset All Filters
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              ) : (
+                /* Table / Cards Body */
+                paginatedAuditLogs.map((log, index) => {
+                  const isLast = index === paginatedAuditLogs.length - 1;
+                  const sev = (log.severity || 'INFO').toUpperCase();
+
+                  // Status Badge Colors
+                  const statusMeta = {
+                    CRITICAL: { label: 'CRITICAL', color: '#DC2626', dot: '#EF4444', bg: isDarkMode ? '#341515' : '#FEF2F2' },
+                    WARNING: { label: 'WARNING', color: '#D97706', dot: '#F59E0B', bg: isDarkMode ? '#2D2012' : '#FFFBEB' },
+                    SUCCESS: { label: 'SUCCESS', color: '#059669', dot: '#10B981', bg: isDarkMode ? '#132A26' : '#ECFDF5' },
+                    INFO: { label: 'INFO', color: '#2563EB', dot: '#3B82F6', bg: isDarkMode ? '#1E293B' : '#EFF6FF' },
+                  }[sev] || { label: sev, color: '#475569', dot: '#94A3B8', bg: isDarkMode ? '#1E293B' : '#F1F5F9' };
+
+                  // Action Title & Icon presentation
+                  const getPresentation = (action) => {
+                    switch (action) {
+                      case 'ORDER_APPROVED':
+                      case 'COD_ORDER_APPROVED':
+                        return { title: 'Order Approved', icon: 'check2', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
+                      case 'INVENTORY_RESTOCKED':
+                      case 'STOCK_REPLENISHED':
+                        return { title: 'Inventory Restocked', icon: 'box-seam', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
+                      case 'BOOKING_BAY_UPDATED':
+                      case 'BOOKING_STATUS_CHANGED':
+                        return { title: 'Booking Bay Updated', icon: 'calendar-check', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
+                      case 'SECURITY_PIN_VERIFIED':
+                        return { title: 'Security PIN Verified', icon: 'shield-lock', color: '#D97706', bg: isDarkMode ? '#2D2012' : '#FFFBEB' };
+                      case 'FAILED_LOGIN_ATTEMPT':
+                        return { title: 'Failed Login Attempt', icon: 'shield-x', color: '#DC2626', bg: isDarkMode ? '#341515' : '#FEF2F2' };
+                      case 'ORDER_STATUS_CHANGED':
+                        return { title: 'Order Status Changed', icon: 'truck', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
+                      case 'PROMO_CREATED':
+                        return { title: 'Promo Code Published', icon: 'ticket-perforated', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
+                      case 'SYSTEM_SETTINGS_UPDATED':
+                      case 'SYSTEM_SETTINGS_SAVED':
+                        return { title: 'System Settings Updated', icon: 'sliders', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
+                      case 'SUPPLIER_PO_SIGNED':
+                        return { title: 'Supplier PO Signed', icon: 'file-earmark-check', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
+                      case 'DATABASE_BACKUP_EXPORTED':
+                        return { title: 'Database Backup Exported', icon: 'database', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
+                      case 'USER_PERMISSIONS_MODIFIED':
+                        return { title: 'User Permissions Modified', icon: 'person-gear', color: '#D97706', bg: isDarkMode ? '#2D2012' : '#FFFBEB' };
+                      default: {
+                        const readable = (action || 'Operation')
+                          .replace(/_/g, ' ')
+                          .toLowerCase()
+                          .replace(/\b\w/g, (c) => c.toUpperCase());
+                        if (sev === 'CRITICAL') return { title: readable, icon: 'shield-x', color: '#DC2626', bg: isDarkMode ? '#341515' : '#FEF2F2' };
+                        if (sev === 'WARNING') return { title: readable, icon: 'shield-lock', color: '#D97706', bg: isDarkMode ? '#2D2012' : '#FFFBEB' };
+                        if (sev === 'SUCCESS') return { title: readable, icon: 'check2', color: '#059669', bg: isDarkMode ? '#132A26' : '#ECFDF5' };
+                        return { title: readable, icon: 'info-circle', color: '#2563EB', bg: isDarkMode ? '#1E293B' : '#EFF6FF' };
+                      }
+                    }
+                  };
+
+                  const meta = getPresentation(log.action);
+
+                  // Relative timestamp formatter
+                  const formatTime = (iso) => {
+                    if (!iso) return 'Just now';
+                    try {
+                      const diff = Date.now() - new Date(iso).getTime();
+                      const m = Math.floor(diff / 60000);
+                      const h = Math.floor(m / 60);
+                      const d = Math.floor(h / 24);
+                      if (m < 1) return 'Just now';
+                      if (m === 1) return '1 min ago';
+                      if (m < 60) return `${m} min ago`;
+                      if (h === 1) return '1 hour ago';
+                      if (h < 24) return `${h} hours ago`;
+                      if (d === 1) return 'Yesterday';
+                      return `${d} days ago`;
+                    } catch (_e) {
+                      return 'Recent';
+                    }
+                  };
+
+                  const isHovered = hoveredAuditRowId === (log.id || index);
+
+                  if (!isDesktop) {
+                    /* ─── Mobile Card View ─── */
+                    return (
+                      <TouchableOpacity
+                        key={log.id || index}
+                        style={{
+                          padding: 16,
+                          borderBottomWidth: isLast ? 0 : 1,
+                          borderBottomColor: isHovered
+                            ? (isDarkMode ? '#10B98133' : '#05966928')
+                            : (isDarkMode ? tokens.borderInput : '#F1F5F9'),
+                          borderLeftWidth: 5,
+                          borderLeftColor: isHovered ? (isDarkMode ? '#10B981' : '#059669') : 'transparent',
+                          backgroundColor: isHovered
+                            ? (isDarkMode ? '#1C4434' : '#E2EFE7')
+                            : (isDarkMode ? 'transparent' : '#FFFFFF'),
+                          gap: 10,
+                          cursor: 'pointer',
+                          boxShadow: isHovered
+                            ? (isDarkMode ? '0 4px 16px rgba(0,0,0,0.45)' : '0 4px 14px rgba(234, 88, 12, 0.12)')
+                            : 'none',
+                          transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
+                        }}
+                        onMouseEnter={() => setHoveredAuditRowId(log.id || index)}
+                        onMouseLeave={() => setHoveredAuditRowId(null)}
+                        onPress={() => setSelectedAuditLogForModal(log)}
+                        activeOpacity={0.75}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                            <View
+                              style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 16,
+                                backgroundColor: isHovered ? (isDarkMode ? '#132A26' : '#DCFCE7') : meta.bg,
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
+                              }}
+                            >
+                              <BootstrapIcon name={meta.icon} size={15} color={meta.color} />
+                            </View>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                fontWeight: isHovered ? '700' : '600',
+                                color: isHovered
+                                  ? (isDarkMode ? '#34D399' : '#0F442A')
+                                  : (isDarkMode ? tokens.textPrimary : '#0F172A'),
+                              }}
+                            >
+                              {meta.title}
+                            </Text>
+                          </View>
+
+                          {/* Status Pill */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 5,
+                              backgroundColor: statusMeta.bg,
+                              paddingHorizontal: 8,
+                              paddingVertical: 3,
+                              borderRadius: 9999,
+                            }}
+                          >
+                            <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusMeta.dot }} />
+                            <Text style={{ fontSize: 10, fontWeight: '500', color: statusMeta.color }}>
+                              {statusMeta.label}
+                            </Text>
+                          </View>
+                        </View>
+
+                        <Text style={{ fontSize: 12.5, color: isDarkMode ? '#CBD5E1' : '#475569', lineHeight: 18 }}>
+                          {log.details}
+                        </Text>
+
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 6, paddingTop: 4 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                            <BootstrapIcon name="person" size={12} color="#64748B" />
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                              {log.admin_name}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
+                              • {log.target}
+                            </Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
+                              {formatTime(log.timestamp)}
+                            </Text>
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 5,
+                                backgroundColor: isHovered
+                                  ? (isDarkMode ? '#10B981' : '#EA580C')
+                                  : (isDarkMode ? '#1E293B' : '#F1F5F9'),
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 6,
+                                boxShadow: isHovered
+                                  ? (isDarkMode ? '0 2px 8px rgba(16,185,129,0.35)' : '0 2px 8px rgba(234, 88, 12,0.22)')
+                                  : 'none',
+                                transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
+                              }}
+                            >
+                              <BootstrapIcon
+                                name="eye"
+                                size={11}
+                                color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 10.5,
+                                  fontWeight: '700',
+                                  color: isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B'),
+                                }}
+                              >
+                                Details
+                              </Text>
+                              <BootstrapIcon
+                                name="arrow-right"
+                                size={10}
+                                color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                              />
+                            </View>
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }
+
+                  /* ─── Desktop Table Row View ─── */
+                  return (
+                    <TouchableOpacity
+                      key={log.id || index}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 20,
+                        paddingLeft: 16,
+                        paddingVertical: 14,
+                        borderBottomWidth: isLast ? 0 : 1,
+                        borderBottomColor: isHovered
+                          ? (isDarkMode ? '#10B98133' : '#05966928')
+                          : (isDarkMode ? tokens.borderInput : '#F1F5F9'),
+                        borderLeftWidth: 5,
+                        borderLeftColor: isHovered ? (isDarkMode ? '#10B981' : '#059669') : 'transparent',
+                        backgroundColor: isHovered
+                          ? (isDarkMode ? '#1C4434' : '#E2EFE7')
+                          : (isDarkMode ? 'transparent' : '#FFFFFF'),
+                        cursor: 'pointer',
+                        boxShadow: isHovered
+                          ? (isDarkMode ? '0 4px 16px rgba(0,0,0,0.45)' : '0 4px 14px rgba(234, 88, 12, 0.12)')
+                          : 'none',
+                        transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
+                      }}
+                      onMouseEnter={() => setHoveredAuditRowId(log.id || index)}
+                      onMouseLeave={() => setHoveredAuditRowId(null)}
+                      onPress={() => setSelectedAuditLogForModal(log)}
+                      activeOpacity={0.75}
+                    >
+                      {/* Column 1: EVENT */}
+                      <View style={{ flex: 2.2, flexDirection: 'row', alignItems: 'center', gap: 12, paddingRight: 10 }}>
+                        <View
+                          style={{
+                            width: 34,
+                            height: 34,
+                            borderRadius: 17,
+                            backgroundColor: isHovered ? (isDarkMode ? '#132A26' : '#DCFCE7') : meta.bg,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            flexShrink: 0,
+                            transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
+                          }}
+                        >
+                          <BootstrapIcon name={meta.icon} size={15} color={meta.color} />
+                        </View>
+                        <View style={{ minWidth: 0, flex: 1 }}>
+                          <Text
+                            numberOfLines={1}
+                            style={{
+                              fontSize: 13.5,
+                              fontWeight: isHovered ? '700' : '600',
+                              color: isHovered
+                                ? isDarkMode ? '#34D399' : '#0F442A'
+                                : isDarkMode ? tokens.textPrimary : '#0F172A',
+                              transition: Platform.OS === 'web' ? 'color 0.15s ease' : undefined,
+                            }}
+                          >
+                            {meta.title}
+                          </Text>
+                          <Text
+                            numberOfLines={1}
+                            style={{
+                              fontSize: 12,
+                              color: isDarkMode ? tokens.textMuted : '#64748B',
+                              marginTop: 2,
+                            }}
+                          >
+                            {log.details}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Column 2: ACTOR / TARGET */}
+                      <View style={{ flex: 1.7, paddingRight: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                          <BootstrapIcon name="person" size={12} color="#64748B" />
+                          <Text
+                            numberOfLines={1}
+                            style={{
+                              fontSize: 13,
+                              fontWeight: '600',
+                              color: isHovered
+                                ? isDarkMode ? tokens.textPrimary : '#0F172A'
+                                : isDarkMode ? tokens.textPrimary : '#1E293B',
+                            }}
+                          >
+                            {log.admin_name}
+                          </Text>
+                        </View>
+                        <Text
+                          numberOfLines={1}
+                          style={{
+                            fontSize: 11.5,
+                            color: isDarkMode ? tokens.textMuted : '#64748B',
+                            marginTop: 2,
+                          }}
+                        >
+                          {log.target}
+                        </Text>
+                      </View>
+
+                      {/* Column 3: IP ADDRESS */}
+                      <View style={{ flex: 1.1, paddingRight: 10 }}>
+                        <Text
+                          style={{
+                            fontSize: 12.5,
+                            color: isDarkMode ? tokens.textMuted : '#475569',
+                            fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+                          }}
+                        >
+                          {log.ip_address || '192.168.1.104'}
+                        </Text>
+                      </View>
+
+                      {/* Column 4: TIME */}
+                      <View style={{ flex: 0.9, paddingRight: 10 }}>
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            color: isDarkMode ? tokens.textMuted : '#64748B',
+                          }}
+                        >
+                          {formatTime(log.timestamp)}
+                        </Text>
+                      </View>
+
+                      {/* Column 5: STATUS */}
+                      <View style={{ flex: 0.9, paddingRight: 10 }}>
+                        <View
+                          style={{
+                            alignSelf: 'flex-start',
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            backgroundColor: statusMeta.bg,
+                            paddingHorizontal: 9,
+                            paddingVertical: 3.5,
+                            borderRadius: 9999,
+                          }}
+                        >
+                          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusMeta.dot }} />
+                          <Text
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: '500',
+                              color: statusMeta.color,
+                              letterSpacing: 0.2,
+                            }}
+                          >
+                            {statusMeta.label}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Column 6: ACTION / VIEW DETAILS */}
+                      <View style={{ width: 110, alignItems: 'flex-end', paddingRight: 6 }}>
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                            backgroundColor: isHovered
+                              ? (isDarkMode ? '#10B981' : '#EA580C')
+                              : (isDarkMode ? '#1E293B' : '#F1F5F9'),
+                            borderWidth: 1,
+                            borderColor: isHovered
+                              ? (isDarkMode ? '#34D399' : '#EA580C')
+                              : (isDarkMode ? tokens.borderInput : '#E2E8F0'),
+                            paddingHorizontal: 10,
+                            paddingVertical: 5,
+                            borderRadius: 7,
+                            boxShadow: isHovered
+                              ? (isDarkMode ? '0 2px 8px rgba(16,185,129,0.35)' : '0 2px 8px rgba(234, 88, 12,0.22)')
+                              : 'none',
+                            transition: Platform.OS === 'web' ? 'all 0.15s ease' : undefined,
+                          }}
+                        >
+                          <BootstrapIcon
+                            name="eye"
+                            size={12}
+                            color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                          />
+                          <Text
+                            style={{
+                              fontSize: 11.5,
+                              fontWeight: '700',
+                              color: isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#475569'),
+                              letterSpacing: 0.2,
+                            }}
+                          >
+                            Details
+                          </Text>
+                          <BootstrapIcon
+                            name="arrow-right"
+                            size={11}
+                            color={isHovered ? (isDarkMode ? '#06281E' : '#FFFFFF') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                          />
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+
+              {/* ─── 5. Table Pagination Footer ─── */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingHorizontal: 20,
+                  paddingVertical: 14,
+                  borderTopWidth: 1,
+                  borderTopColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                  backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                  flexWrap: 'wrap',
+                  gap: 12,
+                }}
+              >
+                <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+                  {filteredAuditLogs.length === 0
+                    ? 'Showing 0 of 0 events'
+                    : `Showing ${(auditCurrentPage - 1) * auditItemsPerPage + 1}–${Math.min(auditCurrentPage * auditItemsPerPage, filteredAuditLogs.length)} of ${filteredAuditLogs.length} events`}
+                </Text>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  {/* Previous Button */}
+                  <TouchableOpacity
+                    disabled={auditCurrentPage <= 1}
+                    onPress={() => setAuditCurrentPage((prev) => Math.max(1, prev - 1))}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 7,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                      backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                      opacity: auditCurrentPage <= 1 ? 0.45 : 1,
+                      cursor: auditCurrentPage <= 1 ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <BootstrapIcon name="chevron-left" size={10} color={isDarkMode ? tokens.textPrimary : '#334155'} />
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                      Previous
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Numbered Page Buttons */}
+                  {Array.from({ length: totalAuditPages }, (_, i) => i + 1).map((pageNum) => {
+                    const isActive = pageNum === auditCurrentPage;
+                    return (
+                      <TouchableOpacity
+                        key={pageNum}
+                        onPress={() => setAuditCurrentPage(pageNum)}
+                        style={{
+                          minWidth: 32,
+                          height: 32,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          borderRadius: 7,
+                          backgroundColor: isActive ? '#EA580C' : isDarkMode ? '#1E293B' : '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: isActive ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontWeight: isActive ? '600' : '500',
+                            color: isActive ? '#FFFFFF' : isDarkMode ? tokens.textPrimary : '#334155',
+                          }}
+                        >
+                          {pageNum}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+
+                  {/* Next Button */}
+                  <TouchableOpacity
+                    disabled={auditCurrentPage >= totalAuditPages}
+                    onPress={() => setAuditCurrentPage((prev) => Math.min(totalAuditPages, prev + 1))}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      borderRadius: 7,
+                      borderWidth: 1,
+                      borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                      backgroundColor: isDarkMode ? '#1E293B' : '#FFFFFF',
+                      opacity: auditCurrentPage >= totalAuditPages ? 0.45 : 1,
+                      cursor: auditCurrentPage >= totalAuditPages ? 'not-allowed' : 'pointer',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }}>
+                      Next
+                    </Text>
+                    <BootstrapIcon name="chevron-right" size={10} color={isDarkMode ? tokens.textPrimary : '#334155'} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ─── TAB 13: ADMINISTRATOR PROFILE ─── */}
+        {activeNav === 'profile' && (
+          <AdminProfileLogsPanel
+            isDarkMode={isDarkMode}
+            tokens={tokens}
+            showToast={showToast}
+            showConfirm={showConfirm}
+            isDesktop={isDesktop}
+            onNavigate={setActiveNav}
+          />
+        )}
+      </ScrollView>
+    </View>
+      </View >
+
+    {/* ─── MODAL: DEDICATED BRAND IDENTITY MODAL ─── */ }
+    < EditBrandModal
+  visible = { isBrandModalOpen }
+  onClose = {() => setIsBrandModalOpen(false)
+}
+isDarkMode = { isDarkMode }
+showToast = { showToast }
+  />
+
+  {/* ─── MODAL: AUDIT LOG INSPECTION MODAL ─── */ }
+  < Modal
+visible = { Boolean(selectedAuditLogForModal) }
+transparent
+animationType = "fade"
+onRequestClose = {() => setSelectedAuditLogForModal(null)}
+      >
+  <View style={styles.modalOverlay}>
+    <View
+      style={[
+        styles.modalCard,
+        {
+          maxWidth: 640,
+          width: '100%',
+          backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+          borderRadius: 16,
+          padding: 22,
+          gap: 14,
+        },
+      ]}
+    >
+      {/* Modal Header */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingBottom: 14,
+          borderBottomWidth: 1,
+          borderBottomColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 10,
+              backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <BootstrapIcon name="journal-text" size={18} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
+          </View>
+          <View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text
+                style={{
+                  fontSize: 16,
+                  fontWeight: '600',
+                  color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                }}
+              >
+                Activity Log Details
+              </Text>
+              <View
+                style={{
+                  backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                  borderRadius: 4,
+                }}
+              >
+                <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#059669', letterSpacing: 0.3 }}>
+                  IMMUTABLE
+                </Text>
+              </View>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+              <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8', fontFamily: Platform.OS === 'web' ? 'monospace' : undefined }}>
+                ID: {selectedAuditLogForModal?.id}
+              </Text>
               <TouchableOpacity
-                style={[styles.mobileMoreCard, { backgroundColor: isDarkMode ? tokens.statusDangerBg : '#FEE2E2', borderColor: isDarkMode ? tokens.chipBorder : '#FECACA' }]}
                 onPress={() => {
-                  setIsMobileMoreOpen(false);
-                  try {
-                    adminSecurityService.lockSession(currentUser);
-                    setIsAdminUnlocked(false);
-                  } catch (_e) { }
-                  if (onLogout) {
-                    onLogout();
-                  } else {
-                    logout?.();
-                    onNavigateToStore?.();
+                  if (selectedAuditLogForModal?.id && typeof navigator !== 'undefined' && navigator.clipboard) {
+                    navigator.clipboard.writeText(selectedAuditLogForModal.id);
+                    showToast('✓ Event ID copied to clipboard');
                   }
                 }}
+                style={{ padding: 2 }}
               >
-                <BootstrapIcon name="box-arrow-right" size={20} color={isDarkMode ? tokens.statusDangerText : "#DC2626"} />
-                <View>
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.statusDangerText : '#DC2626' }}>Log Out</Text>
-                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.statusDangerText : '#DC2626' }}>Exit Backoffice</Text>
-                </View>
+                <BootstrapIcon name="clipboard" size={11} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
               </TouchableOpacity>
             </View>
           </View>
         </View>
-      </Modal>
 
-      {/* ─── MODAL: ORDER DETAILS & FULFILLMENT CONTROL ─── */}
-      <AdminOrderDetailsModal
-        visible={isOrderModalOpen}
-        order={selectedOrderForModal}
-        deliveryDetail={orderDeliveryDetail}
-        deliveryHistory={orderDeliveryHistory}
-        isDarkMode={isDarkMode}
-        isDesktop={isDesktop}
-        tokens={tokens}
-        styles={styles}
-        showConfirm={showConfirm}
-        onClose={() => setIsOrderModalOpen(false)}
-        onApprove={handleApproveCOD}
-        onRetryEmail={handleRetryCodApprovalEmail}
-        onAdvanceStatus={handleAdvanceOrderStatus}
-        onReject={handleRejectOrder}
-        onCancel={handleCancelOrder}
-        onAssignRider={(ord) => {
-          setAssignDeliveryOrder({
-            ...ord,
-            expected_delivery_at:
-              orderDeliveryDetail?.expected_delivery_at || ord?.expected_delivery_at,
-            expected_delivery_end_at:
-              orderDeliveryDetail?.expected_delivery_end_at || ord?.expected_delivery_end_at,
-          });
-        }}
-        onOpenQr={(ord) => setDeliveryTokenModal({ order: ord, bundle: null })}
-        onOpenRiderAccess={(payload) => setRiderAccessModal(payload)}
-        onDeliveryAction={(payload) => setDeliveryAction(payload)}
-        onUploadProof={handleUploadProof}
-        onViewProof={(payload) => setProofViewer(payload)}
-        onProcessReturn={handleProcessReturn}
-        onPrint={() => {
-          showToast('Receipt download initiated / print ready');
-          if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            window.print?.();
-          }
-        }}
-      />
+        <TouchableOpacity
+          onPress={() => setSelectedAuditLogForModal(null)}
+          style={{
+            padding: 6,
+            borderRadius: 8,
+            backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
+          }}
+        >
+          <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? tokens.textMuted : '#64748B'} />
+        </TouchableOpacity>
+      </View>
 
-      {/* ─── 3. ADMIN MOBILE BOTTOM NAVIGATION BAR (MOBILE ONLY) ─── */}
-      {!isDesktop && (
-        <View style={styles.bottomNavWrapper}>
-          {/* 1. Overview */}
-          <TouchableOpacity
-            style={styles.bottomNavItem}
-            onPress={() => {
-              setActiveNav('overview');
-              setIsMobileMoreOpen(false);
-            }}
-            activeOpacity={0.8}
-          >
+      {/* Modal Content */}
+      {selectedAuditLogForModal && (
+        <ScrollView style={{ maxHeight: 480 }}>
+          <View style={{ gap: 12 }}>
+            {/* Action & Status Card */}
             <View
-              style={[styles.bottomNavIconWrap, activeNav === 'overview' && styles.bottomNavIconWrapActive]}
+              style={{
+                backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                padding: 14,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 10,
+              }}
             >
-              <BootstrapIcon
-                name="grid-1x2-fill"
-                size={17}
-                color={activeNav === 'overview' ? '#EA580C' : '#64748B'}
-              />
-            </View>
-            <Text style={[styles.bottomNavLabel, activeNav === 'overview' && styles.bottomNavLabelActive]}>
-              Dashboard
-            </Text>
-          </TouchableOpacity>
+              <View>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
+                  Action Event
+                </Text>
+                <Text style={{ fontSize: 14.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A', marginTop: 2 }}>
+                  {selectedAuditLogForModal.action}
+                </Text>
+              </View>
 
-          {/* 2. Inventory */}
-          <TouchableOpacity
-            style={styles.bottomNavItem}
-            onPress={() => {
-              setActiveNav('inventory');
-              setIsMobileMoreOpen(false);
-            }}
-            activeOpacity={0.8}
-          >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <View
+                  style={{
+                    backgroundColor:
+                      selectedAuditLogForModal.severity === 'CRITICAL'
+                        ? isDarkMode ? '#341515' : '#FEE2E2'
+                        : selectedAuditLogForModal.severity === 'WARNING'
+                          ? isDarkMode ? '#2D2012' : '#FEF3C7'
+                          : selectedAuditLogForModal.severity === 'SUCCESS'
+                            ? isDarkMode ? '#132A26' : '#D1FAE5'
+                            : isDarkMode ? '#1E293B' : '#DBEAFE',
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: '600',
+                      color:
+                        selectedAuditLogForModal.severity === 'CRITICAL'
+                          ? '#DC2626'
+                          : selectedAuditLogForModal.severity === 'WARNING'
+                            ? '#D97706'
+                            : selectedAuditLogForModal.severity === 'SUCCESS'
+                              ? '#059669'
+                              : '#2563EB',
+                    }}
+                  >
+                    {selectedAuditLogForModal.severity}
+                  </Text>
+                </View>
+
+                <View
+                  style={{
+                    backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 6,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: '700',
+                      color: isDarkMode ? tokens.textMuted : '#475569',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {selectedAuditLogForModal.category}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Target & Details */}
             <View
-              style={[
-                styles.bottomNavIconWrap,
-                activeNav === 'inventory' && styles.bottomNavIconWrapActive,
-              ]}
+              style={{
+                backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                padding: 14,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                gap: 8,
+              }}
             >
-              <BootstrapIcon
-                name="box-seam-fill"
-                size={17}
-                color={activeNav === 'inventory' ? '#EA580C' : '#64748B'}
-              />
-              {invStats.lowStockCount > 0 && (
-                <View style={styles.bottomNavDot} />
-              )}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B', textTransform: 'uppercase' }}>
+                  Target Resource:
+                </Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
+                  {selectedAuditLogForModal.target}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 13, color: isDarkMode ? '#CBD5E1' : '#334155', lineHeight: 19 }}>
+                {selectedAuditLogForModal.details}
+              </Text>
             </View>
-            <Text
-              style={[
-                styles.bottomNavLabel,
-                activeNav === 'inventory' && styles.bottomNavLabelActive,
-              ]}
-            >
-              Inventory
-            </Text>
-          </TouchableOpacity>
 
-          {/* 3. POS Cashier */}
-          <TouchableOpacity
-            style={styles.bottomNavItem}
-            onPress={() => {
-              setActiveNav('pos');
-              setIsMobileMoreOpen(false);
-            }}
-            activeOpacity={0.8}
-          >
-            <View style={[styles.bottomNavIconWrap, activeNav === 'pos' && styles.bottomNavIconWrapActive]}>
-              <BootstrapIcon
-                name="cart-check-fill"
-                size={17}
-                color={activeNav === 'pos' ? '#EA580C' : '#64748B'}
-              />
-              {posCart.length > 0 && (
-                <View style={styles.bottomNavDot} />
-              )}
-            </View>
-            <Text style={[styles.bottomNavLabel, activeNav === 'pos' && styles.bottomNavLabelActive]}>
-              POS
-            </Text>
-          </TouchableOpacity>
-
-          {/* 4. Analytics */}
-          <TouchableOpacity
-            style={styles.bottomNavItem}
-            onPress={() => {
-              setActiveNav('analytics');
-              setIsMobileMoreOpen(false);
-            }}
-            activeOpacity={0.8}
-          >
+            {/* Operator & Network Info */}
             <View
-              style={[styles.bottomNavIconWrap, activeNav === 'analytics' && styles.bottomNavIconWrapActive]}
+              style={{
+                flexDirection: isDesktop ? 'row' : 'column',
+                gap: 10,
+                backgroundColor: isDarkMode ? '#0F172A' : '#F8FAFC',
+                padding: 12,
+                borderRadius: 10,
+                borderWidth: 1,
+                borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+              }}
             >
-              <BootstrapIcon
-                name="graph-up-arrow"
-                size={17}
-                color={activeNav === 'analytics' ? '#EA580C' : '#64748B'}
-              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
+                  Actor / Operator
+                </Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A', marginTop: 2 }}>
+                  {selectedAuditLogForModal.admin_name}
+                </Text>
+                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 1 }}>
+                  Role: {selectedAuditLogForModal.admin_role || 'Administrator'}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
+                  Network Telemetry
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 11.5,
+                    color: isDarkMode ? '#CBD5E1' : '#475569',
+                    marginTop: 2,
+                    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+                  }}
+                >
+                  IP: {selectedAuditLogForModal.ip_address || '127.0.0.1'}
+                </Text>
+                <Text style={{ fontSize: 10.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 1 }}>
+                  {selectedAuditLogForModal.client || 'Admin Dashboard'}
+                </Text>
+              </View>
+              <View style={{ flex: 1.1 }}>
+                <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8', textTransform: 'uppercase' }}>
+                  Timestamp
+                </Text>
+                <Text style={{ fontSize: 11.5, color: isDarkMode ? '#CBD5E1' : '#475569', marginTop: 2 }}>
+                  {new Date(selectedAuditLogForModal.timestamp).toLocaleString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                  })}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 10,
+                    color: isDarkMode ? tokens.textMuted : '#94A3B8',
+                    marginTop: 1,
+                    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+                  }}
+                >
+                  {selectedAuditLogForModal.timestamp}
+                </Text>
+              </View>
             </View>
-            <Text style={[styles.bottomNavLabel, activeNav === 'analytics' && styles.bottomNavLabelActive]}>
-              Analytics
-            </Text>
-          </TouchableOpacity>
 
-          {/* 5. Orders */}
-          <TouchableOpacity
-            style={styles.bottomNavItem}
-            onPress={() => {
-              setActiveNav('orders');
-              setIsMobileMoreOpen(false);
-            }}
-            activeOpacity={0.8}
-          >
-            <View
-              style={[styles.bottomNavIconWrap, activeNav === 'orders' && styles.bottomNavIconWrapActive]}
-            >
-              <BootstrapIcon
-                name="receipt"
-                size={17}
-                color={activeNav === 'orders' ? '#EA580C' : '#64748B'}
-              />
-              {pendingCodCount > 0 && (
-                <View style={styles.bottomNavDot} />
-              )}
-            </View>
-            <Text style={[styles.bottomNavLabel, activeNav === 'orders' && styles.bottomNavLabelActive]}>
-              Orders
-            </Text>
-          </TouchableOpacity>
-
-          {/* 6. More Options */}
-          <TouchableOpacity
-            style={styles.bottomNavItem}
-            onPress={() => setIsMobileMoreOpen(true)}
-            activeOpacity={0.8}
-          >
-            <View
-              style={[
-                styles.bottomNavIconWrap,
-                ['products', 'orders', 'promos', 'garage', 'users', 'supabase', 'forecast', 'audit'].includes(activeNav) &&
-                styles.bottomNavIconWrapActive,
-              ]}
-            >
-              <BootstrapIcon
-                name="three-dots"
-                size={18}
-                color={
-                  ['products', 'orders', 'promos', 'garage', 'users', 'supabase', 'forecast', 'audit'].includes(activeNav)
-                    ? '#EA580C'
-                    : '#64748B'
-                }
-              />
-              {pendingCodCount > 0 && (
-                <View style={styles.bottomNavDot} />
-              )}
-            </View>
-            <Text
-              style={[
-                styles.bottomNavLabel,
-                ['products', 'orders', 'promos', 'garage', 'users', 'supabase', 'forecast', 'audit'].includes(activeNav) &&
-                styles.bottomNavLabelActive,
-              ]}
-            >
-              More
-            </Text>
-          </TouchableOpacity>
-        </View>
+            {/* JSON Metadata Payload (if present) */}
+            {Boolean(selectedAuditLogForModal.metadata && Object.keys(selectedAuditLogForModal.metadata).length > 0) && (
+              <View style={{ gap: 6 }}>
+                <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B', textTransform: 'uppercase' }}>
+                  Payload Metadata
+                </Text>
+                <View
+                  style={{
+                    backgroundColor: isDarkMode ? '#0A0F1D' : '#F1F5F9',
+                    padding: 12,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+                      fontSize: 11,
+                      color: isDarkMode ? '#38BDF8' : '#0369A1',
+                      lineHeight: 17,
+                    }}
+                  >
+                    {JSON.stringify(selectedAuditLogForModal.metadata, null, 2)}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </ScrollView>
       )}
 
-      {/* ─── ASSIGN DELIVERY MODAL ─── */}
+      {/* Modal Footer */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingTop: 12,
+          borderTopWidth: 1,
+          borderTopColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+          flexWrap: 'wrap',
+          gap: 8,
+        }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <BootstrapIcon name="shield-lock-fill" size={13} color="#059669" />
+          <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '500' }}>
+            Immutable Audit Ledger • Tamper-evident record
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 8,
+            borderRadius: 8,
+            backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
+          }}
+          onPress={() => setSelectedAuditLogForModal(null)}
+        >
+          <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12.5 }}>Close</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+      </Modal >
+
+  {/* ─── MODAL: ADD NEW CATEGORY ─── */ }
+  < Modal
+visible = { isAddCategoryModalOpen }
+transparent
+animationType = "fade"
+onRequestClose = {() => {
+  if (!isSavingCategory) setIsAddCategoryModalOpen(false);
+}}
+      >
+  <View style={styles.modalOverlay}>
+    <View style={[styles.modalSheet, { maxWidth: 520 }]}>
+      <View style={styles.modalHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              backgroundColor: isDarkMode ? '#1E293B' : '#FFF7ED',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: '#EA580C',
+            }}
+          >
+            <BootstrapIcon name="folder-plus" size={18} color="#EA580C" />
+          </View>
+          <View>
+            <Text style={styles.modalTitle}>Add Product Category</Text>
+            <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+              Create a custom catalog category for parts & gear
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity
+          onPress={() => {
+            if (!isSavingCategory) setIsAddCategoryModalOpen(false);
+          }}
+          disabled={isSavingCategory}
+        >
+          <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : '#64748B'} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+        <Text style={styles.formLabel}>Category Name *</Text>
+        <TextInput
+          style={styles.formInput}
+          value={newCatName}
+          onChangeText={setNewCatName}
+          placeholder="e.g. Helmets, Carbon Fairings, Riding Boots"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+          autoFocus
+        />
+
+        <Text style={styles.formLabel}>Description (Optional)</Text>
+        <TextInput
+          style={[styles.formInput, { height: 72, textAlignVertical: 'top', paddingTop: 8 }]}
+          value={newCatDesc}
+          onChangeText={setNewCatDesc}
+          placeholder="Brief summary of components or gear belonging to this category..."
+          placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+          multiline
+          numberOfLines={3}
+        />
+
+        <Text style={styles.formLabel}>Category Icon</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+          {[
+            { icon: 'shield-shaded', label: 'Shield / Gear' },
+            { icon: 'circle', label: 'Tires' },
+            { icon: 'disc', label: 'Brakes' },
+            { icon: 'gear-fill', label: 'Engine' },
+            { icon: 'lightning-charge-fill', label: 'Electrical' },
+            { icon: 'droplet-fill', label: 'Oils / Lubes' },
+            { icon: 'bag-fill', label: 'Accessories' },
+            { icon: 'fire', label: 'Exhaust' },
+            { icon: 'tools', label: 'Suspension' },
+            { icon: 'gear-wide-connected', label: 'Drivetrain' },
+            { icon: 'fuel-pump-fill', label: 'Fuel' },
+            { icon: 'speedometer2', label: 'Cockpit' },
+            { icon: 'box-seam', label: 'Box / Parts' },
+            { icon: 'tag-fill', label: 'Tag' },
+          ].map((item) => {
+            const isSelected = newCatIcon === item.icon;
+            return (
+              <TouchableOpacity
+                key={item.icon}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 10,
+                  paddingVertical: 6,
+                  borderRadius: 8,
+                  borderWidth: 1.5,
+                  borderColor: isSelected ? '#EA580C' : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                  backgroundColor: isSelected
+                    ? isDarkMode ? '#132A26' : '#FFF7ED'
+                    : isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                  cursor: 'pointer',
+                }}
+                onPress={() => setNewCatIcon(item.icon)}
+              >
+                <BootstrapIcon
+                  name={item.icon}
+                  size={13}
+                  color={isSelected ? '#EA580C' : isDarkMode ? tokens.textMuted : '#64748B'}
+                />
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: isSelected ? '700' : '500',
+                    color: isSelected ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#334155',
+                  }}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={styles.formLabel}>Cover Image URL (Optional)</Text>
+        <TextInput
+          style={styles.formInput}
+          value={newCatImage}
+          onChangeText={setNewCatImage}
+          placeholder="https://... (or leave blank to use iconic category icon)"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+        />
+      </ScrollView>
+
+      <View style={styles.modalFooter}>
+        <TouchableOpacity
+          style={styles.quickStoreBtn}
+          onPress={() => {
+            if (!isSavingCategory) setIsAddCategoryModalOpen(false);
+          }}
+          disabled={isSavingCategory}
+        >
+          <Text style={styles.quickStoreBtnText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.addBtnPrimary, isSavingCategory && { opacity: 0.7 }]}
+          onPress={handleAddCategory}
+          disabled={isSavingCategory}
+        >
+          <BootstrapIcon name="check-lg" size={14} color="#FFFFFF" />
+          <Text style={styles.addBtnPrimaryText}>
+            {isSavingCategory ? 'Creating Category...' : 'Create Category'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+      </Modal >
+
+  {/* ─── MODAL 1: ADD NEW PRODUCT ─── */ }
+  < Modal
+visible = { isAddProductOpen }
+transparent
+animationType = "fade"
+onRequestClose = {() => setIsAddProductOpen(false)}
+      >
+  <View style={styles.modalOverlay}>
+    <View style={styles.modalSheet}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Add New Performance Part SKU</Text>
+        <TouchableOpacity onPress={() => setIsAddProductOpen(false)}>
+          <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.modalBody}>
+        <Text style={styles.formLabel}>Part Name</Text>
+        <TextInput
+          style={styles.formInput}
+          value={newProdName}
+          onChangeText={setNewProdName}
+          placeholder="e.g. Akrapovič Slip-On Exhaust"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+
+        <Text style={styles.formLabel}>Brand Name</Text>
+        <TextInput
+          style={styles.formInput}
+          value={newProdBrand}
+          onChangeText={setNewProdBrand}
+          placeholder="e.g. Brembo, Öhlins, Akrapovič"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Cost / Purchase (₱)</Text>
+            <TextInput
+              style={styles.formInput}
+              keyboardType="numeric"
+              value={newProdCost}
+              onChangeText={setNewProdCost}
+              placeholder="25000"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Selling Price (₱)</Text>
+            <TextInput
+              style={styles.formInput}
+              keyboardType="numeric"
+              value={newProdPrice}
+              onChangeText={setNewProdPrice}
+              placeholder="39000"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Initial Stock</Text>
+            <TextInput
+              style={styles.formInput}
+              keyboardType="numeric"
+              value={newProdStock}
+              onChangeText={setNewProdStock}
+              placeholder="15"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+        </View>
+        {Number(newProdPrice) > 0 && (
+          Number(newProdCost || 0) > 0 ? (
+            <Text style={{ fontSize: 12, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '700', marginBottom: 8 }}>
+              Profit per unit: ₱
+              {(Number(newProdPrice) - Number(newProdCost || 0)).toLocaleString()} (
+              {(
+                ((Number(newProdPrice) - Number(newProdCost || 0)) / Number(newProdPrice)) *
+                100
+              ).toFixed(1)}
+              % margin)
+            </Text>
+          ) : (
+            <Text style={{ fontSize: 12, color: isDarkMode ? '#FBBF24' : '#D97706', fontWeight: '700', marginBottom: 8 }}>
+              ⚠️ Enter purchase cost above to calculate accurate profit & margin
+            </Text>
+          )
+        )}
+
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+          <Text style={styles.formLabel}>Category</Text>
+          <TouchableOpacity
+            onPress={() => setIsAddCategoryModalOpen(true)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: 6 }}
+            activeOpacity={0.7}
+          >
+            <BootstrapIcon name="plus-circle-fill" size={12} color="#EA580C" />
+            <Text style={{ color: '#EA580C', fontSize: 12, fontWeight: '700' }}>+ New Category</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+          {availableCategoryNames.filter((c) => c !== 'All').map((cat) => (
+            <TouchableOpacity
+              key={cat}
+              style={[styles.filterPill, newProdCategory === cat && styles.filterPillActive]}
+              onPress={() => setNewProdCategory(cat)}
+            >
+              <Text
+                style={[styles.filterPillText, newProdCategory === cat && styles.filterPillTextActive]}
+              >
+                {cat}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <ProductSizesEditor
+          sizes={newProdSizes}
+          basePrice={parseFloat(newProdPrice) || 0}
+          onChange={setNewProdSizes}
+          formInputStyle={styles.formInput}
+          formLabelStyle={styles.formLabel}
+          productKey={isAddProductOpen ? 'new-open' : 'new-closed'}
+        />
+
+        <ProductColorsEditor
+          colors={newProdColors}
+          onChange={setNewProdColors}
+          formInputStyle={styles.formInput}
+          formLabelStyle={styles.formLabel}
+          onToast={showToast}
+          productKey={isAddProductOpen ? 'new-open' : 'new-closed'}
+        />
+
+        <Text style={[styles.formLabel, { marginTop: 8 }]}>Compatible Motorcycles</Text>
+        <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 8 }}>
+          Save the product first, then open Edit to select compatible motorcycle models.
+        </Text>
+
+        {/* Image Selection: File Picker / URL / Presets */}
+        <Text style={styles.formLabel}>Product Image</Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: 14,
+            alignItems: 'center',
+            marginBottom: 12,
+            padding: 12,
+            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: tokens.border,
+          }}
+        >
+          <View style={{ flex: 1, gap: 6 }}>
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderRadius: 10,
+              }}
+              onPress={async () => {
+                const res = await pickImageFromFile();
+                if (res.success && res.uri) {
+                  setNewProdImage(res.uri);
+                  showToast('Image selected from device files!');
+                } else if (res.error && res.error !== 'Selection cancelled') {
+                  showAlert('Image Picker', res.error);
+                }
+              }}
+              activeOpacity={0.85}
+            >
+              <BootstrapIcon name="folder2-open" size={15} color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+                Choose Image from File
+              </Text>
+            </TouchableOpacity>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+              Upload PNG, JPG, WEBP from your local PC or phone
+            </Text>
+          </View>
+        </View>
+
+        <Text style={[styles.formLabel, { fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B' }]}>
+          Or Paste Direct Image URL
+        </Text>
+        <TextInput
+          style={styles.formInput}
+          value={newProdImage}
+          onChangeText={setNewProdImage}
+          placeholder="https://..."
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+
+      </ScrollView>
+
+      <View style={styles.modalFooter}>
+        <TouchableOpacity style={styles.quickStoreBtn} onPress={() => setIsAddProductOpen(false)}>
+          <Text style={styles.quickStoreBtnText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.addBtnPrimary} onPress={handleCreateProduct}>
+          <Text style={styles.addBtnPrimaryText}>Save Product to Inventory</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+      </Modal >
+
+  {/* ─── MODAL 2: EDIT PRODUCT ─── */ }
+{
+  editingProduct && (
+    <Modal
+      visible={Boolean(editingProduct)}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setEditingProduct(null)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalSheet}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Edit Product Part</Text>
+            <TouchableOpacity onPress={() => setEditingProduct(null)}>
+              <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalBody}>
+            <Text style={styles.formLabel}>Part Name</Text>
+            <TextInput
+              style={styles.formInput}
+              value={editingProduct.name}
+              onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, name: val }))}
+            />
+
+            <Text style={styles.formLabel}>Brand</Text>
+            <TextInput
+              style={styles.formInput}
+              value={editingProduct.brand}
+              onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, brand: val }))}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.formLabel}>Cost / Purchase (₱)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  keyboardType="numeric"
+                  value={String(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0)}
+                  onChangeText={(val) => {
+                    const cost = parseFloat(val) || 0;
+                    setEditingProduct((prev) => ({
+                      ...prev,
+                      unit_cost: cost,
+                      unitCost: cost,
+                    }));
+                  }}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.formLabel}>Selling Price (₱)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  keyboardType="numeric"
+                  value={String(editingProduct.price)}
+                  onChangeText={(val) =>
+                    setEditingProduct((prev) => ({ ...prev, price: parseFloat(val) || 0 }))
+                  }
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.formLabel}>Stock</Text>
+                <TextInput
+                  style={styles.formInput}
+                  keyboardType="numeric"
+                  value={String(editingProduct.stock)}
+                  onChangeText={(val) =>
+                    setEditingProduct((prev) => ({ ...prev, stock: parseInt(val, 10) || 0 }))
+                  }
+                />
+              </View>
+            </View>
+            {Number(editingProduct.price) > 0 && (
+              Number(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0) > 0 ? (
+                <Text style={{ fontSize: 12, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '700', marginBottom: 8 }}>
+                  Profit per unit: ₱
+                  {(
+                    Number(editingProduct.price) -
+                    Number(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0)
+                  ).toLocaleString()}{' '}
+                  (
+                  {(
+                    ((Number(editingProduct.price) -
+                      Number(editingProduct.unit_cost ?? editingProduct.unitCost ?? 0)) /
+                      Number(editingProduct.price)) *
+                    100
+                  ).toFixed(1)}
+                  % margin)
+                </Text>
+              ) : (
+                <Text style={{ fontSize: 12, color: isDarkMode ? '#FBBF24' : '#D97706', fontWeight: '700', marginBottom: 8 }}>
+                  ⚠️ Enter purchase cost above to calculate accurate profit & margin
+                </Text>
+              )
+            )}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <Text style={styles.formLabel}>Category</Text>
+              <TouchableOpacity
+                onPress={() => setIsAddCategoryModalOpen(true)}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2, paddingHorizontal: 6 }}
+                activeOpacity={0.7}
+              >
+                <BootstrapIcon name="plus-circle-fill" size={12} color="#EA580C" />
+                <Text style={{ color: '#EA580C', fontSize: 12, fontWeight: '700' }}>+ New Category</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
+              {availableCategoryNames.filter((c) => c !== 'All').map((cat) => (
+                <TouchableOpacity
+                  key={cat}
+                  style={[
+                    styles.filterPill,
+                    (editingProduct.category || '').toLowerCase() === cat.toLowerCase() && styles.filterPillActive,
+                  ]}
+                  onPress={() => setEditingProduct((prev) => ({ ...prev, category: cat }))}
+                >
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      (editingProduct.category || '').toLowerCase() === cat.toLowerCase() && styles.filterPillTextActive,
+                    ]}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <ProductSizesEditor
+              sizes={editingProduct.sizes || []}
+              basePrice={Number(editingProduct.price) || 0}
+              onChange={(next) => setEditingProduct((prev) => ({ ...prev, sizes: next }))}
+              formInputStyle={styles.formInput}
+              formLabelStyle={styles.formLabel}
+              productKey={editingProduct.id || editingProduct.product_id || 'edit'}
+            />
+
+            <ProductColorsEditor
+              colors={editingProduct.colors || []}
+              onChange={(next) => setEditingProduct((prev) => ({ ...prev, colors: next }))}
+              formInputStyle={styles.formInput}
+              formLabelStyle={styles.formLabel}
+              onToast={showToast}
+              productKey={editingProduct.id || editingProduct.product_id || 'edit'}
+            />
+
+            <ProductCompatibilityPicker
+              productId={editingProduct.id || editingProduct.product_id}
+              onToast={showToast}
+              isDarkMode={isDarkMode}
+            />
+
+            {/* Edit Product Image with File Picker */}
+            <Text style={styles.formLabel}>Product Image</Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 14,
+                alignItems: 'center',
+                marginBottom: 12,
+                padding: 12,
+                backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: tokens.border,
+              }}
+            >
+              <Image
+                source={{
+                  uri:
+                    editingProduct.image ||
+                    'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
+                }}
+                style={{
+                  width: 68,
+                  height: 68,
+                  borderRadius: 12,
+                  backgroundColor: '#E2E8F0',
+                  borderWidth: 1.5,
+                  borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                }}
+                resizeMode="cover"
+              />
+              <View style={{ flex: 1, gap: 6 }}>
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
+                    paddingVertical: 10,
+                    paddingHorizontal: 14,
+                    borderRadius: 10,
+                  }}
+                  onPress={async () => {
+                    const res = await pickImageFromFile();
+                    if (res.success && res.uri) {
+                      setEditingProduct((prev) => ({ ...prev, image: res.uri }));
+                      showToast('Image updated from file!');
+                    } else if (res.error && res.error !== 'Selection cancelled') {
+                      showAlert('Image Picker', res.error);
+                    }
+                  }}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="folder2-open" size={15} color="#FFFFFF" />
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+                    Choose New Image File
+                  </Text>
+                </TouchableOpacity>
+                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+                  Pick replacement image from your computer or phone
+                </Text>
+              </View>
+            </View>
+
+            <Text style={[styles.formLabel, { fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B' }]}>Or Paste Image URL</Text>
+            <TextInput
+              style={styles.formInput}
+              value={editingProduct.image || ''}
+              onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, image: val }))}
+              placeholder="https://..."
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+
+            <Text style={styles.formLabel}>Description</Text>
+            <TextInput
+              style={[styles.formInput, { height: 60 }]}
+              multiline
+              value={editingProduct.description}
+              onChangeText={(val) => setEditingProduct((prev) => ({ ...prev, description: val }))}
+            />
+          </ScrollView>
+
+          <View style={styles.modalFooter}>
+            <TouchableOpacity style={styles.quickStoreBtn} onPress={() => setEditingProduct(null)}>
+              <Text style={styles.quickStoreBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveProductEdit}>
+              <Text style={styles.addBtnPrimaryText}>Save Changes</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+{/* ─── MODAL 3: SUPPLIER PURCHASE / RESTOCK (same form style as Add Product) ─── */ }
+<Modal
+  visible={isRestockModalOpen}
+  transparent
+  animationType="fade"
+  onRequestClose={closeRestockModal}
+>
+  <View style={styles.modalOverlay}>
+    <View style={[styles.modalSheet, { maxWidth: 560 }]}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>Purchase from Supplier</Text>
+        <TouchableOpacity onPress={closeRestockModal}>
+          <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+        <Text style={styles.formLabel}>Select Product SKU</Text>
+        <TextInput
+          style={styles.formInput}
+          value={restockSearchQuery}
+          onChangeText={setRestockSearchQuery}
+          placeholder="Search by name, brand, or category…"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+
+        {!restockModalProduct || restockSearchQuery.trim() ? (
+          <View
+            style={{
+              maxHeight: 180,
+              borderWidth: 1,
+              borderColor: tokens.border,
+              borderRadius: 12,
+              marginBottom: 12,
+              overflow: 'hidden',
+            }}
+          >
+            <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled">
+              {(products || [])
+                .filter((p) => {
+                  const q = restockSearchQuery.toLowerCase().trim();
+                  if (!q) return true;
+                  return (
+                    (p.name || '').toLowerCase().includes(q) ||
+                    (p.brand || '').toLowerCase().includes(q) ||
+                    (p.category || '').toLowerCase().includes(q)
+                  );
+                })
+                .slice(0, 12)
+                .map((p) => (
+                  <TouchableOpacity
+                    key={p.id || p.product_id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 10,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      borderBottomWidth: 1,
+                      borderBottomColor: tokens.border,
+                      backgroundColor:
+                        restockModalProduct?.id === p.id
+                          ? (isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#FFF7ED')
+                          : (isDarkMode ? '#141A18' : '#FFFFFF'),
+                    }}
+                    onPress={() => selectRestockProduct(p)}
+                    activeOpacity={0.85}
+                  >
+                    <Image
+                      source={{
+                        uri:
+                          p.image ||
+                          'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=200&q=80',
+                      }}
+                      style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: isDarkMode ? tokens.bgSub : '#E2E8F0' }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: tokens.textPrimary }} numberOfLines={1}>
+                        {p.name}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: tokens.textMuted }} numberOfLines={1}>
+                        {p.brand} · Stock {p.stock || 0} · ₱{Number(p.price || 0).toLocaleString()}
+                      </Text>
+                    </View>
+                    <BootstrapIcon name="plus-circle" size={16} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+                  </TouchableOpacity>
+                ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        {restockModalProduct ? (
+          <>
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 14,
+                alignItems: 'center',
+                marginBottom: 14,
+                padding: 12,
+                backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                borderRadius: 14,
+                borderWidth: 1,
+                borderColor: tokens.border,
+              }}
+            >
+              <Image
+                source={{
+                  uri:
+                    restockModalProduct.image ||
+                    'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=200&q=80',
+                }}
+                style={{
+                  width: 68,
+                  height: 68,
+                  borderRadius: 12,
+                  backgroundColor: isDarkMode ? tokens.bgSub : '#E2E8F0',
+                  borderWidth: 1.5,
+                  borderColor: tokens.borderInput,
+                }}
+                resizeMode="cover"
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                  {restockModalProduct.name}
+                </Text>
+                <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
+                  {restockModalProduct.brand} · {restockModalProduct.category}
+                </Text>
+                <Text style={{ fontSize: 12, color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '700', marginTop: 4 }}>
+                  Current stock: {restockModalProduct.stock || 0} · Cost ₱
+                  {Number(
+                    restockModalProduct.unit_cost ?? restockModalProduct.unitCost ?? 0
+                  ).toLocaleString()}{' '}
+                  · Price ₱{Number(restockModalProduct.price || 0).toLocaleString()}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setRestockModalProduct(null);
+                    setRestockSizeAdds([]);
+                    setRestockSelectedSize('');
+                    setRestockColorAdds([]);
+                    setRestockSelectedColor('');
+                    setRestockSearchQuery('');
+                  }}
+                  style={{ marginTop: 6 }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? tokens.statusWarningText : '#B45309' }}>
+                    Change product
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <Text style={styles.formLabel}>Supplier</Text>
+            <View style={{ flexDirection: 'row', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+              <TouchableOpacity
+                style={[styles.filterPill, !restockSupplierId && styles.filterPillActive]}
+                onPress={() => setRestockSupplierId('')}
+              >
+                <Text
+                  style={[
+                    styles.filterPillText,
+                    !restockSupplierId && styles.filterPillTextActive,
+                  ]}
+                >
+                  No supplier
+                </Text>
+              </TouchableOpacity>
+              {(suppliers || []).slice(0, 12).map((s) => {
+                const sid = s.supplier_id || s.id;
+                return (
+                  <TouchableOpacity
+                    key={sid}
+                    style={[
+                      styles.filterPill,
+                      restockSupplierId === sid && styles.filterPillActive,
+                    ]}
+                    onPress={() => setRestockSupplierId(sid)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterPillText,
+                        restockSupplierId === sid && styles.filterPillTextActive,
+                      ]}
+                    >
+                      {s.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* ─── SIZE PICKER SECTION (if product has sizes) ─── */}
+            {(() => {
+              const availSizes = normalizeProductSizes(restockModalProduct);
+              if (!availSizes.length) return null;
+
+              return (
+                <View style={{ marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={styles.formLabel}>Select Size to Restock</Text>
+                    <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+                      {availSizes.length} variant{availSizes.length !== 1 ? 's' : ''} available
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                    {availSizes.map((sz) => {
+                      const isSelected = restockSelectedSize === sz.label;
+                      const currentStock =
+                        sz.stock === null || sz.stock === undefined
+                          ? Number(restockModalProduct.stock || 0)
+                          : Number(sz.stock || 0);
+                      return (
+                        <TouchableOpacity
+                          key={sz.label}
+                          style={[
+                            styles.filterPill,
+                            isSelected && styles.filterPillActive,
+                            {
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                              paddingVertical: 7,
+                              paddingHorizontal: 12,
+                              borderRadius: 10,
+                              borderColor: isSelected ? '#EA580C' : tokens.borderInput,
+                              borderWidth: 1.5,
+                              backgroundColor: isSelected ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
+                            },
+                          ]}
+                          onPress={() => {
+                            setRestockSelectedSize(sz.label);
+                            if (sz.price) {
+                              setRestockSellPrice(String(sz.price));
+                            }
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              fontWeight: '600',
+                              color: isSelected ? '#FFFFFF' : tokens.textPrimary,
+                            }}
+                          >
+                            {sz.label}
+                          </Text>
+                          <View
+                            style={{
+                              backgroundColor: isSelected ? 'rgba(255,255,255,0.22)' : '#E2E8F0',
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                fontWeight: '700',
+                                color: isSelected ? '#FFFFFF' : '#475569',
+                              }}
+                            >
+                              {currentStock} in stock
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    <TouchableOpacity
+                      style={[
+                        styles.filterPill,
+                        restockSelectedSize === 'all' && styles.filterPillActive,
+                        {
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          paddingVertical: 7,
+                          paddingHorizontal: 12,
+                          borderRadius: 10,
+                          borderColor: restockSelectedSize === 'all' ? '#EA580C' : tokens.borderInput,
+                          borderWidth: 1.5,
+                          backgroundColor: restockSelectedSize === 'all' ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
+                        },
+                      ]}
+                      onPress={() => setRestockSelectedSize('all')}
+                    >
+                      <BootstrapIcon
+                        name="grid-3x3-gap-fill"
+                        size={12}
+                        color={restockSelectedSize === 'all' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '600',
+                          color: restockSelectedSize === 'all' ? '#FFFFFF' : '#0F172A',
+                        }}
+                      >
+                        All Sizes (Multi-restock)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {restockSelectedSize && restockSelectedSize !== 'all' && (() => {
+                    const activeSize = availSizes.find((s) => s.label === restockSelectedSize);
+                    const curStock =
+                      activeSize?.stock === null || activeSize?.stock === undefined
+                        ? Number(restockModalProduct.stock || 0)
+                        : Number(activeSize?.stock || 0);
+                    const addQty = parseInt(restockAmount, 10) || 0;
+                    return (
+                      <View
+                        style={{
+                          marginTop: 8,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          backgroundColor: '#FFF7ED',
+                          borderWidth: 1,
+                          borderColor: '#FED7AA',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, color: '#0F766E', fontWeight: '700' }}>
+                          Restocking: <Text style={{ fontWeight: '600' }}>{restockSelectedSize}</Text> (Current: {curStock} units)
+                        </Text>
+                        <Text style={{ fontSize: 12, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '600' }}>
+                          → Will become: {curStock + addQty} units
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                </View>
+              );
+            })()}
+
+            {/* ─── COLOR PICKER SECTION (if product has colors and no sizes) ─── */}
+            {(() => {
+              const availColors = normalizeProductColors(restockModalProduct);
+              const availSizes = normalizeProductSizes(restockModalProduct);
+              // Only show color picker when there are colors and no sizes (sizes take priority)
+              if (!availColors.length || availSizes.length > 0) return null;
+              return (
+                <View style={{ marginBottom: 12 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                    <Text style={styles.formLabel}>Select Color to Restock</Text>
+                    <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+                      {availColors.length} color{availColors.length !== 1 ? 's' : ''} available
+                    </Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+                    {availColors.map((c) => {
+                      const isSelected = restockSelectedColor === c.label;
+                      const currentStock =
+                        c.stock === null || c.stock === undefined
+                          ? Number(restockModalProduct.stock || 0)
+                          : Number(c.stock || 0);
+                      return (
+                        <TouchableOpacity
+                          key={c.label}
+                          style={[
+                            styles.filterPill,
+                            isSelected && styles.filterPillActive,
+                            {
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 6,
+                              paddingVertical: 7,
+                              paddingHorizontal: 12,
+                              borderRadius: 10,
+                              borderColor: isSelected ? '#EA580C' : tokens.borderInput,
+                              borderWidth: 1.5,
+                              backgroundColor: isSelected ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
+                            },
+                          ]}
+                          onPress={() => setRestockSelectedColor(c.label)}
+                        >
+                          {/* Color swatch */}
+                          {c.image ? (
+                            <Image
+                              source={{ uri: c.image }}
+                              style={{
+                                width: 18,
+                                height: 18,
+                                borderRadius: 4,
+                                borderWidth: 1,
+                                borderColor: 'rgba(0,0,0,0.12)',
+                              }}
+                              resizeMode="cover"
+                            />
+                          ) : c.hex ? (
+                            <View
+                              style={{
+                                width: 14,
+                                height: 14,
+                                borderRadius: 3,
+                                backgroundColor: c.hex,
+                                borderWidth: 1,
+                                borderColor: 'rgba(0,0,0,0.15)',
+                              }}
+                            />
+                          ) : null}
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              fontWeight: '600',
+                              color: isSelected ? '#FFFFFF' : tokens.textPrimary,
+                            }}
+                          >
+                            {c.label}
+                          </Text>
+                          <View
+                            style={{
+                              backgroundColor: isSelected ? 'rgba(255,255,255,0.22)' : '#E2E8F0',
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                fontWeight: '700',
+                                color: isSelected ? '#FFFFFF' : '#475569',
+                              }}
+                            >
+                              {currentStock} in stock
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    {/* All Colors button */}
+                    <TouchableOpacity
+                      style={[
+                        styles.filterPill,
+                        restockSelectedColor === 'all' && styles.filterPillActive,
+                        {
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          paddingVertical: 7,
+                          paddingHorizontal: 12,
+                          borderRadius: 10,
+                          borderColor: restockSelectedColor === 'all' ? '#EA580C' : tokens.borderInput,
+                          borderWidth: 1.5,
+                          backgroundColor: restockSelectedColor === 'all' ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
+                        },
+                      ]}
+                      onPress={() => setRestockSelectedColor('all')}
+                    >
+                      <BootstrapIcon
+                        name="grid-3x3-gap-fill"
+                        size={12}
+                        color={restockSelectedColor === 'all' ? '#FFFFFF' : isDarkMode ? '#AAB4B0' : '#64748B'}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: '600',
+                          color: restockSelectedColor === 'all' ? '#FFFFFF' : tokens.textPrimary,
+                        }}
+                      >
+                        All Colors (Multi-restock)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {restockSelectedColor && restockSelectedColor !== 'all' && (() => {
+                    const activeColor = availColors.find((c) => c.label === restockSelectedColor);
+                    const curStock =
+                      activeColor?.stock === null || activeColor?.stock === undefined
+                        ? Number(restockModalProduct.stock || 0)
+                        : Number(activeColor?.stock || 0);
+                    const addQty = parseInt(restockAmount, 10) || 0;
+                    return (
+                      <View
+                        style={{
+                          marginTop: 8,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          backgroundColor: '#FFF7ED',
+                          borderWidth: 1,
+                          borderColor: '#FED7AA',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, color: '#0F766E', fontWeight: '700' }}>
+                          Restocking: <Text style={{ fontWeight: '600' }}>{restockSelectedColor}</Text> (Current: {curStock} units)
+                        </Text>
+                        <Text style={{ fontSize: 12, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '600' }}>
+                          → Will become: {curStock + addQty} units
+                        </Text>
+                      </View>
+                    );
+                  })()}
+                </View>
+              );
+            })()}
+
+            {/* ─── QUANTITY SECTION ─── */}
+            {(() => {
+              const availSizes = normalizeProductSizes(restockModalProduct);
+              const availColors = normalizeProductColors(restockModalProduct);
+              const hasSizesQ = availSizes.length > 0;
+              const hasColorsQ = availColors.length > 0 && !hasSizesQ;
+              const isAll = hasSizesQ && restockSelectedSize === 'all';
+              const isAllColors = hasColorsQ && restockSelectedColor === 'all';
+
+              if (isAllColors) {
+                return (
+                  <>
+                    <Text style={styles.formLabel}>Restock by color (add units)</Text>
+                    <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 8 }}>
+                      Enter how many units to add for each color.
+                    </Text>
+                    {restockColorAdds.map((row, idx) => (
+                      <View
+                        key={row.label}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <View style={{ flex: 1.2 }}>
+                          {row.hex ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: row.hex, borderWidth: 1, borderColor: 'rgba(0,0,0,0.15)' }} />
+                              <Text style={{ fontSize: 13, fontWeight: '500', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>{row.label}</Text>
+                            </View>
+                          ) : (
+                            <Text style={{ fontSize: 13, fontWeight: '500', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>{row.label}</Text>
+                          )}
+                          <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>Now: {row.currentStock}</Text>
+                        </View>
+                        <TextInput
+                          style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
+                          keyboardType="numeric"
+                          value={row.addQty}
+                          placeholder="+ qty"
+                          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                          onChangeText={(val) => {
+                            setRestockColorAdds((prev) =>
+                              prev.map((r, i) => (i === idx ? { ...r, addQty: val } : r))
+                            );
+                          }}
+                        />
+                      </View>
+                    ))}
+                    <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                      {[5, 10, 25].map((qty) => (
+                        <TouchableOpacity
+                          key={qty}
+                          style={{
+                            flex: 1,
+                            backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
+                            paddingVertical: 6,
+                            borderRadius: 8,
+                            alignItems: 'center',
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? tokens.chipBorder : '#FDE68A',
+                          }}
+                          onPress={() =>
+                            setRestockColorAdds((prev) =>
+                              prev.map((r) => ({ ...r, addQty: String(qty) }))
+                            )
+                          }
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
+                            +{qty} all
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </>
+                );
+              }
+
+              if (isAll) {
+                return (
+                  <>
+                    <Text style={styles.formLabel}>Restock by size (add units)</Text>
+                    <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 8 }}>
+                      Enter how many units to add for each size.
+                    </Text>
+                    {restockSizeAdds.map((row, idx) => (
+                      <View
+                        key={row.label}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 8,
+                          marginBottom: 8,
+                        }}
+                      >
+                        <View style={{ flex: 1.2 }}>
+                          <Text style={{ fontSize: 13, fontWeight: '500', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                            {row.label}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+                            Now: {row.currentStock}
+                          </Text>
+                        </View>
+                        <TextInput
+                          style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
+                          keyboardType="numeric"
+                          value={row.addQty}
+                          placeholder="+ qty"
+                          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                          onChangeText={(val) => {
+                            setRestockSizeAdds((prev) =>
+                              prev.map((r, i) => (i === idx ? { ...r, addQty: val } : r))
+                            );
+                          }}
+                        />
+                      </View>
+                    ))}
+                    <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                      {[5, 10, 25].map((qty) => (
+                        <TouchableOpacity
+                          key={qty}
+                          style={{
+                            flex: 1,
+                            backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
+                            paddingVertical: 6,
+                            borderRadius: 8,
+                            alignItems: 'center',
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? tokens.chipBorder : '#FDE68A',
+                          }}
+                          onPress={() =>
+                            setRestockSizeAdds((prev) =>
+                              prev.map((r) => ({ ...r, addQty: String(qty) }))
+                            )
+                          }
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
+                            +{qty} all
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </>
+                );
+              }
+
+              return (
+                <>
+                  <Text style={styles.formLabel}>Quantity purchased</Text>
+                  <TextInput
+                    style={[styles.formInput, { fontSize: 16, fontWeight: '500', color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}
+                    keyboardType="numeric"
+                    value={restockAmount}
+                    onChangeText={setRestockAmount}
+                    placeholder="10"
+                    placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                  />
+                  <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                    {[5, 10, 25, 50].map((qty) => (
+                      <TouchableOpacity
+                        key={qty}
+                        style={{
+                          flex: 1,
+                          backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
+                          paddingVertical: 6,
+                          borderRadius: 8,
+                          alignItems: 'center',
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? tokens.chipBorder : '#FDE68A',
+                        }}
+                        onPress={() => setRestockAmount(String(qty))}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
+                          +{qty}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </>
+              );
+            })()}
+
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.formLabel}>Cost / Purchase (₱)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  keyboardType="numeric"
+                  value={restockUnitCost}
+                  onChangeText={setRestockUnitCost}
+                  placeholder="What you paid the supplier"
+                  placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.formLabel}>Selling Price (₱)</Text>
+                <TextInput
+                  style={styles.formInput}
+                  keyboardType="numeric"
+                  value={restockSellPrice}
+                  onChangeText={setRestockSellPrice}
+                  placeholder="Customer price"
+                  placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                />
+              </View>
+            </View>
+
+            {(() => {
+              const availSizes = normalizeProductSizes(restockModalProduct);
+              const availColors = normalizeProductColors(restockModalProduct);
+              const hasSizesP = availSizes.length > 0;
+              const hasColorsP = availColors.length > 0 && !hasSizesP;
+              const isAll = hasSizesP && restockSelectedSize === 'all';
+              const isAllColors = hasColorsP && restockSelectedColor === 'all';
+              const sizeTotal = (restockSizeAdds || []).reduce(
+                (sum, r) => sum + (parseInt(String(r.addQty || '0'), 10) || 0),
+                0
+              );
+              const colorTotal = (restockColorAdds || []).reduce(
+                (sum, r) => sum + (parseInt(String(r.addQty || '0'), 10) || 0),
+                0
+              );
+              const qty = isAll ? sizeTotal : isAllColors ? colorTotal : Number(restockAmount) || 0;
+              const cost = Number(restockUnitCost) || 0;
+              const price = Number(restockSellPrice) || 0;
+              const expense = qty * cost;
+              const profitUnit = price - cost;
+              const expected = profitUnit * qty;
+              const margin = price > 0 ? (profitUnit / price) * 100 : 0;
+              if (qty <= 0 && price <= 0) return null;
+              return (
+                <View
+                  style={{
+                    marginTop: 8,
+                    marginBottom: 8,
+                    padding: 12,
+                    borderRadius: 12,
+                    backgroundColor: '#FFF7ED',
+                    borderWidth: 1,
+                    borderColor: '#99F6E4',
+                    gap: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F766E' }}>
+                    Expense & Profit preview
+                  </Text>
+                  {Number(price) > 0 && (
+                    <Text style={{ fontSize: 12, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '700' }}>
+                      Profit per unit: ₱{profitUnit.toLocaleString()} ({margin.toFixed(1)}%
+                      margin)
+                    </Text>
+                  )}
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? tokens.statusWarningText : '#B45309' }}>
+                    Expense (paid to supplier): ₱{expense.toLocaleString()}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#475569' }}>
+                    If all {qty || 0} units sell: ₱{expected.toLocaleString()} profit
+                  </Text>
+                </View>
+              );
+            })()}
+          </>
+        ) : (
+          <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 4, marginBottom: 12 }}>
+            Pick a product above — same flow as adding stock when creating an SKU, then enter
+            quantity and cost.
+          </Text>
+        )}
+      </ScrollView>
+
+      <View style={styles.modalFooter}>
+        <TouchableOpacity style={styles.quickStoreBtn} onPress={closeRestockModal}>
+          <Text style={styles.quickStoreBtnText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.addBtnPrimary, !restockModalProduct && { opacity: 0.5 }]}
+          onPress={handleExecuteRestock}
+          disabled={!restockModalProduct}
+        >
+          <BootstrapIcon name="box-arrow-in-down" size={14} color="#FFFFFF" />
+          <Text style={styles.addBtnPrimaryText}>Confirm Purchase</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+{/* ─── POS SIZE PICKER (tires / rims) ─── */ }
+{
+  posSizePickerProduct && (
+    <Modal
+      visible={Boolean(posSizePickerProduct)}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        setPosSizePickerProduct(null);
+        setPosSelectedSize('');
+      }}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={[styles.modalSheet, { maxWidth: 420 }]}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Select Size</Text>
+            <TouchableOpacity
+              onPress={() => {
+                setPosSizePickerProduct(null);
+                setPosSelectedSize('');
+              }}
+            >
+              <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.modalBody}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A', marginBottom: 4 }}>
+              {posSizePickerProduct.name}
+            </Text>
+            <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 12 }}>
+              Choose a size before adding to the POS cart.
+            </Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              {getProductSizeEntries(posSizePickerProduct).map((entry) => {
+                const soldOut = isSizeSoldOut(posSizePickerProduct, entry.label);
+                const active = posSelectedSize === entry.label;
+                return (
+                  <TouchableOpacity
+                    key={entry.label}
+                    disabled={soldOut}
+                    onPress={() => setPosSelectedSize(entry.label)}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 10,
+                      borderWidth: 1.5,
+                      borderColor: soldOut ? (isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#FECACA') : active ? '#EA580C' : tokens.border,
+                      backgroundColor: soldOut ? (isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2') : active ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#F8FAFC'),
+                      minWidth: 110,
+                      opacity: soldOut ? 0.7 : 1,
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: '500',
+                        color: soldOut ? (isDarkMode ? tokens.statusDangerText : '#991B1B') : active ? '#FFFFFF' : tokens.textPrimary,
+                        textDecorationLine: soldOut ? 'line-through' : 'none',
+                      }}
+                    >
+                      {entry.label}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        fontWeight: '700',
+                        marginTop: 2,
+                        color: soldOut ? '#DC2626' : active ? '#FED7AA' : '#EA580C',
+                      }}
+                    >
+                      {soldOut ? 'Sold Out' : `₱${Number(entry.price || 0).toLocaleString()}`}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+          <View style={styles.modalFooter}>
+            <TouchableOpacity
+              style={styles.quickStoreBtn}
+              onPress={() => {
+                setPosSizePickerProduct(null);
+                setPosSelectedSize('');
+              }}
+            >
+              <Text style={styles.quickStoreBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.addBtnPrimary, !posSelectedSize && { opacity: 0.5 }]}
+              onPress={handlePOSConfirmSize}
+              disabled={!posSelectedSize}
+            >
+              <Text style={styles.addBtnPrimaryText}>Add to Cart</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+{/* ─── MODAL 4: DIGITAL POS THERMAL RECEIPT ─── */ }
+{
+  posReceiptOrder && (
+    <Modal
+      visible={Boolean(posReceiptOrder)}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setPosReceiptOrder(null)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.receiptSheet}>
+          <Text style={styles.receiptLogo}>MotoTrack Motorparts & Accessories</Text>
+          <Text style={styles.receiptSub}>Official Counter POS Sales Invoice</Text>
+          <Text style={styles.receiptSub}>
+            Receipt No: {posReceiptOrder.order_id} • {posReceiptOrder.order_date}
+          </Text>
+
+          <View style={styles.receiptDivider} />
+
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptText}>Customer:</Text>
+            <Text style={styles.receiptTextBold}>{posReceiptOrder.customer_name}</Text>
+          </View>
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptText}>Cashier:</Text>
+            <Text style={styles.receiptTextBold}>{posReceiptOrder.cashier || 'Admin Cashier'}</Text>
+          </View>
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptText}>Channel:</Text>
+            <Text style={styles.receiptTextBold}>Direct In-Store Counter</Text>
+          </View>
+
+          <View style={styles.receiptDivider} />
+
+          {/* Items */}
+          {(posReceiptOrder.items || []).map((it, idx) => (
+            <View key={idx} style={{ marginVertical: 3 }}>
+              <Text style={[styles.receiptTextBold, { fontSize: 11.5 }]} numberOfLines={1}>
+                {it.name}
+              </Text>
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptText}>
+                  {' '}
+                  {it.quantity} x ₱{it.price?.toLocaleString()}
+                </Text>
+                <Text style={styles.receiptTextBold}>₱{(it.price * it.quantity).toLocaleString()}</Text>
+              </View>
+            </View>
+          ))}
+
+          <View style={styles.receiptDivider} />
+
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptText}>Subtotal:</Text>
+            <Text style={styles.receiptTextBold}>₱{posReceiptOrder.total_amount?.toLocaleString()}</Text>
+          </View>
+
+          {posReceiptOrder.discount_amount > 0 && (
+            <View style={styles.receiptRow}>
+              <Text style={[styles.receiptText, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>Voucher Discount:</Text>
+              <Text style={[styles.receiptTextBold, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>
+                -₱{posReceiptOrder.discount_amount?.toLocaleString()}
+              </Text>
+            </View>
+          )}
+
+          <View style={[styles.receiptRow, { marginTop: 4 }]}>
+            <Text style={[styles.receiptTextBold, { fontSize: 14 }]}>TOTAL PAID:</Text>
+            <Text style={[styles.receiptTextBold, { fontSize: 16, color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}>
+              ₱{posReceiptOrder.grand_total?.toLocaleString()}
+            </Text>
+          </View>
+
+          <View style={styles.receiptRow}>
+            <Text style={styles.receiptText}>Payment Method:</Text>
+            <Text style={styles.receiptTextBold}>{posReceiptOrder.payment_method}</Text>
+          </View>
+
+          {posReceiptOrder.payment_method === 'Cash' && (
+            <>
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptText}>Tendered:</Text>
+                <Text style={styles.receiptTextBold}>
+                  ₱{posReceiptOrder.amount_tendered?.toLocaleString()}
+                </Text>
+              </View>
+              <View style={styles.receiptRow}>
+                <Text style={styles.receiptText}>Change Given:</Text>
+                <Text style={[styles.receiptTextBold, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>
+                  ₱{posReceiptOrder.change_amount?.toLocaleString()}
+                </Text>
+              </View>
+            </>
+          )}
+
+          <View style={styles.receiptBarcode}>
+            <Text style={styles.receiptBarcodeText}>|||||||| | ||||| |||| | |||||||</Text>
+          </View>
+
+          <Text style={[styles.receiptSub, { marginTop: 6 }]}>
+            Thank you for choosing MotoTrack! Drive safe.
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+            <TouchableOpacity
+              style={[styles.addBtnPrimary, { flex: 1, justifyContent: 'center' }]}
+              onPress={() => {
+                if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                  window.print?.();
+                }
+                setPosReceiptOrder(null);
+              }}
+            >
+              <BootstrapIcon name="printer-fill" size={14} color="#FFFFFF" />
+              <Text style={styles.addBtnPrimaryText}>Print / Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+{/* ─── MODAL: MANAGE BOOKING / WORK ORDER ─── */ }
+{
+  selectedBookingForModal && (
+    <Modal
+      visible={isBookingModalOpen}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setIsBookingModalOpen(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View
+          style={[
+            styles.modalSheet,
+            {
+              maxWidth: 860,
+              maxHeight: '92%',
+              borderRadius: 24,
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+              borderWidth: 1,
+              borderColor: isDarkMode ? tokens.border : '#E2E8F0',
+              shadowColor: '#000000',
+              shadowOffset: { width: 0, height: 12 },
+              shadowOpacity: 0.2,
+              shadowRadius: 28,
+              elevation: 12,
+            },
+          ]}
+        >
+          {/* Fixed Modal Header */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20,
+              paddingVertical: 10,
+              borderBottomWidth: 1,
+              borderBottomColor: isDarkMode ? tokens.border : '#E2E8F0',
+              backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+              <View
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 8,
+                  backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? tokens.chipBorder : '#FDE68A',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <BootstrapIcon name="tools" size={15} color="#B45309" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A', letterSpacing: -0.3 }}>
+                    Work Order #{selectedBookingForModal.booking_id || selectedBookingForModal.id}
+                  </Text>
+                  <View
+                    style={{
+                      backgroundColor: selectedBookingForModal.status === 'Cancelled' ? '#FEF2F2' : '#ECFDF5',
+                      paddingHorizontal: 7,
+                      paddingVertical: 2,
+                      borderRadius: 5,
+                      borderWidth: 1,
+                      borderColor: selectedBookingForModal.status === 'Cancelled' ? '#FECACA' : '#A7F3D0',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10.5,
+                        fontWeight: '600',
+                        color: selectedBookingForModal.status === 'Cancelled' ? '#DC2626' : '#047857',
+                      }}
+                    >
+                      {selectedBookingForModal.status === 'Cancelled'
+                        ? 'DP Forfeited'
+                        : `20% DP ₱${(selectedBookingForModal.downpayment_amount !== undefined ? selectedBookingForModal.downpayment_amount : Math.round((selectedBookingForModal.pricePhp || 2500) * 0.20)).toLocaleString()} Paid (${selectedBookingForModal.downpayment_method || 'GCash'})`}
+                    </Text>
+                  </View>
+                </View>
+
+                <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '500', marginTop: 1 }}>
+                  {selectedBookingForModal.category || 'PMS'} Service Appointment •{' '}
+                  {selectedBookingForModal.branch?.replace('MotoTrack ', '') || 'D\'Blockchain Motorparts and Accessories'}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setIsBookingModalOpen(false)}
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 7,
+                backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                borderWidth: 1,
+                borderColor: isDarkMode ? tokens.border : '#E2E8F0',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+              }}
+              activeOpacity={0.7}
+            >
+              <BootstrapIcon name="x-lg" size={12} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Organized Booking Details & Operational Workflow Modal */}
+          <AdminBookingDetailsPanel
+            booking={selectedBookingForModal}
+            onClose={() => setIsBookingModalOpen(false)}
+            onDeleteBooking={handleDeleteBooking}
+            mechanics={garageMechanics}
+            onToast={showToast}
+            isDarkMode={isDarkMode}
+            tokens={tokens}
+            showConfirm={showConfirm}
+            isDesktop={true}
+            onBookingUpdated={(next, list) => {
+              if (Array.isArray(list)) setGarageBookings(list);
+              if (next) {
+                setSelectedBookingForModal(next);
+                setEditBkStatus(next.status || editBkStatus);
+                setEditBkMechanic(next.mechanic || editBkMechanic);
+              } else {
+                garageService.fetchBookings().then((fresh) => {
+                  if (Array.isArray(fresh)) {
+                    setGarageBookings(fresh);
+                    const id = selectedBookingForModal?.booking_id || selectedBookingForModal?.id;
+                    const found = fresh.find((b) => b.booking_id === id || b.id === id);
+                    if (found) {
+                      setSelectedBookingForModal(found);
+                      setEditBkStatus(found.status || editBkStatus);
+                    }
+                  }
+                });
+              }
+            }}
+          />
+        </View>
+      </View>
+    </Modal>
+  )
+}
+
+{/* ─── MODAL: CREATE WALK-IN / NEW BOOKING ─── */ }
+<Modal
+  visible={isNewBookingModalOpen}
+  transparent
+  animationType="fade"
+  onRequestClose={() => setIsNewBookingModalOpen(false)}
+>
+  <View style={styles.modalOverlay}>
+    <View style={[styles.modalSheet, { maxWidth: 640, maxHeight: '90%' }]}>
+      <View style={styles.modalHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <BootstrapIcon name="calendar-plus-fill" size={18} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
+          </View>
+          <View>
+            <Text style={styles.modalTitle}>Book Walk-in / Phone-in Service</Text>
+            <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+              Schedule new garage appointment and assign lift bay
+            </Text>
+          </View>
+        </View>
+        <TouchableOpacity onPress={() => setIsNewBookingModalOpen(false)}>
+          <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+        {/* Category selector */}
+        <Text style={styles.formLabel}>Service Type</Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+            borderRadius: 8,
+            padding: 3,
+            borderWidth: 1,
+            borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+            marginBottom: 12,
+          }}
+        >
+          {[
+            { key: 'Repair', label: 'Mechanical Repair' },
+            { key: 'PMS', label: 'Preventive Maintenance (PMS)' },
+            { key: 'Installation', label: 'Installation' },
+          ].map((c) => {
+            const isSelected = newBkCategory === c.key;
+            return (
+              <TouchableOpacity
+                key={c.key}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingVertical: 7,
+                  borderRadius: 6,
+                  backgroundColor: isSelected ? '#EA580C' : 'transparent',
+                  boxShadow: isSelected ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                onPress={() => {
+                  setNewBkCategory(c.key);
+                  const match = garageServices.find((pkg) => pkg.category === c.key);
+                  if (match) {
+                    setNewBkServiceTitle(match.title);
+                    setNewBkPrice(String(getPackagePricePhp(match) || match.pricePhp || ''));
+                  } else if (c.key === 'Repair') {
+                    setNewBkServiceTitle('Track Diagnostic & Mechanical Repair');
+                    setNewBkPrice('1500');
+                  } else if (c.key === 'PMS') {
+                    setNewBkServiceTitle('Pro Performance Full PMS');
+                    setNewBkPrice('3750');
+                  } else {
+                    setNewBkServiceTitle('Parts / Accessory Installation');
+                    setNewBkPrice('1500');
+                  }
+                }}
+                activeOpacity={0.85}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: isSelected ? '700' : '600',
+                    color: isSelected ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
+                    transition: 'color 0.15s ease',
+                  }}
+                >
+                  {c.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Service Title & Price */}
+        <Text style={styles.formLabel}>Shop Service Package</Text>
+        <View style={{ gap: 8, marginBottom: 12 }}>
+          {garageServices
+            .filter((pkg) => {
+              if (!newBkCategory) return true;
+              if (pkg.category === newBkCategory) return true;
+              // Legacy packages labeled Customization map to Installation
+              if (
+                newBkCategory === 'Installation' &&
+                /customization|tuning|install/i.test(String(pkg.category || ''))
+              ) {
+                return true;
+              }
+              return false;
+            })
+            .map((pkg) => {
+              const selected = newBkServiceTitle === pkg.title;
+              const price = getPackagePricePhp(pkg);
+              return (
+                <TouchableOpacity
+                  key={pkg.id || pkg.service_id}
+                  onPress={() => {
+                    setNewBkServiceTitle(pkg.title);
+                    setNewBkPrice(String(price));
+                    const pkgCat = pkg.category || newBkCategory;
+                    setNewBkCategory(
+                      /customization|tuning/i.test(String(pkgCat || ''))
+                        ? 'Installation'
+                        : pkgCat
+                    );
+                  }}
+                  style={{
+                    padding: 10,
+                    borderRadius: 10,
+                    borderWidth: 1.5,
+                    borderColor: selected ? '#EA580C' : tokens.border,
+                    backgroundColor: selected ? (isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#F0FDF4') : (isDarkMode ? tokens.bgSub : '#FFFFFF'),
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: selected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : tokens.textPrimary, flex: 1 }}>
+                      {pkg.title}
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>₱{price.toLocaleString()}</Text>
+                  </View>
+                  <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
+                    {pkg.category} • {pkg.duration || '60 mins'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+        </View>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 2 }}>
+            <Text style={styles.formLabel}>Service Package Name</Text>
+            <TextInput
+              style={styles.formInput}
+              value={newBkServiceTitle}
+              onChangeText={setNewBkServiceTitle}
+              placeholder="e.g. Pro Performance Full PMS"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Service Price (₱)</Text>
+            <TextInput
+              style={styles.formInput}
+              keyboardType="numeric"
+              value={newBkPrice}
+              onChangeText={setNewBkPrice}
+              placeholder="3750"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+        </View>
+
+        {/* Customer Info */}
+        <Text style={[styles.formLabel, { marginTop: 4 }]}>Customer Full Name *</Text>
+        <TextInput
+          style={styles.formInput}
+          value={newBkCustomerName}
+          onChangeText={setNewBkCustomerName}
+          placeholder="e.g. Juan dela Cruz"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Contact Phone</Text>
+            <TextInput
+              style={styles.formInput}
+              value={newBkCustomerPhone}
+              onChangeText={setNewBkCustomerPhone}
+              placeholder="+63 9XX XXX XXXX"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Email (Optional)</Text>
+            <TextInput
+              style={styles.formInput}
+              value={newBkCustomerEmail}
+              onChangeText={setNewBkCustomerEmail}
+              placeholder="juan@example.com"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+              autoCapitalize="none"
+            />
+          </View>
+        </View>
+
+        {/* Motorcycle Details */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Bike Brand</Text>
+            <TextInput
+              style={styles.formInput}
+              value={newBkBikeBrand}
+              onChangeText={setNewBkBikeBrand}
+              placeholder="Yamaha, Honda, Kawasaki..."
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Bike Model</Text>
+            <TextInput
+              style={styles.formInput}
+              value={newBkBikeModel}
+              onChangeText={setNewBkBikeModel}
+              placeholder="NMAX 155, Ninja 400..."
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Plate Number</Text>
+            <TextInput
+              style={styles.formInput}
+              value={newBkPlate}
+              onChangeText={setNewBkPlate}
+              placeholder="ABC-1234"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Odometer (km)</Text>
+            <TextInput
+              style={styles.formInput}
+              value={newBkOdo}
+              onChangeText={setNewBkOdo}
+              placeholder="8,500 km"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+        </View>
+
+        {/* Appointment Date & Slot */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Appointment Date</Text>
+            <TextInput
+              style={styles.formInput}
+              value={newBkDate}
+              onChangeText={setNewBkDate}
+              placeholder="Today / Tomorrow"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Time Slot</Text>
+            <TextInput
+              style={styles.formInput}
+              value={newBkTimeSlot}
+              onChangeText={setNewBkTimeSlot}
+              placeholder="10:30 AM - 12:00 PM"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+        </View>
+
+        <Text style={styles.formLabel}>Garage Branch</Text>
+        <TextInput
+          style={styles.formInput}
+          value={newBkBranch}
+          onChangeText={setNewBkBranch}
+          placeholder="MotoTrack Flagship Central Hub & Pit Bays"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+
+        <Text style={styles.formLabel}>Assigned Technician</Text>
+        <TextInput
+          style={styles.formInput}
+          value={newBkMechanic}
+          onChangeText={setNewBkMechanic}
+          placeholder="Assigned technician (optional / pending)"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+
+        {/* Mandatory 20% Non-Refundable Downpayment Notice */}
+        <View style={{ backgroundColor: '#F0FDF4', padding: 12, borderRadius: 8, borderWidth: 1, borderColor: isDarkMode ? tokens.chipBorder : '#BBF7D0', marginVertical: 8 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.statusSuccessText : '#166534' }}>
+              Mandatory 20% Downpayment (Collected):
+            </Text>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: isDarkMode ? tokens.statusSuccessText : '#166534' }}>
+              ₱{Math.round((Number(newBkPrice) || (newBkCategory === 'PMS' ? 3750 : 6000)) * 0.20).toLocaleString()}
+            </Text>
+          </View>
+          <Text style={{ fontSize: 11, color: isDarkMode ? tokens.statusSuccessText : '#166534', marginTop: 2 }}>
+            Anti-fake booking policy: 20% advance downpayment is collected and strictly non-refundable.
+          </Text>
+        </View>
+
+        <Text style={styles.formLabel}>Special Notes & Requests</Text>
+        <TextInput
+          style={[styles.formInput, { height: 60 }]}
+          multiline
+          value={newBkNotes}
+          onChangeText={setNewBkNotes}
+          placeholder="Customer symptoms, requests, pre-existing scratches..."
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+      </ScrollView>
+
+      <View style={styles.modalFooter}>
+        <TouchableOpacity style={styles.quickStoreBtn} onPress={() => setIsNewBookingModalOpen(false)}>
+          <Text style={styles.quickStoreBtnText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.addBtnPrimary} onPress={handleCreateAdminBooking}>
+          <BootstrapIcon name="check2-circle" size={14} color="#FFFFFF" />
+          <Text style={styles.addBtnPrimaryText}>Confirm & Book Service</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+{/* ─── MODAL: ADD / EDIT PMS FIXED RATE (BY CC) ─── */ }
+<Modal
+  visible={isAddPmsRateOpen}
+  transparent
+  animationType="fade"
+  onRequestClose={() => {
+    if (pmsRateSaving) return;
+    setIsAddPmsRateOpen(false);
+    resetPmsRateForm();
+  }}
+>
+  <View style={styles.modalOverlay}>
+    <View style={[styles.modalSheet, { maxWidth: 520, maxHeight: '90%' }]}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>
+          {editingPmsRate ? 'Edit Service' : 'Add Service'}
+        </Text>
+        <TouchableOpacity
+          disabled={pmsRateSaving}
+          onPress={() => {
+            setIsAddPmsRateOpen(false);
+            resetPmsRateForm();
+          }}
+        >
+          <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : '#64748B'} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+        <Text style={styles.formLabel}>Service name *</Text>
+        <TextInput
+          style={styles.formInput}
+          value={pmsRateName}
+          onChangeText={setPmsRateName}
+          placeholder="e.g. Replace Clutch Cable"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+        />
+
+        <Text style={styles.formLabel}>Category *</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          {[
+            { key: CATALOG_CATEGORIES.PMS, label: 'PMS' },
+            { key: CATALOG_CATEGORIES.REPAIR, label: 'Repair Services' },
+          ].map((opt) => {
+            const active = pmsRateCatalogCategory === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                onPress={() => setPmsRateCatalogCategory(opt.key)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 10,
+                  borderWidth: 1.5,
+                  borderColor: active
+                    ? isDarkMode
+                      ? tokens.accentBrand
+                      : '#EA580C'
+                    : isDarkMode
+                      ? tokens.borderInput
+                      : '#E2E8F0',
+                  backgroundColor: active
+                    ? isDarkMode
+                      ? '#132A26'
+                      : '#E8F0EC'
+                    : isDarkMode
+                      ? tokens.bgElevated
+                      : '#FFFFFF',
+                  alignItems: 'center',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: '600',
+                    color: active
+                      ? isDarkMode
+                        ? tokens.accentBrand
+                        : '#EA580C'
+                      : isDarkMode
+                        ? tokens.textMuted
+                        : '#64748B',
+                  }}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 12 }}>
+          {CATALOG_CATEGORY_LABELS[pmsRateCatalogCategory] || pmsRateCatalogCategory}. Category is for browsing — shops may reclassify services like cable/fork/chain work.
+        </Text>
+
+        <Text style={[styles.formLabel, { marginTop: 4 }]}>
+          Labor prices by motorcycle tier (₱)
+        </Text>
+        <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginBottom: 10 }}>
+          Mark a tier as Price not configured when it does not apply. Never use ₱0 for missing prices — those bookings will be blocked.
+        </Text>
+
+        {[
+          {
+            key: '125',
+            label: 'Tier 1 · 125cc and Below',
+            value: pmsRate125,
+            setValue: setPmsRate125,
+            na: pmsRate125Na,
+            setNa: setPmsRate125Na,
+          },
+          {
+            key: '150',
+            label: 'Tier 2 · 150cc–160cc',
+            value: pmsRate150,
+            setValue: setPmsRate150,
+            na: pmsRate150Na,
+            setNa: setPmsRate150Na,
+          },
+          {
+            key: 'big',
+            label: 'Tier 3 · Big bikes (200cc+)',
+            value: pmsRateBig,
+            setValue: setPmsRateBig,
+            na: pmsRateBigNa,
+            setNa: setPmsRateBigNa,
+          },
+        ].map((row) => (
+          <View
+            key={row.key}
+            style={{
+              marginBottom: 12,
+              padding: 12,
+              borderRadius: 12,
+              borderWidth: 1,
+              borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+              backgroundColor: isDarkMode ? tokens.bgElevated : '#F8FAFC',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                {row.label}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  const next = !row.na;
+                  row.setNa(next);
+                  if (next) row.setValue('');
+                }}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 5,
+                  borderRadius: 999,
+                  backgroundColor: row.na
+                    ? isDarkMode
+                      ? '#3F1D1D'
+                      : '#FEE2E2'
+                    : isDarkMode
+                      ? '#132A26'
+                      : '#E8F0EC',
+                  borderWidth: 1,
+                  borderColor: row.na
+                    ? isDarkMode
+                      ? '#7F1D1D'
+                      : '#FECACA'
+                    : isDarkMode
+                      ? tokens.borderInput
+                      : '#C8DDD3',
+                }}
+                activeOpacity={0.85}
+              >
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color: row.na
+                      ? isDarkMode
+                        ? tokens.statusDangerText
+                        : '#B91C1C'
+                      : isDarkMode
+                        ? tokens.accentBrand
+                        : '#EA580C',
+                  }}
+                >
+                  {row.na ? 'Price not configured' : 'Configured'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={[
+                styles.formInput,
+                row.na && { opacity: 0.45 },
+                { marginBottom: 0 },
+              ]}
+              keyboardType="numeric"
+              editable={!row.na && !pmsRateSaving}
+              value={row.value}
+              onChangeText={row.setValue}
+              placeholder={row.na ? 'Price not configured' : 'e.g. 450'}
+              placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+            />
+          </View>
+        ))}
+      </ScrollView>
+
+      <View style={styles.modalFooter}>
+        <TouchableOpacity
+          style={styles.btnSecondary}
+          disabled={pmsRateSaving}
+          onPress={() => {
+            setIsAddPmsRateOpen(false);
+            resetPmsRateForm();
+          }}
+        >
+          <Text style={styles.btnSecondaryText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.btnPrimary, pmsRateSaving && { opacity: 0.7 }]}
+          disabled={pmsRateSaving}
+          onPress={handleSavePmsFixedRate}
+          activeOpacity={0.85}
+        >
+          {pmsRateSaving ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={styles.btnPrimaryText}>
+              {editingPmsRate ? 'Save Changes' : 'Add Service'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+{/* ─── MODAL: ADD / EDIT GARAGE SERVICE PACKAGE ─── */ }
+<Modal
+  visible={isAddGarageOpen}
+  transparent
+  animationType="fade"
+  onRequestClose={() => {
+    setIsAddGarageOpen(false);
+    setEditingGarageService(null);
+  }}
+>
+  <View style={styles.modalOverlay}>
+    <View style={[styles.modalSheet, { maxWidth: 540, maxHeight: '90%' }]}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>
+          {editingGarageService ? 'Edit Service Package' : 'Add New Service Package'}
+        </Text>
+        <TouchableOpacity
+          onPress={() => {
+            setIsAddGarageOpen(false);
+            setEditingGarageService(null);
+          }}
+        >
+          <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+        <Text style={styles.formLabel}>Service Title *</Text>
+        <TextInput
+          style={styles.formInput}
+          value={servTitle}
+          onChangeText={setServTitle}
+          placeholder="e.g. Master Brake System Flush & Bleed"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+
+        <Text style={styles.formLabel}>Subtitle / Short Tagline</Text>
+        <TextInput
+          style={styles.formInput}
+          value={servSubtitle}
+          onChangeText={setServSubtitle}
+          placeholder="e.g. High Temp Motul RBF 660 Fluid Bleed"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Category</Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                borderRadius: 8,
+                padding: 3,
+                borderWidth: 1,
+                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+              }}
+            >
+              {['PMS', 'Repair', 'Installation'].map((cat) => {
+                const isSelected = servCategory === cat;
+                return (
+                  <TouchableOpacity
+                    key={cat}
+                    style={{
+                      flex: 1,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingVertical: 7,
+                      borderRadius: 6,
+                      backgroundColor: isSelected ? '#EA580C' : 'transparent',
+                      boxShadow: isSelected ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    onPress={() => setServCategory(cat)}
+                    activeOpacity={0.85}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: isSelected ? '700' : '600',
+                        color: isSelected ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
+                        transition: 'color 0.15s ease',
+                      }}
+                    >
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Price (₱) *</Text>
+            <TextInput
+              style={styles.formInput}
+              keyboardType="numeric"
+              value={servPrice}
+              onChangeText={setServPrice}
+              placeholder="3750"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Est. Duration</Text>
+            <TextInput
+              style={styles.formInput}
+              value={servDuration}
+              onChangeText={setServDuration}
+              placeholder="60 mins"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Badge Tag</Text>
+            <TextInput
+              style={styles.formInput}
+              value={servBadge}
+              onChangeText={setServBadge}
+              placeholder="Popular / Express"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+        </View>
+
+        {/* Service Package Image */}
+        <Text style={[styles.formLabel, { marginTop: 10 }]}>Package Image</Text>
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: 14,
+            alignItems: 'center',
+            marginBottom: 10,
+            padding: 10,
+            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: tokens.border,
+          }}
+        >
+          {servImage ? (
+            <Image
+              source={{ uri: servImage }}
+              style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: isDarkMode ? tokens.bgSub : '#E2E8F0' }}
+              resizeMode="cover"
+            />
+          ) : (
+            <View
+              style={{ width: 56, height: 56, borderRadius: 10, backgroundColor: isDarkMode ? tokens.bgSub : '#E2E8F0', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <BootstrapIcon name="tools" size={20} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
+            </View>
+          )}
+          <View style={{ flex: 1, gap: 4 }}>
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                borderRadius: 8,
+              }}
+              onPress={async () => {
+                const res = await pickImageFromFile();
+                if (res.success && res.uri) {
+                  setServImage(res.uri);
+                  showToast('Service image selected!');
+                }
+              }}
+              activeOpacity={0.85}
+            >
+              <BootstrapIcon name="folder2-open" size={13} color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
+                Choose Image File
+              </Text>
+            </TouchableOpacity>
+            <TextInput
+              style={[styles.formInput, { marginBottom: 0, paddingVertical: 4, fontSize: 11 }]}
+              value={servImage}
+              onChangeText={setServImage}
+              placeholder="Or paste image URL"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+        </View>
+
+        <Text style={styles.formLabel}>Service Description</Text>
+        <TextInput
+          style={[styles.formInput, { height: 60 }]}
+          multiline
+          value={servDesc}
+          onChangeText={setServDesc}
+          placeholder="Full description of what this service entails..."
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+
+        <Text style={styles.formLabel}>Inclusions (One per line)</Text>
+        <TextInput
+          style={[styles.formInput, { height: 80 }]}
+          multiline
+          value={servInclusions}
+          onChangeText={setServInclusions}
+          placeholder="e.g. Complete Fluid Change&#10;System Pressure Test"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+        />
+      </ScrollView>
+
+      <View style={styles.modalFooter}>
+        <TouchableOpacity
+          style={styles.btnSecondary}
+          onPress={() => {
+            setIsAddGarageOpen(false);
+            setEditingGarageService(null);
+          }}
+        >
+          <Text style={styles.btnSecondaryText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.btnPrimary} onPress={handleSaveGarageService}>
+          <Text style={styles.btnPrimaryText}>
+            {editingGarageService ? 'Save Changes' : 'Add Service'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+{/* ─── MODAL: ADD / EDIT CERTIFIED TECHNICIAN ─── */ }
+<Modal
+  visible={isAddMechanicModalOpen}
+  transparent
+  animationType="fade"
+  onRequestClose={() => {
+    setIsAddMechanicModalOpen(false);
+    setEditingMechanic(null);
+  }}
+>
+  <View style={styles.modalOverlay}>
+    <View style={[styles.modalSheet, { maxWidth: 620, maxHeight: '92%' }]}>
+      {/* Header (Fixed) */}
+      <View style={styles.modalHeader}>
+        <View>
+          <Text style={styles.modalTitle}>
+            {editingMechanic ? 'Edit Mechanic' : 'Add Mechanic to Roster'}
+          </Text>
+          <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
+            Admin-managed pit bay roster only — technicians do not get a login account
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => {
+            setIsAddMechanicModalOpen(false);
+            setEditingMechanic(null);
+          }}
+        >
+          <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Scrollable Form Body */}
+      <ScrollView
+        style={styles.modalBody}
+        contentContainerStyle={{ gap: 18, paddingBottom: 16 }}
+        showsVerticalScrollIndicator={true}
+      >
+        {/* SECTION 1 — TECHNICIAN PHOTO */}
+        <View style={{ gap: 10 }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C', letterSpacing: 0.6 }}>
+            TECHNICIAN PHOTO
+          </Text>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
+            {/* Photo Placeholder / Selected Image Container */}
+            {mechAvatar ? (
+              <View style={{ position: 'relative' }}>
+                <Image
+                  source={{ uri: mechAvatar }}
+                  style={{
+                    width: 72,
+                    height: 72,
+                    borderRadius: 16,
+                    borderWidth: 2,
+                    borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
+                    backgroundColor: isDarkMode ? tokens.bgSub : '#F1F5F9',
+                  }}
+                />
+                <TouchableOpacity
+                  style={{
+                    position: 'absolute',
+                    top: -6,
+                    right: -6,
+                    backgroundColor: '#DC2626',
+                    width: 22,
+                    height: 22,
+                    borderRadius: 11,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderWidth: 1.5,
+                    borderColor: '#FFFFFF',
+                  }}
+                  onPress={() => setMechAvatar('')}
+                  title="Remove photo"
+                >
+                  <BootstrapIcon name="x-lg" size={11} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View
+                style={{
+                  width: 72,
+                  height: 72,
+                  borderRadius: 16,
+                  borderWidth: 1.5,
+                  borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                  borderStyle: 'dashed',
+                  backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 2,
+                }}
+              >
+                <BootstrapIcon name="person-fill" size={26} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
+                <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
+                  No photo
+                </Text>
+              </View>
+            )}
+
+            {/* Actions Column */}
+            <View style={{ flex: 1, gap: 8 }}>
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
+                  paddingVertical: 8,
+                  paddingHorizontal: 14,
+                  borderRadius: 8,
+                  alignSelf: 'flex-start',
+                }}
+                onPress={async () => {
+                  const res = await pickImageFromFile();
+                  if (res.success && res.uri) {
+                    setMechAvatar(res.uri);
+                    showToast('Technician photo selected!');
+                  }
+                }}
+                activeOpacity={0.85}
+              >
+                <BootstrapIcon name="camera-fill" size={13} color="#FFFFFF" />
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
+                  Upload Device Photo
+                </Text>
+              </TouchableOpacity>
+
+              {mechAvatar ? (
+                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.statusSuccessText : '#059669', fontWeight: '600' }}>
+                  ✓ Photo attached
+                </Text>
+              ) : (
+                <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+                  Upload a device photo for the technician
+                </Text>
+              )}
+            </View>
+          </View>
+        </View>
+
+        <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 2 }} />
+
+        {/* SECTION 2 — TECHNICIAN INFORMATION */}
+        <View style={{ gap: 10 }}>
+          <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C', letterSpacing: 0.6 }}>
+            TECHNICIAN INFORMATION
+          </Text>
+
+          <View style={{ flexDirection: 'row', gap: 12 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.formLabel}>Full Name & Credentials *</Text>
+              <TextInput
+                style={styles.formInput}
+                value={mechName}
+                onChangeText={(txt) => {
+                  setMechName(txt);
+                  if (!editingMechanic && !mechShortName) {
+                    const parts = txt.split('(')[0].trim();
+                    setMechShortName(parts);
+                  }
+                }}
+                placeholder="e.g. Master Tech Roberto (Ducati Certified)"
+                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+              />
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.formLabel}>Short Name / Nickname</Text>
+              <TextInput
+                style={styles.formInput}
+                value={mechShortName}
+                onChangeText={setMechShortName}
+                placeholder="e.g. Tech Roberto"
+                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+              />
+            </View>
+          </View>
+
+          <Text style={styles.formLabel}>Contact Number</Text>
+          <TextInput
+            style={styles.formInput}
+            value={mechPhone}
+            onChangeText={setMechPhone}
+            placeholder="e.g. 09171234567"
+            placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+            keyboardType="phone-pad"
+          />
+
+          <Text style={styles.formLabel}>Contact email (optional)</Text>
+          <TextInput
+            style={styles.formInput}
+            value={mechEmail}
+            onChangeText={setMechEmail}
+            placeholder="shop-contact@example.com"
+            placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+            autoCapitalize="none"
+            keyboardType="email-address"
+          />
+          <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+            Contact only. Mechanics cannot sign in — only admins manage the roster and bookings.
+          </Text>
+        </View>
+
+        <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 2 }} />
+
+        {/* SECTION 3 — CERTIFICATIONS & SPECIALIZATIONS */}
+        <View style={{ gap: 10 }}>
+          <Text style={{ fontSize: 11, fontWeight: '500', color: isDarkMode ? tokens.accentBrand : '#EA580C', letterSpacing: 0.6 }}>
+            CERTIFICATIONS & SPECIALIZATIONS
+          </Text>
+
+          {/* Primary Specialization (Aligned 2-Column Grid) */}
+          <Text style={styles.formLabel}>Primary Specialization</Text>
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              justifyContent: 'space-between',
+              gap: 8,
+              marginBottom: 10,
+            }}
+          >
+            {MECHANIC_SPECIALIZATION_PRESETS.map((spec) => {
+              const isMatch =
+                mechSpecialization?.trim().toLowerCase() === spec.toLowerCase();
+              return (
+                <TouchableOpacity
+                  key={spec}
+                  activeOpacity={0.75}
+                  style={{
+                    width: Platform.OS === 'web' ? 'calc(50% - 4px)' : '48.8%',
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    borderRadius: 8,
+                    backgroundColor: isMatch
+                      ? '#EA580C'
+                      : isDarkMode
+                        ? '#1E293B'
+                        : '#F8FAFC',
+                    borderWidth: 1.5,
+                    borderColor: isMatch
+                      ? '#EA580C'
+                      : isDarkMode
+                        ? '#334155'
+                        : '#CBD5E1',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                  }}
+                  onPress={() => setMechSpecialization(spec)}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: isMatch ? '700' : '600',
+                      color: isMatch
+                        ? '#FFFFFF'
+                        : isDarkMode
+                          ? '#E2E8F0'
+                          : '#334155',
+                      flex: 1,
+                      marginRight: 6,
+                    }}
+                    numberOfLines={1}
+                  >
+                    {spec}
+                  </Text>
+                  {isMatch ? (
+                    <BootstrapIcon name="check-circle-fill" size={14} color="#10B981" />
+                  ) : (
+                    <View
+                      style={{
+                        width: 14,
+                        height: 14,
+                        borderRadius: 7,
+                        borderWidth: 1.5,
+                        borderColor: isDarkMode ? '#475569' : '#CBD5E1',
+                      }}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <TextInput
+            style={styles.formInput}
+            value={mechSpecialization}
+            onChangeText={setMechSpecialization}
+            placeholder="e.g. Desmo Valve Clearance & Superbike Electronics"
+            placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+          />
+
+          {/* Certifications & Experience */}
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.formLabel}>OEM Certifications & Badges</Text>
+              <TextInput
+                style={styles.formInput}
+                value={mechCertifications}
+                onChangeText={setMechCertifications}
+                placeholder="e.g. Yamaha YTA Gold • Öhlins Factory Center"
+                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+              />
+            </View>
+
+            <View style={{ flex: 1 }}>
+              <Text style={styles.formLabel}>Experience</Text>
+              <TextInput
+                style={styles.formInput}
+                value={mechExperience}
+                onChangeText={setMechExperience}
+                placeholder="e.g. 7 Years Pro Tech"
+                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+              />
+            </View>
+          </View>
+
+          {/* Status */}
+          <Text style={styles.formLabel}>Initial Status</Text>
+          <View style={{ flexDirection: 'row', gap: 10, marginBottom: 4 }}>
+            {[
+              { id: 'Available', label: '🟢 Available on Duty', desc: 'Ready for booking assignment' },
+              { id: 'In Pit Bay', label: '🟠 In Pit Bay', desc: 'Currently working on bike' },
+            ].map((st) => {
+              const isSelected = mechStatus === st.id;
+              return (
+                <TouchableOpacity
+                  key={st.id}
+                  style={{
+                    flex: 1,
+                    padding: 10,
+                    borderRadius: 8,
+                    borderWidth: 1.5,
+                    borderColor: isSelected ? '#EA580C' : tokens.borderInput,
+                    backgroundColor: isSelected ? (isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#F3F7F6') : (isDarkMode ? tokens.bgSub : '#FFFFFF'),
+                  }}
+                  onPress={() => setMechStatus(st.id)}
+                >
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '600',
+                      color: isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : tokens.textPrimary,
+                      marginBottom: 2,
+                    }}
+                  >
+                    {st.label}
+                  </Text>
+                  <Text style={{ fontSize: 10.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{st.desc}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Footer (Fixed) */}
+      <View style={[styles.modalFooter, { borderTopWidth: 1, borderColor: isDarkMode ? tokens.border : '#E2E8F0', paddingTop: 14 }]}>
+        <TouchableOpacity
+          style={styles.quickStoreBtn}
+          onPress={() => {
+            setIsAddMechanicModalOpen(false);
+            setEditingMechanic(null);
+          }}
+        >
+          <Text style={styles.quickStoreBtnText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveMechanic}>
+          <BootstrapIcon
+            name={editingMechanic ? 'check-lg' : 'person-plus-fill'}
+            size={14}
+            color="#FFFFFF"
+          />
+          <Text style={styles.addBtnPrimaryText}>
+            {editingMechanic ? 'Save Changes' : 'Add to Roster'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+{/* ─── MODAL: ADD / EDIT DELIVERY RIDER ─── */ }
+<Modal
+  visible={isAddRiderModalOpen}
+  transparent
+  animationType="fade"
+  onRequestClose={() => {
+    setIsAddRiderModalOpen(false);
+    setEditingRider(null);
+  }}
+>
+  <View style={styles.modalOverlay}>
+    <View style={[styles.modalSheet, { maxWidth: 520, maxHeight: '90%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }]}>
+      <View style={[styles.modalHeader, { flexShrink: 0 }]}>
+        <Text style={styles.modalTitle}>
+          {editingRider ? 'Edit Rider Account' : 'Invite Rider Account'}
+        </Text>
+        <TouchableOpacity
+          onPress={() => {
+            setIsAddRiderModalOpen(false);
+            setEditingRider(null);
+          }}
+        >
+          <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={[styles.modalBody, { flex: 1, minHeight: 0, maxHeight: undefined }]}
+        contentContainerStyle={{ paddingBottom: 16 }}
+        showsVerticalScrollIndicator={true}
+      >
+        <Text style={styles.formLabel}>Rider Photo / Avatar</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 14 }}>
+          {riderAvatar ? (
+            <Image
+              source={{ uri: riderAvatar }}
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                borderWidth: 2,
+                borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
+                backgroundColor: isDarkMode ? tokens.bgSub : '#F1F5F9',
+              }}
+            />
+          ) : (
+            <View
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: 28,
+                borderWidth: 2,
+                borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                borderStyle: 'dashed',
+                backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <BootstrapIcon name="person-fill" size={24} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
+            </View>
+          )}
+
+          <View style={{ flex: 1, gap: 6 }}>
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                backgroundColor: isDarkMode ? '#EA580C' : '#EA580C',
+                paddingVertical: 7,
+                paddingHorizontal: 12,
+                borderRadius: 8,
+                alignSelf: 'flex-start',
+              }}
+              onPress={async () => {
+                const res = await pickImageFromFile();
+                if (res.success && res.uri) {
+                  setRiderAvatar(res.uri);
+                  showToast('Rider photo selected!');
+                }
+              }}
+              activeOpacity={0.85}
+            >
+              <BootstrapIcon name="camera-fill" size={13} color="#FFFFFF" />
+              <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>
+                Upload Device Photo
+              </Text>
+            </TouchableOpacity>
+            <TextInput
+              style={[styles.formInput, { marginBottom: 0, paddingVertical: 4, fontSize: 11 }]}
+              value={riderAvatar}
+              onChangeText={setRiderAvatar}
+              placeholder="Or paste image URL"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Full Name *</Text>
+            <TextInput
+              style={styles.formInput}
+              value={riderName}
+              onChangeText={(txt) => {
+                setRiderName(txt);
+                if (!editingRider && !riderShortName) {
+                  setRiderShortName(txt.trim().split(' ')[0] || '');
+                }
+              }}
+              placeholder="e.g. Juan Dela Cruz"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Short Name</Text>
+            <TextInput
+              style={styles.formInput}
+              value={riderShortName}
+              onChangeText={setRiderShortName}
+              placeholder="e.g. Juan"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+        </View>
+
+        <Text style={styles.formLabel}>Phone *</Text>
+        <TextInput
+          style={styles.formInput}
+          value={riderPhone}
+          onChangeText={setRiderPhone}
+          placeholder="e.g. 09171234567"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+          keyboardType="phone-pad"
+        />
+
+        <Text style={styles.formLabel}>Rider ID</Text>
+        <TextInput
+          style={[styles.formInput, editingRider && { backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC' }]}
+          value={riderIdInput}
+          onChangeText={setRiderIdInput}
+          placeholder="e.g. rider-juan (optional, auto if blank)"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+          autoCapitalize="none"
+          editable={!editingRider}
+        />
+
+        {editingRider ? (
+          <>
+            <Text style={styles.formLabel}>Login email</Text>
+            <TextInput
+              style={[styles.formInput, { backgroundColor: isDarkMode ? tokens.bgSub : '#F1F5F9' }]}
+              value={riderEmail}
+              editable={false}
+            />
+          </>
+        ) : (
+          <>
+            <Text style={styles.formLabel}>Email *</Text>
+            <TextInput
+              style={styles.formInput}
+              value={riderEmail}
+              onChangeText={setRiderEmail}
+              placeholder="rider@store.com"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+              autoCapitalize="none"
+              keyboardType="email-address"
+            />
+          </>
+        )}
+
+        <Text style={styles.formLabel}>Account status (login)</Text>
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+          {Object.values(RIDER_ACCOUNT_STATUSES).map((st) => {
+            const isSelected = riderAccountStatus === st;
+            return (
+              <TouchableOpacity
+                key={st}
+                activeOpacity={0.75}
+                onPress={() => setRiderAccountStatus(st)}
+                style={{
+                  flex: 1,
+                  paddingHorizontal: 12,
+                  paddingVertical: 9,
+                  borderRadius: 8,
+                  borderWidth: 1.5,
+                  borderColor: isSelected ? '#EA580C' : isDarkMode ? '#334155' : '#CBD5E1',
+                  backgroundColor: isSelected ? '#EA580C' : isDarkMode ? '#1E293B' : '#F8FAFC',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: isSelected ? '700' : '600',
+                    color: isSelected ? '#FFFFFF' : isDarkMode ? '#E2E8F0' : '#334155',
+                    flex: 1,
+                  }}
+                >
+                  {st}
+                </Text>
+                {isSelected ? (
+                  <BootstrapIcon name="check-circle-fill" size={14} color="#10B981" />
+                ) : (
+                  <View
+                    style={{
+                      width: 14,
+                      height: 14,
+                      borderRadius: 7,
+                      borderWidth: 1.5,
+                      borderColor: isDarkMode ? '#475569' : '#CBD5E1',
+                    }}
+                  />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Vehicle</Text>
+            <TextInput
+              style={styles.formInput}
+              value={riderVehicle}
+              onChangeText={setRiderVehicle}
+              placeholder="e.g. Yamaha NMAX 155"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Plate Number</Text>
+            <TextInput
+              style={styles.formInput}
+              value={riderPlate}
+              onChangeText={setRiderPlate}
+              placeholder="e.g. NMX-1001"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+              autoCapitalize="characters"
+            />
+          </View>
+        </View>
+
+        <Text style={styles.formLabel}>Fleet Delivery Status</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+          {Object.values(RIDER_STATUSES).map((st) => {
+            const isSelected = riderStatus === st;
+            return (
+              <TouchableOpacity
+                key={st}
+                activeOpacity={0.75}
+                onPress={() => setRiderStatus(st)}
+                style={{
+                  flex: 1,
+                  paddingHorizontal: 10,
+                  paddingVertical: 9,
+                  borderRadius: 8,
+                  borderWidth: 1.5,
+                  borderColor: isSelected ? '#EA580C' : isDarkMode ? '#334155' : '#CBD5E1',
+                  backgroundColor: isSelected ? '#EA580C' : isDarkMode ? '#1E293B' : '#F8FAFC',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
+                  cursor: 'pointer',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: isSelected ? '700' : '600',
+                    color: isSelected ? '#FFFFFF' : isDarkMode ? '#E2E8F0' : '#334155',
+                  }}
+                >
+                  {st}
+                </Text>
+                {isSelected && (
+                  <BootstrapIcon name="check-circle-fill" size={12} color="#10B981" />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <Text style={styles.formLabel}>Notes</Text>
+        <TextInput
+          style={[styles.formInput, { minHeight: 64, textAlignVertical: 'top' }]}
+          value={riderNotes}
+          onChangeText={setRiderNotes}
+          placeholder="Optional notes..."
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+          multiline
+        />
+      </ScrollView>
+
+      <View style={[styles.modalFooter, { flexShrink: 0, marginTop: 12 }]}>
+        <TouchableOpacity
+          style={styles.quickStoreBtn}
+          onPress={() => {
+            setIsAddRiderModalOpen(false);
+            setEditingRider(null);
+          }}
+        >
+          <Text style={styles.quickStoreBtnText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveRider}>
+          <BootstrapIcon
+            name={editingRider ? 'check-lg' : 'person-plus-fill'}
+            size={14}
+            color="#FFFFFF"
+          />
+          <Text style={styles.addBtnPrimaryText}>
+            {editingRider ? 'Save Changes' : 'Send OTP Invite'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+{/* ─── MODAL: ADD / EDIT SUPPLIER PARTNER ─── */ }
+<Modal
+  visible={isAddSupplierModalOpen}
+  transparent
+  animationType="fade"
+  onRequestClose={() => {
+    setIsAddSupplierModalOpen(false);
+    setEditingSupplier(null);
+  }}
+>
+  <View style={styles.modalOverlay}>
+    <View style={[styles.modalSheet, { maxWidth: 580, maxHeight: '92%' }]}>
+      <View style={styles.modalHeader}>
+        <View>
+          <Text style={styles.modalTitle}>
+            {editingSupplier ? 'Edit Supplier Partner' : 'Add New Supplier Partner'}
+          </Text>
+          <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
+            Procurement source, catalog categories, and fulfillment logistics
+          </Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => {
+            setIsAddSupplierModalOpen(false);
+            setEditingSupplier(null);
+          }}
+        >
+          <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
+        {/* Supplier / Company Name */}
+        <Text style={styles.formLabel}>Supplier / Company Name *</Text>
+        <TextInput
+          style={styles.formInput}
+          placeholder="e.g. Akrapovič Racing Exhausts, Brembo SpA..."
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+          value={supName}
+          onChangeText={setSupName}
+        />
+
+        {/* Contact Person */}
+        <Text style={styles.formLabel}>Account Executive / Contact Person</Text>
+        <TextInput
+          style={styles.formInput}
+          placeholder="e.g. Matteo Rossi, Regional Sales Manager"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+          value={supContactPerson}
+          onChangeText={setSupContactPerson}
+        />
+
+        {/* Two Column: Email & Phone */}
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Contact Email</Text>
+            <TextInput
+              style={styles.formInput}
+              placeholder="supply@company.com"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+              keyboardType="email-address"
+              value={supEmail}
+              onChangeText={setSupEmail}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Phone / Hotline</Text>
+            <TextInput
+              style={styles.formInput}
+              placeholder="+63 917 123 4567"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+              keyboardType="phone-pad"
+              value={supPhone}
+              onChangeText={setSupPhone}
+            />
+          </View>
+        </View>
+
+        {/* Address / Headquarters */}
+        <Text style={styles.formLabel}>Warehouse / Distribution Address</Text>
+        <TextInput
+          style={styles.formInput}
+          placeholder="e.g. Bergamo, Italy / Laguna Technopark, PH"
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+          value={supAddress}
+          onChangeText={setSupAddress}
+        />
+
+        {/* Supplied Category Field & Presets */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, marginBottom: 6 }}>
+          <Text style={[styles.formLabel, { marginTop: 0, marginBottom: 0 }]}>
+            Supplied Category *
+          </Text>
+          {Boolean(
+            supCategories?.trim() &&
+            !SUPPLIER_CATEGORY_PRESETS.some(
+              (c) => c.toLowerCase() === supCategories.trim().toLowerCase()
+            )
+          ) && (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  backgroundColor: isDarkMode ? 'rgba(56, 189, 248, 0.15)' : '#F0F9FF',
+                  paddingHorizontal: 8,
+                  paddingVertical: 2,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? '#0284C7' : '#BAE6FD',
+                }}
+              >
+                <BootstrapIcon name="pencil" size={10} color={isDarkMode ? '#38BDF8' : '#0284C7'} />
+                <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? '#38BDF8' : '#0284C7' }}>
+                  Custom Category
+                </Text>
+              </View>
+            )}
+        </View>
+
+        <View style={{ position: 'relative', marginBottom: 10 }}>
+          <TextInput
+            style={[
+              styles.formInput,
+              {
+                paddingRight: supCategories ? 38 : 14,
+                marginBottom: 0,
+              },
+            ]}
+            placeholder="e.g. Exhaust & Performance, Custom Helmets, Gear..."
+            placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+            value={supCategories}
+            onChangeText={setSupCategories}
+          />
+          {Boolean(supCategories) && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setSupCategories('')}
+              style={{
+                position: 'absolute',
+                right: 10,
+                top: '50%',
+                transform: [{ translateY: -11 }],
+                width: 22,
+                height: 22,
+                borderRadius: 11,
+                backgroundColor: isDarkMode ? '#334155' : '#E2E8F0',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              title="Clear category"
+            >
+              <BootstrapIcon name="x" size={14} color={isDarkMode ? '#CBD5E1' : '#64748B'} />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Category Presets Header */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, marginTop: 2 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B', letterSpacing: 0.3, textTransform: 'uppercase' }}>
+            Category Presets
+          </Text>
+          <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8' }}>
+            Select preset or type custom above
+          </Text>
+        </View>
+
+        {/* Aligned 2-Column Grid */}
+        <View
+          style={{
+            flexDirection: 'row',
+            flexWrap: 'wrap',
+            justifyContent: 'space-between',
+            gap: 8,
+            marginBottom: 14,
+          }}
+        >
+          {SUPPLIER_CATEGORY_PRESETS.map((cat) => {
+            const isSelected =
+              supCategories?.trim().toLowerCase() === cat.toLowerCase();
+            return (
+              <TouchableOpacity
+                key={cat}
+                activeOpacity={0.75}
+                style={{
+                  width: Platform.OS === 'web' ? 'calc(50% - 4px)' : '48.8%',
+                  paddingHorizontal: 12,
+                  paddingVertical: 9,
+                  borderRadius: 8,
+                  backgroundColor: isSelected
+                    ? '#EA580C'
+                    : isDarkMode
+                      ? '#1E293B'
+                      : '#F8FAFC',
+                  borderWidth: 1.5,
+                  borderColor: isSelected
+                    ? '#EA580C'
+                    : isDarkMode
+                      ? '#334155'
+                      : '#CBD5E1',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                }}
+                onPress={() => setSupCategories(cat)}
+              >
+                <Text
+                  style={{
+                    fontSize: 11.5,
+                    fontWeight: isSelected ? '700' : '600',
+                    color: isSelected
+                      ? '#FFFFFF'
+                      : isDarkMode
+                        ? '#E2E8F0'
+                        : '#475569',
+                    flex: 1,
+                    marginRight: 6,
+                  }}
+                  numberOfLines={1}
+                >
+                  {cat}
+                </Text>
+                <View
+                  style={{
+                    width: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: isSelected
+                      ? '#22C55E'
+                      : isDarkMode
+                        ? '#334155'
+                        : '#E2E8F0',
+                  }}
+                >
+                  {isSelected ? (
+                    <BootstrapIcon name="check" size={12} color="#FFFFFF" />
+                  ) : (
+                    <View
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: 3,
+                        backgroundColor: isDarkMode ? '#64748B' : '#94A3B8',
+                      }}
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Two Column: Lead Time & Reliability Rating */}
+        <View style={{ flexDirection: 'row', gap: 12 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Restock Lead Time</Text>
+            <TextInput
+              style={styles.formInput}
+              placeholder="e.g. 3-5 Days, 1-2 Weeks"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+              value={supLeadTime}
+              onChangeText={setSupLeadTime}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.formLabel}>Quality Score (1.0 - 5.0)</Text>
+            <TextInput
+              style={styles.formInput}
+              placeholder="5.0"
+              placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+              keyboardType="numeric"
+              value={supRating}
+              onChangeText={setSupRating}
+            />
+          </View>
+        </View>
+
+        {/* Status Radio Pills */}
+        <Text style={styles.formLabel}>Vendor Status</Text>
+        <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+          {[
+            { id: 'Active', label: 'Active Partner', color: isDarkMode ? tokens.statusSuccessText : '#10B981' },
+            { id: 'Pending', label: 'Pending Review', color: isDarkMode ? tokens.statusWarningText : '#F59E0B' },
+            { id: 'Inactive', label: 'Inactive / On Hold', color: isDarkMode ? tokens.textMuted : '#64748B' },
+          ].map((st) => {
+            const selected = supStatus === st.id;
+            return (
+              <TouchableOpacity
+                key={st.id}
+                style={{
+                  flex: 1,
+                  paddingVertical: 9,
+                  paddingHorizontal: 8,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: selected
+                    ? isDarkMode
+                      ? 'rgba(234, 88, 12,0.3)'
+                      : '#E8F0EC'
+                    : isDarkMode
+                      ? '#1E293B'
+                      : '#F8FAFC',
+                  borderWidth: 1.5,
+                  borderColor: selected
+                    ? '#EA580C'
+                    : isDarkMode
+                      ? '#334155'
+                      : '#E2E8F0',
+                }}
+                onPress={() => setSupStatus(st.id)}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <View
+                    style={{
+                      width: 7,
+                      height: 7,
+                      borderRadius: 3.5,
+                      backgroundColor: st.color,
+                    }}
+                  />
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: selected ? '600' : '500',
+                      color: selected
+                        ? '#EA580C'
+                        : isDarkMode
+                          ? '#94A3B8'
+                          : '#475569',
+                    }}
+                  >
+                    {st.label}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Notes & Contract Terms */}
+        <Text style={styles.formLabel}>Procurement Notes & Terms (Optional)</Text>
+        <TextInput
+          style={[styles.formInput, { height: 70, textAlignVertical: 'top', paddingTop: 8 }]}
+          placeholder="e.g. OEM Certified Direct Importer, NET 30 payment term, minimum batch order of 10 units..."
+          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+          multiline
+          numberOfLines={3}
+          value={supNotes}
+          onChangeText={setSupNotes}
+        />
+      </ScrollView>
+
+      <View style={styles.modalFooter}>
+        <TouchableOpacity
+          style={styles.quickStoreBtn}
+          onPress={() => {
+            setIsAddSupplierModalOpen(false);
+            setEditingSupplier(null);
+          }}
+        >
+          <Text style={styles.quickStoreBtnText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.addBtnPrimary} onPress={handleSaveSupplier}>
+          <BootstrapIcon
+            name={editingSupplier ? 'check-lg' : 'plus-lg'}
+            size={14}
+            color="#FFFFFF"
+          />
+          <Text style={styles.addBtnPrimaryText}>
+            {editingSupplier ? 'Save Changes' : 'Register Supplier'}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+{/* ─── MODAL 6: MOBILE ADMIN MORE MENU SHEET ─── */ }
+<Modal
+  visible={isMobileMoreOpen}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setIsMobileMoreOpen(false)}
+>
+  <View style={styles.modalOverlay}>
+    <TouchableOpacity
+      style={{ flex: 1 }}
+      activeOpacity={1}
+      onPress={() => setIsMobileMoreOpen(false)}
+    />
+    <View style={styles.mobileMoreSheet}>
+      <View style={styles.modalHeader}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+          >
+            <BootstrapIcon name="grid-fill" size={16} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
+          </View>
+          <Text style={styles.modalTitle}>Admin Management Menu</Text>
+        </View>
+        <TouchableOpacity onPress={() => setIsMobileMoreOpen(false)}>
+          <BootstrapIcon name="x-lg" size={16} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.mobileMoreGrid}>
+        {/* Products */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'products' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('products');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="tag-fill"
+            size={20}
+            color={activeNav === 'products' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Products</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{products.length} products</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Orders & Fulfillment */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'orders' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('orders');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="receipt"
+            size={20}
+            color={activeNav === 'orders' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Orders & COD</Text>
+            <Text
+              style={{
+                fontSize: 11,
+                color: pendingCodCount > 0 ? '#D97706' : '#64748B',
+                fontWeight: pendingCodCount > 0 ? '700' : '400',
+              }}
+            >
+              {pendingCodCount > 0 ? `${pendingCodCount} Pending COD` : `${orders.length} orders`}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Promos */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'promos' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('promos');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="ticket-perforated-fill"
+            size={20}
+            color={activeNav === 'promos' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Promo Codes</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{promos.length} active vouchers</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Suppliers */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'suppliers' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('suppliers');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="truck"
+            size={20}
+            color={activeNav === 'suppliers' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Supplier</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{suppliers.length} vendors</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Garage */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'garage' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('garage');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="tools"
+            size={20}
+            color={activeNav === 'garage' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Pitstop Services</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>PMS & Tuning</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Mechanics */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'mechanics' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('mechanics');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="person-badge-fill"
+            size={20}
+            color={activeNav === 'mechanics' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Mechanics & Crew</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{garageMechanics.length} certified</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Riders */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'riders' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('riders');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="bicycle"
+            size={20}
+            color={activeNav === 'riders' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Riders</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{deliveryRiders.length} delivery staff</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Users */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'users' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('users');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="people-fill"
+            size={20}
+            color={activeNav === 'users' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>User Accounts</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{usersList.length} registered</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Ratings & Reports */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'ratings_reports' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('ratings_reports');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="star"
+            size={20}
+            color={activeNav === 'ratings_reports' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Ratings & reports</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+              {newReportsCount > 0 ? `${newReportsCount} new reports` : 'Customer feedback'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Supabase DB */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'supabase' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('supabase');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="database-fill-gear"
+            size={20}
+            color={activeNav === 'supabase' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Supabase DB</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>Cloud Database</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Forecast & Stock */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'forecast' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('forecast');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="clipboard-data"
+            size={20}
+            color={activeNav === 'forecast' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Forecast & Stock</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>Demand & restock planner</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Activity Logs */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'audit' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('audit');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="journal-text"
+            size={20}
+            color={activeNav === 'audit' ? '#EA580C' : '#475569'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Activity Logs</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>{auditLogs.length} tracked records</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Notifications Center */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'notifications' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('notifications');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="bell-fill"
+            size={20}
+            color={activeNav === 'notifications' ? '#EA580C' : '#475569'}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Notifications</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+              {unreadNotificationsCount > 0 ? `${unreadNotificationsCount} unread alerts` : 'All alerts read'}
+            </Text>
+          </View>
+          {unreadNotificationsCount > 0 && (
+            <View
+              style={{
+                backgroundColor: '#E11D48',
+                borderRadius: 10,
+                paddingHorizontal: 7,
+                paddingVertical: 2,
+              }}
+            >
+              <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '600' }}>
+                {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {/* System Settings */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, activeNav === 'settings' && styles.mobileMoreCardActive]}
+          onPress={() => {
+            setActiveNav('settings');
+            setIsMobileMoreOpen(false);
+          }}
+        >
+          <BootstrapIcon
+            name="gear-fill"
+            size={20}
+            color={activeNav === 'settings' ? '#EA580C' : '#475569'}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>System Settings</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>Store rules & maintenance</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Change Password */}
+        <TouchableOpacity
+          style={[
+            styles.mobileMoreCard,
+            { backgroundColor: isDarkMode ? '#142826' : '#F3F7F6', borderColor: isDarkMode ? '#1F4742' : '#C8DDD3' },
+          ]}
+          onPress={() => {
+            setIsMobileMoreOpen(false);
+            setIsAdminAccountOpen(true);
+          }}
+        >
+          <BootstrapIcon name="key-fill" size={20} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
+              Change Password
+            </Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
+              Account & login password
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Change Security PIN */}
+        <TouchableOpacity
+          style={[
+            styles.mobileMoreCard,
+            { backgroundColor: isDarkMode ? '#142826' : '#FFF7ED', borderColor: isDarkMode ? '#1F4742' : '#FED7AA' },
+          ]}
+          onPress={() => {
+            setIsMobileMoreOpen(false);
+            setIsAdminPinModalOpen(true);
+          }}
+        >
+          <BootstrapIcon name="shield-lock-fill" size={20} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
+              Change Security PIN
+            </Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
+              Console lock PIN
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Dark Mode Toggle */}
+        <TouchableOpacity
+          style={[
+            styles.mobileMoreCard,
+            isDarkMode && { backgroundColor: '#1E293B', borderColor: '#334155' },
+          ]}
+          onPress={() => {
+            toggleDarkMode();
+            showToast(isDarkMode ? 'Switched to Light Theme' : 'Switched to Dark Theme');
+          }}
+        >
+          <BootstrapIcon
+            name={isDarkMode ? 'sun-fill' : 'moon-stars-fill'}
+            size={20}
+            color={isDarkMode ? tokens.statusWarningText : '#64748B'}
+          />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+              {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+            </Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+              {isDarkMode ? 'Switch Theme' : 'Night Display'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Live Storefront */}
+        <TouchableOpacity
+          style={[
+            styles.mobileMoreCard,
+            {
+              backgroundColor: isDarkMode ? '#142826' : '#FEF3C7',
+              borderColor: isDarkMode ? '#1F4742' : '#FDE68A',
+            },
+          ]}
+          onPress={() => {
+            setIsMobileMoreOpen(false);
+            onNavigateToStore?.();
+          }}
+        >
+          <BootstrapIcon name="shop" size={20} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>Live Storefront</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>View Store</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Log Out */}
+        <TouchableOpacity
+          style={[styles.mobileMoreCard, { backgroundColor: isDarkMode ? tokens.statusDangerBg : '#FEE2E2', borderColor: isDarkMode ? tokens.chipBorder : '#FECACA' }]}
+          onPress={() => {
+            setIsMobileMoreOpen(false);
+            try {
+              adminSecurityService.lockSession(currentUser);
+              setIsAdminUnlocked(false);
+            } catch (_e) { }
+            if (onLogout) {
+              onLogout();
+            } else {
+              logout?.();
+              onNavigateToStore?.();
+            }
+          }}
+        >
+          <BootstrapIcon name="box-arrow-right" size={20} color={isDarkMode ? tokens.statusDangerText : "#DC2626"} />
+          <View>
+            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.statusDangerText : '#DC2626' }}>Log Out</Text>
+            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.statusDangerText : '#DC2626' }}>Exit Backoffice</Text>
+          </View>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+</Modal>
+
+{/* ─── MODAL: ORDER DETAILS & FULFILLMENT CONTROL ─── */ }
+<AdminOrderDetailsModal
+  visible={isOrderModalOpen}
+  order={selectedOrderForModal}
+  deliveryDetail={orderDeliveryDetail}
+  deliveryHistory={orderDeliveryHistory}
+  isDarkMode={isDarkMode}
+  isDesktop={isDesktop}
+  tokens={tokens}
+  styles={styles}
+  showConfirm={showConfirm}
+  onClose={() => setIsOrderModalOpen(false)}
+  onApprove={handleApproveCOD}
+  onRetryEmail={handleRetryCodApprovalEmail}
+  onAdvanceStatus={handleAdvanceOrderStatus}
+  onReject={handleRejectOrder}
+  onCancel={handleCancelOrder}
+  onAssignRider={(ord) => {
+    setAssignDeliveryOrder({
+      ...ord,
+      expected_delivery_at:
+        orderDeliveryDetail?.expected_delivery_at || ord?.expected_delivery_at,
+      expected_delivery_end_at:
+        orderDeliveryDetail?.expected_delivery_end_at || ord?.expected_delivery_end_at,
+    });
+  }}
+  onOpenQr={(ord) => setDeliveryTokenModal({ order: ord, bundle: null })}
+  onOpenRiderAccess={(payload) => setRiderAccessModal(payload)}
+  onDeliveryAction={(payload) => setDeliveryAction(payload)}
+  onUploadProof={handleUploadProof}
+  onViewProof={(payload) => setProofViewer(payload)}
+  onProcessReturn={handleProcessReturn}
+  onPrint={() => {
+    showToast('Receipt download initiated / print ready');
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.print?.();
+    }
+  }}
+/>
+
+{/* ─── 3. ADMIN MOBILE BOTTOM NAVIGATION BAR (MOBILE ONLY) ─── */ }
+{
+  !isDesktop && (
+    <View style={styles.bottomNavWrapper}>
+      {/* 1. Overview */}
+      <TouchableOpacity
+        style={styles.bottomNavItem}
+        onPress={() => {
+          setActiveNav('overview');
+          setIsMobileMoreOpen(false);
+        }}
+        activeOpacity={0.8}
+      >
+        <View
+          style={[styles.bottomNavIconWrap, activeNav === 'overview' && styles.bottomNavIconWrapActive]}
+        >
+          <BootstrapIcon
+            name="grid-1x2-fill"
+            size={17}
+            color={activeNav === 'overview' ? '#EA580C' : '#64748B'}
+          />
+        </View>
+        <Text style={[styles.bottomNavLabel, activeNav === 'overview' && styles.bottomNavLabelActive]}>
+          Dashboard
+        </Text>
+      </TouchableOpacity>
+
+      {/* 2. Inventory */}
+      <TouchableOpacity
+        style={styles.bottomNavItem}
+        onPress={() => {
+          setActiveNav('inventory');
+          setIsMobileMoreOpen(false);
+        }}
+        activeOpacity={0.8}
+      >
+        <View
+          style={[
+            styles.bottomNavIconWrap,
+            activeNav === 'inventory' && styles.bottomNavIconWrapActive,
+          ]}
+        >
+          <BootstrapIcon
+            name="box-seam-fill"
+            size={17}
+            color={activeNav === 'inventory' ? '#EA580C' : '#64748B'}
+          />
+          {invStats.lowStockCount > 0 && (
+            <View style={styles.bottomNavDot} />
+          )}
+        </View>
+        <Text
+          style={[
+            styles.bottomNavLabel,
+            activeNav === 'inventory' && styles.bottomNavLabelActive,
+          ]}
+        >
+          Inventory
+        </Text>
+      </TouchableOpacity>
+
+      {/* 3. POS Cashier */}
+      <TouchableOpacity
+        style={styles.bottomNavItem}
+        onPress={() => {
+          setActiveNav('pos');
+          setIsMobileMoreOpen(false);
+        }}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.bottomNavIconWrap, activeNav === 'pos' && styles.bottomNavIconWrapActive]}>
+          <BootstrapIcon
+            name="cart-check-fill"
+            size={17}
+            color={activeNav === 'pos' ? '#EA580C' : '#64748B'}
+          />
+          {posCart.length > 0 && (
+            <View style={styles.bottomNavDot} />
+          )}
+        </View>
+        <Text style={[styles.bottomNavLabel, activeNav === 'pos' && styles.bottomNavLabelActive]}>
+          POS
+        </Text>
+      </TouchableOpacity>
+
+      {/* 4. Analytics */}
+      <TouchableOpacity
+        style={styles.bottomNavItem}
+        onPress={() => {
+          setActiveNav('analytics');
+          setIsMobileMoreOpen(false);
+        }}
+        activeOpacity={0.8}
+      >
+        <View
+          style={[styles.bottomNavIconWrap, activeNav === 'analytics' && styles.bottomNavIconWrapActive]}
+        >
+          <BootstrapIcon
+            name="graph-up-arrow"
+            size={17}
+            color={activeNav === 'analytics' ? '#EA580C' : '#64748B'}
+          />
+        </View>
+        <Text style={[styles.bottomNavLabel, activeNav === 'analytics' && styles.bottomNavLabelActive]}>
+          Analytics
+        </Text>
+      </TouchableOpacity>
+
+      {/* 5. Orders */}
+      <TouchableOpacity
+        style={styles.bottomNavItem}
+        onPress={() => {
+          setActiveNav('orders');
+          setIsMobileMoreOpen(false);
+        }}
+        activeOpacity={0.8}
+      >
+        <View
+          style={[styles.bottomNavIconWrap, activeNav === 'orders' && styles.bottomNavIconWrapActive]}
+        >
+          <BootstrapIcon
+            name="receipt"
+            size={17}
+            color={activeNav === 'orders' ? '#EA580C' : '#64748B'}
+          />
+          {pendingCodCount > 0 && (
+            <View style={styles.bottomNavDot} />
+          )}
+        </View>
+        <Text style={[styles.bottomNavLabel, activeNav === 'orders' && styles.bottomNavLabelActive]}>
+          Orders
+        </Text>
+      </TouchableOpacity>
+
+      {/* 6. More Options */}
+      <TouchableOpacity
+        style={styles.bottomNavItem}
+        onPress={() => setIsMobileMoreOpen(true)}
+        activeOpacity={0.8}
+      >
+        <View
+          style={[
+            styles.bottomNavIconWrap,
+            ['products', 'orders', 'promos', 'garage', 'users', 'supabase', 'forecast', 'audit'].includes(activeNav) &&
+            styles.bottomNavIconWrapActive,
+          ]}
+        >
+          <BootstrapIcon
+            name="three-dots"
+            size={18}
+            color={
+              ['products', 'orders', 'promos', 'garage', 'users', 'supabase', 'forecast', 'audit'].includes(activeNav)
+                ? '#EA580C'
+                : '#64748B'
+            }
+          />
+          {pendingCodCount > 0 && (
+            <View style={styles.bottomNavDot} />
+          )}
+        </View>
+        <Text
+          style={[
+            styles.bottomNavLabel,
+            ['products', 'orders', 'promos', 'garage', 'users', 'supabase', 'forecast', 'audit'].includes(activeNav) &&
+            styles.bottomNavLabelActive,
+          ]}
+        >
+          More
+        </Text>
+      </TouchableOpacity>
+    </View>
+  )
+}
+
+{/* ─── ASSIGN DELIVERY MODAL ─── */ }
       <AssignDeliveryModal
         visible={Boolean(assignDeliveryOrder)}
         order={assignDeliveryOrder}
@@ -19153,45 +19164,45 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         showToast={showToast}
       />
 
-      {/* ─── CUSTOM CENTER CONFIRMATION & ALERT DIALOG MODAL ─── */}
-      <ConfirmModal
-        visible={confirmDialog.visible}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        itemName={confirmDialog.itemName}
-        confirmText={confirmDialog.confirmText}
-        cancelText={confirmDialog.cancelText}
-        type={confirmDialog.type}
-        confirmIcon={confirmDialog.confirmIcon}
-        hideCancel={confirmDialog.hideCancel}
-        onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog((prev) => ({ ...prev, visible: false }))}
-      />
+{/* ─── CUSTOM CENTER CONFIRMATION & ALERT DIALOG MODAL ─── */ }
+<ConfirmModal
+  visible={confirmDialog.visible}
+  title={confirmDialog.title}
+  message={confirmDialog.message}
+  itemName={confirmDialog.itemName}
+  confirmText={confirmDialog.confirmText}
+  cancelText={confirmDialog.cancelText}
+  type={confirmDialog.type}
+  confirmIcon={confirmDialog.confirmIcon}
+  hideCancel={confirmDialog.hideCancel}
+  onConfirm={confirmDialog.onConfirm}
+  onCancel={() => setConfirmDialog((prev) => ({ ...prev, visible: false }))}
+/>
 
-      {/* ─── ADMIN ACCOUNT: CHANGE PASSWORD MODAL (SEPARATE FROM PIN) ─── */}
-      <AdminAccountSettingsModal
-        visible={isAdminAccountOpen}
-        onClose={() => setIsAdminAccountOpen(false)}
-        onSaved={() => setIsAdminAccountOpen(false)}
-        onSwitchToPin={() => {
-          setIsAdminAccountOpen(false);
-          setIsAdminPinModalOpen(true);
-        }}
-        showToast={showToast}
-      />
+{/* ─── ADMIN ACCOUNT: CHANGE PASSWORD MODAL (SEPARATE FROM PIN) ─── */ }
+<AdminAccountSettingsModal
+  visible={isAdminAccountOpen}
+  onClose={() => setIsAdminAccountOpen(false)}
+  onSaved={() => setIsAdminAccountOpen(false)}
+  onSwitchToPin={() => {
+    setIsAdminAccountOpen(false);
+    setIsAdminPinModalOpen(true);
+  }}
+  showToast={showToast}
+/>
 
-      {/* ─── ADMIN SECURITY PIN MODAL (SEPARATE FROM PASSWORD) ─── */}
-      <AdminPinSettingsModal
-        visible={isAdminPinModalOpen}
-        onClose={() => setIsAdminPinModalOpen(false)}
-        onSaved={() => setIsAdminPinModalOpen(false)}
-        onSwitchToPassword={() => {
-          setIsAdminPinModalOpen(false);
-          setIsAdminAccountOpen(true);
-        }}
-        showToast={showToast}
-      />
+{/* ─── ADMIN SECURITY PIN MODAL (SEPARATE FROM PASSWORD) ─── */ }
+<AdminPinSettingsModal
+  visible={isAdminPinModalOpen}
+  onClose={() => setIsAdminPinModalOpen(false)}
+  onSaved={() => setIsAdminPinModalOpen(false)}
+  onSwitchToPassword={() => {
+    setIsAdminPinModalOpen(false);
+    setIsAdminAccountOpen(true);
+  }}
+  showToast={showToast}
+/>
 
-    </SafeAreaView>
+    </SafeAreaView >
   );
 }

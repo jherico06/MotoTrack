@@ -755,6 +755,7 @@ export default function CustomizerPageWeb({
       <View style={styles.maxContainer}>
           <AiMotorcycleInstallStudio
             currentUser={currentUser}
+            initialSelectedProduct={initialSelectedProduct}
             onRequireLogin={() => {
               setRedirectReason?.('ai-install');
               onNavigateToLogin?.();

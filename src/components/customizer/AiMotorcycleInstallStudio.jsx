@@ -40,18 +40,25 @@ import {
   clearInstallStudioSession,
 } from '../../utils/installStudioSession.js';
 import {
+  MAX_SELECTED_PRODUCTS,
+  MIN_CANVAS_ZOOM,
+  MAX_CANVAS_ZOOM,
+  CLICK_ZOOM_TARGET,
   GENERATION_STATES,
   UPLOAD_PART_CATEGORIES,
   bikePhotoUri,
   productImageUri,
+  getProductKey,
   normalizeMotorcycle,
   normalizeProduct,
   validateInstallSession,
-  evaluateCompatibility,
+  evaluateMultiCompatibility,
   buildInstallationPrompt,
   logInstallSessionSelection,
   createInstallResult,
   isInstallablePart,
+  clampCanvasPan,
+  computeCursorAnchoredZoom,
 } from '../../utils/installStudioLogic.js';
 
 const InstallThemeContext = React.createContext({
@@ -63,6 +70,8 @@ const InstallThemeContext = React.createContext({
 
 const COMPAT_WARNING =
   'This part may not be compatible with your selected motorcycle. Please verify compatibility before installation.';
+
+const MAX_PRODUCTS_NOTICE = 'You can select a maximum of 3 products.';
 
 
 function bikeLabel(bike) {
@@ -116,9 +125,17 @@ function filterUserBikes(all, user) {
 }
 
 function formatPartPrice(product) {
-  const amount = Number(product?.price);
+  const amount = Number(product?.price ?? product?.raw?.price);
   if (!Number.isFinite(amount)) return '';
   return `₱${amount.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })}`;
+}
+
+function formatPhpAmount(amount) {
+  const num = Number.isFinite(Number(amount)) ? Number(amount) : 0;
+  return `₱${num.toLocaleString(undefined, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })}`;
@@ -135,6 +152,7 @@ export default function AiMotorcycleInstallStudio({
   currentUser,
   onNavigateToGarage,
   onNavigateToWishlist,
+  initialSelectedProduct = null,
   mobileTab: propMobileTab,
   onMobileTabChange,
   hideMobileToolbar = false,
@@ -150,7 +168,7 @@ export default function AiMotorcycleInstallStudio({
   const { width } = useWindowDimensions();
   const isWide = isWebMode ? width >= 860 : width >= 1024;
   const shouldHideToolbar = hideMobileToolbar || isWebMode;
-  const { addToCart } = useCart();
+  const { addToCart, showToast } = useCart();
   const { addCustomizationToWishlist } = useWishlist();
 
   const currentUserId = currentUser?.id || currentUser?.user_id;
@@ -175,11 +193,51 @@ export default function AiMotorcycleInstallStudio({
   const [partMode, setPartMode] = useState('catalog'); // 'catalog' | 'upload'
   const [catalog, setCatalog] = useState([]);
   const [partSearch, setPartSearch] = useState('');
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedProducts, setSelectedProducts] = useState(() => {
+    if (
+      initialSelectedProduct &&
+      getProductKey(initialSelectedProduct) &&
+      isInstallablePart(initialSelectedProduct) &&
+      productImage(initialSelectedProduct)
+    ) {
+      const normalized = normalizeProduct(initialSelectedProduct);
+      return normalized ? [normalized] : [];
+    }
+    return [];
+  });
+  const selectedProductsRef = useRef(selectedProducts);
+  const [limitNotice, setLimitNotice] = useState('');
+  const limitNoticeTimerRef = useRef(null);
+  const isSubmittingRef = useRef(false);
+  const lastInitialProductIdRef = useRef(
+    initialSelectedProduct ? getProductKey(initialSelectedProduct) : ''
+  );
   const [partUri, setPartUri] = useState(null);
   const [partName, setPartName] = useState('');
   const [uploadCategory, setUploadCategory] = useState('');
+
+  useEffect(() => {
+    selectedProductsRef.current = selectedProducts;
+  }, [selectedProducts]);
+
+  useEffect(() => {
+    return () => {
+      if (limitNoticeTimerRef.current) {
+        clearTimeout(limitNoticeTimerRef.current);
+      }
+    };
+  }, []);
+
+  const triggerLimitNotice = useCallback(() => {
+    setLimitNotice(MAX_PRODUCTS_NOTICE);
+    showToast?.(MAX_PRODUCTS_NOTICE);
+    if (limitNoticeTimerRef.current) {
+      clearTimeout(limitNoticeTimerRef.current);
+    }
+    limitNoticeTimerRef.current = setTimeout(() => {
+      setLimitNotice('');
+    }, 4500);
+  }, [showToast]);
 
   // Custom prompt & Generation state
   const [customRequest, setCustomRequest] = useState('');
@@ -223,6 +281,31 @@ export default function AiMotorcycleInstallStudio({
   // New Preview-First interactive state:
   const [previewMode, setPreviewMode] = useState('before'); // 'before' (original motorcycle) | 'after' (AI result)
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const canvasViewportRef = useRef(null);
+  const zoomStateRef = useRef({ scale: 1, x: 0, y: 0 });
+  const panDragRef = useRef({
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    originX: 0,
+    originY: 0,
+    moved: false,
+  });
+
+  useEffect(() => {
+    zoomStateRef.current = { scale: zoomLevel, x: panOffset.x, y: panOffset.y };
+  }, [zoomLevel, panOffset]);
+
+  const resetZoomAndPan = useCallback(() => {
+    zoomStateRef.current = { scale: 1, x: 0, y: 0 };
+    panDragRef.current.active = false;
+    setZoomLevel(1);
+    setPanOffset({ x: 0, y: 0 });
+    setIsPanning(false);
+  }, []);
   const [internalMobileTab, setInternalMobileTab] = useState('preview'); // Default to AI preview canvas
   const mobileTab = propMobileTab !== undefined ? propMobileTab : internalMobileTab;
   const setMobileTab = useCallback(
@@ -324,8 +407,24 @@ export default function AiMotorcycleInstallStudio({
       if (session.selectedBikeId) setSelectedBikeId(session.selectedBikeId);
       if (session.bikeOverrideUri) setBikeOverrideUri(session.bikeOverrideUri);
       if (session.partMode) setPartMode(session.partMode);
-      if (session.selectedProductId) setSelectedProductId(session.selectedProductId);
-      if (session.selectedProduct) setSelectedProduct(session.selectedProduct);
+      const rawSessionProducts = Array.isArray(session.selectedProducts)
+        ? session.selectedProducts
+        : session.selectedProduct
+          ? [session.selectedProduct]
+          : [];
+      if (rawSessionProducts.length > 0) {
+        const seen = new Set();
+        const hydrated = [];
+        for (const item of rawSessionProducts) {
+          const key = getProductKey(item);
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          hydrated.push(item);
+          if (hydrated.length >= MAX_SELECTED_PRODUCTS) break;
+        }
+        selectedProductsRef.current = hydrated;
+        setSelectedProducts(hydrated);
+      }
       if (session.partUri) setPartUri(session.partUri);
       if (session.partName) setPartName(session.partName);
       if (session.uploadCategory) setUploadCategory(session.uploadCategory);
@@ -348,8 +447,9 @@ export default function AiMotorcycleInstallStudio({
       selectedBikeId,
       bikeOverrideUri,
       partMode,
-      selectedProductId,
-      selectedProduct,
+      selectedProducts,
+      selectedProductId: getProductKey(selectedProducts[0]) || '',
+      selectedProduct: selectedProducts[0] || null,
       partUri,
       partName,
       uploadCategory,
@@ -364,8 +464,7 @@ export default function AiMotorcycleInstallStudio({
     selectedBikeId,
     bikeOverrideUri,
     partMode,
-    selectedProductId,
-    selectedProduct,
+    selectedProducts,
     partUri,
     partName,
     uploadCategory,
@@ -423,10 +522,12 @@ export default function AiMotorcycleInstallStudio({
     setLastResult(null);
     setPromptUsed('');
     setSavedToGarage(false);
+    setSavedCustomizationId(null);
     setSaveNotice('');
     setPreviewFailed(false);
+    setCompatBlocked(false);
     setError('');
-    setZoomLevel(1);
+    resetZoomAndPan();
     setPreviewMode('before');
     setGenerationState(GENERATION_STATES.IDLE);
   };
@@ -442,8 +543,35 @@ export default function AiMotorcycleInstallStudio({
       build.motorcycleName ||
       [build.motorcycleBrand, build.motorcycleModel].filter(Boolean).join(' ') ||
       'Motorcycle';
-    const firstItem = build.items?.[0];
-    const partTitle = firstItem?.product_name || firstItem?.name || 'Custom Part';
+    const buildItems = Array.isArray(build.items) ? build.items : [];
+    const partNames = buildItems
+      .map((it) => it?.product_name || it?.name)
+      .filter(Boolean);
+    const partTitle = partNames.length > 0 ? partNames.join(' + ') : 'Custom Part';
+
+    if (buildItems.length > 0 && catalog.length > 0) {
+      const restored = [];
+      const seen = new Set();
+      for (const it of buildItems) {
+        const pid = String(it?.product_id || it?.productId || it?.id || '').trim();
+        if (!pid || seen.has(pid)) continue;
+        seen.add(pid);
+        const found = catalog.find((c) => getProductKey(c) === pid);
+        if (found) {
+          const normalized = normalizeProduct(found, {
+            compatible_motorcycles: compatMap?.get(pid) || [],
+          });
+          if (normalized) restored.push(normalized);
+        }
+        if (restored.length >= MAX_SELECTED_PRODUCTS) break;
+      }
+      if (restored.length > 0) {
+        setPartMode('catalog');
+        selectedProductsRef.current = restored;
+        setSelectedProducts(restored);
+      }
+    }
+
     setLastResult({
       motorcycle_name: bikeTitle,
       product_name: partTitle,
@@ -451,6 +579,7 @@ export default function AiMotorcycleInstallStudio({
       generated_prompt: build.previewPrompt || '',
     });
     setSavedToGarage(true);
+    resetZoomAndPan();
     setPreviewMode('after');
     setGenerationState(GENERATION_STATES.COMPLETED);
     setSavedBuildsModalOpen(false);
@@ -576,23 +705,6 @@ export default function AiMotorcycleInstallStudio({
         ? rows.filter((p) => productImage(p) && isInstallablePart(p))
         : [];
       setCatalog(list);
-      if (list.length > 0) {
-        setSelectedProductId((prev) => {
-          if (!prev) {
-            const def =
-              list.find((p) => /rim|wheel/i.test(p.name || p.category)) ||
-              list.find((p) => /exhaust|pipe/i.test(p.name || p.category)) ||
-              list[0];
-            if (def) {
-              const defId = String(def.product_id || def.id || '');
-              setSelectedProduct(normalizeProduct(def));
-              setPartName(def.name || '');
-              return defId;
-            }
-          }
-          return prev;
-        });
-      }
     });
     compatibilityService.getCompatibilityMap().then((map) => {
       if (!cancelled) setCompatMap(map instanceof Map ? map : null);
@@ -602,6 +714,41 @@ export default function AiMotorcycleInstallStudio({
     };
   }, []);
 
+  useEffect(() => {
+    if (!initialSelectedProduct) return undefined;
+    const initKey = getProductKey(initialSelectedProduct);
+    if (!initKey || lastInitialProductIdRef.current === initKey) return undefined;
+    if (!isInstallablePart(initialSelectedProduct) || !productImage(initialSelectedProduct)) {
+      return undefined;
+    }
+    lastInitialProductIdRef.current = initKey;
+    const rows = compatMap?.get(initKey) || [];
+    const normalized = normalizeProduct(initialSelectedProduct, { compatible_motorcycles: rows });
+    if (!normalized) return undefined;
+
+    let cancelled = false;
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setPartMode('catalog');
+      setSelectedProducts((prev) => {
+        const list = Array.isArray(prev) ? prev : [];
+        if (list.some((item) => getProductKey(item) === initKey)) {
+          selectedProductsRef.current = list;
+          return list;
+        }
+        const next =
+          list.length >= MAX_SELECTED_PRODUCTS
+            ? [normalized, ...list.slice(0, MAX_SELECTED_PRODUCTS - 1)]
+            : [...list, normalized];
+        selectedProductsRef.current = next;
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [initialSelectedProduct, compatMap]);
+
   const selectedBike = useMemo(() => {
     let raw = bikes.find((b) => b.motorcycle_id === selectedBikeId) || null;
     if (!raw && bikes.length > 0) {
@@ -610,51 +757,75 @@ export default function AiMotorcycleInstallStudio({
     return normalizeMotorcycle(raw, bikeOverrideUri);
   }, [bikes, selectedBikeId, bikeOverrideUri]);
 
-  const sessionProduct = useMemo(() => {
-    if (partMode === 'upload') {
-      if (!partUri) return null;
-      return normalizeProduct(null, {
-        uploadedImage: partUri,
-        name: partName,
-        category: uploadCategory,
-      });
+  const enrichedSelectedProducts = useMemo(() => {
+    if (!Array.isArray(selectedProducts) || selectedProducts.length === 0) return [];
+    const seen = new Set();
+    const list = [];
+    for (const item of selectedProducts) {
+      const key = getProductKey(item);
+      if (!key || seen.has(key)) continue;
+      seen.add(key);
+      const fromCatalog = catalog.find((p) => getProductKey(p) === key) || item?.raw || item;
+      const rows =
+        compatMap?.get(key) ||
+        (Array.isArray(item?.compatible_motorcycles) ? item.compatible_motorcycles : []);
+      const normalized = normalizeProduct(fromCatalog, { compatible_motorcycles: rows });
+      if (normalized) list.push(normalized);
+      if (list.length >= MAX_SELECTED_PRODUCTS) break;
     }
-    if (selectedProduct) return selectedProduct;
-    const selectedKey = String(selectedProductId || '');
-    if (!selectedKey) return null;
-    const fromCatalog =
-      catalog.find((product) => String(product.product_id || product.id || '') === selectedKey) ||
-      null;
-    if (!fromCatalog) return null;
-    const rows = compatMap?.get(selectedKey) || [];
-    return normalizeProduct(fromCatalog, { compatible_motorcycles: rows });
-  }, [
-    partMode,
-    partUri,
-    partName,
-    uploadCategory,
-    selectedProduct,
-    selectedProductId,
-    catalog,
-    compatMap,
-  ]);
+    return list;
+  }, [selectedProducts, catalog, compatMap]);
+
+  const uploadedProduct = useMemo(() => {
+    if (partMode !== 'upload' || !partUri) return null;
+    return normalizeProduct(null, {
+      uploadedImage: partUri,
+      name: partName,
+      category: uploadCategory,
+    });
+  }, [partMode, partUri, partName, uploadCategory]);
+
+  const activeProducts = useMemo(() => {
+    if (partMode === 'upload') {
+      return uploadedProduct ? [uploadedProduct] : [];
+    }
+    return enrichedSelectedProducts;
+  }, [partMode, uploadedProduct, enrichedSelectedProducts]);
+
+  const sessionProduct = activeProducts[0] || null;
+  const selectedCount = enrichedSelectedProducts.length;
+  const isMaxSelectionReached = selectedCount >= MAX_SELECTED_PRODUCTS;
+  const selectionProgressPct = Math.min(
+    100,
+    Math.round((selectedCount / MAX_SELECTED_PRODUCTS) * 100)
+  );
+
+  const selectedProductIdsSet = useMemo(
+    () => new Set(enrichedSelectedProducts.map((p) => getProductKey(p)).filter(Boolean)),
+    [enrichedSelectedProducts]
+  );
+
+  const combinedSelectedPrice = useMemo(
+    () =>
+      enrichedSelectedProducts.reduce(
+        (sum, p) => sum + (Number(p?.price ?? p?.raw?.price) || 0),
+        0
+      ),
+    [enrichedSelectedProducts]
+  );
 
   const bikeUri = selectedBike?.motorcycle_image || selectedBike?.image || null;
   const resolvedPartUri = sessionProduct?.product_image || sessionProduct?.image || null;
 
-  const applyCompatibilityCheck = useCallback((motorcycle, product) => {
-    const result = evaluateCompatibility(motorcycle, product);
-    if (result.status === 'incompatible') {
-      setCompatWarning(result.warning || COMPAT_WARNING);
-      setCompatOverride(false);
-      setCompatBlocked(false);
-    } else {
-      setCompatWarning('');
-      setCompatOverride(false);
-      setCompatBlocked(false);
+  const liveCompatWarning = useMemo(() => {
+    if (!selectedBike || partMode === 'upload' || enrichedSelectedProducts.length === 0) {
+      return '';
     }
-    return result;
-  }, []);
+    const result = evaluateMultiCompatibility(selectedBike, enrichedSelectedProducts);
+    return result.status === 'incompatible' ? result.warning || COMPAT_WARNING : '';
+  }, [selectedBike, enrichedSelectedProducts, partMode]);
+
+  const displayCompatWarning = compatWarning || liveCompatWarning;
 
   const categories = useMemo(() => {
     const names = new Set();
@@ -690,25 +861,25 @@ export default function AiMotorcycleInstallStudio({
       .slice(0, 32);
   }, [catalog, partSearch, categoryFilter, brandFilter]);
 
+  const resetPreviewOutput = useCallback(() => {
+    setResultUri(null);
+    setLastResult(null);
+    setSavedToGarage(false);
+    setSavedCustomizationId(null);
+    setSaveNotice('');
+    setPreviewFailed(false);
+    setCompatBlocked(false);
+    setCompatOverride(false);
+    setError('');
+    setPreviewMode('before');
+  }, []);
+
   const selectBike = (bike) => {
     setGenerationState(GENERATION_STATES.SELECTING);
     setSelectedBikeId(bike.motorcycle_id);
     setBikeOverrideUri(null);
-    setResultUri(null);
-    setLastResult(null);
-    setSavedToGarage(false);
-    setSaveNotice('');
-    setPreviewFailed(false);
-    setError('');
-    setPreviewMode('before');
-    const nextBike = normalizeMotorcycle(bike, null);
-    if (sessionProduct) {
-      applyCompatibilityCheck(nextBike, sessionProduct);
-    } else {
-      setCompatWarning('');
-      setCompatOverride(false);
-      setCompatBlocked(false);
-    }
+    resetZoomAndPan();
+    resetPreviewOutput();
     setGenerationState(GENERATION_STATES.IDLE);
   };
 
@@ -720,6 +891,7 @@ export default function AiMotorcycleInstallStudio({
       setResultUri(null);
       setLastResult(null);
       setSavedToGarage(false);
+      setSavedCustomizationId(null);
       setSaveNotice('');
       setPreviewFailed(false);
       if (selectedBike?.motorcycle_id) {
@@ -736,20 +908,11 @@ export default function AiMotorcycleInstallStudio({
     if (res?.success && res.uri) {
       setGenerationState(GENERATION_STATES.SELECTING);
       setPartMode('upload');
-      setSelectedProductId('');
-      setSelectedProduct(null);
       setPartUri(res.uri);
       setPartName('');
       setUploadCategory('');
-      setResultUri(null);
-      setLastResult(null);
-      setSavedToGarage(false);
-      setSaveNotice('');
-      setPreviewFailed(false);
-      setPreviewMode('before');
+      resetPreviewOutput();
       setCompatWarning('');
-      setCompatOverride(false);
-      setCompatBlocked(false);
       setGenerationState(GENERATION_STATES.IDLE);
       if (!isWide) {
         setMobileTab('preview');
@@ -759,55 +922,83 @@ export default function AiMotorcycleInstallStudio({
     }
   };
 
-  const selectCatalogPart = async (product) => {
-    const nextId = String(product.product_id || product.id || '');
-    if (!nextId) return;
+  const selectCatalogPart = useCallback(
+    (product) => {
+      if (loading || !product) return;
+      const nextId = getProductKey(product);
+      if (!nextId) return;
 
-    setGenerationState(GENERATION_STATES.SELECTING);
-    setPartMode('catalog');
-    setPartUri(null);
-    setUploadCategory('');
-    setResultUri(null);
-    setLastResult(null);
-    setSavedToGarage(false);
-    setSaveNotice('');
-    setPreviewFailed(false);
-    setError('');
-    setPreviewMode('before');
+      setPartMode('catalog');
+      setPartUri(null);
+      setUploadCategory('');
 
-    // Toggle off keeps motorcycle selection intact.
-    if (String(selectedProductId || '') === nextId) {
-      setSelectedProductId('');
-      setSelectedProduct(null);
-      setPartName('');
-      setCompatWarning('');
-      setCompatOverride(false);
-      setCompatBlocked(false);
-      setGenerationState(GENERATION_STATES.IDLE);
+      const currentList = Array.isArray(selectedProductsRef.current)
+        ? selectedProductsRef.current
+        : [];
+      const alreadySelected = currentList.some((item) => getProductKey(item) === nextId);
+
+      // Toggle off deselects product while keeping motorcycle and remaining selections intact
+      if (alreadySelected) {
+        const nextList = currentList.filter((item) => getProductKey(item) !== nextId);
+        selectedProductsRef.current = nextList;
+        setSelectedProducts(nextList);
+        setLimitNotice('');
+        resetPreviewOutput();
+        return;
+      }
+
+      // Enforce strict maximum of 3 products
+      if (currentList.length >= MAX_SELECTED_PRODUCTS) {
+        triggerLimitNotice();
+        return;
+      }
+
+      const rows = compatMap?.get(nextId) || [];
+      const nextProduct = normalizeProduct(product, { compatible_motorcycles: rows });
+      if (!nextProduct) return;
+
+      const nextList = [...currentList, nextProduct].slice(0, MAX_SELECTED_PRODUCTS);
+      selectedProductsRef.current = nextList;
+      setSelectedProducts(nextList);
+      setPartName(nextProduct.name || '');
+      setLimitNotice('');
+      resetPreviewOutput();
+    },
+    [loading, compatMap, resetPreviewOutput, triggerLimitNotice]
+  );
+
+  const removeSelectedProduct = useCallback(
+    (productId) => {
+      if (loading) return;
+      const targetKey = String(productId || '').trim();
+      if (!targetKey) return;
+      const currentList = Array.isArray(selectedProductsRef.current)
+        ? selectedProductsRef.current
+        : [];
+      const nextList = currentList.filter((item) => getProductKey(item) !== targetKey);
+      if (nextList.length === currentList.length) return;
+      selectedProductsRef.current = nextList;
+      setSelectedProducts(nextList);
+      setLimitNotice('');
+      resetPreviewOutput();
+    },
+    [loading, resetPreviewOutput]
+  );
+
+  const clearSelectedProducts = useCallback(() => {
+    if (loading) return;
+    if (!selectedProductsRef.current?.length) return;
+    selectedProductsRef.current = [];
+    setSelectedProducts([]);
+    setLimitNotice('');
+    resetPreviewOutput();
+  }, [loading, resetPreviewOutput]);
+
+  const handleGenerate = async ({ forceCompatOverride = false } = {}) => {
+    if (isSubmittingRef.current || loading) {
       return;
     }
 
-    let rows = compatMap?.get(nextId) || [];
-    if (!rows.length) {
-      try {
-        rows = await compatibilityService.getCompatibilityForProduct(nextId);
-      } catch (_e) {
-        rows = [];
-      }
-    }
-
-    const nextProduct = normalizeProduct(product, { compatible_motorcycles: rows });
-    setSelectedProductId(nextId);
-    setSelectedProduct(nextProduct);
-    setPartName(nextProduct.name || '');
-    applyCompatibilityCheck(selectedBike, nextProduct);
-    setGenerationState(GENERATION_STATES.IDLE);
-    if (!isWide) {
-      setMobileTab('preview');
-    }
-  };
-
-  const handleGenerate = async ({ forceCompatOverride = false } = {}) => {
     if (!currentUser) {
       onRequireLogin?.();
       return;
@@ -822,143 +1013,180 @@ export default function AiMotorcycleInstallStudio({
       return;
     }
 
-    setGenerationState(GENERATION_STATES.VALIDATING);
-    setError('');
-    setPreviewFailed(false);
-
-    const motorcycle = selectedBike;
-    const product = sessionProduct;
-
-    const validation = validateInstallSession({
-      motorcycle,
-      product,
-      partMode,
-      uploadCategory,
-    });
-    if (!validation.ok) {
-      setGenerationState(GENERATION_STATES.IDLE);
-      setError(validation.message);
+    if (partMode === 'catalog' && enrichedSelectedProducts.length > MAX_SELECTED_PRODUCTS) {
+      triggerLimitNotice();
+      setError(MAX_PRODUCTS_NOTICE);
       return;
     }
 
-    const compat = evaluateCompatibility(motorcycle, product);
-    if (compat.status === 'incompatible') {
-      setCompatWarning(compat.warning || COMPAT_WARNING);
-      if (!forceCompatOverride && !compatOverride) {
-        setCompatBlocked(true);
+    isSubmittingRef.current = true;
+    try {
+      setGenerationState(GENERATION_STATES.VALIDATING);
+      setError('');
+      setPreviewFailed(false);
+
+      const motorcycle = selectedBike;
+      const productsToInstall = activeProducts;
+
+      const validation = validateInstallSession({
+        motorcycle,
+        products: productsToInstall,
+        partMode,
+        uploadCategory,
+      });
+      if (!validation.ok) {
         setGenerationState(GENERATION_STATES.IDLE);
-        setError(compat.warning || COMPAT_WARNING);
+        setError(validation.message);
+        if (validation.message === MAX_PRODUCTS_NOTICE) {
+          triggerLimitNotice();
+        }
         return;
       }
-      setCompatBlocked(false);
-    } else {
-      setCompatBlocked(false);
-      if (compat.status !== 'unavailable') {
-        setCompatWarning('');
+
+      const compat = evaluateMultiCompatibility(motorcycle, productsToInstall);
+      if (compat.status === 'incompatible') {
+        setCompatWarning(compat.warning || COMPAT_WARNING);
+        if (!forceCompatOverride && !compatOverride) {
+          setCompatBlocked(true);
+          setGenerationState(GENERATION_STATES.IDLE);
+          setError(compat.warning || COMPAT_WARNING);
+          return;
+        }
+        setCompatBlocked(false);
+      } else {
+        setCompatBlocked(false);
+        if (compat.status !== 'unavailable') {
+          setCompatWarning('');
+        }
       }
-    }
 
-    const accessoryName = product.product_name || product.name || 'accessory';
-    const bikeName = bikeLabel(motorcycle);
-    const installationPrompt = buildInstallationPrompt({
-      motorcycle,
-      product,
-      customNotes: customRequest,
-      compatibilityNote:
-        compat.status === 'unavailable'
-          ? compat.instructAi ||
-            'Compatibility information is unavailable. Prioritize a mechanically realistic installation for this motorcycle and part.'
-          : compat.status === 'incompatible'
-            ? 'Compatibility warning acknowledged by customer. Still prioritize a mechanically realistic installation if possible.'
-            : '',
-    });
-
-    logInstallSessionSelection({ motorcycle, product });
-
-    setGenerationState(GENERATION_STATES.PREPARING);
-    setInfo(`Installing ${accessoryName} on ${bikeName}…`);
-    setResultUri(null);
-    setSavedToGarage(false);
-    setSaveNotice('');
-
-    const currentUid = currentUser?.id || currentUser?.user_id || 'usr-customer-01';
-
-    setGenerationState(GENERATION_STATES.GENERATING);
-    const result = await requestMotorcycleCustomization({
-      userId: currentUid,
-      bikeUri: motorcycle.motorcycle_image || motorcycle.image,
-      partUri: product.product_image || product.image,
-      installationPrompt,
-      customRequest: installationPrompt,
-      selectionMeta: {
-        userId: currentUid,
-        motorcycleId: motorcycle.motorcycle_id || motorcycle.id,
-        motorcycleName: motorcycle.motorcycle_name || motorcycle.name,
-        motorcycleImage: motorcycle.motorcycle_image || motorcycle.image,
-        productId: product.product_id || product.id,
-        productName: product.product_name || product.name,
-        productImage: product.product_image || product.image,
-      },
-    });
-
-    if (!result.success) {
-      setGenerationState(GENERATION_STATES.FAILED);
-      setPreviewFailed(true);
-      setError(result.error || 'Generation failed.');
-      setInfo('');
-
-      if (result.code === 'RATE_LIMIT' || result.reason) {
-        setAiUsage((prev) => ({
-          ...prev,
-          allowed: false,
-          weeklyUsed: result.weeklyUsed ?? prev.weeklyUsed,
-          weeklyLimit: result.weeklyLimit ?? prev.weeklyLimit,
-          consecutiveUsed: result.consecutiveUsed ?? prev.consecutiveUsed,
-          consecutiveLimit: result.consecutiveLimit ?? prev.consecutiveLimit,
-          isCooldownActive: Boolean(result.reason === 'CONSECUTIVE_LIMIT' || result.cooldownUntil),
-          cooldownUntil: result.cooldownUntil || prev.cooldownUntil,
-          remainingSeconds: Math.max(0, Number(result.remainingSeconds) || 0),
-        }));
+      if (!isWide) {
+        setMobileTab('preview');
       }
-      return;
-    }
 
-    if (result.usage) {
-      setAiUsage({
-        allowed: result.usage.allowed ?? true,
-        isAdmin: Boolean(result.usage.isAdmin),
-        weeklyUsed: Number(result.usage.weeklyUsed) || 0,
-        weeklyLimit: result.usage.weeklyLimit ?? 3,
-        consecutiveUsed: Number(result.usage.consecutiveUsed) || 0,
-        consecutiveLimit: result.usage.consecutiveLimit ?? 2,
-        isCooldownActive: Boolean(result.usage.isCooldownActive),
-        cooldownUntil: result.usage.cooldownUntil || null,
-        remainingSeconds: Math.max(0, Number(result.usage.remainingSeconds) || 0),
+      const accessoryNames = productsToInstall.map(
+        (p) => p.product_name || p.name || 'accessory'
+      );
+      const accessorySummary = accessoryNames.join(' + ');
+      const bikeName = bikeLabel(motorcycle);
+      const installationPrompt = buildInstallationPrompt({
+        motorcycle,
+        products: productsToInstall,
+        customNotes: customRequest,
+        compatibilityNote:
+          compat.status === 'unavailable'
+            ? compat.instructAi ||
+              'Compatibility information is unavailable. Prioritize a mechanically realistic installation for this motorcycle and all selected parts.'
+            : compat.status === 'incompatible'
+              ? 'Compatibility warning acknowledged by customer. Still prioritize a mechanically realistic installation if possible.'
+              : '',
       });
-    } else {
-      refreshAiUsage();
+
+      logInstallSessionSelection({ motorcycle, products: productsToInstall });
+
+      setGenerationState(GENERATION_STATES.PREPARING);
+      setInfo(`Installing ${accessorySummary} on ${bikeName}…`);
+      setResultUri(null);
+      setSavedToGarage(false);
+      setSavedCustomizationId(null);
+      setSaveNotice('');
+
+      const currentUid = currentUser?.id || currentUser?.user_id || 'usr-customer-01';
+      const partUris = productsToInstall
+        .map((p) => p.product_image || p.image)
+        .filter(Boolean);
+
+      setGenerationState(GENERATION_STATES.GENERATING);
+      const result = await requestMotorcycleCustomization({
+        userId: currentUid,
+        bikeUri: motorcycle.motorcycle_image || motorcycle.image,
+        partUri: partUris[0],
+        partUris,
+        installationPrompt,
+        customRequest: installationPrompt,
+        selectionMeta: {
+          userId: currentUid,
+          motorcycleId: motorcycle.motorcycle_id || motorcycle.id,
+          motorcycleName: motorcycle.motorcycle_name || motorcycle.name,
+          motorcycleImage: motorcycle.motorcycle_image || motorcycle.image,
+          productId: productsToInstall[0]?.product_id || productsToInstall[0]?.id,
+          productName: accessorySummary,
+          productImage: partUris[0],
+          productIds: productsToInstall.map((p) => p.product_id || p.id).filter(Boolean),
+          products: productsToInstall.map((p) => ({
+            id: p.product_id || p.id,
+            product_id: p.product_id || p.id,
+            name: p.product_name || p.name || 'Accessory',
+            brand: p.brand || '',
+            category: p.category || '',
+            price: Number(p.price ?? p.raw?.price) || 0,
+            image: p.product_image || p.image || '',
+            position: p.position || '',
+            type: p.type || '',
+          })),
+        },
+      });
+
+      if (!result.success) {
+        if (result.code === 'MAX_PRODUCTS_EXCEEDED') {
+          triggerLimitNotice();
+        }
+        setGenerationState(GENERATION_STATES.FAILED);
+        setPreviewFailed(true);
+        setError(result.error || 'Generation failed.');
+        setInfo('');
+
+        if (result.code === 'RATE_LIMIT' || result.reason) {
+          setAiUsage((prev) => ({
+            ...prev,
+            allowed: false,
+            weeklyUsed: result.weeklyUsed ?? prev.weeklyUsed,
+            weeklyLimit: result.weeklyLimit ?? prev.weeklyLimit,
+            consecutiveUsed: result.consecutiveUsed ?? prev.consecutiveUsed,
+            consecutiveLimit: result.consecutiveLimit ?? prev.consecutiveLimit,
+            isCooldownActive: Boolean(result.reason === 'CONSECUTIVE_LIMIT' || result.cooldownUntil),
+            cooldownUntil: result.cooldownUntil || prev.cooldownUntil,
+            remainingSeconds: Math.max(0, Number(result.remainingSeconds) || 0),
+          }));
+        }
+        return;
+      }
+
+      if (result.usage) {
+        setAiUsage({
+          allowed: result.usage.allowed ?? true,
+          isAdmin: Boolean(result.usage.isAdmin),
+          weeklyUsed: Number(result.usage.weeklyUsed) || 0,
+          weeklyLimit: result.usage.weeklyLimit ?? 3,
+          consecutiveUsed: Number(result.usage.consecutiveUsed) || 0,
+          consecutiveLimit: result.usage.consecutiveLimit ?? 2,
+          isCooldownActive: Boolean(result.usage.isCooldownActive),
+          cooldownUntil: result.usage.cooldownUntil || null,
+          remainingSeconds: Math.max(0, Number(result.usage.remainingSeconds) || 0),
+        });
+      } else {
+        refreshAiUsage();
+      }
+
+      const persisted = createInstallResult({
+        motorcycle,
+        products: productsToInstall,
+        generatedImageUrl: result.previewImageUrl,
+        generatedPrompt: result.promptUsed || installationPrompt,
+        cameraView: productsToInstall[0]?.camera_view,
+      });
+
+      setLastResult(persisted);
+      setPreviewFailed(false);
+      setResultUri(result.previewImageUrl);
+      setPromptUsed(result.promptUsed || installationPrompt);
+      setModelUsed(result.model || '');
+      setPreviewMode('after');
+      setGenerationState(GENERATION_STATES.COMPLETED);
+      setInfo(`Done — ${accessorySummary} installed on ${bikeName}.`);
+    } finally {
+      isSubmittingRef.current = false;
     }
-
-    const persisted = createInstallResult({
-      motorcycle,
-      product,
-      generatedImageUrl: result.previewImageUrl,
-      generatedPrompt: result.promptUsed || installationPrompt,
-      cameraView: product.camera_view,
-    });
-
-    setLastResult(persisted);
-    setPreviewFailed(false);
-    setResultUri(result.previewImageUrl);
-    setPromptUsed(result.promptUsed || installationPrompt);
-    setModelUsed(result.model || '');
-    setPreviewMode('after');
-    setGenerationState(GENERATION_STATES.COMPLETED);
-    setInfo(
-      result.note
-        ? `Done — ${accessoryName} installed on ${bikeName}.`
-        : `Done — ${accessoryName} installed on ${bikeName}.`
-    );
   };
 
   const handleSaveRegisteredBike = async (bikeData) => {
@@ -976,21 +1204,32 @@ export default function AiMotorcycleInstallStudio({
       setSelectedBikeId(res.motorcycle.motorcycle_id);
       setBikeOverrideUri(null);
     }
-    setInfo('Motorcycle registered. Choose a part to install on it.');
+    setInfo('Motorcycle registered. Choose up to 3 parts to install on it.');
   };
 
-  const identity = selectedBike ? bikeIdentity(selectedBike.raw || selectedBike) : null;
-  const partDisplayName = sessionProduct?.product_name || sessionProduct?.name || '';
+  const activePartDisplayNames = useMemo(
+    () => activeProducts.map((p) => p.product_name || p.name || 'Accessory').filter(Boolean),
+    [activeProducts]
+  );
+  const partDisplayName = activePartDisplayNames.join(' + ');
   const partBrand =
     partMode === 'catalog'
-      ? sessionProduct?.brand || sessionProduct?.category || 'Universal'
+      ? enrichedSelectedProducts.length > 1
+        ? `Selected: ${selectedCount}/${MAX_SELECTED_PRODUCTS}`
+        : sessionProduct?.brand || sessionProduct?.category || 'Universal'
       : uploadCategory || 'Custom Part';
   const partPrice =
-    partMode === 'catalog' ? formatPartPrice(sessionProduct?.raw || sessionProduct) : '';
+    partMode === 'catalog'
+      ? enrichedSelectedProducts.length > 1
+        ? `Combined: ${formatPhpAmount(combinedSelectedPrice)}`
+        : formatPartPrice(sessionProduct?.raw || sessionProduct)
+      : '';
   const readyToGenerate = Boolean(
     selectedBike &&
       bikeUri &&
-      resolvedPartUri &&
+      activeProducts.length > 0 &&
+      activeProducts.length <= MAX_SELECTED_PRODUCTS &&
+      activeProducts.every((p) => Boolean(p?.product_image || p?.image)) &&
       (partMode !== 'upload' || Boolean(uploadCategory))
   );
 
@@ -998,10 +1237,14 @@ export default function AiMotorcycleInstallStudio({
   const isConsecutiveCooldown = !aiUsage.isAdmin && aiUsage.isCooldownActive;
   const isGenerationBlocked = isWeeklyLimitReached || isConsecutiveCooldown;
 
-  const canAddToCart = partMode === 'catalog' && Boolean(sessionProduct?.raw || selectedProduct?.raw);
+  const canAddToCart =
+    partMode === 'catalog' && enrichedSelectedProducts.some((p) => Boolean(p?.raw || p));
   const friendlyError = (() => {
     const raw = String(error || '');
     if (!raw) return '';
+    if (raw === MAX_PRODUCTS_NOTICE) {
+      return raw;
+    }
     if (/weekly.*limit|cooldown|preview limit|wait before generating|consecutive/i.test(raw)) {
       return raw;
     }
@@ -1036,10 +1279,18 @@ export default function AiMotorcycleInstallStudio({
 
   const handleAddToCart = () => {
     if (!canAddToCart || loading) return;
-    const cartProduct = sessionProduct?.raw || selectedProduct?.raw;
-    if (!cartProduct) return;
-    addToCart(cartProduct, 1);
-    setSaveNotice('✓ Part added to cart!');
+    let added = 0;
+    enrichedSelectedProducts.forEach((item) => {
+      const cartProduct = item?.raw || item;
+      if (cartProduct) {
+        addToCart(cartProduct, 1);
+        added += 1;
+      }
+    });
+    if (!added) return;
+    setSaveNotice(
+      added === 1 ? '✓ Part added to cart!' : `✓ ${added} selected parts added to cart!`
+    );
     setTimeout(() => setSaveNotice(''), 3000);
   };
 
@@ -1057,11 +1308,10 @@ export default function AiMotorcycleInstallStudio({
         'motorcycle';
       const pName =
         lastResult?.product_name ||
-        sessionProduct?.name ||
-        sessionProduct?.product_name ||
-        'custom_part';
+        partDisplayName ||
+        'custom_parts';
       const safeBike = bikeName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-      const safePart = pName.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+      const safePart = pName.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 48).replace(/^_+|_+$/g, '');
       const fileName = `mototrack_${safeBike}_${safePart}_${Date.now()}.png`;
 
       if (Platform.OS === 'web') {
@@ -1149,59 +1399,65 @@ export default function AiMotorcycleInstallStudio({
       'My Motorcycle';
     const pTitle =
       lastResult?.product_name ||
-      sessionProduct?.name ||
-      sessionProduct?.product_name ||
+      partDisplayName ||
       partName ||
       'Custom Part';
     const setupName = `${bikeTitle} with ${pTitle}`;
-    const items = prod
-      ? [
-          {
-            productId: prod.product_id || prod.id,
-            quantity: 1,
-            price: Number(prod.price) || 0,
-            name: prod.name || prod.product_name || pTitle,
-            brand: prod.brand || '',
-            category: prod.category || '',
-          },
-        ]
-      : partMode === 'upload'
-        ? [
-            {
-              productId: null,
+    const items =
+      partMode === 'catalog' && enrichedSelectedProducts.length > 0
+        ? enrichedSelectedProducts.map((item) => {
+            const raw = item?.raw || item;
+            return {
+              productId: raw.product_id || raw.id || item.product_id || item.id,
               quantity: 1,
-              price: 0,
-              name: pTitle,
-              brand: '',
-              category: uploadCategory || 'Custom',
-            },
-          ]
-        : [];
+              price: Number(raw.price ?? item.price) || 0,
+              name: raw.name || raw.product_name || item.product_name || item.name || 'Accessory',
+              brand: raw.brand || item.brand || '',
+              category: raw.category || item.category || '',
+            };
+          })
+        : partMode === 'upload' && uploadedProduct
+          ? [
+              {
+                productId: null,
+                quantity: 1,
+                price: 0,
+                name: pTitle,
+                brand: '',
+                category: uploadCategory || 'Custom',
+              },
+            ]
+          : [];
     return { bike, prod, bikeTitle, pTitle, setupName, items };
   };
 
-  // Detect Free Installation promo for the selected catalog part
+  const selectedProductIdsKey = useMemo(() => {
+    if (partMode !== 'catalog') return '';
+    return enrichedSelectedProducts
+      .map((p) => getProductKey(p))
+      .filter(Boolean)
+      .join(',');
+  }, [partMode, enrichedSelectedProducts]);
+
+  // Detect Free Installation promo across selected catalog parts
   useEffect(() => {
+    if (!selectedProductIdsKey) return undefined;
     let cancelled = false;
-    const run = async () => {
-      const prod = sessionProduct?.raw || sessionProduct;
-      const pid = prod?.product_id || prod?.id;
-      if (!pid) {
-        setFreeInstallPromo(null);
-        return;
-      }
-      try {
-        const match = await promoService.findApplicableFreeInstallation([String(pid)]);
+    const ids = selectedProductIdsKey.split(',').filter(Boolean);
+    promoService
+      .findApplicableFreeInstallation(ids)
+      .then((match) => {
         if (!cancelled) setFreeInstallPromo(match);
-      } catch {
+      })
+      .catch(() => {
         if (!cancelled) setFreeInstallPromo(null);
-      }
-    };
-    run();
+      });
     return () => {
       cancelled = true;
     };
-  }, [sessionProduct]);
+  }, [selectedProductIdsKey]);
+
+  const effectiveFreeInstallPromo = selectedProductIdsKey ? freeInstallPromo : null;
 
   const persistPreviewForWishlist = async () => {
     const { bike, setupName, items } = buildPreviewSnapshot();
@@ -1377,17 +1633,6 @@ export default function AiMotorcycleInstallStudio({
     }
   };
 
-  // Zoom controls
-  const handleZoomIn = () => setZoomLevel((z) => Math.min(2.5, Math.round((z + 0.25) * 100) / 100));
-  const handleZoomOut = () => setZoomLevel((z) => Math.max(0.75, Math.round((z - 0.25) * 100) / 100));
-  const handleFitScreen = () => setZoomLevel(1);
-
-  // Compare Original action
-  const handleToggleCompare = () => {
-    if (!resultUri) return;
-    setPreviewMode((prev) => (prev === 'before' ? 'after' : 'before'));
-  };
-
   // Active display image in canvas:
   // - "before" exclusively displays the original motorcycle photo.
   // - "after" exclusively displays the AI generated installation result (never falls back to before).
@@ -1398,6 +1643,210 @@ export default function AiMotorcycleInstallStudio({
     // previewMode === 'after'
     return resultUri || null;
   }, [previewMode, resultUri, bikeUri]);
+
+  const getViewportRect = useCallback((fallbackEl = null) => {
+    const el =
+      (canvasViewportRef.current &&
+        typeof canvasViewportRef.current.getBoundingClientRect === 'function' &&
+        canvasViewportRef.current) ||
+      (fallbackEl &&
+        typeof fallbackEl.getBoundingClientRect === 'function' &&
+        fallbackEl) ||
+      null;
+    if (!el) {
+      return { left: 0, top: 0, width: 640, height: 540 };
+    }
+    const rect = el.getBoundingClientRect();
+    return {
+      left: Number(rect.left) || 0,
+      top: Number(rect.top) || 0,
+      width: Number(rect.width) || 640,
+      height: Number(rect.height) || 540,
+    };
+  }, []);
+
+  const applyZoomAtPoint = useCallback(
+    (targetScale, cursorOffsetX = 0, cursorOffsetY = 0, rectOverride = null) => {
+      const prev = zoomStateRef.current;
+      const rect = rectOverride || getViewportRect();
+      const next = computeCursorAnchoredZoom({
+        prevScale: prev.scale,
+        prevX: prev.x,
+        prevY: prev.y,
+        targetScale,
+        cursorOffsetX,
+        cursorOffsetY,
+        viewportWidth: rect.width,
+        viewportHeight: rect.height,
+      });
+      zoomStateRef.current = next;
+      setZoomLevel(next.scale);
+      setPanOffset({ x: next.x, y: next.y });
+    },
+    [getViewportRect]
+  );
+
+  // Zoom controls (top-right buttons remain synced with cursor zoom & pan bounds)
+  const handleZoomIn = useCallback(() => {
+    const nextTarget = Math.round((zoomStateRef.current.scale + 0.25) * 100) / 100;
+    applyZoomAtPoint(nextTarget, 0, 0);
+  }, [applyZoomAtPoint]);
+
+  const handleZoomOut = useCallback(() => {
+    const nextTarget = Math.round((zoomStateRef.current.scale - 0.25) * 100) / 100;
+    applyZoomAtPoint(nextTarget, 0, 0);
+  }, [applyZoomAtPoint]);
+
+  const handleFitScreen = useCallback(() => {
+    resetZoomAndPan();
+  }, [resetZoomAndPan]);
+
+  // Web cursor-anchored mouse wheel & trackpad pinch zoom (non-passive to prevent page scroll)
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !canvasDisplayUri || loading || previewFailed) {
+      return undefined;
+    }
+    const node = canvasViewportRef.current;
+    if (!node || typeof node.addEventListener !== 'function') {
+      return undefined;
+    }
+
+    const onWheel = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const rect = getViewportRect(node);
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const cursorOffsetX = e.clientX - centerX;
+      const cursorOffsetY = e.clientY - centerY;
+
+      const normalizedDelta =
+        e.deltaMode === 1 ? e.deltaY * 18 : e.deltaMode === 2 ? e.deltaY * 120 : e.deltaY;
+      const clampedDelta = Math.max(-180, Math.min(180, normalizedDelta));
+      const sensitivity = e.ctrlKey ? 0.01 : 0.0024;
+      const factor = Math.exp(-clampedDelta * sensitivity);
+
+      applyZoomAtPoint(
+        zoomStateRef.current.scale * factor,
+        cursorOffsetX,
+        cursorOffsetY,
+        rect
+      );
+    };
+
+    node.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      node.removeEventListener('wheel', onWheel);
+    };
+  }, [canvasDisplayUri, loading, previewFailed, applyZoomAtPoint, getViewportRect]);
+
+  const handleCanvasPointerDown = useCallback((e) => {
+    if (Platform.OS !== 'web') return;
+    if (e.button != null && e.button !== 0) return;
+    e.preventDefault?.();
+    try {
+      e.currentTarget?.setPointerCapture?.(e.pointerId);
+    } catch (_err) {
+      // Ignore pointer capture errors on synthetic/unsupported targets
+    }
+    panDragRef.current = {
+      active: true,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      originX: zoomStateRef.current.x,
+      originY: zoomStateRef.current.y,
+      moved: false,
+    };
+  }, []);
+
+  const handleCanvasPointerMove = useCallback(
+    (e) => {
+      if (Platform.OS !== 'web') return;
+      const drag = panDragRef.current;
+      if (
+        !drag.active ||
+        (drag.pointerId != null && e.pointerId != null && drag.pointerId !== e.pointerId)
+      ) {
+        return;
+      }
+      const dx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+
+      if (!drag.moved && Math.hypot(dx, dy) > 5) {
+        drag.moved = true;
+        if (zoomStateRef.current.scale > 1.01) {
+          setIsPanning(true);
+        }
+      }
+
+      if (drag.moved && zoomStateRef.current.scale > 1.01) {
+        const rect = getViewportRect(e.currentTarget);
+        const nextPan = clampCanvasPan(
+          drag.originX + dx,
+          drag.originY + dy,
+          zoomStateRef.current.scale,
+          rect.width,
+          rect.height
+        );
+        zoomStateRef.current = {
+          scale: zoomStateRef.current.scale,
+          x: nextPan.x,
+          y: nextPan.y,
+        };
+        setPanOffset(nextPan);
+      }
+    },
+    [getViewportRect]
+  );
+
+  const handleCanvasPointerUp = useCallback(
+    (e) => {
+      if (Platform.OS !== 'web') return;
+      const drag = panDragRef.current;
+      if (!drag.active) return;
+      try {
+        e.currentTarget?.releasePointerCapture?.(e.pointerId);
+      } catch (_err) {
+        // Ignore release errors
+      }
+      const wasMoved = drag.moved;
+      panDragRef.current.active = false;
+      setIsPanning(false);
+
+      // Clean click without dragging: zoom in to 200% anchored at cursor, or reset to 100% Fit
+      if (!wasMoved) {
+        const rect = getViewportRect(e.currentTarget);
+        const cursorOffsetX = e.clientX - (rect.left + rect.width / 2);
+        const cursorOffsetY = e.clientY - (rect.top + rect.height / 2);
+        if (zoomStateRef.current.scale <= 1.05) {
+          applyZoomAtPoint(CLICK_ZOOM_TARGET, cursorOffsetX, cursorOffsetY, rect);
+        } else {
+          resetZoomAndPan();
+        }
+      }
+    },
+    [applyZoomAtPoint, getViewportRect, resetZoomAndPan]
+  );
+
+  const handleCanvasPointerCancel = useCallback((e) => {
+    if (Platform.OS !== 'web') return;
+    if (!panDragRef.current.active) return;
+    try {
+      e?.currentTarget?.releasePointerCapture?.(e?.pointerId);
+    } catch (_err) {
+      // Ignore release errors
+    }
+    panDragRef.current.active = false;
+    setIsPanning(false);
+  }, []);
+
+  // Compare Original action (preserves cursor zoom & pan for pixel-level Before/After comparison)
+  const handleToggleCompare = () => {
+    if (!resultUri) return;
+    setPreviewMode((prev) => (prev === 'before' ? 'after' : 'before'));
+  };
 
   // ─────────────────────────────────────────────────────────────────────────
   // LEFT SIDEBAR: Selection Panel
@@ -1526,7 +1975,26 @@ export default function AiMotorcycleInstallStudio({
 
       {/* SECTION 2: Select part to install */}
       <View style={[styles.sidebarCard, openFilter && styles.sidebarCardRaised]}>
-        <Text style={styles.sidebarTitle}>2. Select part to install</Text>
+        <View style={styles.sidebarCardHeader}>
+          <Text style={styles.sidebarTitle}>2. Select part to install</Text>
+          {partMode === 'catalog' ? (
+            <View
+              style={[
+                styles.selectionCounterPill,
+                selectedCount > 0 && styles.selectionCounterPillActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.selectionCounterText,
+                  selectedCount > 0 && styles.selectionCounterTextActive,
+                ]}
+              >
+                Selected: {selectedCount}/{MAX_SELECTED_PRODUCTS}
+              </Text>
+            </View>
+          ) : null}
+        </View>
 
         {/* Catalog / Upload Tabs */}
         <View style={styles.pillTabs}>
@@ -1549,8 +2017,6 @@ export default function AiMotorcycleInstallStudio({
             style={[styles.pillTab, partMode === 'upload' && styles.pillTabActive]}
             onPress={() => {
               setPartMode('upload');
-              setSelectedProductId('');
-              setSelectedProduct(null);
               setCompatWarning('');
               setCompatOverride(false);
               setCompatBlocked(false);
@@ -1567,6 +2033,68 @@ export default function AiMotorcycleInstallStudio({
 
         {partMode === 'catalog' ? (
           <>
+            {/* Subtle Progress Indicator for 3-Product Limit */}
+            <View style={styles.selectionLimitBlock}>
+              <View
+                style={styles.selectionProgressTrack}
+                accessibilityRole="progressbar"
+                accessibilityValue={{
+                  min: 0,
+                  max: MAX_SELECTED_PRODUCTS,
+                  now: selectedCount,
+                }}
+              >
+                <View
+                  style={[
+                    styles.selectionProgressFill,
+                    { width: `${selectionProgressPct}%` },
+                  ]}
+                />
+              </View>
+              <View style={styles.selectionLimitMetaRow}>
+                <Text
+                  style={[
+                    styles.selectionLimitCaption,
+                    isMaxSelectionReached && styles.selectionLimitCaptionFull,
+                  ]}
+                >
+                  {isMaxSelectionReached
+                    ? 'Maximum 3/3 selected — deselect a part to change'
+                    : 'Select up to 3 products for one combined preview'}
+                </Text>
+                {selectedCount > 0 ? (
+                  <TouchableOpacity
+                    onPress={clearSelectedProducts}
+                    disabled={loading}
+                    activeOpacity={0.75}
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear all selected products"
+                  >
+                    <Text style={styles.clearSelectionLink}>Clear all</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Max Limit Notification Banner */}
+            {limitNotice ? (
+              <View
+                style={styles.maxLimitNoticeBanner}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="assertive"
+              >
+                <BootstrapIcon name="exclamation-circle-fill" size={14} color={BRAND} />
+                <Text style={styles.maxLimitNoticeText}>{limitNotice}</Text>
+                <TouchableOpacity
+                  onPress={() => setLimitNotice('')}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel="Dismiss limit notification"
+                >
+                  <BootstrapIcon name="x" size={15} color={MUTED} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
+
             {/* Search Bar */}
             <View style={styles.searchBar}>
               <BootstrapIcon name="search" size={14} color="#94A3B8" />
@@ -1624,18 +2152,28 @@ export default function AiMotorcycleInstallStudio({
                 <Text style={styles.quietText}>No parts match your search or filter.</Text>
               ) : (
                 filteredParts.map((product) => {
-                  const id = String(product.product_id || product.id || '');
-                  const selected = partMode === 'catalog' && id !== '' && id === String(selectedProductId || '');
+                  const id = getProductKey(product);
+                  const selected =
+                    partMode === 'catalog' && Boolean(id) && selectedProductIdsSet.has(id);
+                  const limitLocked =
+                    partMode === 'catalog' && !selected && isMaxSelectionReached;
                   const img = productImage(product);
                   const price = formatPartPrice(product);
                   const badgeLabel = product.brand || product.category || 'Universal';
                   return (
                     <View key={id} style={styles.partSlot}>
                       <TouchableOpacity
-                        style={[styles.partCard, selected && styles.partCardSelected]}
+                        style={[
+                          styles.partCard,
+                          selected && styles.partCardSelected,
+                          limitLocked && styles.partCardLimitReached,
+                        ]}
                         onPress={() => selectCatalogPart(product)}
                         disabled={loading}
-                        activeOpacity={0.88}
+                        activeOpacity={limitLocked ? 0.96 : 0.88}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected, disabled: loading }}
+                        accessibilityLabel={`${product.name}, ${price || ''}${selected ? ', Selected' : limitLocked ? ', Limit reached' : ''}`}
                       >
                         <View style={styles.partImageWrap}>
                           <Image source={{ uri: img }} style={styles.partThumb} resizeMode="cover" />
@@ -1643,16 +2181,27 @@ export default function AiMotorcycleInstallStudio({
                             <View style={styles.checkBadge}>
                               <BootstrapIcon name="check" size={12} color="#FFFFFF" />
                             </View>
+                          ) : limitLocked ? (
+                            <View style={styles.limitLockBadge}>
+                              <Text style={styles.limitLockBadgeText}>Max 3</Text>
+                            </View>
                           ) : null}
                         </View>
                         <Text style={styles.partTitle} numberOfLines={2}>
                           {product.name}
                         </Text>
                         {price ? <Text style={styles.partPrice}>{price}</Text> : null}
-                        <View style={styles.badgePill}>
-                          <Text style={styles.badgePillText} numberOfLines={1}>
-                            {badgeLabel}
-                          </Text>
+                        <View style={styles.partCardFooterRow}>
+                          <View style={styles.badgePill}>
+                            <Text style={styles.badgePillText} numberOfLines={1}>
+                              {badgeLabel}
+                            </Text>
+                          </View>
+                          {selected ? (
+                            <View style={styles.selectedStateTag}>
+                              <Text style={styles.selectedStateTagText}>Selected</Text>
+                            </View>
+                          ) : null}
                         </View>
                       </TouchableOpacity>
                     </View>
@@ -1660,6 +2209,144 @@ export default function AiMotorcycleInstallStudio({
                 })
               )}
             </ScrollView>
+
+            {/* Selected Products Summary */}
+            <View style={styles.selectedSummaryCard}>
+              <View style={styles.selectedSummaryHeader}>
+                <Text style={styles.selectedSummaryTitle}>Selected Products</Text>
+                <Text style={styles.selectedSummaryCount}>
+                  Selected: {selectedCount}/{MAX_SELECTED_PRODUCTS}
+                </Text>
+              </View>
+
+              {enrichedSelectedProducts.length === 0 ? (
+                <Text style={styles.selectedSummaryEmpty}>
+                  No products selected yet. Choose up to 3 parts from the catalog above.
+                </Text>
+              ) : (
+                <View style={styles.selectedSummaryList}>
+                  {enrichedSelectedProducts.map((item) => {
+                    const itemKey = getProductKey(item);
+                    const itemThumb =
+                      item.product_image || item.image || productImage(item.raw);
+                    const itemName = item.product_name || item.name || 'Accessory';
+                    const itemBrand =
+                      item.brand || item.raw?.brand || item.category || 'MotoTrack';
+                    const itemPrice =
+                      formatPartPrice(item.raw || item) || formatPhpAmount(0);
+                    return (
+                      <View key={itemKey} style={styles.selectedSummaryRow}>
+                        {itemThumb ? (
+                          <Image
+                            source={{ uri: itemThumb }}
+                            style={styles.selectedSummaryThumb}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={[styles.selectedSummaryThumb, styles.imageFallback]}>
+                            <BootstrapIcon name="gear" size={14} color={BRAND} />
+                          </View>
+                        )}
+                        <View style={styles.selectedSummaryInfo}>
+                          <Text style={styles.selectedSummaryName} numberOfLines={1}>
+                            {itemName}
+                          </Text>
+                          <Text style={styles.selectedSummaryBrand} numberOfLines={1}>
+                            {itemBrand}
+                          </Text>
+                        </View>
+                        <Text style={styles.selectedSummaryPrice}>{itemPrice}</Text>
+                        <TouchableOpacity
+                          style={styles.selectedSummaryRemoveBtn}
+                          onPress={() => removeSelectedProduct(itemKey)}
+                          disabled={loading}
+                          activeOpacity={0.75}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Remove ${itemName}`}
+                        >
+                          <BootstrapIcon name="x" size={15} color={MUTED} />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
+
+              <View style={styles.selectedSummaryTotalRow}>
+                <Text style={styles.selectedSummaryTotalLabel}>Combined Price</Text>
+                <Text style={styles.selectedSummaryTotalValue}>
+                  {formatPhpAmount(combinedSelectedPrice)}
+                </Text>
+              </View>
+
+              {friendlyError && !previewFailed ? (
+                <View style={styles.inlineValidationAlert}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 7, flex: 1 }}>
+                    <BootstrapIcon name="exclamation-circle-fill" size={14} color="#DC2626" />
+                    <Text style={styles.inlineValidationText}>{friendlyError}</Text>
+                  </View>
+                  {compatBlocked ? (
+                    <TouchableOpacity
+                      style={styles.inlineOverrideBtn}
+                      onPress={() => {
+                        setCompatOverride(true);
+                        handleGenerate({ forceCompatOverride: true });
+                      }}
+                      disabled={loading}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.inlineOverrideBtnText}>Install Anyway</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              ) : null}
+
+              <TouchableOpacity
+                style={[
+                  styles.installSelectedBtn,
+                  (selectedCount === 0 || isGenerationBlocked || loading) &&
+                    styles.installSelectedBtnDisabled,
+                ]}
+                onPress={() => handleGenerate()}
+                disabled={selectedCount === 0 || isGenerationBlocked || loading}
+                activeOpacity={0.88}
+                accessibilityRole="button"
+                accessibilityState={{
+                  disabled: selectedCount === 0 || isGenerationBlocked || loading,
+                }}
+                accessibilityLabel="Install Selected Parts"
+              >
+                {loading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <BootstrapIcon
+                    name="stars"
+                    size={15}
+                    color={
+                      selectedCount === 0 || isGenerationBlocked || loading
+                        ? '#94A3B8'
+                        : '#FFFFFF'
+                    }
+                  />
+                )}
+                <Text
+                  style={[
+                    styles.installSelectedBtnText,
+                    (selectedCount === 0 || isGenerationBlocked || loading) &&
+                      styles.installSelectedBtnTextDisabled,
+                  ]}
+                >
+                  {loading
+                    ? 'Installing Selected Parts...'
+                    : isConsecutiveCooldown
+                    ? `Cooldown (${cooldownCountdown || 'wait'})`
+                    : isWeeklyLimitReached
+                    ? 'Weekly Limit Reached (3 / 3)'
+                    : 'Install Selected Parts'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </>
         ) : partUri ? (
           <View style={{ gap: 10 }}>
@@ -1867,21 +2554,38 @@ export default function AiMotorcycleInstallStudio({
       <TouchableOpacity
         style={styles.partInfoCard}
         onPress={() => {
-          if (sessionProduct?.raw || selectedProduct?.raw || selectedProduct) {
-            setViewingPartDetails(sessionProduct?.raw || selectedProduct?.raw || selectedProduct);
+          if (sessionProduct?.raw || sessionProduct) {
+            setViewingPartDetails(sessionProduct?.raw || sessionProduct);
           } else {
             setMobileTab('selection');
           }
         }}
         activeOpacity={0.88}
         accessibilityLabel={
-          sessionProduct
-            ? `Selected part: ${partDisplayName || 'Accessory'}, ${partBrand} · ${partPrice || ''}. Status: ${readyToGenerate ? 'Preview Ready' : 'Incomplete Selection'}.`
+          activeProducts.length > 0
+            ? `Selected parts: ${partDisplayName || 'Accessory'}, ${partBrand} · ${partPrice || ''}. Status: ${readyToGenerate ? 'Preview Ready' : 'Incomplete Selection'}.`
             : 'No part selected. Tap to browse catalog or upload a part.'
         }
       >
         <View style={styles.partInfoLeft}>
-          {resolvedPartUri ? (
+          {activeProducts.length > 1 ? (
+            <View style={styles.partInfoThumbGroup}>
+              {activeProducts.slice(0, MAX_SELECTED_PRODUCTS).map((item, idx) => {
+                const thumbUri = item.product_image || item.image || productImage(item.raw);
+                return thumbUri ? (
+                  <Image
+                    key={getProductKey(item) || idx}
+                    source={{ uri: thumbUri }}
+                    style={[
+                      styles.partInfoMultiThumb,
+                      idx > 0 && styles.partInfoMultiThumbOverlap,
+                    ]}
+                    resizeMode="cover"
+                  />
+                ) : null;
+              })}
+            </View>
+          ) : resolvedPartUri ? (
             <Image source={{ uri: resolvedPartUri }} style={styles.partInfoThumb} resizeMode="cover" />
           ) : (
             <View style={[styles.partInfoThumb, styles.partInfoFallback]}>
@@ -1890,12 +2594,14 @@ export default function AiMotorcycleInstallStudio({
           )}
           <View style={styles.partInfoMeta}>
             <Text style={styles.partInfoName} numberOfLines={1}>
-              {sessionProduct ? (partDisplayName || 'Accessory') : 'No Part Selected'}
+              {activeProducts.length > 0 ? partDisplayName || 'Accessory' : 'No Parts Selected'}
             </Text>
             <Text style={styles.partInfoBrandPrice} numberOfLines={1}>
-              {sessionProduct
-                ? `${partBrand}${partPrice ? ` · ${partPrice}` : ''}`
-                : 'Select from catalog or upload a photo below'}
+              {activeProducts.length > 0
+                ? partMode === 'catalog' && selectedCount === 1
+                  ? `${partBrand}${partPrice ? ` · ${partPrice}` : ''} · Selected: 1/${MAX_SELECTED_PRODUCTS}`
+                  : `${partBrand}${partPrice ? ` · ${partPrice}` : ''}`
+                : 'Select up to 3 parts from catalog or upload a photo'}
             </Text>
           </View>
         </View>
@@ -1908,7 +2614,7 @@ export default function AiMotorcycleInstallStudio({
                 ? 'Preview Ready'
                 : !selectedBike
                 ? 'Select Motorcycle'
-                : !sessionProduct
+                : activeProducts.length === 0
                 ? 'Select Part'
                 : 'Setup Incomplete'}
             </Text>
@@ -1918,10 +2624,10 @@ export default function AiMotorcycleInstallStudio({
       </TouchableOpacity>
 
       {/* Compatibility Warning if present */}
-      {compatWarning ? (
+      {displayCompatWarning ? (
         <View style={styles.compatWarningAlert}>
           <BootstrapIcon name="exclamation-triangle-fill" size={15} color="#B45309" />
-          <Text style={styles.compatWarningAlertText}>{compatWarning}</Text>
+          <Text style={styles.compatWarningAlertText}>{displayCompatWarning}</Text>
         </View>
       ) : null}
 
@@ -1996,26 +2702,50 @@ export default function AiMotorcycleInstallStudio({
           </View>
         )}
 
-        {/* Floating Zoom Controls: Zoom Out / Zoom In / Fit (Upper-Right) */}
+        {/* Floating Zoom Controls: Zoom Out / % / Zoom In / Fit (Upper-Right) */}
         <View style={styles.floatingZoomGroup}>
           <TouchableOpacity
             style={styles.zoomButton}
             onPress={handleZoomOut}
-            disabled={zoomLevel <= 0.75}
+            disabled={zoomLevel <= MIN_CANVAS_ZOOM}
             activeOpacity={0.7}
             accessibilityLabel="Zoom Out"
           >
-            <BootstrapIcon name="dash" size={16} color={isDarkMode ? '#F8FAFC' : '#172033'} />
+            <BootstrapIcon
+              name="dash"
+              size={16}
+              color={
+                zoomLevel <= MIN_CANVAS_ZOOM
+                  ? '#94A3B8'
+                  : isDarkMode
+                    ? '#F8FAFC'
+                    : '#172033'
+              }
+            />
           </TouchableOpacity>
+          <View style={styles.zoomDivider} />
+          <View style={styles.zoomReadoutBox} pointerEvents="none">
+            <Text style={styles.zoomLevelReadout}>{Math.round(zoomLevel * 100)}%</Text>
+          </View>
           <View style={styles.zoomDivider} />
           <TouchableOpacity
             style={styles.zoomButton}
             onPress={handleZoomIn}
-            disabled={zoomLevel >= 2.5}
+            disabled={zoomLevel >= MAX_CANVAS_ZOOM}
             activeOpacity={0.7}
             accessibilityLabel="Zoom In"
           >
-            <BootstrapIcon name="plus" size={16} color={isDarkMode ? '#F8FAFC' : '#172033'} />
+            <BootstrapIcon
+              name="plus"
+              size={16}
+              color={
+                zoomLevel >= MAX_CANVAS_ZOOM
+                  ? '#94A3B8'
+                  : isDarkMode
+                    ? '#F8FAFC'
+                    : '#172033'
+              }
+            />
           </TouchableOpacity>
           <View style={styles.zoomDivider} />
           <TouchableOpacity
@@ -2029,6 +2759,21 @@ export default function AiMotorcycleInstallStudio({
           </TouchableOpacity>
         </View>
 
+        {Platform.OS === 'web' && canvasDisplayUri && !loading && !previewFailed ? (
+          <View pointerEvents="none" style={styles.floatingZoomHint}>
+            <BootstrapIcon
+              name={zoomLevel > 1.05 ? 'arrows-move' : 'zoom-in'}
+              size={11}
+              color={BRAND}
+            />
+            <Text style={styles.floatingZoomHintText}>
+              {zoomLevel > 1.05
+                ? 'Drag to pan · Scroll to zoom · Click to reset'
+                : 'Scroll or click to zoom at cursor'}
+            </Text>
+          </View>
+        ) : null}
+
         {/* Canvas Display Content */}
         {loading ? (
           <View style={styles.canvasLoadingOverlay}>
@@ -2036,9 +2781,9 @@ export default function AiMotorcycleInstallStudio({
               <ActivityIndicator size="large" color={BRAND} />
               <Text style={styles.canvasLoadingTitle}>AI Installation In Progress</Text>
               <Text style={styles.canvasLoadingSubtitle}>
-                Precision-fitting {sessionProduct?.name || 'part'} onto {selectedBike?.nickname || selectedBike?.name || 'motorcycle'}...
+                Precision-fitting {partDisplayName || 'selected parts'} onto {selectedBike?.nickname || selectedBike?.name || 'motorcycle'}...
               </Text>
-              <GenerationProgress phase={genPhase} />
+              <GenerationProgress phase={genPhase} partCount={activeProducts.length} />
             </View>
           </View>
         ) : previewFailed ? (
@@ -2058,12 +2803,41 @@ export default function AiMotorcycleInstallStudio({
             </TouchableOpacity>
           </View>
         ) : canvasDisplayUri ? (
-          <View style={styles.canvasImageWrapper}>
+          <View
+            ref={canvasViewportRef}
+            style={[
+              styles.canvasImageWrapper,
+              Platform.OS === 'web' &&
+                (isPanning
+                  ? styles.canvasImageWrapperPanning
+                  : zoomLevel > 1.05
+                    ? styles.canvasImageWrapperZoomed
+                    : styles.canvasImageWrapperZoomable),
+            ]}
+            {...(Platform.OS === 'web'
+              ? {
+                  onPointerDown: handleCanvasPointerDown,
+                  onPointerMove: handleCanvasPointerMove,
+                  onPointerUp: handleCanvasPointerUp,
+                  onPointerCancel: handleCanvasPointerCancel,
+                  onLostPointerCapture: handleCanvasPointerCancel,
+                }
+              : {})}
+          >
             <Image
               source={{ uri: canvasDisplayUri }}
+              draggable={false}
+              pointerEvents="none"
               style={[
                 styles.canvasImage,
-                { transform: [{ scale: zoomLevel }] },
+                isPanning && styles.canvasImagePanning,
+                {
+                  transform: [
+                    { translateX: panOffset.x },
+                    { translateY: panOffset.y },
+                    { scale: zoomLevel },
+                  ],
+                },
               ]}
               resizeMode="contain"
             />
@@ -2208,7 +2982,7 @@ export default function AiMotorcycleInstallStudio({
               !resultUri && styles.secondaryCardTextDisabled,
             ]}
           >
-            {freeInstallPromo ? 'Book Free Install' : 'Book Installation'}
+            {effectiveFreeInstallPromo ? 'Book Free Install' : 'Book Installation'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -2237,11 +3011,11 @@ export default function AiMotorcycleInstallStudio({
         </Text>
       </TouchableOpacity>
 
-      {freeInstallPromo && resultUri ? (
+      {effectiveFreeInstallPromo && resultUri ? (
         <View style={styles.freeInstallBanner}>
           <BootstrapIcon name="gift" size={13} color="#166534" />
           <Text style={styles.freeInstallBannerText}>
-            Free Installation promo active for this part ({freeInstallPromo.code})
+            Free Installation promo active for this part ({effectiveFreeInstallPromo.code})
           </Text>
         </View>
       ) : null}
@@ -2262,7 +3036,9 @@ export default function AiMotorcycleInstallStudio({
           {canAddToCart ? (
             <TouchableOpacity style={styles.auxActionBtn} onPress={handleAddToCart} activeOpacity={0.85}>
               <BootstrapIcon name="cart3" size={14} color={BRAND} />
-              <Text style={styles.auxActionBtnText}>Add Part to Cart</Text>
+              <Text style={styles.auxActionBtnText}>
+                {selectedCount > 1 ? `Add Selected Parts to Cart (${selectedCount})` : 'Add Part to Cart'}
+              </Text>
             </TouchableOpacity>
           ) : null}
 
@@ -2291,6 +3067,10 @@ export default function AiMotorcycleInstallStudio({
       </View>
     </View>
   );
+
+  const viewingPartKey = viewingPartDetails ? getProductKey(viewingPartDetails) : '';
+  const isViewingPartSelected = Boolean(viewingPartKey && selectedProductIdsSet.has(viewingPartKey));
+  const isViewingPartAtLimit = !isViewingPartSelected && isMaxSelectionReached;
 
   return (
     <InstallThemeContext.Provider value={{ styles, BRAND, MUTED, isDark: isDarkMode, isWeb: isWebMode }}>
@@ -2325,10 +3105,10 @@ export default function AiMotorcycleInstallStudio({
           onRequestClose={() => setViewingPartDetails(null)}
         >
           <View style={styles.modalOverlay}>
-            {viewingPartDetails && (
+            {viewingPartDetails ? (
               <View style={[styles.modalSheet, { maxWidth: 420, padding: 18, gap: 12 }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: isDarkMode ? '#F8FAFC' : '#172033' }}>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#172033' }}>
                     Part Details & Fitment
                   </Text>
                   <TouchableOpacity onPress={() => setViewingPartDetails(null)} activeOpacity={0.7}>
@@ -2343,7 +3123,7 @@ export default function AiMotorcycleInstallStudio({
                 ) : null}
 
                 <View style={{ gap: 2 }}>
-                  <Text style={{ fontSize: 15, fontWeight: '800', color: isDarkMode ? '#F8FAFC' : '#172033' }}>
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#172033' }}>
                     {viewingPartDetails.name || viewingPartDetails.product_name}
                   </Text>
                   <Text style={{ fontSize: 12.5, color: '#64748B', fontWeight: '500' }}>
@@ -2352,30 +3132,60 @@ export default function AiMotorcycleInstallStudio({
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                  <Text style={{ fontSize: 18, fontWeight: '800', color: '#EA580C' }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#EA580C', fontVariant: ['tabular-nums'] }}>
                     {formatPartPrice(viewingPartDetails)}
                   </Text>
                 </View>
 
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 6 }}>
                   <BootstrapIcon name="check-circle-fill" size={14} color="#10B981" />
-                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#065F46' }}>
+                  <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#065F46' }}>
                     Fits {selectedBike?.nickname || selectedBike?.name || 'Selected Motorcycle'}
                   </Text>
                 </View>
 
                 <TouchableOpacity
-                  style={{ backgroundColor: '#EA580C', height: 46, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginTop: 6 }}
+                  style={{
+                    backgroundColor: isViewingPartSelected
+                      ? '#24272B'
+                      : isViewingPartAtLimit
+                      ? '#CBD5E1'
+                      : '#EA580C',
+                    height: 46,
+                    borderRadius: 12,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginTop: 6,
+                  }}
                   onPress={() => {
-                    selectCatalogPart(viewingPartDetails);
-                    setViewingPartDetails(null);
+                    if (isViewingPartSelected) {
+                      removeSelectedProduct(viewingPartKey);
+                      setViewingPartDetails(null);
+                    } else if (isViewingPartAtLimit) {
+                      triggerLimitNotice();
+                    } else {
+                      selectCatalogPart(viewingPartDetails);
+                      setViewingPartDetails(null);
+                    }
                   }}
                   activeOpacity={0.88}
                 >
-                  <Text style={{ color: '#FFFFFF', fontSize: 14, fontWeight: '700' }}>Equip on Motorcycle</Text>
+                  <Text
+                    style={{
+                      color: isViewingPartAtLimit ? '#475569' : '#FFFFFF',
+                      fontSize: 14,
+                      fontWeight: '600',
+                    }}
+                  >
+                    {isViewingPartSelected
+                      ? 'Remove from Selection'
+                      : isViewingPartAtLimit
+                      ? 'Maximum 3 Products Selected'
+                      : `Select Part (${selectedCount + 1}/${MAX_SELECTED_PRODUCTS})`}
+                  </Text>
                 </TouchableOpacity>
               </View>
-            )}
+            ) : null}
           </View>
         </Modal>
 
@@ -2396,7 +3206,7 @@ export default function AiMotorcycleInstallStudio({
           bikeTitle={buildPreviewSnapshot().bikeTitle}
           serviceName={buildPreviewSnapshot().pTitle}
           laborFeePhp={usdToPhp(AI_INSTALLATION_FEE_USD)}
-          freeInstallPromo={freeInstallPromo}
+          freeInstallPromo={effectiveFreeInstallPromo}
           branches={GARAGE_BRANCHES}
           selectedBranch={bookingBranch}
           onSelectBranch={setBookingBranch}
@@ -2476,8 +3286,12 @@ export default function AiMotorcycleInstallStudio({
                       build.motorcycleName ||
                       [build.motorcycleBrand, build.motorcycleModel].filter(Boolean).join(' ') ||
                       'Custom Motorcycle';
-                    const firstItem = build.items?.[0];
-                    const pTitle = firstItem?.product_name || firstItem?.name || 'Installed Part';
+                    const buildItems = Array.isArray(build.items) ? build.items : [];
+                    const buildPartNames = buildItems
+                      .map((it) => it?.product_name || it?.name)
+                      .filter(Boolean);
+                    const pTitle =
+                      buildPartNames.length > 0 ? buildPartNames.join(' + ') : 'Installed Part';
 
                     return (
                       <View key={buildId} style={styles.savedCard}>
@@ -2565,11 +3379,14 @@ function FilterSelect({ label, value, options, open, onToggle, onChange, disable
   );
 }
 
-function GenerationProgress({ phase }) {
+function GenerationProgress({ phase, partCount = 1 }) {
   const { styles, BRAND } = React.useContext(InstallThemeContext);
   const rows = [
     { label: 'Motorcycle selected', status: 'done' },
-    { label: 'Part selected', status: 'done' },
+    {
+      label: partCount > 1 ? `${partCount} parts selected` : 'Part selected',
+      status: 'done',
+    },
     { label: 'Preparing installation geometry', status: phase > 0 ? 'done' : 'active' },
     { label: 'AI image rendering', status: phase > 1 ? 'done' : phase === 1 ? 'active' : 'wait' },
     { label: 'Finalizing photorealistic output', status: phase >= 2 ? 'active' : 'wait' },
@@ -2827,6 +3644,21 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       borderRadius: 10,
       backgroundColor: isDark ? '#232D3B' : '#F1F5F9',
     },
+    partInfoThumbGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    partInfoMultiThumb: {
+      width: 38,
+      height: 38,
+      borderRadius: 9,
+      borderWidth: 1.5,
+      borderColor: SURFACE,
+      backgroundColor: isDark ? '#232D3B' : '#F1F5F9',
+    },
+    partInfoMultiThumbOverlap: {
+      marginLeft: -10,
+    },
     partInfoFallback: {
       width: 44,
       height: 44,
@@ -2842,14 +3674,15 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     partInfoName: {
       fontSize: 14,
-      fontWeight: '800',
+      fontWeight: '700',
       color: INK,
       letterSpacing: -0.2,
     },
     partInfoBrandPrice: {
       fontSize: 12.5,
-      fontWeight: '600',
+      fontWeight: '500',
       color: MUTED,
+      fontVariant: ['tabular-nums'],
     },
     partInfoRight: {
       flexDirection: 'row',
@@ -2979,9 +3812,30 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     sidebarTitle: {
       fontSize: 14,
-      fontWeight: '800',
+      fontWeight: '700',
       color: INK,
       letterSpacing: -0.2,
+    },
+    selectionCounterPill: {
+      paddingHorizontal: 9,
+      paddingVertical: 3,
+      borderRadius: 999,
+      backgroundColor: isDark ? '#232D3B' : '#F1F5F9',
+      borderWidth: 1,
+      borderColor: LINE,
+    },
+    selectionCounterPillActive: {
+      backgroundColor: BRAND_SOFT,
+      borderColor: isDark ? 'rgba(234, 88, 12, 0.45)' : '#FDBA74',
+    },
+    selectionCounterText: {
+      fontSize: 11.5,
+      fontWeight: '600',
+      color: MUTED,
+      fontVariant: ['tabular-nums'],
+    },
+    selectionCounterTextActive: {
+      color: BRAND,
     },
     registerLink: {
       flexDirection: 'row',
@@ -2992,7 +3846,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     registerLinkText: {
       fontSize: 12,
-      fontWeight: '700',
+      fontWeight: '600',
       color: BRAND,
     },
     // Motorcycle Selection Grid
@@ -3016,7 +3870,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     bikeCardSelected: {
       borderColor: BRAND,
-      backgroundColor: isDark ? 'rgba(77, 184, 150, 0.1)' : '#F0FDF4',
+      backgroundColor: BRAND_SOFT,
     },
     bikeImageWrapper: {
       position: 'relative',
@@ -3117,6 +3971,63 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     pillTabTextActive: {
       color: '#FFFFFF',
     },
+    selectionLimitBlock: {
+      gap: 5,
+    },
+    selectionProgressTrack: {
+      width: '100%',
+      height: 5,
+      borderRadius: 999,
+      backgroundColor: isDark ? '#263040' : '#E2E8F0',
+      overflow: 'hidden',
+    },
+    selectionProgressFill: {
+      height: '100%',
+      borderRadius: 999,
+      backgroundColor: BRAND,
+      ...Platform.select({
+        web: { transition: 'width 0.2s ease-out' },
+      }),
+    },
+    selectionLimitMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    selectionLimitCaption: {
+      flex: 1,
+      fontSize: 11,
+      fontWeight: '500',
+      color: MUTED,
+      fontVariant: ['tabular-nums'],
+    },
+    selectionLimitCaptionFull: {
+      color: BRAND,
+      fontWeight: '600',
+    },
+    clearSelectionLink: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: BRAND,
+    },
+    maxLimitNoticeBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: BRAND_SOFT,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(234, 88, 12, 0.5)' : '#FDBA74',
+      borderRadius: isWeb ? 8 : 10,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+    },
+    maxLimitNoticeText: {
+      flex: 1,
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDark ? '#FDBA74' : '#9A3412',
+    },
     searchBar: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -3211,7 +4122,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     // Independently scrollable catalog
     catalogScroll: {
-      maxHeight: isWeb ? 460 : 380,
+      maxHeight: isWeb ? 380 : 340,
       borderRadius: isWeb ? 8 : 10,
     },
     catalogGrid: {
@@ -3234,7 +4145,35 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     partCardSelected: {
       borderColor: BRAND,
-      backgroundColor: isDark ? 'rgba(77, 184, 150, 0.1)' : '#F0FDF4',
+      backgroundColor: BRAND_SOFT,
+      ...Platform.select({
+        web: {
+          boxShadow: '0 0 0 1px #EA580C, 0 2px 8px rgba(234, 88, 12, 0.14)',
+        },
+      }),
+    },
+    partCardLimitReached: {
+      opacity: 0.46,
+      backgroundColor: isDark ? '#151A23' : '#F8FAFC',
+      borderColor: LINE,
+      ...Platform.select({
+        web: { cursor: 'not-allowed' },
+      }),
+    },
+    limitLockBadge: {
+      position: 'absolute',
+      top: 5,
+      right: 5,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      backgroundColor: isDark ? 'rgba(23, 32, 51, 0.9)' : 'rgba(36, 39, 43, 0.82)',
+    },
+    limitLockBadgeText: {
+      fontSize: 9,
+      fontWeight: '600',
+      color: '#FFFFFF',
+      fontVariant: ['tabular-nums'],
     },
     partImageWrap: {
       position: 'relative',
@@ -3252,28 +4191,204 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       marginTop: 3,
       fontSize: 11.5,
       lineHeight: 15,
-      fontWeight: '700',
+      fontWeight: '600',
       color: INK,
     },
     partPrice: {
       fontSize: 12,
-      fontWeight: '800',
+      fontWeight: '700',
       color: BRAND,
+      fontVariant: ['tabular-nums'],
+    },
+    partCardFooterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 4,
+      marginTop: 2,
     },
     badgePill: {
-      alignSelf: 'flex-start',
-      backgroundColor: isDark ? '#1D2A24' : '#F1F5F9',
+      flexShrink: 1,
+      backgroundColor: isDark ? '#232D3B' : '#F1F5F9',
       paddingHorizontal: 6,
       paddingVertical: 2,
       borderRadius: 6,
       borderWidth: 1,
-      borderColor: isDark ? '#2B3D35' : '#E2E8F0',
-      marginTop: 2,
+      borderColor: LINE,
     },
     badgePillText: {
       fontSize: 9.5,
+      fontWeight: '600',
+      color: isDark ? '#CBD5E1' : '#475569',
+    },
+    selectedStateTag: {
+      backgroundColor: BRAND,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 5,
+      flexShrink: 0,
+    },
+    selectedStateTagText: {
+      fontSize: 9,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+    // Selected Products Summary Section
+    selectedSummaryCard: {
+      marginTop: 2,
+      padding: 11,
+      borderRadius: isWeb ? 10 : 12,
+      borderWidth: 1,
+      borderColor: LINE,
+      backgroundColor: isDark ? '#151A23' : '#F8FAFC',
+      gap: 9,
+    },
+    selectedSummaryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    selectedSummaryTitle: {
+      fontSize: 12.5,
       fontWeight: '700',
-      color: isDark ? '#AAB4B0' : '#475569',
+      color: INK,
+    },
+    selectedSummaryCount: {
+      fontSize: 11.5,
+      fontWeight: '600',
+      color: BRAND,
+      fontVariant: ['tabular-nums'],
+    },
+    selectedSummaryEmpty: {
+      fontSize: 11.5,
+      lineHeight: 16,
+      color: MUTED,
+      paddingVertical: 4,
+    },
+    selectedSummaryList: {
+      gap: 6,
+    },
+    selectedSummaryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: 7,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: LINE,
+      backgroundColor: SURFACE,
+    },
+    selectedSummaryThumb: {
+      width: 38,
+      height: 38,
+      borderRadius: 7,
+      backgroundColor: isDark ? '#232D3B' : '#F1F5F9',
+    },
+    selectedSummaryInfo: {
+      flex: 1,
+      minWidth: 0,
+      gap: 1,
+    },
+    selectedSummaryName: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: INK,
+    },
+    selectedSummaryBrand: {
+      fontSize: 10.5,
+      fontWeight: '500',
+      color: MUTED,
+    },
+    selectedSummaryPrice: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: INK,
+      fontVariant: ['tabular-nums'],
+    },
+    selectedSummaryRemoveBtn: {
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: LINE,
+      backgroundColor: isDark ? '#232D3B' : '#F8FAFC',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    selectedSummaryTotalRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: LINE,
+    },
+    selectedSummaryTotalLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: MUTED,
+    },
+    selectedSummaryTotalValue: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: BRAND,
+      fontVariant: ['tabular-nums'],
+    },
+    inlineValidationAlert: {
+      gap: 8,
+      padding: 9,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(220, 38, 38, 0.45)' : '#FECACA',
+      backgroundColor: isDark ? 'rgba(127, 29, 29, 0.22)' : '#FEF2F2',
+    },
+    inlineValidationText: {
+      flex: 1,
+      fontSize: 11.5,
+      lineHeight: 16,
+      fontWeight: '500',
+      color: isDark ? '#FCA5A5' : '#991B1B',
+    },
+    inlineOverrideBtn: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 6,
+      backgroundColor: BRAND,
+    },
+    inlineOverrideBtnText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+    installSelectedBtn: {
+      width: '100%',
+      height: isWeb ? 40 : 44,
+      borderRadius: isWeb ? 8 : 10,
+      backgroundColor: BRAND,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+      paddingHorizontal: 12,
+      ...Platform.select({
+        web: { boxShadow: '0 2px 8px rgba(234, 88, 12, 0.24)' },
+      }),
+    },
+    installSelectedBtnDisabled: {
+      backgroundColor: isDark ? '#232D3B' : '#E2E8F0',
+      ...Platform.select({
+        web: { boxShadow: 'none', cursor: 'not-allowed' },
+      }),
+    },
+    installSelectedBtnText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+    installSelectedBtnTextDisabled: {
+      color: '#94A3B8',
     },
     quietText: {
       fontSize: 12,
@@ -3644,6 +4759,19 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       alignItems: 'center',
       justifyContent: 'center',
     },
+    zoomReadoutBox: {
+      minWidth: 42,
+      height: 30,
+      paddingHorizontal: 6,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    zoomLevelReadout: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: isDark ? '#F5F7F6' : '#334155',
+      fontVariant: ['tabular-nums'],
+    },
     zoomFitButton: {
       width: 'auto',
       paddingHorizontal: 8,
@@ -3659,6 +4787,32 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       fontSize: 11,
       fontWeight: '700',
       color: isDark ? '#F5F7F6' : '#334155',
+    },
+    floatingZoomHint: {
+      position: 'absolute',
+      bottom: 12,
+      right: 12,
+      zIndex: 25,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 7,
+      backgroundColor: isDark ? 'rgba(23, 32, 51, 0.86)' : 'rgba(255, 255, 255, 0.92)',
+      borderWidth: 1,
+      borderColor: LINE,
+      ...Platform.select({
+        web: {
+          boxShadow: '0 2px 6px rgba(15, 23, 42, 0.06)',
+          userSelect: 'none',
+        },
+      }),
+    },
+    floatingZoomHintText: {
+      fontSize: 10.5,
+      fontWeight: '500',
+      color: isDark ? '#CBD5E1' : '#475569',
     },
     floatingModeTag: {
       position: 'absolute',
@@ -3731,13 +4885,48 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       alignItems: 'center',
       justifyContent: 'center',
       padding: 12,
+      ...Platform.select({
+        web: {
+          userSelect: 'none',
+          touchAction: 'none',
+        },
+      }),
+    },
+    canvasImageWrapperZoomable: {
+      ...Platform.select({
+        web: {
+          cursor: 'zoom-in',
+        },
+      }),
+    },
+    canvasImageWrapperZoomed: {
+      ...Platform.select({
+        web: {
+          cursor: 'grab',
+        },
+      }),
+    },
+    canvasImageWrapperPanning: {
+      ...Platform.select({
+        web: {
+          cursor: 'grabbing',
+        },
+      }),
     },
     canvasImage: {
       width: '92%',
       height: '90%',
       ...Platform.select({
         web: {
-          transition: 'transform 0.15s ease-out',
+          transition: 'transform 0.11s cubic-bezier(0.22, 1, 0.36, 1)',
+          userSelect: 'none',
+        },
+      }),
+    },
+    canvasImagePanning: {
+      ...Platform.select({
+        web: {
+          transition: 'none',
         },
       }),
     },

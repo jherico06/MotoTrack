@@ -17,6 +17,8 @@ import customizeRouter from './routes/customize.js';
 import staffRouter from './routes/staff.js';
 import notifyRouter from './routes/notify.js';
 import bannerRouter from './routes/banner.js';
+import forecastRouter from './routes/forecast.js';
+import { startForecastScheduler } from './services/forecastScheduler.js';
 import { multerErrorHandler } from './middleware/upload.js';
 
 const app = express();
@@ -66,6 +68,12 @@ app.get('/', (_req, res) => {
       staffVerify: 'POST /api/staff/verify',
       staffList: 'GET /api/staff',
       notifyEmail: 'POST /api/notify/email',
+      forecastDaily: 'GET /api/forecast/:productId?period=daily',
+      forecastWeekly: 'GET /api/forecast/:productId?period=weekly',
+      forecastMonthly: 'GET /api/forecast/:productId?period=monthly',
+      forecastRecommendation: 'GET /api/forecast/:productId/recommendation?period=daily|weekly|monthly',
+      forecastScheduleStatus: 'GET /api/forecast/schedule/status',
+      forecastScheduleRun: 'POST /api/forecast/schedule/run',
     },
   });
 });
@@ -79,6 +87,8 @@ app.get(['/health', '/api/health'], (_req, res) => {
   });
 });
 
+app.use('/api/forecast', forecastRouter);
+app.use('/forecast', forecastRouter);
 app.use('/api', customizeRouter);
 app.use('/', customizeRouter);
 app.use('/api/staff', staffRouter);
@@ -121,6 +131,12 @@ if (!isServerless && process.env.NODE_ENV !== 'test') {
     console.log(`Local:   http://127.0.0.1:${PORT}`);
     lan.forEach((ip) => console.log(`LAN/device: http://${ip}:${PORT}`));
     console.log(`Health:  http://127.0.0.1:${PORT}/api/health`);
+
+    if (String(process.env.DISABLE_FORECAST_SCHEDULER || '').toLowerCase() !== 'true') {
+      startForecastScheduler();
+      console.log('[forecastScheduler] Automatic daily/weekly/monthly Simple Linear Regression scheduler active.');
+    }
+
     const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY);
     if (!hasGeminiKey) {
       console.warn('WARNING: GEMINI_API_KEY is not set. Copy server/.env.example → server/.env');

@@ -3,36 +3,75 @@ import { View, Text, ScrollView, Platform } from 'react-native';
 import { getForecastTokens } from '../../styles/forecast.styles.js';
 
 /**
- * Figma-matched forecast chart:
- * teal area (actual) + dashed gray trend + violet dashed forecast + Forecast divider
+ * Historical Demand & Forecast Chart
+ * Matches the reference design:
+ * - Blue solid line + dots: Actual Sales (#2563EB)
+ * - Orange dashed line + dots: Forecast (#EA580C)
+ * - Gray dashed line: Simple Linear Regression Line (Y = a + bX)
+ * - Vertical dashed separator: "Forecast Period"
+ * - Clean Y-axis grid lines (0, 50, 100, 150, 200...)
+ * - Subsampled, human-readable X-axis tick labels (no clutter or overlap)
+ * - Interactive hover guideline & detailed tooltip
  */
 export default function ForecastChart({
   chartPoints = [],
   trendLine = [],
   isDark = false,
   height = 280,
-  periodType = 'week',
-  confidence = null,
-  forecastSummary = null,
+  periodType = 'month',
 }) {
   const t = getForecastTokens(isDark);
+  const actualColor = '#2563EB';
+  const forecastColor = '#EA580C';
+  const regressionColor = '#94A3B8';
+  const gridColor = isDark ? '#2E3236' : '#F1F5F9';
+
   const [hover, setHover] = useState(null);
 
-  const { width, points, trendPts, maxY, pad, forecastStartX, bandPath } = useMemo(() => {
+  const {
+    width,
+    points,
+    trendPts,
+    maxY,
+    yTicks,
+    pad,
+    dividerX,
+    visibleTicks,
+    pointRadius,
+    strokeW,
+  } = useMemo(() => {
     const n = Math.max(chartPoints.length, 2);
-    const w = Math.max(680, n * 72);
-    const padLocal = { top: 20, right: 28, bottom: 36, left: 40 };
+    // Dynamic width allocation giving each point sufficient horizontal space
+    const stepPx = n > 50 ? 14 : n > 25 ? 24 : 48;
+    const w = Math.max(700, Math.min(1400, n * stepPx));
+    const padLocal = { top: 26, right: 36, bottom: 40, left: 46 };
     const gW = w - padLocal.left - padLocal.right;
     const gH = height - padLocal.top - padLocal.bottom;
 
-    const values = [
+    const allValues = [
       ...chartPoints.map((p) => p.actual).filter((v) => v != null),
       ...chartPoints.map((p) => p.forecast).filter((v) => v != null),
-      ...chartPoints.map((p) => p.rangeHigh).filter((v) => v != null),
-      ...trendLine.map((p) => p.y),
+      ...trendLine.map((p) => p.y).filter((v) => v != null),
       1,
     ];
-    const max = Math.max(...values) * 1.2 || 1;
+    const rawMax = Math.max(...allValues);
+
+    // Calculate clean, rounded Y-axis ticks like 0, 50, 100, 150, 200 or 0, 5, 10, 15, 20
+    let step = 50;
+    if (rawMax <= 20) step = 5;
+    else if (rawMax <= 50) step = 10;
+    else if (rawMax <= 100) step = 25;
+    else if (rawMax <= 250) step = 50;
+    else if (rawMax <= 500) step = 100;
+    else step = Math.ceil(rawMax / 4 / 50) * 50;
+
+    const maxTicksCount = 4;
+    const topTick = Math.max(step * maxTicksCount, Math.ceil(rawMax / step) * step);
+    const ticks = [];
+    for (let val = 0; val <= topTick; val += step) {
+      ticks.push(val);
+    }
+    const max = topTick || 1;
     const lastX = chartPoints[chartPoints.length - 1]?.x || n;
 
     const toXY = (xIndex, y) => {
@@ -41,89 +80,101 @@ export default function ForecastChart({
       return { x, y: yy };
     };
 
-    const mapped = chartPoints.map((p) => ({
+    const mapped = chartPoints.map((p, idx) => ({
       ...p,
+      idx,
       actualPt: p.actual != null ? toXY(p.x, p.actual) : null,
       forecastPt: p.forecast != null ? toXY(p.x, p.forecast) : null,
       fittedPt: p.fitted != null ? toXY(p.x, p.fitted) : null,
-      rangeLowPt: p.rangeLow != null ? toXY(p.x, p.rangeLow) : null,
-      rangeHighPt: p.rangeHigh != null ? toXY(p.x, p.rangeHigh) : null,
     }));
 
-    const firstForecast = mapped.find((p) => p.forecast != null);
+    const firstForecast = mapped.find((p) => p.forecast != null && p.actual == null);
     const lastActual = [...mapped].reverse().find((p) => p.actual != null);
-    const dividerX =
-      firstForecast?.forecastPt?.x ??
-      (lastActual?.actualPt ? lastActual.actualPt.x + 8 : null);
-
-    // Confidence band for forecast points
-    const bandPts = mapped.filter((p) => p.rangeLowPt && p.rangeHighPt);
-    let band = '';
-    if (bandPts.length > 0) {
-      const top = bandPts.map((p) => `${p.rangeHighPt.x},${p.rangeHighPt.y}`).join(' L ');
-      const bottom = [...bandPts]
-        .reverse()
-        .map((p) => `${p.rangeLowPt.x},${p.rangeLowPt.y}`)
-        .join(' L ');
-      band = `M ${top} L ${bottom} Z`;
+    let sepX = null;
+    if (firstForecast?.forecastPt && lastActual?.actualPt) {
+      sepX = (lastActual.actualPt.x + firstForecast.forecastPt.x) / 2;
+    } else if (firstForecast?.forecastPt) {
+      sepX = firstForecast.forecastPt.x;
     }
+
+    // Adaptive circle radius: dense series (daily/weekly) have small radii to prevent blob clusters
+    const pRadius = n > 50 ? 1.5 : n > 25 ? 2.5 : 4;
+    const sWidth = n > 50 ? 1 : n > 25 ? 1.5 : 2;
+
+    // Subsample X-axis ticks to a max of 6 to 8 nicely spaced ticks across the canvas
+    let selectedIndices = [];
+    if (mapped.length <= 8) {
+      selectedIndices = mapped.map((_, i) => i);
+    } else {
+      const targetCount = Math.max(4, Math.min(8, Math.floor(gW / 85)));
+      const stepIdx = (mapped.length - 1) / (targetCount - 1);
+      const set = new Set();
+      set.add(0);
+      for (let i = 1; i < targetCount - 1; i += 1) {
+        set.add(Math.round(i * stepIdx));
+      }
+      set.add(mapped.length - 1);
+      selectedIndices = Array.from(set).sort((a, b) => a - b);
+    }
+
+    const visibleTicksList = selectedIndices
+      .map((idx) => mapped[idx])
+      .filter(Boolean)
+      .map((p, tickOrder, arr) => {
+        const xPos = (p.actualPt || p.forecastPt)?.x ?? padLocal.left;
+        const prev = tickOrder > 0 ? arr[tickOrder - 1] : null;
+        const labelParts = getCleanXAxisLabel(p, periodType, prev);
+        return {
+          ...labelParts,
+          x: xPos,
+          key: `tick-${p.key || p.x || tickOrder}`,
+        };
+      });
 
     return {
       width: w,
       points: mapped,
       trendPts: trendLine.map((p) => toXY(p.x, p.y)),
       maxY: max,
+      yTicks: ticks,
       pad: padLocal,
-      forecastStartX: dividerX,
-      bandPath: band,
+      dividerX: sepX,
+      visibleTicks: visibleTicksList,
+      pointRadius: pRadius,
+      strokeW: sWidth,
     };
-  }, [chartPoints, trendLine, height]);
+  }, [chartPoints, trendLine, height, periodType]);
 
   const poly = (pts) => pts.map((p) => `${p.x},${p.y}`).join(' ');
 
-  const areaPath = (pts, baselineY) => {
-    if (!pts.length) return '';
-    const top = pts.map((p) => `${p.x},${p.y}`).join(' ');
-    const last = pts[pts.length - 1];
-    const first = pts[0];
-    return `M ${first.x},${baselineY} L ${top.replace(/ /g, ' L ')} L ${last.x},${baselineY} Z`;
-  };
-
   const actualPath = points.filter((p) => p.actualPt).map((p) => p.actualPt);
   const forecastPath = points.filter((p) => p.forecastPt).map((p) => p.forecastPt);
+  // Bridge the last actual point to the first forecast point so the line is continuous
   const forecastBridge =
     actualPath.length && forecastPath.length
       ? [actualPath[actualPath.length - 1], ...forecastPath]
       : forecastPath;
 
   const baselineY = height - pad.bottom;
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(maxY * f));
 
   const onHoverPoint = (p, chartX, chartY) => {
     if (!p) {
       setHover(null);
       return;
     }
-    const actual = p.actual;
-    const fitted = p.fitted != null ? p.fitted : null;
+    const actual = p.actual != null ? p.actual : null;
     const forecast = p.forecast != null ? p.forecast : null;
-    const title = shortLabel(p.label, p.x, periodType);
+    const fitted = p.fitted != null ? p.fitted : null;
     setHover({
-      title,
-      actual: actual != null ? Math.round(actual * 100) / 100 : null,
-      fitted: fitted != null ? Math.round(fitted * 100) / 100 : null,
-      forecast: forecast != null ? Math.round(forecast * 100) / 100 : null,
-      rangeLow: p.rangeLow != null ? p.rangeLow : null,
-      rangeHigh: p.rangeHigh != null ? p.rangeHigh : null,
-      isForecastPoint: forecast != null && actual == null,
+      title: formatTooltipDate(p, periodType),
+      label: p.label || (periodType === 'month' ? `Month ${p.x}` : `Period ${p.x}`),
+      periodNum: p.x,
+      actual,
+      forecast,
+      fitted,
       x: chartX,
       y: chartY,
     });
-  };
-
-  const handlePointEnter = (p) => {
-    const pt = p.actualPt || p.forecastPt;
-    onHoverPoint(p, pt?.x ?? 0, pt?.y ?? 0);
   };
 
   const svg = (
@@ -131,337 +182,423 @@ export default function ForecastChart({
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      style={{ display: 'block' }}
+      style={{ display: 'block', overflow: 'visible' }}
       onMouseLeave={() => setHover(null)}
     >
-      <defs>
-        <linearGradient id="actualAreaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={t.primary} stopOpacity={isDark ? 0.45 : 0.35} />
-          <stop offset="100%" stopColor={t.primary} stopOpacity="0" />
-        </linearGradient>
-        <linearGradient id="forecastAreaGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={t.forecast} stopOpacity={isDark ? 0.35 : 0.28} />
-          <stop offset="100%" stopColor={t.forecast} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-
-      {yTicks.map((tick, i) => {
+      {/* Horizontal Y-axis gridlines & tick values */}
+      {yTicks.map((tick) => {
         const y = pad.top + (height - pad.top - pad.bottom) * (1 - tick / maxY);
         return (
-          <g key={`yt-${i}`}>
-            <line
-              x1={pad.left}
-              y1={y}
-              x2={width - pad.right}
-              y2={y}
-              stroke={t.border}
-              strokeWidth="1"
-            />
-            <text x={pad.left - 8} y={y + 4} textAnchor="end" fontSize="10" fill={t.mutedForeground}>
+          <g key={`yt-${tick}`}>
+            <line x1={pad.left} y1={y} x2={width - pad.right} y2={y} stroke={gridColor} strokeWidth="1" />
+            <text
+              x={pad.left - 10}
+              y={y + 4}
+              textAnchor="end"
+              fontSize="11"
+              fontWeight="400"
+              fill={t.mutedForeground}
+            >
               {tick}
             </text>
           </g>
         );
       })}
 
-      {bandPath ? (
-        <path d={bandPath} fill={t.forecast} opacity={isDark ? 0.18 : 0.12} />
-      ) : null}
+      {/* Units label at top of Y-axis */}
+      <text
+        x={pad.left - 10}
+        y={pad.top - 8}
+        textAnchor="end"
+        fontSize="11"
+        fontWeight="500"
+        fill={t.mutedForeground}
+      >
+        Units
+      </text>
 
-      {actualPath.length > 1 && (
-        <path d={areaPath(actualPath, baselineY)} fill="url(#actualAreaGrad)" />
-      )}
-      {forecastBridge.length > 1 && (
-        <path d={areaPath(forecastBridge, baselineY)} fill="url(#forecastAreaGrad)" />
-      )}
-
+      {/* Regression Line: Light gray dashed line spanning across */}
       {trendPts.length > 1 && (
         <polyline
           points={poly(trendPts)}
           fill="none"
-          stroke={t.mutedForeground}
+          stroke={regressionColor}
           strokeWidth="1.75"
           strokeDasharray="5 4"
-          opacity="0.75"
+          opacity="0.85"
         />
       )}
 
-      {actualPath.length > 1 && (
-        <polyline points={poly(actualPath)} fill="none" stroke={t.primary} strokeWidth="2.5" />
+      {/* Vertical separator & Top Dimension Line: Forecast Period */}
+      {dividerX != null && dividerX < width - pad.right && (
+        <g>
+          {/* Vertical dashed separator */}
+          <line
+            x1={dividerX}
+            y1={pad.top}
+            x2={dividerX}
+            y2={baselineY}
+            stroke={regressionColor}
+            strokeWidth="1.25"
+            strokeDasharray="3 3"
+            opacity="0.8"
+          />
+
+          {/* Top bracket / dimension line across forecast horizon */}
+          {(() => {
+            const rightEdge = width - pad.right;
+            const midX = (dividerX + rightEdge) / 2;
+            const lineY = pad.top + 8;
+            return (
+              <g>
+                <line
+                  x1={dividerX + 2}
+                  y1={lineY}
+                  x2={midX - 44}
+                  y2={lineY}
+                  stroke={regressionColor}
+                  strokeWidth="1"
+                  opacity="0.75"
+                />
+                <polygon
+                  points={`${dividerX + 4},${lineY} ${dividerX + 9},${lineY - 3} ${dividerX + 9},${lineY + 3}`}
+                  fill={regressionColor}
+                  opacity="0.75"
+                />
+                <text
+                  x={midX}
+                  y={lineY + 3.5}
+                  textAnchor="middle"
+                  fontSize="10"
+                  fontWeight="500"
+                  fill={t.mutedForeground}
+                >
+                  Forecast Period
+                </text>
+                <line
+                  x1={midX + 44}
+                  y1={lineY}
+                  x2={rightEdge - 2}
+                  y2={lineY}
+                  stroke={regressionColor}
+                  strokeWidth="1"
+                  opacity="0.75"
+                />
+                <polygon
+                  points={`${rightEdge - 4},${lineY} ${rightEdge - 9},${lineY - 3} ${rightEdge - 9},${lineY + 3}`}
+                  fill={regressionColor}
+                  opacity="0.75"
+                />
+              </g>
+            );
+          })()}
+        </g>
       )}
 
+      {/* Solid Blue Line: Actual historical sales */}
+      {actualPath.length > 1 && (
+        <polyline
+          points={poly(actualPath)}
+          fill="none"
+          stroke={actualColor}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      )}
+
+      {/* Dashed Orange Line: Forecast demand */}
       {forecastBridge.length > 1 && (
         <polyline
           points={poly(forecastBridge)}
           fill="none"
-          stroke={t.forecast}
-          strokeWidth="2.5"
-          strokeDasharray="7 5"
+          stroke={forecastColor}
+          strokeWidth="2.25"
+          strokeDasharray="5 4"
+          strokeLinecap="round"
+          strokeLinejoin="round"
         />
       )}
 
-      {forecastStartX != null && (
-        <g>
-          <line
-            x1={forecastStartX}
-            y1={pad.top}
-            x2={forecastStartX}
-            y2={baselineY}
-            stroke={t.mutedForeground}
-            strokeWidth="1.25"
-            strokeDasharray="4 4"
-            opacity="0.7"
-          />
-          <text
-            x={forecastStartX + 6}
-            y={pad.top + 12}
-            fontSize="10"
-            fontWeight="700"
-            fill={t.mutedForeground}
-          >
-            Forecast →
-          </text>
-        </g>
+      {/* Hover Guideline crosshair line */}
+      {hover && hover.x != null && (
+        <line
+          x1={hover.x}
+          y1={pad.top}
+          x2={hover.x}
+          y2={baselineY}
+          stroke={regressionColor}
+          strokeWidth="1.25"
+          strokeDasharray="3 3"
+          opacity="0.8"
+        />
       )}
 
-      {points.map((p) => (
-        <g key={p.key || p.x}>
-          {p.actualPt && (
-            <circle
-              cx={p.actualPt.x}
-              cy={p.actualPt.y}
-              r="5"
-              fill={t.primary}
-              stroke={t.card}
-              strokeWidth="2.5"
-              style={{ cursor: 'pointer' }}
-              onMouseEnter={() => handlePointEnter(p)}
-              onClick={() => handlePointEnter(p)}
+      {/* Data points */}
+      {points.map((p) => {
+        const isForecast = p.forecast != null && p.actual == null;
+        const isHovered = hover && hover.periodNum === p.x;
+        const r = isHovered ? Math.max(pointRadius + 2.5, 5.5) : pointRadius;
+
+        return (
+          <g key={p.key || p.x}>
+            {/* Actual Sales Dots (Blue) */}
+            {p.actualPt && (
+              <circle
+                cx={p.actualPt.x}
+                cy={p.actualPt.y}
+                r={r}
+                fill={actualColor}
+                stroke={isHovered ? '#FFFFFF' : t.card}
+                strokeWidth={isHovered ? 2 : strokeW}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={() => onHoverPoint(p, p.actualPt.x, p.actualPt.y)}
+                onClick={() => onHoverPoint(p, p.actualPt.x, p.actualPt.y)}
+              />
+            )}
+
+            {/* Forecast Dots (Orange) */}
+            {p.forecastPt && isForecast && (
+              <circle
+                cx={p.forecastPt.x}
+                cy={p.forecastPt.y}
+                r={r}
+                fill={forecastColor}
+                stroke={isHovered ? '#FFFFFF' : t.card}
+                strokeWidth={isHovered ? 2 : strokeW}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={() => onHoverPoint(p, p.forecastPt.x, p.forecastPt.y)}
+                onClick={() => onHoverPoint(p, p.forecastPt.x, p.forecastPt.y)}
+              />
+            )}
+          </g>
+        );
+      })}
+
+      {/* Subsampled, Clean X-axis tick labels (No overlap, spacious, easy to read) */}
+      {visibleTicks.map((tick) => {
+        return (
+          <g key={tick.key}>
+            {/* Small vertical tick line */}
+            <line
+              x1={tick.x}
+              y1={baselineY}
+              x2={tick.x}
+              y2={baselineY + 4}
+              stroke={isDark ? '#3E444B' : '#CBD5E1'}
+              strokeWidth="1"
             />
-          )}
-          {p.forecastPt && (
-            <circle
-              cx={p.forecastPt.x}
-              cy={p.forecastPt.y}
-              r="5"
-              fill={t.forecast}
-              stroke={t.card}
-              strokeWidth="2.5"
-              style={{ cursor: 'pointer' }}
-              onMouseEnter={() => handlePointEnter(p)}
-              onClick={() => handlePointEnter(p)}
-            />
-          )}
-          <text
-            x={(p.actualPt || p.forecastPt)?.x || 0}
-            y={height - 12}
-            textAnchor="middle"
-            fontSize="10"
-            fill={t.mutedForeground}
-            fontWeight="600"
-          >
-            {shortLabel(p.label, p.x, periodType)}
-          </text>
-        </g>
-      ))}
+            {/* Primary label: Month or Month Day */}
+            <text
+              x={tick.x}
+              y={height - 20}
+              textAnchor="middle"
+              fontSize="11"
+              fill={t.mutedForeground}
+              fontWeight="500"
+            >
+              {tick.primary}
+            </text>
+            {/* Secondary label: Year */}
+            {tick.secondary ? (
+              <text
+                x={tick.x}
+                y={height - 7}
+                textAnchor="middle"
+                fontSize="9.5"
+                fill={isDark ? '#64748B' : '#94A3B8'}
+                fontWeight="400"
+              >
+                {tick.secondary}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
     </svg>
   );
 
   return (
     <View style={{ width: '100%', position: 'relative' }}>
+      {/* Tooltip on hover */}
       {hover && Platform.OS === 'web' && (
         <View
           pointerEvents="none"
           style={{
             position: 'absolute',
-            left: Math.min(Math.max((hover.x || 0) + 14, 8), Math.max(width - 200, 8)),
-            top: Math.max((hover.y || 0) - 72, 4),
-            zIndex: 20,
-            backgroundColor: isDark ? '#161820' : '#FFFFFF',
-            borderRadius: 10,
-            paddingHorizontal: 14,
-            paddingVertical: 10,
-            minWidth: 168,
+            left: Math.min(Math.max((hover.x || 0) + 14, 10), Math.max(width - 220, 10)),
+            top: Math.max((hover.y || 0) - 85, 6),
+            zIndex: 40,
+            backgroundColor: isDark ? '#1E2124' : '#FFFFFF',
+            borderRadius: 8,
+            paddingHorizontal: 12,
+            paddingVertical: 9,
+            minWidth: 160,
             borderWidth: 1,
-            borderColor: isDark ? '#272930' : '#E5E7EB',
-            // web shadow
-            boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+            borderColor: isDark ? '#2E3236' : '#E2E8F0',
+            boxShadow: '0 6px 18px rgba(15, 23, 42, 0.14)',
           }}
         >
           <Text
             style={{
-              color: isDark ? '#E8EAF0' : '#111318',
-              fontSize: 12.5,
-              fontWeight: '600',
-              marginBottom: 8,
+              color: t.foreground,
+              fontSize: 12,
+              fontWeight: '700',
+              marginBottom: 4,
             }}
           >
-            {hover.title}
+            {hover.title || hover.label}
           </Text>
 
           {hover.actual != null && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: t.primary,
-                }}
-              />
-              <Text style={{ color: isDark ? '#C4C6D4' : '#4B5563', fontSize: 12, fontWeight: '500' }}>
-                Actual Sales:{' '}
-                <Text style={{ fontWeight: '600', color: isDark ? '#E8EAF0' : '#111318' }}>
-                  {formatUnits(hover.actual)}
-                </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: actualColor }} />
+              <Text style={{ fontSize: 11.5, color: t.mutedForeground }}>
+                Actual Sales: <Text style={{ fontWeight: '600', color: t.foreground }}>{hover.actual} units</Text>
               </Text>
             </View>
           )}
 
-          {hover.fitted != null && !hover.isForecastPoint && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 5 }}>
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: t.mutedForeground,
-                }}
-              />
-              <Text style={{ color: isDark ? '#C4C6D4' : '#4B5563', fontSize: 12, fontWeight: '500' }}>
-                Regression Trend:{' '}
-                <Text style={{ fontWeight: '600', color: isDark ? '#E8EAF0' : '#111318' }}>
-                  {formatUnits(hover.fitted)}
-                </Text>
+          {hover.forecast != null && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+              <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: forecastColor }} />
+              <Text style={{ fontSize: 11.5, color: t.mutedForeground }}>
+                Forecast: <Text style={{ fontWeight: '600', color: forecastColor }}>{hover.forecast} units</Text>
               </Text>
             </View>
           )}
 
-          {(hover.isForecastPoint || (hover.forecast != null && hover.actual == null)) && (
-            <View style={{ gap: 4 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View
-                  style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: t.forecast,
-                  }}
-                />
-                <Text style={{ color: isDark ? '#C4C6D4' : '#4B5563', fontSize: 12, fontWeight: '500' }}>
-                  Forecast:{' '}
-                  <Text style={{ fontWeight: '600', color: isDark ? '#E8EAF0' : '#111318' }}>
-                    {formatUnits(hover.forecast)}
-                  </Text>
-                </Text>
-              </View>
-              {hover.rangeLow != null && hover.rangeHigh != null ? (
-                <Text style={{ color: isDark ? '#C4C6D4' : '#4B5563', fontSize: 11.5, fontWeight: '500', marginLeft: 16 }}>
-                  Range:{' '}
-                  <Text style={{ fontWeight: '600', color: isDark ? '#E8EAF0' : '#111318' }}>
-                    {hover.rangeLow}–{hover.rangeHigh} units
-                  </Text>
-                </Text>
-              ) : null}
+          {hover.fitted != null && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 8, height: 2, backgroundColor: regressionColor }} />
+              <Text style={{ fontSize: 11, color: t.mutedForeground }}>
+                Trend Line: <Text style={{ fontWeight: '500', color: t.foreground }}>{hover.fitted} units</Text>
+              </Text>
             </View>
           )}
         </View>
       )}
 
-      {forecastSummary && Platform.OS === 'web' ? (
-        <View
-          style={{
-            flexDirection: 'row',
-            flexWrap: 'wrap',
-            gap: 16,
-            marginBottom: 10,
-            paddingHorizontal: 4,
-          }}
-        >
-          <Text style={{ fontSize: 12, fontWeight: '700', color: t.foreground || t.mutedForeground }}>
-            Forecast:{' '}
-            <Text style={{ color: t.forecast }}>{forecastSummary.demand ?? '—'} units</Text>
-          </Text>
-          {forecastSummary.rangeLow != null ? (
-            <Text style={{ fontSize: 12, fontWeight: '600', color: t.mutedForeground }}>
-              Expected Range: {forecastSummary.rangeLow}–{forecastSummary.rangeHigh} units
-            </Text>
-          ) : null}
-          {confidence?.score != null ? (
-            <Text style={{ fontSize: 12, fontWeight: '600', color: t.mutedForeground }}>
-              Confidence: {confidence.score}%
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-
-      <ScrollView horizontal showsHorizontalScrollIndicator style={{ width: '100%' }}>
-        {Platform.OS === 'web' ? (
-          <div style={{ width, height }}>{svg}</div>
-        ) : (
-          <View style={{ width, height }}>
-            <NativeBarFallback
-              points={points}
-              height={height}
-              width={width}
-              tokens={t}
-              maxY={maxY}
-            />
-          </View>
-        )}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }}>
+        <div style={{ width, height }}>{svg}</div>
       </ScrollView>
     </View>
   );
 }
 
-function formatUnits(value) {
-  if (value == null || value === '—') return '—';
-  const n = Number(value);
-  if (!Number.isFinite(n)) return '—';
-  const rounded = Math.round(n * 100) / 100;
-  const text = Number.isInteger(rounded) ? String(rounded) : String(rounded);
-  return `${text} units`;
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function getCleanXAxisLabel(point, periodType, prevPoint) {
+  const dateStr = point.date || point.forecastDate;
+  const prevDateStr = prevPoint?.date || prevPoint?.forecastDate;
+
+  let year = '';
+  let month = '';
+  let day = '';
+
+  if (dateStr && String(dateStr).includes('-')) {
+    const parts = String(dateStr).split('-');
+    year = parts[0] || '';
+    const mNum = parseInt(parts[1], 10);
+    month = MONTH_NAMES[mNum - 1] || parts[1] || '';
+    if (parts[2]) {
+      day = String(parseInt(parts[2], 10));
+    }
+  }
+
+  let prevYear = '';
+  if (prevDateStr && String(prevDateStr).includes('-')) {
+    prevYear = String(prevDateStr).split('-')[0] || '';
+  }
+
+  const showYear = Boolean(year && (prevPoint == null || year !== prevYear));
+
+  if (periodType === 'month') {
+    if (month) {
+      return {
+        primary: month,
+        secondary: showYear ? year : '',
+      };
+    }
+    if (point.label && !point.label.startsWith('Month ')) {
+      const parts = point.label.trim().split(' ');
+      return {
+        primary: parts[0] || 'Jan',
+        secondary: parts[1] || (showYear ? year : ''),
+      };
+    }
+    const mIdx = (point.x - 1) % 12;
+    const calcYear = 2025 + Math.floor((point.x - 1) / 12);
+    return {
+      primary: MONTH_NAMES[mIdx] || 'Jan',
+      secondary: String(calcYear),
+    };
+  }
+
+  if (periodType === 'week') {
+    if (month && day) {
+      return {
+        primary: `${month} ${day}`,
+        secondary: showYear ? year : '',
+      };
+    }
+    if (month) {
+      return {
+        primary: month,
+        secondary: showYear ? year : '',
+      };
+    }
+    return {
+      primary: `W${point.x}`,
+      secondary: showYear ? year : '',
+    };
+  }
+
+  // Daily
+  if (month && day) {
+    return {
+      primary: `${month} ${day}`,
+      secondary: showYear ? year : '',
+    };
+  }
+  if (point.label && !point.label.startsWith('Day ')) {
+    return {
+      primary: point.label,
+      secondary: showYear ? year : '',
+    };
+  }
+  return {
+    primary: `D${point.x}`,
+    secondary: showYear ? year : '',
+  };
 }
 
-function shortLabel(label, x, periodType) {
-  if (!label) return periodType === 'month' ? `M${x}` : `Wk ${x}`;
-  if (label.startsWith('Week ')) return `Wk ${label.replace('Week ', '')}`;
-  return label.length > 8 ? label.slice(0, 7) : label;
-}
+function formatTooltipDate(p, periodType) {
+  const dateStr = p.date || p.forecastDate;
+  if (!dateStr) return p.label || `Period ${p.x}`;
+  const d = new Date(dateStr + (dateStr.length === 10 ? 'T00:00:00Z' : ''));
+  if (Number.isNaN(d.getTime())) return p.label || String(dateStr);
 
-function NativeBarFallback({ points, height, width, tokens, maxY }) {
-  const barW = Math.max(18, width / Math.max(points.length, 1) - 12);
-  return (
-    <View
-      style={{
-        width,
-        height,
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        paddingHorizontal: 8,
-        paddingBottom: 28,
-        gap: 6,
-      }}
-    >
-      {points.map((p) => {
-        const val = p.actual != null ? p.actual : p.forecast || 0;
-        const h = Math.max(4, (val / maxY) * (height - 48));
-        const color = p.forecast != null ? tokens.forecast : tokens.primary;
-        return (
-          <View key={p.key || p.x} style={{ width: barW, alignItems: 'center' }}>
-            <Text style={{ fontSize: 9, color: tokens.mutedForeground, marginBottom: 4 }}>
-              {Math.round(val)}
-            </Text>
-            <View style={{ width: barW * 0.7, height: h, borderRadius: 6, backgroundColor: color }} />
-            <Text
-              style={{ fontSize: 9, color: tokens.mutedForeground, marginTop: 6 }}
-              numberOfLines={1}
-            >
-              {shortLabel(p.label, p.x, 'week')}
-            </Text>
-          </View>
-        );
-      })}
-    </View>
-  );
+  if (periodType === 'day') {
+    return d.toLocaleDateString('en-US', {
+      timeZone: 'UTC',
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }
+  if (periodType === 'week') {
+    return `Week of ${d.toLocaleDateString('en-US', {
+      timeZone: 'UTC',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    })}`;
+  }
+  return d.toLocaleDateString('en-US', {
+    timeZone: 'UTC',
+    month: 'long',
+    year: 'numeric',
+  });
 }

@@ -1,52 +1,79 @@
 import { StyleSheet } from 'react-native';
 
-/** Figma Make — Sales Forecasting Dashboard Design tokens */
+/**
+ * MotoTrack Inventory Forecasting Dashboard Tokens
+ * Based on the reference design: Clean Slate/White cards, soft borders, Inter typography
+ */
 export function getForecastTokens(isDark = false) {
   if (isDark) {
     return {
       isDark: true,
-      background: '#1E2124',
+      background: '#121417',
       foreground: '#F9FAFB',
-      card: '#24272B',
+      card: '#1E2124',
+      cardBorder: '#2E3236',
       cardForeground: '#F9FAFB',
       primary: '#EA580C',
       primarySoft: 'rgba(234, 88, 12, 0.14)',
       secondary: '#2E3236',
       muted: '#2E3236',
-      mutedForeground: '#9CA3AF',
-      border: '#374151',
+      mutedForeground: '#94A3B8',
+      border: '#2E3236',
+      borderSubtle: '#26292E',
       navActive: '#EA580C',
       navActiveText: '#FFFFFF',
       sky: '#38BDF8',
-      violet: '#A78BDB',
-      amber: '#F59E0B',
+      blue: '#3B82F6',
+      blueSoft: 'rgba(59, 130, 246, 0.16)',
+      actualLine: '#3B82F6',
+      trendLineColor: '#94A3B8',
       forecast: '#EA580C',
+      forecastSoft: 'rgba(234, 88, 12, 0.14)',
       success: '#10B981',
+      successSoft: 'rgba(16, 185, 129, 0.14)',
       danger: '#EF4444',
       warning: '#F59E0B',
+      warningSoft: 'rgba(245, 158, 11, 0.14)',
+      headerBg: '#1E2124',
+      calloutBg: 'rgba(16, 185, 129, 0.08)',
+      calloutBorder: 'rgba(16, 185, 129, 0.25)',
+      darkBtnBg: '#0F172A',
+      darkBtnText: '#FFFFFF',
     };
   }
   return {
     isDark: false,
-    background: '#F3F4F6',
-    foreground: '#111827',
+    background: '#F8FAFC',
+    foreground: '#0F172A',
     card: '#FFFFFF',
-    cardForeground: '#111827',
+    cardBorder: '#E2E8F0',
+    cardForeground: '#0F172A',
     primary: '#EA580C',
     primarySoft: 'rgba(234, 88, 12, 0.10)',
-    secondary: '#F3F4F6',
-    muted: '#F3F4F6',
-    mutedForeground: '#6B7280',
-    border: '#E5E7EB',
+    secondary: '#F1F5F9',
+    muted: '#F8FAFC',
+    mutedForeground: '#64748B',
+    border: '#E2E8F0',
+    borderSubtle: '#F1F5F9',
     navActive: '#EA580C',
     navActiveText: '#FFFFFF',
     sky: '#0284C7',
-    violet: '#7C3AED',
-    amber: '#F59E0B',
+    blue: '#2563EB',
+    blueSoft: '#EFF6FF',
+    actualLine: '#2563EB',
+    trendLineColor: '#94A3B8',
     forecast: '#EA580C',
+    forecastSoft: 'rgba(234, 88, 12, 0.10)',
     success: '#059669',
+    successSoft: '#ECFDF5',
     danger: '#DC2626',
     warning: '#D97706',
+    warningSoft: '#FFFBEB',
+    headerBg: '#FFFFFF',
+    calloutBg: '#F0FDF4',
+    calloutBorder: '#DCFCE7',
+    darkBtnBg: '#111827',
+    darkBtnText: '#FFFFFF',
   };
 }
 
@@ -55,512 +82,569 @@ export function createForecastStyles(isDark = false) {
 
   return StyleSheet.create({
     root: {
-      gap: 20,
-      paddingBottom: 40,
+      gap: 16,
+      paddingBottom: 48,
     },
 
-    /* ── Page header ── */
-    pageHeader: {
+    /* ── Top Header Bar ── */
+    topBackLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 8,
+      alignSelf: 'flex-start',
+    },
+    topBackText: {
+      fontSize: 12.5,
+      fontWeight: '500',
+      color: t.mutedForeground,
+    },
+    pageHeaderRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
       gap: 16,
-      marginBottom: 4,
+      marginBottom: 2,
       position: 'relative',
-      zIndex: 50,
+      zIndex: 60,
+    },
+    headerTitleCol: {
+      flex: 1,
+      minWidth: 260,
+    },
+    pageTitleContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 9,
     },
     pageTitle: {
       fontSize: 22,
-      fontWeight: '800',
+      fontWeight: '700',
       color: t.foreground,
-      letterSpacing: -0.4,
+      letterSpacing: -0.3,
       lineHeight: 28,
     },
     pageSubtitle: {
-      fontSize: 13,
+      fontSize: 12.5,
+      fontWeight: '400',
       color: t.mutedForeground,
-      marginTop: 6,
-      lineHeight: 19,
-      maxWidth: 480,
+      marginTop: 4,
+      lineHeight: 18,
+      maxWidth: 580,
     },
-    controlsRow: {
+    headerActionsRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      alignItems: 'center',
-      gap: 8,
+      alignItems: 'flex-end',
+      gap: 12,
       position: 'relative',
-      zIndex: 50,
+      zIndex: 60,
     },
-    controlBtn: {
+    controlGroup: {
+      gap: 4,
+    },
+    controlGroupLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: t.mutedForeground,
+      letterSpacing: 0.2,
+    },
+    selectBox: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      justifyContent: 'space-between',
+      gap: 10,
       backgroundColor: t.card,
       borderWidth: 1,
-      borderColor: t.border,
-      borderRadius: 10,
+      borderColor: t.cardBorder,
+      borderRadius: 9,
       paddingHorizontal: 12,
-      paddingVertical: 9,
-      minHeight: 38,
+      paddingVertical: 8,
+      minHeight: 40,
+      minWidth: 140,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.03,
+      shadowRadius: 2,
+      elevation: 1,
     },
-    controlBtnText: {
+    productThumbnail: {
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      backgroundColor: isDark ? '#2E3236' : '#F1F5F9',
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    selectBoxText: {
       fontSize: 12.5,
       fontWeight: '600',
       color: t.foreground,
     },
-    generateBtn: {
+    darkGenerateBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 7,
-      backgroundColor: t.navActive,
-      borderRadius: 10,
+      backgroundColor: t.darkBtnBg,
+      borderRadius: 9,
       paddingHorizontal: 16,
       paddingVertical: 10,
-      minHeight: 38,
+      minHeight: 40,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 4,
+      elevation: 2,
     },
-    generateBtnText: {
+    darkGenerateBtnText: {
       fontSize: 12.5,
-      fontWeight: '700',
-      color: t.navActiveText,
+      fontWeight: '600',
+      color: t.darkBtnText,
+      letterSpacing: 0.1,
+    },
+    orangeGenerateBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      backgroundColor: t.primary,
+      borderRadius: 9,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      minHeight: 40,
+      shadowColor: t.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 5,
+      elevation: 2,
+    },
+    orangeGenerateBtnText: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: '#FFFFFF',
+      letterSpacing: 0.1,
     },
 
-    /* ── Summary cards (matching AdminStatCard design system) ── */
-    statsGrid: {
+    /* ── Row 2: 5 KPI Summary Cards ── */
+    kpiRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 16,
-      marginBottom: 24,
+      gap: 12,
       position: 'relative',
       zIndex: 1,
     },
-    statCard: {
+    kpiCard: {
       flex: 1,
-      minWidth: 200,
-      backgroundColor: isDark ? '#0F1412' : t.card,
-      borderRadius: 16,
-      paddingVertical: 20,
-      paddingHorizontal: 22,
+      minWidth: 180,
+      backgroundColor: t.card,
+      borderRadius: 12,
+      padding: 16,
       borderWidth: 1,
-      borderColor: isDark ? '#26332E' : '#E2E8F0',
-      shadowColor: isDark ? '#000000' : 'rgba(15, 23, 42, 0.08)',
+      borderColor: t.cardBorder,
+      shadowColor: '#0F172A',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.04,
-      shadowRadius: 6,
+      shadowRadius: 4,
       elevation: 1,
       justifyContent: 'space-between',
-      minHeight: 148,
+      minHeight: 110,
     },
-    statCardMobile: {
+    kpiCardMobile: {
       flexBasis: '100%',
       minWidth: '100%',
       minHeight: 'auto',
     },
-    statCardTealAccent: {
-      borderColor: isDark ? '#14B8A6' : '#0C6258',
+    kpiTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 8,
     },
-    statCardBlueAccent: {
-      borderColor: isDark ? '#60A5FA' : '#3B82F6',
+    kpiIconSquare: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    statCardCyanAccent: {
-      borderColor: isDark ? '#2DD4BF' : '#14B8A6',
-    },
-    statCardWarningAccent: {
-      borderColor: isDark ? '#FBBF24' : '#F59E0B',
-    },
-    statCardDangerAccent: {
-      borderColor: isDark ? '#F87171' : '#EF4444',
-    },
-    statCardSuccessAccent: {
-      borderColor: isDark ? '#34D399' : '#10B981',
-    },
-    statCardPurpleAccent: {
-      borderColor: isDark ? '#A78BFA' : '#8B5CF6',
-    },
-    statLabel: {
-      fontSize: 11,
-      lineHeight: 16,
-      fontWeight: '600',
+    kpiLabel: {
+      fontSize: 11.5,
+      fontWeight: '500',
       color: t.mutedForeground,
-      textTransform: 'uppercase',
-      letterSpacing: 0.8,
-      marginBottom: 4,
+      flex: 1,
     },
-    statValue: {
-      fontSize: 28,
-      lineHeight: 34,
-      fontWeight: '800',
+    kpiValueRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 6,
+    },
+    kpiValue: {
+      fontSize: 26,
+      lineHeight: 30,
+      fontWeight: '700',
       color: t.foreground,
-      letterSpacing: -0.5,
+      letterSpacing: -0.4,
+      fontVariant: ['tabular-nums'],
     },
-    statUnit: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: t.mutedForeground,
-    },
-    statSub: {
-      fontSize: 12,
-      lineHeight: 16,
-      color: t.mutedForeground,
+    kpiUnit: {
+      fontSize: 12.5,
       fontWeight: '400',
+      color: t.mutedForeground,
+    },
+    kpiSubBadge: {
+      alignSelf: 'flex-start',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 7,
+      paddingVertical: 2.5,
+      borderRadius: 6,
       marginTop: 6,
     },
+    kpiSubBadgeText: {
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    kpiSubText: {
+      fontSize: 11,
+      color: t.mutedForeground,
+      fontWeight: '400',
+      marginTop: 4,
+    },
 
-    /* ── Cards ── */
+    /* ── Cards General ── */
     card: {
       backgroundColor: t.card,
       borderRadius: 12,
       borderWidth: 1,
-      borderColor: t.border,
-      padding: 20,
+      borderColor: t.cardBorder,
+      padding: 18,
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.04,
+      shadowRadius: 4,
+      elevation: 1,
     },
-    cardHeaderRow: {
+    cardHeader: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       justifyContent: 'space-between',
       gap: 12,
-      marginBottom: 16,
+      marginBottom: 14,
       flexWrap: 'wrap',
     },
+    cardTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
     cardTitle: {
-      fontSize: 15,
-      fontWeight: '800',
+      fontSize: 14.5,
+      fontWeight: '700',
       color: t.foreground,
       letterSpacing: -0.2,
     },
-    cardSubtitle: {
-      fontSize: 12,
-      color: t.mutedForeground,
-      marginTop: 3,
-      lineHeight: 17,
-    },
 
-    /* ── Period tabs (4W / 12W / 24W) ── */
-    periodTabs: {
-      flexDirection: 'row',
-      backgroundColor: t.secondary,
-      borderRadius: 10,
-      padding: 3,
-      borderWidth: 1,
-      borderColor: t.border,
-    },
-    periodTab: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 8,
-    },
-    periodTabActive: {
-      backgroundColor: t.navActive,
-    },
-    periodTabText: {
-      fontSize: 11.5,
-      fontWeight: '700',
-      color: t.mutedForeground,
-    },
-    periodTabTextActive: {
-      color: t.navActiveText,
-    },
-
-    legendRow: {
+    /* ── Middle Row: Chart (Left) + Forecast Details (Right) ── */
+    middleRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 16,
-      marginTop: 14,
+      gap: 14,
+    },
+    chartCol: {
+      flexGrow: 1,
+      flexBasis: '64%',
+      minWidth: 320,
+    },
+    detailsCol: {
+      flexGrow: 1,
+      flexBasis: '32%',
+      minWidth: 280,
+    },
+
+    /* Chart Segmented Pill Tabs (Daily | Weekly | Monthly) */
+    pillTabsRow: {
+      flexDirection: 'row',
+      backgroundColor: isDark ? '#2E3236' : '#F1F5F9',
+      borderRadius: 8,
+      padding: 3,
+      gap: 2,
+    },
+    pillTab: {
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: 6,
+    },
+    pillTabActive: {
+      backgroundColor: t.primary,
+    },
+    pillTabText: {
+      fontSize: 11.5,
+      fontWeight: '600',
+      color: t.mutedForeground,
+    },
+    pillTabTextActive: {
+      color: '#FFFFFF',
+    },
+
+    /* Chart Legend */
+    chartLegendRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 18,
+      marginTop: 2,
+      marginBottom: 8,
     },
     legendItem: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
     },
-    legendLine: {
-      width: 16,
-      height: 3,
+    legendSquare: {
+      width: 9,
+      height: 9,
       borderRadius: 2,
     },
+    legendLine: {
+      width: 14,
+      height: 2,
+      borderRadius: 1,
+    },
     legendText: {
-      fontSize: 11.5,
-      fontWeight: '600',
+      fontSize: 11,
+      fontWeight: '500',
       color: t.mutedForeground,
     },
 
-    /* ── Two-column: regression + stock ── */
-    splitRow: {
+    /* Key-Value Details Rows (Forecast Details & Inventory Analysis) */
+    keyValueList: {
+      gap: 10,
+    },
+    keyValueRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: t.borderSubtle,
+    },
+    keyValueLabel: {
+      fontSize: 12,
+      fontWeight: '400',
+      color: t.mutedForeground,
+    },
+    keyValueVal: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: t.foreground,
+      fontVariant: ['tabular-nums'],
+    },
+
+    /* Callout Highlight Cards */
+    calloutCard: {
+      marginTop: 14,
+      borderRadius: 10,
+      padding: 14,
+      borderWidth: 1,
+      flexDirection: 'row',
+      gap: 10,
+      alignItems: 'flex-start',
+    },
+    calloutTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      marginBottom: 3,
+    },
+    calloutText: {
+      fontSize: 11.5,
+      lineHeight: 16,
+      fontWeight: '400',
+    },
+
+    /* ── Bottom Row: 3 Equal-Width Columns ── */
+    bottomRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 14,
     },
-    splitMain: {
-      flexGrow: 1,
-      flexBasis: '55%',
+    bottomCol: {
+      flex: 1,
       minWidth: 280,
     },
-    splitSide: {
-      flexGrow: 1,
-      flexBasis: 260,
-      minWidth: 260,
-      maxWidth: 340,
-    },
 
-    equationBox: {
-      backgroundColor: t.muted,
-      borderRadius: 10,
-      padding: 16,
-      borderWidth: 1,
-      borderColor: t.border,
-      marginBottom: 14,
-    },
-    equationLabel: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: t.mutedForeground,
-      letterSpacing: 1.1,
-      textTransform: 'uppercase',
-      marginBottom: 8,
-    },
-    equationText: {
-      fontSize: 22,
-      fontWeight: '800',
-      color: t.primary,
-      letterSpacing: -0.4,
-      fontVariant: ['tabular-nums'],
-    },
-    equationHint: {
-      fontSize: 11,
-      color: t.mutedForeground,
-      marginTop: 6,
-    },
-    metaGrid: {
+    /* Table Styles */
+    tableHeaderRow: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 10,
-    },
-    metaItem: {
-      minWidth: 110,
-      flexGrow: 1,
-      backgroundColor: t.secondary,
-      borderRadius: 10,
-      padding: 12,
-      borderWidth: 1,
-      borderColor: t.border,
-    },
-    metaLabel: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: t.mutedForeground,
-      letterSpacing: 0.9,
-      textTransform: 'uppercase',
-      marginBottom: 5,
-    },
-    metaValue: {
-      fontSize: 15,
-      fontWeight: '800',
-      color: t.foreground,
-      fontVariant: ['tabular-nums'],
-    },
-    predictedBox: {
-      marginTop: 14,
-      backgroundColor: t.primarySoft,
-      borderRadius: 10,
-      padding: 14,
-      borderWidth: 1,
-      borderColor: t.primary,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    predictedLabel: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: t.primary,
-      letterSpacing: 1,
-      textTransform: 'uppercase',
-    },
-    predictedValue: {
-      fontSize: 20,
-      fontWeight: '800',
-      color: t.primary,
-      fontVariant: ['tabular-nums'],
-    },
-
-    /* ── Stock optimization flow ── */
-    stockHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 16,
-    },
-    flowStep: {
-      backgroundColor: t.secondary,
-      borderRadius: 10,
-      padding: 14,
-      borderWidth: 1,
-      borderColor: t.border,
-    },
-    flowStepHighlight: {
-      backgroundColor: t.primarySoft,
-      borderColor: t.primary,
-      borderWidth: 1.5,
-    },
-    flowLabel: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: t.mutedForeground,
-      letterSpacing: 1,
-      textTransform: 'uppercase',
+      paddingVertical: 8,
+      paddingHorizontal: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: t.cardBorder,
+      backgroundColor: isDark ? '#26292E' : '#F8FAFC',
+      borderRadius: 6,
       marginBottom: 4,
     },
-    flowValue: {
-      fontSize: 20,
-      fontWeight: '800',
-      color: t.foreground,
-      fontVariant: ['tabular-nums'],
-    },
-    flowArrow: {
-      alignItems: 'center',
-      paddingVertical: 6,
-    },
-    flowArrowText: {
+    tableHeaderCell: {
       fontSize: 11,
       fontWeight: '600',
       color: t.mutedForeground,
+      textTransform: 'none',
+      letterSpacing: 0.1,
     },
-    safetyNote: {
+    tableDataRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 9,
+      paddingHorizontal: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: t.borderSubtle,
+    },
+    tableDataCell: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: t.foreground,
+      fontVariant: ['tabular-nums'],
+    },
+    tableDataCellMuted: {
+      fontSize: 12,
+      fontWeight: '400',
+      color: t.mutedForeground,
+      fontVariant: ['tabular-nums'],
+    },
+    paginationBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingTop: 12,
+      marginTop: 6,
+      borderTopWidth: 1,
+      borderTopColor: t.borderSubtle,
+    },
+    paginationCountText: {
+      fontSize: 11.5,
+      color: t.mutedForeground,
+      fontWeight: '400',
+    },
+    paginationButtons: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    paginationBtn: {
+      width: 26,
+      height: 26,
+      borderRadius: 6,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? '#26292E' : '#F1F5F9',
+    },
+    paginationBtnActive: {
+      backgroundColor: t.primary,
+    },
+    paginationBtnText: {
       fontSize: 11.5,
       fontWeight: '600',
-      color: t.mutedForeground,
-      textAlign: 'center',
-      paddingVertical: 4,
-    },
-    safetyRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-      alignItems: 'center',
-      marginTop: 14,
-      paddingTop: 14,
-      borderTopWidth: 1,
-      borderTopColor: t.border,
-    },
-    safetyInput: {
-      borderWidth: 1,
-      borderColor: t.border,
-      backgroundColor: t.card,
-      borderRadius: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 7,
-      minWidth: 64,
       color: t.foreground,
-      fontWeight: '700',
-      fontSize: 13,
-      fontVariant: ['tabular-nums'],
     },
-    chip: {
-      paddingHorizontal: 10,
-      paddingVertical: 6,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: t.border,
-      backgroundColor: t.secondary,
+    paginationBtnTextActive: {
+      color: '#FFFFFF',
     },
-    chipActive: {
-      backgroundColor: t.navActive,
-      borderColor: t.navActive,
-    },
-    chipText: {
-      fontSize: 11,
-      fontWeight: '700',
-      color: t.mutedForeground,
-    },
-    chipTextActive: {
-      color: t.navActiveText,
-    },
-
-    /* ── Status pills ── */
-    statusPill: {
+    reorderBadge: {
       alignSelf: 'flex-start',
+      marginTop: 8,
       paddingHorizontal: 10,
       paddingVertical: 4,
-      borderRadius: 999,
+      borderRadius: 6,
+      backgroundColor: isDark ? 'rgba(16, 185, 129, 0.16)' : '#DCFCE7',
       borderWidth: 1,
+      borderColor: isDark ? 'rgba(16, 185, 129, 0.35)' : '#86EFAC',
     },
-    statusPillText: {
+    reorderBadgeText: {
       fontSize: 11,
-      fontWeight: '700',
+      fontWeight: '600',
+      color: isDark ? '#34D399' : '#15803D',
     },
 
-    /* ── Table ── */
-    tableHeader: {
+    /* Trend & Insights items */
+    insightItem: {
       flexDirection: 'row',
-      paddingVertical: 10,
-      paddingHorizontal: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: isDark ? '#374151' : '#32373D',
-      backgroundColor: '#24272B',
-      borderTopLeftRadius: 8,
-      borderTopRightRadius: 8,
+      alignItems: 'flex-start',
+      gap: 10,
+      paddingVertical: 7,
     },
-    tableHeaderText: {
-      fontSize: 10,
-      fontWeight: '700',
-      color: '#CBD5E1',
-      letterSpacing: 0.8,
-      textTransform: 'uppercase',
-    },
-    tableRow: {
-      flexDirection: 'row',
+    insightCircle: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
       alignItems: 'center',
-      paddingVertical: 13,
-      paddingHorizontal: 10,
-      borderBottomWidth: 1,
-      borderBottomColor: t.border,
+      justifyContent: 'center',
+      marginTop: 1,
     },
-    tableRowActive: {
-      backgroundColor: t.primarySoft,
-    },
-    tableCell: {
-      fontSize: 12.5,
-      color: t.mutedForeground,
-      fontWeight: '500',
-      fontVariant: ['tabular-nums'],
-    },
-    tableCellBold: {
-      fontSize: 13,
+    insightTitle: {
+      fontSize: 12,
+      fontWeight: '600',
       color: t.foreground,
-      fontWeight: '700',
     },
-    productCard: {
-      backgroundColor: t.card,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: t.border,
-      padding: 14,
-      marginBottom: 10,
-      gap: 8,
-    },
-    productCardActive: {
-      borderColor: t.primary,
-      backgroundColor: t.primarySoft,
-    },
-
-    emptyState: {
-      padding: 28,
-      alignItems: 'center',
-      gap: 8,
-    },
-    emptyText: {
-      fontSize: 13,
+    insightSub: {
+      fontSize: 11.5,
       color: t.mutedForeground,
-      textAlign: 'center',
-      lineHeight: 19,
+      marginTop: 2,
+      lineHeight: 15,
+    },
+    sectionDivider: {
+      height: 1,
+      backgroundColor: t.cardBorder,
+      marginVertical: 10,
+    },
+    subSectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 8,
+    },
+    subSectionTitle: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: t.foreground,
     },
 
-    historyRow: {
+    /* Dropdown Menus */
+    dropdownMenu: {
+      position: 'absolute',
+      top: '100%',
+      right: 0,
+      marginTop: 6,
+      minWidth: 180,
+      backgroundColor: t.card,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: t.cardBorder,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      elevation: 20,
+      zIndex: 1000,
+      overflow: 'hidden',
+    },
+    dropdownItem: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 8,
-      paddingVertical: 12,
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 14,
+      paddingVertical: 10,
       borderBottomWidth: 1,
-      borderBottomColor: t.border,
+      borderBottomColor: t.borderSubtle,
+    },
+    dropdownItemActive: {
+      backgroundColor: isDark ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
+    },
+    dropdownItemText: {
+      fontSize: 12.5,
+      fontWeight: '500',
+      color: t.foreground,
     },
   });
 }
@@ -576,19 +660,19 @@ export function getStockStatusColors(status, isDark = false) {
       bg: isDark ? 'rgba(16,185,129,0.15)' : '#ECFDF5',
       text: isDark ? '#34D399' : '#047857',
       border: isDark ? 'rgba(16,185,129,0.3)' : '#A7F3D0',
-      label: 'In Stock',
+      label: 'Stock Sufficient',
     },
     'Low Stock': {
       bg: isDark ? 'rgba(245,158,11,0.15)' : '#FFFBEB',
       text: isDark ? '#FBBF24' : '#B45309',
       border: isDark ? 'rgba(245,158,11,0.3)' : '#FDE68A',
-      label: 'Low Stock',
+      label: 'Reorder Soon',
     },
     'Critical Stock': {
       bg: isDark ? 'rgba(239,68,68,0.15)' : '#FEF2F2',
       text: isDark ? '#F87171' : '#B91C1C',
       border: isDark ? 'rgba(239,68,68,0.3)' : '#FECACA',
-      label: 'Critical',
+      label: 'Stockout Risk',
     },
     Overstocked: {
       bg: isDark ? 'rgba(59,130,246,0.15)' : '#EFF6FF',
@@ -600,7 +684,7 @@ export function getStockStatusColors(status, isDark = false) {
       bg: t.muted,
       text: t.mutedForeground,
       border: t.border,
-      label: 'No Data',
+      label: 'Insufficient Data',
     },
   };
   return map[status] || map['Insufficient Data'];
