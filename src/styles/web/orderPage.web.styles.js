@@ -44,7 +44,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   logoText: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   headerNavLinks: {
@@ -85,7 +85,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   userNameText: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#18181B',
   },
   signInBtn: {
@@ -98,7 +98,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   signInBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   scrollContent: {
@@ -138,7 +138,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   metricNum: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
   },
   metricLabel: {
@@ -185,7 +185,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     marginTop: 12,
   },
@@ -223,7 +223,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   orderNumber: {
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#EA580C',
   },
   orderDate: {
@@ -242,7 +242,7 @@ export const orderWebStyles = StyleSheet.create({
   statusTextProcessing: {
     color: '#075985',
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   statusDelivered: {
     backgroundColor: '#DCFCE7',
@@ -250,7 +250,7 @@ export const orderWebStyles = StyleSheet.create({
   statusTextDelivered: {
     color: '#15803D',
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   orderSummaryText: {
     fontSize: 13.5,
@@ -268,7 +268,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   orderTotalText: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
   },
   trackBtn: {
@@ -284,7 +284,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   trackBtnText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
   invoiceDrawerCol: {
@@ -309,7 +309,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   invoiceTitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
   },
   invoiceSub: {
@@ -330,7 +330,7 @@ export const orderWebStyles = StyleSheet.create({
   fullTrackBtnText: {
     color: '#FFFFFF',
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   timelineBlock: {
     backgroundColor: '#F8FAFC',
@@ -358,7 +358,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   timelineStepTitle: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   timelineStepSub: {
@@ -374,7 +374,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   blockHeading: {
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
     marginBottom: 6,
   },
@@ -411,7 +411,7 @@ export const orderWebStyles = StyleSheet.create({
   },
   itemTotal: {
     fontSize: 13.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
   },
   totalSummaryBlock: {
@@ -439,12 +439,12 @@ export const orderWebStyles = StyleSheet.create({
   },
   grandTotalLabel: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
   },
   grandTotalVal: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#EA580C',
   },
 });

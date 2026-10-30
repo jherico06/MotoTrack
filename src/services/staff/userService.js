@@ -37,11 +37,22 @@ export const CUSTOMER_USER = {
   orders: [],
 };
 
-const SEED_DEMO_USER_IDS = new Set(['usr-admin-01', 'usr-customer-01', 'usr-google-demo']);
+const SEED_DEMO_USER_IDS = new Set(['usr-customer-01', 'usr-google-demo']);
 
 function isSeedDemoUser(user) {
   const id = String(user?.id || user?.user_id || '');
   return SEED_DEMO_USER_IDS.has(id);
+}
+
+function isLegacyPasswordMatch(inputPassword, storedPwd, saltEmail = '') {
+  if (verifyPassword(inputPassword, storedPwd, saltEmail)) {
+    return true;
+  }
+  // Repair compatibility for legacy migration 20261009120000 which seeded 'sha256:admin123'
+  if (storedPwd === 'sha256:admin123' && inputPassword === 'admin123') {
+    return true;
+  }
+  return false;
 }
 
 const STORAGE_KEYS = {
@@ -155,50 +166,27 @@ class UserService {
           .maybeSingle();
 
         if (existingUser) {
-          if (safeRole === 'rider') {
-            return {
-              success: false,
-              error: 'That email already belongs to another account. Use a unique rider email.',
-            };
-          }
-          const updatedPwd = hashPassword(password || '', normalizedEmail);
-          await supabase
-            .from('users')
-            .update({
-              password: updatedPwd,
-              name: (name || '').trim(),
-              phone: (phone || '').trim(),
-              address: (address || 'Metro Manila, Philippines').trim(),
-              status: 'active',
-            })
-            .eq('user_id', existingUser.user_id);
-
-          const updatedLocalUser = {
-            id: existingUser.user_id,
-            user_id: existingUser.user_id,
-            name: (name || '').trim(),
-            email: normalizedEmail,
-            username: normalizedUsername,
-            password: updatedPwd,
-            phone: (phone || '').trim(),
-            address: (address || 'Metro Manila, Philippines').trim(),
-            role: role || 'user',
-            status: 'active',
-            avatar: avatar || '',
-            memberSince: 'Today',
-            orders: [],
+          return {
+            success: false,
+            error:
+              safeRole === 'rider'
+                ? 'That email already belongs to another account. Use a unique rider email.'
+                : 'This email is already registered. Please sign in instead.',
           };
-
-          this.saveLocalUsers([
-            updatedLocalUser,
-            ...this.getLocalUsers().filter((u) => u.email.toLowerCase() !== normalizedEmail),
-          ]);
-
-          return { success: true, user: updatedLocalUser };
         }
       } catch (e) {
         console.warn('Supabase email check note:', e);
       }
+    }
+
+    const existingLocal = this.getLocalUsers().find(
+      (u) => String(u.email || '').toLowerCase() === normalizedEmail
+    );
+    if (existingLocal) {
+      return {
+        success: false,
+        error: 'This email is already registered. Please sign in instead.',
+      };
     }
 
     if (normalizedUsername && supabase) {
@@ -398,7 +386,7 @@ class UserService {
         if (avatar !== undefined) updatePayload.avatar = avatar;
         if (cleanUsername !== undefined) updatePayload.username = cleanUsername;
 
-        await supabase.from('users').update(updatePayload).or(`user_id.eq.${userId},id.eq.${userId}`);
+        await supabase.from('users').update(updatePayload).eq('user_id', userId);
 
         // Keep staff roster display names / usernames in sync
         const rosterPayload = {};
@@ -500,6 +488,19 @@ class UserService {
     } catch (_e) {}
 
     return { success: true, user: updatedUser };
+  }
+
+  async updateUser(id, updates = {}) {
+    if (!id || !updates || typeof updates !== 'object') {
+      return { success: false, error: 'Invalid user update parameters.' };
+    }
+    return await this.updateProfile(id, {
+      name: updates.name,
+      phone: updates.phone,
+      address: updates.address,
+      avatar: updates.avatar,
+      username: updates.username,
+    });
   }
 
   // ─── LOG ACCOUNT ACTIVITY / SECURITY AUDIT ───
@@ -623,7 +624,7 @@ class UserService {
         const { data } = await supabase
           .from('users')
           .select('*')
-          .or(`user_id.eq.${uid},id.eq.${uid}`)
+          .eq('user_id', uid)
           .maybeSingle();
         if (data) {
           currentUser = data;
@@ -638,6 +639,11 @@ class UserService {
       if (currentUser) storedPwd = currentUser.password;
     }
 
+    if (!currentUser && uid === 'usr-admin-01') {
+      currentUser = { ...ADMIN_USER };
+      storedPwd = ADMIN_USER.password;
+    }
+
     if (!currentUser) {
       return { success: false, error: 'User account not found.' };
     }
@@ -647,8 +653,7 @@ class UserService {
       return { success: false, error: 'New email cannot be the same as your current email.' };
     }
 
-    const isCurrentPwdValid =
-      verifyPassword(cleanCurrentPwd, storedPwd, currentEmail) || storedPwd === cleanCurrentPwd;
+    const isCurrentPwdValid = isLegacyPasswordMatch(cleanCurrentPwd, storedPwd, currentEmail);
     if (!isCurrentPwdValid) {
       return { success: false, error: 'Incorrect current password. Verification failed.' };
     }
@@ -681,14 +686,18 @@ class UserService {
     // 4. Update in Supabase
     if (supabase) {
       try {
-        await supabase
+        const { error: updateErr } = await supabase
           .from('users')
           .update({
             email: cleanNewEmail,
             password: newPasswordHash,
             updated_at: new Date().toISOString(),
           })
-          .or(`user_id.eq.${uid},id.eq.${uid}`);
+          .eq('user_id', uid);
+
+        if (updateErr) {
+          return { success: false, error: updateErr.message || 'Could not update email in database.' };
+        }
 
         await supabase
           .from('customers')
@@ -704,7 +713,8 @@ class UserService {
 
     // 5. Update local cache
     let updatedSafeUser = null;
-    const localUsers = this.getLocalUsers().map((u) => {
+    const existingLocal = this.getLocalUsers();
+    const localUsers = existingLocal.map((u) => {
       if (u.id === uid || u.user_id === uid) {
         const updated = {
           ...u,
@@ -716,6 +726,16 @@ class UserService {
       }
       return u;
     });
+    if (!updatedSafeUser) {
+      updatedSafeUser = {
+        ...currentUser,
+        id: currentUser.user_id || currentUser.id || uid,
+        user_id: currentUser.user_id || currentUser.id || uid,
+        email: cleanNewEmail,
+        password: newPasswordHash,
+      };
+      localUsers.unshift(updatedSafeUser);
+    }
     this.saveLocalUsers(localUsers);
 
     // Log the event
@@ -757,7 +777,7 @@ class UserService {
         const { data } = await supabase
           .from('users')
           .select('*')
-          .or(`user_id.eq.${uid},id.eq.${uid}`)
+          .eq('user_id', uid)
           .maybeSingle();
         if (data) {
           currentUser = data;
@@ -772,13 +792,17 @@ class UserService {
       if (currentUser) storedPwd = currentUser.password;
     }
 
+    if (!currentUser && uid === 'usr-admin-01') {
+      currentUser = { ...ADMIN_USER };
+      storedPwd = ADMIN_USER.password;
+    }
+
     if (!currentUser) {
       return { success: false, error: 'User account not found.' };
     }
 
     const currentEmail = (currentUser.email || '').toLowerCase();
-    const isCurrentPwdValid =
-      verifyPassword(cleanCurrentPwd, storedPwd, currentEmail) || storedPwd === cleanCurrentPwd;
+    const isCurrentPwdValid = isLegacyPasswordMatch(cleanCurrentPwd, storedPwd, currentEmail);
     if (!isCurrentPwdValid) {
       return { success: false, error: 'Incorrect current password. Verification failed.' };
     }
@@ -789,14 +813,18 @@ class UserService {
     // 3. Update in Supabase
     if (supabase) {
       try {
-        await supabase
+        const { error: updateErr } = await supabase
           .from('users')
           .update({
             password: newPasswordHash,
             must_change_password: false,
             updated_at: new Date().toISOString(),
           })
-          .or(`user_id.eq.${uid},id.eq.${uid}`);
+          .eq('user_id', uid);
+
+        if (updateErr) {
+          return { success: false, error: updateErr.message || 'Could not update password in database.' };
+        }
 
         // Update in Supabase Auth
         supabase.auth.updateUser({ password: cleanNewPwd }).catch(() => {});
@@ -806,8 +834,10 @@ class UserService {
     }
 
     // 4. Update local cache
+    let matchedLocal = false;
     const localUsers = this.getLocalUsers().map((u) => {
       if (u.id === uid || u.user_id === uid) {
+        matchedLocal = true;
         return {
           ...u,
           password: newPasswordHash,
@@ -816,6 +846,15 @@ class UserService {
       }
       return u;
     });
+    if (!matchedLocal) {
+      localUsers.unshift({
+        ...currentUser,
+        id: currentUser.user_id || currentUser.id || uid,
+        user_id: currentUser.user_id || currentUser.id || uid,
+        password: newPasswordHash,
+        must_change_password: false,
+      });
+    }
     this.saveLocalUsers(localUsers);
 
     // Log the event
@@ -833,27 +872,191 @@ class UserService {
     };
   }
 
-  // ─── UPDATE USER ROLE (PROMOTE / DEMOTE) ───
-  async updateUserRole(id, newRole) {
+  // ─── RESET PASSWORD BY EMAIL (USED BY OTP-VERIFIED FORGOT PASSWORD FLOW) ───
+  async resetPasswordByEmail(email, newPassword) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanNewPwd = String(newPassword || '').trim();
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, error: 'A valid email address is required.' };
+    }
+    if (cleanNewPwd.length < 8) {
+      return { success: false, error: 'New password must be at least 8 characters long.' };
+    }
+
+    let targetUser = null;
     if (supabase) {
       try {
-        await supabase.from('users').update({ role: newRole }).or(`user_id.eq.${id},id.eq.${id}`);
-      } catch (e) {}
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .ilike('email', cleanEmail)
+          .maybeSingle();
+        if (data) targetUser = data;
+      } catch (_e) {}
+    }
+
+    if (!targetUser) {
+      targetUser = this.getLocalUsers().find(
+        (u) => String(u.email || '').toLowerCase() === cleanEmail
+      );
+    }
+
+    if (!targetUser && cleanEmail === ADMIN_USER.email.toLowerCase()) {
+      targetUser = { ...ADMIN_USER };
+    }
+
+    if (!targetUser) {
+      return { success: false, error: 'No account found with this email address.' };
+    }
+
+    const uid = targetUser.user_id || targetUser.id;
+    const newPasswordHash = hashPassword(cleanNewPwd, cleanEmail);
+
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('users')
+          .update({
+            password: newPasswordHash,
+            must_change_password: false,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', uid);
+        if (error) {
+          return { success: false, error: error.message || 'Could not reset password in database.' };
+        }
+      } catch (e) {
+        console.warn('Supabase resetPasswordByEmail error:', e);
+      }
+    }
+
+    let matched = false;
+    const localUsers = this.getLocalUsers().map((u) => {
+      if (u.id === uid || u.user_id === uid || String(u.email || '').toLowerCase() === cleanEmail) {
+        matched = true;
+        return { ...u, password: newPasswordHash, must_change_password: false };
+      }
+      return u;
+    });
+    if (!matched) {
+      localUsers.unshift({
+        ...targetUser,
+        id: uid,
+        user_id: uid,
+        password: newPasswordHash,
+        must_change_password: false,
+      });
+    }
+    this.saveLocalUsers(localUsers);
+
+    await this.logAccountActivity(uid, 'PASSWORD_RESET', 'Password reset via email OTP verification');
+
+    const { password: _, ...safeUser } = targetUser;
+    return {
+      success: true,
+      user: {
+        ...safeUser,
+        id: uid,
+        user_id: uid,
+        must_change_password: false,
+      },
+    };
+  }
+
+  // ─── UPDATE USER ROLE (PROMOTE / DEMOTE WITH SELF & LAST-ADMIN PROTECTION) ───
+  async updateUserRole(id, newRole, actingUserId = null) {
+    const userId = String(id || '').trim();
+    if (!userId) return { success: false, error: 'User ID is required.' };
+
+    if (actingUserId && String(actingUserId).trim() === userId && newRole !== 'admin') {
+      return {
+        success: false,
+        error: 'You cannot demote your own active administrator account.',
+      };
+    }
+
+    // Prevent demoting the last active administrator
+    if (newRole !== 'admin') {
+      try {
+        const allUsers = await this.getAllUsers();
+        const target = (allUsers || []).find((u) => u.id === userId || u.user_id === userId);
+        if (target?.role === 'admin') {
+          const activeAdmins = (allUsers || []).filter(
+            (u) => u.role === 'admin' && (u.status || 'active') === 'active'
+          );
+          if (activeAdmins.length <= 1) {
+            return {
+              success: false,
+              error: 'Cannot demote the last active Store Administrator account.',
+            };
+          }
+        }
+      } catch (_e) {}
+    }
+
+    if (supabase) {
+      try {
+        const { error } = await supabase
+          .from('users')
+          .update({ role: newRole, updated_at: new Date().toISOString() })
+          .eq('user_id', userId);
+        if (error) {
+          return { success: false, error: error.message || 'Could not update user role.' };
+        }
+      } catch (e) {
+        console.warn('Supabase updateUserRole note:', e);
+      }
     }
 
     let localUsers = this.getLocalUsers();
-    localUsers = localUsers.map((u) => (u.id === id || u.user_id === id ? { ...u, role: newRole } : u));
+    localUsers = localUsers.map((u) =>
+      u.id === userId || u.user_id === userId ? { ...u, role: newRole } : u
+    );
     this.saveLocalUsers(localUsers);
 
     return { success: true };
   }
 
-  // ─── UPDATE USER STATUS (ACTIVE / DISABLED) ───
-  async updateUserStatus(id, newStatus) {
-    const userId = String(id).trim();
+  // ─── UPDATE USER STATUS (ACTIVE / DISABLED WITH SELF & LAST-ADMIN PROTECTION) ───
+  async updateUserStatus(id, newStatus, actingUserId = null) {
+    const userId = String(id || '').trim();
+    if (!userId) return { success: false, error: 'User ID is required.' };
+
+    if (actingUserId && String(actingUserId).trim() === userId && newStatus !== 'active') {
+      return {
+        success: false,
+        error: 'You cannot disable your own active administrator account.',
+      };
+    }
+
+    if (newStatus !== 'active') {
+      try {
+        const allUsers = await this.getAllUsers();
+        const target = (allUsers || []).find((u) => u.id === userId || u.user_id === userId);
+        if (target?.role === 'admin') {
+          const activeAdmins = (allUsers || []).filter(
+            (u) => u.role === 'admin' && (u.status || 'active') === 'active'
+          );
+          if (activeAdmins.length <= 1) {
+            return {
+              success: false,
+              error: 'Cannot disable the last active Store Administrator account.',
+            };
+          }
+        }
+      } catch (_e) {}
+    }
+
     if (supabase) {
       try {
-        await supabase.from('users').update({ status: newStatus }).or(`user_id.eq.${userId},id.eq.${userId}`);
+        const { error } = await supabase
+          .from('users')
+          .update({ status: newStatus, updated_at: new Date().toISOString() })
+          .eq('user_id', userId);
+        if (error) {
+          return { success: false, error: error.message || 'Could not update user status.' };
+        }
       } catch (e) {
         console.warn('Supabase updateUserStatus note:', e);
       }
@@ -892,7 +1095,7 @@ class UserService {
         const { data: dbTarget } = await supabase
           .from('users')
           .select('user_id, role, email')
-          .or(`user_id.eq.${userId},id.eq.${userId}`)
+          .eq('user_id', userId)
           .maybeSingle();
         if (dbTarget?.role === 'admin') {
           return {
@@ -910,7 +1113,7 @@ class UserService {
         try {
           await supabase.from('customers').delete().eq('user_id', userId);
         } catch (e) {}
-        await supabase.from('users').delete().or(`user_id.eq.${userId},id.eq.${userId}`);
+        await supabase.from('users').delete().eq('user_id', userId);
       } catch (e) {
         console.warn('Supabase delete user error:', e);
       }
@@ -1079,13 +1282,12 @@ class UserService {
         if (dbUser) {
           const storedPwd = dbUser.password;
           const salt = String(dbUser.email || normalizedEmail).toLowerCase();
-          const pwdValid =
-            verifyPassword(cleanPassword, storedPwd, salt) || storedPwd === password;
+          const pwdValid = isLegacyPasswordMatch(cleanPassword, storedPwd, salt);
           if (!pwdValid) {
             return { success: false, error: 'Incorrect password. Please verify your credentials.' };
           }
 
-          if (storedPwd && !isHashed(storedPwd)) {
+          if (storedPwd && (!isHashed(storedPwd) || storedPwd === 'sha256:admin123')) {
             try {
               await supabase
                 .from('users')
@@ -1155,12 +1357,12 @@ class UserService {
 
     const storedPwd = user.password;
     const salt = String(user.email || normalizedEmail).toLowerCase();
-    const pwdValid = verifyPassword(cleanPassword, storedPwd, salt) || storedPwd === password;
+    const pwdValid = isLegacyPasswordMatch(cleanPassword, storedPwd, salt);
     if (!pwdValid) {
       return { success: false, error: 'Incorrect password. Please try again.' };
     }
 
-    if (storedPwd && !isHashed(storedPwd)) {
+    if (storedPwd && (!isHashed(storedPwd) || storedPwd === 'sha256:admin123')) {
       const upgradedHash = hashPassword(cleanPassword, salt);
       this.saveLocalUsers(
         this.getLocalUsers().map((u) =>

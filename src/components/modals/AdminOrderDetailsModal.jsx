@@ -51,7 +51,7 @@ function Section({ title, right, children, tokens, isDark, style }) {
         <Text
           style={{
             fontSize: 11.5,
-            fontWeight: '800',
+            fontWeight: '600',
             color: tokens.textMuted,
             textTransform: 'uppercase',
             letterSpacing: 0.55,
@@ -134,7 +134,7 @@ function WorkflowStepper({ status, tokens, isDark, isDesktop }) {
               <Text
                 style={{
                   fontSize: 10,
-                  fontWeight: current ? '800' : '600',
+                  fontWeight: current ? '600' : '500',
                   color: current || done ? tokens.textPrimary : tokens.textMuted,
                   marginTop: 6,
                   textAlign: 'center',
@@ -303,7 +303,7 @@ export default function AdminOrderDetailsModal({
                   }}
                 >
                   <BootstrapIcon name={tone.icon} size={11} color={tone.color} />
-                  <Text style={{ fontSize: 11, fontWeight: '800', color: tone.color }}>
+                  <Text style={{ fontSize: 11, fontWeight: '600', color: tone.color }}>
                     {status}
                   </Text>
                 </View>
@@ -334,7 +334,7 @@ export default function AdminOrderDetailsModal({
                 <Text
                   style={{
                     fontSize: 10.5,
-                    fontWeight: '800',
+                    fontWeight: '600',
                     color: tone.color,
                     textTransform: 'uppercase',
                     letterSpacing: 0.6,
@@ -342,7 +342,7 @@ export default function AdminOrderDetailsModal({
                 >
                   Current Status
                 </Text>
-                <Text style={{ fontSize: 18, fontWeight: '900', color: tone.color, marginTop: 4 }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: tone.color, marginTop: 4 }}>
                   {status}
                 </Text>
                 <Text style={{ fontSize: 12.5, color: tokens.textPrimary, marginTop: 6, lineHeight: 18 }}>
@@ -353,7 +353,7 @@ export default function AdminOrderDetailsModal({
               <Text
                 style={{
                   fontSize: 10.5,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: tokens.textMuted,
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
@@ -419,7 +419,7 @@ export default function AdminOrderDetailsModal({
                     borderColor: isDarkMode ? 'rgba(217,119,6,0.3)' : '#FDE68A',
                   }}
                 >
-                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: isDarkMode ? '#E0B35C' : '#92400E' }}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? '#E0B35C' : '#92400E' }}>
                     Cannot proceed
                   </Text>
                   <Text style={{ fontSize: 12.5, color: tokens.textPrimary, marginTop: 4, lineHeight: 18 }}>
@@ -450,7 +450,7 @@ export default function AdminOrderDetailsModal({
                   }}
                 >
                   <BootstrapIcon name="arrow-right-circle-fill" size={15} color="#FFFFFF" />
-                  <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>
+                  <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}>
                     {busy ? 'Working…' : primary.label}
                   </Text>
                 </TouchableOpacity>
@@ -564,7 +564,7 @@ export default function AdminOrderDetailsModal({
                       }
                     />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 11.5, fontWeight: '800', color: tokens.textPrimary }}>
+                      <Text style={{ fontSize: 11.5, fontWeight: '600', color: tokens.textPrimary }}>
                         COD Approval Email: {order.cod_approval_email_sent ? 'Sent' : order.cod_approval_email_status === 'failed' ? 'Failed' : 'Pending Approval'}
                       </Text>
                       <Text style={{ fontSize: 11, color: tokens.textMuted, marginTop: 1 }}>
@@ -588,7 +588,7 @@ export default function AdminOrderDetailsModal({
                         cursor: 'pointer',
                       }}
                     >
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: tokens.textPrimary }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: tokens.textPrimary }}>
                         {order.cod_approval_email_sent ? 'Resend' : 'Retry'}
                       </Text>
                     </TouchableOpacity>
@@ -618,7 +618,7 @@ export default function AdminOrderDetailsModal({
                       }}
                     >
                       <BootstrapIcon name="person-plus-fill" size={11} color="#FFF" />
-                      <Text style={{ fontSize: 11.5, fontWeight: '800', color: '#FFF' }}>
+                      <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#FFF' }}>
                         {deliveryDetail?.rider_name || order.rider_name ? 'Change Rider' : 'Assign Rider'}
                       </Text>
                     </TouchableOpacity>
@@ -636,7 +636,7 @@ export default function AdminOrderDetailsModal({
                       gap: 4,
                     }}
                   >
-                    <Text style={{ fontSize: 13.5, fontWeight: '800', color: isDarkMode ? '#EA580C' : '#065F46' }}>
+                    <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDarkMode ? '#EA580C' : '#065F46' }}>
                       {deliveryDetail?.rider_name || order.rider_name}
                     </Text>
                     {(deliveryDetail?.rider_contact || order.rider_contact) && (
@@ -802,7 +802,7 @@ export default function AdminOrderDetailsModal({
                       Qty {it.quantity || 1} · ₱{Number(it.price || 0).toLocaleString()}
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: tokens.textPrimary }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: tokens.textPrimary }}>
                     ₱
                     {(Number(it.price || 0) * Number(it.quantity || 1)).toLocaleString(undefined, {
                       minimumFractionDigits: 2,
@@ -842,8 +842,8 @@ export default function AdminOrderDetailsModal({
                   borderTopColor: tokens.border,
                 }}
               >
-                <Text style={{ fontSize: 14, fontWeight: '900', color: tokens.textPrimary }}>Total</Text>
-                <Text style={{ fontSize: 16, fontWeight: '900', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary }}>Total</Text>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
                   ₱{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </Text>
               </View>
@@ -887,7 +887,7 @@ export default function AdminOrderDetailsModal({
                       <Text
                         style={{
                           fontSize: 13,
-                          fontWeight: ev.current ? '800' : '700',
+                          fontWeight: ev.current ? '600' : '500',
                           color: tokens.textPrimary,
                         }}
                       >
@@ -942,7 +942,7 @@ export default function AdminOrderDetailsModal({
                     onPress={() => onReject?.(orderId)}
                   >
                     <BootstrapIcon name="x-circle" size={13} color="#DC2626" />
-                    <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#DC2626' }}>
+                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#DC2626' }}>
                       Cancel Order
                     </Text>
                   </TouchableOpacity>
@@ -991,7 +991,7 @@ export default function AdminOrderDetailsModal({
                 }}
               >
                 <BootstrapIcon name="arrow-right-circle-fill" size={14} color="#FFFFFF" />
-                <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13.5 }}>
+                <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13.5 }}>
                   {busy ? 'Working…' : primary.label}
                 </Text>
               </TouchableOpacity>

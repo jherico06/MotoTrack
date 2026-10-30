@@ -251,7 +251,7 @@ export default function GCashPaymentModal({
                 <View style={gStyles.sandboxTipCard}>
                   <BootstrapIcon name="shield-check" size={14} color="#007DFE" />
                   <Text style={gStyles.sandboxTipText}>
-                    <Text style={{ fontWeight: '800' }}>Sandbox Mode Active:</Text> Any Philippine test number
+                    <Text style={{ fontWeight: '600' }}>Sandbox Mode Active:</Text> Any Philippine test number
                     works. OTP & MPIN will be auto-verified.
                   </Text>
                 </View>
@@ -281,7 +281,7 @@ export default function GCashPaymentModal({
                 <Text style={gStyles.stepHeading}>Enter Authentication Code</Text>
                 <Text style={gStyles.stepSub}>
                   Sent via SMS to{' '}
-                  <Text style={{ fontWeight: '800', color: '#0F172A' }}>+63 {mobileNumber}</Text>
+                  <Text style={{ fontWeight: '600', color: '#0F172A' }}>+63 {mobileNumber}</Text>
                 </Text>
 
                 <TextInput
@@ -303,7 +303,7 @@ export default function GCashPaymentModal({
                   <BootstrapIcon name="stars" size={12} color="#007DFE" />
                   <Text style={gStyles.autofillChipText}>
                     Test Sandbox OTP:{' '}
-                    <Text style={{ fontWeight: '900' }}>{GCASH_CONFIG.DEFAULT_TEST_OTP}</Text> (Tap to
+                    <Text style={{ fontWeight: '600' }}>{GCASH_CONFIG.DEFAULT_TEST_OTP}</Text> (Tap to
                     Auto-fill)
                   </Text>
                 </TouchableOpacity>
@@ -352,7 +352,7 @@ export default function GCashPaymentModal({
                 >
                   <BootstrapIcon name="key-fill" size={12} color="#007DFE" />
                   <Text style={gStyles.autofillChipText}>
-                    Test MPIN: <Text style={{ fontWeight: '900' }}>{GCASH_CONFIG.DEFAULT_TEST_MPIN}</Text>{' '}
+                    Test MPIN: <Text style={{ fontWeight: '600' }}>{GCASH_CONFIG.DEFAULT_TEST_MPIN}</Text>{' '}
                     (Tap to Auto-fill)
                   </Text>
                 </TouchableOpacity>
@@ -417,12 +417,12 @@ export default function GCashPaymentModal({
                     ]}
                   >
                     <Text
-                      style={[gStyles.breakdownLabel, { fontWeight: '900', color: '#0F172A', fontSize: 13 }]}
+                      style={[gStyles.breakdownLabel, { fontWeight: '600', color: '#0F172A', fontSize: 13 }]}
                     >
                       Total Amount
                     </Text>
                     <Text
-                      style={[gStyles.breakdownVal, { fontWeight: '900', color: '#007DFE', fontSize: 16 }]}
+                      style={[gStyles.breakdownVal, { fontWeight: '600', color: '#007DFE', fontSize: 16 }]}
                     >
                       ₱{totalAmountFormatted}
                     </Text>
@@ -457,7 +457,7 @@ export default function GCashPaymentModal({
                 <Text style={gStyles.receiptPaidTitle}>Payment Successful!</Text>
                 <Text style={gStyles.receiptPaidSub}>
                   You have successfully paid{' '}
-                  <Text style={{ fontWeight: '800', color: '#0F172A' }}>₱{totalAmountFormatted}</Text> to{' '}
+                  <Text style={{ fontWeight: '600', color: '#0F172A' }}>₱{totalAmountFormatted}</Text> to{' '}
                   {GCASH_CONFIG.MERCHANT_NAME}.
                 </Text>
 
@@ -486,7 +486,7 @@ export default function GCashPaymentModal({
                   </View>
                   <View style={gStyles.receiptLine}>
                     <Text style={gStyles.receiptLabel}>Remaining Balance</Text>
-                    <Text style={[gStyles.receiptVal, { color: '#16A34A', fontWeight: '800' }]}>
+                    <Text style={[gStyles.receiptVal, { color: '#16A34A', fontWeight: '600' }]}>
                       ₱{walletBalance.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </Text>
                   </View>
@@ -563,12 +563,12 @@ const gStyles = StyleSheet.create({
   },
   gcashLogoG: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#007DFE',
   },
   gcashBrandTitle: {
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: -0.5,
   },
@@ -580,7 +580,7 @@ const gStyles = StyleSheet.create({
   },
   sandboxBadgeText: {
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#000000',
   },
   testKeyStrip: {
@@ -595,7 +595,7 @@ const gStyles = StyleSheet.create({
   },
   testKeyText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#007DFE',
   },
 
@@ -617,13 +617,13 @@ const gStyles = StyleSheet.create({
   },
   merchantName: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     marginTop: 1,
   },
   merchantAmount: {
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#007DFE',
     marginTop: 1,
   },
@@ -659,7 +659,7 @@ const gStyles = StyleSheet.create({
   },
   stepHeading: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
   },
   stepSub: {
@@ -691,7 +691,7 @@ const gStyles = StyleSheet.create({
   },
   countryCodeText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   phoneTextInput: {
@@ -703,7 +703,7 @@ const gStyles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 11,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     letterSpacing: 1,
   },
@@ -715,7 +715,7 @@ const gStyles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 12,
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#007DFE',
     letterSpacing: 8,
     marginTop: 8,
@@ -728,7 +728,7 @@ const gStyles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 12,
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#007DFE',
     letterSpacing: 12,
     marginTop: 8,
@@ -784,7 +784,7 @@ const gStyles = StyleSheet.create({
   },
   walletCardBalance: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#007DFE',
   },
   walletAccountRow: {
@@ -811,7 +811,7 @@ const gStyles = StyleSheet.create({
   },
   verifiedBadgeText: {
     fontSize: 9.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#166534',
   },
 
@@ -833,7 +833,7 @@ const gStyles = StyleSheet.create({
   },
   breakdownVal: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
 
@@ -853,7 +853,7 @@ const gStyles = StyleSheet.create({
   },
   primaryGcashBtnText: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },
@@ -884,7 +884,7 @@ const gStyles = StyleSheet.create({
   },
   receiptPaidTitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
   },
   receiptPaidSub: {
@@ -919,7 +919,7 @@ const gStyles = StyleSheet.create({
   },
   receiptValBold: {
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#007DFE',
   },
 });

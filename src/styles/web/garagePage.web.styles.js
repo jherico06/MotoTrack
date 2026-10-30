@@ -51,12 +51,12 @@ export const garageWebStyles = StyleSheet.create({
   },
   logoText: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   logoSubText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#94A3B8',
     letterSpacing: 1.2,
   },
@@ -71,37 +71,41 @@ export const garageWebStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 16,
   },
   headerCenterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    height: 38,
     gap: 7,
     paddingHorizontal: 12,
-    paddingVertical: 7,
     borderRadius: 6,
     cursor: 'pointer',
     backgroundColor: 'transparent',
   },
   headerCenterBtnText: {
-    fontSize: 13.5,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.70)',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+    color: 'rgba(255, 255, 255, 0.75)',
   },
   headerCenterBtnActive: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    height: 38,
     gap: 7,
     paddingHorizontal: 12,
-    paddingVertical: 7,
     borderRadius: 6,
     cursor: 'pointer',
     backgroundColor: 'transparent',
   },
   headerCenterBtnTextActive: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    lineHeight: 20,
+    color: '#FF5A0A',
   },
   headerActions: {
     flex: 1,
@@ -124,24 +128,25 @@ export const garageWebStyles = StyleSheet.create({
   },
   navBadgeCircle: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    top: -3,
+    right: -3,
     backgroundColor: '#EF4444',
+    borderRadius: 9999,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 5,
-    borderWidth: 2,
-    borderColor: '#0A0F1C',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
     zIndex: 10,
-    boxShadow: '0 2px 6px rgba(239, 68, 68, 0.5)',
   },
   navBadgeText: {
     color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 12,
   },
   loggedInContainer: {
     flexDirection: 'row',
@@ -166,7 +171,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   signInHeaderBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   scrollContent: {
@@ -206,7 +211,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   garageHeaderTitle: {
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.3,
   },
@@ -286,7 +291,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   statValue: {
     fontSize: 36,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
     marginBottom: 4,
     letterSpacing: -1,
@@ -326,11 +331,11 @@ export const garageWebStyles = StyleSheet.create({
   heroTagText: {
     color: '#A7F3D0',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   heroTitle: {
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
     lineHeight: 34,
     marginBottom: 12,
@@ -416,7 +421,7 @@ export const garageWebStyles = StyleSheet.create({
   serviceCatBadgeText: {
     color: '#FFFFFF',
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   servicePriceTag: {
     position: 'absolute',
@@ -430,14 +435,14 @@ export const garageWebStyles = StyleSheet.create({
   servicePriceText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '600',
   },
   serviceBody: {
     padding: 16,
   },
   serviceTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     marginBottom: 4,
   },
@@ -476,14 +481,14 @@ export const garageWebStyles = StyleSheet.create({
   bookServiceBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   bookingsContainer: {
     paddingVertical: 10,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
     marginBottom: 16,
   },
@@ -498,7 +503,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     marginTop: 12,
   },
@@ -528,12 +533,12 @@ export const garageWebStyles = StyleSheet.create({
   },
   bookingId: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
   bookingServiceTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     marginTop: 2,
   },
@@ -545,7 +550,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   statusPillText: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#15803D',
   },
   bookingDetailsGrid: {
@@ -577,7 +582,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   cancelBookingBtnText: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#DC2626',
   },
   modalOverlay: {
@@ -606,7 +611,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
   },
   modalSub: {
@@ -620,7 +625,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '500',
     color: '#334155',
     marginBottom: 6,
   },
@@ -658,7 +663,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   branchPickTextActive: {
     color: '#EA580C',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   timeSlotsGrid: {
     flexDirection: 'row',
@@ -717,7 +722,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   modalSubmitText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   statusPillRepair: {
@@ -777,7 +782,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   serviceTypeTabTextActive: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   // ─── REPAIR COMMON FAULT CHIPS ───
   repairFaultChipsGrid: {
@@ -809,7 +814,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   repairFaultChipTextActive: {
     color: '#DC2626',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   // ─── HERO QUICK ACTIONS ───
   heroActionsRow: {
@@ -841,7 +846,7 @@ export const garageWebStyles = StyleSheet.create({
   heroBookBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   heroBookTomorrowBtn: {
     flexDirection: 'row',
@@ -857,7 +862,7 @@ export const garageWebStyles = StyleSheet.create({
   heroBookTomorrowBtnText: {
     color: '#FFFFFF',
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   heroRosterBtn: {
     flexDirection: 'row',
@@ -908,7 +913,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   heroStatNumber: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   heroStatTitle: {
@@ -1003,7 +1008,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   rosterModalTitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
   rosterModalSub: {
@@ -1043,7 +1048,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   rosterItemName: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
     marginBottom: 2,
   },
@@ -1067,7 +1072,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   rosterStatusText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   // ─── EMBEDDED BOOKING CARD ───
   bookingCardWrap: {
@@ -1087,7 +1092,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   bookingFormTitle: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
   },
   bookingFormSub: {
@@ -1116,7 +1121,7 @@ export const garageWebStyles = StyleSheet.create({
   submitBookingBtnText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.3,
   },
   // ─── STEP WIZARD STYLES ───
@@ -1160,7 +1165,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   wizardStepBadgeText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#64748B',
   },
   wizardStepBadgeTextActive: {
@@ -1173,7 +1178,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   wizardStepLabelActive: {
     color: '#0F172A',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   // ─── SINGLE FLAGSHIP HUB BANNER ───
   singleHubCard: {
@@ -1195,13 +1200,13 @@ export const garageWebStyles = StyleSheet.create({
   singleHubBadgeText: {
     color: '#FFFFFF',
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   singleHubTitle: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#18181B',
     marginBottom: 4,
   },
@@ -1283,7 +1288,7 @@ export const garageWebStyles = StyleSheet.create({
   reviewValue: {
     fontSize: 13,
     color: '#0F172A',
-    fontWeight: '800',
+    fontWeight: '600',
     textAlign: 'right',
     maxWidth: '60%',
   },
@@ -1326,7 +1331,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   wizardNextBtnText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   // ─── ONE FILL UP PAGE POPUP MODAL STYLES ───
@@ -1353,8 +1358,8 @@ export const garageWebStyles = StyleSheet.create({
   },
   popupModalCard: {
     width: '100%',
-    maxWidth: 680,
-    maxHeight: '90vh',
+    maxWidth: 880,
+    maxHeight: '92vh',
     backgroundColor: '#FFFFFF',
     borderRadius: 24,
     overflow: 'hidden',
@@ -1378,7 +1383,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   popupModalTitle: {
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
   },
   popupModalSub: {
@@ -1396,10 +1401,8 @@ export const garageWebStyles = StyleSheet.create({
     cursor: 'pointer',
   },
   popupModalBody: {
-    paddingHorizontal: 24,
-    paddingVertical: 20,
     flex: 1,
-    maxHeight: 'calc(90vh - 145px)',
+    minHeight: 0,
     overflowY: 'auto',
   },
   formSectionBox: {
@@ -1418,7 +1421,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   formSectionHeading: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -1463,7 +1466,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   popupSubmitBtnText: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 
@@ -1474,65 +1477,70 @@ export const garageWebStyles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
     paddingHorizontal: 24,
     paddingTop: 18,
-    paddingBottom: 16,
+    paddingBottom: 14,
+    flexShrink: 0,
   },
   stepperTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 12,
-    marginBottom: 16,
+    marginBottom: 14,
   },
   stepperIconWrap: {
-    width: 40,
-    height: 40,
+    width: 38,
+    height: 38,
     borderRadius: 10,
-    backgroundColor: '#E8F5EE',
+    backgroundColor: '#FFF7ED',
     borderWidth: 1,
-    borderColor: '#C8DDD3',
+    borderColor: '#FFEDD5',
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepperModalTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#143425',
-    letterSpacing: -0.3,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.2,
   },
   stepperModalSubtitle: {
-    fontSize: 12.5,
-    fontWeight: '600',
+    fontSize: 9.5,
+    fontWeight: '700',
     color: '#64748B',
-    marginTop: 2,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
   },
   stepperCloseBtn: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
+    transition: 'all 0.18s ease',
   },
   stepIndicatorContainer: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingTop: 2,
+    paddingBottom: 2,
+    width: '100%',
   },
   stepNodeWrap: {
+    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flex: 1,
+    gap: 7,
     cursor: 'pointer',
+    flexShrink: 0,
   },
   stepCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
@@ -1543,41 +1551,42 @@ export const garageWebStyles = StyleSheet.create({
   stepCircleActive: {
     backgroundColor: '#EA580C',
     borderColor: '#EA580C',
-    boxShadow: '0 0 0 3px rgba(234, 88, 12, 0.2), 0 2px 6px rgba(234, 88, 12, 0.2)',
   },
   stepCircleCompleted: {
     backgroundColor: '#EA580C',
     borderColor: '#EA580C',
   },
   stepNumberText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#64748B',
+    color: '#94A3B8',
   },
   stepNumberTextActive: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '700',
   },
   stepLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11.5,
+    fontWeight: '500',
     color: '#64748B',
-    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    flexShrink: 0,
   },
   stepLabelActive: {
-    color: '#EA580C',
-    fontWeight: '800',
+    color: '#334155',
+    fontWeight: '600',
   },
   stepLabelCompleted: {
     color: '#EA580C',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   stepConnectingLine: {
     height: 2,
     backgroundColor: '#E2E8F0',
-    flex: 0.8,
-    marginHorizontal: -6,
-    marginTop: 15,
+    flex: 1,
+    minWidth: 16,
+    marginHorizontal: 12,
+    marginTop: 0,
   },
   stepConnectingLineCompleted: {
     backgroundColor: '#EA580C',
@@ -1587,7 +1596,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   stepSectionTitle: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.2,
   },
@@ -1690,7 +1699,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   packageCardTitle: {
     fontSize: 16.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
     marginBottom: 4,
   },
@@ -1712,7 +1721,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   packageCardPrice: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
   },
   packageCardDurationPill: {
@@ -1803,14 +1812,14 @@ export const garageWebStyles = StyleSheet.create({
   },
   studioEyebrowText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#92400E',
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
   studioTitle: {
     fontSize: 28,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     fontFamily: '"Playfair Display", Georgia, "Times New Roman", serif',
     letterSpacing: -0.5,
@@ -1905,7 +1914,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   studioGlassCountText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: 0.3,
   },
@@ -1920,7 +1929,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   studioCardTitle: {
     fontSize: 19,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
     fontFamily: '"Playfair Display", Georgia, "Times New Roman", serif',
     lineHeight: 25,
@@ -1966,14 +1975,14 @@ export const garageWebStyles = StyleSheet.create({
   },
   studioPriceLabel: {
     fontSize: 9.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#94A3B8',
     letterSpacing: 0.8,
     textTransform: 'uppercase',
   },
   studioPriceValue: {
     fontSize: 21,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
     fontFamily: '"Playfair Display", Georgia, serif',
   },
@@ -1996,7 +2005,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   studioProceedText: {
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#1C1917',
     letterSpacing: 0.6,
   },
@@ -2010,27 +2019,29 @@ export const garageWebStyles = StyleSheet.create({
   },
   motorcycleCardGrid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-    gap: 16,
+    gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+    gap: 20,
     marginBottom: 16,
   },
   motorcycleCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    padding: 12,
+    overflow: 'hidden',
+    padding: 0,
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'space-between',
     cursor: 'pointer',
     transition: 'all 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
-    boxShadow: '0 4px 16px rgba(15, 23, 42, 0.05)',
+    boxShadow: '0 4px 16px rgba(15, 23, 42, 0.04)',
   },
   motorcycleCardActive: {
     borderColor: '#EA580C',
+    borderWidth: 2,
     backgroundColor: '#FFFFFF',
-    boxShadow: '0 10px 28px -4px rgba(234, 88, 12, 0.25), 0 0 0 2px #EA580C',
+    boxShadow: '0 10px 28px -4px rgba(234, 88, 12, 0.22)',
     transform: 'translateY(-2px)',
   },
   brandChip: {
@@ -2058,12 +2069,13 @@ export const garageWebStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
+    paddingHorizontal: 28,
     paddingVertical: 14,
     borderTopWidth: 1,
     borderTopColor: '#F1F5F9',
     backgroundColor: '#FFFFFF',
     gap: 12,
+    flexShrink: 0,
   },
   stepBackBtn: {
     paddingHorizontal: 16,
@@ -2090,7 +2102,7 @@ export const garageWebStyles = StyleSheet.create({
   },
   stepNextBtnText: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 });

@@ -1000,3 +1000,28 @@ ALTER TABLE "public"."booking_additional_charges" ADD CONSTRAINT "booking_additi
 ALTER TABLE "public"."booking_additional_charges" ADD CONSTRAINT "booking_additional_charges_booking_id_fkey" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings" ("booking_id");
 ALTER TABLE "public"."booking_status_history" ADD CONSTRAINT "booking_status_history_booking_id_fkey" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings" ("booking_id");
 ALTER TABLE "public"."pickup_verifications" ADD CONSTRAINT "pickup_verifications_booking_id_fkey" FOREIGN KEY ("booking_id") REFERENCES "public"."bookings" ("booking_id");
+
+
+-- RLS enabled: true
+CREATE TABLE "public"."customer_ratings_reports" (
+  "id" text NOT NULL,
+  "submission_type" text NOT NULL DEFAULT 'rating_review'::text,
+  "customer_name" text NOT NULL,
+  "customer_email" text,
+  "customer_id" text,
+  "rating" numeric,
+  "category" text NOT NULL,
+  "message" text NOT NULL,
+  "transaction_type" text DEFAULT 'general'::text,
+  "transaction_id" text,
+  "transaction_status" text,
+  "transaction_details" jsonb DEFAULT '{}'::jsonb,
+  "status" text NOT NULL DEFAULT 'New'::text,
+  "admin_notes" text,
+  "reviewed_by" text,
+  "reviewed_at" timestamp with time zone,
+  "dismissed_reason" text,
+  "created_at" timestamp with time zone NOT NULL DEFAULT now(),
+  "updated_at" timestamp with time zone NOT NULL DEFAULT now(),
+  PRIMARY KEY ("id")
+);

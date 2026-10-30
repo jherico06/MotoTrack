@@ -96,6 +96,96 @@ async function ensureCameraPermission(ImagePicker) {
 }
 
 /**
+ * Automatically trims empty transparent borders from images on Web.
+ * Avoids emblems being letterboxed down to tiny unrecognizable specks.
+ */
+export function trimImageWhitespace(dataUri) {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      resolve(dataUri);
+      return;
+    }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const w = img.naturalWidth || img.width;
+        const h = img.naturalHeight || img.height;
+        if (!w || !h || w > 3000 || h > 3000) {
+          resolve(dataUri);
+          return;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) {
+          resolve(dataUri);
+          return;
+        }
+        ctx.drawImage(img, 0, 0);
+        const imgData = ctx.getImageData(0, 0, w, h);
+        const data = imgData.data;
+
+        let minX = w, maxX = 0, minY = h, maxY = 0;
+        let hasContent = false;
+
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            const idx = (y * w + x) * 4;
+            const a = data[idx + 3];
+            // Only consider pixels with visible opacity (alpha > 12)
+            if (a > 12) {
+              hasContent = true;
+              if (x < minX) minX = x;
+              if (x > maxX) maxX = x;
+              if (y < minY) minY = y;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+
+        // If no visible content or padding is minimal (less than 12px), return original
+        const padX = minX + (w - 1 - maxX);
+        const padY = minY + (h - 1 - maxY);
+        if (!hasContent || (padX < 12 && padY < 12)) {
+          resolve(dataUri);
+          return;
+        }
+
+        // Add 6px breathing room padding
+        const pad = 6;
+        minX = Math.max(0, minX - pad);
+        minY = Math.max(0, minY - pad);
+        maxX = Math.min(w - 1, maxX + pad);
+        maxY = Math.min(h - 1, maxY + pad);
+
+        const cropW = maxX - minX + 1;
+        const cropH = maxY - minY + 1;
+
+        const cropCanvas = document.createElement('canvas');
+        cropCanvas.width = cropW;
+        cropCanvas.height = cropH;
+        const cropCtx = cropCanvas.getContext('2d');
+        if (!cropCtx) {
+          resolve(dataUri);
+          return;
+        }
+
+        cropCtx.drawImage(canvas, minX, minY, cropW, cropH, 0, 0, cropW, cropH);
+        const mime = dataUri.startsWith('data:image/jpeg') ? 'image/jpeg' : 'image/png';
+        const croppedUri = cropCanvas.toDataURL(mime, 0.95);
+        resolve(croppedUri);
+      } catch (_e) {
+        resolve(dataUri);
+      }
+    };
+    img.onerror = () => resolve(dataUri);
+    img.src = dataUri;
+  });
+}
+
+/**
  * Pick an image from device files (supports Web browser file upload and Mobile camera roll)
  * Returns { success: boolean, uri?: string, error?: string, openSettings?: boolean }
  */
@@ -122,13 +212,15 @@ export async function pickImageFromFile() {
           }
 
           const reader = new FileReader();
-          reader.onload = () => {
-            const uri = reader.result;
-            if (isImageTooLarge(estimateDataUriBytes(uri))) {
+          reader.onload = async () => {
+            const rawUri = reader.result;
+            if (isImageTooLarge(estimateDataUriBytes(rawUri))) {
               resolve(tooLargeError());
               return;
             }
-            resolve({ success: true, uri });
+            // Auto-trim transparent borders so emblems fill their container crisply
+            const trimmedUri = await trimImageWhitespace(rawUri);
+            resolve({ success: true, uri: trimmedUri });
           };
           reader.onerror = () => {
             resolve({ success: false, error: 'Failed to read image file' });

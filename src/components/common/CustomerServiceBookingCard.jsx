@@ -304,7 +304,7 @@ export default function CustomerServiceBookingCard({
     const partsTot = Number(booking?.parts_total ?? booking?.partsTotal ?? 0);
     const otherTot = Number(booking?.other_charges_total ?? booking?.otherChargesTotal ?? 0);
     const dpAmt = Number(booking?.downpayment_amount ?? booking?.downpaymentAmount ?? 0);
-    const rate = Number(booking?.quoted_hourly_rate ?? booking?.hourly_rate ?? 150);
+    const rate = Number(booking?.quoted_hourly_rate ?? booking?.hourly_rate ?? 0);
     const hours = Number(booking?.estimated_labor_hours ?? booking?.estimatedLaborHours ?? 0);
     const discountAmt = Number(booking?.discount_amount ?? booking?.discountAmount ?? 0);
 
@@ -802,21 +802,6 @@ export default function CustomerServiceBookingCard({
               : null
           }
         >
-          {effectiveQuotation.hourly_rate > 0 || effectiveQuotation.estimated_labor_hours > 0 ? (
-            <>
-              <Text style={styles.subhead}>Labor</Text>
-              <Line
-                label={`${formatPhp(effectiveQuotation.hourly_rate)}/hour × ${Number(
-                  effectiveQuotation.estimated_labor_hours || 0
-                )} hrs`}
-                value={formatPhp(
-                  effectiveQuotation.labor_cost ??
-                    calcLaborCost(effectiveQuotation.hourly_rate, effectiveQuotation.estimated_labor_hours)
-                )}
-              />
-            </>
-          ) : null}
-
           {parts.length > 0 ? (
             <>
               <Text style={styles.subhead}>Parts</Text>
@@ -1036,7 +1021,7 @@ export default function CustomerServiceBookingCard({
             {/* Remaining Balance Note */}
             <View style={[styles.receiptRow, { marginTop: 10 }]}>
               <Text style={styles.receiptMetaLabel}>Remaining Balance Due at Bay</Text>
-              <Text style={[styles.receiptMetaValue, { fontWeight: '800', color: '#EA580C' }]}>
+              <Text style={[styles.receiptMetaValue, { fontWeight: '600', color: '#EA580C' }]}>
                 {formatPhp(
                   Number(booking?.remaining_balance) > 0
                     ? booking.remaining_balance
@@ -1979,7 +1964,7 @@ const styles = StyleSheet.create({
   },
   listServiceTitle: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
     letterSpacing: -0.3,
   },
@@ -2055,14 +2040,14 @@ const styles = StyleSheet.create({
   },
   listPriceLabel: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#94A3B8',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   listPriceValue: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#EA580C',
     fontVariant: ['tabular-nums'],
   },
@@ -2094,7 +2079,7 @@ const styles = StyleSheet.create({
   listDetailsBtnText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   listCancelBtn: {
     flexDirection: 'row',
@@ -2130,7 +2115,7 @@ const styles = StyleSheet.create({
   },
   refLabel: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#334155',
     letterSpacing: 0.5,
   },
@@ -2150,7 +2135,7 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.2,
   },
   titleRow: {
@@ -2162,14 +2147,14 @@ const styles = StyleSheet.create({
   },
   serviceTitle: {
     fontSize: 16.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
     flex: 1,
     letterSpacing: -0.3,
   },
   headTotal: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#EA580C',
     fontVariant: ['tabular-nums'],
   },
@@ -2195,7 +2180,7 @@ const styles = StyleSheet.create({
   },
   motoName: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#1E293B',
   },
   motoPlate: {
@@ -2265,7 +2250,7 @@ const styles = StyleSheet.create({
   },
   expandToggleText: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
   cancelActionBtn: {
@@ -2283,8 +2268,8 @@ const styles = StyleSheet.create({
     color: '#DC2626',
   },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-  ref: { fontSize: 11, fontWeight: '800', color: '#EA580C', letterSpacing: 0.3 },
-  title: { fontSize: 15, fontWeight: '800', color: '#0F172A', marginTop: 2 },
+  ref: { fontSize: 11, fontWeight: '600', color: '#EA580C', letterSpacing: 0.3 },
+  title: { fontSize: 15, fontWeight: '600', color: '#0F172A', marginTop: 2 },
   meta: { fontSize: 12, color: '#64748B', marginTop: 2 },
   stage: { fontSize: 12, color: '#EA580C', marginTop: 8 },
   noteBox: {
@@ -2303,7 +2288,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginTop: 8,
   },
-  warnTitle: { fontSize: 12, fontWeight: '800', color: '#92400E', marginBottom: 3 },
+  warnTitle: { fontSize: 12, fontWeight: '600', color: '#92400E', marginBottom: 3 },
   noteText: { fontSize: 12.5, color: '#334155', lineHeight: 18 },
   ctaBtn: {
     marginTop: 8,
@@ -2318,7 +2303,7 @@ const styles = StyleSheet.create({
     gap: 6,
     cursor: 'pointer',
   },
-  ctaText: { color: '#FFF', fontWeight: '800', fontSize: 12.5 },
+  ctaText: { color: '#FFF', fontWeight: '600', fontSize: 12.5 },
   sectionContainer: {
     borderWidth: 1,
     borderColor: '#E2E8F0',
@@ -2352,7 +2337,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     letterSpacing: -0.2,
   },
@@ -2370,7 +2355,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   badge: { backgroundColor: '#FED7AA', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 },
-  badgeText: { fontSize: 10, fontWeight: '800', color: '#EA580C' },
+  badgeText: { fontSize: 10, fontWeight: '600', color: '#EA580C' },
 
   // Stepper Styles
   stepperWrap: {
@@ -2461,7 +2446,7 @@ const styles = StyleSheet.create({
   },
   stepTitleCurrent: {
     color: '#059669',
-    fontWeight: '800',
+    fontWeight: '600',
     fontSize: 13.5,
   },
   activeStepTag: {
@@ -2474,7 +2459,7 @@ const styles = StyleSheet.create({
   },
   activeStepTagText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#047857',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -2502,7 +2487,7 @@ const styles = StyleSheet.create({
   },
   gridKvLabel: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#64748B',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -2531,11 +2516,11 @@ const styles = StyleSheet.create({
   },
   statusBadgeTextInline: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   subhead: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#64748B',
     textTransform: 'uppercase',
     marginTop: 6,
@@ -2545,13 +2530,13 @@ const styles = StyleSheet.create({
   stepText: { fontSize: 13, color: '#94A3B8' },
   stepDone: { color: '#0F172A', fontWeight: '700' },
   kv: { marginBottom: 6 },
-  kvLabel: { fontSize: 10, fontWeight: '800', color: '#94A3B8', textTransform: 'uppercase' },
+  kvLabel: { fontSize: 10, fontWeight: '600', color: '#94A3B8', textTransform: 'uppercase' },
   kvValue: { fontSize: 13, color: '#0F172A', fontWeight: '600' },
   thumb: { width: 84, height: 84, borderRadius: 8, marginRight: 8, backgroundColor: '#E2E8F0' },
   lineRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 10, paddingVertical: 3 },
   lineLabel: { fontSize: 13, color: '#475569', flex: 1 },
   lineValue: { fontSize: 13, color: '#0F172A', fontWeight: '600' },
-  lineBold: { fontWeight: '800', fontSize: 15, color: '#0F172A' },
+  lineBold: { fontWeight: '600', fontSize: 15, color: '#0F172A' },
   tableHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingBottom: 2, marginTop: 4 },
   colHeaderLeft: { fontSize: 10.5, fontWeight: '700', color: '#94A3B8', letterSpacing: 0.6 },
   colHeaderRight: { fontSize: 10.5, fontWeight: '700', color: '#94A3B8', letterSpacing: 0.6 },
@@ -2578,7 +2563,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
   },
-  btnAcceptText: { color: '#FFF', fontWeight: '800' },
+  btnAcceptText: { color: '#FFF', fontWeight: '600' },
   btnDecline: {
     flex: 1,
     backgroundColor: '#FEF2F2',
@@ -2588,7 +2573,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
   },
-  btnDeclineText: { color: '#DC2626', fontWeight: '800' },
+  btnDeclineText: { color: '#DC2626', fontWeight: '600' },
   btnPay: {
     marginTop: 10,
     backgroundColor: '#EA580C',
@@ -2596,7 +2581,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
   },
-  btnPayText: { color: '#FFF', fontWeight: '800' },
+  btnPayText: { color: '#FFF', fontWeight: '600' },
   addBox: {
     padding: 10,
     backgroundColor: '#FFFBEB',
@@ -2605,7 +2590,7 @@ const styles = StyleSheet.create({
     borderColor: '#FDE68A',
     marginBottom: 8,
   },
-  addTitle: { fontSize: 13.5, fontWeight: '800', color: '#0F172A', marginBottom: 4 },
+  addTitle: { fontSize: 13.5, fontWeight: '600', color: '#0F172A', marginBottom: 4 },
   payRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2615,7 +2600,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   payType: { fontSize: 13, fontWeight: '700', color: '#0F172A' },
-  payAmt: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
+  payAmt: { fontSize: 14, fontWeight: '600', color: '#0F172A' },
   pickupBox: { alignItems: 'center', marginBottom: 8 },
   qr: { width: 180, height: 180, marginVertical: 8 },
   officialReceiptSheet: {
@@ -2632,7 +2617,7 @@ const styles = StyleSheet.create({
   },
   receiptBrand: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
     letterSpacing: 0.8,
   },
@@ -2656,7 +2641,7 @@ const styles = StyleSheet.create({
   },
   receiptVerifiedText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#065F46',
     letterSpacing: 0.5,
   },
@@ -2695,7 +2680,7 @@ const styles = StyleSheet.create({
   },
   receiptHighlightLabel: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#15803D',
     letterSpacing: 0.4,
   },
@@ -2706,7 +2691,7 @@ const styles = StyleSheet.create({
   },
   receiptHighlightValue: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#15803D',
   },
   receiptBarcodeContainer: {
@@ -2722,7 +2707,7 @@ const styles = StyleSheet.create({
   },
   receiptBarcodeCode: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 3,
     color: '#64748B',
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
@@ -2749,7 +2734,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   totalsTitle: {
-    fontWeight: '800',
+    fontWeight: '600',
     fontSize: 12.5,
     letterSpacing: 0.8,
     color: '#EA580C',
@@ -2791,12 +2776,12 @@ const styles = StyleSheet.create({
   },
   totalsTotalLabel: {
     fontSize: 15.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   totalsTotalValue: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
   breakdownSubBox: {
@@ -2874,20 +2859,20 @@ const styles = StyleSheet.create({
   },
   dueDateBannerTitle: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#C2410C',
     textTransform: 'uppercase',
     letterSpacing: 0.4,
   },
   dueDateBannerValue: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#9A3412',
     marginTop: 2,
   },
   dueDateCountdown: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#C2410C',
     marginTop: 2,
   },
@@ -2973,7 +2958,7 @@ const styles = StyleSheet.create({
   },
   gridRefText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#CBDCEE',
     letterSpacing: 0.5,
   },
@@ -2998,7 +2983,7 @@ const styles = StyleSheet.create({
   },
   gridStatusText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.2,
   },
   gridBody: {
@@ -3009,7 +2994,7 @@ const styles = StyleSheet.create({
   },
   gridServiceTitle: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: -0.4,
     marginBottom: 3,
@@ -3054,7 +3039,7 @@ const styles = StyleSheet.create({
   },
   gridPriceAmount: {
     fontSize: 25,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: -0.5,
   },
@@ -3074,7 +3059,7 @@ const styles = StyleSheet.create({
   },
   gridPillBtnText: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#152A42',
   },
   gridCancelLink: {

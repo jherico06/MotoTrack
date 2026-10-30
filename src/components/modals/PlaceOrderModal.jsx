@@ -171,7 +171,7 @@ export default function PlaceOrderModal({
                   marginBottom: 10,
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>SOLD OUT</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#DC2626' }}>SOLD OUT</Text>
               </View>
             ) : null}
 
@@ -221,7 +221,7 @@ export default function PlaceOrderModal({
                         <Text
                           style={{
                             fontSize: 11,
-                            fontWeight: '800',
+                            fontWeight: '600',
                             marginTop: 6,
                             textAlign: 'center',
                             color: soldOut ? '#991B1B' : active ? '#EA580C' : '#0F172A',
@@ -276,7 +276,7 @@ export default function PlaceOrderModal({
                         <Text
                           style={{
                             fontSize: 12,
-                            fontWeight: '800',
+                            fontWeight: '500',
                             color: soldOut ? '#991B1B' : active ? '#FFFFFF' : '#0F172A',
                             textDecorationLine: soldOut ? 'line-through' : 'none',
                           }}
@@ -334,7 +334,7 @@ export default function PlaceOrderModal({
               }}
             >
               <View>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>Quantity</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>Quantity</Text>
                 <Text style={{ fontSize: 11.5, color: '#64748B', fontWeight: '600', marginTop: 2 }}>
                   {availableStock > 0 ? `${availableStock} in stock` : 'Out of stock'}
                 </Text>
@@ -363,7 +363,7 @@ export default function PlaceOrderModal({
                 <Text
                   style={{
                     fontSize: 16,
-                    fontWeight: '900',
+                    fontWeight: '600',
                     color: '#0F172A',
                     minWidth: 28,
                     textAlign: 'center',

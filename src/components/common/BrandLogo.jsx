@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, StyleSheet } from 'react-native';
+import { View, Text, Image, StyleSheet, Platform } from 'react-native';
 import { systemSettingsService } from '../../services/system/systemSettingsService.js';
 
 export default function BrandLogo({
@@ -16,6 +16,8 @@ export default function BrandLogo({
   titleStyle,
 }) {
   const [settings, setSettings] = useState(() => systemSettingsService.getSettings());
+  const [imgError, setImgError] = useState(false);
+  const [aspectRatio, setAspectRatio] = useState(1);
 
   useEffect(() => {
     const unsub = systemSettingsService.subscribe((updated) => {
@@ -30,14 +32,45 @@ export default function BrandLogo({
   const rawTagline = customTagline !== undefined ? customTagline : settings?.storeTagline;
   const systemTagline = typeof rawTagline === 'string' ? rawTagline.trim() : '';
 
+  useEffect(() => {
+    if (!customLogoUrl) {
+      setImgError(false);
+      setAspectRatio(1);
+      return;
+    }
+    setImgError(false);
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && typeof window.Image === 'function') {
+      const img = new window.Image();
+      img.onload = () => {
+        if (img.naturalWidth && img.naturalHeight) {
+          setAspectRatio(img.naturalWidth / img.naturalHeight);
+        }
+      };
+      img.onerror = () => setImgError(true);
+      img.src = customLogoUrl;
+    } else {
+      Image.getSize(
+        customLogoUrl,
+        (w, h) => {
+          if (w && h) setAspectRatio(w / h);
+        },
+        () => setImgError(true)
+      );
+    }
+  }, [customLogoUrl]);
+
+  const isCustomActive = Boolean(customLogoUrl && !imgError);
+
   if (variant === 'full' || variant === 'image') {
-    if (customLogoUrl) {
+    if (isCustomActive) {
+      const fullWidth = Math.round(size * Math.max(1.8, Math.min(aspectRatio, 3.2)));
       return (
         <View style={[styles.container, style]}>
           <Image
             source={{ uri: customLogoUrl }}
             resizeMode="contain"
-            style={{ width: Math.round(size * 2.62), height: size }}
+            style={{ width: fullWidth, height: size }}
+            onError={() => setImgError(true)}
           />
         </View>
       );
@@ -83,27 +116,30 @@ export default function BrandLogo({
     ? textSize
     : Math.max(12, Math.round(size * 0.44));
 
+  const badgeWidth = isCustomActive && aspectRatio > 1.25
+    ? Math.min(Math.round(size * Math.min(aspectRatio, 2.4)), Math.round(size * 2.5))
+    : size;
+
   return (
     <View style={[styles.container, style]}>
       <View
         style={[
           styles.logoBadge,
           {
-            width: size,
+            width: badgeWidth,
             height: size,
-            borderRadius: Math.round(size * 0.24),
           },
         ]}
       >
-        {customLogoUrl ? (
+        {isCustomActive ? (
           <Image
             source={{ uri: customLogoUrl }}
             resizeMode="contain"
             style={{
-              width: Math.round(size * 0.95),
-              height: Math.round(size * 0.95),
-              borderRadius: Math.round(size * 0.2),
+              width: '100%',
+              height: '100%',
             }}
+            onError={() => setImgError(true)}
           />
         ) : (
           <Image
@@ -158,9 +194,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   logoBadge: {
-    overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
   textColumn: {
     justifyContent: 'center',
@@ -171,14 +207,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   brandTitle: {
-    fontFamily: 'Plus Jakarta Sans',
-    fontWeight: '900',
+    fontFamily: 'Inter',
+    fontWeight: '600',
     letterSpacing: 0.3,
     color: '#0F172A',
   },
   brandSubtitle: {
-    fontFamily: 'Plus Jakarta Sans',
-    fontWeight: '800',
+    fontFamily: 'Inter',
+    fontWeight: '600',
     letterSpacing: 0.6,
     color: '#EA580C',
     marginTop: -1,

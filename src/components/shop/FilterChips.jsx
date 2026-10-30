@@ -430,7 +430,7 @@ const chipModalStyles = StyleSheet.create({
   },
   sheetTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   sheetSub: {
@@ -489,7 +489,7 @@ const chipModalStyles = StyleSheet.create({
   },
   itemTitleSelected: {
     color: '#EA580C',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   itemSubtitle: {
     fontSize: 11,
@@ -548,7 +548,7 @@ const chipModalStyles = StyleSheet.create({
   },
   doneFooterBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 });

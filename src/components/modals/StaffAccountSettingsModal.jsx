@@ -280,13 +280,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
+  title: { fontSize: 17, fontWeight: '700', color: '#0F172A' },
   subtitle: { fontSize: 12, color: '#64748B', marginTop: 2, maxWidth: 320 },
   body: { paddingHorizontal: 18, paddingTop: 14 },
   label: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 },
   section: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
     marginTop: 8,
     marginBottom: 10,
@@ -342,5 +342,5 @@ const styles = StyleSheet.create({
     minWidth: 130,
     alignItems: 'center',
   },
-  saveText: { color: '#FFFFFF', fontWeight: '800' },
+  saveText: { color: '#FFFFFF', fontWeight: '600' },
 });

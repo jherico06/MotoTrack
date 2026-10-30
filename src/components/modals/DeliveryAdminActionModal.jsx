@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 12,
   },
-  title: { fontSize: 16, fontWeight: '800', color: '#0F172A', flex: 1, paddingRight: 8 },
+  title: { fontSize: 16, fontWeight: '700', color: '#0F172A', flex: 1, paddingRight: 8 },
   closeBtn: {
     width: 32,
     height: 32,
@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
   },
   body: { fontSize: 14, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
   sub: { fontSize: 12.5, color: '#64748B', lineHeight: 18, marginBottom: 14 },
-  label: { fontSize: 11, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', marginBottom: 6 },
+  label: { fontSize: 11, fontWeight: '500', color: '#64748B', textTransform: 'uppercase', marginBottom: 6 },
   input: {
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  primaryBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
+  primaryBtnText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
   secondaryBtn: {
     borderRadius: 12,
     height: 44,

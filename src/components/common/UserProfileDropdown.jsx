@@ -37,7 +37,7 @@ export default function UserProfileDropdown({
   align = 'right',
   topOffset,
   currentScreen,
-  showDashboard = true,
+  showDashboard = false,
   isDark,
   onToggleDarkMode,
 }) {
@@ -416,8 +416,8 @@ export default function UserProfileDropdown({
 
       {/* Main Choices Menu */}
       <View style={styles.menuList}>
-        {/* 1. Dashboard */}
-        {showDashboard !== false && (
+        {/* 1. Dashboard (Hidden by default for standard web users) */}
+        {showDashboard === true && (
           <TouchableOpacity
             style={[
               styles.menuItem,
@@ -426,9 +426,9 @@ export default function UserProfileDropdown({
             onPress={() => {
               onClose?.();
               if (onNavigateToDashboard) {
-                onNavigateToDashboard('overview');
+                onNavigateToDashboard('garage');
               } else if (onNavigateToProfile) {
-                onNavigateToProfile('overview');
+                onNavigateToProfile('garage');
               }
             }}
             activeOpacity={0.7}
@@ -992,7 +992,7 @@ export default function UserProfileDropdown({
                   <Text
                     style={{
                       fontSize: 11,
-                      fontWeight: '800',
+                      fontWeight: '600',
                       color: theme.textMuted,
                       textTransform: 'uppercase',
                       letterSpacing: 0.8,
@@ -1202,7 +1202,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     letterSpacing: -0.2,
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   userSub: {
@@ -1211,7 +1211,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontWeight: '400',
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   divider: {
@@ -1254,7 +1254,7 @@ const styles = StyleSheet.create({
     flex: 1,
     letterSpacing: -0.1,
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   textWithSubWrap: {
@@ -1268,7 +1268,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
     letterSpacing: 0.2,
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   modalOverlay: {
@@ -1416,7 +1416,7 @@ const styles = StyleSheet.create({
     color: '#0F172A',
     letterSpacing: -0.2,
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   menuItemHighlighted: {

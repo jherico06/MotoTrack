@@ -74,7 +74,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   logoText: {
     fontSize: 21,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: -0.5,
   },
@@ -83,7 +83,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   logoSubText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#94A3B8',
     letterSpacing: 1.2,
   },
@@ -98,37 +98,41 @@ export const customizerWebStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 16,
   },
   headerCenterBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    height: 38,
     gap: 7,
     paddingHorizontal: 12,
-    paddingVertical: 7,
     borderRadius: 6,
     cursor: 'pointer',
     backgroundColor: 'transparent',
   },
   headerCenterBtnText: {
-    fontSize: 13.5,
-    fontWeight: '500',
-    color: 'rgba(255, 255, 255, 0.70)',
+    fontSize: 14,
+    fontWeight: '600',
+    lineHeight: 20,
+    color: 'rgba(255, 255, 255, 0.75)',
   },
   headerCenterBtnActive: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    height: 38,
     gap: 7,
     paddingHorizontal: 12,
-    paddingVertical: 7,
     borderRadius: 6,
     cursor: 'pointer',
     backgroundColor: 'transparent',
   },
   headerCenterBtnTextActive: {
-    fontSize: 13.5,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
+    lineHeight: 20,
+    color: '#FF5A0A',
   },
   headerActions: {
     flex: 1,
@@ -151,24 +155,25 @@ export const customizerWebStyles = StyleSheet.create({
   },
   navBadgeCircle: {
     position: 'absolute',
-    top: -4,
-    right: -4,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    top: -3,
+    right: -3,
     backgroundColor: '#EF4444',
+    borderRadius: 9999,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 5,
-    borderWidth: 2,
-    borderColor: '#0A0F1C',
+    borderWidth: 1.5,
+    borderColor: '#1E293B',
     zIndex: 10,
-    boxShadow: '0 2px 6px rgba(239, 68, 68, 0.5)',
   },
   navBadgeText: {
     color: '#FFFFFF',
     fontSize: 10,
-    fontWeight: '900',
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 12,
   },
   loggedInContainer: {
     flexDirection: 'row',
@@ -193,7 +198,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   signInHeaderBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 
@@ -227,12 +232,12 @@ export const customizerWebStyles = StyleSheet.create({
   heroPillText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.4,
   },
   heroHeading: {
     fontSize: 28,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
     lineHeight: 36,
     marginBottom: 8,
@@ -315,7 +320,7 @@ export const customizerWebStyles = StyleSheet.create({
   bikeTagText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   toggleViewBtn: {
     backgroundColor: '#EA580C',
@@ -336,7 +341,7 @@ export const customizerWebStyles = StyleSheet.create({
   toggleViewBtnText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   // ─── SCANNING & PROGRESS OVERLAY ───
@@ -361,7 +366,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   scanTitle: {
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 8,
     textAlign: 'center',
@@ -390,7 +395,7 @@ export const customizerWebStyles = StyleSheet.create({
   progressPercentText: {
     fontSize: 12.5,
     color: '#94A3B8',
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   // ─── GEMINI DIAGNOSTICS & TELEMETRY ───
@@ -413,7 +418,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   geminiTitle: {
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
   },
   geminiBadge: {
@@ -426,7 +431,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   geminiBadgeText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
   geminiSummary: {
@@ -467,7 +472,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   diagTitle: {
     fontSize: 13.5,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -494,7 +499,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   diagItemVal: {
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#EA580C',
   },
   diagItemSub: {
@@ -527,7 +532,7 @@ export const customizerWebStyles = StyleSheet.create({
   generateCtaText: {
     color: '#FFFFFF',
     fontSize: 15.5,
-    fontWeight: '900',
+    fontWeight: '600',
     letterSpacing: 0.4,
   },
   bookServiceBtn: {
@@ -546,7 +551,7 @@ export const customizerWebStyles = StyleSheet.create({
   bookServiceBtnText: {
     color: '#EA580C',
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   addCartBtn: {
     backgroundColor: '#F1F5F9',
@@ -589,7 +594,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   sectionHeading: {
     fontSize: 16.5,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.3,
   },
@@ -634,7 +639,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   uploadTitle: {
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     marginBottom: 4,
     textAlign: 'center',
@@ -678,7 +683,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   presetBikeName: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   presetBikeBrand: {
@@ -710,7 +715,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   themeTitle: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   themeDesc: {
@@ -727,7 +732,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   themeBadgeText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
 
@@ -756,7 +761,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   partsCategoryTextActive: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   partsSearchBox: {
     flexDirection: 'row',
@@ -808,7 +813,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   partName: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   partMeta: {
@@ -821,7 +826,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   partPricePhp: {
     fontSize: 13.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#EA580C',
   },
   partPriceUsd: {
@@ -860,14 +865,14 @@ export const customizerWebStyles = StyleSheet.create({
   },
   selectedTrayTitle: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#18181B',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   selectedTrayTotal: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#EA580C',
   },
 
@@ -902,7 +907,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 19,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
   },
   modalCloseBtn: {
@@ -916,7 +921,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   formLabel: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '500',
     color: '#475569',
     marginBottom: 6,
     textTransform: 'uppercase',
@@ -950,7 +955,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   branchText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   branchSub: {
@@ -980,7 +985,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   slotTextActive: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   // ─── DUAL-MODE CUSTOMIZATION STYLES (WEB) ───
@@ -1040,7 +1045,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   modeTabBadgeText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#475569',
   },
   modeTabBadgeTextActive: {
@@ -1048,7 +1053,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   modeTabTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     marginBottom: 4,
   },
@@ -1112,11 +1117,11 @@ export const customizerWebStyles = StyleSheet.create({
   inspoStylePillText: {
     color: '#EA580C',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   inspoTaglineText: {
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
     lineHeight: 26,
     marginBottom: 8,
@@ -1167,7 +1172,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   matchedPartsTitle: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
   },
   matchedPartsCountBadge: {
@@ -1179,7 +1184,7 @@ export const customizerWebStyles = StyleSheet.create({
   matchedPartsCountText: {
     color: '#FFFFFF',
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   matchedPartItem: {
     flexDirection: 'row',
@@ -1205,7 +1210,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   matchedPartName: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   matchedPartBrand: {
@@ -1215,7 +1220,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   matchedPartPrice: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
     marginTop: 2,
   },
@@ -1301,7 +1306,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   regBikeTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     flex: 1,
   },
@@ -1325,7 +1330,7 @@ export const customizerWebStyles = StyleSheet.create({
   regBikePlateText: {
     color: '#F8FAFC',
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.5,
   },
   regBikeColorBadge: {
@@ -1351,7 +1356,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   regBikePrimaryTagText: {
     fontSize: 9.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#92400E',
   },
   emptyRegBikesBox: {
@@ -1411,7 +1416,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   formedPromptTitle: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   formedPromptBadge: {
@@ -1422,7 +1427,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   formedPromptBadgeText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
     letterSpacing: 0.3,
   },
@@ -1506,7 +1511,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   stepBadgeText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#64748B',
   },
   stepBadgeTextActive: {
@@ -1522,7 +1527,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   stepLabelActive: {
     color: '#0F172A',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   stepSubLabel: {
     fontSize: 10.5,
@@ -1590,12 +1595,12 @@ export const customizerWebStyles = StyleSheet.create({
   partModalBadgeText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.5,
   },
   partModalTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     marginBottom: 4,
   },
@@ -1618,7 +1623,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   partModalPricePhp: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#EA580C',
   },
   partModalPriceUsd: {
@@ -1666,7 +1671,7 @@ export const customizerWebStyles = StyleSheet.create({
   partModalAddBtnText: {
     color: '#FFFFFF',
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   partModalCancelBtn: {
     flex: 1,
@@ -1719,7 +1724,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   addMorePromptTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   addMorePromptSub: {
@@ -1762,7 +1767,7 @@ export const customizerWebStyles = StyleSheet.create({
   addMoreBtnNoText: {
     color: '#FFFFFF',
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   // ─── STAGE 3: REVIEW CUSTOMIZATION & AI PREVIEW ───
@@ -1796,7 +1801,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   reviewBikeTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   reviewBikeSub: {
@@ -1841,7 +1846,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   reviewPartPrice: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
   reviewPartRemoveBtn: {
@@ -1895,7 +1900,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   reviewActionPrimaryText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 
@@ -1939,12 +1944,12 @@ export const customizerWebStyles = StyleSheet.create({
   },
   totalGrandLabel: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
   totalGrandAmount: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#EA580C',
     textAlign: 'right',
   },
@@ -1971,7 +1976,7 @@ export const customizerWebStyles = StyleSheet.create({
   buyPartsCheckoutText: {
     color: '#FFFFFF',
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   bookInstallServiceBtn: {
     flex: 1,
@@ -1991,7 +1996,7 @@ export const customizerWebStyles = StyleSheet.create({
   bookInstallServiceText: {
     color: '#F8FAFC',
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 });
 

@@ -10,13 +10,14 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import BootstrapIcon from '../../../components/common/BootstrapIcon.jsx';
-import { productDetailsStyles as styles } from '../../../styles/productDetailsPage.styles.js';
+import { createProductDetailsStyles } from '../../../styles/productDetailsPage.styles.js';
 import { productService } from '../../../services/products/productService.js';
 import { orderService } from '../../../services/orders/orderService.js';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useCart } from '../../../context/CartContext.jsx';
 import { useWishlist } from '../../../context/WishlistContext.jsx';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import {
   getProductSizeEntries,
   getSizePrice,
@@ -88,10 +89,13 @@ export default function ProductDetailsPage({
   onNavigateToWishlist: _onNavigateToWishlist,
   onNavigateToOrders,
   onNavigateToLogin,
+  onRequireLogin,
 }) {
   const { currentUser, setRedirectReason } = useAuth();
   const { addToCart, cartItemCount, toastMessage, showToast } = useCart();
   const { isWishlisted, toggleWishlist } = useWishlist();
+  const { isDarkMode = false } = useTheme?.() || {};
+  const styles = useMemo(() => createProductDetailsStyles(isDarkMode), [isDarkMode]);
 
   // Variant Data
   const sizeEntries = useMemo(() => getProductSizeEntries(product), [product]);
@@ -357,8 +361,21 @@ export default function ProductDetailsPage({
   if (!product) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-          <Text style={{ color: '#0F172A', fontSize: 16, fontWeight: '700', marginBottom: 16 }}>
+        <View
+          style={[
+            styles.rootContainer,
+            isDarkMode && { backgroundColor: '#121518' },
+            { justifyContent: 'center', alignItems: 'center', padding: 24 },
+          ]}
+        >
+          <Text
+            style={{
+              color: isDarkMode ? '#F9FAFB' : '#0F172A',
+              fontSize: 16,
+              fontWeight: '700',
+              marginBottom: 16,
+            }}
+          >
             Product not found or unavailable
           </Text>
           <TouchableOpacity
@@ -375,8 +392,17 @@ export default function ProductDetailsPage({
   // Open variant picker modal for Add to Cart
   const handleAddToCartPress = () => {
     if (!currentUser) {
-      setRedirectReason('Please sign in or create an account to add items to your cart.');
-      onNavigateToLogin?.();
+      if (typeof onRequireLogin === 'function') {
+        onRequireLogin({
+          title: 'Sign In to Add to Cart',
+          message: 'Please log in first to add performance parts and gear to your cart.',
+          actionLabel: 'Sign In to Continue',
+          feature: 'order',
+        });
+      } else {
+        setRedirectReason('Please sign in or create an account to add items to your cart.');
+        onNavigateToLogin?.();
+      }
       return;
     }
     if (productSoldOut) {
@@ -390,8 +416,17 @@ export default function ProductDetailsPage({
   // Open variant picker modal for Buy Now
   const handleBuyNowPress = () => {
     if (!currentUser) {
-      setRedirectReason('Please sign in or create an account to complete your purchase.');
-      onNavigateToLogin?.();
+      if (typeof onRequireLogin === 'function') {
+        onRequireLogin({
+          title: 'Sign In to Order',
+          message: 'Please log in first or create an account to complete your purchase.',
+          actionLabel: 'Sign In to Buy',
+          feature: 'order',
+        });
+      } else {
+        setRedirectReason('Please sign in or create an account to complete your purchase.');
+        onNavigateToLogin?.();
+      }
       return;
     }
     if (productSoldOut) {
@@ -567,8 +602,17 @@ export default function ProductDetailsPage({
             style={styles.topBarIconButton}
             onPress={() => {
               if (!currentUser) {
-                setRedirectReason('Please sign in to view your shopping cart.');
-                onNavigateToLogin?.();
+                if (typeof onRequireLogin === 'function') {
+                  onRequireLogin({
+                    title: 'Sign In to View Cart',
+                    message: 'Please log in first to view your cart and proceed with checkout.',
+                    actionLabel: 'Sign In to View Cart',
+                    feature: 'order',
+                  });
+                } else {
+                  setRedirectReason('Please sign in to view your shopping cart.');
+                  onNavigateToLogin?.();
+                }
               } else {
                 setIsCartOpen(true);
               }
@@ -588,7 +632,8 @@ export default function ProductDetailsPage({
 
       {/* ─── MAIN SCROLLABLE PRODUCT CONTENT ─── */}
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        style={[styles.rootContainer, isDarkMode && { backgroundColor: '#121518' }]}
+        contentContainerStyle={[styles.scrollContent, isDarkMode && { backgroundColor: '#121518' }]}
         showsVerticalScrollIndicator={false}
       >
         {/* ─── HERO GALLERY SHOWCASE ─── */}
@@ -800,7 +845,14 @@ export default function ProductDetailsPage({
                     <Text style={styles.shippingFeeCurrent}>FREE</Text>
                   </>
                 ) : (
-                  <Text style={[styles.shippingFeeCurrent, { color: '#0F172A' }]}>₱150.00</Text>
+                  <Text
+                    style={[
+                      styles.shippingFeeCurrent,
+                      { color: isDarkMode ? '#F9FAFB' : '#0F172A' },
+                    ]}
+                  >
+                    ₱150.00
+                  </Text>
                 )}
               </View>
 
@@ -953,7 +1005,11 @@ export default function ProductDetailsPage({
                   disabled={quantity <= 1}
                   activeOpacity={0.7}
                 >
-                  <BootstrapIcon name="dash" size={14} color={quantity <= 1 ? '#94A3B8' : '#0F172A'} />
+                  <BootstrapIcon
+                    name="dash"
+                    size={14}
+                    color={quantity <= 1 ? '#94A3B8' : isDarkMode ? '#F9FAFB' : '#0F172A'}
+                  />
                 </TouchableOpacity>
 
                 <Text style={styles.stepperValueText}>{quantity}</Text>
@@ -967,7 +1023,9 @@ export default function ProductDetailsPage({
                   <BootstrapIcon
                     name="plus"
                     size={14}
-                    color={quantity >= availableStock ? '#94A3B8' : '#0F172A'}
+                    color={
+                      quantity >= availableStock ? '#94A3B8' : isDarkMode ? '#F9FAFB' : '#0F172A'
+                    }
                   />
                 </TouchableOpacity>
               </View>

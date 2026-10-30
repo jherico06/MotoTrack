@@ -151,15 +151,19 @@ export function createProfileWebStyles(isDark = false) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      gap: 16,
     },
     mainNavList: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
+      gap: 16,
     },
     mainNavItem: {
-      paddingVertical: 7,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: 38,
       paddingHorizontal: 12,
       borderRadius: 6,
       cursor: 'pointer',
@@ -171,14 +175,17 @@ export function createProfileWebStyles(isDark = false) {
       borderColor: 'transparent',
     },
     mainNavItemText: {
-      fontSize: 13.5,
-      fontWeight: '500',
-      color: 'rgba(255, 255, 255, 0.65)',
+      fontSize: 14,
+      fontWeight: '600',
+      lineHeight: 20,
+      color: 'rgba(255, 255, 255, 0.75)',
       whiteSpace: 'nowrap',
     },
     mainNavItemTextActive: {
-      color: '#FFFFFF',
-      fontWeight: '700',
+      fontSize: 14,
+      color: '#FF5A0A',
+      fontWeight: '600',
+      lineHeight: 20,
       opacity: 1,
     },
     headerActions: {
@@ -186,13 +193,18 @@ export function createProfileWebStyles(isDark = false) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'flex-end',
+      gap: 12,
+    },
+    loggedInContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
       gap: 8,
     },
     navSearchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: 'rgba(255, 255, 255, 0.05)',
-      borderRadius: 24,
+      borderRadius: 8,
       height: 38,
       width: 190,
       paddingHorizontal: 12,
@@ -226,24 +238,25 @@ export function createProfileWebStyles(isDark = false) {
     },
     navBadgeCircle: {
       position: 'absolute',
-      top: -2,
-      right: -2,
+      top: -3,
+      right: -3,
+      backgroundColor: '#EF4444',
+      borderRadius: 9999,
       minWidth: 16,
       height: 16,
-      borderRadius: 8,
-      backgroundColor: '#EF4444',
+      paddingHorizontal: 4,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 3,
       borderWidth: 1.5,
-      borderColor: '#24272B',
+      borderColor: isDark ? '#151C19' : '#1E293B',
       zIndex: 10,
     },
     navBadgeText: {
       color: '#FFFFFF',
-      fontSize: 9.5,
-      fontWeight: '800',
-      lineHeight: 11,
+      fontSize: 10,
+      fontWeight: '700',
+      textAlign: 'center',
+      lineHeight: 12,
     },
     mobileNavDrawer: {
       backgroundColor: isDark ? '#151C19' : '#163829',
@@ -276,7 +289,7 @@ export function createProfileWebStyles(isDark = false) {
     },
     mobileNavItemTextActive: {
       color: '#FFFFFF',
-      fontWeight: '900',
+      fontWeight: '600',
       opacity: 1,
     },
 
@@ -330,10 +343,10 @@ export function createProfileWebStyles(isDark = false) {
     },
     sectionTitle: {
       fontSize: 16,
-      fontWeight: '800',
+      fontWeight: '700',
       color: t.textPrimary,
       letterSpacing: -0.2,
-      fontFamily: Platform.select({ web: "'Plus Jakarta Sans', sans-serif" }),
+      fontFamily: Platform.select({ web: "'Inter', sans-serif" }),
     },
     sectionSubtitle: {
       fontSize: 12,
@@ -377,15 +390,15 @@ export function createProfileWebStyles(isDark = false) {
       color: t.textMuted,
       textTransform: 'uppercase',
       letterSpacing: 0.6,
-      fontFamily: Platform.select({ web: "'Plus Jakarta Sans', sans-serif" }),
+      fontFamily: Platform.select({ web: "'Inter', sans-serif" }),
     },
     statValue: {
       fontSize: 27,
-      fontWeight: '800',
+      fontWeight: '700',
       color: t.textPrimary,
       letterSpacing: -0.5,
       marginVertical: 4,
-      fontFamily: Platform.select({ web: "'Plus Jakarta Sans', sans-serif" }),
+      fontFamily: Platform.select({ web: "'Inter', sans-serif" }),
     },
     statSub: {
       fontSize: 11.5,
@@ -420,9 +433,9 @@ export function createProfileWebStyles(isDark = false) {
     },
     profileSummaryName: {
       fontSize: 16,
-      fontWeight: '800',
+      fontWeight: '600',
       color: t.textPrimary,
-      fontFamily: Platform.select({ web: "'Plus Jakarta Sans', sans-serif" }),
+      fontFamily: Platform.select({ web: "'Inter', sans-serif" }),
     },
     verifiedBadge: {
       flexDirection: 'row',
@@ -437,7 +450,7 @@ export function createProfileWebStyles(isDark = false) {
     },
     verifiedBadgeText: {
       fontSize: 10.5,
-      fontWeight: '800',
+      fontWeight: '600',
       color: t.statusSuccessText,
     },
     profileSummaryContact: {
@@ -523,7 +536,7 @@ export function createProfileWebStyles(isDark = false) {
     },
     bookingSlotTitle: {
       fontSize: 14,
-      fontWeight: '800',
+      fontWeight: '600',
       color: t.textPrimary,
     },
     bookingMetaGrid: {
@@ -590,12 +603,12 @@ export function createProfileWebStyles(isDark = false) {
     },
     profileFullName: {
       fontSize: 21,
-      fontWeight: '800',
+      fontWeight: '600',
       color: t.textPrimary,
       textAlign: 'center',
       marginBottom: 3,
       letterSpacing: -0.2,
-      fontFamily: Platform.select({ web: "'Plus Jakarta Sans', sans-serif" }),
+      fontFamily: Platform.select({ web: "'Inter', sans-serif" }),
     },
     profileHeadlineText: {
       fontSize: 13.5,
@@ -637,16 +650,35 @@ export function createProfileWebStyles(isDark = false) {
       textTransform: 'uppercase',
       letterSpacing: 0.6,
       marginBottom: 4,
-      fontFamily: Platform.select({ web: "'Plus Jakarta Sans', sans-serif" }),
+      fontFamily: Platform.select({ web: "'Inter', sans-serif" }),
     },
     profileFieldValue: {
       fontSize: 14,
       fontWeight: '700',
       color: t.textPrimary,
-      fontFamily: Platform.select({ web: "'Plus Jakarta Sans', sans-serif" }),
+      fontFamily: Platform.select({ web: "'Inter', sans-serif" }),
     },
 
     // ─── 11. BUTTON SYSTEM ───
+    signInHeaderBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      height: 38,
+      paddingHorizontal: 14,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 255, 255, 0.45)',
+      backgroundColor: 'transparent',
+      cursor: 'pointer',
+    },
+    signInHeaderBtnText: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '600',
+      fontFamily: Platform.select({ web: "'Inter', sans-serif" }),
+    },
     btnPrimary: {
       backgroundColor: '#EA580C',
       paddingHorizontal: 16,
@@ -662,7 +694,7 @@ export function createProfileWebStyles(isDark = false) {
       color: '#FFFFFF',
       fontSize: 13,
       fontWeight: '700',
-      fontFamily: Platform.select({ web: "'Plus Jakarta Sans', sans-serif" }),
+      fontFamily: Platform.select({ web: "'Inter', sans-serif" }),
     },
     btnSecondary: {
       backgroundColor: t.bgCard,
@@ -681,7 +713,7 @@ export function createProfileWebStyles(isDark = false) {
       color: t.textPrimary,
       fontSize: 12.5,
       fontWeight: '700',
-      fontFamily: Platform.select({ web: "'Plus Jakarta Sans', sans-serif" }),
+      fontFamily: Platform.select({ web: "'Inter', sans-serif" }),
     },
     btnDangerSubtle: {
       backgroundColor: t.statusDangerBg,
@@ -737,7 +769,7 @@ export function createProfileWebStyles(isDark = false) {
     },
     statusBadgePillText: {
       fontSize: 11,
-      fontWeight: '800',
+      fontWeight: '600',
     },
 
     // Backward compatibility with admin style keys
@@ -845,7 +877,7 @@ export function createProfileWebStyles(isDark = false) {
     },
     sidebarCountTextActive: {
       color: '#FFFFFF',
-      fontWeight: '800',
+      fontWeight: '600',
     },
     statusDotGreen: {
       width: 7,

@@ -19,8 +19,8 @@ export default function DesktopWorkArea({ title, subtitle, children, maxWidth = 
           paddingHorizontal: 22,
         }}
       >
-        <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '800' }}>MotoTrack</Text>
-        <Text style={{ color: '#D1FAE5', marginTop: 8, fontSize: 15, fontWeight: '700' }}>{title}</Text>
+        <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '700' }}>MotoTrack</Text>
+        <Text style={{ color: '#D1FAE5', marginTop: 8, fontSize: 15, fontWeight: '600' }}>{title}</Text>
         {subtitle ? (
           <Text style={{ color: '#A7C4B5', marginTop: 14, fontSize: 13, lineHeight: 19 }}>{subtitle}</Text>
         ) : null}

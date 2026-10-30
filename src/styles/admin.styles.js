@@ -97,7 +97,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   bottomNavLabelActive: {
     color: '#EA580C',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   bottomNavBadge: {
     position: 'absolute',
@@ -111,10 +111,19 @@ export const createAdminStyles = (isDark = false) => {
     alignItems: 'center',
     paddingHorizontal: 3,
   },
+  bottomNavDot: {
+    position: "absolute",
+    top: 2,
+    right: 8,
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#EA580C",
+  },
   bottomNavBadgeText: {
     color: '#FFFFFF',
     fontSize: 8.5,
-    fontWeight: '900',
+    fontWeight: '600',
   },
   mobileMoreSheet: {
     backgroundColor: t.bgCard,
@@ -164,7 +173,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   sidebarLogo: {
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
     color: t.textPrimary,
     letterSpacing: -0.5,
   },
@@ -182,7 +191,7 @@ export const createAdminStyles = (isDark = false) => {
   adminTagBadgeText: {
     color: '#EA580C',
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   adminProfileBox: {
     flexDirection: 'row',
@@ -206,7 +215,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   adminAvatarText: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '600',
     fontSize: 15,
   },
   onlineIndicator: {
@@ -486,7 +495,7 @@ export const createAdminStyles = (isDark = false) => {
   statValue: {
     fontSize: fontSizes.kpi,
     lineHeight: lineHeights.kpi,
-    fontWeight: fontWeights.extraBold,
+    fontWeight: fontWeights.bold,
     color: t.textPrimary,
     letterSpacing: letterSpacings.tight,
     fontVariant: ['tabular-nums'],
@@ -661,7 +670,7 @@ export const createAdminStyles = (isDark = false) => {
     borderColor: t.borderInput,
     color: t.textPrimary,
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     textAlign: 'center',
     paddingVertical: 5,
     paddingHorizontal: 8,
@@ -717,7 +726,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   promoStatusText: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   promoStatusTextActive: {
     color: isDark ? t.accentBrand : '#166534',
@@ -802,7 +811,7 @@ export const createAdminStyles = (isDark = false) => {
   stockInStockText: {
     color: isDark ? t.accentBrand : '#065F46',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   stockLow: {
     backgroundColor: isDark ? t.statusWarningBg : '#FEF3C7',
@@ -810,7 +819,7 @@ export const createAdminStyles = (isDark = false) => {
   stockLowText: {
     color: isDark ? t.statusWarningText : '#92400E',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   stockOut: {
     backgroundColor: isDark ? t.statusDangerBg : '#FEE2E2',
@@ -818,7 +827,7 @@ export const createAdminStyles = (isDark = false) => {
   stockOutText: {
     color: isDark ? t.statusDangerText : '#991B1B',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   stockAdjustBtnRow: {
     flexDirection: 'row',
@@ -837,7 +846,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   stockMiniBtnText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: t.textPrimary,
   },
   inventoryAlertBanner: {
@@ -946,7 +955,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   posProductPrice: {
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
   posAddBtn: {
@@ -990,7 +999,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   posRegisterTitle: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     color: t.textPrimary,
   },
   posCustomerSelector: {
@@ -1003,7 +1012,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   posCustomerLabel: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: t.textMuted,
     textTransform: 'uppercase',
     marginBottom: 4,
@@ -1055,7 +1064,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   posQtyText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: t.textPrimary,
     minWidth: 18,
     textAlign: 'center',
@@ -1085,12 +1094,12 @@ export const createAdminStyles = (isDark = false) => {
   },
   posGrandTotalLabel: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
     color: t.textPrimary,
   },
   posGrandTotalVal: {
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#EA580C',
   },
   posPayMethodRow: {
@@ -1123,7 +1132,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   posPayMethodTextActive: {
     color: '#EA580C',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   posTenderBox: {
     backgroundColor: t.bgSub,
@@ -1170,7 +1179,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   posChangeBannerAmount: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#047857',
   },
   posCheckoutBtn: {
@@ -1195,7 +1204,7 @@ export const createAdminStyles = (isDark = false) => {
   posCheckoutBtnText: {
     color: '#FFFFFF',
     fontSize: 14.5,
-    fontWeight: '900',
+    fontWeight: '600',
   },
 
   // ─── 8. ANALYTICS & CHARTS ───
@@ -1261,7 +1270,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   analyticsPeriodTabTextActive: {
     color: '#EA580C',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   chartBarContainer: {
     flexDirection: 'row',
@@ -1299,7 +1308,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   chartBarVal: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
     marginBottom: 4,
   },
@@ -1321,7 +1330,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   leaderboardRankText: {
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#EA580C',
   },
   progressBarTrack: {
@@ -1464,7 +1473,7 @@ export const createAdminStyles = (isDark = false) => {
   uploadActionText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   presetGrid: {
     flexDirection: 'row',
@@ -1517,7 +1526,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   receiptLogo: {
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
     color: t.textPrimary,
     textAlign: 'center',
   },
@@ -1562,7 +1571,7 @@ export const createAdminStyles = (isDark = false) => {
   receiptBarcodeText: {
     fontSize: 12,
     letterSpacing: 4,
-    fontWeight: '900',
+    fontWeight: '600',
     color: t.textSecondary,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
@@ -1656,7 +1665,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   paymentDropdownItemTextActive: {
     color: '#EA580C',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   orderFilterBar: {
     flexDirection: 'row',
@@ -1700,7 +1709,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   codAlertBannerText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: isDark ? t.statusWarningText : '#92400E',
   },
   codAlertBannerSub: {
@@ -1720,7 +1729,7 @@ export const createAdminStyles = (isDark = false) => {
   approveAllCodBtnText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   orderActionBtnGroup: {
     flexDirection: 'row',
@@ -1796,7 +1805,7 @@ export const createAdminStyles = (isDark = false) => {
     color: isDark ? t.accentBrand : '#EA580C',
     fontSize: 11,
     lineHeight: 14,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   orderFormField: {
     marginBottom: 10,
@@ -1871,7 +1880,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   garageSubNavTextActive: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   garageBadgeCount: {
     backgroundColor: '#E2E8F0',
@@ -1886,7 +1895,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   garageBadgeCountText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: t.textSecondary,
   },
   garageBadgeCountTextActive: {
@@ -1966,7 +1975,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   bikePlateText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '600',
     color: t.textPrimary,
     letterSpacing: 0.5,
   },
@@ -2028,7 +2037,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   mechanicName: {
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: t.textPrimary,
     lineHeight: 19,
     marginBottom: 2,
@@ -2054,7 +2063,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   mechanicStatusAvailableText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: isDark ? t.accentBrand : '#059669',
   },
   mechanicStatusBusy: {
@@ -2064,7 +2073,7 @@ export const createAdminStyles = (isDark = false) => {
   },
   mechanicStatusBusyText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: isDark ? t.statusWarningText : '#B45309',
   },
   mechanicInfoRow: {

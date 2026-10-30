@@ -132,7 +132,7 @@ function createStyles(t, isDark) {
       borderWidth: 1,
       borderColor: isDark ? t.border : '#E2E8F0',
     },
-    title: { fontSize: 16, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A' },
+    title: { fontSize: 16, fontWeight: '700', color: isDark ? t.textPrimary : '#0F172A' },
     sub: { fontSize: 12, color: isDark ? t.textMuted : '#64748B', marginVertical: 8 },
     input: {
       borderWidth: 1.5,
@@ -172,7 +172,7 @@ function createStyles(t, isDark) {
     },
     previewTitle: {
       fontSize: 14,
-      fontWeight: '800',
+      fontWeight: '600',
       color: isDark ? t.statusSuccessText : '#166534',
       marginBottom: 8,
     },

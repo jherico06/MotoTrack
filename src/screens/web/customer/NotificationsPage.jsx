@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#71717A',
     letterSpacing: 0.8,
   },

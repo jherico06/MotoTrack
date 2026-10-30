@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 16.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   subtitle: {
     fontSize: 11.5,
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '500',
   },
   fieldHint: {
     fontSize: 11,
@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
   },
   brandPillTextActive: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   grid: {
     display: 'flex',
@@ -749,6 +749,6 @@ const styles = StyleSheet.create({
   saveBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 });

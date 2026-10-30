@@ -292,7 +292,7 @@ function SectionCard({ title, subtitle, actionLabel, onAction, headerRight, chil
           <Text
             style={{
               fontSize: 13,
-              fontWeight: '800',
+              fontWeight: '600',
               color: isDark ? '#F8FAFC' : tokens.textPrimary,
               textTransform: 'uppercase',
               letterSpacing: 0.6,
@@ -407,11 +407,11 @@ function SalesMetricCard({
         <Text
           style={{
             fontSize: 22,
-            fontWeight: '800',
+            fontWeight: '600',
             color: isDark ? '#F8FAFC' : tokens.textPrimary,
             marginTop: 4,
             fontVariant: ['tabular-nums'],
-            fontFamily: Platform.select({ web: "'Plus Jakarta Sans', sans-serif", default: undefined }),
+            fontFamily: Platform.select({ web: "'Inter', sans-serif", default: undefined }),
             letterSpacing: -0.4,
           }}
         >
@@ -596,7 +596,7 @@ function SalesRevenueTrendChart({
             <Text
               style={{
                 fontSize: 12.5,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: isDark ? '#F8FAFC' : tokens.textPrimary,
                 letterSpacing: 0.2,
               }}
@@ -839,7 +839,7 @@ function SalesRevenueTrendChart({
               <Text
                 style={{
                   fontSize: 14,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: '#FFFFFF',
                   marginTop: 2,
                   fontVariant: ['tabular-nums'],
@@ -884,7 +884,7 @@ function SalesRevenueTrendChart({
           <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Period Total
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {formatPeso(totalRev)}
           </Text>
         </View>
@@ -893,7 +893,7 @@ function SalesRevenueTrendChart({
           <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Period Average
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {formatPeso(avgRev)}{' '}
             <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#94A3B8' : tokens.textMuted }}>
               /{granularity === 'daily' ? 'day' : granularity === 'weekly' ? 'wk' : 'mo'}
@@ -905,7 +905,7 @@ function SalesRevenueTrendChart({
           <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Peak Period
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {peakRev > 0 ? formatPeso(peakRev) : '₱0'}{' '}
             <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#94A3B8' : tokens.textMuted }}>
               ({peakLabel})
@@ -917,7 +917,7 @@ function SalesRevenueTrendChart({
           <Text style={{ fontSize: 10, fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Orders in Period
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {totalOrders} order{totalOrders === 1 ? '' : 's'}
           </Text>
         </View>
@@ -942,7 +942,7 @@ function HealthRow({ label, count, color, tokens, isDark }) {
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
         <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary }}>{label}</Text>
       </View>
-      <Text style={{ fontSize: 15, fontWeight: '800', color: isDark ? '#F8FAFC' : tokens.textPrimary, fontVariant: ['tabular-nums'] }}>
+      <Text style={{ fontSize: 15, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, fontVariant: ['tabular-nums'] }}>
         {count}
       </Text>
     </View>
@@ -954,7 +954,7 @@ function ChannelBar({ label, amount, pct, color, tokens, isDark }) {
     <View style={{ marginBottom: 14 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
         <Text style={{ fontSize: 13, fontWeight: '700', color: isDark ? '#F8FAFC' : tokens.textPrimary }}>{label}</Text>
-        <Text style={{ fontSize: 13, fontWeight: '800', color: isDark ? '#F8FAFC' : tokens.textPrimary, fontVariant: ['tabular-nums'] }}>
+        <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? '#F8FAFC' : tokens.textPrimary, fontVariant: ['tabular-nums'] }}>
           {formatPeso(amount)}{'  '}
           <Text style={{ fontWeight: '700', color: isDark ? '#94A3B8' : tokens.textMuted }}>{pct}%</Text>
         </Text>

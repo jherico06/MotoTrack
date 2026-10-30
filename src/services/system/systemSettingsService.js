@@ -100,18 +100,86 @@ export const DEFAULT_SYSTEM_SETTINGS = {
   isMaintenanceMode: false,
   maintenanceMode: false,
   maintenanceMessage: '',
+
+  // Storefront Footer Configuration
+  footerTagline: 'Ride Better. Go Further.',
+  footerAboutText: 'Your one-stop destination for genuine motorcycle parts, professional PMS garage servicing, and custom builds.',
+  footerShowLogo: true,
+  // Column 2: Quick Links
+  footerQuickLinksTitle: 'Quick Links',
+  footerLinkShopLabel: 'Shop',
+  footerLinkShopEnabled: true,
+  footerLinkServiceLabel: 'Book a Service',
+  footerLinkServiceEnabled: true,
+  footerLinkCustomizeLabel: 'Customize',
+  footerLinkCustomizeEnabled: true,
+  footerLinkAboutLabel: 'About Us',
+  footerLinkAboutEnabled: true,
+  // Column 3: Customer Care
+  footerCustomerCareTitle: 'Customer Care',
+  footerLinkHelpLabel: 'Help Center',
+  footerLinkHelpEnabled: true,
+  footerLinkShippingLabel: 'Shipping & Delivery',
+  footerLinkShippingEnabled: true,
+  footerLinkReturnsLabel: 'Returns & Refunds',
+  footerLinkReturnsEnabled: true,
+  footerLinkContactLabel: 'Contact Us',
+  footerLinkContactEnabled: true,
+  // Column 4: Stay Connected & Newsletter
+  footerStayConnectedTitle: 'Stay Connected',
+  footerNewsletterSubtitle: 'Get the latest updates, promos and more.',
+  footerNewsletterEnabled: true,
+  footerNewsletterPlaceholder: 'Enter your email address',
+  footerSocialFacebook: 'https://facebook.com/mototrack',
+  footerSocialInstagram: 'https://instagram.com/mototrack',
+  footerSocialYoutube: 'https://youtube.com/mototrack',
+  footerSocialTiktok: 'https://tiktok.com/@mototrack',
+  // Bottom Bar / Legal & Copyright
+  footerCopyrightText: '© 2026 MotoTrack. All rights reserved.',
+  footerTermsLabel: 'Terms of Service',
+  footerTermsEnabled: true,
+  footerPrivacyLabel: 'Privacy Policy',
+  footerPrivacyEnabled: true,
+
   lastUpdated: new Date().toISOString(),
 };
 
 const STORAGE_KEY = 'mototrack_system_settings_v1';
+const BROADCAST_CHANNEL_NAME = 'mototrack_settings_sync_channel';
+
+function readStoredSettingsJson() {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const fromLocal = window.localStorage.getItem(STORAGE_KEY);
+      if (fromLocal) return fromLocal;
+    }
+  } catch (_e) {}
+  try {
+    return appStorage.getItem(STORAGE_KEY);
+  } catch (_e) {
+    return null;
+  }
+}
+
+function writeStoredSettingsJson(jsonStr) {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.setItem(STORAGE_KEY, jsonStr);
+    }
+  } catch (_e) {}
+  try {
+    appStorage.setItem(STORAGE_KEY, jsonStr);
+  } catch (_e) {}
+}
 
 class SystemSettingsService {
   constructor() {
     this.subscribers = new Set();
-    this.settings = this.loadSettings();
+    this.broadcastChannel = null;
     this.realtimeChannel = null;
+    this.settings = this.loadSettings();
 
-    // 1. Cross-tab synchronization via browser storage events
+    // 1. Cross-tab synchronization via browser storage events & BroadcastChannel
     this.initCrossTabSync();
 
     // 2. Initial cloud fetch from Supabase to ensure customer & other user sync
@@ -121,20 +189,52 @@ class SystemSettingsService {
     this.initRealtimeSubscription();
   }
 
+  broadcast(settings) {
+    try {
+      if (this.broadcastChannel) {
+        this.broadcastChannel.postMessage({
+          type: 'SETTINGS_UPDATE',
+          settings,
+          timestamp: Date.now(),
+        });
+      }
+    } catch (_e) {}
+  }
+
   initCrossTabSync() {
-    if (typeof window !== 'undefined' && window.addEventListener) {
-      window.addEventListener('storage', (e) => {
-        if (!e.key || e.key === STORAGE_KEY) {
-          const reloaded = this.loadSettings();
-          if (JSON.stringify(reloaded) !== JSON.stringify(this.settings)) {
-            this.settings = reloaded;
-            if (typeof document !== 'undefined' && this.settings.storeName) {
-              document.title = `${this.settings.storeName}${this.settings.storeTagline ? ' - ' + this.settings.storeTagline : ''}`;
+    if (typeof window !== 'undefined') {
+      // Modern BroadcastChannel for 0ms instant tab-to-tab sync
+      try {
+        if (typeof window.BroadcastChannel === 'function') {
+          this.broadcastChannel = new window.BroadcastChannel(BROADCAST_CHANNEL_NAME);
+          this.broadcastChannel.onmessage = (event) => {
+            if (event?.data?.type === 'SETTINGS_UPDATE' && event.data.settings) {
+              this.settings = { ...this.settings, ...event.data.settings };
+              writeStoredSettingsJson(JSON.stringify(this.settings));
+              if (typeof document !== 'undefined' && this.settings.storeName) {
+                document.title = `${this.settings.storeName}${this.settings.storeTagline ? ' - ' + this.settings.storeTagline : ''}`;
+              }
+              this.notify();
             }
-            this.notify();
-          }
+          };
         }
-      });
+      } catch (_e) {}
+
+      // Browser storage event listener for cross-tab localStorage updates
+      if (window.addEventListener) {
+        window.addEventListener('storage', (e) => {
+          if (!e.key || e.key === STORAGE_KEY) {
+            const reloaded = this.loadSettings();
+            if (JSON.stringify(reloaded) !== JSON.stringify(this.settings)) {
+              this.settings = reloaded;
+              if (typeof document !== 'undefined' && this.settings.storeName) {
+                document.title = `${this.settings.storeName}${this.settings.storeTagline ? ' - ' + this.settings.storeTagline : ''}`;
+              }
+              this.notify();
+            }
+          }
+        });
+      }
     }
   }
 
@@ -200,11 +300,12 @@ class SystemSettingsService {
 
       if (changed) {
         this.settings = next;
-        appStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
+        writeStoredSettingsJson(JSON.stringify(this.settings));
         if (typeof document !== 'undefined' && this.settings.storeName) {
           document.title = `${this.settings.storeName}${this.settings.storeTagline ? ' - ' + this.settings.storeTagline : ''}`;
         }
         this.notify();
+        this.broadcast(this.settings);
       }
     } catch (err) {
       console.warn('[systemSettingsService] fetchRemoteSettings error:', err?.message || err);
@@ -223,8 +324,9 @@ class SystemSettingsService {
           if (upRes.success && upRes.url) {
             finalLogoUrl = upRes.url;
             this.settings.storeLogoUrl = finalLogoUrl;
-            appStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
+            writeStoredSettingsJson(JSON.stringify(this.settings));
             this.notify();
+            this.broadcast(this.settings);
           }
         } catch (_e) {}
       }
@@ -260,7 +362,7 @@ class SystemSettingsService {
 
   loadSettings() {
     try {
-      const raw = appStorage.getItem(STORAGE_KEY);
+      const raw = readStoredSettingsJson();
       if (raw) {
         const parsed = JSON.parse(raw);
         // Strip out any legacy mocked values (keep real branding defaults intact)
@@ -321,11 +423,25 @@ class SystemSettingsService {
     return this.getSettings();
   }
 
-  saveSettings(partial) {
+  async saveSettings(partial) {
     try {
+      let finalLogoUrl = partial?.storeLogoUrl;
+      // If a data URI is provided, upload it to Supabase Storage immediately
+      if (finalLogoUrl && String(finalLogoUrl).startsWith('data:')) {
+        try {
+          const upRes = await uploadProductImage(finalLogoUrl, { folder: 'brand' });
+          if (upRes.success && upRes.url) {
+            finalLogoUrl = upRes.url;
+          }
+        } catch (uploadErr) {
+          console.warn('[systemSettingsService] Immediate logo upload failed, continuing with fallback:', uploadErr);
+        }
+      }
+
       const next = {
         ...this.settings,
         ...partial,
+        ...(finalLogoUrl !== undefined ? { storeLogoUrl: finalLogoUrl } : {}),
         lastUpdated: new Date().toISOString(),
       };
       // Keep legacy alias pairs in sync so every consumer reads the same value
@@ -337,15 +453,17 @@ class SystemSettingsService {
       if (partial.isMaintenanceMode !== undefined) next.maintenanceMode = partial.isMaintenanceMode;
       if (partial.autoAssignMechanics !== undefined) next.autoAssignMechanic = partial.autoAssignMechanics;
       if (partial.autoAssignMechanic !== undefined) next.autoAssignMechanics = partial.autoAssignMechanic;
+
       this.settings = next;
-      appStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
+      writeStoredSettingsJson(JSON.stringify(this.settings));
       if (typeof document !== 'undefined' && this.settings.storeName) {
         document.title = `${this.settings.storeName}${this.settings.storeTagline ? ' - ' + this.settings.storeTagline : ''}`;
       }
       this.notify();
+      this.broadcast(this.settings);
 
-      // Trigger cloud sync to Supabase so customers and other users immediately receive updates
-      this.syncToSupabase(this.settings);
+      // Cloud sync to Supabase so customers and other users immediately receive updates
+      await this.syncToSupabase(this.settings);
 
       return { success: true, settings: this.settings };
     } catch (err) {
@@ -354,18 +472,19 @@ class SystemSettingsService {
     }
   }
 
-  resetToDefaults() {
+  async resetToDefaults() {
     try {
       this.settings = {
         ...DEFAULT_SYSTEM_SETTINGS,
         lastUpdated: new Date().toISOString(),
       };
-      appStorage.setItem(STORAGE_KEY, JSON.stringify(this.settings));
+      writeStoredSettingsJson(JSON.stringify(this.settings));
       if (typeof document !== 'undefined') {
         document.title = 'MotoTrack';
       }
       this.notify();
-      this.syncToSupabase(this.settings);
+      this.broadcast(this.settings);
+      await this.syncToSupabase(this.settings);
       return { success: true, settings: this.settings };
     } catch (err) {
       console.error('Failed to reset system settings:', err);

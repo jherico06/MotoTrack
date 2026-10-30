@@ -65,16 +65,25 @@ async function sendViaSmtp({ to, subject, html }) {
     };
   }
 
-  const transporter = nodemailer.createTransport({
-    host,
-    port: Number(process.env.SMTP_PORT || 465),
-    secure: String(process.env.SMTP_SECURE || 'true') !== 'false',
-    auth: { user, pass: (pass || '').replace(/\s+/g, '') },
-  });
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port: Number(process.env.SMTP_PORT || 465),
+      secure: String(process.env.SMTP_SECURE || 'true') !== 'false',
+      auth: { user, pass: (pass || '').replace(/\s+/g, '') },
+    });
 
-  const from = process.env.EMAIL_FROM || `MotoTrack <${user}>`;
-  await transporter.sendMail({ from, to, subject, html });
-  return { ok: true, provider: 'smtp' };
+    const from = process.env.EMAIL_FROM || `MotoTrack <${user}>`;
+    await transporter.sendMail({ from, to, subject, html });
+    return { ok: true, provider: 'smtp' };
+  } catch (smtpErr) {
+    console.error('[emailDispatch] SMTP sendMail error:', smtpErr);
+    return {
+      ok: false,
+      provider: 'smtp',
+      error: smtpErr?.message || 'SMTP transmission error',
+    };
+  }
 }
 
 export async function sendTransactionalEmail({ to, subject, html }) {

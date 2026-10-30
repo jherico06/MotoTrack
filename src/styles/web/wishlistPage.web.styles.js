@@ -52,12 +52,12 @@ export function createWishlistWebStyles(isDark = false) {
     },
     logoText: {
       fontSize: 22,
-      fontWeight: '900',
+      fontWeight: '700',
       color: '#FFFFFF',
     },
     logoSubText: {
       fontSize: 10.5,
-      fontWeight: '800',
+      fontWeight: '600',
       color: '#94A3B8',
       letterSpacing: 1.2,
     },
@@ -72,22 +72,24 @@ export function createWishlistWebStyles(isDark = false) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 10,
+      gap: 16,
     },
     headerCenterBtn: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
+      height: 38,
       gap: 7,
       paddingHorizontal: 12,
-      paddingVertical: 7,
       borderRadius: 6,
       cursor: 'pointer',
       backgroundColor: 'transparent',
     },
     headerCenterBtnText: {
-      fontSize: 13.5,
-      fontWeight: '500',
-      color: 'rgba(255, 255, 255, 0.70)',
+      fontSize: 14,
+      fontWeight: '600',
+      lineHeight: 20,
+      color: 'rgba(255, 255, 255, 0.75)',
     },
     headerActions: {
       flex: 1,
@@ -110,24 +112,25 @@ export function createWishlistWebStyles(isDark = false) {
     },
     navBadgeCircle: {
       position: 'absolute',
-      top: -4,
-      right: -4,
-      minWidth: 18,
-      height: 18,
-      borderRadius: 9,
+      top: -3,
+      right: -3,
       backgroundColor: '#EF4444',
+      borderRadius: 9999,
+      minWidth: 16,
+      height: 16,
+      paddingHorizontal: 4,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 5,
-      borderWidth: 2,
-      borderColor: isDark ? '#151C19' : '#0A0F1C',
+      borderWidth: 1.5,
+      borderColor: isDark ? '#151C19' : '#1E293B',
       zIndex: 10,
-      boxShadow: '0 2px 6px rgba(239, 68, 68, 0.5)',
     },
     navBadgeText: {
       color: '#FFFFFF',
       fontSize: 10,
-      fontWeight: '900',
+      fontWeight: '700',
+      textAlign: 'center',
+      lineHeight: 12,
     },
     loggedInContainer: {
       flexDirection: 'row',
@@ -152,7 +155,7 @@ export function createWishlistWebStyles(isDark = false) {
     },
     signInHeaderBtnText: {
       fontSize: 13,
-      fontWeight: '800',
+      fontWeight: '600',
       color: '#FFFFFF',
     },
     scrollContent: {
@@ -177,7 +180,7 @@ export function createWishlistWebStyles(isDark = false) {
     },
     pageTitle: {
       fontSize: 24,
-      fontWeight: '900',
+      fontWeight: '700',
       color: isDark ? '#F5F7F6' : '#0F172A',
     },
     pageSub: {
@@ -202,7 +205,7 @@ export function createWishlistWebStyles(isDark = false) {
     },
     clearWishlistBtnText: {
       fontSize: 13,
-      fontWeight: '800',
+      fontWeight: '600',
       color: isDark ? '#F87171' : '#DC2626',
     },
     moveAllBtn: {
@@ -216,7 +219,7 @@ export function createWishlistWebStyles(isDark = false) {
     },
     moveAllBtnText: {
       fontSize: 13,
-      fontWeight: '800',
+      fontWeight: '600',
       color: '#FFFFFF',
     },
     emptyBox: {
@@ -230,7 +233,7 @@ export function createWishlistWebStyles(isDark = false) {
     },
     emptyTitle: {
       fontSize: 18,
-      fontWeight: '800',
+      fontWeight: '600',
       color: isDark ? '#F5F7F6' : '#0F172A',
       marginTop: 14,
     },
@@ -254,7 +257,7 @@ export function createWishlistWebStyles(isDark = false) {
     exploreStoreBtnText: {
       color: '#FFFFFF',
       fontSize: 13.5,
-      fontWeight: '800',
+      fontWeight: '600',
     },
     productGrid: {
       flexDirection: 'row',
@@ -319,7 +322,7 @@ export function createWishlistWebStyles(isDark = false) {
     },
     priceMainText: {
       fontSize: 15.5,
-      fontWeight: '800',
+      fontWeight: '600',
       color: '#EA580C',
     },
     tagsRow: {
@@ -336,7 +339,7 @@ export function createWishlistWebStyles(isDark = false) {
     },
     codTagText: {
       fontSize: 10,
-      fontWeight: '800',
+      fontWeight: '600',
       color: isDark ? '#FBBF24' : '#B45309',
     },
     stockTag: {

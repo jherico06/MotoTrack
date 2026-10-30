@@ -292,7 +292,7 @@ export default function ForecastChart({
             style={{
               color: isDark ? '#E8EAF0' : '#111318',
               fontSize: 12.5,
-              fontWeight: '800',
+              fontWeight: '600',
               marginBottom: 8,
             }}
           >
@@ -311,7 +311,7 @@ export default function ForecastChart({
               />
               <Text style={{ color: isDark ? '#C4C6D4' : '#4B5563', fontSize: 12, fontWeight: '500' }}>
                 Actual Sales:{' '}
-                <Text style={{ fontWeight: '800', color: isDark ? '#E8EAF0' : '#111318' }}>
+                <Text style={{ fontWeight: '600', color: isDark ? '#E8EAF0' : '#111318' }}>
                   {formatUnits(hover.actual)}
                 </Text>
               </Text>
@@ -330,7 +330,7 @@ export default function ForecastChart({
               />
               <Text style={{ color: isDark ? '#C4C6D4' : '#4B5563', fontSize: 12, fontWeight: '500' }}>
                 Regression Trend:{' '}
-                <Text style={{ fontWeight: '800', color: isDark ? '#E8EAF0' : '#111318' }}>
+                <Text style={{ fontWeight: '600', color: isDark ? '#E8EAF0' : '#111318' }}>
                   {formatUnits(hover.fitted)}
                 </Text>
               </Text>
@@ -350,7 +350,7 @@ export default function ForecastChart({
                 />
                 <Text style={{ color: isDark ? '#C4C6D4' : '#4B5563', fontSize: 12, fontWeight: '500' }}>
                   Forecast:{' '}
-                  <Text style={{ fontWeight: '800', color: isDark ? '#E8EAF0' : '#111318' }}>
+                  <Text style={{ fontWeight: '600', color: isDark ? '#E8EAF0' : '#111318' }}>
                     {formatUnits(hover.forecast)}
                   </Text>
                 </Text>
@@ -358,7 +358,7 @@ export default function ForecastChart({
               {hover.rangeLow != null && hover.rangeHigh != null ? (
                 <Text style={{ color: isDark ? '#C4C6D4' : '#4B5563', fontSize: 11.5, fontWeight: '500', marginLeft: 16 }}>
                   Range:{' '}
-                  <Text style={{ fontWeight: '800', color: isDark ? '#E8EAF0' : '#111318' }}>
+                  <Text style={{ fontWeight: '600', color: isDark ? '#E8EAF0' : '#111318' }}>
                     {hover.rangeLow}–{hover.rangeHigh} units
                   </Text>
                 </Text>

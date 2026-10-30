@@ -94,7 +94,7 @@ export default function ServiceReceiptModal({
               </View>
             </View>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
-              <BootstrapIcon name="x-lg" size={14} color={isDark ? t.textMuted : '#64748B'} />
+              <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? t.textMuted : '#64748B'} />
             </TouchableOpacity>
           </View>
 
@@ -304,7 +304,7 @@ function createStyles(t, isDark) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    headerTitle: { fontSize: 16, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A' },
+    headerTitle: { fontSize: 16, fontWeight: '600', color: isDark ? t.textPrimary : '#0F172A' },
     headerSub: { fontSize: 12, color: isDark ? t.textMuted : '#64748B', marginTop: 2 },
     body: { paddingHorizontal: 16, paddingTop: 14 },
     receiptCard: {
@@ -316,7 +316,7 @@ function createStyles(t, isDark) {
     },
     brand: {
       fontSize: 13,
-      fontWeight: '900',
+      fontWeight: '600',
       letterSpacing: 1.2,
       color: isDark ? t.accentBrand : '#EA580C',
       textAlign: 'center',
@@ -339,7 +339,7 @@ function createStyles(t, isDark) {
       paddingVertical: 5,
       borderRadius: 999,
     },
-    verifiedText: { fontSize: 10.5, fontWeight: '800', color: isDark ? '#86EFAC' : '#166534' },
+    verifiedText: { fontSize: 10.5, fontWeight: '600', color: isDark ? '#86EFAC' : '#166534' },
     dash: {
       borderStyle: 'dashed',
       borderWidth: 1,
@@ -348,7 +348,7 @@ function createStyles(t, isDark) {
     },
     sectionLabel: {
       fontSize: 10.5,
-      fontWeight: '800',
+      fontWeight: '600',
       color: isDark ? t.textMuted : '#64748B',
       letterSpacing: 0.6,
       marginTop: 6,
@@ -357,7 +357,7 @@ function createStyles(t, isDark) {
     row: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginBottom: 6 },
     rowLabel: { flex: 1, fontSize: 12.5, color: isDark ? t.textSecondary : '#475569' },
     rowValue: { fontSize: 12.5, fontWeight: '700', color: isDark ? t.textPrimary : '#0F172A' },
-    bold: { fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A' },
+    bold: { fontWeight: '600', color: isDark ? t.textPrimary : '#0F172A' },
     danger: { color: isDark ? t.statusDangerText : '#DC2626' },
     totalRow: {
       flexDirection: 'row',
@@ -365,8 +365,8 @@ function createStyles(t, isDark) {
       alignItems: 'center',
       marginBottom: 8,
     },
-    totalLabel: { fontSize: 13, fontWeight: '900', color: isDark ? t.accentBrand : '#EA580C' },
-    totalValue: { fontSize: 20, fontWeight: '900', color: isDark ? t.accentBrand : '#EA580C' },
+    totalLabel: { fontSize: 13, fontWeight: '600', color: isDark ? t.accentBrand : '#EA580C' },
+    totalValue: { fontSize: 20, fontWeight: '700', color: isDark ? t.accentBrand : '#EA580C' },
     notice: {
       marginTop: 12,
       fontSize: 11.5,
@@ -402,6 +402,6 @@ function createStyles(t, isDark) {
       paddingVertical: 12,
       alignItems: 'center',
     },
-    primaryBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 13 },
+    primaryBtnText: { color: '#FFFFFF', fontWeight: '600', fontSize: 13 },
   });
 }

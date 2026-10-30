@@ -65,7 +65,7 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
                 <BootstrapIcon name="shield-lock-fill" size={17} color="#EA580C" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16.5, fontWeight: '800', color: '#0F172A' }}>
+                <Text style={{ fontSize: 16.5, fontWeight: '600', color: '#0F172A' }}>
                   Admin Privileges Required
                 </Text>
                 <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
@@ -122,7 +122,7 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
             activeOpacity={0.85}
           >
             <BootstrapIcon name="shield-check" size={16} color="#FFFFFF" />
-            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13.5 }}>
+            <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13.5 }}>
               Switch to Store Admin (One-Click)
             </Text>
           </TouchableOpacity>
@@ -146,7 +146,7 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
             activeOpacity={0.85}
           >
             <BootstrapIcon name="box-arrow-in-right" size={14} color="#475569" />
-            <Text style={{ color: '#475569', fontWeight: '800', fontSize: 13.5 }}>
+            <Text style={{ color: '#475569', fontWeight: '600', fontSize: 13.5 }}>
               Sign In with Admin Credentials
             </Text>
           </TouchableOpacity>

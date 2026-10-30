@@ -334,8 +334,8 @@ export default function CustomizerPageWeb({
     try {
       const res = await motorcycleService.addMotorcycle({
         ...bikeData,
-        user_id: currentUser?.id || 'usr-rider-01',
-        customer_id: currentUser?.customer_id || currentUser?.id || 'cust-demo-01',
+        user_id: currentUser?.id || currentUser?.user_id,
+        customer_id: currentUser?.customer_id || currentUser?.id,
         customer_email: currentUser?.email || '',
       });
       if (res?.success && res.motorcycle) {
@@ -609,7 +609,31 @@ export default function CustomizerPageWeb({
                 activeOpacity={0.9}
                 title="Customize"
               >
-                <Text style={styles.headerCenterBtnTextActive}>Customize</Text>
+                <Text style={styles.headerCenterBtnTextActive}>
+                  Customize
+                </Text>
+              </TouchableOpacity>
+
+              {/* Garage Button */}
+              <TouchableOpacity
+                className="main-nav-tab"
+                style={styles.headerCenterBtn}
+                onPress={() => onNavigateToProfile?.('garage')}
+                activeOpacity={0.8}
+                title="Garage"
+              >
+                <Text style={styles.headerCenterBtnText}>Garage</Text>
+              </TouchableOpacity>
+
+              {/* Orders Button */}
+              <TouchableOpacity
+                className="main-nav-tab"
+                style={styles.headerCenterBtn}
+                onPress={() => onNavigateToOrders?.()}
+                activeOpacity={0.8}
+                title="Orders"
+              >
+                <Text style={styles.headerCenterBtnText}>Orders</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -655,7 +679,7 @@ export default function CustomizerPageWeb({
                   if (screen === 'store' || screen === 'shop') onNavigateToStore?.();
                   else if (screen === 'orders') onNavigateToOrders?.();
                   else if (screen === 'notifications') onNavigateToProfile?.('notifications');
-                  else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
+                  else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
                   else if (screen === 'garage') onNavigateToGarage?.();
                 }}
                 currentUser={currentUser}
@@ -690,11 +714,11 @@ export default function CustomizerPageWeb({
                   currentUser={currentUser}
                   isOpen={isUserDropdownOpen}
                   currentScreen="customizer"
-                  showDashboard={true}
+                  showDashboard={false}
                   isDark={isDarkMode}
                   onToggleDarkMode={toggleDarkMode}
                   onClose={() => setIsUserDropdownOpen(false)}
-                  onNavigateToDashboard={() => onNavigateToProfile?.('overview')}
+                  onNavigateToDashboard={() => onNavigateToProfile?.('garage')}
                   onNavigateToOrders={() => onNavigateToOrders?.()}
                   onNavigateToProfile={(tab = 'profile') => onNavigateToProfile?.(typeof tab === 'string' ? tab : 'profile')}
                   onNavigateToSettings={() => onNavigateToProfile?.('settings')}
@@ -747,7 +771,7 @@ export default function CustomizerPageWeb({
               <View style={[styles.partModalHeader, isDarkMode && { borderBottomColor: '#26332E' }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <BootstrapIcon name="info-circle-fill" size={18} color={isDarkMode ? '#EA580C' : '#EA580C'} />
-                  <Text style={{ fontSize: 15, fontWeight: '800', color: isDarkMode ? '#F5F7F6' : '#0F172A' }}>
+                  <Text style={{ fontSize: 15, fontWeight: '600', color: isDarkMode ? '#F5F7F6' : '#0F172A' }}>
                     Part Details & Fitment
                   </Text>
                 </View>
@@ -825,7 +849,7 @@ export default function CustomizerPageWeb({
         onClose={() => setIsCheckoutModalOpen(false)}
         onCompleteOrder={() => {
           setIsCheckoutModalOpen(false);
-          showToast('🎉 Order placed successfully! Check your orders in dashboard.');
+          showToast('🎉 Order placed successfully! Check your orders.');
           onNavigateToOrders?.();
         }}
         onOpenProfile={() => {
@@ -896,7 +920,7 @@ export default function CustomizerPageWeb({
           else if (screen === 'garage') onNavigateToGarage?.();
           else if (screen === 'customizer') { /* already here */ }
           else if (screen === 'wishlist') onNavigateToWishlist?.();
-          else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
+          else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
           else if (screen === 'login') onNavigateToLogin?.();
           else if (screen === 'admin') onNavigateToAdmin?.();
         }}

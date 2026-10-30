@@ -276,7 +276,7 @@ export default function AdminMarketingBannerSettings({
                 <Text
                   style={{
                     fontSize: 20,
-                    fontWeight: '900',
+                    fontWeight: '600',
                     color: textColor,
                     letterSpacing: -0.3,
                     fontFamily: fontFamily.sans,
@@ -292,7 +292,7 @@ export default function AdminMarketingBannerSettings({
                     borderRadius: 6,
                   }}
                 >
-                  <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#FF5A0A' }}>
+                  <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#FF5A0A' }}>
                     Landing Page Hero
                   </Text>
                 </View>
@@ -362,7 +362,7 @@ export default function AdminMarketingBannerSettings({
               <Text
                 style={{
                   fontSize: 13.5,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: '#FFFFFF',
                   fontFamily: fontFamily.sans,
                 }}
@@ -412,7 +412,7 @@ export default function AdminMarketingBannerSettings({
               <Text
                 style={{
                   fontSize: 16,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: textColor,
                   fontFamily: fontFamily.sans,
                 }}
@@ -501,7 +501,7 @@ export default function AdminMarketingBannerSettings({
             width: previewDevice === 'mobile' ? 380 : '100%',
             maxWidth: '100%',
             alignSelf: 'center',
-            backgroundColor: '#171C22',
+            backgroundColor: '#24272B',
             borderRadius: 18,
             overflow: 'hidden',
             position: 'relative',
@@ -534,7 +534,7 @@ export default function AdminMarketingBannerSettings({
                 style={{
                   width: '100%',
                   height: '100%',
-                  backgroundColor: '#1E252D',
+                  backgroundColor: '#24272B',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -554,8 +554,8 @@ export default function AdminMarketingBannerSettings({
                   bottom: 0,
                   background:
                     previewDevice === 'desktop'
-                      ? 'linear-gradient(90deg, #171C22 0%, #171C22 18%, rgba(23, 28, 34, 0.92) 40%, rgba(23, 28, 34, 0.3) 75%, rgba(23, 28, 34, 0) 100%)'
-                      : 'linear-gradient(180deg, rgba(23, 28, 34, 0.95) 0%, rgba(23, 28, 34, 0.8) 50%, #171C22 100%)',
+                      ? 'linear-gradient(90deg, #24272B 0%, #24272B 18%, rgba(36, 39, 43, 0.92) 40%, rgba(36, 39, 43, 0.3) 75%, rgba(36, 39, 43, 0) 100%)'
+                      : 'linear-gradient(180deg, rgba(36, 39, 43, 0.95) 0%, rgba(36, 39, 43, 0.8) 50%, #24272B 100%)',
                   pointerEvents: 'none',
                 }}
               />
@@ -581,7 +581,7 @@ export default function AdminMarketingBannerSettings({
                     style={{
                       color: i % 2 === 0 ? '#FF5A0A' : '#FFFFFF',
                       fontSize: 11,
-                      fontWeight: '900',
+                      fontWeight: '600',
                       letterSpacing: 2,
                       fontFamily: fontFamily.sans,
                       textTransform: 'uppercase',
@@ -620,7 +620,7 @@ export default function AdminMarketingBannerSettings({
                   style={{
                     color: '#FF5A0A',
                     fontSize: 11,
-                    fontWeight: '900',
+                    fontWeight: '600',
                     letterSpacing: 2,
                     textTransform: 'uppercase',
                     fontFamily: fontFamily.sans,
@@ -634,7 +634,7 @@ export default function AdminMarketingBannerSettings({
               <Text
                 style={{
                   fontSize: previewDevice === 'desktop' ? 32 : 24,
-                  fontWeight: '900',
+                  fontWeight: '600',
                   color: '#FFFFFF',
                   lineHeight: previewDevice === 'desktop' ? 38 : 30,
                   letterSpacing: -0.6,
@@ -686,7 +686,7 @@ export default function AdminMarketingBannerSettings({
                   }}
                 >
                   <BootstrapIcon name="cart3" size={13} color="#FFFFFF" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '600' }}>
                     Shop Parts
                   </Text>
                 </View>
@@ -764,7 +764,7 @@ export default function AdminMarketingBannerSettings({
             <Text
               style={{
                 fontSize: 16,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: textColor,
                 fontFamily: fontFamily.sans,
               }}
@@ -1110,7 +1110,7 @@ export default function AdminMarketingBannerSettings({
             <Text
               style={{
                 fontSize: 13.5,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: '#FFFFFF',
                 fontFamily: fontFamily.sans,
               }}

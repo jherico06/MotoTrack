@@ -2,6 +2,7 @@
 import { supabase } from '../../lib/supabase.js';
 import { orderService } from '../orders/orderService.js';
 import { supplierService } from '../inventory/supplierService.js';
+import { categoryService } from '../products/categoryService.js';
 
 export const databaseService = {
   // ─── 1. SUPPLIERS ───
@@ -32,86 +33,23 @@ export const databaseService = {
   },
 
   // ─── 2. CATEGORIES ───
-  async getCategories() {
-    if (supabase) {
-      try {
-        const { data, error } = await supabase
-          .from('categories')
-          .select('*')
-          .order('name', { ascending: true });
-        if (!error && data && data.length > 0) return data;
-      } catch (e) {
-        console.warn('Failed to fetch categories from Supabase:', e);
-      }
+  async getCategories(options) {
+    try {
+      return await categoryService.getCategories(options);
+    } catch (e) {
+      console.warn('Failed to fetch categories:', e);
+      return [];
     }
-    return [
-      {
-        category_id: 'cat-01',
-        name: 'Engine',
-        description: 'Camshafts, big bore kits, pistons and high-performance engine parts',
-      },
-      {
-        category_id: 'cat-02',
-        name: 'Electrical',
-        description: 'Lithium batteries, iridium spark plugs, stators and electronics',
-      },
-      {
-        category_id: 'cat-03',
-        name: 'Tires & Wheels',
-        description: 'WSBK compound racing tires and forged lightweight wheels',
-      },
-      {
-        category_id: 'cat-04',
-        name: 'Brakes',
-        description: 'Radial master cylinders, monobloc calipers, racing pads and rotors',
-      },
-      {
-        category_id: 'cat-05',
-        name: 'Suspension',
-        description: 'Monoshock dampers, cartridge kits, steering dampers and springs',
-      },
-      {
-        category_id: 'cat-06',
-        name: 'Transmission',
-        description: 'Gold racing chains, sprockets, slipper clutches and quickshifters',
-      },
-      {
-        category_id: 'cat-07',
-        name: 'Fuel System',
-        description: 'ECU tuners, flat-slide carburetors, fuel pumps and injectors',
-      },
-      {
-        category_id: 'cat-08',
-        name: 'Body Parts',
-        description: 'Full carbon fiber fairings, CNC billet rearsets and aero winglets',
-      },
-      {
-        category_id: 'cat-09',
-        name: 'Exhaust',
-        description: 'Titanium & Carbon fiber slip-on and full racing exhaust systems',
-      },
-      {
-        category_id: 'cat-10',
-        name: 'Maintenance',
-        description: '100% synthetic racing oils, high-flow filters, fluids and care',
-      },
-      {
-        category_id: 'cat-11',
-        name: 'Accessories',
-        description: 'FIM helmets, phone vibration mounts, luggage and gear',
-      },
-    ];
   },
 
-  async addCategory({ name, description = '' }) {
-    const id = 'cat-' + Date.now();
-    const newCat = { category_id: id, name, description };
-    if (supabase) {
-      try {
-        await supabase.from('categories').insert([newCat]);
-      } catch (e) {}
+  async addCategory({ name, description = '', icon = '', image = '' }) {
+    try {
+      const res = await categoryService.addCategory({ name, description, icon, image });
+      return res.category || res;
+    } catch (e) {
+      console.warn('Failed to add category:', e);
+      return { category_id: 'cat-' + Date.now(), name, description };
     }
-    return newCat;
   },
 
   // ─── 3. INVENTORY & STOCKS ───

@@ -45,6 +45,8 @@ import {
   RegisterMotorcycleModal,
   EditCustomerSettingsModal,
   CartModal,
+  RateDeliveredOrderModal,
+  CustomerSubmitReportModal,
 } from '../../../components/modals';
 import { motorcycleService } from '../../../services/products/motorcycleService.js';
 import { customizationService } from '../../../services/bookings/customizationService.js';
@@ -146,11 +148,10 @@ const MOTORCYCLE_BRANDS = ['Yamaha', 'Honda', 'Kawasaki', 'Suzuki', 'Ducati', 'B
 
 const MAIN_NAV_ITEMS = [
   { id: 'shop', label: 'Shop' },
-  { id: 'overview', label: 'Overview' },
-  { id: 'garage', label: 'My Garage' },
-  { id: 'orders', label: 'My Orders' },
-  { id: 'wishlist', label: 'My Wishlist' },
-  { id: 'bookings', label: 'Booked Services' },
+  { id: 'booking', label: 'Book a Service' },
+  { id: 'customize', label: 'Customize' },
+  { id: 'garage', label: 'Garage' },
+  { id: 'orders', label: 'Orders' },
 ];
 
 function formatNotifTime(isoString) {
@@ -257,7 +258,7 @@ function getNotifActionLabel(notif) {
 }
 
 export default function ProfilePage({
-  initialTab = 'overview',
+  initialTab = 'garage',
   onNavigateToStore,
   onNavigateToGarage,
   onNavigateToOrders,
@@ -299,20 +300,26 @@ export default function ProfilePage({
   // ─── ACTIVE NAVIGATION TAB ───
   // ─── ACTIVE NAVIGATION TAB ───
   // 'overview' | 'garage' | 'orders' | 'bookings' | 'profile' | 'notifications' | 'settings'
-  const resolveWebTab = (t) => (t && typeof t === 'object' ? t.tab : t);
+  const resolveWebTab = (t) => {
+    const raw = (t && typeof t === 'object' ? t.tab : t);
+    if (raw === 'bookings') {
+      onNavigateToGarage?.();
+      return 'garage';
+    }
+    return raw === 'overview' ? 'garage' : raw;
+  };
   const [activeTab, setActiveTab] = useState(() => {
     const raw = resolveWebTab(initialTab);
     if (
       raw === 'orders' ||
-      raw === 'bookings' ||
-      raw === 'garage' ||
+            raw === 'garage' ||
       raw === 'settings' ||
       raw === 'notifications' ||
       raw === 'profile'
     ) {
       return raw;
     }
-    return 'overview';
+    return 'garage';
   });
 
   useEffect(() => {
@@ -320,9 +327,9 @@ export default function ProfilePage({
     if (raw === 'wishlist') {
       onNavigateToWishlist?.();
     } else if (raw) {
-      setActiveTab(raw);
+      setActiveTab(raw === 'overview' || raw === 'bookings' ? 'garage' : raw);
     }
-  }, [initialTab, onNavigateToWishlist]);
+  }, [initialTab, onNavigateToWishlist, onNavigateToGarage]);
 
   // Profile Form State
   const initialName = currentUser?.name || currentUser?.fullName || '';
@@ -339,10 +346,10 @@ export default function ProfilePage({
   const [isEditingPersonalInfo, setIsEditingPersonalInfo] = useState(false);
   const [isEditingGarageInfo, setIsEditingGarageInfo] = useState(false);
   const [isEditingSecurity, setIsEditingSecurity] = useState(false);
-  const [bikeBrand, setBikeBrand] = useState(currentUser?.bikeBrand || 'Yamaha');
-  const [bikeModel, setBikeModel] = useState(currentUser?.bikeModel || 'NMAX 155');
-  const [bikePlate, setBikePlate] = useState(currentUser?.bikePlate || 'NM-4892');
-  const [bikeOdo, setBikeOdo] = useState(currentUser?.bikeOdo || '12,400 km');
+  const [bikeBrand, setBikeBrand] = useState(currentUser?.bikeBrand || '');
+  const [bikeModel, setBikeModel] = useState(currentUser?.bikeModel || '');
+  const [bikePlate, setBikePlate] = useState(currentUser?.bikePlate || '');
+  const [bikeOdo, setBikeOdo] = useState(currentUser?.bikeOdo || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [isEditEmailOpen, setIsEditEmailOpen] = useState(false);
@@ -362,7 +369,7 @@ export default function ProfilePage({
 
   // Motorcycle Fleet State ("My Garage")
   const [motorcycles, setMotorcycles] = useState(() =>
-    motorcycleService.getMotorcycles(currentUser?.id)
+    currentUser?.id ? motorcycleService.getMotorcycles(currentUser?.id) : []
   );
   const [isMotorcycleModalOpen, setIsMotorcycleModalOpen] = useState(false);
   const [editingMotorcycle, setEditingMotorcycle] = useState(null);
@@ -414,6 +421,12 @@ export default function ProfilePage({
   // Live Tracking Modal State
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
+
+  // Customer Rating & Report Modal States
+  const [selectedOrderForRating, setSelectedOrderForRating] = useState(null);
+  const [isRateOrderModalOpen, setIsRateOrderModalOpen] = useState(false);
+  const [isSubmitReportModalOpen, setIsSubmitReportModalOpen] = useState(false);
+  const [reportContextOrder, setReportContextOrder] = useState(null);
 
   // Saved Customizations & AI Previews State
   const [customizations, setCustomizations] = useState([]);
@@ -618,15 +631,19 @@ export default function ProfilePage({
     } catch (_e) {}
 
     try {
-      orderService
-        .getUserOrders(
-          currentUser?.id || currentUser?.user_id,
-          currentUser?.customer_id,
-          currentUser?.name,
-          currentUser
-        )
-        .then((list) => setOrders(Array.isArray(list) ? list : []))
-        .catch(() => setOrders([]));
+      if (currentUser?.id || currentUser?.user_id) {
+        orderService
+          .getUserOrders(
+            currentUser?.id || currentUser?.user_id,
+            currentUser?.customer_id,
+            currentUser?.name,
+            currentUser
+          )
+          .then((list) => setOrders(Array.isArray(list) ? list : []))
+          .catch(() => setOrders([]));
+      } else {
+        setOrders([]);
+      }
     } catch (_e) {
       setOrders([]);
     }
@@ -640,11 +657,11 @@ export default function ProfilePage({
     let unsubMoto = () => {};
     try {
       if (typeof motorcycleService?.subscribe === 'function') {
-        unsubMoto = motorcycleService.subscribe((list) => {
-          setMotorcycles([...list]);
+        unsubMoto = motorcycleService.subscribe(() => {
+          setMotorcycles(currentUser?.id ? motorcycleService.getMotorcycles(currentUser.id) || [] : []);
         });
       }
-      setMotorcycles(motorcycleService.getMotorcycles(currentUser?.id) || []);
+      setMotorcycles(currentUser?.id ? motorcycleService.getMotorcycles(currentUser?.id) || [] : []);
     } catch (_e) {}
 
     const unsubSettings = systemSettingsService.subscribe(() => {
@@ -966,7 +983,7 @@ export default function ProfilePage({
     const link = (notif.link || '').toLowerCase();
     const type = (notif.type || '').toLowerCase();
     if (type === 'booking' || link === 'bookings' || link === 'garage') {
-      setActiveTab('bookings');
+      onNavigateToGarage?.();
     } else if (type === 'order' || link === 'orders') {
       setActiveTab('orders');
       if (notif.meta?.orderId) {
@@ -985,7 +1002,7 @@ export default function ProfilePage({
     } else if (type === 'security' || link === 'settings') {
       setActiveTab('settings');
     } else {
-      setActiveTab('overview');
+      setActiveTab('garage');
     }
   };
 
@@ -1266,7 +1283,7 @@ export default function ProfilePage({
             elevation: 10,
           }}
         >
-          <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13.5 }}>{toastMessage}</Text>
+          <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13.5 }}>{toastMessage}</Text>
         </View>
       ) : null}
 
@@ -1308,8 +1325,8 @@ export default function ProfilePage({
             </TouchableOpacity>
           </View>
 
-          {/* MAIN NAVIGATION (CENTERED): Overview | My Garage | My Orders | Booked Services */}
-          {windowWidth >= 1024 && (
+          {/* MAIN NAVIGATION (CENTERED): Shop | Book a Service | Customize | Garage | Orders */}
+          {windowWidth >= 768 && (
             <View style={styles.headerCenterNav}>
               <View style={styles.mainNavList}>
                 {MAIN_NAV_ITEMS.map((item) => {
@@ -1322,15 +1339,23 @@ export default function ProfilePage({
                       onPress={() => {
                         if (item.id === 'shop') {
                           onNavigateToStore?.();
-                        } else if (item.id === 'wishlist') {
-                          onNavigateToWishlist?.();
+                        } else if (item.id === 'booking') {
+                          onNavigateToGarage?.();
+                        } else if (item.id === 'customize') {
+                          if (onNavigateToCustomizer) onNavigateToCustomizer();
+                          else onNavigateToStore?.();
                         } else {
                           setActiveTab(item.id);
                         }
                       }}
                       activeOpacity={0.8}
                     >
-                      <Text style={[styles.mainNavItemText, isActive && styles.mainNavItemTextActive]}>
+                      <Text
+                        style={[
+                          styles.mainNavItemText,
+                          isActive && styles.mainNavItemTextActive,
+                        ]}
+                      >
                         {item.label}
                       </Text>
                     </TouchableOpacity>
@@ -1341,7 +1366,7 @@ export default function ProfilePage({
           )}
 
           {/* RIGHT: [Heart] | [Bell] | [Cart] | [⚙] | [Profile] */}
-          <View style={[styles.headerActions, windowWidth < 768 && { gap: 6 }]}>
+          <View style={[styles.headerActions, windowWidth < 768 && { gap: 8 }]}>
             {/* Wishlist / Heart Icon [Heart] */}
             <TouchableOpacity
               style={styles.navActionIconBtn}
@@ -1414,7 +1439,7 @@ export default function ProfilePage({
 
             {/* User Profile Avatar [Profile] or Sign In */}
             {currentUser ? (
-              <View style={{ position: 'relative' }}>
+              <View style={[styles.loggedInContainer, { position: 'relative' }]}>
                 <UserProfileButton
                   currentUser={currentUser}
                   onPress={() => {
@@ -1428,11 +1453,11 @@ export default function ProfilePage({
                   currentUser={currentUser}
                   isOpen={isProfileDropdownOpen}
                   currentScreen="profile"
-                  showDashboard={true}
+                  showDashboard={false}
                   isDark={isDarkMode}
                   onToggleDarkMode={toggleDarkMode}
                   onClose={() => setIsProfileDropdownOpen(false)}
-                  onNavigateToDashboard={(tab = 'overview') => setActiveTab(tab)}
+                  onNavigateToDashboard={(tab = 'garage') => setActiveTab(tab)}
                   onNavigateToOrders={() => setActiveTab('orders')}
                   onNavigateToProfile={(tab = 'profile') => {
                     setActiveTab(typeof tab === 'string' ? tab : 'profile');
@@ -1455,10 +1480,14 @@ export default function ProfilePage({
               </View>
             ) : (
               <TouchableOpacity
-                style={styles.btnPrimary}
+                style={styles.signInHeaderBtn || styles.btnPrimary}
                 onPress={onNavigateToLogin}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityLabel="Sign In"
               >
-                <Text style={styles.btnPrimaryText}>Sign In</Text>
+                <BootstrapIcon name="person" size={15} color="#FFFFFF" />
+                <Text style={styles.signInHeaderBtnText || styles.btnPrimaryText}>Sign In</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -1476,8 +1505,11 @@ export default function ProfilePage({
                   onPress={() => {
                     if (item.id === 'shop') {
                       onNavigateToStore?.();
-                    } else if (item.id === 'wishlist') {
-                      onNavigateToWishlist?.();
+                    } else if (item.id === 'booking') {
+                      onNavigateToGarage?.();
+                    } else if (item.id === 'customize') {
+                      if (onNavigateToCustomizer) onNavigateToCustomizer();
+                      else onNavigateToStore?.();
                     } else {
                       setActiveTab(item.id);
                     }
@@ -1511,1332 +1543,10 @@ export default function ProfilePage({
             ]}
           >
             {/* ───────────────────────────────────────────────────────── */}
-            {/* TAB 1: OVERVIEW                                           */}
-            {/* ───────────────────────────────────────────────────────── */}
-            {activeTab === 'overview' && (
-              <View>
-                {/* 1. Summary / Statistics Cards (5 Cards) */}
-                <View style={styles.statsGrid}>
-                  {/* Card 1: Orders Placed */}
-                  <TouchableOpacity
-                    style={styles.statCard}
-                    onPress={() => setActiveTab('orders')}
-                    activeOpacity={0.88}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={styles.statLabel}>Orders Placed</Text>
-                      {activeOrders.length > 0 && (
-                        <View style={{ backgroundColor: tokens.statusInfoBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5, borderWidth: 1, borderColor: tokens.statusInfoBorder }}>
-                          <Text style={{ fontSize: 10, fontWeight: '700', color: tokens.statusInfoText }}>
-                            {activeOrders.length} active
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.statValue}>{orders.length}</Text>
-                    <Text style={styles.statSub}>
-                      {activeOrders.length > 0 ? `${activeOrders.length} active in delivery` : 'All deliveries completed'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Card 2: Garage Bookings */}
-                  <TouchableOpacity
-                    style={styles.statCard}
-                    onPress={() => setActiveTab('bookings')}
-                    activeOpacity={0.88}
-                  >
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Text style={styles.statLabel}>Garage Bookings</Text>
-                      {activeBookings.length > 0 && (
-                        <View style={{ backgroundColor: tokens.brandLight, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 5, borderWidth: 1, borderColor: tokens.brandBorder }}>
-                          <Text style={{ fontSize: 10, fontWeight: '700', color: tokens.brandPrimary }}>
-                            Scheduled
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    <Text style={styles.statValue}>{activeBookings.length}</Text>
-                    <Text style={styles.statSub}>
-                      {activeBookings.length > 0 ? `${activeBookings.length} scheduled services` : 'No scheduled pit services'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Card 3: Saved Wishlist */}
-                  <TouchableOpacity
-                    style={styles.statCard}
-                    onPress={onNavigateToWishlist}
-                    activeOpacity={0.88}
-                  >
-                    <Text style={styles.statLabel}>Saved Wishlist</Text>
-                    <Text style={styles.statValue}>{wishlistCount || 0}</Text>
-                    <Text style={styles.statSub}>Components ready for your next build</Text>
-                  </TouchableOpacity>
-
-                  {/* Card 4: Total Spend */}
-                  <View style={styles.statCard}>
-                    <Text style={styles.statLabel}>Total Spend</Text>
-                    <Text style={styles.statValue}>₱{Number(totalSpent).toLocaleString()}</Text>
-                    <Text style={styles.statSub}>Verified purchases</Text>
-                  </View>
-
-                  {/* Card 5: Custom Builds */}
-                  <TouchableOpacity
-                    style={styles.statCard}
-                    onPress={() => onNavigateToCustomizer?.()}
-                    activeOpacity={0.88}
-                  >
-                    <Text style={styles.statLabel}>Custom Builds</Text>
-                    <Text style={styles.statValue}>{customizations.length}</Text>
-                    <Text style={styles.statSub}>
-                      {customizations.length > 0 ? `${customizations.length} AI installation previews` : 'Create your dream build'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-
-                {/* 2. Dashboard Main Content: Two-Column Activity Cards */}
-                <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 20, marginBottom: 20 }}>
-                  {/* LEFT: Recent Orders */}
-                  <View style={[styles.sectionCard, { flex: 1, marginBottom: 0, justifyContent: 'flex-start' }]}>
-                    {/* Standardized Header */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <View
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            backgroundColor: tokens.brandLight,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderWidth: 1,
-                            borderColor: tokens.brandBorder,
-                          }}
-                        >
-                          <BootstrapIcon name="box-seam-fill" size={15} color={tokens.brandPrimary} />
-                        </View>
-                        <View>
-                          <Text style={{ fontSize: 15.5, fontWeight: '800', color: tokens.textPrimary }}>
-                            Recent Orders
-                          </Text>
-                          <Text style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 1 }}>
-                            Your latest motorcycle parts and accessories orders
-                          </Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity onPress={() => setActiveTab('orders')} activeOpacity={0.7}>
-                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#EA580C' }}>
-                          View All ({orders.length}) →
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {orders.length === 0 ? (
-                      <View style={{ paddingVertical: 28, alignItems: 'center' }}>
-                        <BootstrapIcon name="cart3" size={32} color={tokens.textMuted} />
-                        <Text style={{ fontSize: 13.5, fontWeight: '700', color: tokens.textPrimary, marginTop: 8 }}>
-                          No Orders Yet
-                        </Text>
-                        <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 4 }}>
-                          Explore genuine racing parts & components.
-                        </Text>
-                        <TouchableOpacity
-                          style={[styles.btnPrimary, { marginTop: 14 }]}
-                          onPress={onNavigateToStore}
-                          activeOpacity={0.85}
-                        >
-                          <Text style={styles.btnPrimaryText}>Browse Catalog</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <View style={{ gap: 10 }}>
-                        {sortedOrders.slice(0, 4).map((ord) => {
-                          const isDone = isOrderDeliveredOrDone(ord.status);
-                          const isPending = isOrderPendingApproval(ord.status);
-                          const orderName = ord.itemsSummary || (Array.isArray(ord.items) && ord.items.length > 0 ? ord.items.map((i) => typeof i === 'string' ? i : (i?.name || i?.product_name || 'Part')).join(', ') : 'Motorcycle Performance Equipment');
-                          const orderDate = formatOrderDate(ord.created_at);
-                          const itemCount = ord.items?.length || 1;
-                          const paymentMethod = ord.paymentMethod || 'COD';
-                          const grandTotal = getOrderGrandTotal(ord);
-
-                          const statusLower = String(ord.status || '').toLowerCase().trim();
-                          let statusBg = tokens.statusWarningBg;
-                          let statusText = tokens.statusWarningText;
-                          let statusBorder = tokens.statusWarningBorder;
-                          let statusDot = '#D97706';
-                          let statusLabel = ord.status || 'Processing';
-
-                          if (statusLower.includes('out') || statusLower.includes('transit') || statusLower.includes('shipped') || statusLower.includes('ready')) {
-                            statusBg = tokens.statusInfoBg;
-                            statusText = tokens.statusInfoText;
-                            statusBorder = tokens.statusInfoBorder;
-                            statusDot = '#2563EB';
-                            statusLabel = statusLower.includes('out') ? 'Out for Delivery' : statusLower.includes('shipped') ? 'Shipped' : (ord.status || 'In Transit');
-                          } else if (statusLower === 'delivered' || statusLower.includes('complete')) {
-                            statusBg = tokens.statusSuccessBg;
-                            statusText = tokens.statusSuccessText;
-                            statusBorder = tokens.statusSuccessBorder;
-                            statusDot = '#16A34A';
-                            statusLabel = 'Delivered';
-                          } else if (statusLower.includes('report')) {
-                            statusBg = '#FFF7ED';
-                            statusText = '#C2410C';
-                            statusBorder = '#FFEDD5';
-                            statusDot = '#EA580C';
-                            statusLabel = 'Delivery Reported';
-                          } else if (statusLower.includes('cancel')) {
-                            statusBg = tokens.statusDangerBg;
-                            statusText = tokens.statusDangerText;
-                            statusBorder = tokens.statusDangerBorder;
-                            statusDot = '#DC2626';
-                            statusLabel = 'Cancelled';
-                          }
-
-                          return (
-                            <View
-                              key={ord.id}
-                              style={{
-                                backgroundColor: tokens.bgSub,
-                                borderWidth: 1,
-                                borderColor: tokens.border,
-                                borderRadius: 12,
-                                padding: 13,
-                                flexDirection: isSmallMobile ? 'column' : 'row',
-                                justifyContent: 'space-between',
-                                alignItems: isSmallMobile ? 'flex-start' : 'center',
-                                gap: 12,
-                              }}
-                            >
-                              <View style={{ flex: 1, minWidth: 0 }}>
-                                <Text style={{ fontSize: 13.5, fontWeight: '700', color: tokens.textPrimary }} numberOfLines={1}>
-                                  {orderName}
-                                </Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
-                                  <Text style={{ fontSize: 11.5, color: tokens.textMuted }}>
-                                    {orderDate}
-                                  </Text>
-                                  <Text style={{ color: tokens.border }}>•</Text>
-                                  <Text style={{ fontSize: 11.5, color: tokens.textMuted }}>
-                                    {itemCount} {itemCount === 1 ? 'item' : 'items'}
-                                  </Text>
-                                  <Text style={{ color: tokens.border }}>•</Text>
-                                  <Text style={{ fontSize: 11.5, color: tokens.textMuted }}>
-                                    {paymentMethod}
-                                  </Text>
-                                  <Text style={{ color: tokens.border }}>•</Text>
-                                  <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>
-                                    ₱{grandTotal.toLocaleString()}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              <View
-                                style={{
-                                  flexDirection: isSmallMobile ? 'row' : 'column',
-                                  alignItems: isSmallMobile ? 'center' : 'flex-end',
-                                  gap: 7,
-                                  width: isSmallMobile ? '100%' : 'auto',
-                                  justifyContent: 'space-between',
-                                }}
-                              >
-                                {/* Status Pill with Dot */}
-                                <View
-                                  style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 5,
-                                    backgroundColor: statusBg,
-                                    borderWidth: 1,
-                                    borderColor: statusBorder,
-                                    paddingHorizontal: 8,
-                                    paddingVertical: 2.5,
-                                    borderRadius: 6,
-                                  }}
-                                >
-                                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: statusDot }} />
-                                  <Text style={{ fontSize: 11, fontWeight: '700', color: statusText }}>
-                                    {statusLabel}
-                                  </Text>
-                                </View>
-
-                                {/* Action Button (No Duplicate Button) */}
-                                {isDone ? (
-                                  <TouchableOpacity
-                                    style={[styles.btnSecondary, { paddingVertical: 5, paddingHorizontal: 10 }]}
-                                    onPress={() => setActiveTab('orders')}
-                                    activeOpacity={0.8}
-                                  >
-                                    <Text style={[styles.btnSecondaryText, { fontSize: 11.5 }]}>View Order</Text>
-                                  </TouchableOpacity>
-                                ) : isPending ? (
-                                  <TouchableOpacity
-                                    style={[
-                                      styles.btnSecondary,
-                                      {
-                                        paddingVertical: 5,
-                                        paddingHorizontal: 10,
-                                        backgroundColor: tokens.statusWarningBg || '#FEF3C7',
-                                        borderColor: tokens.statusWarningBorder || '#FDE68A',
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        gap: 4,
-                                      },
-                                    ]}
-                                    onPress={() => showToast('⏳ Order is pending admin approval. Live tracking will unlock once approved.')}
-                                    activeOpacity={0.8}
-                                  >
-                                    <BootstrapIcon name="hourglass-split" size={11} color={tokens.statusWarningText || '#92400E'} />
-                                    <Text style={[styles.btnSecondaryText, { fontSize: 11.5, color: tokens.statusWarningText || '#92400E' }]}>
-                                      Awaiting Approval
-                                    </Text>
-                                  </TouchableOpacity>
-                                ) : (
-                                  <TouchableOpacity
-                                    style={[styles.btnSecondary, { paddingVertical: 5, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 4 }]}
-                                    onPress={() => {
-                                      setSelectedOrderForTracking(ord);
-                                      setIsLiveTrackingOpen(true);
-                                    }}
-                                    activeOpacity={0.8}
-                                  >
-                                    <BootstrapIcon name="geo-alt-fill" size={11} color={tokens.brandPrimary} />
-                                    <Text style={[styles.btnSecondaryText, { fontSize: 11.5 }]}>Track Order</Text>
-                                  </TouchableOpacity>
-                                )}
-                              </View>
-                            </View>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </View>
-
-                  {/* RIGHT: Garage Pit Bay Slots / Booked Services */}
-                  <View style={[styles.sectionCard, { flex: 1, marginBottom: 0, justifyContent: 'flex-start' }]}>
-                    {/* Standardized Header */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <View
-                          style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            backgroundColor: tokens.brandLight,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderWidth: 1,
-                            borderColor: tokens.brandBorder,
-                          }}
-                        >
-                          <BootstrapIcon name="tools" size={15} color={tokens.brandPrimary} />
-                        </View>
-                        <View>
-                          <Text style={{ fontSize: 15.5, fontWeight: '800', color: tokens.textPrimary }}>
-                            Garage Pit Bay Slots
-                          </Text>
-                          <Text style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 1 }}>
-                            Scheduled maintenance and pit bay appointments
-                          </Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity onPress={() => setActiveTab('bookings')} activeOpacity={0.7}>
-                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#EA580C' }}>
-                          Manage ({bookings.length}) →
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {activeBookings.length === 0 ? (
-                      <View style={{ paddingVertical: 28, alignItems: 'center' }}>
-                        <BootstrapIcon name="calendar-x" size={32} color={tokens.textMuted} />
-                        <Text style={{ fontSize: 13.5, fontWeight: '700', color: tokens.textPrimary, marginTop: 8 }}>
-                          No Active Appointments
-                        </Text>
-                        <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 4 }}>
-                          Need PMS tune-up, dyno test, or tire fitting?
-                        </Text>
-                        <TouchableOpacity
-                          style={[styles.btnPrimary, { marginTop: 14 }]}
-                          onPress={onNavigateToGarage}
-                          activeOpacity={0.85}
-                        >
-                          <Text style={styles.btnPrimaryText}>Book a Service Slot</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <View style={{ gap: 10 }}>
-                        {activeBookings.slice(0, 2).map((bk) => {
-                          const serviceTitle = bk.service_title || bk.serviceName || 'PMS Service';
-                          const categoryStatus = `${bk.category || 'PMS'} / Scheduled`;
-                          const formattedDate = formatBookingDate(bk.appointment_date);
-                          const timeSlot = bk.time_slot || '3:00 PM – 4:30 PM';
-                          const location = bk.branch || `${brandSettings.storeName || "D'Blockchain Motoparts and Accessories"}`;
-
-                          return (
-                            <View
-                              key={bk.id}
-                              style={{
-                                backgroundColor: tokens.bgSub,
-                                borderWidth: 1,
-                                borderColor: tokens.border,
-                                borderRadius: 12,
-                                padding: 14,
-                                gap: 10,
-                              }}
-                            >
-                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                                <View style={{ flex: 1 }}>
-                                  <Text style={{ fontSize: 10, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                                    SERVICE TYPE
-                                  </Text>
-                                  <Text style={{ fontSize: 14, fontWeight: '800', color: tokens.textPrimary, marginTop: 2 }}>
-                                    {serviceTitle}
-                                  </Text>
-                                </View>
-                                <View
-                                  style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 5,
-                                    backgroundColor: tokens.brandLight,
-                                    borderWidth: 1,
-                                    borderColor: tokens.brandBorder,
-                                    paddingHorizontal: 8,
-                                    paddingVertical: 2.5,
-                                    borderRadius: 6,
-                                  }}
-                                >
-                                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: tokens.brandPrimary }} />
-                                  <Text style={{ fontSize: 10.5, fontWeight: '800', color: tokens.brandPrimary }}>
-                                    {categoryStatus}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              <View style={{ gap: 5, paddingVertical: 2 }}>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                  <BootstrapIcon name="calendar3" size={12} color={tokens.brandPrimary} />
-                                  <Text style={{ fontSize: 12, color: tokens.textSecondary, fontWeight: '500' }}>
-                                    {formattedDate}
-                                  </Text>
-                                </View>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                  <BootstrapIcon name="clock" size={12} color={tokens.brandPrimary} />
-                                  <Text style={{ fontSize: 12, color: tokens.textSecondary, fontWeight: '500' }}>
-                                    {timeSlot}
-                                  </Text>
-                                </View>
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                  <BootstrapIcon name="geo-alt-fill" size={12} color={tokens.brandPrimary} />
-                                  <Text style={{ fontSize: 12, color: tokens.textSecondary, fontWeight: '500' }} numberOfLines={1}>
-                                    {location}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              <View style={{ flexDirection: 'row', gap: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: tokens.border }}>
-                                <TouchableOpacity
-                                  style={[styles.btnSecondary, { flex: 1, paddingVertical: 6 }]}
-                                  onPress={() => setActiveTab('bookings')}
-                                  activeOpacity={0.8}
-                                >
-                                  <Text style={[styles.btnSecondaryText, { fontSize: 12 }]}>View Details</Text>
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                  style={[styles.btnDangerSubtle, { paddingVertical: 6, paddingHorizontal: 12 }]}
-                                  onPress={() => {
-                                    setBookingToCancel(bk);
-                                    setIsCancelModalOpen(true);
-                                  }}
-                                  activeOpacity={0.8}
-                                >
-                                  <Text style={[styles.btnDangerSubtleText, { fontSize: 12 }]}>Cancel</Text>
-                                </TouchableOpacity>
-                              </View>
-                            </View>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                {/* 4. Section: My Garage Fleet */}
-                <View style={[styles.sectionCard, { marginBottom: 20 }]}>
-                  {/* Standardized Header */}
-                  <View
-                    style={{
-                      flexDirection: isSmallMobile ? 'column' : 'row',
-                      justifyContent: 'space-between',
-                      alignItems: isSmallMobile ? 'flex-start' : 'center',
-                      flexWrap: 'wrap',
-                      gap: 16,
-                      marginBottom: 20,
-                    }}
-                  >
-                    {/* Left: Icon, Title, Count, Description */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <View
-                        style={{
-                          width: 38,
-                          height: 38,
-                          borderRadius: 10,
-                          backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.16)' : '#F0FDF4',
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? 'rgba(22, 163, 74, 0.35)' : '#BBF7D0',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
-                      >
-                        <BootstrapIcon name="motorcycle" size={19} color="#16A34A" />
-                      </View>
-                      <View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text
-                            style={{
-                              fontSize: 16,
-                              fontWeight: '700',
-                              color: tokens.textPrimary,
-                              letterSpacing: -0.2,
-                            }}
-                          >
-                            My Garage Fleet
-                          </Text>
-                          <View
-                            style={{
-                              backgroundColor: isDarkMode ? '#1E293B' : '#133827',
-                              paddingHorizontal: 9,
-                              paddingVertical: 2.5,
-                              borderRadius: 9999,
-                            }}
-                          >
-                            <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>
-                              {motorcycles.length} {motorcycles.length === 1 ? 'Motorcycle' : 'Motorcycles'}
-                            </Text>
-                          </View>
-                        </View>
-                        <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 2 }}>
-                          Registered rides with customized specs, mileage logs, and pit booking profiles
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Right: Actions */}
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <TouchableOpacity
-                        className="garage-outline-btn"
-                        style={{
-                          backgroundColor: isDarkMode ? '#1A2320' : '#FFFFFF',
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? tokens.border : '#E2E8F0',
-                          paddingHorizontal: 14,
-                          paddingVertical: 8.5,
-                          borderRadius: 10,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 2px rgba(15, 23, 42, 0.04)',
-                        }}
-                        onPress={() => setActiveTab('garage')}
-                        activeOpacity={0.8}
-                      >
-                        <Text
-                          style={{
-                            color: tokens.textPrimary,
-                            fontSize: 12.5,
-                            fontWeight: '600',
-                          }}
-                        >
-                          Manage Garage Fleet →
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        className="garage-register-btn"
-                        style={{
-                          backgroundColor: '#16A34A',
-                          paddingHorizontal: 16,
-                          paddingVertical: 8.5,
-                          borderRadius: 10,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          cursor: 'pointer',
-                          boxShadow: '0 1px 3px rgba(22, 163, 74, 0.25)',
-                        }}
-                        onPress={handleOpenAddMotorcycle}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="plus-circle-fill" size={13} color="#FFFFFF" />
-                        <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' }}>
-                          Register Motorcycle
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  {motorcycles.length === 0 ? (
-                    <View style={{ paddingVertical: 32, alignItems: 'center' }}>
-                      <View
-                        style={{
-                          width: 48,
-                          height: 48,
-                          borderRadius: 12,
-                          backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.16)' : '#F0FDF4',
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? 'rgba(22, 163, 74, 0.35)' : '#BBF7D0',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginBottom: 12,
-                        }}
-                      >
-                        <BootstrapIcon name="motorcycle" size={24} color="#16A34A" />
-                      </View>
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: tokens.textPrimary }}>
-                        No Motorcycle Registered in My Garage Yet
-                      </Text>
-                      <Text style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 4, textAlign: 'center', maxWidth: 400 }}>
-                        Add your ride to easily book pit appointments and verify part fitments.
-                      </Text>
-                      <TouchableOpacity
-                        className="garage-register-btn"
-                        style={{
-                          backgroundColor: '#16A34A',
-                          paddingHorizontal: 18,
-                          paddingVertical: 9,
-                          borderRadius: 10,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                          marginTop: 16,
-                          cursor: 'pointer',
-                        }}
-                        onPress={handleOpenAddMotorcycle}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="plus-circle-fill" size={13} color="#FFFFFF" />
-                        <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' }}>
-                          Register Your Motorcycle
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View
-                      style={{
-                        width: '100%',
-                        ...(Platform.OS === 'web'
-                          ? {
-                              display: 'grid',
-                              gridTemplateColumns: windowWidth >= 768 ? 'repeat(2, minmax(0, 1fr))' : '1fr',
-                              gap: 20,
-                            }
-                          : {
-                              flexDirection: isDesktop ? 'row' : 'column',
-                              gap: 20,
-                            }),
-                      }}
-                    >
-                      {motorcycles.slice(0, 2).map((bike) => (
-                        <View
-                          key={bike.motorcycle_id}
-                          className="garage-fleet-card"
-                          style={{
-                            width: '100%',
-                            borderRadius: 24,
-                            borderWidth: 1.5,
-                            borderColor: customerHeaderBorder,
-                            overflow: 'hidden',
-                            backgroundColor: customerHeaderBg,
-                            boxShadow: isDarkMode ? '0 4px 18px rgba(0, 0, 0, 0.35)' : '0 4px 18px rgba(0, 0, 0, 0.18)',
-                            elevation: 4,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                          }}
-                        >
-                          {/* 1. Upper Image Showcase Section */}
-                          <View
-                            style={{
-                              position: 'relative',
-                              width: '100%',
-                              height: 230,
-                              backgroundColor: '#FFFFFF',
-                              borderTopLeftRadius: 22,
-                              borderTopRightRadius: 22,
-                              overflow: 'hidden',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              paddingHorizontal: 16,
-                              paddingTop: 12,
-                              paddingBottom: 22,
-                            }}
-                          >
-                            {/* Subtle showroom floor ambient shadow */}
-                            <View
-                              style={[
-                                StyleSheet.absoluteFillObject,
-                                Platform.OS === 'web'
-                                  ? {
-                                      backgroundImage:
-                                        'radial-gradient(ellipse at 50% 86%, rgba(15, 23, 42, 0.07) 0%, rgba(15, 23, 42, 0.015) 50%, transparent 72%)',
-                                    }
-                                  : null,
-                              ]}
-                            />
-
-                            {/* Centered Motorcycle Image with consistent scaling */}
-                            <Image
-                              source={{
-                                uri:
-                                  bike.photo_url ||
-                                  'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=900&q=80',
-                              }}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                              }}
-                              resizeMode="contain"
-                            />
-
-                            {/* Top Badges Row Floating Over Photo */}
-                            <View
-                              style={{
-                                position: 'absolute',
-                                top: 12,
-                                left: 12,
-                                right: 12,
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                zIndex: 5,
-                              }}
-                            >
-                              {/* Left Compact Reference & Engine-Size Labels */}
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <View
-                                  style={{
-                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.88)' : 'rgba(24, 26, 29, 0.92)',
-                                    borderWidth: 1,
-                                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                                    paddingHorizontal: 11,
-                                    paddingVertical: 4.5,
-                                    borderRadius: 9999,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 10.5,
-                                      fontWeight: '700',
-                                      color: '#FFFFFF',
-                                      letterSpacing: 0.4,
-                                    }}
-                                  >
-                                    REF: {bike.plate_number || 'N/A'}
-                                  </Text>
-                                </View>
-
-                                <View
-                                  style={{
-                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.82)' : 'rgba(24, 26, 29, 0.92)',
-                                    borderWidth: 1,
-                                    borderColor: 'rgba(255, 255, 255, 0.16)',
-                                    paddingHorizontal: 10,
-                                    paddingVertical: 4.5,
-                                    borderRadius: 9999,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 10.5,
-                                      fontWeight: '600',
-                                      color: '#E2E8F0',
-                                    }}
-                                  >
-                                    {bike.engine_cc ? `${bike.engine_cc} cc` : '150 cc'}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              {/* Right Status Badge */}
-                              {bike.is_primary ? (
-                                <View
-                                  style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 5,
-                                    paddingHorizontal: 11,
-                                    paddingVertical: 4.5,
-                                    borderRadius: 9999,
-                                    borderWidth: 1.5,
-                                    backgroundColor: 'rgba(28, 19, 5, 0.92)',
-                                    borderColor: '#F59E0B',
-                                    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.15)',
-                                  }}
-                                >
-                                  <BootstrapIcon name="star-fill" size={10.5} color="#FBBF24" />
-                                  <Text
-                                    style={{
-                                      fontSize: 10.5,
-                                      fontWeight: '700',
-                                      color: '#FEF3C7',
-                                      letterSpacing: 0.2,
-                                    }}
-                                  >
-                                    Primary Ride
-                                  </Text>
-                                </View>
-                              ) : (
-                                <View
-                                  style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 6,
-                                    paddingHorizontal: 11,
-                                    paddingVertical: 4.5,
-                                    borderRadius: 9999,
-                                    borderWidth: 1.5,
-                                    backgroundColor: 'rgba(6, 32, 20, 0.92)',
-                                    borderColor: '#16A34A',
-                                    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.15)',
-                                  }}
-                                >
-                                  <View
-                                    style={{
-                                      width: 6.5,
-                                      height: 6.5,
-                                      borderRadius: 3.5,
-                                      backgroundColor: '#22C55E',
-                                    }}
-                                  />
-                                  <Text
-                                    style={{
-                                      fontSize: 10.5,
-                                      fontWeight: '700',
-                                      color: '#86EFAC',
-                                      letterSpacing: 0.2,
-                                    }}
-                                  >
-                                    Garage Fleet
-                                  </Text>
-                                </View>
-                              )}
-                            </View>
-
-                            {/* Center Pagination Indicator Dots Neatly Positioned Below Image */}
-                            <View
-                              style={{
-                                position: 'absolute',
-                                bottom: 8,
-                                left: 0,
-                                right: 0,
-                                flexDirection: 'row',
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                gap: 5,
-                                zIndex: 5,
-                              }}
-                            >
-                              <View style={{ width: 14, height: 3.5, borderRadius: 2, backgroundColor: customerHeaderBg }} />
-                              <View style={{ width: 3.5, height: 3.5, borderRadius: 2, backgroundColor: '#CBD5E1' }} />
-                              <View style={{ width: 3.5, height: 3.5, borderRadius: 2, backgroundColor: '#CBD5E1' }} />
-                              <View style={{ width: 3.5, height: 3.5, borderRadius: 2, backgroundColor: '#CBD5E1' }} />
-                            </View>
-                          </View>
-
-                          {/* 2. Lower Information Section (Customer Header Color #EA580C) */}
-                          <View
-                            style={{
-                              flex: 1,
-                              paddingHorizontal: 22,
-                              paddingTop: 18,
-                              paddingBottom: 22,
-                              backgroundColor: customerHeaderBg,
-                              borderBottomLeftRadius: 22,
-                              borderBottomRightRadius: 22,
-                              display: 'flex',
-                              flexDirection: 'column',
-                              justifyContent: 'space-between',
-                            }}
-                          >
-                            {/* Upper Details Group */}
-                            <View>
-                              {/* Motorcycle Name & Nickname Label */}
-                              <View
-                                style={{
-                                  flexDirection: 'row',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  gap: 10,
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 21,
-                                    fontWeight: '800',
-                                    color: '#FFFFFF',
-                                    letterSpacing: -0.4,
-                                    flex: 1,
-                                  }}
-                                  numberOfLines={1}
-                                >
-                                  {bike.brand} {bike.model}
-                                </Text>
-
-                                {bike.nickname ? (
-                                  <View
-                                    style={{
-                                      borderWidth: 1.5,
-                                      borderColor: 'rgba(255, 255, 255, 0.35)',
-                                      backgroundColor: 'transparent',
-                                      paddingHorizontal: 11,
-                                      paddingVertical: 3.5,
-                                      borderRadius: 9999,
-                                    }}
-                                  >
-                                    <Text
-                                      style={{
-                                        fontSize: 11.5,
-                                        fontWeight: '700',
-                                        color: '#FFFFFF',
-                                        letterSpacing: 0.2,
-                                      }}
-                                    >
-                                      "{bike.nickname}"
-                                    </Text>
-                                  </View>
-                                ) : null}
-                              </View>
-
-                              {/* Secondary Metadata Line */}
-                              <Text
-                                style={{
-                                  fontSize: 12.5,
-                                  fontWeight: '500',
-                                  color: '#94A3B8',
-                                  lineHeight: 18,
-                                  marginTop: 4,
-                                }}
-                                numberOfLines={1}
-                              >
-                                {bike.engine_cc ? `${bike.engine_cc} cc` : '150 cc'} · {bike.year || '2026'} · {bike.color ? `${bike.color} · ` : ''}{bike.odometer ? (String(bike.odometer).includes('km') ? bike.odometer : `${bike.odometer} km`) : '0 km'}
-                              </Text>
-
-                              {/* Compact Service-Readiness Indicator */}
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 7 }}>
-                                <BootstrapIcon name="check-circle-fill" size={12.5} color="#38BDF8" />
-                                <Text
-                                  style={{
-                                    fontSize: 12,
-                                    color: '#38BDF8',
-                                    fontWeight: '600',
-                                    lineHeight: 16,
-                                  }}
-                                >
-                                  Pit service ready · Compatible specs verified
-                                </Text>
-                              </View>
-                            </View>
-
-                            {/* Lower Action & Odometer Group */}
-                            <View style={{ marginTop: 14 }}>
-                              {/* Subtle Divider */}
-                              <View
-                                style={{
-                                  height: 1,
-                                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                  marginBottom: 12,
-                                }}
-                              />
-
-                              {/* Clearly Labeled Odometer Reading and Edit Specs Row */}
-                              <View
-                                style={{
-                                  flexDirection: 'row',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  marginBottom: 14,
-                                }}
-                              >
-                                <View>
-                                  <Text
-                                    style={{
-                                      fontSize: 10,
-                                      color: '#64748B',
-                                      fontWeight: '800',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: 0.6,
-                                    }}
-                                  >
-                                    ODOMETER LOG
-                                  </Text>
-                                  <Text
-                                    style={{
-                                      fontSize: 17,
-                                      fontWeight: '800',
-                                      color: '#FFFFFF',
-                                      marginTop: 2,
-                                    }}
-                                  >
-                                    {bike.odometer ? (String(bike.odometer).includes('km') ? bike.odometer : `${bike.odometer} km`) : '0 km'}
-                                  </Text>
-                                </View>
-
-                                <TouchableOpacity
-                                  onPress={() => handleOpenEditMotorcycle(bike)}
-                                  style={{
-                                    cursor: 'pointer',
-                                    paddingVertical: 5,
-                                    paddingHorizontal: 10,
-                                    borderRadius: 8,
-                                    backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 5,
-                                  }}
-                                  activeOpacity={0.7}
-                                >
-                                  <BootstrapIcon name="pencil-square" size={12} color="#38BDF8" />
-                                  <Text
-                                    style={{
-                                      fontSize: 12,
-                                      fontWeight: '600',
-                                      color: '#38BDF8',
-                                      textDecorationLine: 'underline',
-                                    }}
-                                  >
-                                    Edit Specs
-                                  </Text>
-                                </TouchableOpacity>
-                              </View>
-
-                              {/* Primary Action: Full-Width Book Pit Service Button */}
-                              <TouchableOpacity
-                                className="garage-book-btn"
-                                style={{
-                                  backgroundColor: '#FFFFFF',
-                                  borderRadius: 9999,
-                                  width: '100%',
-                                  paddingVertical: 13,
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: 6,
-                                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.16)',
-                                  cursor: 'pointer',
-                                }}
-                                onPress={onNavigateToGarage}
-                                activeOpacity={0.9}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 13.5,
-                                    fontWeight: '700',
-                                    color: customerHeaderBg,
-                                    letterSpacing: 0.2,
-                                  }}
-                                >
-                                  Book Pit Service
-                                </Text>
-                                <BootstrapIcon name="arrow-right-short" size={18} color={customerHeaderBg} />
-                              </TouchableOpacity>
-                            </View>
-                          </View>
-                        </View>
-                      ))}
-                    </View>
-                  )}
-                </View>
-
-                {/* 5. Section: Saved Customizations & AI Previews */}
-                <View style={[styles.sectionCard, { marginBottom: 20 }]}>
-                  {/* Standardized Header */}
-                  <View
-                    style={{
-                      flexDirection: isSmallMobile ? 'column' : 'row',
-                      justifyContent: 'space-between',
-                      alignItems: isSmallMobile ? 'flex-start' : 'center',
-                      flexWrap: 'wrap',
-                      gap: 12,
-                      marginBottom: 16,
-                    }}
-                  >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                      <View
-                        style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: 8,
-                          backgroundColor: tokens.brandLight,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          borderWidth: 1,
-                          borderColor: tokens.brandBorder,
-                        }}
-                      >
-                        <BootstrapIcon name="palette-fill" size={15} color={tokens.brandPrimary} />
-                      </View>
-                      <View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Text style={{ fontSize: 15.5, fontWeight: '800', color: tokens.textPrimary }}>
-                            Saved Customizations & AI Previews
-                          </Text>
-                          <View
-                            style={{
-                              backgroundColor: '#EA580C',
-                              paddingHorizontal: 8,
-                              paddingVertical: 2,
-                              borderRadius: 10,
-                            }}
-                          >
-                            <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>
-                              {customizations.length} {customizations.length === 1 ? 'Build' : 'Builds'}
-                            </Text>
-                          </View>
-                        </View>
-                        <Text style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 1 }}>
-                          Your stored motorcycle builds and photorealistic AI installation previews
-                        </Text>
-                      </View>
-                    </View>
-
-                    <TouchableOpacity
-                      style={styles.btnPrimary}
-                      onPress={() => onNavigateToCustomizer?.()}
-                      activeOpacity={0.85}
-                    >
-                      <BootstrapIcon name="plus-circle-fill" size={13} color="#FFFFFF" />
-                      <Text style={styles.btnPrimaryText}>+ New Customization</Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {loadingCustomizations ? (
-                    <View style={{ paddingVertical: 32, alignItems: 'center', gap: 8 }}>
-                      <ActivityIndicator size="small" color={tokens.brandPrimary} />
-                      <Text style={{ fontSize: 12, color: tokens.textMuted }}>Loading your saved builds…</Text>
-                    </View>
-                  ) : customizations.length === 0 ? (
-                    <View style={{ paddingVertical: 32, alignItems: 'center' }}>
-                      <View
-                        style={{
-                          width: 50,
-                          height: 50,
-                          borderRadius: 25,
-                          backgroundColor: tokens.brandLight,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          marginBottom: 10,
-                        }}
-                      >
-                        <BootstrapIcon name="stars" size={22} color={tokens.brandPrimary} />
-                      </View>
-                      <Text style={{ fontSize: 14.5, fontWeight: '800', color: tokens.textPrimary }}>
-                        No Saved Customizations Yet
-                      </Text>
-                      <Text style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 4, maxWidth: 440, textAlign: 'center', lineHeight: 18 }}>
-                        Use our AI Install Studio to test parts and preview how they look on your motorcycle before purchasing.
-                      </Text>
-                      <TouchableOpacity
-                        style={[styles.btnPrimary, { marginTop: 14 }]}
-                        onPress={() => onNavigateToCustomizer?.()}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="lightning-charge-fill" size={13} color="#FFFFFF" />
-                        <Text style={styles.btnPrimaryText}>Launch AI Install Studio</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : (
-                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', flexWrap: 'wrap', gap: 14 }}>
-                      {customizations.map((item) => {
-                        const id = item.id || item.customization_id;
-                        const img = item.previewImageUrl || item.preview_image_url;
-                        const bikeName =
-                          item.name ||
-                          item.motorcycleName ||
-                          [item.motorcycleBrand, item.motorcycleModel].filter(Boolean).join(' ') ||
-                          'Custom Motorcycle';
-                        const firstItem = item.items?.[0];
-                        const partTitle =
-                          firstItem?.product_name ||
-                          firstItem?.name ||
-                          (item.items?.length > 1 ? `${item.items.length} parts installed` : 'Custom Part');
-                        const dateStr = item.createdAt || item.created_at
-                          ? new Date(item.createdAt || item.created_at).toLocaleDateString(undefined, {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                            })
-                          : '';
-
-                        return (
-                          <View
-                            key={id}
-                            style={{
-                              flex: 1,
-                              minWidth: 280,
-                              maxWidth: isDesktop ? 420 : '100%',
-                              backgroundColor: tokens.bgSub,
-                              borderRadius: 14,
-                              borderWidth: 1,
-                              borderColor: tokens.border,
-                              overflow: 'hidden',
-                            }}
-                          >
-                            <View
-                              style={{
-                                position: 'relative',
-                                height: 140,
-                                backgroundColor: img ? (isDarkMode ? '#17201D' : '#F8FAFC') : (isDarkMode ? '#131A18' : '#F1F5F9'),
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                              }}
-                            >
-                              {img ? (
-                                <Image
-                                  source={{ uri: img }}
-                                  style={{ width: '100%', height: '100%' }}
-                                  resizeMode="contain"
-                                />
-                              ) : (
-                                <View style={{ alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-                                  <BootstrapIcon name="card-image" size={24} color={tokens.textMuted} />
-                                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: tokens.textMuted }}>
-                                    Preview Unavailable
-                                  </Text>
-                                  <Text style={{ fontSize: 10, color: tokens.textSubtle }}>
-                                    Model renders will appear once generated
-                                  </Text>
-                                </View>
-                              )}
-                              <View
-                                style={{
-                                  position: 'absolute',
-                                  top: 10,
-                                  left: 10,
-                                  backgroundColor: isDarkMode ? '#24272B' : '#EA580C',
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 3,
-                                  borderRadius: 6,
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  gap: 4,
-                                }}
-                              >
-                                <BootstrapIcon name="stars" size={10} color="#FFFFFF" />
-                                <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800', letterSpacing: 0.3 }}>
-                                  AI PREVIEW
-                                </Text>
-                              </View>
-                            </View>
-
-                            <View style={{ padding: 14 }}>
-                              <Text style={{ fontSize: 14.5, fontWeight: '800', color: tokens.textPrimary }} numberOfLines={1}>
-                                {bikeName}
-                              </Text>
-                              <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.brandPrimary, marginTop: 2 }} numberOfLines={1}>
-                                Installed: {partTitle}
-                              </Text>
-                              {dateStr ? (
-                                <Text style={{ fontSize: 11, color: tokens.textMuted, marginTop: 2 }}>
-                                  Saved on {dateStr}
-                                </Text>
-                              ) : null}
-
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 }}>
-                                <TouchableOpacity
-                                  style={[styles.btnPrimary, { flex: 1, paddingVertical: 7.5 }]}
-                                  onPress={() => onNavigateToCustomizer?.()}
-                                  activeOpacity={0.85}
-                                >
-                                  <BootstrapIcon name="eye-fill" size={12} color="#FFFFFF" />
-                                  <Text style={[styles.btnPrimaryText, { fontSize: 12 }]}>Open in Studio</Text>
-                                </TouchableOpacity>
-
-                                {firstItem ? (
-                                  <TouchableOpacity
-                                    style={[styles.btnSecondary, { paddingHorizontal: 10, paddingVertical: 7.5 }]}
-                                    onPress={() => handleAddCustomizationToCart(item)}
-                                    title="Add part to cart"
-                                    activeOpacity={0.8}
-                                  >
-                                    <BootstrapIcon name="cart-plus" size={13} color={tokens.brandPrimary} />
-                                  </TouchableOpacity>
-                                ) : null}
-
-                                <TouchableOpacity
-                                  style={[styles.btnSecondary, { paddingHorizontal: 10, paddingVertical: 7.5 }]}
-                                  onPress={() => handleDownloadCustomization(item)}
-                                  title="Download Preview"
-                                  activeOpacity={0.8}
-                                >
-                                  <BootstrapIcon name="download" size={13} color={tokens.textPrimary} />
-                                </TouchableOpacity>
-
-                                <TouchableOpacity
-                                  style={[styles.btnDangerSubtle, { paddingHorizontal: 10, paddingVertical: 7.5 }]}
-                                  onPress={() => handleDeleteCustomization(id)}
-                                  title="Delete Build"
-                                  activeOpacity={0.8}
-                                >
-                                  <BootstrapIcon name="trash" size={13} color="#DC2626" />
-                                </TouchableOpacity>
-                              </View>
-                            </View>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  )}
-                </View>
-              </View>
-            )}
-
-            {/* ───────────────────────────────────────────────────────── */}
             {/* TAB: MY GARAGE (FLEET MANAGEMENT)                         */}
             {/* ───────────────────────────────────────────────────────── */}
             {activeTab === 'garage' && (
               <View>
-                {/* Fleet Overview Stat Cards */}
-                <View style={[styles.statsGrid, { marginBottom: 20 }]}>
-                  {/* Stat 1: Total Fleet */}
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <Text style={styles.statLabel}>Garage Fleet</Text>
-                    <Text style={styles.statValue}>{motorcycles.length}</Text>
-                    <Text style={styles.statSub}>Registered vehicles</Text>
-                  </View>
-
-                  {/* Stat 2: Primary Ride */}
-                  <View style={[styles.statCard, styles.statCardWarningAccent]}>
-                    <Text style={styles.statLabel}>Primary Ride</Text>
-                    <Text style={[styles.statValue, { fontSize: 16 }]} numberOfLines={1}>
-                      {primaryMotorcycle ? `${primaryMotorcycle.brand} ${primaryMotorcycle.model}` : 'None'}
-                    </Text>
-                    <Text style={styles.statSub}>
-                      {primaryMotorcycle ? `Plate: ${primaryMotorcycle.plate_number}` : 'No default bike set'}
-                    </Text>
-                  </View>
-
-                  {/* Stat 3: Active Pit Bookings */}
-                  <TouchableOpacity
-                    style={[styles.statCard, styles.statCardSuccessAccent]}
-                    onPress={() => setActiveTab('bookings')}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.statLabel}>Pit Bay Bookings</Text>
-                    <Text style={styles.statValue}>{activeBookings.length}</Text>
-                    <Text style={styles.statSub}>Scheduled PMS & repairs</Text>
-                  </TouchableOpacity>
-
-                  {/* Stat 4: Service Readiness */}
-                  <View style={[styles.statCard, styles.statCardDangerAccent]}>
-                    <Text style={styles.statLabel}>Status</Text>
-                    <Text style={[styles.statValue, { color: '#059669', fontSize: 17 }]}>
-                      Track & Road Ready
-                    </Text>
-                    <Text style={styles.statSub}>All profiles verified</Text>
-                  </View>
-                </View>
-
                 {/* Empty State or Motorcycles Cards Grid */}
                 {motorcycles.length === 0 ? (
                   <View style={[styles.sectionCard, { paddingVertical: 48, alignItems: 'center' }]}>
@@ -2853,7 +1563,7 @@ export default function ProfilePage({
                     >
                       <BootstrapIcon name="tools" size={32} color={tokens.brandPrimary} />
                     </View>
-                    <Text style={{ fontSize: 18, fontWeight: '900', color: tokens.textPrimary }}>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.textPrimary }}>
                       Your Garage is Currently Empty
                     </Text>
                     <Text
@@ -3224,7 +1934,7 @@ export default function ProfilePage({
                                 <Text
                                   style={{
                                     fontSize: 21,
-                                    fontWeight: '800',
+                                    fontWeight: '600',
                                     color: '#FFFFFF',
                                     letterSpacing: -0.4,
                                     flex: 1,
@@ -3314,7 +2024,7 @@ export default function ProfilePage({
                                     style={{
                                       fontSize: 10,
                                       color: '#64748B',
-                                      fontWeight: '800',
+                                      fontWeight: '600',
                                       textTransform: 'uppercase',
                                       letterSpacing: 0.6,
                                     }}
@@ -3324,7 +2034,7 @@ export default function ProfilePage({
                                   <Text
                                     style={{
                                       fontSize: 17,
-                                      fontWeight: '800',
+                                      fontWeight: '600',
                                       color: '#FFFFFF',
                                       marginTop: 2,
                                     }}
@@ -3478,11 +2188,37 @@ export default function ProfilePage({
                 {/* Orders Header & Filter Controls */}
                 <View style={[styles.sectionCard, { zIndex: isOrderFilterDropdownOpen ? 1000 : 10, marginBottom: 20 }]}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                    <Text style={{ fontSize: 18, fontWeight: '900', color: tokens.textPrimary }}>
+                    <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.textPrimary }}>
                       Order History ({orders.length})
                     </Text>
 
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                      {/* Submit Feedback / Report Button */}
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          backgroundColor: tokens.bgSub,
+                          borderWidth: 1,
+                          borderColor: tokens.border,
+                          borderRadius: 10,
+                          paddingHorizontal: 12,
+                          height: 38,
+                          cursor: 'pointer',
+                        }}
+                        onPress={() => {
+                          setReportContextOrder(null);
+                          setIsSubmitReportModalOpen(true);
+                        }}
+                        activeOpacity={0.8}
+                      >
+                        <BootstrapIcon name="chat-square-dots" size={13} color="#EA580C" />
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textPrimary }}>
+                          Submit Feedback
+                        </Text>
+                      </TouchableOpacity>
+
                       {/* Category Dropdown */}
                       <View style={{ position: 'relative', zIndex: 1000 }}>
                         <TouchableOpacity
@@ -3509,7 +2245,7 @@ export default function ProfilePage({
                           <Text
                             style={{
                               fontSize: 12.5,
-                              fontWeight: orderFilter !== 'All' ? '800' : '600',
+                              fontWeight: '600',
                               color: orderFilter !== 'All' ? tokens.brandPrimary : tokens.textPrimary,
                             }}
                           >
@@ -3612,7 +2348,7 @@ export default function ProfilePage({
                                       <Text
                                         style={{
                                           fontSize: 13,
-                                          fontWeight: isActive ? '800' : '600',
+                                          fontWeight: '600',
                                           color: isActive ? tokens.brandPrimary : tokens.textPrimary,
                                         }}
                                       >
@@ -3634,7 +2370,7 @@ export default function ProfilePage({
                                       <Text
                                         style={{
                                           fontSize: 11,
-                                          fontWeight: '800',
+                                          fontWeight: '600',
                                           color: isActive ? (isDarkMode ? tokens.brandPrimary : '#EA580C') : tokens.textMuted,
                                         }}
                                       >
@@ -3686,7 +2422,7 @@ export default function ProfilePage({
                 {filteredOrders.length === 0 ? (
                   <View style={[styles.sectionCard, { alignItems: 'center', paddingVertical: 40 }]}>
                     <BootstrapIcon name="inbox" size={40} color={tokens.textMuted} />
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary, marginTop: 12 }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.textPrimary, marginTop: 12 }}>
                       No matching orders found
                     </Text>
                     <Text style={{ fontSize: 13, color: tokens.textMuted, marginTop: 4 }}>
@@ -3699,7 +2435,7 @@ export default function ProfilePage({
                       <View key={o.id} style={styles.sectionCard}>
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
                           <View>
-                            <Text style={{ fontSize: 15, fontWeight: '900', color: tokens.textPrimary }}>
+                            <Text style={{ fontSize: 15, fontWeight: '600', color: tokens.textPrimary }}>
                               Order #{o.id}
                             </Text>
                             <Text style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 2 }}>
@@ -3719,7 +2455,7 @@ export default function ProfilePage({
                               <Text
                                 style={{
                                   fontSize: 11.5,
-                                  fontWeight: '800',
+                                  fontWeight: '600',
                                   color: o.status === 'Delivered' ? '#065F46' : o.status === 'Cancelled' ? '#991B1B' : '#92400E',
                                 }}
                               >
@@ -3747,7 +2483,7 @@ export default function ProfilePage({
                                   activeOpacity={0.8}
                                 >
                                   <BootstrapIcon name="hourglass-split" size={12} color="#92400E" />
-                                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#92400E' }}>
+                                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#92400E' }}>
                                     Awaiting Approval
                                   </Text>
                                 </TouchableOpacity>
@@ -3761,11 +2497,76 @@ export default function ProfilePage({
                                   activeOpacity={0.8}
                                 >
                                   <BootstrapIcon name="geo-alt-fill" size={12} color="#FFFFFF" />
-                                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>
+                                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFFFFF' }}>
                                     Track Live
                                   </Text>
                                 </TouchableOpacity>
                               )
+                            )}
+
+                            {o.status === 'Delivered' && (
+                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                <TouchableOpacity
+                                  style={[
+                                    styles.addBtnPrimary,
+                                    {
+                                      paddingVertical: 7,
+                                      paddingHorizontal: 12,
+                                      backgroundColor: o.is_rated ? '#FEF3C7' : '#EA580C',
+                                      borderColor: o.is_rated ? '#FDE68A' : '#EA580C',
+                                      borderWidth: 1,
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 6,
+                                    },
+                                  ]}
+                                  onPress={() => {
+                                    setSelectedOrderForRating(o);
+                                    setIsRateOrderModalOpen(true);
+                                  }}
+                                  activeOpacity={0.8}
+                                >
+                                  <BootstrapIcon
+                                    name={o.is_rated ? 'star-fill' : 'star'}
+                                    size={12}
+                                    color={o.is_rated ? '#D97706' : '#FFFFFF'}
+                                  />
+                                  <Text
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: '600',
+                                      color: o.is_rated ? '#92400E' : '#FFFFFF',
+                                    }}
+                                  >
+                                    {o.is_rated ? 'Rated ★' : 'Rate Order'}
+                                  </Text>
+                                </TouchableOpacity>
+
+                                <TouchableOpacity
+                                  style={{
+                                    paddingVertical: 7,
+                                    paddingHorizontal: 10,
+                                    backgroundColor: tokens.bgSub,
+                                    borderWidth: 1,
+                                    borderColor: tokens.border,
+                                    borderRadius: 8,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 5,
+                                  }}
+                                  onPress={() => {
+                                    setReportContextOrder(o);
+                                    setIsSubmitReportModalOpen(true);
+                                  }}
+                                  activeOpacity={0.8}
+                                  title="Report an issue with this order"
+                                >
+                                  <BootstrapIcon name="flag" size={12} color={tokens.textMuted} />
+                                  <Text style={{ fontSize: 11.5, fontWeight: '500', color: tokens.textMuted }}>
+                                    Report
+                                  </Text>
+                                </TouchableOpacity>
+                              </View>
                             )}
                           </View>
                         </View>
@@ -3801,7 +2602,7 @@ export default function ProfilePage({
                                   </Text>
                                 </View>
                               </View>
-                              <Text style={{ fontSize: 13, fontWeight: '800', color: tokens.textPrimary }}>
+                              <Text style={{ fontSize: 13, fontWeight: '600', color: tokens.textPrimary }}>
                                 ₱{(Number(item.price || 0) * (item.quantity || 1)).toLocaleString()}
                               </Text>
                             </View>
@@ -3810,7 +2611,7 @@ export default function ProfilePage({
 
                         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                           <Text style={{ fontSize: 12, color: tokens.textMuted }}>
-                            Payment: <Text style={{ fontWeight: '700', color: tokens.textPrimary }}>{o.paymentMethod || 'COD'}</Text> • Total: <Text style={{ fontWeight: '900', color: tokens.brandPrimary, fontSize: 14 }}>₱{getOrderGrandTotal(o).toLocaleString()}</Text>
+                            Payment: <Text style={{ fontWeight: '700', color: tokens.textPrimary }}>{o.paymentMethod || 'COD'}</Text> • Total: <Text style={{ fontWeight: '600', color: tokens.brandPrimary, fontSize: 14 }}>₱{getOrderGrandTotal(o).toLocaleString()}</Text>
                           </Text>
 
                           {typeof addToCart === 'function' && o.items && o.items.length > 0 && (
@@ -3840,511 +2641,6 @@ export default function ProfilePage({
                     ))}
                   </View>
                 )}
-              </View>
-            )}
-
-            {/* ───────────────────────────────────────────────────────── */}
-            {/* TAB 3: GARAGE BOOKINGS (MOTORCYCLE REPAIR & MAINTENANCE)  */}
-            {/* ───────────────────────────────────────────────────────── */}
-            {activeTab === 'bookings' && (
-              <View style={{ width: '100%' }}>
-                {/* ─── GARAGE HEADER & QUICK ACTIONS ─── */}
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    flexWrap: 'wrap',
-                    gap: 16,
-                    marginBottom: 24,
-                  }}
-                >
-                  <View style={{ flex: 1, minWidth: 260 }}>
-                    <Text
-                      style={{
-                        fontSize: 26,
-                        fontWeight: '900',
-                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                        letterSpacing: -0.5,
-                        marginBottom: 6,
-                      }}
-                    >
-                      Motorcycle Repair & Maintenance
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 13.5,
-                        color: isDarkMode ? tokens.textMuted : '#64748B',
-                        fontWeight: '500',
-                        lineHeight: 20,
-                      }}
-                    >
-                      Manage your motorcycle service appointments and maintenance bookings.
-                    </Text>
-                  </View>
-
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <TouchableOpacity
-                      style={{
-                        backgroundColor: tokens.brandPrimary,
-                        borderColor: tokens.brandPrimary,
-                        paddingHorizontal: 20,
-                        paddingVertical: 10,
-                        borderRadius: 12,
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 14px rgba(0, 0, 0, 0.22)',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 8,
-                      }}
-                      onPress={onNavigateToGarage}
-                      activeOpacity={0.85}
-                    >
-                      <BootstrapIcon
-                        name="calendar-plus-fill"
-                        size={15}
-                        color="#FFFFFF"
-                      />
-                      <Text
-                        style={{
-                          fontSize: 13.5,
-                          fontWeight: '800',
-                          color: '#FFFFFF',
-                          letterSpacing: 0.3,
-                        }}
-                      >
-                        Book Now
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                {/* ─── 4 KPI STATS GRID (CLEAN MODERN SAAS) ─── */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 w-full">
-                  {/* Card 1: MECHANICS AVAILABLE */}
-                  <div
-                    className={`rounded-2xl p-5 border border-emerald-200/90 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px] ${
-                      isDarkMode ? 'bg-[#18261F] border-emerald-800/60' : 'bg-white'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                          Mechanics Available
-                        </span>
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                          mechanicsData.availableCount > 0
-                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-slate-100 text-slate-500 border border-slate-200'
-                        }`}>
-                          {mechanicsData.availableCount > 0 ? `${mechanicsData.availableCount} Available` : 'Busy'}
-                        </span>
-                      </div>
-                      <span className={`text-3xl font-extrabold tracking-tight leading-none block font-mono ${
-                        isDarkMode ? 'text-white' : 'text-slate-900'
-                      }`}>
-                        {mechanicsData.availableCount}
-                      </span>
-                    </div>
-                    <span className="text-[11.5px] font-medium text-slate-500 mt-3 block leading-snug">
-                      {mechanicsData.availableCount > 0
-                        ? `${mechanicsData.availableCount} of ${mechanicsData.totalCount} on-duty & available`
-                        : 'All technicians currently busy in pit bays'}
-                    </span>
-                  </div>
-
-                  {/* Card 2: TODAY'S SLOTS */}
-                  <div
-                    className={`rounded-2xl p-5 border shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px] ${
-                      todaySlotsData.isFullyBooked
-                        ? 'border-rose-200 bg-rose-50/20'
-                        : 'border-amber-200/90'
-                    } ${isDarkMode ? 'bg-[#18261F] border-amber-800/60' : 'bg-white'}`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                          Today's Slots
-                        </span>
-                        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                          todaySlotsData.isFullyBooked
-                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200'
-                        }`}>
-                          {todaySlotsData.isFullyBooked ? 'Full' : `${todaySlotsData.totalSlots} Slots`}
-                        </span>
-                      </div>
-                      <span
-                        className={`text-3xl font-extrabold tracking-tight leading-none block font-mono ${
-                          todaySlotsData.isFullyBooked ? 'text-rose-600' : isDarkMode ? 'text-white' : 'text-slate-900'
-                        }`}
-                      >
-                        {todaySlotsData.isFullyBooked ? '0' : todaySlotsData.availableSlotsCount}
-                      </span>
-                    </div>
-                    <span className="text-[11.5px] font-medium text-slate-500 mt-3 block leading-snug">
-                      {todaySlotsData.mechanicCount === 0
-                        ? 'No mechanics on duty today'
-                        : todaySlotsData.isFullyBooked
-                          ? 'Fully booked for today (0 remaining)'
-                          : `${todaySlotsData.mechanicCount} on duty × ${todaySlotsData.slotsPerMechanic} slots · ${todaySlotsData.bookedSlotsCount} reserved`}
-                    </span>
-                  </div>
-
-                  {/* Card 3: NEXT OPENING */}
-                  <div className={`rounded-2xl p-5 border border-purple-200/90 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px] ${
-                    isDarkMode ? 'bg-[#18261F] border-purple-800/60' : 'bg-white'
-                  }`}>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                          Next Opening
-                        </span>
-                        <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 border border-purple-200">
-                          {todaySlotsData.isFullyBooked ? 'Tomorrow' : 'Express'}
-                        </span>
-                      </div>
-                      <span className={`text-3xl font-extrabold tracking-tight leading-none block font-mono ${
-                        isDarkMode ? 'text-white' : 'text-slate-900'
-                      }`}>
-                        {todaySlotsData.isFullyBooked ? 'Tomorrow' : 'Today'}
-                      </span>
-                    </div>
-                    <span className="text-[11.5px] font-medium text-slate-500 mt-3 block leading-snug">
-                      {todaySlotsData.isFullyBooked
-                        ? '09:00 AM - 10:30 AM (Next Slot)'
-                        : 'Immediate express pit bay slot'}
-                    </span>
-                  </div>
-
-                  {/* Card 4: PIT BAY CAPACITY — limited by free technicians */}
-                  {(() => {
-                    const physicalBays = Math.max(
-                      1,
-                      Number(brandSettings?.serviceBayCount) || mechanicsData.totalCount || 6
-                    );
-                    const activeBays = Math.min(
-                      physicalBays,
-                      Number(mechanicsData.availableCount) || 0
-                    );
-                    const bayBadge =
-                      activeBays <= 0 ? 'All Busy' : activeBays >= physicalBays ? 'Full Staff' : 'Active Bays';
-                    const bayFooter =
-                      activeBays <= 0
-                        ? 'No free technicians — all in pit bay'
-                        : `${activeBays} of ${physicalBays} bays open (${mechanicsData.availableCount} techs free)`;
-                    return (
-                      <div
-                        className={`rounded-2xl p-5 border border-sky-200/90 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px] ${
-                          isDarkMode ? 'bg-[#18261F] border-sky-800/60' : 'bg-white'
-                        }`}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                              Pit Bay Capacity
-                            </span>
-                            <span
-                              className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                                activeBays <= 0
-                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                  : 'bg-sky-50 text-sky-700 border border-sky-200'
-                              }`}
-                            >
-                              {bayBadge}
-                            </span>
-                          </div>
-                          <span
-                            className={`text-3xl font-extrabold tracking-tight leading-none block font-mono ${
-                              activeBays <= 0
-                                ? 'text-rose-600'
-                                : isDarkMode
-                                  ? 'text-white'
-                                  : 'text-slate-900'
-                            }`}
-                          >
-                            {activeBays}
-                          </span>
-                        </div>
-                        <span className="text-[11.5px] font-medium text-slate-500 mt-3 block leading-snug">
-                          {bayFooter}
-                        </span>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* ─── SCHEDULED BOOKING INFORMATION (MAIN VIEW) ─── */}
-                <div id="scheduled-booking-section" className="w-full">
-                  <View>
-                    {/* Section Header & Count */}
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        marginBottom: 16,
-                        flexWrap: 'wrap',
-                        gap: 12,
-                      }}
-                    >
-                      <View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                          <View
-                            style={{
-                              width: 34,
-                              height: 34,
-                              borderRadius: 10,
-                              backgroundColor: '#ECFDF5',
-                              borderWidth: 1,
-                              borderColor: '#A7F3D0',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                            }}
-                          >
-                            <BootstrapIcon name="calendar3" size={16} color="#059669" />
-                          </View>
-                          <Text
-                            style={{
-                              fontSize: 18,
-                              fontWeight: '800',
-                              color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                            }}
-                          >
-                            Scheduled Bookings
-                          </Text>
-                        </View>
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            color: isDarkMode ? tokens.textMuted : '#64748B',
-                            marginTop: 4,
-                            marginLeft: 44,
-                            fontWeight: '500',
-                          }}
-                        >
-                          View and manage your upcoming motorcycle service appointments.
-                        </Text>
-                      </View>
-
-                      <View
-                        style={{
-                          backgroundColor: '#ECFDF5',
-                          borderWidth: 1,
-                          borderColor: '#A7F3D0',
-                          paddingHorizontal: 14,
-                          paddingVertical: 7,
-                          borderRadius: 20,
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 6,
-                        }}
-                      >
-                        <BootstrapIcon name="ticket-detailed" size={13} color="#059669" />
-                        <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#065F46' }}>
-                          {bookings.length} Scheduled {bookings.length === 1 ? 'Booking' : 'Bookings'}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Modern Segmented Status Filter Tabs + Grid/List View Toggle */}
-                    {bookings.length > 0 && (
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-                        <div className={`flex flex-row items-center gap-1.5 flex-wrap p-1 rounded-xl w-fit ${
-                          isDarkMode ? 'bg-[#18261F] border border-emerald-900/60' : 'bg-slate-100/90 border border-slate-200/80'
-                        }`}>
-                          {[
-                            { key: 'ALL', label: `All (${bookings.length})` },
-                            { key: 'PENDING', label: 'Pending Review' },
-                            { key: 'IN_PROGRESS', label: 'In Service' },
-                            { key: 'READY', label: 'Ready for Pickup' },
-                            { key: 'COMPLETED', label: 'Completed' },
-                          ].map((tab) => {
-                            const isSel = bookingStatusFilter === tab.key;
-                            return (
-                              <button
-                                key={tab.key}
-                                onClick={() => {
-                                  setBookingStatusFilter(tab.key);
-                                  setBookingsPage(1);
-                                }}
-                                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
-                                  isSel
-                                    ? (isDarkMode ? 'bg-[#EA580C] text-white shadow-xs' : 'bg-[#EA580C] text-white shadow-xs')
-                                    : isDarkMode
-                                    ? 'bg-transparent text-emerald-200/70 hover:text-white hover:bg-emerald-900/40'
-                                    : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                                }`}
-                              >
-                                {tab.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Grid / List View Mode Toggle Button Group */}
-                        <div className={`flex items-center gap-1 p-1 rounded-xl w-fit self-start sm:self-auto ${
-                          isDarkMode ? 'bg-[#18261F] border border-emerald-900/60' : 'bg-slate-100/90 border border-slate-200/80'
-                        }`}>
-                          <button
-                            onClick={() => setBookingViewMode('grid')}
-                            title="Grid View"
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
-                              bookingViewMode === 'grid'
-                                ? (isDarkMode ? 'bg-[#EA580C] text-white shadow-xs' : 'bg-[#EA580C] text-white shadow-xs')
-                                : isDarkMode
-                                ? 'bg-transparent text-emerald-200/70 hover:text-white hover:bg-emerald-900/40'
-                                : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                            }`}
-                          >
-                            <BootstrapIcon
-                              name="grid-fill"
-                              size={13}
-                              color={bookingViewMode === 'grid' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#475569'}
-                            />
-                            <span>Grid</span>
-                          </button>
-                          <button
-                            onClick={() => setBookingViewMode('list')}
-                            title="List View"
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all duration-150 cursor-pointer ${
-                              bookingViewMode === 'list'
-                                ? (isDarkMode ? 'bg-[#EA580C] text-white shadow-xs' : 'bg-[#EA580C] text-white shadow-xs')
-                                : isDarkMode
-                                ? 'bg-transparent text-emerald-200/70 hover:text-white hover:bg-emerald-900/40'
-                                : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                            }`}
-                          >
-                            <BootstrapIcon
-                              name="view-list"
-                              size={14}
-                              color={bookingViewMode === 'list' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#475569'}
-                            />
-                            <span>List</span>
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {bookings.length === 0 ? (
-                      <div className={`rounded-2xl border p-12 text-center flex flex-col items-center justify-center max-w-lg mx-auto shadow-xs my-4 ${
-                        isDarkMode ? 'bg-[#18261F] border-emerald-900/60' : 'bg-white border-slate-200/80'
-                      }`}>
-                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-4 ${
-                          isDarkMode ? 'bg-emerald-950/60 border border-emerald-800/50' : 'bg-emerald-50 border border-emerald-100'
-                        }`}>
-                          <BootstrapIcon name="calendar-plus" size={26} color={isDarkMode ? '#EA580C' : '#EA580C'} />
-                        </div>
-                        <h3 className={`text-base font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>No scheduled bookings</h3>
-                        <p className="text-xs text-slate-500 max-w-sm mb-5 leading-relaxed">
-                          You don't have any service appointments scheduled. Book a service to get your slot reserved.
-                        </p>
-                        <button
-                          onClick={onNavigateToGarage}
-                          className={`${isDarkMode ? 'bg-[#EA580C] hover:bg-[#EA580C]' : 'bg-[#EA580C] hover:bg-[#EA580C]'} text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-2`}
-                        >
-                          <BootstrapIcon name="tools" size={13} color="#FFFFFF" />
-                          Book a Service
-                        </button>
-                      </div>
-                    ) : filteredBookings.length === 0 ? (
-                      <div className={`rounded-2xl border p-10 text-center flex flex-col items-center justify-center max-w-md mx-auto shadow-xs my-4 ${
-                        isDarkMode ? 'bg-[#18261F] border-emerald-900/60' : 'bg-white border-slate-200/80'
-                      }`}>
-                        <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center mb-3 text-slate-400">
-                          <BootstrapIcon name="calendar2-x" size={22} color="#94A3B8" />
-                        </div>
-                        <h3 className={`text-sm font-bold mb-1 ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>No bookings in this filter</h3>
-                        <p className="text-xs text-slate-500 mb-4">Switch to "All" to view your full booking history.</p>
-                        <button
-                          onClick={() => {
-                            setBookingStatusFilter('ALL');
-                            setBookingsPage(1);
-                          }}
-                          className={`${isDarkMode ? 'bg-[#EA580C] hover:bg-[#EA580C]' : 'bg-[#EA580C] hover:bg-[#EA580C]'} text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs transition-colors cursor-pointer`}
-                        >
-                          View All Bookings
-                        </button>
-                      </div>
-                    ) : (
-                      <div
-                        className={
-                          bookingViewMode === 'grid'
-                            ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 w-full items-start'
-                            : 'flex flex-col gap-3.5 w-full'
-                        }
-                      >
-                        {pagedBookings.map((b) => {
-                          const flexStatus = normalizeBookingStatus(b?.status);
-                          const canCancel = [
-                            'PENDING_REVIEW',
-                            'APPROVED',
-                            'SCHEDULED',
-                            'AWAITING_CUSTOMER_APPROVAL',
-                            'QUOTATION_SENT',
-                            'AWAITING_DOWNPAYMENT',
-                          ].includes(flexStatus);
-                          return (
-                            <div key={b.id || b.booking_id} className="w-full">
-                              <CustomerServiceBookingCard
-                                booking={b}
-                                viewMode={bookingViewMode}
-                                onToast={showToast}
-                                onUpdated={() => {
-                                  if (currentUser?.email || currentUser?.id || currentUser?.name || currentUser?.fullName) {
-                                    const userBks = garageService.getUserBookings(
-                                      currentUser.email,
-                                      currentUser.id,
-                                      currentUser.name || currentUser.fullName
-                                    );
-                                    setBookings(Array.isArray(userBks) ? userBks : []);
-                                  }
-                                }}
-                                canCancel={canCancel}
-                                onCancel={() => {
-                                  setBookingToCancel(b);
-                                  setIsCancelModalOpen(true);
-                                }}
-                                onViewDetails={(item) => setSelectedBookingForModal(item)}
-                              />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {bookingsTotalPages > 1 ? (
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: 14,
-                          paddingVertical: 14,
-                          width: '100%',
-                        }}
-                      >
-                        <TouchableOpacity
-                          disabled={bookingsPage <= 1}
-                          onPress={() => setBookingsPage((p) => Math.max(1, p - 1))}
-                          style={{ opacity: bookingsPage <= 1 ? 0.4 : 1, padding: 6 }}
-                        >
-                          <BootstrapIcon name="chevron-left" size={16} color={tokens.brandPrimary} />
-                        </TouchableOpacity>
-                        <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? '#CBD5E1' : '#475569' }}>
-                          Page {bookingsPage} of {bookingsTotalPages}
-                        </Text>
-                        <TouchableOpacity
-                          disabled={bookingsPage >= bookingsTotalPages}
-                          onPress={() => setBookingsPage((p) => Math.min(bookingsTotalPages, p + 1))}
-                          style={{ opacity: bookingsPage >= bookingsTotalPages ? 0.4 : 1, padding: 6 }}
-                        >
-                          <BootstrapIcon name="chevron-right" size={16} color={tokens.brandPrimary} />
-                        </TouchableOpacity>
-                      </View>
-                    ) : null}
-                  </View>
-                </div>
               </View>
             )}
 
@@ -4465,7 +2761,7 @@ export default function ProfilePage({
                         <Text
                           style={{
                             fontSize: 18.5,
-                            fontWeight: '800',
+                            fontWeight: '600',
                             color: tokens.textPrimary,
                             letterSpacing: -0.2,
                           }}
@@ -4652,7 +2948,7 @@ export default function ProfilePage({
                         <Text
                           style={{
                             fontSize: 15.5,
-                            fontWeight: '800',
+                            fontWeight: '600',
                             color: tokens.textPrimary,
                             letterSpacing: -0.2,
                           }}
@@ -4929,7 +3225,7 @@ export default function ProfilePage({
                         <Text
                           style={{
                             fontSize: 15.5,
-                            fontWeight: '800',
+                            fontWeight: '600',
                             color: tokens.textPrimary,
                             letterSpacing: -0.2,
                           }}
@@ -4984,7 +3280,7 @@ export default function ProfilePage({
                             <Text
                               style={{
                                 fontSize: 11,
-                                fontWeight: '800',
+                                fontWeight: '600',
                                 color: tokens.brandPrimary,
                                 textTransform: 'uppercase',
                                 letterSpacing: 0.7,
@@ -5063,13 +3359,13 @@ export default function ProfilePage({
                               <Text
                                 style={{
                                   fontSize: 16,
-                                  fontWeight: '800',
+                                  fontWeight: '600',
                                   color: tokens.textPrimary,
                                   marginBottom: 6,
                                 }}
                               >
-                                {bikeBrand || primaryMotorcycle?.brand || 'Yamaha'}{' '}
-                                {bikeModel || primaryMotorcycle?.model || 'NMAX 155'}
+                                {primaryMotorcycle?.brand || bikeBrand || 'No Bike Registered'}{' '}
+                                {primaryMotorcycle?.model || bikeModel || ''}
                               </Text>
 
                               <View
@@ -5095,8 +3391,8 @@ export default function ProfilePage({
                                       borderColor: tokens.border,
                                     }}
                                   >
-                                    <Text style={{ fontSize: 12.5, fontWeight: '800', color: tokens.textPrimary, letterSpacing: 0.5 }}>
-                                      {bikePlate || primaryMotorcycle?.plate_number || 'NM-4892'}
+                                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: tokens.textPrimary, letterSpacing: 0.5 }}>
+                                      {primaryMotorcycle?.plate_number || bikePlate || 'N/A'}
                                     </Text>
                                   </View>
                                 </View>
@@ -5108,7 +3404,7 @@ export default function ProfilePage({
                                     Odometer:
                                   </Text>
                                   <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary }}>
-                                    {bikeOdo || primaryMotorcycle?.odometer || '12,400 km'}
+                                    {primaryMotorcycle?.odometer || bikeOdo || '0 km'}
                                   </Text>
                                 </View>
 
@@ -5188,7 +3484,7 @@ export default function ProfilePage({
                             <Text
                               style={{
                                 fontSize: 11,
-                                fontWeight: '800',
+                                fontWeight: '600',
                                 color: tokens.brandPrimary,
                                 textTransform: 'uppercase',
                                 letterSpacing: 0.7,
@@ -5444,7 +3740,7 @@ export default function ProfilePage({
                         <Text
                           style={{
                             fontSize: 15.5,
-                            fontWeight: '800',
+                            fontWeight: '600',
                             color: tokens.textPrimary,
                             letterSpacing: -0.2,
                           }}
@@ -5526,7 +3822,7 @@ export default function ProfilePage({
                         </Text>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 4 }}>
                           <BootstrapIcon name="shield-check" size={13} color="#16A34A" />
-                          <Text style={{ fontSize: 14, fontWeight: '800', color: '#16A34A' }}>
+                          <Text style={{ fontSize: 14, fontWeight: '600', color: '#16A34A' }}>
                             Protected (Active)
                           </Text>
                         </View>
@@ -5547,7 +3843,7 @@ export default function ProfilePage({
                           <Text
                             style={{
                               fontSize: 14,
-                              fontWeight: '800',
+                              fontWeight: '600',
                               color: isVerifiedCustomer ? tokens.brandPrimary : tokens.textSecondary,
                             }}
                           >
@@ -5736,7 +4032,7 @@ export default function ProfilePage({
                         </View>
                         <View>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                            <Text style={{ fontSize: 18, fontWeight: '900', color: tokens.textPrimary, letterSpacing: -0.3 }}>
+                            <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.textPrimary, letterSpacing: -0.3 }}>
                               Notifications & Alerts
                             </Text>
                             {unreadNotifCount > 0 && (
@@ -5748,7 +4044,7 @@ export default function ProfilePage({
                                   borderRadius: 10,
                                 }}
                               >
-                                <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF' }}>
+                                <Text style={{ fontSize: 10, fontWeight: '600', color: '#FFFFFF' }}>
                                   {unreadNotifCount} NEW
                                 </Text>
                               </View>
@@ -5853,7 +4149,7 @@ export default function ProfilePage({
                             <Text
                               style={{
                                 fontSize: 12,
-                                fontWeight: isSelected ? '800' : '600',
+                                fontWeight: '600',
                                 color: isSelected ? '#FFFFFF' : tokens.textSecondary,
                               }}
                             >
@@ -5886,7 +4182,7 @@ export default function ProfilePage({
                         >
                           <BootstrapIcon name="bell-slash" size={26} color={tokens.textMuted} />
                         </View>
-                        <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.textPrimary }}>
+                        <Text style={{ fontSize: 15, fontWeight: '600', color: tokens.textPrimary }}>
                           {notifSearchQuery ? 'No matching notifications' : 'No notifications yet'}
                         </Text>
                         <Text style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 4 }}>
@@ -5912,7 +4208,7 @@ export default function ProfilePage({
                               <Text
                                 style={{
                                   fontSize: 13,
-                                  fontWeight: '800',
+                                  fontWeight: '600',
                                   color: tokens.textPrimary,
                                   letterSpacing: 0.3,
                                   textTransform: 'uppercase',
@@ -5929,7 +4225,7 @@ export default function ProfilePage({
                                     borderRadius: 8,
                                   }}
                                 >
-                                  <Text style={{ fontSize: 10, fontWeight: '800', color: tokens.brandPrimary }}>
+                                  <Text style={{ fontSize: 10, fontWeight: '600', color: tokens.brandPrimary }}>
                                     {group.badge}
                                   </Text>
                                 </View>
@@ -6160,7 +4456,7 @@ export default function ProfilePage({
                         <BootstrapIcon name="person-vcard-fill" size={17} color={tokens.brandPrimary} />
                       </View>
                       <View>
-                        <Text style={{ fontSize: 16.5, fontWeight: '800', color: tokens.textPrimary, letterSpacing: -0.2 }}>
+                        <Text style={{ fontSize: 16.5, fontWeight: '600', color: tokens.textPrimary, letterSpacing: -0.2 }}>
                           Customer Information & Settings
                         </Text>
                         <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>
@@ -6196,7 +4492,7 @@ export default function ProfilePage({
                         <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
                           Full Customer Name
                         </Text>
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: tokens.textPrimary, marginTop: 3 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: tokens.textPrimary, marginTop: 3 }}>
                           {userDisplayName}
                         </Text>
                       </View>
@@ -6225,7 +4521,7 @@ export default function ProfilePage({
                               borderColor: tokens.statusSuccessBorder,
                             }}
                           >
-                            <Text style={{ fontSize: 10, fontWeight: '800', color: tokens.statusSuccessText }}>Verified</Text>
+                            <Text style={{ fontSize: 10, fontWeight: '600', color: tokens.statusSuccessText }}>Verified</Text>
                           </View>
                         </View>
                         <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary, marginTop: 3 }}>
@@ -6387,7 +4683,7 @@ export default function ProfilePage({
                           <BootstrapIcon name="key-fill" size={15} color={tokens.brandPrimary} />
                         </View>
                         <View>
-                          <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary }}>
+                          <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.textPrimary }}>
                             Change Password
                           </Text>
                           <Text style={{ fontSize: 12, color: tokens.textMuted }}>
@@ -6478,7 +4774,7 @@ export default function ProfilePage({
                                 <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                                   Password Strength
                                 </Text>
-                                <Text style={{ fontSize: 11.5, fontWeight: '800', color: strengthColor }}>
+                                <Text style={{ fontSize: 11.5, fontWeight: '600', color: strengthColor }}>
                                   {strengthLabel}
                                 </Text>
                               </View>
@@ -6579,7 +4875,7 @@ export default function ProfilePage({
                       <BootstrapIcon name="envelope-check-fill" size={15} color={tokens.brandPrimary} />
                     </View>
                     <View>
-                      <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary }}>
+                      <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.textPrimary }}>
                         Account Email Address
                       </Text>
                       <Text style={{ fontSize: 12, color: tokens.textMuted }}>
@@ -6648,7 +4944,7 @@ export default function ProfilePage({
                 <View style={styles.sectionCard}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                     <BootstrapIcon name="shield-lock" size={18} color={tokens.brandPrimary} />
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.textPrimary }}>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.textPrimary }}>
                       Security Activity History
                     </Text>
                   </View>
@@ -6755,7 +5051,7 @@ export default function ProfilePage({
                   <BootstrapIcon name="file-earmark-text" size={20} color={tokens.brandPrimary} />
                 </View>
                 <View>
-                  <Text style={{ fontSize: 18, fontWeight: '800', color: tokens.textPrimary, letterSpacing: -0.3 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.textPrimary, letterSpacing: -0.3 }}>
                     Booking Details & Quotation
                   </Text>
                   <Text style={{ fontSize: 12, color: tokens.textMuted, fontWeight: '600', marginTop: 2 }}>
@@ -6949,6 +5245,36 @@ export default function ProfilePage({
         onProceedToCheckout={() => {
           setIsCartOpen(false);
           onNavigateToStore?.();
+        }}
+      />
+
+      {/* Customer Delivered Order Rating & Review Modal */}
+      <RateDeliveredOrderModal
+        visible={isRateOrderModalOpen}
+        order={selectedOrderForRating}
+        currentUser={currentUser}
+        onClose={() => {
+          setIsRateOrderModalOpen(false);
+          setSelectedOrderForRating(null);
+        }}
+        onSubmitSuccess={() => {
+          refreshOrders();
+        }}
+      />
+
+      {/* Customer Feedback & Issue Report Submission Modal */}
+      <CustomerSubmitReportModal
+        visible={isSubmitReportModalOpen}
+        currentUser={currentUser}
+        recentOrders={orders}
+        recentBookings={bookings}
+        initialOrder={reportContextOrder}
+        onClose={() => {
+          setIsSubmitReportModalOpen(false);
+          setReportContextOrder(null);
+        }}
+        onSubmitSuccess={() => {
+          showToast?.('Your report has been logged and sent to MotoTrack administrators.');
         }}
       />
 

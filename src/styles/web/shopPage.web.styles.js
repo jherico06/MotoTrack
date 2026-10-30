@@ -9,7 +9,7 @@ export function createShopWebStyles(isDark = false) {
   const textPrimary = isDark ? '#F9FAFB' : '#111827';
   const textSecondary = isDark ? '#CBD5E1' : '#475569';
   const textMuted = isDark ? '#94A3B8' : '#64748B';
-  const headerBg = '#171C22';
+  const headerBg = '#24272B';
   const brandPrimary = '#FF5A0A';
   const footerBg = '#171C22';
   const footerBorder = isDark ? '#242D36' : 'rgba(255, 255, 255, 0.10)';
@@ -20,6 +20,8 @@ export function createShopWebStyles(isDark = false) {
     container: {
       flex: 1,
       backgroundColor: bgMain,
+      maxWidth: '100vw',
+      overflowX: 'hidden',
     },
     headerWrapper: {
       backgroundColor: headerBg,
@@ -30,15 +32,17 @@ export function createShopWebStyles(isDark = false) {
       left: 0,
       right: 0,
       width: '100%',
+      maxWidth: '100vw',
       alignSelf: 'stretch',
       zIndex: 1000,
       boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
       borderBottomWidth: 1,
-      borderBottomColor: isDark ? '#26332E' : 'rgba(255, 255, 255, 0.10)',
+      borderBottomColor: 'rgba(255, 255, 255, 0.10)',
       minHeight: 67,
       transform: 'translateZ(0)',
       WebkitTransform: 'translateZ(0)',
       willChange: 'transform',
+      boxSizing: 'border-box',
     },
     headerInner: {
       maxWidth: 1360,
@@ -51,6 +55,7 @@ export function createShopWebStyles(isDark = false) {
       alignItems: 'center',
       justifyContent: 'space-between',
       gap: 20,
+      boxSizing: 'border-box',
     },
     logoWrap: {
       flexDirection: 'row',
@@ -82,14 +87,14 @@ export function createShopWebStyles(isDark = false) {
     mobileSearchInputWrap: {
       flex: 1,
       height: 38,
-      backgroundColor: isDark ? '#1A2320' : 'rgba(255, 255, 255, 0.15)',
-      borderRadius: 19,
+      backgroundColor: 'transparent',
+      borderRadius: 8,
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 12,
       gap: 8,
       borderWidth: 1,
-      borderColor: isDark ? '#26332E' : 'rgba(255, 255, 255, 0.20)',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.20)' : 'rgba(255, 255, 255, 0.30)',
     },
     mobileSearchInput: {
       flex: 1,
@@ -109,7 +114,7 @@ export function createShopWebStyles(isDark = false) {
     },
     logoText: {
       fontSize: 22,
-      fontWeight: '900',
+      fontWeight: '700',
       color: '#FFFFFF',
       letterSpacing: -0.5,
     },
@@ -118,7 +123,7 @@ export function createShopWebStyles(isDark = false) {
     },
     logoSubText: {
       fontSize: 11,
-      fontWeight: '800',
+      fontWeight: '600',
       color: isDark ? '#AAB4B0' : '#64748B',
       letterSpacing: 1,
     },
@@ -127,7 +132,7 @@ export function createShopWebStyles(isDark = false) {
       maxWidth: 480,
       height: 42,
       backgroundColor: bgSub,
-      borderRadius: 21,
+      borderRadius: 8,
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 16,
@@ -142,11 +147,11 @@ export function createShopWebStyles(isDark = false) {
       outlineStyle: 'none',
     },
     headerActions: {
-      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'flex-end',
       gap: 12,
+      flexShrink: 0,
     },
     navLinkBtn: {
       flexDirection: 'row',
@@ -187,85 +192,137 @@ export function createShopWebStyles(isDark = false) {
       position: 'relative',
     },
     headerLeft: {
-      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'flex-start',
       gap: 16,
+      flexShrink: 0,
     },
     headerCenterNav: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 10,
+      gap: 16,
     },
     headerShopBtn: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
+      height: 38,
       gap: 7,
       paddingHorizontal: 12,
-      paddingVertical: 7,
       borderRadius: 6,
       cursor: 'pointer',
       backgroundColor: 'transparent',
+      flexShrink: 0,
     },
     headerShopBtnText: {
-      fontSize: 13.5,
+      fontSize: 14,
       fontWeight: '600',
-      color: '#FFFFFF',
+      lineHeight: 20,
+      color: '#FF5A0A',
+      whiteSpace: 'nowrap',
     },
     headerRepairBtn: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
+      height: 38,
       gap: 7,
       paddingHorizontal: 12,
-      paddingVertical: 7,
       borderRadius: 6,
       cursor: 'pointer',
       backgroundColor: 'transparent',
+      flexShrink: 0,
     },
     headerRepairBtnText: {
-      fontSize: 13.5,
-      fontWeight: '500',
-      color: 'rgba(255, 255, 255, 0.70)',
+      fontSize: 14,
+      fontWeight: '600',
+      lineHeight: 20,
+      color: 'rgba(255, 255, 255, 0.85)',
+      whiteSpace: 'nowrap',
     },
     headerAiVisionBtn: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
+      height: 38,
       gap: 7,
       paddingHorizontal: 12,
-      paddingVertical: 7,
       borderRadius: 6,
       cursor: 'pointer',
       backgroundColor: 'transparent',
+      flexShrink: 0,
     },
     headerAiVisionBtnText: {
-      fontSize: 13.5,
-      fontWeight: '500',
-      color: 'rgba(255, 255, 255, 0.70)',
+      fontSize: 14,
+      fontWeight: '600',
+      lineHeight: 20,
+      color: 'rgba(255, 255, 255, 0.85)',
+      whiteSpace: 'nowrap',
     },
-    headerSearchSlot: {
-      flex: 1,
+    headerGarageBtn: {
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      height: 38,
+      gap: 7,
       paddingHorizontal: 12,
+      borderRadius: 6,
+      cursor: 'pointer',
+      backgroundColor: 'transparent',
+      flexShrink: 0,
+    },
+    headerGarageBtnText: {
+      fontSize: 14,
+      fontWeight: '600',
+      lineHeight: 20,
+      color: 'rgba(255, 255, 255, 0.85)',
+      whiteSpace: 'nowrap',
+    },
+    headerOrdersBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      height: 38,
+      gap: 7,
+      paddingHorizontal: 12,
+      borderRadius: 6,
+      cursor: 'pointer',
+      backgroundColor: 'transparent',
+      flexShrink: 0,
+    },
+    headerOrdersBtnText: {
+      fontSize: 14,
+      fontWeight: '600',
+      lineHeight: 20,
+      color: 'rgba(255, 255, 255, 0.85)',
+      whiteSpace: 'nowrap',
+    },
+    headerSearchSlot: {
+      alignItems: 'stretch',
+      justifyContent: 'center',
+      paddingHorizontal: 0,
+      width: 280,
+      flexShrink: 0,
     },
     navSearchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
-      backgroundColor: isDark ? '#1A2320' : 'rgba(255, 255, 255, 0.15)',
-      borderRadius: 18,
+      gap: 10,
+      backgroundColor: 'transparent',
+      borderRadius: 8,
       paddingHorizontal: 14,
-      height: 36,
+      height: 40,
       borderWidth: 1,
-      borderColor: isDark ? '#26332E' : 'rgba(255, 255, 255, 0.20)',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.20)' : 'rgba(255, 255, 255, 0.30)',
       width: '100%',
-      maxWidth: 240,
+      minWidth: 280,
     },
     navSearchInput: {
       flex: 1,
-      fontSize: 13,
+      fontSize: 13.5,
       color: '#FFFFFF',
       outlineStyle: 'none',
       paddingVertical: 0,
@@ -299,7 +356,7 @@ export function createShopWebStyles(isDark = false) {
     navBadgeText: {
       color: '#FFFFFF',
       fontSize: 9.5,
-      fontWeight: '900',
+      fontWeight: '600',
       lineHeight: 12,
     },
     headerFavoritesBtn: {
@@ -337,7 +394,7 @@ export function createShopWebStyles(isDark = false) {
     headerBadgeText: {
       color: '#FFFFFF',
       fontSize: 9.5,
-      fontWeight: '900',
+      fontWeight: '600',
       lineHeight: 12,
     },
     loggedInContainer: {
@@ -349,22 +406,26 @@ export function createShopWebStyles(isDark = false) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
+      flexShrink: 0,
     },
     signInHeaderBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: 7,
       paddingHorizontal: 16,
-      paddingVertical: 9,
+      paddingVertical: 8,
       borderRadius: 8,
       backgroundColor: 'transparent',
       borderWidth: 1,
-      borderColor: isDark ? '#26332E' : 'rgba(255, 255, 255, 0.5)',
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.45)',
+      flexShrink: 0,
+      cursor: 'pointer',
     },
     signInHeaderBtnText: {
-      fontSize: 13,
-      fontWeight: '800',
+      fontSize: 13.5,
+      fontWeight: '600',
       color: '#FFFFFF',
+      whiteSpace: 'nowrap',
     },
     signUpHeaderBtn: {
       flexDirection: 'row',
@@ -377,7 +438,7 @@ export function createShopWebStyles(isDark = false) {
     },
     signUpHeaderBtnText: {
       fontSize: 13,
-      fontWeight: '800',
+      fontWeight: '600',
       color: '#FFFFFF',
     },
     scrollContent: {
@@ -504,7 +565,7 @@ export function createShopWebStyles(isDark = false) {
       minWidth: 220,
       height: 42,
       backgroundColor: bgCard,
-      borderRadius: 14,
+      borderRadius: 8,
       borderWidth: 1,
       borderColor: border,
       flexDirection: 'row',
@@ -579,7 +640,7 @@ export function createShopWebStyles(isDark = false) {
     },
     catalogTitle: {
       fontSize: 22,
-      fontWeight: '900',
+      fontWeight: '700',
       color: textPrimary,
     },
     catalogSub: {
@@ -629,27 +690,74 @@ export function createShopWebStyles(isDark = false) {
       zIndex: 5,
     },
     productDetails: {
-      padding: 10,
+      paddingHorizontal: 10,
+      paddingTop: 8,
+      paddingBottom: 10,
       backgroundColor: bgCard,
+    },
+    productBrandText: {
+      fontSize: 9.5,
+      fontWeight: '600',
+      color: textMuted,
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+      marginBottom: 2,
     },
     productName: {
       fontSize: 12.5,
       fontWeight: '600',
       color: textPrimary,
-      lineHeight: 17,
-      marginBottom: 4,
-      height: 34,
+      lineHeight: 16,
+      minHeight: 32,
+      marginBottom: 3,
     },
     priceRow: {
       flexDirection: 'row',
       alignItems: 'baseline',
-      gap: 5,
-      marginBottom: 5,
+      marginBottom: 3,
     },
     priceMainText: {
-      fontSize: 15.5,
+      fontSize: 15,
       fontWeight: '800',
       color: brandPrimary,
+    },
+    priceOldText: {
+      fontSize: 10.5,
+      color: textMuted,
+      textDecorationLine: 'line-through',
+      fontWeight: '500',
+      marginLeft: 5,
+    },
+    metaMinimalRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 1,
+    },
+    ratingMinimal: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2.5,
+    },
+    ratingValText: {
+      fontSize: 10.5,
+      fontWeight: '600',
+      color: textPrimary,
+    },
+    unratedMinimalText: {
+      fontSize: 10,
+      color: textMuted,
+      fontWeight: '500',
+    },
+    metaDotDivider: {
+      fontSize: 10,
+      color: isDark ? '#475569' : '#CBD5E1',
+      marginHorizontal: 1,
+    },
+    stockMinimalText: {
+      fontSize: 10,
+      fontWeight: '500',
+      color: '#059669',
     },
     tagsRow: {
       flexDirection: 'row',
@@ -665,7 +773,7 @@ export function createShopWebStyles(isDark = false) {
     },
     codTagText: {
       fontSize: 10,
-      fontWeight: '800',
+      fontWeight: '600',
       color: isDark ? '#FBBF24' : '#B45309',
     },
     stockTag: {
@@ -780,7 +888,7 @@ export function createShopWebStyles(isDark = false) {
     },
     footerColTitle: {
       fontSize: 12.5,
-      fontWeight: '800',
+      fontWeight: '600',
       color: footerTextPrimary,
       letterSpacing: 0.8,
       textTransform: 'uppercase',
@@ -894,7 +1002,7 @@ export function createShopWebStyles(isDark = false) {
     },
     categoryCard: {
       flex: 1,
-      minWidth: 80,
+      minWidth: 105,
       backgroundColor: bgCard,
       borderRadius: 16,
       borderWidth: 1.5,
@@ -913,29 +1021,24 @@ export function createShopWebStyles(isDark = false) {
       boxShadow: '0 4px 14px rgba(255, 90, 10, 0.16)',
     },
     categoryCardImgWrap: {
-      width: 52,
-      height: 52,
-      borderRadius: 12,
+      width: 44,
+      height: 44,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 8,
-      backgroundColor: isDark ? '#242D36' : '#F8FAFC',
-      overflow: 'hidden',
-    },
-    categoryCardImg: {
-      width: 44,
-      height: 44,
-      borderRadius: 8,
+      backgroundColor: 'transparent',
     },
     categoryCardLabel: {
-      fontSize: 12,
-      fontWeight: '700',
+      fontSize: 13,
+      fontWeight: '600',
       color: textPrimary,
       textAlign: 'center',
-      lineHeight: 15,
+      lineHeight: 16,
     },
     categoryCardLabelActive: {
-      color: brandPrimary,
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#FF5A0A',
     },
 
     // ─── PRODUCT CARD ACTIONS ───
@@ -954,7 +1057,7 @@ export function createShopWebStyles(isDark = false) {
     },
     productCardAddBtnText: {
       fontSize: 12.5,
-      fontWeight: '800',
+      fontWeight: '600',
       color: '#FFFFFF',
     },
     productCardStockBadge: {
@@ -972,7 +1075,7 @@ export function createShopWebStyles(isDark = false) {
     productCardStockBadgeText: {
       color: '#059669',
       fontSize: 10,
-      fontWeight: '800',
+      fontWeight: '600',
     },
     productCardDiscountBadge: {
       position: 'absolute',
@@ -987,7 +1090,7 @@ export function createShopWebStyles(isDark = false) {
     productCardDiscountBadgeText: {
       color: '#FFFFFF',
       fontSize: 10,
-      fontWeight: '800',
+      fontWeight: '600',
     },
     productCardFitmentText: {
       fontSize: 11,
@@ -999,7 +1102,7 @@ export function createShopWebStyles(isDark = false) {
 
     // ─── PROFESSIONAL SERVICE BANNER ───
     serviceBannerWrap: {
-      backgroundColor: '#171C22',
+      backgroundColor: '#24272B',
       borderRadius: 20,
       borderWidth: 1,
       borderColor: '#26313B',
@@ -1025,7 +1128,7 @@ export function createShopWebStyles(isDark = false) {
     serviceBannerEyebrow: {
       color: brandPrimary,
       fontSize: 11,
-      fontWeight: '900',
+      fontWeight: '600',
       letterSpacing: 2,
       textTransform: 'uppercase',
       marginBottom: 8,
@@ -1033,7 +1136,7 @@ export function createShopWebStyles(isDark = false) {
     serviceBannerTitle: {
       color: '#FFFFFF',
       fontSize: 30,
-      fontWeight: '900',
+      fontWeight: '700',
       lineHeight: 36,
       marginBottom: 10,
     },
@@ -1064,7 +1167,7 @@ export function createShopWebStyles(isDark = false) {
     serviceBannerPrimaryBtnText: {
       color: '#FFFFFF',
       fontSize: 13.5,
-      fontWeight: '800',
+      fontWeight: '600',
     },
     serviceBannerSecondaryBtn: {
       backgroundColor: 'rgba(255, 255, 255, 0.08)',
@@ -1093,7 +1196,7 @@ export function createShopWebStyles(isDark = false) {
     servicePopularTitle: {
       color: '#FFFFFF',
       fontSize: 13,
-      fontWeight: '800',
+      fontWeight: '600',
       textTransform: 'uppercase',
       letterSpacing: 1,
       marginBottom: 14,
@@ -1127,7 +1230,7 @@ export function createShopWebStyles(isDark = false) {
     serviceBannerRightTitle: {
       color: '#FFFFFF',
       fontSize: 20,
-      fontWeight: '900',
+      fontWeight: '700',
       lineHeight: 26,
     },
 
@@ -1143,7 +1246,7 @@ export function createShopWebStyles(isDark = false) {
     promoCard: {
       flex: 1,
       minWidth: 260,
-      backgroundColor: '#171C22',
+      backgroundColor: '#24272B',
       borderRadius: 18,
       borderWidth: 1,
       borderColor: '#26313B',
@@ -1157,7 +1260,7 @@ export function createShopWebStyles(isDark = false) {
     promoCardTag: {
       color: brandPrimary,
       fontSize: 10,
-      fontWeight: '900',
+      fontWeight: '600',
       letterSpacing: 1.5,
       textTransform: 'uppercase',
       marginBottom: 6,
@@ -1165,7 +1268,7 @@ export function createShopWebStyles(isDark = false) {
     promoCardTitle: {
       color: '#FFFFFF',
       fontSize: 18,
-      fontWeight: '900',
+      fontWeight: '700',
       marginBottom: 4,
     },
     promoCardSub: {
@@ -1183,7 +1286,7 @@ export function createShopWebStyles(isDark = false) {
     promoCardLinkText: {
       color: brandPrimary,
       fontSize: 13,
-      fontWeight: '800',
+      fontWeight: '600',
     },
   });
 }

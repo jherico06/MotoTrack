@@ -629,7 +629,7 @@ export default function ModernOverviewDashboard({
             <Text
               style={{
                 fontSize: 32,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: theme.textPrimary,
                 letterSpacing: -0.8,
                 fontVariant: ['tabular-nums'],
@@ -879,7 +879,7 @@ export default function ModernOverviewDashboard({
               <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textMuted, letterSpacing: 0.5 }}>
                 PERIOD TOTAL
               </Text>
-              <Text style={{ fontSize: 16, fontWeight: '800', color: theme.textPrimary, marginTop: 2 }}>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 2 }}>
                 {formatPhp(chartTelemetry.totalRev)}
               </Text>
             </View>
@@ -889,7 +889,7 @@ export default function ModernOverviewDashboard({
               <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textMuted, letterSpacing: 0.5 }}>
                 PERIOD AVERAGE
               </Text>
-              <Text style={{ fontSize: 16, fontWeight: '800', color: theme.textPrimary, marginTop: 2 }}>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 2 }}>
                 {formatPhp(chartTelemetry.avgRev)}
                 <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textMuted }}>
                   /{granularity === 'daily' ? 'day' : granularity === 'weekly' ? 'wk' : 'mo'}
@@ -902,7 +902,7 @@ export default function ModernOverviewDashboard({
               <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textMuted, letterSpacing: 0.5 }}>
                 PEAK PERIOD
               </Text>
-              <Text style={{ fontSize: 16, fontWeight: '800', color: theme.textPrimary, marginTop: 2 }}>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 2 }}>
                 {formatPhp(chartTelemetry.peakRev)}
                 <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textMuted }}>
                   {' '}({chartTelemetry.peakLabel})
@@ -915,7 +915,7 @@ export default function ModernOverviewDashboard({
               <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textMuted, letterSpacing: 0.5 }}>
                 ORDERS IN PERIOD
               </Text>
-              <Text style={{ fontSize: 16, fontWeight: '800', color: theme.textPrimary, marginTop: 2 }}>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 2 }}>
                 {chartTelemetry.totalOrders.toLocaleString()} {chartTelemetry.totalOrders === 1 ? 'order' : 'orders'}
               </Text>
             </View>
@@ -974,7 +974,7 @@ export default function ModernOverviewDashboard({
             </View>
 
             <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontSize: 28, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
+              <Text style={{ fontSize: 28, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
                 {orderStats.total ? orderStats.total.toLocaleString() : orders.length.toLocaleString()}
               </Text>
               <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
@@ -1037,7 +1037,7 @@ export default function ModernOverviewDashboard({
             </View>
 
             <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontSize: 28, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
+              <Text style={{ fontSize: 28, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
                 ₱{(profitOverview.soldProfit || 0).toLocaleString()}
               </Text>
               <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
@@ -1105,7 +1105,7 @@ export default function ModernOverviewDashboard({
             </View>
 
             <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontSize: 28, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
+              <Text style={{ fontSize: 28, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
                 {(invStats.lowStockCount || 0) + (invStats.outOfStockCount || 0)}
               </Text>
               <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 1 }}>
@@ -1178,7 +1178,7 @@ export default function ModernOverviewDashboard({
             </View>
 
             <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontSize: 28, fontWeight: '800', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
+              <Text style={{ fontSize: 28, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
                 {formatPhp(aov)}
               </Text>
               <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
@@ -1219,7 +1219,7 @@ export default function ModernOverviewDashboard({
       >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <View>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: theme.textPrimary }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.textPrimary }}>
               Sales Performance
             </Text>
             <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
@@ -1255,7 +1255,7 @@ export default function ModernOverviewDashboard({
               <BootstrapIcon name="calendar2-check" size={13} color={theme.brandGreen} />
               <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>Today's Sales</Text>
             </View>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
               {formatPhp(salesPerformance.todaySales || 0)}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
@@ -1290,7 +1290,7 @@ export default function ModernOverviewDashboard({
               <BootstrapIcon name="graph-up-arrow" size={13} color={theme.brandGreen} />
               <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>This Week</Text>
             </View>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
               {formatPhp(salesPerformance.weekSales || 0)}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
@@ -1325,7 +1325,7 @@ export default function ModernOverviewDashboard({
               <BootstrapIcon name="cash-stack" size={13} color={theme.brandGreen} />
               <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>This Month</Text>
             </View>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
               {formatPhp(salesPerformance.monthSales || 0)}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
@@ -1360,7 +1360,7 @@ export default function ModernOverviewDashboard({
               <BootstrapIcon name="clock-history" size={13} color="#D97706" />
               <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>Action Required</Text>
             </View>
-            <Text style={{ fontSize: 20, fontWeight: '800', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
               {(orderStats.pendingCod || 0) + (bookingStats.pending || 0)}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
@@ -1698,7 +1698,7 @@ export default function ModernOverviewDashboard({
                   <BootstrapIcon name="calendar-check" size={16} color="#10B981" />
                   <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary }}>Completed Services</Text>
                 </View>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: theme.textPrimary }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.textPrimary }}>
                   {bookingStats.completed || 0}
                 </Text>
               </TouchableOpacity>
@@ -1724,7 +1724,7 @@ export default function ModernOverviewDashboard({
                   <BootstrapIcon name="tools" size={16} color="#3B82F6" />
                   <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary }}>Currently In Service</Text>
                 </View>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: theme.textPrimary }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.textPrimary }}>
                   {bookingStats.inProgress || 0}
                 </Text>
               </TouchableOpacity>
@@ -1750,7 +1750,7 @@ export default function ModernOverviewDashboard({
                   <BootstrapIcon name="clock-history" size={16} color="#D97706" />
                   <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary }}>Pending Review</Text>
                 </View>
-                <Text style={{ fontSize: 15, fontWeight: '800', color: theme.textPrimary }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.textPrimary }}>
                   {bookingStats.pending || 0}
                 </Text>
               </TouchableOpacity>
@@ -1790,7 +1790,7 @@ export default function ModernOverviewDashboard({
           }}
         >
           <View>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.2 }}>
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#FFFFFF', letterSpacing: -0.2 }}>
               Recent Orders & POS Sales
             </Text>
             <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>
@@ -2085,7 +2085,7 @@ export default function ModernOverviewDashboard({
 
                     {/* Payment & Total */}
                     <View style={{ flex: 1.3, paddingRight: 10 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: theme.brandGreen }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: theme.brandGreen }}>
                         ₱{orderTotal.toLocaleString()}
                       </Text>
                       <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 1 }}>

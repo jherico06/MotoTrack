@@ -335,7 +335,7 @@ export default function ProductColorsEditor({
         activeOpacity={0.85}
       >
         <BootstrapIcon name="plus-lg" size={12} color="#EA580C" />
-        <Text style={{ fontSize: 12, fontWeight: '800', color: '#EA580C' }}>Add Color</Text>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>Add Color</Text>
       </TouchableOpacity>
     </View>
   );

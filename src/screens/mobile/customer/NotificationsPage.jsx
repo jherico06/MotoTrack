@@ -407,7 +407,14 @@ export default function NotificationsPage({
       </View>
 
       {/* Grouped Notifications List matching Web */}
-      <ScrollView contentContainerStyle={[styles.content, isDarkMode && { backgroundColor: '#121518' }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: isDarkMode ? '#121518' : '#F8FAFC' }}
+        contentContainerStyle={[
+          styles.content,
+          { flexGrow: 1, backgroundColor: isDarkMode ? '#121518' : '#F8FAFC' },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {groupedSections.length === 0 ? (
           <View style={[styles.emptyContainer, isDarkMode && { backgroundColor: '#1C1F23', borderColor: '#2B3035' }]}>
             <View style={[styles.emptyIconCircle, isDarkMode && { backgroundColor: '#23272B' }]}>

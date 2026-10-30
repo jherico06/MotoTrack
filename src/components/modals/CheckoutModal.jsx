@@ -280,11 +280,11 @@ export default function CheckoutModal({
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                     <BootstrapIcon name="box-seam-fill" size={14} color="#EA580C" />
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>
                       Items in this Order ({displayItemCount})
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#EA580C' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>
                     ₱{displayTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Text>
                 </View>
@@ -342,10 +342,10 @@ export default function CheckoutModal({
 
                         <View style={{ flex: 1, justifyContent: 'center' }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                            <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#0F172A', flex: 1 }} numberOfLines={1}>
+                            <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#0F172A', flex: 1 }} numberOfLines={1}>
                               {name}
                             </Text>
-                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#EA580C' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>
                               ₱{(itemPrice * qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </Text>
                           </View>
@@ -532,7 +532,7 @@ export default function CheckoutModal({
                             borderRadius: 6,
                           }}
                         >
-                          <Text style={{ fontSize: 10, fontWeight: '800', color: '#EA580C' }}>INSTANT</Text>
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: '#EA580C' }}>INSTANT</Text>
                         </View>
                       </View>
                       <Text style={styles.paymentOptionSub}>
@@ -570,10 +570,10 @@ export default function CheckoutModal({
                           marginBottom: 4,
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#64748B' }}>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: '#64748B' }}>
                           OFFICIAL GCASH MERCHANT:
                         </Text>
-                        <Text style={{ fontSize: 12, fontWeight: '900', color: '#EA580C' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>
                           0917-582-9410
                         </Text>
                       </View>
@@ -692,8 +692,8 @@ export default function CheckoutModal({
                   alignItems: 'center',
                 }}
               >
-                <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A' }}>Total to Pay</Text>
-                <Text style={{ fontSize: 18, fontWeight: '900', color: '#EA580C' }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A' }}>Total to Pay</Text>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: '#EA580C' }}>
                   ₱
                   {Number(displayTotal).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
@@ -752,7 +752,7 @@ const checkoutStyles = StyleSheet.create({
   },
   addressCardTitle: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   editProfileAddressBtn: {
@@ -765,7 +765,7 @@ const checkoutStyles = StyleSheet.create({
   },
   editProfileAddressText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
   addressDisplayWrap: {
@@ -774,7 +774,7 @@ const checkoutStyles = StyleSheet.create({
   },
   addressRecipientName: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   addressPhoneText: {
@@ -832,7 +832,7 @@ const checkoutStyles = StyleSheet.create({
   },
   inlineSaveBtnText: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 });

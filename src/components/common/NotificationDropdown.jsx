@@ -270,7 +270,7 @@ export default function NotificationDropdown({
     if (onNavigateToScreen) {
       const link = (item.link || item.type || '').toLowerCase();
       if (link.includes('booking') || link.includes('garage')) {
-        onNavigateToScreen('profile', { tab: 'bookings' });
+        onNavigateToScreen('garage');
       } else if (link.includes('order')) {
         onNavigateToScreen('profile', { tab: 'orders' });
       } else if (link.includes('customizer')) {
@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E293B',
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   headerSubtitle: {
@@ -637,7 +637,7 @@ const styles = StyleSheet.create({
     color: '#8E8B85',
     marginTop: 1,
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   headerActionBtn: {
@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#64748B',
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   tabPillTextActive: {
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
     color: '#334155',
     flex: 1,
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   itemTitleUnread: {
@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     color: '#94A3B8',
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   itemMessage: {
@@ -734,16 +734,16 @@ const styles = StyleSheet.create({
     color: '#64748B',
     lineHeight: 16,
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   categoryTag: {
     fontSize: 9.5,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   unreadDot: {
@@ -771,7 +771,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E293B',
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   emptySub: {
@@ -779,7 +779,7 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     marginTop: 2,
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   footerRow: {
@@ -797,14 +797,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#856839',
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
   hoverNoticeText: {
     fontSize: 10.5,
     color: '#A19E95',
     ...(Platform.OS === 'web'
-      ? { fontFamily: 'Plus Jakarta Sans, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
+      ? { fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }
       : {}),
   },
 });

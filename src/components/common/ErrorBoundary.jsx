@@ -69,7 +69,7 @@ export default class ErrorBoundary extends React.Component {
             <Text
               style={{
                 fontSize: 22,
-                fontWeight: '900',
+                fontWeight: '600',
                 color: '#0F172A',
                 textAlign: 'center',
                 marginBottom: 8,
@@ -127,7 +127,7 @@ export default class ErrorBoundary extends React.Component {
               onPress={this.handleReload}
               activeOpacity={0.85}
             >
-              <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14.5 }}>
+              <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14.5 }}>
                 Refresh & Continue Riding
               </Text>
             </TouchableOpacity>

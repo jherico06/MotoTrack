@@ -185,7 +185,7 @@ export default function ProductSpecsModal({
                       borderRadius: 8,
                     }}
                   >
-                    <Text style={{ fontSize: 11, fontWeight: '800', color: '#DC2626' }}>SOLD OUT</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#DC2626' }}>SOLD OUT</Text>
                   </View>
                 ) : null}
               </View>
@@ -193,7 +193,7 @@ export default function ProductSpecsModal({
               {reviews.length > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                   <StarRow rating={avgReviewScore} size={15} />
-                  <Text style={{ fontSize: 13, color: '#F59E0B', fontWeight: '800' }}>
+                  <Text style={{ fontSize: 13, color: '#F59E0B', fontWeight: '600' }}>
                     {avgReviewScore.toFixed(1)}
                   </Text>
                   <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>
@@ -275,7 +275,7 @@ export default function ProductSpecsModal({
                             marginBottom: 6,
                           }}
                         >
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>
                             {rev.customerName || rev.customer_name || 'Rider'}
                           </Text>
                           <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>

@@ -20,3 +20,5 @@ export { default as AdminSidebar, AdminSidebarSkeleton } from './AdminSidebar.js
 export { default as AdminProfileLogsPanel } from './AdminProfileLogsPanel.jsx';
 export { default as ModernOverviewDashboard } from './ModernOverviewDashboard.jsx';
 export { default as AdminMarketingBannerSettings } from './AdminMarketingBannerSettings.jsx';
+export { default as AdminCustomerRatingsReportsPanel } from './AdminCustomerRatingsReportsPanel.jsx';
+export { default as ViewReportDetailsModal } from './ViewReportDetailsModal.jsx';

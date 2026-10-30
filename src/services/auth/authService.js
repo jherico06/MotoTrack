@@ -471,6 +471,196 @@ export const authService = {
     return res;
   },
 
+  /**
+   * Send 6-Digit OTP for Password Reset / Recovery (Admin & Customer)
+   */
+  async requestPasswordResetOtp({ email }) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, error: 'Please enter a valid registered email address.' };
+    }
+
+    let targetUser = null;
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from('users')
+          .select('user_id, name, email, status')
+          .ilike('email', cleanEmail)
+          .maybeSingle();
+        if (data) targetUser = data;
+      } catch (_e) {}
+    }
+
+    if (!targetUser) {
+      try {
+        const all = await userService.getAllUsers();
+        targetUser = (all || []).find((u) => String(u.email || '').toLowerCase() === cleanEmail);
+      } catch (_e) {}
+    }
+
+    if (!targetUser && cleanEmail === ADMIN_USER.email.toLowerCase()) {
+      targetUser = ADMIN_USER;
+    }
+
+    if (!targetUser) {
+      return {
+        success: false,
+        error: 'No account found with that email address.',
+      };
+    }
+
+    if (targetUser.status === 'disabled' || targetUser.status === 'inactive') {
+      return {
+        success: false,
+        error: 'This account is disabled. Please contact the store administrator.',
+      };
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    const otpId = 'otp-reset-' + Date.now();
+
+    if (supabase) {
+      try {
+        await supabase.from('otp_verifications').insert([
+          {
+            id: otpId,
+            email: cleanEmail,
+            otp_code: otpCode,
+            expires_at: expiresAt,
+            verified: false,
+            created_at: new Date().toISOString(),
+          },
+        ]);
+      } catch (e) {
+        console.warn('Supabase password reset OTP insert note:', e);
+      }
+    }
+
+    try {
+      await emailService.sendOtpEmail({
+        email: cleanEmail,
+        otpCode,
+        name: targetUser.name || 'MotoTrack User',
+      });
+    } catch (err) {
+      console.warn('Password reset email dispatch warning:', err);
+    }
+
+    try {
+      appStorage.setItem(
+        STORAGE_KEYS.PENDING_OTP + '_reset',
+        JSON.stringify({
+          email: cleanEmail,
+          otpCode,
+          expiresAt,
+        })
+      );
+    } catch (_e) {}
+
+    return {
+      success: true,
+      email: cleanEmail,
+      expiresAt,
+      message: `A 6-digit password reset code has been sent to ${cleanEmail}.`,
+    };
+  },
+
+  /**
+   * Verify Password Reset OTP and update the user's password in Supabase
+   */
+  async confirmPasswordResetOtp({ email, otp, newPassword }) {
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    const cleanOtp = String(otp || '').trim();
+    const cleanNewPwd = String(newPassword || '').trim();
+
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      return { success: false, error: 'Please enter a valid email address.' };
+    }
+    if (!/^\d{6}$/.test(cleanOtp)) {
+      return { success: false, error: 'Please enter the 6-digit verification code.' };
+    }
+
+    const strength = this.validatePasswordStrength(cleanNewPwd);
+    if (!strength.isStrong) {
+      return {
+        success: false,
+        error: strength.feedback || 'Please choose a stronger password.',
+      };
+    }
+
+    let isOtpValid = false;
+
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('otp_verifications')
+          .select('*')
+          .ilike('email', cleanEmail)
+          .eq('otp_code', cleanOtp)
+          .eq('verified', false)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          const record = data[0];
+          const expiresAtMs = new Date(record.expires_at).getTime();
+          if (expiresAtMs > Date.now()) {
+            isOtpValid = true;
+            await supabase
+              .from('otp_verifications')
+              .update({ verified: true })
+              .eq('id', record.id);
+          }
+        }
+      } catch (e) {
+        console.warn('Supabase reset OTP verification error:', e);
+      }
+    }
+
+    if (!isOtpValid) {
+      try {
+        const pendingRaw = appStorage.getItem(STORAGE_KEYS.PENDING_OTP + '_reset');
+        if (pendingRaw) {
+          const pending = JSON.parse(pendingRaw);
+          if (
+            String(pending.email || '').toLowerCase() === cleanEmail &&
+            pending.otpCode === cleanOtp &&
+            new Date(pending.expiresAt).getTime() > Date.now()
+          ) {
+            isOtpValid = true;
+          }
+        }
+      } catch (_e) {}
+    }
+
+    if (!isOtpValid) {
+      return {
+        success: false,
+        error: 'Invalid or expired verification code. Please check your code and try again.',
+      };
+    }
+
+    const resetRes = await userService.resetPasswordByEmail(cleanEmail, cleanNewPwd);
+    if (!resetRes?.success) {
+      return resetRes;
+    }
+
+    try {
+      appStorage.removeItem(STORAGE_KEYS.PENDING_OTP + '_reset');
+      emailService.sendNotification({
+        title: 'MotoTrack Security Alert: Password Reset Completed',
+        message:
+          'Your account password was reset using a 6-digit email verification code. If this was not you, contact support immediately.',
+        type: 'security',
+        userId: resetRes.user?.user_id || resetRes.user?.id,
+      });
+    } catch (_e) {}
+
+    return resetRes;
+  },
+
   async getAccountLogs(userId) {
     return await userService.getAccountLogs(userId);
   },
@@ -790,16 +980,38 @@ export const authService = {
       'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=200&q=80';
 
     let existingRecord = null;
-    try {
-      const allUsers = await userService.getAllUsers();
-      existingRecord = (allUsers || []).find((user) => (user.email || '').toLowerCase() === googleEmail);
-    } catch (_e) {}
+    if (supabase) {
+      try {
+        const { data } = await supabase
+          .from('users')
+          .select('*')
+          .ilike('email', googleEmail)
+          .maybeSingle();
+        if (data) {
+          existingRecord = {
+            ...data,
+            id: data.user_id || data.id,
+            user_id: data.user_id || data.id,
+          };
+        }
+      } catch (_e) {}
+    }
+    if (!existingRecord) {
+      try {
+        const allUsers = await userService.getAllUsers();
+        existingRecord = (allUsers || []).find(
+          (user) => (user.email || '').toLowerCase() === googleEmail
+        );
+      } catch (_e) {}
+    }
 
     let safeUser;
     if (existingRecord) {
+      const { password: _pwd, ...restExisting } = existingRecord;
       safeUser = {
-        ...existingRecord,
+        ...restExisting,
         id: existingRecord.id || existingRecord.user_id || u.id,
+        user_id: existingRecord.user_id || existingRecord.id || u.id,
         name: existingRecord.name || fullName,
         email: googleEmail,
         role: existingRecord.role || 'user',
@@ -807,8 +1019,14 @@ export const authService = {
         auth_provider: 'google',
       };
       try {
-        await userService.updateUser(safeUser.id, safeUser);
+        await userService.updateUser(safeUser.id, {
+          name: safeUser.name,
+          avatar: safeUser.avatar,
+        });
       } catch (_e) {}
+      if (safeUser.role === 'admin') {
+        adminSecurityService.lockSession(safeUser);
+      }
     } else {
       const createRes = await userService.createUser({
         name: fullName,

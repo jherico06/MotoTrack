@@ -104,7 +104,7 @@ export const authWebStyles = StyleSheet.create({
   },
   topBrandText: {
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: -0.5,
   },
@@ -170,7 +170,7 @@ export const authWebStyles = StyleSheet.create({
   },
   formHeading: {
     fontSize: 26,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#111827',
     marginBottom: 18,
     textAlign: 'center',
@@ -273,7 +273,7 @@ export const authWebStyles = StyleSheet.create({
   primaryTealBtnText: {
     color: '#FFFFFF',
     fontSize: 13.5,
-    fontWeight: '900',
+    fontWeight: '600',
     letterSpacing: 0.8,
   },
 
@@ -300,7 +300,7 @@ export const authWebStyles = StyleSheet.create({
   },
   strengthBadge: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   meterTrack: {
     height: 4,
@@ -370,7 +370,7 @@ export const authWebStyles = StyleSheet.create({
     maxWidth: 280,
   },
   otpEmailHighlight: {
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
   instantOtpBadge: {
@@ -393,7 +393,7 @@ export const authWebStyles = StyleSheet.create({
     flex: 1,
   },
   instantOtpCode: {
-    fontWeight: '900',
+    fontWeight: '700',
     letterSpacing: 2,
     color: '#1E40AF',
   },
@@ -415,7 +415,7 @@ export const authWebStyles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     textAlign: 'center',
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#111827',
     outlineStyle: 'none',
   },
@@ -436,7 +436,7 @@ export const authWebStyles = StyleSheet.create({
   resendLink: {
     fontSize: 11.5,
     color: '#EA580C',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   resendCountdown: {
     fontSize: 11.5,
@@ -573,7 +573,7 @@ export const authWebStyles = StyleSheet.create({
   },
   overlayHeadingLine1: {
     fontSize: 36,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
     textAlign: 'center',
     lineHeight: 42,
@@ -582,7 +582,7 @@ export const authWebStyles = StyleSheet.create({
   },
   overlayHeadingLine2: {
     fontSize: 32,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
     textAlign: 'center',
     lineHeight: 38,
@@ -609,7 +609,7 @@ export const authWebStyles = StyleSheet.create({
   overlayGhostBtnText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '600',
     letterSpacing: 1.2,
   },
 
@@ -681,7 +681,7 @@ export const authWebStyles = StyleSheet.create({
   },
   mobileWelcomeTitle: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#FFFFFF',
     marginBottom: 4,
     textAlign: 'center',
@@ -690,7 +690,7 @@ export const authWebStyles = StyleSheet.create({
   },
   mobileWelcomeSubtitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
     marginBottom: 10,
     textAlign: 'center',

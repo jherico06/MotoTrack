@@ -197,7 +197,7 @@ export default function CustomerMobileNavDrawer({
                   style={[
                     drawerStyles.navLabel,
                     { color: isDarkMode ? '#F8FAFC' : '#0F172A' },
-                    isActive && { color: '#EA580C', fontWeight: '800' },
+                    isActive && { color: '#EA580C', fontWeight: '600' },
                     item.isAdminOnly && { color: '#EA580C', fontWeight: '700' },
                   ]}
                   numberOfLines={1}
@@ -272,7 +272,7 @@ export default function CustomerMobileNavDrawer({
               <View style={drawerStyles.userActionsRow}>
                 <TouchableOpacity
                   style={[drawerStyles.userActionBtn, { flex: 1 }]}
-                  onPress={() => handleNav('profile', { tab: 'overview' })}
+                  onPress={() => handleNav('profile', { tab: 'garage' })}
                   activeOpacity={0.8}
                 >
                   <BootstrapIcon name="person-circle" size={14} color="#EA580C" />
@@ -489,7 +489,7 @@ const drawerStyles = StyleSheet.create({
   },
   sectionHeading: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: 0.8,
     marginBottom: 8,
     marginTop: 4,
@@ -524,7 +524,7 @@ const drawerStyles = StyleSheet.create({
   aiBadgeText: {
     color: '#FFFFFF',
     fontSize: 6.5,
-    fontWeight: '900',
+    fontWeight: '600',
   },
   navLabel: {
     flex: 1,
@@ -540,7 +540,7 @@ const drawerStyles = StyleSheet.create({
   badgePillText: {
     color: '#FFFFFF',
     fontSize: 9.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   divider: {
     height: 1,
@@ -568,7 +568,7 @@ const drawerStyles = StyleSheet.create({
   },
   userAvatarLetter: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '600',
     fontSize: 15,
   },
   userName: {
@@ -615,7 +615,7 @@ const drawerStyles = StyleSheet.create({
   },
   signInBtnText: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '600',
     fontSize: 13,
   },
   signUpBtn: {

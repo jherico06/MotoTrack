@@ -23,5 +23,6 @@ export * from './inventory/dashboardInsightsService.js';
 export * from './bookings/customizationService.js';
 export * from './products/motorcycleService.js';
 export * from './marketing/marketingBannerService.js';
+export * from './feedback/ratingsReportsService.js';
 export { dataCache } from './cache/dataCache.js';
 export { CacheKeys, CACHE_TTL } from './cache/cacheKeys.js';

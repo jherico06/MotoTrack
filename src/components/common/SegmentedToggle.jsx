@@ -178,7 +178,7 @@ export default function SegmentedToggle({
               <Text
                 style={{
                   fontSize: 13,
-                  fontWeight: isSelected ? '800' : '600',
+                  fontWeight: isSelected ? '600' : '500',
                   color: isSelected ? activeLabelColor : '#64748B',
                   transition: isWeb ? 'color 0.22s ease' : undefined,
                 }}

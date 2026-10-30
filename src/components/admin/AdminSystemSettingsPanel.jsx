@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import EditBrandModal from '../modals/EditBrandModal.jsx';
+import BrandLogo from '../common/BrandLogo.jsx';
 import { systemSettingsService } from '../../services/system/systemSettingsService.js';
 import { auditLogService } from '../../services/system/auditLogService.js';
 import { marketingBannerService } from '../../services/marketing/marketingBannerService.js';
@@ -154,7 +155,7 @@ export default function AdminSystemSettingsPanel({
         }
       });
 
-      const res = systemSettingsService.saveSettings(sanitized);
+      const res = await systemSettingsService.saveSettings(sanitized);
       if (res.success) {
         setSettings(res.settings);
         try {
@@ -236,6 +237,7 @@ export default function AdminSystemSettingsPanel({
   const subTabs = [
     { id: 'general', label: 'Store Identity & Theme', icon: 'shop', desc: 'Branding, contact details & schedule' },
     { id: 'marketing', label: 'Marketing Banner', icon: 'image', desc: 'Hero banner copy, graphics & live preview' },
+    { id: 'footer', label: 'Shop Footer', icon: 'layout-text-window-reverse', desc: 'Storefront footer columns, tagline, quick links & social profiles' },
     { id: 'store', label: 'Store & Business Configuration', icon: 'building', desc: 'Hours, delivery, pickup & status' },
     { id: 'checkout', label: 'Checkout & Payment Settings', icon: 'credit-card', desc: 'COD, online payment & fees' },
     { id: 'garage', label: 'Pitstop Garage Rules', icon: 'tools', desc: 'Operating hours & booking capacities' },
@@ -278,7 +280,7 @@ export default function AdminSystemSettingsPanel({
           <Text
             style={{
               fontSize: 11,
-              fontWeight: '800',
+              fontWeight: '600',
               color: isDarkMode ? tokens.textMuted : '#64748B',
               textTransform: 'uppercase',
               letterSpacing: 0.6,
@@ -373,7 +375,7 @@ export default function AdminSystemSettingsPanel({
           <BootstrapIcon name={icon} size={20} color="#EA580C" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 16, fontWeight: '900', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
             {title}
           </Text>
           <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
@@ -400,7 +402,7 @@ export default function AdminSystemSettingsPanel({
           activeOpacity={0.8}
         >
           <BootstrapIcon name="pencil-square" size={13} color={isDarkMode ? tokens.accentBrand : '#059669'} />
-          <Text style={{ fontSize: 12.5, fontWeight: '800', color: isDarkMode ? tokens.accentBrand : '#059669' }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#059669' }}>
             Edit
           </Text>
         </TouchableOpacity>
@@ -432,7 +434,7 @@ export default function AdminSystemSettingsPanel({
         <Text
           style={{
             fontSize: 11,
-            fontWeight: '800',
+            fontWeight: '600',
             color: isDarkMode ? tokens.textMuted : '#64748B',
             textTransform: 'uppercase',
             letterSpacing: 0.6,
@@ -540,7 +542,7 @@ export default function AdminSystemSettingsPanel({
                 <Text
                   style={{
                     fontSize: 20,
-                    fontWeight: '900',
+                    fontWeight: '600',
                     color: isDarkMode ? tokens.textPrimary : '#0F172A',
                     letterSpacing: -0.3,
                   }}
@@ -555,7 +557,7 @@ export default function AdminSystemSettingsPanel({
                     borderRadius: 6,
                   }}
                 >
-                  <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#EA580C' }}>
+                  <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#EA580C' }}>
                     Core Platform
                   </Text>
                 </View>
@@ -663,7 +665,7 @@ export default function AdminSystemSettingsPanel({
                     numberOfLines={1}
                     style={{
                       fontSize: 13.5,
-                      fontWeight: '800',
+                      fontWeight: '600',
                       color: isDarkMode ? tokens.textPrimary : '#0F172A',
                     }}
                   >
@@ -752,7 +754,7 @@ export default function AdminSystemSettingsPanel({
                         <Text
                           style={{
                             fontSize: 13,
-                            fontWeight: isSelected ? '800' : '600',
+                            fontWeight: isSelected ? '600' : '500',
                             color: isSelected
                               ? isDarkMode ? tokens.accentBrand : '#EA580C'
                               : isDarkMode ? tokens.textPrimary : '#0F172A',
@@ -959,7 +961,7 @@ export default function AdminSystemSettingsPanel({
                       onPress={() => setActiveSubTab('marketing')}
                       style={{ marginTop: 4, flexDirection: 'row', alignItems: 'center', gap: 4, cursor: 'pointer' }}
                     >
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#EA580C' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>
                         Edit in Marketing Banner Studio →
                       </Text>
                     </TouchableOpacity>
@@ -1115,6 +1117,486 @@ export default function AdminSystemSettingsPanel({
         />
       )}
 
+      {/* ─── SUBTAB: SHOP FOOTER SETTINGS & LIVE PREVIEW ─── */}
+      {canonicalTabId === 'footer' && (
+        <View style={{ gap: 20 }}>
+          {/* Header Action Banner */}
+          <View
+            style={{
+              backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+              padding: 24,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+              boxShadow: '0 4px 20px -4px rgba(0, 0, 0, 0.05)',
+              flexDirection: isDesktop ? 'row' : 'column',
+              alignItems: isDesktop ? 'center' : 'flex-start',
+              justifyContent: 'space-between',
+              gap: 16,
+            }}
+          >
+            <View style={{ flex: 1, gap: 4 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                  Storefront Footer & Navigation Settings
+                </Text>
+                <View style={{ backgroundColor: '#FFF7ED', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#EA580C' }}>
+                    LIVE STOREFRONT
+                  </Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+                Control all customer-facing footer content on the Shop page: brand tagline, 4-column navigation, newsletter subscription, social media links, and copyright text.
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                backgroundColor: '#EA580C',
+                paddingHorizontal: 18,
+                paddingVertical: 10,
+                borderRadius: 10,
+                cursor: 'pointer',
+              }}
+              onPress={() => openSectionModal('shop_footer')}
+              activeOpacity={0.85}
+            >
+              <BootstrapIcon name="pencil-square" size={15} color="#FFFFFF" />
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
+                Edit All Footer Settings
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ─── LIVE INTERACTIVE STOREFRONT FOOTER PREVIEW CARD ─── */}
+          <View
+            style={{
+              backgroundColor: '#0B1118',
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.15)',
+              overflow: 'hidden',
+              boxShadow: '0 10px 30px -5px rgba(0, 0, 0, 0.3)',
+            }}
+          >
+            {/* Simulation Header Bar */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: 20,
+                paddingVertical: 12,
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                borderBottomWidth: 1,
+                borderBottomColor: 'rgba(255, 255, 255, 0.1)',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' }} />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#94A3B8', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  Live Storefront Footer Simulation
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <BootstrapIcon name="eye-fill" size={12} color="#F97316" />
+                <Text style={{ fontSize: 11, color: '#F97316', fontWeight: '600' }}>
+                  Updates Instantly
+                </Text>
+              </View>
+            </View>
+
+            {/* Footer Inner Simulation */}
+            <View style={{ padding: 24, gap: 24 }}>
+              <View
+                style={{
+                  flexDirection: isDesktop ? 'row' : 'column',
+                  gap: 24,
+                  justifyContent: 'space-between',
+                }}
+              >
+                {/* Column 1: Brand & Tagline */}
+                <View style={{ flex: 1.2, minWidth: 180 }}>
+                  <BrandLogo size={32} textColor="#FFFFFF" />
+                  <Text style={{ fontSize: 13, color: '#94A3B8', marginTop: 10, fontWeight: '500' }}>
+                    {settings.footerTagline || 'Ride Better. Go Further.'}
+                  </Text>
+                  {settings.footerAboutText ? (
+                    <Text style={{ fontSize: 11.5, color: '#64748B', marginTop: 6, lineHeight: 16 }}>
+                      {settings.footerAboutText}
+                    </Text>
+                  ) : null}
+                </View>
+
+                {/* Column 2: Quick Links */}
+                <View style={{ flex: 1, minWidth: 120 }}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.5, marginBottom: 12, textTransform: 'uppercase' }}>
+                    {settings.footerQuickLinksTitle || 'Quick Links'}
+                  </Text>
+                  <View style={{ gap: 8 }}>
+                    {settings.footerLinkShopEnabled !== false && (
+                      <Text style={{ fontSize: 12, color: '#94A3B8' }}>{settings.footerLinkShopLabel || 'Shop'}</Text>
+                    )}
+                    {settings.footerLinkServiceEnabled !== false && (
+                      <Text style={{ fontSize: 12, color: '#94A3B8' }}>{settings.footerLinkServiceLabel || 'Book a Service'}</Text>
+                    )}
+                    {settings.footerLinkCustomizeEnabled !== false && (
+                      <Text style={{ fontSize: 12, color: '#94A3B8' }}>{settings.footerLinkCustomizeLabel || 'Customize'}</Text>
+                    )}
+                    {settings.footerLinkAboutEnabled !== false && (
+                      <Text style={{ fontSize: 12, color: '#94A3B8' }}>{settings.footerLinkAboutLabel || 'About Us'}</Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Column 3: Customer Care */}
+                <View style={{ flex: 1, minWidth: 140 }}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.5, marginBottom: 12, textTransform: 'uppercase' }}>
+                    {settings.footerCustomerCareTitle || 'Customer Care'}
+                  </Text>
+                  <View style={{ gap: 8 }}>
+                    {settings.footerLinkHelpEnabled !== false && (
+                      <Text style={{ fontSize: 12, color: '#94A3B8' }}>{settings.footerLinkHelpLabel || 'Help Center'}</Text>
+                    )}
+                    {settings.footerLinkShippingEnabled !== false && (
+                      <Text style={{ fontSize: 12, color: '#94A3B8' }}>{settings.footerLinkShippingLabel || 'Shipping & Delivery'}</Text>
+                    )}
+                    {settings.footerLinkReturnsEnabled !== false && (
+                      <Text style={{ fontSize: 12, color: '#94A3B8' }}>{settings.footerLinkReturnsLabel || 'Returns & Refunds'}</Text>
+                    )}
+                    {settings.footerLinkContactEnabled !== false && (
+                      <Text style={{ fontSize: 12, color: '#94A3B8' }}>{settings.footerLinkContactLabel || 'Contact Us'}</Text>
+                    )}
+                  </View>
+                </View>
+
+                {/* Column 4: Stay Connected */}
+                <View style={{ flex: 1.4, minWidth: 220 }}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#FFFFFF', letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' }}>
+                    {settings.footerStayConnectedTitle || 'Stay Connected'}
+                  </Text>
+                  <Text style={{ fontSize: 11.5, color: '#94A3B8', marginBottom: 10 }}>
+                    {settings.footerNewsletterSubtitle || 'Get the latest updates, promos and more.'}
+                  </Text>
+                  {settings.footerNewsletterEnabled !== false && (
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        paddingHorizontal: 10,
+                        height: 34,
+                        marginBottom: 12,
+                      }}
+                    >
+                      <Text style={{ flex: 1, color: '#64748B', fontSize: 11.5 }}>
+                        {settings.footerNewsletterPlaceholder || 'Enter your email address'}
+                      </Text>
+                      <View style={{ width: 22, height: 22, borderRadius: 6, backgroundColor: '#EA580C', alignItems: 'center', justifyContent: 'center' }}>
+                        <BootstrapIcon name="arrow-right" size={10} color="#FFFFFF" />
+                      </View>
+                    </View>
+                  )}
+                  {/* Social icons preview */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    {[
+                      { icon: 'facebook', val: settings.footerSocialFacebook },
+                      { icon: 'instagram', val: settings.footerSocialInstagram },
+                      { icon: 'youtube', val: settings.footerSocialYoutube },
+                      { icon: 'tiktok', val: settings.footerSocialTiktok },
+                    ].map((s) => (
+                      <View
+                        key={s.icon}
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 6,
+                          backgroundColor: s.val ? 'rgba(234, 88, 12, 0.2)' : 'rgba(255, 255, 255, 0.06)',
+                          borderWidth: 1,
+                          borderColor: s.val ? 'rgba(234, 88, 12, 0.4)' : 'rgba(255, 255, 255, 0.1)',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <BootstrapIcon name={s.icon} size={12} color={s.val ? '#EA580C' : '#64748B'} />
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
+
+              {/* Divider */}
+              <View style={{ height: 1, backgroundColor: 'rgba(255, 255, 255, 0.1)' }} />
+
+              {/* Bottom Row */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                <Text style={{ fontSize: 11.5, color: '#64748B' }}>
+                  {settings.footerCopyrightText || ('© ' + new Date().getFullYear() + ' ' + (settings.storeName || 'MOTOTRACK') + '. All rights reserved.')}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  {settings.footerTermsEnabled !== false && (
+                    <Text style={{ fontSize: 11.5, color: '#94A3B8' }}>{settings.footerTermsLabel || 'Terms of Service'}</Text>
+                  )}
+                  {settings.footerPrivacyEnabled !== false && (
+                    <Text style={{ fontSize: 11.5, color: '#94A3B8' }}>{settings.footerPrivacyLabel || 'Privacy Policy'}</Text>
+                  )}
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* Section 1: Brand Identity & Column Headings */}
+          <View
+            style={{
+              backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+              padding: 24,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+              gap: 16,
+            }}
+          >
+            <SectionHeader
+              icon="shop"
+              title="Brand Tagline & Column Titles"
+              subtitle="Configure the brand slogan and title headers displayed at the top of each footer column."
+              onEdit={() => openSectionModal('footer_brand')}
+            />
+
+            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Footer Brand Tagline"
+                  value={settings.footerTagline || 'Ride Better. Go Further.'}
+                  icon="tag"
+                  description="Promotional slogan displayed below the brand logo in Column 1."
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="About Summary Blurb"
+                  value={settings.footerAboutText || 'Ride Better. Go Further.'}
+                  icon="card-text"
+                  description="Short optional company description rendered in the brand column."
+                />
+              </View>
+            </View>
+
+            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Column 2 Heading"
+                  value={settings.footerQuickLinksTitle || 'Quick Links'}
+                  icon="fonts"
+                  description="Title header for general platform navigation links."
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Column 3 Heading"
+                  value={settings.footerCustomerCareTitle || 'Customer Care'}
+                  icon="fonts"
+                  description="Title header for customer support and policies."
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Column 4 Heading"
+                  value={settings.footerStayConnectedTitle || 'Stay Connected'}
+                  icon="fonts"
+                  description="Title header for newsletter and social community."
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Section 2: Quick Links & Customer Care Navigation */}
+          <View
+            style={{
+              backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+              padding: 24,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+              gap: 16,
+            }}
+          >
+            <SectionHeader
+              icon="link-45deg"
+              title="Quick Links & Customer Care Navigation"
+              subtitle="Customize the labels and visibility of each navigation item in Columns 2 & 3."
+              onEdit={() => openSectionModal('footer_links')}
+            />
+
+            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Quick Links Column Items"
+                  icon="list-ul"
+                  description="Main navigation links pointing to store shopping, servicing, and customizer."
+                  displayValue={
+                    <View style={{ gap: 6, marginTop: 4 }}>
+                      <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textPrimary : '#0F172A', fontWeight: '600' }}>
+                        • {settings.footerLinkShopLabel || 'Shop'} {settings.footerLinkShopEnabled === false ? '(Hidden)' : '(Active)'}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textPrimary : '#0F172A', fontWeight: '600' }}>
+                        • {settings.footerLinkServiceLabel || 'Book a Service'} {settings.footerLinkServiceEnabled === false ? '(Hidden)' : '(Active)'}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textPrimary : '#0F172A', fontWeight: '600' }}>
+                        • {settings.footerLinkCustomizeLabel || 'Customize'} {settings.footerLinkCustomizeEnabled === false ? '(Hidden)' : '(Active)'}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textPrimary : '#0F172A', fontWeight: '600' }}>
+                        • {settings.footerLinkAboutLabel || 'About Us'} {settings.footerLinkAboutEnabled === false ? '(Hidden)' : '(Active)'}
+                      </Text>
+                    </View>
+                  }
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Customer Care Column Items"
+                  icon="headset"
+                  description="Support and policy links directing customers to help and service conditions."
+                  displayValue={
+                    <View style={{ gap: 6, marginTop: 4 }}>
+                      <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textPrimary : '#0F172A', fontWeight: '600' }}>
+                        • {settings.footerLinkHelpLabel || 'Help Center'} {settings.footerLinkHelpEnabled === false ? '(Hidden)' : '(Active)'}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textPrimary : '#0F172A', fontWeight: '600' }}>
+                        • {settings.footerLinkShippingLabel || 'Shipping & Delivery'} {settings.footerLinkShippingEnabled === false ? '(Hidden)' : '(Active)'}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textPrimary : '#0F172A', fontWeight: '600' }}>
+                        • {settings.footerLinkReturnsLabel || 'Returns & Refunds'} {settings.footerLinkReturnsEnabled === false ? '(Hidden)' : '(Active)'}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textPrimary : '#0F172A', fontWeight: '600' }}>
+                        • {settings.footerLinkContactLabel || 'Contact Us'} {settings.footerLinkContactEnabled === false ? '(Hidden)' : '(Active)'}
+                      </Text>
+                    </View>
+                  }
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Section 3: Newsletter & Social Profiles */}
+          <View
+            style={{
+              backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+              padding: 24,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+              gap: 16,
+            }}
+          >
+            <SectionHeader
+              icon="megaphone"
+              title="Newsletter Prompt & Social Community Profiles"
+              subtitle="Configure newsletter signup call-to-action and direct links to official social pages."
+              onEdit={() => openSectionModal('footer_social')}
+            />
+
+            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Newsletter Subscription CTA"
+                  value={settings.footerNewsletterEnabled !== false ? 'Enabled' : 'Disabled'}
+                  icon="envelope-check"
+                  description={settings.footerNewsletterSubtitle || 'Get the latest updates, promos and more.'}
+                  badge={
+                    <View style={{ backgroundColor: settings.footerNewsletterEnabled !== false ? '#DCFCE7' : '#F1F5F9', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: settings.footerNewsletterEnabled !== false ? '#15803D' : '#64748B' }}>
+                        {settings.footerNewsletterEnabled !== false ? 'ACTIVE' : 'OFF'}
+                      </Text>
+                    </View>
+                  }
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Social Profiles Connected"
+                  icon="share"
+                  description="Social links displayed as icon buttons in the stay connected column."
+                  displayValue={
+                    <View style={{ gap: 4, marginTop: 4 }}>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        Facebook: <Text style={{ color: '#EA580C' }}>{settings.footerSocialFacebook || 'Not configured'}</Text>
+                      </Text>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        Instagram: <Text style={{ color: '#EA580C' }}>{settings.footerSocialInstagram || 'Not configured'}</Text>
+                      </Text>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        YouTube: <Text style={{ color: '#EA580C' }}>{settings.footerSocialYoutube || 'Not configured'}</Text>
+                      </Text>
+                      <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        TikTok: <Text style={{ color: '#EA580C' }}>{settings.footerSocialTiktok || 'Not configured'}</Text>
+                      </Text>
+                    </View>
+                  }
+                />
+              </View>
+            </View>
+          </View>
+
+          {/* Section 4: Copyright & Legal Compliance */}
+          <View
+            style={{
+              backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+              padding: 24,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
+              gap: 16,
+            }}
+          >
+            <SectionHeader
+              icon="shield-check"
+              title="Copyright Statement & Legal Compliance"
+              subtitle="Manage copyright notices and consumer protection legal links in the footer bottom bar."
+              onEdit={() => openSectionModal('footer_legal')}
+            />
+
+            <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 14 }}>
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Bottom Copyright Text"
+                  value={settings.footerCopyrightText || ('© ' + new Date().getFullYear() + ' ' + (settings.storeName || 'MOTOTRACK') + '. All rights reserved.')}
+                  icon="c-circle"
+                  description="Legal ownership text displayed at the bottom left of the storefront footer."
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
+                  title="Terms & Privacy Navigation"
+                  icon="file-earmark-text"
+                  description="Visibility of legal modal links at the bottom right of the footer."
+                  displayValue={
+                    <View style={{ gap: 4, marginTop: 4 }}>
+                      <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textPrimary : '#0F172A', fontWeight: '600' }}>
+                        • {settings.footerTermsLabel || 'Terms of Service'} {settings.footerTermsEnabled === false ? '(Hidden)' : '(Active)'}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: isDarkMode ? tokens.textPrimary : '#0F172A', fontWeight: '600' }}>
+                        • {settings.footerPrivacyLabel || 'Privacy Policy'} {settings.footerPrivacyEnabled === false ? '(Hidden)' : '(Active)'}
+                      </Text>
+                    </View>
+                  }
+                />
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+
+
       {/* ─── SUBTAB 2: STORE & BUSINESS CONFIGURATION ─── */}
       {canonicalTabId === 'store' && (
         <View style={{ gap: 20 }}>
@@ -1215,7 +1697,7 @@ export default function AdminSystemSettingsPanel({
                       <Text
                         style={{
                           fontSize: 10,
-                          fontWeight: '800',
+                          fontWeight: '600',
                           color: settings.autoFulfillOrders ? '#166534' : '#64748B',
                         }}
                       >
@@ -1295,7 +1777,7 @@ export default function AdminSystemSettingsPanel({
                       <Text
                         style={{
                           fontSize: 10,
-                          fontWeight: '800',
+                          fontWeight: '600',
                           color: settings.enableBackorders ? '#92400E' : '#166534',
                         }}
                       >
@@ -1420,7 +1902,7 @@ export default function AdminSystemSettingsPanel({
                       <Text
                         style={{
                           fontSize: 10,
-                          fontWeight: '800',
+                          fontWeight: '600',
                           color: settings.autoAssignMechanics ? '#166534' : '#64748B',
                         }}
                       >
@@ -1522,7 +2004,7 @@ export default function AdminSystemSettingsPanel({
                       <Text
                         style={{
                           fontSize: 10,
-                          fontWeight: '800',
+                          fontWeight: '600',
                           color: settings.requireDownpayment !== false ? '#166534' : '#92400E',
                         }}
                       >
@@ -1616,7 +2098,7 @@ export default function AdminSystemSettingsPanel({
                       <Text
                         style={{
                           fontSize: 10,
-                          fontWeight: '800',
+                          fontWeight: '600',
                           color: settings.enableOrderSms ? '#166534' : '#64748B',
                         }}
                       >
@@ -1647,7 +2129,7 @@ export default function AdminSystemSettingsPanel({
                       <Text
                         style={{
                           fontSize: 10,
-                          fontWeight: '800',
+                          fontWeight: '600',
                           color: settings.enableOrderEmail !== false ? '#166534' : '#64748B',
                         }}
                       >
@@ -1676,7 +2158,7 @@ export default function AdminSystemSettingsPanel({
                       <Text
                         style={{
                           fontSize: 10,
-                          fontWeight: '800',
+                          fontWeight: '600',
                           color: settings.enableBookingReminder !== false ? '#166534' : '#64748B',
                         }}
                       >
@@ -1734,7 +2216,7 @@ export default function AdminSystemSettingsPanel({
                       <Text
                         style={{
                           fontSize: 10,
-                          fontWeight: '800',
+                          fontWeight: '600',
                           color: settings.alertOnLowStock !== false ? '#166534' : '#64748B',
                         }}
                       >
@@ -1763,7 +2245,7 @@ export default function AdminSystemSettingsPanel({
                       <Text
                         style={{
                           fontSize: 10,
-                          fontWeight: '800',
+                          fontWeight: '600',
                           color: settings.alertOnNewBooking !== false ? '#166534' : '#64748B',
                         }}
                       >
@@ -1941,7 +2423,7 @@ export default function AdminSystemSettingsPanel({
                   <Text
                     style={{
                       fontSize: 10,
-                      fontWeight: '800',
+                      fontWeight: '600',
                       color: settings.maintenanceMode ? '#B91C1C' : '#166534',
                     }}
                   >
@@ -1986,7 +2468,7 @@ export default function AdminSystemSettingsPanel({
                 <BootstrapIcon name="database" size={20} color="#EA580C" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16, fontWeight: '900', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
                   Data Backup & Storage Utilities
                 </Text>
                 <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
@@ -2011,7 +2493,7 @@ export default function AdminSystemSettingsPanel({
                 activeOpacity={0.85}
               >
                 <BootstrapIcon name="download" size={14} color="#FFFFFF" />
-                <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#FFFFFF' }}>
                   Export System Backup (JSON)
                 </Text>
               </TouchableOpacity>
@@ -2050,7 +2532,7 @@ export default function AdminSystemSettingsPanel({
                 borderColor: isDarkMode ? tokens.bgCard : '#E2E8F0',
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? '#6EE7B7' : '#EA580C', marginBottom: 12 }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#6EE7B7' : '#EA580C', marginBottom: 12 }}>
                 Live System Telemetry & Statistics
               </Text>
               <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 16, flexWrap: 'wrap' }}>
@@ -2185,6 +2667,14 @@ export default function AdminSystemSettingsPanel({
                         ? 'megaphone'
                         : activeModalSection === 'security_system'
                         ? 'shield-lock'
+                        : activeModalSection === 'footer_brand' || activeModalSection === 'shop_footer'
+                        ? 'layout-text-window-reverse'
+                        : activeModalSection === 'footer_links'
+                        ? 'list-nested'
+                        : activeModalSection === 'footer_social'
+                        ? 'share'
+                        : activeModalSection === 'footer_legal'
+                        ? 'shield-check'
                         : 'wrench-adjustable'
                     }
                     size={20}
@@ -2192,7 +2682,7 @@ export default function AdminSystemSettingsPanel({
                   />
                 </View>
                 <View>
-                  <Text style={{ fontSize: 17, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                  <Text style={{ fontSize: 17, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
                     {activeModalSection === 'store_identity' && 'Edit Store Identity & Branding'}
                     {activeModalSection === 'contact_hq' && 'Edit Contact & Headquarters'}
                     {activeModalSection === 'operating_schedule' && 'Edit Operating Hours & Schedule'}
@@ -2208,6 +2698,11 @@ export default function AdminSystemSettingsPanel({
                     {activeModalSection === 'garage_operations' && 'Edit Garage & Service Configuration'}
                     {activeModalSection === 'notifications_hub' && 'Edit Notifications & Communication'}
                     {activeModalSection === 'security_system' && 'Edit Security & System Settings'}
+                    {activeModalSection === 'footer_brand' && 'Edit Footer Brand & Column Headings'}
+                    {activeModalSection === 'footer_links' && 'Edit Footer Navigation Links'}
+                    {activeModalSection === 'footer_social' && 'Edit Footer Newsletter & Social Profiles'}
+                    {activeModalSection === 'footer_legal' && 'Edit Footer Copyright & Legal Links'}
+                    {activeModalSection === 'shop_footer' && 'Edit All Shop Footer Settings'}
                   </Text>
                   <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
                     Update parameters below and click Save Changes to apply immediately.
@@ -2242,7 +2737,7 @@ export default function AdminSystemSettingsPanel({
               {activeModalSection === 'store_identity' && (
                 <>
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Official System / Store Name
                     </Text>
                     <TextInput
@@ -2268,7 +2763,7 @@ export default function AdminSystemSettingsPanel({
                   </View>
 
                   <View style={{ gap: 8 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       System Brand Logo
                     </Text>
 
@@ -2316,7 +2811,7 @@ export default function AdminSystemSettingsPanel({
                       )}
 
                       <View style={{ flex: 1, gap: 8 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
                           {modalForm.storeLogoUrl ? 'Custom Brand Logo Uploaded' : 'Default MotoTrack System Logo'}
                         </Text>
                         <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
@@ -2340,7 +2835,7 @@ export default function AdminSystemSettingsPanel({
                             activeOpacity={0.85}
                           >
                             <BootstrapIcon name="cloud-arrow-up-fill" size={14} color="#FFFFFF" />
-                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFFFFF' }}>
                               Upload Logo Image
                             </Text>
                           </TouchableOpacity>
@@ -2395,7 +2890,7 @@ export default function AdminSystemSettingsPanel({
                   </View>
 
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Store Tagline / Slogan
                     </Text>
                     <TextInput
@@ -2426,7 +2921,7 @@ export default function AdminSystemSettingsPanel({
               {activeModalSection === 'contact_hq' && (
                 <>
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Official Support Email
                     </Text>
                     <TextInput
@@ -2450,7 +2945,7 @@ export default function AdminSystemSettingsPanel({
                   </View>
 
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Hotline / Phone Number
                     </Text>
                     <TextInput
@@ -2473,7 +2968,7 @@ export default function AdminSystemSettingsPanel({
                   </View>
 
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Workshop / Hub Facility Name
                     </Text>
                     <TextInput
@@ -2499,7 +2994,7 @@ export default function AdminSystemSettingsPanel({
                   </View>
 
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Store Physical Address & Hub Facility
                     </Text>
                     <TextInput
@@ -2524,7 +3019,7 @@ export default function AdminSystemSettingsPanel({
                   </View>
 
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       City / Location
                     </Text>
                     <TextInput
@@ -2547,7 +3042,7 @@ export default function AdminSystemSettingsPanel({
                   </View>
 
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Official Business Email
                     </Text>
                     <TextInput
@@ -2577,7 +3072,7 @@ export default function AdminSystemSettingsPanel({
                 <>
                   <View style={{ flexDirection: 'row', gap: 14 }}>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Opening Time
                       </Text>
                       <TextInput
@@ -2600,7 +3095,7 @@ export default function AdminSystemSettingsPanel({
                     </View>
 
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Closing Time
                       </Text>
                       <TextInput
@@ -2624,7 +3119,7 @@ export default function AdminSystemSettingsPanel({
                   </View>
 
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Operating Days / Weekly Schedule
                     </Text>
                     <TextInput
@@ -2647,7 +3142,7 @@ export default function AdminSystemSettingsPanel({
                   </View>
 
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Default Currency Code
                     </Text>
                     <TextInput
@@ -2676,7 +3171,7 @@ export default function AdminSystemSettingsPanel({
                 <>
                   <View style={{ flexDirection: 'row', gap: 14 }}>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Base Delivery Fee (₱)
                       </Text>
                       <TextInput
@@ -2700,7 +3195,7 @@ export default function AdminSystemSettingsPanel({
                     </View>
 
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Free Shipping Min. (₱)
                       </Text>
                       <TextInput
@@ -2725,7 +3220,7 @@ export default function AdminSystemSettingsPanel({
                   </View>
 
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Estimated Delivery Lead Time (Days)
                     </Text>
                     <TextInput
@@ -2793,7 +3288,7 @@ export default function AdminSystemSettingsPanel({
                 <>
                   <View style={{ flexDirection: 'row', gap: 14 }}>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Low Stock Warning (Units)
                       </Text>
                       <TextInput
@@ -2817,7 +3312,7 @@ export default function AdminSystemSettingsPanel({
                     </View>
 
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Critical Stock Level (Units)
                       </Text>
                       <TextInput
@@ -2842,7 +3337,7 @@ export default function AdminSystemSettingsPanel({
                   </View>
 
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Catalog SKU Code Prefix
                     </Text>
                     <TextInput
@@ -2909,7 +3404,7 @@ export default function AdminSystemSettingsPanel({
                 <>
                   <View style={{ flexDirection: 'row', gap: 14 }}>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Active Pitstop Bays
                       </Text>
                       <TextInput
@@ -2933,7 +3428,7 @@ export default function AdminSystemSettingsPanel({
                     </View>
 
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Max Bookings / Slot
                       </Text>
                       <TextInput
@@ -2959,7 +3454,7 @@ export default function AdminSystemSettingsPanel({
 
                   <View style={{ flexDirection: 'row', gap: 14 }}>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Slots per Mechanic
                       </Text>
                       <TextInput
@@ -2985,7 +3480,7 @@ export default function AdminSystemSettingsPanel({
                       </Text>
                     </View>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Default Service Slot Duration (Minutes)
                       </Text>
                     <TextInput
@@ -3054,7 +3549,7 @@ export default function AdminSystemSettingsPanel({
                 <>
                   <View style={{ flexDirection: 'row', gap: 14 }}>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Required Downpayment (%)
                       </Text>
                       <TextInput
@@ -3078,7 +3573,7 @@ export default function AdminSystemSettingsPanel({
                     </View>
 
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Hourly Labor Rate (₱/hr)
                       </Text>
                       <TextInput
@@ -3104,7 +3599,7 @@ export default function AdminSystemSettingsPanel({
 
                   <View style={{ flexDirection: 'row', gap: 14 }}>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Downpayment Due Date (Hours After Booking)
                       </Text>
                       <TextInput
@@ -3130,7 +3625,7 @@ export default function AdminSystemSettingsPanel({
                       </Text>
                     </View>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Free Cancellation Cutoff (Hours)
                       </Text>
                       <TextInput
@@ -3198,7 +3693,7 @@ export default function AdminSystemSettingsPanel({
               {activeModalSection === 'customer_notifications' && (
                 <>
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Appointment Reminder Lead Time (Hours)
                     </Text>
                     <TextInput
@@ -3341,7 +3836,7 @@ export default function AdminSystemSettingsPanel({
               {activeModalSection === 'admin_alerts' && (
                 <>
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Central Dispatch Notification Email
                     </Text>
                     <TextInput
@@ -3446,31 +3941,31 @@ export default function AdminSystemSettingsPanel({
               {activeModalSection === 'store_business' && (
                 <>
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Store Status</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Store Status</Text>
                     <View style={{ flexDirection: 'row', gap: 8 }}>
                       {['open', 'closed'].map((s) => (
                         <TouchableOpacity key={s} onPress={() => handleUpdateFormField('storeStatus', s)} style={{ flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center', backgroundColor: (modalForm.storeStatus || 'open') === s ? '#EA580C' : isDarkMode ? tokens.bgSub : '#F1F5F9', borderWidth: 1.5, borderColor: (modalForm.storeStatus || 'open') === s ? '#EA580C' : '#CBD5E1' }} activeOpacity={0.85}>
-                          <Text style={{ fontSize: 13, fontWeight: '800', color: (modalForm.storeStatus || 'open') === s ? '#FFFFFF' : '#64748B' }}>{s === 'open' ? 'Open' : 'Closed'}</Text>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: (modalForm.storeStatus || 'open') === s ? '#FFFFFF' : '#64748B' }}>{s === 'open' ? 'Open' : 'Closed'}</Text>
                         </TouchableOpacity>
                       ))}
                     </View>
                   </View>
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Minimum Order Amount (₱)</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Minimum Order Amount (₱)</Text>
                     <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} keyboardType="numeric" value={modalForm.minimumOrderAmount !== undefined ? String(modalForm.minimumOrderAmount) : ''} onChangeText={(val) => handleUpdateFormField('minimumOrderAmount', val)} placeholder="0" placeholderTextColor="#94A3B8" />
                   </View>
                   <View style={{ flexDirection: 'row', gap: 14 }}>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Opening</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Opening</Text>
                       <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} value={modalForm.openTime || ''} onChangeText={(val) => handleUpdateFormField('openTime', val)} placeholder="08:00 AM" placeholderTextColor="#94A3B8" />
                     </View>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Closing</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Closing</Text>
                       <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} value={modalForm.closeTime || ''} onChangeText={(val) => handleUpdateFormField('closeTime', val)} placeholder="07:00 PM" placeholderTextColor="#94A3B8" />
                     </View>
                   </View>
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Business Days</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Business Days</Text>
                     <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} value={modalForm.operatingDays || ''} onChangeText={(val) => handleUpdateFormField('operatingDays', val)} placeholder="Monday – Saturday" placeholderTextColor="#94A3B8" />
                   </View>
                   {[
@@ -3510,26 +4005,26 @@ export default function AdminSystemSettingsPanel({
                   ))}
                   <View style={{ flexDirection: 'row', gap: 14 }}>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Min Order (₱)</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Min Order (₱)</Text>
                       <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} keyboardType="numeric" value={modalForm.minimumOrderAmount !== undefined ? String(modalForm.minimumOrderAmount) : ''} onChangeText={(val) => handleUpdateFormField('minimumOrderAmount', val)} placeholder="0" placeholderTextColor="#94A3B8" />
                     </View>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Max COD (₱)</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Max COD (₱)</Text>
                       <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} keyboardType="numeric" value={modalForm.maxCodAmount !== undefined ? String(modalForm.maxCodAmount) : ''} onChangeText={(val) => handleUpdateFormField('maxCodAmount', val)} placeholder="50000" placeholderTextColor="#94A3B8" />
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 14 }}>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delivery Fee (₱)</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Delivery Fee (₱)</Text>
                       <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} keyboardType="numeric" value={modalForm.standardShippingFee !== undefined ? String(modalForm.standardShippingFee) : ''} onChangeText={(val) => handleUpdateFormField('standardShippingFee', val)} placeholder="100" placeholderTextColor="#94A3B8" />
                     </View>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Free Threshold (₱)</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Free Threshold (₱)</Text>
                       <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} keyboardType="numeric" value={modalForm.freeShippingThreshold !== undefined ? String(modalForm.freeShippingThreshold) : ''} onChangeText={(val) => handleUpdateFormField('freeShippingThreshold', val)} placeholder="3500" placeholderTextColor="#94A3B8" />
                     </View>
                   </View>
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Cancellation Window (Hours)</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Cancellation Window (Hours)</Text>
                     <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} keyboardType="numeric" value={modalForm.allowCancellationHours !== undefined ? String(modalForm.allowCancellationHours) : ''} onChangeText={(val) => handleUpdateFormField('allowCancellationHours', val)} placeholder="24" placeholderTextColor="#94A3B8" />
                   </View>
                 </>
@@ -3558,11 +4053,11 @@ export default function AdminSystemSettingsPanel({
                     );
                   })}
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Max Daily Bookings</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Max Daily Bookings</Text>
                     <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} keyboardType="numeric" value={modalForm.maxDailyAppointments !== undefined ? String(modalForm.maxDailyAppointments) : ''} onChangeText={(val) => handleUpdateFormField('maxDailyAppointments', val)} placeholder="24" placeholderTextColor="#94A3B8" />
                   </View>
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Service Status Workflow</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Service Status Workflow</Text>
                     <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} value={modalForm.serviceStatusWorkflow || ''} onChangeText={(val) => handleUpdateFormField('serviceStatusWorkflow', val)} placeholder="Pending → Confirmed → In Service → Ready → Completed" placeholderTextColor="#94A3B8" />
                   </View>
                 </>
@@ -3600,16 +4095,16 @@ export default function AdminSystemSettingsPanel({
                 <>
                   <View style={{ flexDirection: 'row', gap: 14 }}>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Min Password Length</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Min Password Length</Text>
                       <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} keyboardType="numeric" value={modalForm.passwordMinLength !== undefined ? String(modalForm.passwordMinLength) : ''} onChangeText={(val) => handleUpdateFormField('passwordMinLength', val)} placeholder="8" placeholderTextColor="#94A3B8" />
                     </View>
                     <View style={{ flex: 1, gap: 6 }}>
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Session Timeout (min)</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Session Timeout (min)</Text>
                       <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} keyboardType="numeric" value={modalForm.sessionTimeoutMinutes !== undefined ? String(modalForm.sessionTimeoutMinutes) : ''} onChangeText={(val) => handleUpdateFormField('sessionTimeoutMinutes', val)} placeholder="60" placeholderTextColor="#94A3B8" />
                     </View>
                   </View>
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Data Retention (Days)</Text>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>Data Retention (Days)</Text>
                     <TextInput style={{ backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC', borderRadius: 10, borderWidth: 1.5, borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1', paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} keyboardType="numeric" value={modalForm.dataRetentionDays !== undefined ? String(modalForm.dataRetentionDays) : ''} onChangeText={(val) => handleUpdateFormField('dataRetentionDays', val)} placeholder="365" placeholderTextColor="#94A3B8" />
                   </View>
                   {[
@@ -3655,7 +4150,7 @@ export default function AdminSystemSettingsPanel({
                     activeOpacity={0.8}
                   >
                     <View style={{ flex: 1, paddingRight: 10 }}>
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: modalForm.maintenanceMode ? '#B91C1C' : isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: modalForm.maintenanceMode ? '#B91C1C' : isDarkMode ? tokens.textPrimary : '#0F172A' }}>
                         System Maintenance Mode
                       </Text>
                       <Text style={{ fontSize: 12, color: modalForm.maintenanceMode ? '#DC2626' : isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
@@ -3680,7 +4175,7 @@ export default function AdminSystemSettingsPanel({
                   </TouchableOpacity>
 
                   <View style={{ gap: 6 }}>
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                       Customer Maintenance Banner Notice
                     </Text>
                     <TextInput
@@ -3705,6 +4200,594 @@ export default function AdminSystemSettingsPanel({
                   </View>
                 </>
               )}
+              {/* ─── FOOTER SETTINGS MODAL SECTIONS ─── */}
+              {(activeModalSection === 'footer_brand' || activeModalSection === 'shop_footer') && (
+                <View style={{ gap: 14 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#EA580C', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Brand Identity & Column Headers
+                  </Text>
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Footer Brand Tagline
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        fontSize: 14,
+                        fontWeight: '600',
+                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      }}
+                      value={modalForm.footerTagline !== undefined ? modalForm.footerTagline : ''}
+                      onChangeText={(val) => handleUpdateFormField('footerTagline', val)}
+                      placeholder="e.g. Ride Better. Go Further."
+                      placeholderTextColor="#94A3B8"
+                    />
+                    <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textSubtle : '#94A3B8' }}>
+                      Promotional slogan rendered directly below the logo in the shop footer.
+                    </Text>
+                  </View>
+
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      About Summary Blurb
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        fontSize: 13.5,
+                        fontWeight: '500',
+                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                        minHeight: 60,
+                        textAlignVertical: 'top',
+                      }}
+                      multiline
+                      value={modalForm.footerAboutText !== undefined ? modalForm.footerAboutText : ''}
+                      onChangeText={(val) => handleUpdateFormField('footerAboutText', val)}
+                      placeholder="Brief company mission or description..."
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Column 2 Heading (Quick Links)
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        fontSize: 14,
+                        fontWeight: '600',
+                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      }}
+                      value={modalForm.footerQuickLinksTitle !== undefined ? modalForm.footerQuickLinksTitle : ''}
+                      onChangeText={(val) => handleUpdateFormField('footerQuickLinksTitle', val)}
+                      placeholder="Quick Links"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Column 3 Heading (Customer Care)
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        fontSize: 14,
+                        fontWeight: '600',
+                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      }}
+                      value={modalForm.footerCustomerCareTitle !== undefined ? modalForm.footerCustomerCareTitle : ''}
+                      onChangeText={(val) => handleUpdateFormField('footerCustomerCareTitle', val)}
+                      placeholder="Customer Care"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Column 4 Heading (Stay Connected)
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        fontSize: 14,
+                        fontWeight: '600',
+                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      }}
+                      value={modalForm.footerStayConnectedTitle !== undefined ? modalForm.footerStayConnectedTitle : ''}
+                      onChangeText={(val) => handleUpdateFormField('footerStayConnectedTitle', val)}
+                      placeholder="Stay Connected"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+                </View>
+              )}
+
+              {(activeModalSection === 'footer_links' || activeModalSection === 'shop_footer') && (
+                <View style={{ gap: 14, marginTop: activeModalSection === 'shop_footer' ? 16 : 0 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#EA580C', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Quick Links & Customer Care Navigation
+                  </Text>
+
+                  {/* Quick links labels */}
+                  <View style={{ gap: 8 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                      Column 2: Quick Links Navigation Labels
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>Shop Page Label</Text>
+                        <TextInput
+                          style={{
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerLinkShopLabel !== undefined ? modalForm.footerLinkShopLabel : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerLinkShopLabel', val)}
+                          placeholder="Shop"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>Service Booking Label</Text>
+                        <TextInput
+                          style={{
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerLinkServiceLabel !== undefined ? modalForm.footerLinkServiceLabel : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerLinkServiceLabel', val)}
+                          placeholder="Book a Service"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>Customizer Label</Text>
+                        <TextInput
+                          style={{
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerLinkCustomizeLabel !== undefined ? modalForm.footerLinkCustomizeLabel : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerLinkCustomizeLabel', val)}
+                          placeholder="Customize"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>About Us Label</Text>
+                        <TextInput
+                          style={{
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerLinkAboutLabel !== undefined ? modalForm.footerLinkAboutLabel : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerLinkAboutLabel', val)}
+                          placeholder="About Us"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Customer Care Labels */}
+                  <View style={{ gap: 8, marginTop: 4 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                      Column 3: Customer Care Navigation Labels
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>Help Center Label</Text>
+                        <TextInput
+                          style={{
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerLinkHelpLabel !== undefined ? modalForm.footerLinkHelpLabel : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerLinkHelpLabel', val)}
+                          placeholder="Help Center"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>Shipping & Delivery Label</Text>
+                        <TextInput
+                          style={{
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerLinkShippingLabel !== undefined ? modalForm.footerLinkShippingLabel : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerLinkShippingLabel', val)}
+                          placeholder="Shipping & Delivery"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>Returns & Refunds Label</Text>
+                        <TextInput
+                          style={{
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerLinkReturnsLabel !== undefined ? modalForm.footerLinkReturnsLabel : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerLinkReturnsLabel', val)}
+                          placeholder="Returns & Refunds"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                      <View style={{ flex: 1, gap: 4 }}>
+                        <Text style={{ fontSize: 11, color: '#64748B' }}>Contact Us Label</Text>
+                        <TextInput
+                          style={{
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerLinkContactLabel !== undefined ? modalForm.footerLinkContactLabel : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerLinkContactLabel', val)}
+                          placeholder="Contact Us"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {(activeModalSection === 'footer_social' || activeModalSection === 'shop_footer') && (
+                <View style={{ gap: 14, marginTop: activeModalSection === 'shop_footer' ? 16 : 0 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#EA580C', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Newsletter Subscription & Social Media Profiles
+                  </Text>
+
+                  {/* Newsletter Enabled Toggle */}
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 14,
+                      borderRadius: 12,
+                      backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                      borderWidth: 1.5,
+                      borderColor: modalForm.footerNewsletterEnabled !== false ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                      cursor: 'pointer',
+                    }}
+                    onPress={() => handleUpdateFormField('footerNewsletterEnabled', modalForm.footerNewsletterEnabled === false ? true : false)}
+                    activeOpacity={0.8}
+                  >
+                    <View style={{ flex: 1, paddingRight: 10 }}>
+                      <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                        Enable Newsletter Email Subscription
+                      </Text>
+                      <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
+                        Displays the email input box and subscription action in Column 4.
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        width: 44,
+                        height: 24,
+                        borderRadius: 12,
+                        backgroundColor: modalForm.footerNewsletterEnabled !== false ? '#EA580C' : '#CBD5E1',
+                        padding: 2,
+                        justifyContent: 'center',
+                        alignItems: modalForm.footerNewsletterEnabled !== false ? 'flex-end' : 'flex-start',
+                      }}
+                    >
+                      <View style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: '#FFFFFF' }} />
+                    </View>
+                  </TouchableOpacity>
+
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Newsletter Subtitle Copy
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        fontSize: 13.5,
+                        fontWeight: '500',
+                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      }}
+                      value={modalForm.footerNewsletterSubtitle !== undefined ? modalForm.footerNewsletterSubtitle : ''}
+                      onChangeText={(val) => handleUpdateFormField('footerNewsletterSubtitle', val)}
+                      placeholder="e.g. Get the latest updates, promos and more."
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Newsletter Input Placeholder Text
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        fontSize: 13.5,
+                        fontWeight: '500',
+                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      }}
+                      value={modalForm.footerNewsletterPlaceholder !== undefined ? modalForm.footerNewsletterPlaceholder : ''}
+                      onChangeText={(val) => handleUpdateFormField('footerNewsletterPlaceholder', val)}
+                      placeholder="e.g. Enter your email address"
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+
+                  {/* Social Profile URLs */}
+                  <View style={{ gap: 8, marginTop: 4 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                      Social Media Community URLs
+                    </Text>
+                    <View style={{ gap: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#1877F2', alignItems: 'center', justifyContent: 'center' }}>
+                          <BootstrapIcon name="facebook" size={16} color="#FFFFFF" />
+                        </View>
+                        <TextInput
+                          style={{
+                            flex: 1,
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerSocialFacebook !== undefined ? modalForm.footerSocialFacebook : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerSocialFacebook', val)}
+                          placeholder="https://facebook.com/yourpage"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#E4405F', alignItems: 'center', justifyContent: 'center' }}>
+                          <BootstrapIcon name="instagram" size={16} color="#FFFFFF" />
+                        </View>
+                        <TextInput
+                          style={{
+                            flex: 1,
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerSocialInstagram !== undefined ? modalForm.footerSocialInstagram : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerSocialInstagram', val)}
+                          placeholder="https://instagram.com/yourhandle"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#FF0000', alignItems: 'center', justifyContent: 'center' }}>
+                          <BootstrapIcon name="youtube" size={16} color="#FFFFFF" />
+                        </View>
+                        <TextInput
+                          style={{
+                            flex: 1,
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerSocialYoutube !== undefined ? modalForm.footerSocialYoutube : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerSocialYoutube', val)}
+                          placeholder="https://youtube.com/@channel"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' }}>
+                          <BootstrapIcon name="tiktok" size={16} color="#FFFFFF" />
+                        </View>
+                        <TextInput
+                          style={{
+                            flex: 1,
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderRadius: 8,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                            paddingHorizontal: 12,
+                            paddingVertical: 8,
+                            fontSize: 13,
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                          }}
+                          value={modalForm.footerSocialTiktok !== undefined ? modalForm.footerSocialTiktok : ''}
+                          onChangeText={(val) => handleUpdateFormField('footerSocialTiktok', val)}
+                          placeholder="https://tiktok.com/@profile"
+                          placeholderTextColor="#94A3B8"
+                        />
+                      </View>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {(activeModalSection === 'footer_legal' || activeModalSection === 'shop_footer') && (
+                <View style={{ gap: 14, marginTop: activeModalSection === 'shop_footer' ? 16 : 0 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#EA580C', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                    Copyright & Bottom Bar Compliance
+                  </Text>
+
+                  <View style={{ gap: 6 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Copyright Statement Notice
+                    </Text>
+                    <TextInput
+                      style={{
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        borderRadius: 10,
+                        borderWidth: 1.5,
+                        borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                        paddingHorizontal: 14,
+                        paddingVertical: 10,
+                        fontSize: 13.5,
+                        fontWeight: '600',
+                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      }}
+                      value={modalForm.footerCopyrightText !== undefined ? modalForm.footerCopyrightText : ''}
+                      onChangeText={(val) => handleUpdateFormField('footerCopyrightText', val)}
+                      placeholder={'© ' + new Date().getFullYear() + ' ' + (settings.storeName || 'MotoTrack') + '. All rights reserved.'}
+                      placeholderTextColor="#94A3B8"
+                    />
+                  </View>
+
+                  <View style={{ flexDirection: 'row', gap: 10 }}>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={{ fontSize: 11, color: '#64748B' }}>Terms of Service Label</Text>
+                      <TextInput
+                        style={{
+                          backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                          borderRadius: 8,
+                          borderWidth: 1.5,
+                          borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          fontSize: 13,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                        }}
+                        value={modalForm.footerTermsLabel !== undefined ? modalForm.footerTermsLabel : ''}
+                        onChangeText={(val) => handleUpdateFormField('footerTermsLabel', val)}
+                        placeholder="Terms of Service"
+                        placeholderTextColor="#94A3B8"
+                      />
+                    </View>
+                    <View style={{ flex: 1, gap: 4 }}>
+                      <Text style={{ fontSize: 11, color: '#64748B' }}>Privacy Policy Label</Text>
+                      <TextInput
+                        style={{
+                          backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                          borderRadius: 8,
+                          borderWidth: 1.5,
+                          borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                          fontSize: 13,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                        }}
+                        value={modalForm.footerPrivacyLabel !== undefined ? modalForm.footerPrivacyLabel : ''}
+                        onChangeText={(val) => handleUpdateFormField('footerPrivacyLabel', val)}
+                        placeholder="Privacy Policy"
+                        placeholderTextColor="#94A3B8"
+                      />
+                    </View>
+                  </View>
+                </View>
+              )}
+
             </ScrollView>
 
             {/* Modal Footer */}
@@ -3755,7 +4838,7 @@ export default function AdminSystemSettingsPanel({
                 activeOpacity={0.85}
               >
                 <BootstrapIcon name="check-lg" size={15} color="#FFFFFF" />
-                <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#FFFFFF' }}>
                   {isModalSaving ? 'Saving...' : 'Save Changes'}
                 </Text>
               </TouchableOpacity>

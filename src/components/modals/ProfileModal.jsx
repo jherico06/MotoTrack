@@ -356,7 +356,7 @@ export default function ProfileModal({
               )}
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 15, fontWeight: '800', color: '#0F172A' }}>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: '#0F172A' }}>
                 {currentUser.name || currentUser.fullName}
               </Text>
               <Text style={{ fontSize: 12, color: '#64748B' }}>{currentUser.email}</Text>
@@ -383,7 +383,7 @@ export default function ProfileModal({
                 <Text
                   style={{
                     fontSize: 10.5,
-                    fontWeight: '800',
+                    fontWeight: '600',
                     color: currentUser.role === 'admin' ? '#EA580C' : '#475569',
                   }}
                 >
@@ -520,7 +520,7 @@ export default function ProfileModal({
                 {/* Quick Presets for City of Naga & Cebu */}
                 <View style={{ gap: 6 }}>
                   <Text
-                    style={{ fontSize: 11, fontWeight: '800', color: '#64748B', textTransform: 'uppercase' }}
+                    style={{ fontSize: 11, fontWeight: '600', color: '#64748B', textTransform: 'uppercase' }}
                   >
                     Quick Location Shortcuts:
                   </Text>
@@ -587,7 +587,7 @@ export default function ProfileModal({
                   ) : (
                     <>
                       <BootstrapIcon name="check2" size={16} color="#FFFFFF" />
-                      <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 14 }}>
+                      <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}>
                         Save Settings & Delivery Address
                       </Text>
                     </>
@@ -609,7 +609,7 @@ export default function ProfileModal({
                       <Text style={customStyles.cardTitle}>Change Primary Email</Text>
                       <Text style={customStyles.cardSub}>
                         Current:{' '}
-                        <Text style={{ fontWeight: '800', color: '#0F172A' }}>{currentUser.email}</Text>
+                        <Text style={{ fontWeight: '600', color: '#0F172A' }}>{currentUser.email}</Text>
                       </Text>
                     </View>
                   </View>
@@ -755,11 +755,11 @@ export default function ProfileModal({
                       >
                         <Text style={{ fontSize: 11, fontWeight: '700', color: '#475569' }}>
                           Password Strength:{' '}
-                          <Text style={{ color: pwdStrength.color, fontWeight: '900' }}>
+                          <Text style={{ color: pwdStrength.color, fontWeight: '500' }}>
                             {pwdStrength.label}
                           </Text>
                         </Text>
-                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '800' }}>
+                        <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '500' }}>
                           {pwdStrength.score}%
                         </Text>
                       </View>
@@ -885,7 +885,7 @@ export default function ProfileModal({
                 {/* Header with Refresh & Filter Pills */}
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View>
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>
                       Security & Activity Audit Logs
                     </Text>
                     <Text style={{ fontSize: 11.5, color: '#64748B' }}>
@@ -992,7 +992,7 @@ export default function ProfileModal({
                 <View style={customStyles.addressPreviewCard}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                     <BootstrapIcon name="geo-alt-fill" size={14} color="#EA580C" />
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#0F172A' }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F172A' }}>
                       Current Saved Address
                     </Text>
                   </View>
@@ -1028,7 +1028,7 @@ export default function ProfileModal({
                   activeOpacity={0.85}
                 >
                   <BootstrapIcon name="box-seam-fill" size={15} color="#EA580C" />
-                  <Text style={{ color: '#EA580C', fontWeight: '800', fontSize: 13.5 }}>
+                  <Text style={{ color: '#EA580C', fontWeight: '600', fontSize: 13.5 }}>
                     View My Orders & Live Tracking
                   </Text>
                 </TouchableOpacity>
@@ -1054,7 +1054,7 @@ export default function ProfileModal({
                   activeOpacity={0.85}
                 >
                   <BootstrapIcon name="heart-fill" size={15} color="#DC2626" />
-                  <Text style={{ color: '#DC2626', fontWeight: '800', fontSize: 13.5 }}>
+                  <Text style={{ color: '#DC2626', fontWeight: '600', fontSize: 13.5 }}>
                     View Saved Favorites ({wishlistCount})
                   </Text>
                 </TouchableOpacity>
@@ -1079,7 +1079,7 @@ export default function ProfileModal({
                     activeOpacity={0.85}
                   >
                     <BootstrapIcon name="shield-lock-fill" size={15} color="#FFFFFF" />
-                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13.5 }}>
+                    <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13.5 }}>
                       Admin Dashboard
                     </Text>
                   </TouchableOpacity>
@@ -1105,7 +1105,7 @@ export default function ProfileModal({
                   activeOpacity={0.85}
                 >
                   <BootstrapIcon name="box-arrow-right" size={14} color="#EF4444" />
-                  <Text style={{ color: '#EF4444', fontWeight: '800', fontSize: 14 }}>Log Out</Text>
+                  <Text style={{ color: '#EF4444', fontWeight: '600', fontSize: 14 }}>Log Out</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1160,7 +1160,7 @@ const customStyles = StyleSheet.create({
   },
   tabBtnTextActive: {
     color: '#EA580C',
-    fontWeight: '900',
+    fontWeight: '600',
   },
   infoBanner: {
     flexDirection: 'row',
@@ -1203,7 +1203,7 @@ const customStyles = StyleSheet.create({
   },
   presetChipTextActive: {
     color: '#EA580C',
-    fontWeight: '900',
+    fontWeight: '600',
   },
   successBanner: {
     flexDirection: 'row',
@@ -1267,7 +1267,7 @@ const customStyles = StyleSheet.create({
   },
   cardTitle: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   cardSub: {
@@ -1304,7 +1304,7 @@ const customStyles = StyleSheet.create({
   },
   securityActionBtnText: {
     color: '#FFFFFF',
-    fontWeight: '800',
+    fontWeight: '600',
     fontSize: 13,
   },
   strengthCard: {
@@ -1388,7 +1388,7 @@ const customStyles = StyleSheet.create({
   },
   logTitle: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   logTime: {

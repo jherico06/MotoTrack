@@ -79,7 +79,7 @@ export default function ProductCard({ product, bike, onPress }) {
               zIndex: 2,
             }}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '800' }}>SOLD OUT</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '600' }}>SOLD OUT</Text>
           </View>
         ) : null}
 

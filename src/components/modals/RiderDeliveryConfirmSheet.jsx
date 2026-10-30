@@ -147,7 +147,7 @@ const styles = StyleSheet.create({
     letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
-  title: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: 6 },
+  title: { fontSize: 24, fontWeight: '700', color: colors.text, marginTop: 6 },
   sub: { fontSize: 14, color: colors.textMuted, marginTop: 6, lineHeight: 20 },
   card: {
     marginTop: 16,
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.surface,
   },
-  cancelBtnText: { fontWeight: '800', color: colors.textSecondary, fontSize: 15 },
+  cancelBtnText: { fontWeight: '600', color: colors.textSecondary, fontSize: 15 },
   confirmBtn: {
     flex: 1.4,
     minHeight: 48,
@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  confirmBtnText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+  confirmBtnText: { color: colors.white, fontWeight: '600', fontSize: 15 },
   btnDisabled: { opacity: 0.7 },
   successWrap: {
     flex: 1,
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
   successTitle: {
     marginTop: 16,
     fontSize: 26,
-    fontWeight: '800',
+    fontWeight: '600',
     color: colors.text,
     textAlign: 'center',
   },
@@ -245,5 +245,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+  primaryBtnText: { color: colors.white, fontWeight: '600', fontSize: 15 },
 });

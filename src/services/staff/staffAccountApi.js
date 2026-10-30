@@ -1,6 +1,7 @@
 import { Platform } from 'react-native';
 import { APP_CONFIG } from '../../config';
 import { authService } from '../auth/authService.js';
+import { adminSecurityService } from '../auth/adminSecurityService.js';
 
 function getStaffApiBaseUrl() {
   const fromEnv = String(
@@ -9,9 +10,27 @@ function getStaffApiBaseUrl() {
   if (fromEnv && fromEnv.startsWith('https://')) return fromEnv.replace(/\/+$/, '');
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location?.hostname) {
-      const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
-      return `${proto}//${window.location.hostname}:8787`;
+      const hostname = window.location.hostname;
+      const isLocalhost =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '0.0.0.0';
+
+      if (isLocalhost) {
+        if (fromEnv && fromEnv.startsWith('http://') && !fromEnv.includes('192.168.')) {
+          return fromEnv.replace(/\/+$/, '');
+        }
+        const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        return `${proto}//${hostname}:8787`;
+      }
+
+      if (fromEnv && fromEnv.startsWith('https://')) {
+        return fromEnv.replace(/\/+$/, '');
+      }
+
+      return window.location.origin;
     }
+    if (fromEnv) return fromEnv.replace(/\/+$/, '');
     return 'http://127.0.0.1:8787';
   }
   if (fromEnv) return fromEnv.replace(/\/+$/, '');
@@ -36,6 +55,10 @@ async function staffFetch(path, { method = 'GET', body, admin = false } = {}) {
       };
     }
     headers['X-Admin-User-Id'] = String(adminId);
+    const sessionToken = adminSecurityService.getSessionToken?.(adminUser) || '';
+    if (sessionToken) {
+      headers['X-Admin-Session-Token'] = String(sessionToken);
+    }
   }
 
   try {

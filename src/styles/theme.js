@@ -209,14 +209,14 @@ export function getThemeTokens(isDark = false) {
 }
 
 export const fonts = {
-  sans: 'PlusJakartaSans',
-  regular: 'PlusJakartaSans',
-  extraLight: 'PlusJakartaSans-ExtraLight',
-  light: 'PlusJakartaSans-Light',
-  medium: 'PlusJakartaSans-Medium',
-  semiBold: 'PlusJakartaSans-SemiBold',
-  bold: 'PlusJakartaSans-Bold',
-  extraBold: 'PlusJakartaSans-ExtraBold',
+  sans: 'Inter',
+  regular: 'Inter',
+  extraLight: 'Inter-ExtraLight',
+  light: 'Inter-Light',
+  medium: 'Inter-Medium',
+  semiBold: 'Inter-SemiBold',
+  bold: 'Inter-Bold',
+  extraBold: 'Inter-Bold',
 };
 
 export {

@@ -359,10 +359,10 @@ export default function BookingCalendar({
             <Text
               style={{
                 fontSize: isMobile ? 19 : 24,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: isCharcoalHeader ? '#F8FAFC' : theme.headerTitle,
                 letterSpacing: -0.4,
-                fontFamily: Platform.OS === 'web' ? 'Plus Jakarta Sans, sans-serif' : undefined,
+                fontFamily: Platform.OS === 'web' ? 'Inter, sans-serif' : undefined,
               }}
             >
               {MONTH_NAMES[month]} {year}
@@ -411,10 +411,10 @@ export default function BookingCalendar({
                     numberOfLines={1}
                     style={{
                       fontSize: isMobile ? 9 : 11,
-                      fontWeight: '800',
+                      fontWeight: '600',
                       color: isCharcoalHeader ? '#FCD34D' : theme.weekdayWeekendText,
                       letterSpacing: 0.3,
-                      fontFamily: Platform.OS === 'web' ? 'Plus Jakarta Sans, sans-serif' : undefined,
+                      fontFamily: Platform.OS === 'web' ? 'Inter, sans-serif' : undefined,
                     }}
                   >
                     {isMobile ? dh.short : dh.label}
@@ -439,7 +439,7 @@ export default function BookingCalendar({
                     fontWeight: '700',
                     color: isCharcoalHeader ? '#CBD5E1' : theme.weekdayDefaultText,
                     letterSpacing: 0.4,
-                    fontFamily: Platform.OS === 'web' ? 'Plus Jakarta Sans, sans-serif' : undefined,
+                    fontFamily: Platform.OS === 'web' ? 'Inter, sans-serif' : undefined,
                   }}
                 >
                   {dh.short}
@@ -482,10 +482,10 @@ export default function BookingCalendar({
                 <BootstrapIcon name="exclamation-octagon-fill" size={14} color="#DC2626" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: theme.bannerFullTitle, fontFamily: Platform.OS === 'web' ? 'Plus Jakarta Sans, sans-serif' : undefined }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.bannerFullTitle, fontFamily: Platform.OS === 'web' ? 'Inter, sans-serif' : undefined }}>
                   Notice: {selectedDate} is FULLY BOOKED!
                 </Text>
-                <Text style={{ fontSize: 11.5, color: theme.bannerFullText, marginTop: 1, fontFamily: Platform.OS === 'web' ? 'Plus Jakarta Sans, sans-serif' : undefined }}>
+                <Text style={{ fontSize: 11.5, color: theme.bannerFullText, marginTop: 1, fontFamily: Platform.OS === 'web' ? 'Inter, sans-serif' : undefined }}>
                   All pit bay slots and technicians are booked for this day. You may select another date or contact the shop.
                 </Text>
               </View>
@@ -530,6 +530,12 @@ export default function BookingCalendar({
               const isSpecial = info.isSpecial || false;
               const isHighlight = info.isHighlight || false;
               const dayLabel = info.label || (cell.day === 7 ? 'Open' : null);
+              const totalSlots = info.totalSlots ?? 5;
+              const availableSlots = typeof info.availableSlots === 'number'
+                ? info.availableSlots
+                : isFullyBooked
+                  ? 0
+                  : Math.max(0, totalSlots - bookingCount);
 
               const { isSelected, isToday, isPast } = cell;
 
@@ -607,7 +613,7 @@ export default function BookingCalendar({
                     <Text
                       style={{
                         fontSize: isMobile ? 11 : 13,
-                        fontWeight: isSelected || isSpecial || isToday || isFullyBooked ? '800' : '600',
+                        fontWeight: isSelected || isSpecial || isToday || isFullyBooked ? '600' : '500',
                         color: numColor,
                       }}
                     >
@@ -682,7 +688,7 @@ export default function BookingCalendar({
                   {/* Card Content Body: Selected Pills or booking indicators */}
                   {isSelected && (
                     <View style={{ marginTop: isMobile ? 2 : 6, gap: isMobile ? 2 : 4 }}>
-                      {isFullyBooked ? (
+                      {isFullyBooked && (
                         /* Selected Fully Booked Pill */
                         <View
                           style={{
@@ -700,7 +706,7 @@ export default function BookingCalendar({
                             <Text
                               style={{
                                 fontSize: isMobile ? 8.5 : 10.5,
-                                fontWeight: '800',
+                                fontWeight: '600',
                                 color: '#FFFFFF',
                               }}
                             >
@@ -709,55 +715,41 @@ export default function BookingCalendar({
                           </View>
                           <BootstrapIcon name="chevron-right" size={isMobile ? 7 : 9} color="#FFFFFF" />
                         </View>
-                      ) : (
-                        /* Selected Available Day: MotoTrack Road Teal Pill */
-                        <View
-                          style={{
-                            backgroundColor: '#EA580C',
-                            borderRadius: isMobile ? 5 : 7,
-                            paddingHorizontal: isMobile ? 4 : 7,
-                            paddingVertical: isMobile ? 2 : 4,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                          }}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3 }}>
-                            <BootstrapIcon name="camera-fill" size={isMobile ? 8 : 10} color="#FFFFFF" />
-                            <Text
-                              style={{
-                                fontSize: isMobile ? 9 : 11,
-                                fontWeight: '800',
-                                color: '#FFFFFF',
-                              }}
-                            >
-                              {bookingCount || 1}
-                            </Text>
-                          </View>
-                          <BootstrapIcon name="chevron-right" size={isMobile ? 7 : 9} color="#FFFFFF" />
-                        </View>
                       )}
 
-                      {/* Secondary Strip */}
-                      {!isMobile && (
-                        <View
+                      {/* Strip with garage icon and available slots */}
+                      <View
+                        style={{
+                          backgroundColor: isFullyBooked
+                            ? (isDark ? '#4D1518' : '#FEE2E2')
+                            : (isDark ? '#432311' : '#FED7AA'),
+                          borderRadius: 6,
+                          paddingVertical: 3,
+                          paddingHorizontal: 5,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 3.5,
+                        }}
+                        title={isFullyBooked ? '0 slots available' : `${availableSlots} slots available`}
+                      >
+                        <BootstrapIcon
+                          name={isFullyBooked ? 'slash-circle' : 'tools'}
+                          size={isMobile ? 8 : 9}
+                          color={isFullyBooked ? (isDark ? '#F87171' : '#DC2626') : '#EA580C'}
+                        />
+                        <Text
                           style={{
-                            backgroundColor: isFullyBooked
-                              ? (isDark ? '#4D1518' : '#FEE2E2')
-                              : (isDark ? '#432311' : '#FED7AA'),
-                            borderRadius: 5,
-                            paddingVertical: 3,
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                            fontSize: isMobile ? 8 : 9.5,
+                            fontWeight: '600',
+                            color: isFullyBooked ? (isDark ? '#F87171' : '#DC2626') : '#EA580C',
+                            fontVariant: ['tabular-nums'],
                           }}
+                          numberOfLines={1}
                         >
-                          <BootstrapIcon
-                            name={isFullyBooked ? 'slash-circle' : 'tools'}
-                            size={9}
-                            color={isFullyBooked ? (isDark ? '#F87171' : '#DC2626') : '#EA580C'}
-                          />
-                        </View>
-                      )}
+                          {isFullyBooked ? '0' : availableSlots}
+                        </Text>
+                      </View>
                     </View>
                   )}
 
@@ -778,7 +770,7 @@ export default function BookingCalendar({
                       }}
                     >
                       <BootstrapIcon name="slash-circle-fill" size={7} color={isDark ? '#FCA5A5' : '#DC2626'} />
-                      <Text style={{ fontSize: isMobile ? 7.5 : 8.5, fontWeight: '800', color: theme.cellFullyBookedText }}>
+                      <Text style={{ fontSize: isMobile ? 7.5 : 8.5, fontWeight: '600', color: theme.cellFullyBookedText }}>
                         FULL
                       </Text>
                     </View>
@@ -798,10 +790,11 @@ export default function BookingCalendar({
                         marginTop: 4,
                         alignSelf: 'stretch',
                       }}
+                      title={`${availableSlots} slots available`}
                     >
                       <BootstrapIcon name="tools" size={8} color={theme.badgeReservedText} />
-                      <Text style={{ fontSize: 9, fontWeight: '800', color: theme.badgeReservedText }}>
-                        {bookingCount}
+                      <Text style={{ fontSize: 9, fontWeight: '600', color: theme.badgeReservedText, fontVariant: ['tabular-nums'] }}>
+                        {availableSlots}
                       </Text>
                     </View>
                   )}
@@ -859,7 +852,7 @@ export default function BookingCalendar({
               >
                 <BootstrapIcon name="clock-fill" size={13} color="#EA580C" />
               </View>
-              <Text style={{ fontSize: isMobile ? 13 : 14, fontWeight: '800', color: theme.timeSectionTitle }}>
+              <Text style={{ fontSize: isMobile ? 13 : 14, fontWeight: '600', color: theme.timeSectionTitle }}>
                 Select Appointment Time Slot
               </Text>
             </View>
@@ -879,7 +872,7 @@ export default function BookingCalendar({
                 }}
               >
                 <BootstrapIcon name="check-circle-fill" size={12} color="#EA580C" />
-                <Text style={{ fontSize: 11, fontWeight: '800', color: isDark ? '#FB923C' : '#EA580C' }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: isDark ? '#FB923C' : '#EA580C' }}>
                   {selectedTime}
                 </Text>
               </View>
@@ -931,7 +924,7 @@ export default function BookingCalendar({
                       style={{
                         backgroundColor: theme.timeSelectBg,
                         color: isBooked ? (isDark ? '#64748B' : '#94A3B8') : theme.timeSelectText,
-                        fontWeight: selectedTime === slotStr ? '800' : '600',
+                        fontWeight: selectedTime === slotStr ? '600' : '500',
                       }}
                     >
                       {slotStr} {isBooked ? '— (Fully Booked)' : '— (Available)'}
@@ -1005,7 +998,7 @@ export default function BookingCalendar({
               statusBarText
             ) : (
               <>
-                Hours: <Text style={{ fontWeight: '800', color: '#EA580C' }}>9:00 AM – 6:00 PM</Text> (Mon – Sat). Tap any date to choose or view slot availability.
+                Hours: <Text style={{ fontWeight: '600', color: '#EA580C' }}>9:00 AM – 6:00 PM</Text> (Mon – Sat). Tap any date to choose or view slot availability.
               </>
             )}
           </Text>
@@ -1030,7 +1023,7 @@ export default function BookingCalendar({
             <Text
               style={{
                 fontSize: isMobile ? 11 : 12.5,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: '#FFFFFF',
               }}
             >

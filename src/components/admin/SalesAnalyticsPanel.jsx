@@ -450,7 +450,7 @@ export default function SalesAnalyticsPanel({
         <Text
           style={{
             fontSize: 18,
-            fontWeight: '800',
+            fontWeight: '600',
             color: theme.textPrimary,
             marginBottom: 6,
           }}
@@ -644,7 +644,7 @@ export default function SalesAnalyticsPanel({
             <Text
               style={{
                 fontSize: 26,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: theme.textPrimary,
                 letterSpacing: -0.5,
                 fontVariant: ['tabular-nums'],
@@ -718,7 +718,7 @@ export default function SalesAnalyticsPanel({
             <Text
               style={{
                 fontSize: 26,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: theme.textPrimary,
                 letterSpacing: -0.5,
                 fontVariant: ['tabular-nums'],
@@ -792,7 +792,7 @@ export default function SalesAnalyticsPanel({
             <Text
               style={{
                 fontSize: 26,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: theme.textPrimary,
                 letterSpacing: -0.5,
                 fontVariant: ['tabular-nums'],
@@ -866,7 +866,7 @@ export default function SalesAnalyticsPanel({
             <Text
               style={{
                 fontSize: 26,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: theme.textPrimary,
                 letterSpacing: -0.5,
                 fontVariant: ['tabular-nums'],
@@ -1242,7 +1242,7 @@ export default function SalesAnalyticsPanel({
             <Text
               style={{
                 fontSize: 15,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: theme.textPrimary,
                 letterSpacing: -0.2,
               }}
@@ -1283,7 +1283,7 @@ export default function SalesAnalyticsPanel({
                   <Text
                     style={{
                       fontSize: 12.5,
-                      fontWeight: '800',
+                      fontWeight: '600',
                       color: theme.textPrimary,
                     }}
                   >
@@ -1343,7 +1343,7 @@ export default function SalesAnalyticsPanel({
                   <Text
                     style={{
                       fontSize: 12.5,
-                      fontWeight: '800',
+                      fontWeight: '600',
                       color: theme.textPrimary,
                     }}
                   >
@@ -1426,7 +1426,7 @@ export default function SalesAnalyticsPanel({
                 <Text
                   style={{
                     fontSize: 18,
-                    fontWeight: '900',
+                    fontWeight: '600',
                     color: theme.textPrimary,
                     marginTop: 2,
                     fontVariant: ['tabular-nums'],
@@ -1464,7 +1464,7 @@ export default function SalesAnalyticsPanel({
                 <Text
                   style={{
                     fontSize: 18,
-                    fontWeight: '900',
+                    fontWeight: '600',
                     color: theme.textPrimary,
                     marginTop: 2,
                     fontVariant: ['tabular-nums'],
@@ -1514,7 +1514,7 @@ export default function SalesAnalyticsPanel({
               <Text
                 style={{
                   fontSize: 15,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: theme.textPrimary,
                   letterSpacing: -0.2,
                 }}
@@ -1588,7 +1588,7 @@ export default function SalesAnalyticsPanel({
                           <Text
                             style={{
                               fontSize: 10,
-                              fontWeight: '800',
+                              fontWeight: '600',
                               color: idx === 0 ? '#FFFFFF' : theme.textMuted,
                             }}
                           >
@@ -1638,7 +1638,7 @@ export default function SalesAnalyticsPanel({
                       <Text
                         style={{
                           fontSize: 13,
-                          fontWeight: '800',
+                          fontWeight: '600',
                           color: theme.textPrimary,
                           fontVariant: ['tabular-nums'],
                           marginLeft: 10,
@@ -1708,7 +1708,7 @@ export default function SalesAnalyticsPanel({
               <Text
                 style={{
                   fontSize: 15,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: theme.textPrimary,
                   letterSpacing: -0.2,
                 }}
@@ -1807,7 +1807,7 @@ export default function SalesAnalyticsPanel({
                       <Text
                         style={{
                           fontSize: 12.5,
-                          fontWeight: '800',
+                          fontWeight: '600',
                           color: theme.textPrimary,
                           width: 90,
                           textAlign: 'right',
@@ -1825,7 +1825,7 @@ export default function SalesAnalyticsPanel({
                         <Text
                           style={{
                             fontSize: 12,
-                            fontWeight: '800',
+                            fontWeight: '600',
                             color: isDarkMode ? '#EA580C' : '#EA580C',
                             fontVariant: ['tabular-nums'],
                           }}

@@ -162,7 +162,7 @@ export default function CustomizationsAdminPanel({ isDarkMode }) {
             {selected.motorcycle?.year || ''}
           </Text>
           <Text style={styles.detailMeta}>Status: {selected.status}</Text>
-          <Text style={[styles.detailMeta, { fontWeight: '800', color: isDark ? t.money : TEAL }]}>
+          <Text style={[styles.detailMeta, { fontWeight: '600', color: isDark ? t.money : TEAL }]}>
             Total: {customizationService.formatMoney(selected.totalPrice || selected.total_price)}
           </Text>
           <Text style={[styles.detailMeta, { marginTop: 8, fontWeight: '700' }, isDark && { color: t.textPrimary }]}>Selected Parts</Text>
@@ -185,7 +185,7 @@ function createStyles(t, isDark) {
   return StyleSheet.create({
     root: { padding: 8 },
     header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-    title: { fontSize: 18, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A' },
+    title: { fontSize: 18, fontWeight: '700', color: isDark ? t.textPrimary : '#0F172A' },
     sub: { fontSize: 12, color: isDark ? t.textMuted : '#64748B', marginTop: 2 },
     refreshBtn: {
       flexDirection: 'row',
@@ -206,7 +206,7 @@ function createStyles(t, isDark) {
       borderWidth: 1,
       borderColor: isDark ? t.border : '#E2E8F0',
     },
-    statVal: { fontSize: 16, fontWeight: '800', color: isDark ? t.money : TEAL },
+    statVal: { fontSize: 16, fontWeight: '600', color: isDark ? t.money : TEAL },
     statLabel: { fontSize: 11, color: isDark ? t.textMuted : '#64748B', marginTop: 2 },
     search: {
       borderWidth: 1,
@@ -252,7 +252,7 @@ function createStyles(t, isDark) {
       backgroundColor: isDark ? t.bgCard : '#FAFBFC',
     },
     detailHead: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-    detailTitle: { fontSize: 15, fontWeight: '800', color: isDark ? t.textPrimary : '#0F172A' },
+    detailTitle: { fontSize: 15, fontWeight: '600', color: isDark ? t.textPrimary : '#0F172A' },
     preview: {
       width: '100%',
       height: 180,

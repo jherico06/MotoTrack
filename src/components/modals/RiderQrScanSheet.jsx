@@ -317,12 +317,12 @@ const styles = StyleSheet.create({
   },
   kicker: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#5EEAD4',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
-  title: { fontSize: 24, fontWeight: '900', color: '#FFFFFF', marginTop: 2 },
+  title: { fontSize: 24, fontWeight: '700', color: '#FFFFFF', marginTop: 2 },
   hint: { fontSize: 13, color: '#E2E8F0', marginTop: 4, lineHeight: 18 },
   closeBtn: {
     width: 40,
@@ -365,7 +365,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#1F2937',
   },
-  centerTitle: { fontSize: 18, fontWeight: '900', color: '#F8FAFC', textAlign: 'center' },
+  centerTitle: { fontSize: 18, fontWeight: '700', color: '#F8FAFC', textAlign: 'center' },
   centerBody: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 19 },
   warn: {
     fontSize: 13,
@@ -389,9 +389,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#ECFDF5',
   },
-  secondaryBtnText: { color: '#EA580C', fontWeight: '800', fontSize: 13 },
+  secondaryBtnText: { color: '#EA580C', fontWeight: '500', fontSize: 13 },
   pasteBlock: { gap: 8 },
-  label: { fontSize: 12, fontWeight: '800', color: '#CBD5E1' },
+  label: { fontSize: 12, fontWeight: '500', color: '#CBD5E1' },
   input: {
     borderWidth: 1.5,
     borderColor: '#334155',
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     width: '100%',
   },
-  primaryBtnText: { color: '#FFFFFF', fontWeight: '800' },
+  primaryBtnText: { color: '#FFFFFF', fontWeight: '600' },
   ghostCamBtn: { paddingVertical: 8 },
   ghostCamBtnText: { color: '#5EEAD4', fontWeight: '700', fontSize: 13 },
   cancelBtn: {

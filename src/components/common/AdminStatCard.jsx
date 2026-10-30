@@ -326,14 +326,14 @@ export default function AdminStatCard({
         numberOfLines={1}
         style={{
           fontSize: 28,
-          fontWeight: '800',
+          fontWeight: '600',
           letterSpacing: -0.5,
           lineHeight: 34,
           color: resolvedValueColor,
           fontVariant: ['tabular-nums'],
           fontFamily: Platform.select({
-            web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-            default: 'PlusJakartaSans-Bold',
+            web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+            default: 'Inter-Bold',
           }),
         }}
       >

@@ -420,7 +420,7 @@ export default function RevenueTrendChart({
             <Text
               style={{
                 fontSize: 14,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: activeIsDark ? '#F9FAFB' : '#111827',
                 letterSpacing: 0.2,
               }}
@@ -659,7 +659,7 @@ export default function RevenueTrendChart({
               <Text
                 style={{
                   fontSize: 14,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: '#FFFFFF',
                   marginTop: 2,
                   fontVariant: ['tabular-nums'],
@@ -704,7 +704,7 @@ export default function RevenueTrendChart({
           <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Period Total
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {formatPeso(totalRev)}
           </Text>
         </View>
@@ -713,7 +713,7 @@ export default function RevenueTrendChart({
           <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Period Average
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {formatPeso(avgRev)}{' '}
             <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#AAB4B0' : '#64748B' }}>
               /{activeGranularity === 'daily' ? 'day' : activeGranularity === 'weekly' ? 'wk' : 'mo'}
@@ -725,7 +725,7 @@ export default function RevenueTrendChart({
           <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Peak Period
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {peakRev > 0 ? formatPeso(peakRev) : '₱0'}{' '}
             <Text style={{ fontSize: 11, fontWeight: '600', color: activeIsDark ? '#AAB4B0' : '#64748B' }}>
               ({peakLabel})
@@ -737,7 +737,7 @@ export default function RevenueTrendChart({
           <Text style={{ fontSize: 10, fontWeight: '700', color: activeIsDark ? '#AAB4B0' : '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
             Orders in Period
           </Text>
-          <Text style={{ fontSize: 15, fontWeight: '800', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: activeIsDark ? '#F5F7F6' : '#0F172A', marginTop: 2, fontVariant: ['tabular-nums'] }}>
             {totalOrders} order{totalOrders === 1 ? '' : 's'}
           </Text>
         </View>

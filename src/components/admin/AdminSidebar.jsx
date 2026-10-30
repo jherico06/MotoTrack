@@ -1,12 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   ScrollView,
   Platform,
+  Image,
 } from 'react-native';
 import { BootstrapIcon, BrandLogo, Skeleton } from '../common';
+import { useAuth } from '../../context/AuthContext.jsx';
 
 /**
  * MotoTrack Enterprise Admin Sidebar
@@ -47,12 +49,13 @@ export default function AdminSidebar({
   garageMechanics = [],
   deliveryRiders = [],
   auditLogs = [],
+  newReportsCount = 0,
   onBackToStorefront,
   isCollapsed: externalCollapsed,
   setIsCollapsed: externalSetIsCollapsed,
   isMobile = false,
   isMobileOpen = false,
-  onCloseMobile = () => {},
+  onCloseMobile = () => { },
 }) {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const isCollapsed = !isMobile && (externalCollapsed !== undefined ? externalCollapsed : internalCollapsed);
@@ -60,6 +63,35 @@ export default function AdminSidebar({
 
   const [isCollapseHovered, setIsCollapseHovered] = useState(false);
   const [isProfileHovered, setIsProfileHovered] = useState(false);
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
+
+  const auth = useAuth?.();
+  const activeUser = currentUser || auth?.currentUser;
+  const userAvatarUri = useMemo(() => {
+    const raw =
+      activeUser?.avatar ||
+      activeUser?.photoUri ||
+      activeUser?.profile_image ||
+      activeUser?.avatar_url ||
+      '';
+    if (
+      typeof raw === 'string' &&
+      raw.trim().length > 0 &&
+      !raw.includes('ui-avatars.com')
+    ) {
+      return raw.trim();
+    }
+    return null;
+  }, [
+    activeUser?.avatar,
+    activeUser?.photoUri,
+    activeUser?.profile_image,
+    activeUser?.avatar_url,
+  ]);
+
+  useEffect(() => {
+    setAvatarLoadError(false);
+  }, [userAvatarUri]);
 
   // ─── Theme Colors: MotoTrack Charcoal (#24272B) + Racing Orange (#EA580C) ───
   const theme = useMemo(() => {
@@ -67,8 +99,9 @@ export default function AdminSidebar({
       bg: '#24272B', // Charcoal sidebar
       border: 'rgba(255, 255, 255, 0.10)',
       divider: 'rgba(255, 255, 255, 0.10)',
-      activeBg: '#EA580C', // Racing Orange active item
-      activeAccent: '#EA580C', // Deep orange accent
+      activeBg: 'rgba(234, 88, 12, 0.16)', // Warm dark charcoal with orange undertone
+      activeAccent: '#EA580C', // Deep racing orange accent
+      activeIcon: '#EA580C', // Orange icon when active
       activeText: '#FFFFFF',
       textPrimary: '#FFFFFF',
       textSecondary: '#FFFFFF', // White icons and text for inactive navigation items
@@ -116,25 +149,22 @@ export default function AdminSidebar({
           id: 'orders',
           label: 'Orders',
           icon: 'receipt',
-          badge: orders.length,
-          warningCount: pendingCodCount,
-          warningLabel: 'COD',
-          warningTitle: `${pendingCodCount} Pending COD Orders`,
+          needsAttention: pendingCodCount > 0 || orders.some((o) => o.status === 'Pending' || o.status === 'pending'),
+          attentionTitle: pendingCodCount > 0 ? `${pendingCodCount} Pending COD Orders` : 'Orders need review',
         },
         {
           id: 'inventory',
           label: 'Inventory',
           icon: 'box-seam',
-          warningCount: invStats?.lowStockCount || 0,
-          warningLabel: 'LOW',
-          warningTitle: `${invStats?.lowStockCount || 0} Low Stock Products`,
+          needsAttention: (invStats?.lowStockCount || 0) > 0,
+          attentionTitle: `${invStats?.lowStockCount || 0} Low Stock Products`,
         },
         {
           id: 'pos',
           label: 'POS Cashier',
           icon: 'cart-check',
-          badge: posCart.length > 0 ? posCart.length : null,
-          badgeColor: theme.dangerBg,
+          needsAttention: posCart.length > 0,
+          attentionTitle: `${posCart.length} item(s) in register cart`,
         },
         {
           id: 'analytics',
@@ -161,7 +191,6 @@ export default function AdminSidebar({
           id: 'products',
           label: 'Products',
           icon: 'tag',
-          badge: products.length,
         },
         {
           id: 'promos',
@@ -172,7 +201,6 @@ export default function AdminSidebar({
           id: 'suppliers',
           label: 'Supplier',
           icon: 'truck',
-          badge: suppliers.length,
         },
       ],
     },
@@ -184,19 +212,18 @@ export default function AdminSidebar({
           id: 'garage',
           label: 'Bookings',
           icon: 'tools',
-          badge: garageBookings.length,
+          needsAttention: garageBookings.some((b) => b.status === 'pending' || b.status === 'Pending' || b.status === 'waiting'),
+          attentionTitle: 'Pending service bookings',
         },
         {
           id: 'mechanics',
           label: 'Mechanics',
           icon: 'person-badge',
-          badge: garageMechanics.length,
         },
         {
           id: 'riders',
           label: 'Riders',
           icon: 'bicycle',
-          badge: deliveryRiders.length,
         },
       ],
     },
@@ -208,6 +235,13 @@ export default function AdminSidebar({
           id: 'users',
           label: 'Users',
           icon: 'people',
+        },
+        {
+          id: 'ratings_reports',
+          label: 'Ratings & reports',
+          icon: 'star',
+          needsAttention: newReportsCount > 0,
+          attentionTitle: `${newReportsCount} new customer reports/reviews`,
         },
         {
           id: 'profile',
@@ -229,7 +263,6 @@ export default function AdminSidebar({
           id: 'audit',
           label: 'Activity Logs',
           icon: 'journal-text',
-          badge: auditLogs.length,
         },
         {
           id: 'settings',
@@ -404,7 +437,7 @@ export default function AdminSidebar({
               <Text
                 style={{
                   fontSize: 10,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   letterSpacing: 1.1,
                   textTransform: 'uppercase',
                   color: theme.sectionLabel,
@@ -412,7 +445,7 @@ export default function AdminSidebar({
                   marginBottom: 5,
                   paddingHorizontal: 9,
                   fontFamily: Platform.select({
-                    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                    web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                     default: undefined,
                   }),
                 }}
@@ -434,7 +467,10 @@ export default function AdminSidebar({
             <View style={{ gap: 2.5 }}>
               {group.items.map((item) => {
                 const isActive = activeNav === item.id;
-                const hasWarning = (item.warningCount || 0) > 0;
+                const hasAttention = Boolean(
+                  item.needsAttention ||
+                  (item.warningCount && item.warningCount > 0)
+                );
 
                 return (
                   <SidebarNavItem
@@ -442,7 +478,7 @@ export default function AdminSidebar({
                     item={item}
                     isActive={isActive}
                     isCollapsed={isCollapsed}
-                    hasWarning={hasWarning}
+                    hasAttention={hasAttention}
                     theme={theme}
                     onPress={() => handleItemPress(item)}
                   />
@@ -496,7 +532,7 @@ export default function AdminSidebar({
           title={isCollapsed ? 'Administrator - System Manager' : 'View Administrator Profile Settings'}
           aria-label="View Administrator Profile Settings"
         >
-          {/* Avatar Circle with Clean Person Icon */}
+          {/* Avatar Circle with User Profile Picture or Fallback Person Icon */}
           <View
             style={{
               width: 32,
@@ -506,13 +542,29 @@ export default function AdminSidebar({
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
+              overflow: 'hidden',
+              borderWidth: userAvatarUri && !avatarLoadError ? 1.5 : 0,
+              borderColor: 'rgba(255, 255, 255, 0.22)',
             }}
           >
-            <BootstrapIcon
-              name="person"
-              size={16}
-              color="#FFFFFF"
-            />
+            {userAvatarUri && !avatarLoadError ? (
+              <Image
+                source={{ uri: userAvatarUri }}
+                onError={() => setAvatarLoadError(true)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 16,
+                }}
+                resizeMode="cover"
+              />
+            ) : (
+              <BootstrapIcon
+                name="person"
+                size={16}
+                color="#FFFFFF"
+              />
+            )}
           </View>
 
           {!isCollapsed && (
@@ -520,12 +572,12 @@ export default function AdminSidebar({
               <Text
                 style={{
                   color: '#FFFFFF',
-                  fontWeight: '800',
+                  fontWeight: '600',
                   fontSize: 12.5,
                   letterSpacing: 0.15,
                   lineHeight: 16,
                   fontFamily: Platform.select({
-                    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                    web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                     default: undefined,
                   }),
                 }}
@@ -541,7 +593,7 @@ export default function AdminSidebar({
                   lineHeight: 13,
                   marginTop: 1,
                   fontFamily: Platform.select({
-                    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+                    web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
                     default: undefined,
                   }),
                 }}
@@ -650,11 +702,13 @@ function SidebarNavItem({
   item,
   isActive,
   isCollapsed,
+  hasAttention,
   hasWarning,
   theme,
   onPress,
 }) {
   const [isHovered, setIsHovered] = useState(false);
+  const showAttentionDot = Boolean(hasAttention || hasWarning || item.needsAttention || (item.warningCount && item.warningCount > 0));
 
   return (
     <TouchableOpacity
@@ -664,23 +718,22 @@ function SidebarNavItem({
       onMouseLeave={() => setIsHovered(false)}
       activeOpacity={0.85}
       style={{
-        minHeight: 38,
+        minHeight: 40,
         borderRadius: 8,
         paddingVertical: 8,
-        paddingHorizontal: isCollapsed ? 6 : 10,
+        paddingHorizontal: isCollapsed ? 6 : 12,
         backgroundColor: isActive
           ? theme.activeBg
           : isHovered
-          ? theme.hoverBg
-          : 'transparent',
-        borderLeftWidth: 3,
-        borderLeftColor: isActive ? theme.activeAccent : 'transparent',
+            ? theme.hoverBg
+            : 'transparent',
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: isCollapsed ? 'center' : 'flex-start',
         gap: isCollapsed ? 0 : 10,
         transition: 'all 180ms ease',
         position: 'relative',
+        overflow: 'hidden',
         cursor: 'pointer',
       }}
       title={isCollapsed ? item.label : undefined}
@@ -688,6 +741,22 @@ function SidebarNavItem({
       accessibilityState={{ selected: isActive }}
       accessibilityLabel={item.label}
     >
+      {/* Active Left Curved Orange Accent Strip */}
+      {isActive && (
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 4,
+            backgroundColor: '#EA580C',
+            borderTopLeftRadius: 8,
+            borderBottomLeftRadius: 8,
+          }}
+        />
+      )}
+
       {/* 16-18px Outline Icon with 2px shift on hover */}
       <View
         style={{
@@ -700,13 +769,15 @@ function SidebarNavItem({
       >
         <BootstrapIcon
           name={item.icon}
-          size={16}
+          size={17}
           color={
             item.customColor
               ? item.customColor
-              : isActive || isHovered
-              ? theme.activeText
-              : theme.textSecondary
+              : isActive
+                ? '#EA580C'
+                : isHovered
+                  ? '#FFFFFF'
+                  : theme.textSecondary
           }
         />
       </View>
@@ -722,10 +793,10 @@ function SidebarNavItem({
             color: item.customColor
               ? item.customColor
               : isActive || isHovered
-              ? theme.activeText
-              : theme.textSecondary,
+                ? '#FFFFFF'
+                : theme.textSecondary,
             fontFamily: Platform.select({
-              web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+              web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
               default: undefined,
             }),
             transition: 'color 180ms ease',
@@ -736,103 +807,43 @@ function SidebarNavItem({
         </Text>
       )}
 
-      {/* Right side indicators (Badges / Warnings / Active dot) */}
-      {!isCollapsed && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginLeft: 'auto' }}>
-          {/* Warning badge (orange #EA580C for COD / Low Stock alerts) */}
-          {hasWarning && (
-            item.warningLabel === 'COD' ? (
-              <View
-                style={{
-                  backgroundColor: theme.warningBg,
-                  paddingHorizontal: 6,
-                  paddingVertical: 1.5,
-                  borderRadius: 9999,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                }}
-                title={item.warningTitle}
-              >
-                <Text style={{ color: '#FFFFFF', fontSize: 9.5, fontWeight: '800' }}>
-                  {item.warningCount} COD
-                </Text>
-              </View>
-            ) : (
-              /* Glowing Orange Warning Dot */
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: theme.warningBg,
-                  boxShadow: '0 0 6px rgba(234, 88, 12, 0.65)',
-                }}
-                title={item.warningTitle}
-              />
-            )
-          )}
-
-          {item.badge !== undefined && item.badge !== null && (
-            /* Compact count badge */
-            <View
-              style={{
-                paddingHorizontal: 6.5,
-                paddingVertical: 1,
-                borderRadius: 9999,
-                minWidth: 19,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: item.badgeColor
-                  ? item.badgeColor
-                  : isActive
-                  ? theme.badgeActiveBg
-                  : theme.badgeBg,
-                borderColor: theme.badgeBorder,
-                borderWidth: 1,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 10,
-                  fontWeight: '700',
-                  color: '#FFFFFF',
-                }}
-              >
-                {item.badge}
-              </Text>
-            </View>
-          )}
-
-          {/* Active emerald dot indicator on the right */}
-          {isActive && (
-            <View
-              style={{
-                width: 5,
-                height: 5,
-                borderRadius: 2.5,
-                backgroundColor: theme.activeAccent,
-                marginLeft: hasWarning || item.badge !== undefined ? 5 : 'auto',
-                flexShrink: 0,
-              }}
-            />
-          )}
+      {/* Right side Attention Dot (Only shown if module needs attention, NO numbers) */}
+      {!isCollapsed && showAttentionDot && (
+        <View
+          style={{
+            marginLeft: 'auto',
+            paddingRight: 4,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          title={item.attentionTitle || item.warningTitle || 'Needs attention'}
+        >
+          <View
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: '#EA580C',
+              boxShadow: '0 0 6px rgba(234, 88, 12, 0.65)',
+            }}
+          />
         </View>
       )}
 
-      {/* Collapsed Warning Dot */}
-      {isCollapsed && hasWarning && (
+      {/* Collapsed Attention Dot */}
+      {isCollapsed && showAttentionDot && (
         <View
           style={{
             position: 'absolute',
-            top: 5,
+            top: 6,
             right: 10,
             width: 7,
             height: 7,
             borderRadius: 3.5,
-            backgroundColor: theme.warningBg,
-            boxShadow: '0 0 4px rgba(234, 88, 12, 0.65)',
+            backgroundColor: '#EA580C',
+            boxShadow: '0 0 5px rgba(234, 88, 12, 0.65)',
           }}
-          title={item.warningTitle}
+          title={item.attentionTitle || item.warningTitle || 'Needs attention'}
         />
       )}
     </TouchableOpacity>
@@ -848,7 +859,7 @@ export function AdminSidebarSkeleton({
   isDarkMode = false,
   isMobile = false,
   isMobileOpen = false,
-  onCloseMobile = () => {},
+  onCloseMobile = () => { },
   isOffline = false,
   isLagging = false,
   style,
@@ -871,28 +882,28 @@ export function AdminSidebarSkeleton({
     {
       headingWidth: 74,
       items: [
-        { titleWidth: 76, hasActiveBg: true, hasDot: true }, // Dashboard (active)
-        { titleWidth: 50, badgeWidth: 22 },                 // Orders
-        { titleWidth: 68 },                                 // Inventory
-        { titleWidth: 76 },                                 // POS Cashier
-        { titleWidth: 54 },                                 // Reports
-        { titleWidth: 60 },                                 // Forecast
-        { titleWidth: 80 },                                 // Moto Models
+        { titleWidth: 76, hasActiveBg: true }, // Dashboard (active)
+        { titleWidth: 50, hasAttentionDot: true }, // Orders
+        { titleWidth: 68 }, // Inventory
+        { titleWidth: 76 }, // POS Cashier
+        { titleWidth: 54 }, // Reports
+        { titleWidth: 60 }, // Forecast
+        { titleWidth: 80 }, // Moto Models
       ],
     },
     {
       headingWidth: 112,
       items: [
-        { titleWidth: 64, badgeWidth: 20 },                 // Products
-        { titleWidth: 52 },                                 // Promos
-        { titleWidth: 58, badgeWidth: 20, hasPillBg: true },// Supplier
+        { titleWidth: 64 }, // Products
+        { titleWidth: 52 }, // Promos
+        { titleWidth: 58 }, // Supplier
       ],
     },
     {
       headingWidth: 118,
       items: [
-        { titleWidth: 66, badgeWidth: 20 },                 // Bookings
-        { titleWidth: 74, badgeWidth: 20 },                 // Mechanics
+        { titleWidth: 66, hasAttentionDot: true }, // Bookings
+        { titleWidth: 74 }, // Mechanics
       ],
     },
   ];
@@ -1063,25 +1074,16 @@ export function AdminSidebarSkeleton({
                       />
                     </View>
 
-                    {/* Active dot on right */}
-                    {item.hasDot && (
-                      <Skeleton
-                        circle
-                        size={6}
-                        baseColor="#FFFFFF"
-                        highlightColor="#EA580C"
-                      />
-                    )}
-
-                    {/* Right numeric badge pill */}
-                    {item.badgeWidth && (
-                      <Skeleton
-                        width={item.badgeWidth}
-                        height={18}
-                        borderRadius={9}
-                        baseColor={theme.badgeBg}
-                        highlightColor={theme.highlightColor}
-                      />
+                    {/* Attention dot skeleton */}
+                    {item.hasAttentionDot && (
+                      <View style={{ marginLeft: 'auto', paddingRight: 4 }}>
+                        <Skeleton
+                          circle
+                          size={8}
+                          baseColor="rgba(234, 88, 12, 0.4)"
+                          highlightColor="#EA580C"
+                        />
+                      </View>
                     )}
                   </View>
                 );

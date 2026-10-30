@@ -70,9 +70,11 @@ export default function AdminPinLockScreen({
   const [currentPinInput, setCurrentPinInput] = useState('');
   const [newPinInput, setNewPinInput] = useState('');
   const [confirmPinInput, setConfirmPinInput] = useState('');
+  const [showChangePinDigits, setShowChangePinDigits] = useState(false);
   const [changePinError, setChangePinError] = useState('');
   const [changePinSuccess, setChangePinSuccess] = useState('');
   const [isSavingPin, setIsSavingPin] = useState(false);
+  const [pinMeta, setPinMeta] = useState(() => adminSecurityService.getPinMetadata(adminUser));
 
   // Forgot PIN Modal State (when PIN is forgotten, verified with account password)
   const [isForgotPinOpen, setIsForgotPinOpen] = useState(false);
@@ -152,7 +154,13 @@ export default function AdminPinLockScreen({
     } catch (_e) {}
 
     // Refresh PIN from Supabase on popup open
-    adminSecurityService.fetchPinFromSupabase(adminUser).catch(() => {});
+    setPinMeta(adminSecurityService.getPinMetadata(adminUser));
+    adminSecurityService
+      .getPinStatus(adminUser)
+      .then((meta) => {
+        if (meta) setPinMeta(meta);
+      })
+      .catch(() => {});
 
     // Set default email for forgot PIN modal
     if (adminUser?.email) {
@@ -212,7 +220,9 @@ export default function AdminPinLockScreen({
       try {
         appStorage.setItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT, String(nextLeft));
       } catch (_e) {}
-      setErrorMessage(serverError || `Incorrect Security PIN. ${nextLeft} attempt${nextLeft === 1 ? '' : 's'} remaining.`);
+      setErrorMessage(
+        serverError || `Incorrect Security PIN. ${nextLeft} attempt${nextLeft === 1 ? '' : 's'} remaining.`
+      );
       inputRef.current?.focus();
     } else {
       // 3 incorrect attempts reached: trigger 30-second lockout
@@ -223,7 +233,9 @@ export default function AdminPinLockScreen({
       } catch (_e) {}
       setAttemptsLeft(0);
       setLockoutSecondsLeft(LOCKOUT_SECONDS);
-      setErrorMessage(serverError || `⛔ 3 incorrect attempts reached. Please wait ${LOCKOUT_SECONDS}s before trying again.`);
+      setErrorMessage(
+        serverError || `⛔ 3 incorrect attempts reached. Please wait ${LOCKOUT_SECONDS}s before trying again.`
+      );
     }
   };
 
@@ -259,7 +271,9 @@ export default function AdminPinLockScreen({
           } catch (_e) {}
           setAttemptsLeft(0);
           setLockoutSecondsLeft(lockSec);
-          setErrorMessage(res.error || `⛔ 3 incorrect attempts reached. Please wait ${lockSec}s before trying again.`);
+          setErrorMessage(
+            res.error || `⛔ 3 incorrect attempts reached. Please wait ${lockSec}s before trying again.`
+          );
           triggerShake();
         } else {
           handleFailedAttempt(res.attemptsLeft !== undefined ? res.attemptsLeft : null, res.error);
@@ -279,7 +293,7 @@ export default function AdminPinLockScreen({
       return;
     }
     if (!pin) {
-      setErrorMessage('Please enter your 4-digit Admin PIN.');
+      setErrorMessage(`Please enter your ${pinMeta?.pinLength || 4}-digit Admin PIN.`);
       triggerShake();
       return;
     }
@@ -290,25 +304,36 @@ export default function AdminPinLockScreen({
     setChangePinError('');
     setChangePinSuccess('');
 
-    if (!currentPinInput.trim()) {
+    const cleanCurrent = currentPinInput.trim();
+    const cleanNew = newPinInput.trim();
+    const cleanConfirm = confirmPinInput.trim();
+
+    if (!cleanCurrent) {
       setChangePinError('Please enter your current Admin PIN.');
       return;
     }
-    if (!newPinInput.trim() || newPinInput.length < 4 || newPinInput.length > 6) {
+    if (!/^\d{4,6}$/.test(cleanNew)) {
       setChangePinError('New PIN must be 4 to 6 numeric digits.');
       return;
     }
-    if (newPinInput !== confirmPinInput) {
+    if (cleanNew !== cleanConfirm) {
       setChangePinError('New PIN and Confirm PIN do not match.');
+      return;
+    }
+    if (cleanNew === cleanCurrent) {
+      setChangePinError('New PIN cannot be the same as your current PIN.');
       return;
     }
 
     setIsSavingPin(true);
-    const res = await adminSecurityService.setAdminPin(currentPinInput, newPinInput, adminUser);
+    const res = await adminSecurityService.setAdminPin(cleanCurrent, cleanNew, adminUser);
     setIsSavingPin(false);
 
     if (res.success) {
-      setChangePinSuccess('PIN updated and synced to Supabase database!');
+      setPinMeta(adminSecurityService.getPinMetadata(adminUser));
+      setPin('');
+      setErrorMessage('');
+      setChangePinSuccess('Security PIN updated! The previous PIN is now disabled.');
       setTimeout(() => {
         setIsChangePinOpen(false);
         setCurrentPinInput('');
@@ -329,11 +354,11 @@ export default function AdminPinLockScreen({
       setForgotError('Please enter both your admin email and password.');
       return;
     }
-    if (!forgotNewPin.trim() || forgotNewPin.length < 4 || forgotNewPin.length > 6) {
+    if (!/^\d{4,6}$/.test(forgotNewPin.trim())) {
       setForgotError('New PIN must be 4 to 6 numeric digits.');
       return;
     }
-    if (forgotNewPin !== forgotConfirmPin) {
+    if (forgotNewPin.trim() !== forgotConfirmPin.trim()) {
       setForgotError('New PIN and Confirm PIN do not match.');
       return;
     }
@@ -348,6 +373,7 @@ export default function AdminPinLockScreen({
     setIsForgotSubmitting(false);
 
     if (res.success) {
+      setPinMeta(adminSecurityService.getPinMetadata(adminUser));
       setForgotSuccess('Admin PIN successfully reset and verified with Supabase!');
       try {
         appStorage.removeItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL);
@@ -365,12 +391,25 @@ export default function AdminPinLockScreen({
         onUnlockSuccess?.();
       }, 1500);
     } else {
+      if (res.locked) {
+        const lockSec = res.lockoutSeconds || LOCKOUT_SECONDS;
+        const lockoutUntil = Date.now() + lockSec * 1000;
+        try {
+          appStorage.setItem(LOCKOUT_STORAGE_KEYS.LOCKOUT_UNTIL, String(lockoutUntil));
+          appStorage.setItem(LOCKOUT_STORAGE_KEYS.ATTEMPTS_LEFT, '0');
+        } catch (_e) {}
+        setAttemptsLeft(0);
+        setLockoutSecondsLeft(lockSec);
+      } else {
+        handleFailedAttempt(null, res.error || 'Failed to verify admin password.');
+      }
       setForgotError(res.error || 'Failed to verify admin password.');
     }
   };
 
-  // 4 Main PIN Display Digits (or up to pin length)
-  const pinDisplayLength = Math.max(4, pin.length);
+  // Expected PIN length (4 to 6 digits based on active PIN)
+  const expectedPinLength = pinMeta?.pinLength || 4;
+  const pinDisplayLength = Math.max(expectedPinLength, pin.length);
   const pinSlots = Array.from({ length: pinDisplayLength });
   const isLockedOut = lockoutSecondsLeft > 0;
 
@@ -390,7 +429,7 @@ export default function AdminPinLockScreen({
             const clean = text.replace(/[^0-9]/g, '').slice(0, 6);
             setErrorMessage('');
             setPin(clean);
-            if (clean.length === 4) {
+            if (clean.length === expectedPinLength) {
               checkPinDirect(clean);
             }
           }}
@@ -446,7 +485,7 @@ export default function AdminPinLockScreen({
           <Text style={styles.subtitle}>
             {isLockedOut
               ? `Security lockout active due to 3 incorrect attempts. Please wait ${lockoutSecondsLeft}s to try again.`
-              : 'Enter your authorized 4-digit PIN to access the Store Administrator Dashboard.'}
+              : `Enter your authorized ${expectedPinLength}-digit PIN to access the Store Administrator Dashboard.`}
           </Text>
 
           {/* Error Alert Box */}
@@ -542,9 +581,7 @@ export default function AdminPinLockScreen({
                 activeOpacity={1}
               >
                 <BootstrapIcon name="hourglass-split" size={16} color="#FFFFFF" />
-                <Text style={styles.unlockBtnText}>
-                  LOCKED • TRY AGAIN IN {lockoutSecondsLeft}S
-                </Text>
+                <Text style={styles.unlockBtnText}>LOCKED • TRY AGAIN IN {lockoutSecondsLeft}S</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={{
@@ -698,12 +735,12 @@ export default function AdminPinLockScreen({
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Set New 4-Digit PIN</Text>
+                <Text style={styles.inputLabel}>Set New 4 to 6-Digit PIN</Text>
                 <TextInput
                   style={styles.formInput}
                   value={forgotNewPin}
-                  onChangeText={setForgotNewPin}
-                  placeholder="Enter new 4-digit PIN"
+                  onChangeText={(v) => setForgotNewPin(v.replace(/[^\d]/g, '').slice(0, 6))}
+                  placeholder="Enter new 4–6 digit PIN"
                   placeholderTextColor="#94A3B8"
                   keyboardType="numeric"
                   secureTextEntry
@@ -712,12 +749,12 @@ export default function AdminPinLockScreen({
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Confirm New 4-Digit PIN</Text>
+                <Text style={styles.inputLabel}>Confirm New PIN</Text>
                 <TextInput
                   style={styles.formInput}
                   value={forgotConfirmPin}
-                  onChangeText={setForgotConfirmPin}
-                  placeholder="Re-enter new 4-digit PIN"
+                  onChangeText={(v) => setForgotConfirmPin(v.replace(/[^\d]/g, '').slice(0, 6))}
+                  placeholder="Re-enter new 4–6 digit PIN"
                   placeholderTextColor="#94A3B8"
                   keyboardType="numeric"
                   secureTextEntry
@@ -762,12 +799,61 @@ export default function AdminPinLockScreen({
                   </View>
                   <View>
                     <Text style={styles.changePinModalTitle}>Change Security PIN</Text>
-                    <Text style={styles.changePinModalSub}>Syncs directly to Supabase cloud</Text>
+                    <Text style={styles.changePinModalSub}>Replace given PIN & sync to Supabase</Text>
                   </View>
                 </View>
                 <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setIsChangePinOpen(false)}>
                   <BootstrapIcon name="x-lg" size={14} color="#64748B" />
                 </TouchableOpacity>
+              </View>
+
+              {/* Default vs Custom PIN Notice */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  paddingVertical: 9,
+                  paddingHorizontal: 12,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  marginBottom: 14,
+                  backgroundColor: pinMeta?.isDefaultPin ? '#FFFBEB' : '#ECFDF5',
+                  borderColor: pinMeta?.isDefaultPin ? '#FDE68A' : '#A7F3D0',
+                }}
+              >
+                <BootstrapIcon
+                  name={pinMeta?.isDefaultPin ? 'shield-exclamation' : 'shield-check'}
+                  size={14}
+                  color={pinMeta?.isDefaultPin ? '#B45309' : '#059669'}
+                />
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: 11.5,
+                    fontWeight: '600',
+                    color: pinMeta?.isDefaultPin ? '#92400E' : '#065F46',
+                  }}
+                >
+                  {pinMeta?.isDefaultPin
+                    ? `Default given PIN (${pinMeta?.defaultPin || '2026'}) is active.`
+                    : `Custom ${pinMeta?.pinLength || 4}-digit PIN active (default PIN disabled).`}
+                </Text>
+                {pinMeta?.isDefaultPin && currentPinInput !== (pinMeta?.defaultPin || '2026') ? (
+                  <TouchableOpacity
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      backgroundColor: '#FEF3C7',
+                      borderWidth: 1,
+                      borderColor: '#F59E0B',
+                    }}
+                    onPress={() => setCurrentPinInput(pinMeta?.defaultPin || '2026')}
+                  >
+                    <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#92400E' }}>Use 2026</Text>
+                  </TouchableOpacity>
+                ) : null}
               </View>
 
               {changePinError.length > 0 && (
@@ -785,15 +871,39 @@ export default function AdminPinLockScreen({
               )}
 
               <View style={styles.formGroup}>
-                <Text style={styles.inputLabel}>Current Admin PIN</Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: 6,
+                  }}
+                >
+                  <Text style={[styles.inputLabel, { marginBottom: 0 }]}>
+                    {pinMeta?.isDefaultPin ? 'Current Given PIN (2026)' : 'Current Admin PIN'}
+                  </Text>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+                    onPress={() => setShowChangePinDigits((prev) => !prev)}
+                  >
+                    <BootstrapIcon
+                      name={showChangePinDigits ? 'eye-slash' : 'eye'}
+                      size={13}
+                      color="#EA580C"
+                    />
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#EA580C' }}>
+                      {showChangePinDigits ? 'Hide' : 'Show'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
                 <TextInput
                   style={styles.formInput}
                   value={currentPinInput}
-                  onChangeText={setCurrentPinInput}
-                  placeholder="Enter current 4-digit PIN"
+                  onChangeText={(v) => setCurrentPinInput(v.replace(/[^\d]/g, '').slice(0, 6))}
+                  placeholder={pinMeta?.isDefaultPin ? 'Enter given PIN (2026)' : 'Enter current PIN'}
                   placeholderTextColor="#94A3B8"
                   keyboardType="numeric"
-                  secureTextEntry
+                  secureTextEntry={!showChangePinDigits}
                   maxLength={6}
                 />
               </View>
@@ -803,11 +913,11 @@ export default function AdminPinLockScreen({
                 <TextInput
                   style={styles.formInput}
                   value={newPinInput}
-                  onChangeText={setNewPinInput}
+                  onChangeText={(v) => setNewPinInput(v.replace(/[^\d]/g, '').slice(0, 6))}
                   placeholder="Enter new numeric PIN"
                   placeholderTextColor="#94A3B8"
                   keyboardType="numeric"
-                  secureTextEntry
+                  secureTextEntry={!showChangePinDigits}
                   maxLength={6}
                 />
               </View>
@@ -817,11 +927,11 @@ export default function AdminPinLockScreen({
                 <TextInput
                   style={styles.formInput}
                   value={confirmPinInput}
-                  onChangeText={setConfirmPinInput}
+                  onChangeText={(v) => setConfirmPinInput(v.replace(/[^\d]/g, '').slice(0, 6))}
                   placeholder="Re-enter new numeric PIN"
                   placeholderTextColor="#94A3B8"
                   keyboardType="numeric"
-                  secureTextEntry
+                  secureTextEntry={!showChangePinDigits}
                   maxLength={6}
                 />
               </View>
@@ -929,7 +1039,7 @@ const styles = StyleSheet.create({
   supabaseBadgeText: {
     color: '#EA580C',
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   shieldCircle: {
     width: 72,
@@ -967,7 +1077,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
     textAlign: 'center',
     marginBottom: 6,
@@ -1048,7 +1158,7 @@ const styles = StyleSheet.create({
   },
   pinDigitText: {
     fontSize: 22,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#EA580C',
   },
   revealEyeBtn: {
@@ -1091,7 +1201,7 @@ const styles = StyleSheet.create({
   unlockBtnText: {
     color: '#FFFFFF',
     fontSize: 13.5,
-    fontWeight: '900',
+    fontWeight: '600',
     letterSpacing: 0.5,
   },
   cardFooter: {
@@ -1112,7 +1222,7 @@ const styles = StyleSheet.create({
   changePinLinkText: {
     color: '#EA580C',
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   // ─── NESTED MODAL (LIGHT PALETTE) ───
@@ -1154,7 +1264,7 @@ const styles = StyleSheet.create({
   },
   changePinModalTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   changePinModalSub: {
@@ -1209,6 +1319,6 @@ const styles = StyleSheet.create({
   modalSaveText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 });

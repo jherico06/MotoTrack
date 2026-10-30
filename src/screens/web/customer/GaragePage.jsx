@@ -10,6 +10,7 @@ import {
   Modal,
   useWindowDimensions,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -69,17 +70,106 @@ const ESTIMATE_DISCLAIMER_TEXT =
 // Booking wizard: motorcycle -> service type -> services -> details -> review.
 const BOOKING_STEPS = [
   { id: 1, label: 'Motorcycle', shortLabel: 'Motorcycle', icon: 'bicycle' },
-  { id: 2, label: 'Service Type', shortLabel: 'Service Type', icon: 'sliders' },
+  { id: 2, label: 'Service type', shortLabel: 'Service type', icon: 'sliders' },
   { id: 3, label: 'Services', shortLabel: 'Services', icon: 'tools' },
   { id: 4, label: 'Schedule', shortLabel: 'Schedule', icon: 'calendar-event' },
-  { id: 5, label: 'Review & Submit', shortLabel: 'Review', icon: 'clipboard-check' },
+  { id: 5, label: 'Review', shortLabel: 'Review', icon: 'clipboard-check' },
 ];
 const BOOKING_STEP_COUNT = BOOKING_STEPS.length;
 const MAX_SERVICE_TITLE_LENGTH = 160;
 
+const BOOKING_STEP_TITLES = {
+  1: 'Select your motorcycle',
+  2: 'Choose service type',
+  3: 'Choose your services',
+  4: 'Choose schedule',
+  5: 'Review & confirm',
+};
+
+const SERVICE_DURATIONS = {
+  'pms-minor-tune-up': '45–60 min',
+  'pms-major-tune-up': '2–3 hours',
+  'pms-top-overhaul': '3–5 hours',
+  'pms-major-engine-overhaul': '1–2 days',
+  'pms-replace-lubricate-cable': '30–45 min',
+  'pms-replace-brake-pads': '30–45 min',
+  'pms-replace-brake-shoe': '30–45 min',
+  'pms-replace-front-fork-oil': '1–2 hours',
+  'pms-replace-swing-arm-bushing': '1–2 hours',
+  'pms-replace-steering-ball': '1–2 hours',
+  'pms-replace-front-hub-bearing': '45–60 min',
+  'pms-replace-rear-hub-bearing': '45–60 min',
+  'pms-battery-recharging': '2–4 hours',
+  'pms-replace-head-light-bulb': '15–30 min',
+  'pms-replace-tail-light-bulb': '15–30 min',
+  'pms-replace-signal-light-bulb': '15–30 min',
+  'pms-replace-panel-bulb': '30–45 min',
+  'pms-replace-wiring-harness': '3–5 hours',
+  'pms-replace-drive-chain': '30–45 min',
+  'pms-overhaul-carburetor': '1–2 hours',
+  'pms-replace-starter-motor': '45–60 min',
+  'pms-replace-cam-sprocket-chain': '2–3 hours',
+};
+
+const SERVICE_CUSTOM_DESCRIPTIONS = {
+  'pms-minor-tune-up': 'Essential care and a 12-point safety inspection.',
+  'pms-major-tune-up': 'Complete tune-up, diagnostics, and road test.',
+  'pms-top-overhaul': 'Cylinder head rebuild, valve grinding, and gasket refresh.',
+  'pms-major-engine-overhaul': 'Complete disassembly, piston/crank replacement, and precision rebuild.',
+  'pms-replace-lubricate-cable': 'Clutch and throttle cable lubrication and free-play calibration.',
+  'pms-replace-brake-pads': 'Front/rear disc brake pad replacement and caliper cleaning.',
+  'pms-replace-brake-shoe': 'Rear drum brake shoe replacement and drum de-dusting.',
+  'pms-replace-front-fork-oil': 'Fork disassembly, oil replacement, and seal inspection.',
+  'pms-replace-swing-arm-bushing': 'Rear swing arm bushing replacement for stable chassis handling.',
+  'pms-replace-steering-ball': 'Steering head race and ball bearing cleaning, grease, and alignment.',
+  'pms-replace-front-hub-bearing': 'Front wheel bearing replacement and hub race alignment.',
+  'pms-replace-rear-hub-bearing': 'Rear wheel bearing replacement and axle inspection.',
+  'pms-battery-recharging': 'Automotive multi-stage battery load test and deep replenishment.',
+  'pms-replace-head-light-bulb': 'Headlamp bulb replacement and beam alignment check.',
+  'pms-replace-tail-light-bulb': 'Rear brake and running light bulb replacement.',
+  'pms-replace-signal-light-bulb': 'Turn indicator bulb installation and blinker relay check.',
+  'pms-replace-panel-bulb': 'Instrument cluster backlight bulb replacement and circuit test.',
+  'pms-replace-wiring-harness': 'Main chassis wiring replacement and ground terminal sealing.',
+  'pms-replace-drive-chain': 'Chain replacement, tension adjustment, and sprocket alignment.',
+  'pms-overhaul-carburetor': 'Ultrasonic jet cleaning, float bowl setting, and idle mixture tuning.',
+  'pms-replace-starter-motor': 'Electric starter replacement, bendix check, and test crank.',
+  'pms-replace-cam-sprocket-chain': 'Timing chain, tensioner, and cam sprocket sync calibration.',
+};
+
+const POPULAR_SERVICE_IDS = new Set([
+  'pms-major-tune-up',
+]);
+
+const SERVICE_CATEGORY_DESCRIPTIONS = {
+  'Tune-Up and Maintenance': 'Preventive care for a smoother, safer ride',
+  'Tune-up and Maintenance': 'Preventive care for a smoother, safer ride',
+  'TUNE-UP & MAINTENANCE': 'Preventive care for a smoother, safer ride',
+  'Engine Services': 'Core engine maintenance, diagnostics, and component rebuilds',
+  'Brake Services': 'Brake system inspection, pad renewal, and safety tuning',
+  'Electrical Services': 'Battery health, wiring diagnosis, and lighting fixes',
+  'Suspension and Chassis': 'Fork oil replacement, bushing maintenance, and wheel bearing care',
+  'Drive System': 'Chain cleaning, belt inspection, and cable lubrication',
+  'Other Services': 'General scheduled inspections and diagnostic services',
+};
+
+function getServiceDuration(svc) {
+  if (svc.estimated_duration) return svc.estimated_duration;
+  if (svc.duration) return svc.duration;
+  return SERVICE_DURATIONS[svc.id] || '30–60 min';
+}
+
+function getServiceDescription(svc) {
+  if (SERVICE_CUSTOM_DESCRIPTIONS[svc.id]) return SERVICE_CUSTOM_DESCRIPTIONS[svc.id];
+  return svc.description || 'Professional automotive inspection and servicing.';
+}
+
+function isPopularService(svc) {
+  return POPULAR_SERVICE_IDS.has(svc.id) || svc.is_popular || svc.popular || false;
+}
+
 const reviewSectionTitleStyle = {
   fontSize: 12,
-  fontWeight: '800',
+  fontWeight: '600',
   color: '#EA580C',
   textTransform: 'uppercase',
   letterSpacing: 0.5,
@@ -262,6 +352,10 @@ export default function GaragePageWeb({
   const [isRegisterBikeModalOpen, setIsRegisterBikeModalOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isSubmittingBooking, setIsSubmittingBooking] = useState(false);
+  const [hoveredReviewBtn, setHoveredReviewBtn] = useState(null);
+  const [isModalCloseHovered, setIsModalCloseHovered] = useState(false);
+  const [isFooterBackHovered, setIsFooterBackHovered] = useState(false);
+  const [isFooterSubmitHovered, setIsFooterSubmitHovered] = useState(false);
 
   // Form Fields
   const [bikeBrand, setBikeBrand] = useState('Yamaha');
@@ -551,6 +645,52 @@ export default function GaragePageWeb({
       ? `${pmsCatalog.engineCc || selectedMotorcycle?.engine_cc} cc`
       : 'Not set';
 
+  const formattedAppointmentDay = useMemo(() => {
+    if (!selectedDate) return 'Tuesday, March 18';
+    try {
+      const d = new Date(selectedDate + 'T00:00:00');
+      if (isNaN(d.getTime())) return selectedDate;
+      return d.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'long',
+        day: 'numeric',
+      });
+    } catch (_e) {
+      return selectedDate;
+    }
+  }, [selectedDate]);
+
+  const reviewMotorcycleTitle = useMemo(() => {
+    if (selectedMotorcycle) {
+      const yr = selectedMotorcycle.year ? `${selectedMotorcycle.year} ` : '';
+      const br = selectedMotorcycle.brand || '';
+      const md = selectedMotorcycle.model || '';
+      const full = `${yr}${br} ${md}`.trim();
+      if (full) return full;
+    }
+    return selectedMotorcycleLabel || '2026 Suzuki Smash 125';
+  }, [selectedMotorcycle, selectedMotorcycleLabel]);
+
+  const reviewEngineDisplacement = useMemo(() => {
+    const disp = selectedMotorcycle?.engine_displacement || selectedMotorcycle?.engine_cc || pmsCatalog.engineCc;
+    if (!disp) return '125 cc';
+    const str = String(disp).trim();
+    return str.toLowerCase().includes('cc') ? str : `${str} cc`;
+  }, [selectedMotorcycle, pmsCatalog.engineCc]);
+
+  const reviewCcCategory = useMemo(() => {
+    const raw = pmsCatalog.category?.name || '125 cc and below';
+    return raw.replace(/(\d+)\s*cc/i, '$1 cc').toLowerCase();
+  }, [pmsCatalog.category]);
+
+  const reviewPlateNumber = useMemo(() => {
+    return selectedMotorcycle?.plate_number || selectedMotorcycle?.plate || 'NPC-143431';
+  }, [selectedMotorcycle]);
+
+  const reviewServiceType = useMemo(() => {
+    return selectedServiceType === 'Repair' ? 'Mechanical Repair' : 'Preventive Maintenance';
+  }, [selectedServiceType]);
+
   // Switch service type: clear previously picked services to prevent cross-category contamination
   const handleSelectServiceType = (type) => {
     if (selectedServiceType !== type) {
@@ -605,13 +745,45 @@ export default function GaragePageWeb({
     }
   }, [isBookingModalOpen]);
 
+  // Inject clean, non-overlapping scrollbar styles for service booking modal on web
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const styleId = 'mototrack-service-modal-scroll-style';
+    if (!document.getElementById(styleId)) {
+      const styleEl = document.createElement('style');
+      styleEl.id = styleId;
+      styleEl.innerHTML = `
+        [data-service-modal-scroll="true"]::-webkit-scrollbar {
+          width: 6px;
+          height: 6px;
+        }
+        [data-service-modal-scroll="true"]::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        [data-service-modal-scroll="true"]::-webkit-scrollbar-thumb {
+          background-color: #CBD5E1;
+          border-radius: 999px;
+        }
+        [data-service-modal-scroll="true"]::-webkit-scrollbar-thumb:hover {
+          background-color: #94A3B8;
+        }
+        [data-service-modal-scroll="true"] {
+          scrollbar-width: thin;
+          scrollbar-color: #CBD5E1 transparent;
+        }
+      `;
+      document.head.appendChild(styleEl);
+    }
+  }, []);
+
   // Sync registered garage motorcycles from service
   useEffect(() => {
     let unsub = () => {};
     try {
       if (typeof motorcycleService?.subscribe === 'function') {
-        unsub = motorcycleService.subscribe((list) => {
-          setGarageMotorcycles(currentUser ? [...list] : []);
+        unsub = motorcycleService.subscribe(() => {
+          const updated = currentUser?.id ? motorcycleService.getMotorcycles(currentUser.id) || [] : [];
+          setGarageMotorcycles(updated);
         });
       }
       const list = currentUser ? motorcycleService.getMotorcycles(currentUser?.id) || [] : [];
@@ -779,8 +951,8 @@ export default function GaragePageWeb({
   const handleSaveRegisteredMotorcycle = async (motoData) => {
     const res = await motorcycleService.addMotorcycle({
       ...motoData,
-      user_id: currentUser?.id || 'usr-rider-01',
-      customer_id: currentUser?.customerId || currentUser?.customer_id || 'cust-demo-01',
+      user_id: currentUser?.id || currentUser?.user_id,
+      customer_id: currentUser?.customerId || currentUser?.customer_id || currentUser?.id,
       customer_email: currentUser?.email || '',
     });
     const list = motorcycleService.getMotorcycles(currentUser?.id) || [];
@@ -1110,7 +1282,9 @@ export default function GaragePageWeb({
                 activeOpacity={0.9}
                 title="Book a Service"
               >
-                <Text style={gStyles.headerCenterBtnTextActive}>Book a Service</Text>
+                <Text style={gStyles.headerCenterBtnTextActive}>
+                  Book a Service
+                </Text>
               </TouchableOpacity>
 
               {/* Customize Button */}
@@ -1125,6 +1299,28 @@ export default function GaragePageWeb({
                 title="Customize"
               >
                 <Text style={gStyles.headerCenterBtnText}>Customize</Text>
+              </TouchableOpacity>
+
+              {/* Garage Button */}
+              <TouchableOpacity
+                className="main-nav-tab"
+                style={gStyles.headerCenterBtn}
+                onPress={() => onNavigateToProfile?.('garage')}
+                activeOpacity={0.8}
+                title="Garage"
+              >
+                <Text style={gStyles.headerCenterBtnText}>Garage</Text>
+              </TouchableOpacity>
+
+              {/* Orders Button */}
+              <TouchableOpacity
+                className="main-nav-tab"
+                style={gStyles.headerCenterBtn}
+                onPress={() => onNavigateToOrders?.()}
+                activeOpacity={0.8}
+                title="Orders"
+              >
+                <Text style={gStyles.headerCenterBtnText}>Orders</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1174,7 +1370,7 @@ export default function GaragePageWeb({
                   if (screen === 'store' || screen === 'shop') onNavigateToStore?.();
                   else if (screen === 'orders') onNavigateToOrders?.();
                   else if (screen === 'notifications') onNavigateToProfile?.('notifications');
-                  else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
+                  else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
                 }}
                 currentUser={currentUser}
               />
@@ -1195,28 +1391,6 @@ export default function GaragePageWeb({
               )}
             </TouchableOpacity>
 
-            {/* Admin Badge */}
-            {currentUser?.role === 'admin' && (
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 42,
-                  height: 42,
-                  borderRadius: 21,
-                  backgroundColor: 'transparent',
-                  borderWidth: 0,
-                  borderColor: 'transparent',
-                }}
-                onPress={() => onNavigateToAdmin?.()}
-                activeOpacity={0.8}
-                title="Admin Panel"
-              >
-                <BootstrapIcon name="shield-lock-fill" size={16} color="#EA580C" />
-              </TouchableOpacity>
-            )}
-
             {/* Auth: Sign In & Sign Up OR Logged In Profile */}
             {currentUser ? (
               <View style={[gStyles.loggedInContainer, { position: 'relative' }]}>
@@ -1233,9 +1407,9 @@ export default function GaragePageWeb({
                   currentUser={currentUser}
                   isOpen={isUserDropdownOpen}
                   currentScreen="garage"
-                  showDashboard={true}
+                  showDashboard={false}
                   onClose={() => setIsUserDropdownOpen(false)}
-                  onNavigateToDashboard={() => onNavigateToProfile?.('overview')}
+                  onNavigateToDashboard={() => onNavigateToProfile?.('garage')}
                   onNavigateToOrders={() => onNavigateToOrders?.()}
                   onNavigateToProfile={(tab = 'profile') =>
                     onNavigateToProfile?.(typeof tab === 'string' ? tab : 'profile')
@@ -1310,7 +1484,7 @@ export default function GaragePageWeb({
                 <Text
                   style={{
                     fontSize: 13.5,
-                    fontWeight: '800',
+                    fontWeight: '600',
                     color: '#FFFFFF',
                     letterSpacing: 0.3,
                   }}
@@ -1323,39 +1497,47 @@ export default function GaragePageWeb({
 
           {/* ─── 4 KPI STATS GRID (CLEAN MODERN SAAS) ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 w-full">
-            {/* Card 1: FIXED-RATE PMS CATALOG */}
+            {/* Card 1: MECHANICS AVAILABLE */}
             <div
-              className={`${
+              className={`rounded-2xl p-5 border shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px] ${
                 isDarkMode ? 'bg-[#151C19] border-[#374151]' : 'bg-white border-emerald-200/90'
-              } rounded-2xl p-5 border shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between min-h-[145px]`}
+              }`}
             >
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span
-                    className={`text-[11px] font-bold uppercase tracking-wider block ${isDarkMode ? 'text-slate-400' : 'text-slate-400'}`}
-                  >
-                    PMS Services
+                  <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Mechanics Available
                   </span>
                   <span
                     className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${
-                      isDarkMode
-                        ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
-                        : 'bg-[#FFF7ED] text-emerald-700 border border-emerald-200'
+                      mechanicsData.availableCount > 0
+                        ? isDarkMode
+                          ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800'
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : isDarkMode
+                          ? 'bg-slate-800 text-slate-400 border border-slate-700'
+                          : 'bg-slate-100 text-slate-500 border border-slate-200'
                     }`}
                   >
-                    Fixed Rate
+                    {mechanicsData.availableCount > 0 ? `${mechanicsData.availableCount} Available` : 'Busy'}
                   </span>
                 </div>
                 <span
-                  className={`text-3xl font-extrabold tracking-tight leading-none block font-mono ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}
+                  className={`text-3xl font-bold tracking-tight leading-none block font-mono ${
+                    isDarkMode ? 'text-slate-100' : 'text-slate-900'
+                  }`}
                 >
-                  22
+                  {mechanicsData.availableCount}
                 </span>
               </div>
               <span
-                className={`text-[11.5px] font-medium mt-3 block leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}
+                className={`text-[11.5px] font-medium mt-3 block leading-snug ${
+                  isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                }`}
               >
-                Priced by motorcycle CC category (125cc / 150–160cc / 200cc above)
+                {mechanicsData.availableCount > 0
+                  ? `${mechanicsData.availableCount} of ${mechanicsData.totalCount} on-duty & available`
+                  : 'All technicians currently busy in pit bays'}
               </span>
             </div>
 
@@ -1391,7 +1573,7 @@ export default function GaragePageWeb({
                   </span>
                 </div>
                 <span
-                  className={`text-3xl font-extrabold tracking-tight leading-none block font-mono ${
+                  className={`text-3xl font-bold tracking-tight leading-none block font-mono ${
                     todaySlotsData.isFullyBooked
                       ? isDarkMode
                         ? 'text-rose-400'
@@ -1431,7 +1613,7 @@ export default function GaragePageWeb({
                   </span>
                 </div>
                 <span
-                  className={`text-3xl font-extrabold tracking-tight leading-none block font-mono ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}
+                  className={`text-3xl font-bold tracking-tight leading-none block font-mono ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}
                 >
                   {todaySlotsData.isFullyBooked ? 'Tomorrow' : 'Today'}
                 </span>
@@ -1482,7 +1664,7 @@ export default function GaragePageWeb({
                       </span>
                     </div>
                     <span
-                      className={`text-3xl font-extrabold tracking-tight leading-none block font-mono ${
+                      className={`text-3xl font-bold tracking-tight leading-none block font-mono ${
                         activeBays <= 0 ? 'text-rose-600' : isDarkMode ? 'text-slate-100' : 'text-slate-900'
                       }`}
                     >
@@ -1516,7 +1698,7 @@ export default function GaragePageWeb({
             >
               <BootstrapIcon name="exclamation-octagon-fill" size={20} color="#DC2626" />
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '800', color: '#991B1B', marginBottom: 2 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: '#991B1B', marginBottom: 2 }}>
                   Notice: Service Bays Are Fully Booked For Today
                 </Text>
                 <Text style={{ fontSize: 12, color: '#B91C1C' }}>
@@ -1534,7 +1716,7 @@ export default function GaragePageWeb({
                 }}
                 onPress={() => handleQuickBook('PMS', true)}
               >
-                <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Book Tomorrow</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>Book Tomorrow</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -1598,7 +1780,7 @@ export default function GaragePageWeb({
                   }}
                 >
                   <BootstrapIcon name="ticket-detailed" size={13} color="#059669" />
-                  <Text style={{ fontSize: 12.5, fontWeight: '800', color: '#065F46' }}>
+                  <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#065F46' }}>
                     {userBookings.length} Scheduled {userBookings.length === 1 ? 'Booking' : 'Bookings'}
                   </Text>
                 </View>
@@ -1906,12 +2088,12 @@ export default function GaragePageWeb({
                       }}
                     >
                       <Text
-                        style={{ fontSize: 10.5, fontWeight: '800', color: '#EA580C', letterSpacing: 0.5 }}
+                        style={{ fontSize: 10.5, fontWeight: '600', color: '#EA580C', letterSpacing: 0.5 }}
                       >
                         STEP 1 OF 2
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 17, fontWeight: '800', color: '#0F172A' }}>
+                    <Text style={{ fontSize: 17, fontWeight: '600', color: '#0F172A' }}>
                       Select Appointment Date & Time
                     </Text>
                   </View>
@@ -1963,8 +2145,14 @@ export default function GaragePageWeb({
                   const d = new Date(dateStr + 'T00:00:00');
                   const isSunday = d.getDay() === 0;
                   const bookedCount = selAvail?.bookedSlotsCount || 0;
+                  const total = selAvail?.totalSlots || 5;
+                  const avail = typeof selAvail?.availableSlotsCount === 'number'
+                    ? selAvail.availableSlotsCount
+                    : Math.max(0, total - bookedCount);
                   return {
                     bookingCount: bookedCount,
+                    availableSlots: avail,
+                    totalSlots: total,
                     isFullyBooked: selAvail?.isFullyBooked || false,
                     isOffDuty: isSunday,
                     label: bookedCount === 0 && !isSunday ? 'Open' : undefined,
@@ -2014,7 +2202,7 @@ export default function GaragePageWeb({
                     <View style={{ flex: 1, minWidth: 0 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <Text
-                          style={{ fontSize: 14, fontWeight: '800', color: isFull ? '#991B1B' : '#0F172A' }}
+                          style={{ fontSize: 14, fontWeight: '600', color: isFull ? '#991B1B' : '#0F172A' }}
                         >
                           Selected: {selectedDate}
                         </Text>
@@ -2029,7 +2217,7 @@ export default function GaragePageWeb({
                               borderColor: '#A7F3D0',
                             }}
                           >
-                            <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#EA580C' }}>
+                            <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#EA580C' }}>
                               ⏱️ {selectedTime}
                             </Text>
                           </View>
@@ -2045,7 +2233,7 @@ export default function GaragePageWeb({
                           <Text
                             style={{
                               fontSize: 10.5,
-                              fontWeight: '800',
+                              fontWeight: '600',
                               color: isFull ? '#DC2626' : '#EA580C',
                             }}
                           >
@@ -2101,7 +2289,7 @@ export default function GaragePageWeb({
                       activeOpacity={0.85}
                     >
                       <Text
-                        style={{ fontSize: 13, fontWeight: '800', color: isFull ? '#64748B' : '#FFFFFF' }}
+                        style={{ fontSize: 13, fontWeight: '600', color: isFull ? '#64748B' : '#FFFFFF' }}
                       >
                         {isFull ? 'Date Fully Booked' : 'Proceed to Booking Form →'}
                       </Text>
@@ -2133,42 +2321,57 @@ export default function GaragePageWeb({
             style={[
               gStyles.popupModalCard,
               {
-                maxWidth: 760,
+                maxWidth: 880,
                 maxHeight: '92vh',
                 transition: 'max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
               },
             ]}
           >
-            {/* Modal Header & 4-Step Progress Indicator */}
+            {/* Modal Header & 5-Step Progress Indicator */}
             <View style={gStyles.stepperHeader}>
               <View style={gStyles.stepperTitleRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                   <View style={gStyles.stepperIconWrap}>
                     <BootstrapIcon
-                      name={BOOKING_STEPS[bookingStep - 1]?.icon || 'bicycle'}
+                      name={BOOKING_STEPS[bookingStep - 1]?.icon || 'tools'}
                       size={18}
                       color="#EA580C"
                     />
                   </View>
                   <View>
-                    <Text style={gStyles.stepperModalTitle}>Service Request</Text>
-                    <Text style={gStyles.stepperModalSubtitle}>
-                      Step {bookingStep} of {BOOKING_STEPS.length}: {BOOKING_STEPS[bookingStep - 1]?.label}
+                    <Text style={gStyles.stepperModalSubtitle}>SERVICE REQUEST</Text>
+                    <Text style={gStyles.stepperModalTitle}>
+                      {BOOKING_STEP_TITLES[bookingStep] || 'Service Request'}
                     </Text>
                   </View>
                 </View>
 
                 <TouchableOpacity
-                  style={gStyles.stepperCloseBtn}
+                  style={[
+                    gStyles.stepperCloseBtn,
+                    isModalCloseHovered && { backgroundColor: '#F1F5F9', borderColor: '#CBD5E1' },
+                  ]}
                   onPress={() => setIsBookingModalOpen(false)}
+                  onMouseEnter={() => setIsModalCloseHovered(true)}
+                  onMouseLeave={() => setIsModalCloseHovered(false)}
                   activeOpacity={0.7}
+                  accessibilityLabel="Close service request modal"
                 >
-                  <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+                  <BootstrapIcon
+                    name="x-lg"
+                    size={13}
+                    color={isModalCloseHovered ? '#0F172A' : '#64748B'}
+                  />
                 </TouchableOpacity>
               </View>
 
-              {/* 4-Step Progress Stepper Indicator */}
-              <View style={gStyles.stepIndicatorContainer}>
+              {/* 5-Step Progress Stepper Indicator */}
+              <View
+                style={[
+                  gStyles.stepIndicatorContainer,
+                  { overflowX: windowWidth >= 768 ? 'visible' : 'auto' },
+                ]}
+              >
                 {BOOKING_STEPS.map((step, idx) => {
                   const stepNum = idx + 1;
                   const isActive = bookingStep === stepNum;
@@ -2178,7 +2381,7 @@ export default function GaragePageWeb({
                       <TouchableOpacity
                         style={gStyles.stepNodeWrap}
                         onPress={() => handleStepClick(stepNum)}
-                        activeOpacity={0.7}
+                        activeOpacity={0.75}
                       >
                         <View
                           style={[
@@ -2188,7 +2391,7 @@ export default function GaragePageWeb({
                           ]}
                         >
                           {isCompleted ? (
-                            <BootstrapIcon name="check-lg" size={13} color="#FFFFFF" />
+                            <BootstrapIcon name="check-lg" size={12} color="#FFFFFF" />
                           ) : (
                             <Text style={[gStyles.stepNumberText, isActive && gStyles.stepNumberTextActive]}>
                               {stepNum}
@@ -2200,18 +2403,19 @@ export default function GaragePageWeb({
                             gStyles.stepLabel,
                             isActive && gStyles.stepLabelActive,
                             isCompleted && gStyles.stepLabelCompleted,
-                            { display: isDesktop ? 'flex' : isActive ? 'flex' : 'none' },
+                            { display: windowWidth >= 768 ? 'flex' : isActive ? 'flex' : 'none' },
                           ]}
                           numberOfLines={1}
                         >
-                          {isDesktop ? step.label : step.shortLabel}
+                          {windowWidth >= 768 ? step.label : step.shortLabel}
                         </Text>
                       </TouchableOpacity>
                       {idx < BOOKING_STEPS.length - 1 && (
                         <View
                           style={[
                             gStyles.stepConnectingLine,
-                            isCompleted && gStyles.stepConnectingLineCompleted,
+                            (bookingStep > idx + 1 || (bookingStep === 5 && idx <= 3)) &&
+                              gStyles.stepConnectingLineCompleted,
                           ]}
                         />
                       )}
@@ -2222,15 +2426,67 @@ export default function GaragePageWeb({
             </View>
 
             {/* Scrollable Step Body */}
-            <ScrollView style={gStyles.popupModalBody} showsVerticalScrollIndicator={true}>
+            <ScrollView
+              dataSet={{ serviceModalScroll: 'true' }}
+              style={[
+                gStyles.popupModalBody,
+                {
+                  flex: 1,
+                  minHeight: 0,
+                  width: '100%',
+                  ...(Platform.OS === 'web'
+                    ? {
+                        scrollbarWidth: 'thin',
+                        scrollbarColor: '#CBD5E1 transparent',
+                      }
+                    : {}),
+                },
+              ]}
+              contentContainerStyle={{
+                paddingHorizontal: 24,
+                paddingTop: 18,
+                paddingBottom: 20,
+              }}
+              showsVerticalScrollIndicator={true}
+            >
               {/* ════════════════════════════════════════════════════════════════
                   STEP 1: SELECT MOTORCYCLE (REGISTERED ONLY)
                   ════════════════════════════════════════════════════════════════ */}
               {bookingStep === 1 && (
                 <View>
-                  <View style={gStyles.stepSectionHeader}>
-                    <Text style={gStyles.stepSectionTitle}>Select Motorcycle</Text>
-                    <Text style={gStyles.stepSectionSubtitle}>Choose the motorcycle that needs service.</Text>
+                  <View style={{ marginBottom: 20 }}>
+                    <Text
+                      style={{
+                        fontSize: 11.5,
+                        fontWeight: '700',
+                        color: '#EA580C',
+                        letterSpacing: 0.8,
+                        textTransform: 'uppercase',
+                        marginBottom: 6,
+                      }}
+                    >
+                      STEP 1 OF {BOOKING_STEP_COUNT}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 26,
+                        fontWeight: '700',
+                        color: '#0F172A',
+                        letterSpacing: -0.5,
+                        marginBottom: 6,
+                      }}
+                    >
+                      Select your motorcycle
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 14,
+                        color: '#64748B',
+                        lineHeight: 20,
+                      }}
+                    >
+                      Choose a motorcycle to personalize available services and pricing.
+                    </Text>
                   </View>
 
                   {!currentUser ? (
@@ -2243,7 +2499,7 @@ export default function GaragePageWeb({
                         padding: 16,
                       }}
                     >
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#0F172A', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A', marginBottom: 4 }}>
                         Sign in to continue
                       </Text>
                       <Text style={{ fontSize: 12.5, color: '#64748B', marginBottom: 12 }}>
@@ -2265,7 +2521,7 @@ export default function GaragePageWeb({
                         }}
                         activeOpacity={0.85}
                       >
-                        <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>Sign In</Text>
+                        <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '600' }}>Sign In</Text>
                       </TouchableOpacity>
                     </View>
                   ) : !garageMotorcycles.length ? (
@@ -2278,7 +2534,7 @@ export default function GaragePageWeb({
                         padding: 16,
                       }}
                     >
-                      <Text style={{ fontSize: 14, fontWeight: '800', color: '#92400E', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 14, fontWeight: '600', color: '#92400E', marginBottom: 4 }}>
                         No motorcycles registered yet
                       </Text>
                       <Text style={{ fontSize: 12.5, color: '#B45309', marginBottom: 12 }}>
@@ -2300,7 +2556,7 @@ export default function GaragePageWeb({
                         activeOpacity={0.85}
                       >
                         <BootstrapIcon name="plus-lg" size={13} color="#FFFFFF" />
-                        <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '800' }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '600' }}>
                           Add Motorcycle
                         </Text>
                       </TouchableOpacity>
@@ -2310,54 +2566,61 @@ export default function GaragePageWeb({
                       <View style={gStyles.motorcycleCardGrid}>
                         {garageMotorcycles.map((m) => {
                           const isPicked = String(m.motorcycle_id) === String(selectedMotorcycleId);
-                          const bikePhoto = m.photo_url || null;
+                          const brandLower = String(m.brand || '').toLowerCase();
+                          const bikePhoto =
+                            m.photo_url ||
+                            (brandLower.includes('suzuki')
+                              ? 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=800&q=80'
+                              : brandLower.includes('honda')
+                              ? 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80'
+                              : brandLower.includes('yamaha')
+                              ? 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=800&q=80'
+                              : brandLower.includes('kawasaki')
+                              ? 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=800&q=80'
+                              : 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=800&q=80');
+
+                          const bikeTitle = `${m.brand || ''} ${m.model || ''}`.trim() || 'Motorcycle';
+                          const specParts = [
+                            m.year || '2026',
+                            m.engine_cc ? `${m.engine_cc} cc` : null,
+                            m.is_primary ? 'Primary bike' : m.nickname || m.type || m.category || 'Adventure',
+                          ].filter(Boolean);
 
                           return (
                             <TouchableOpacity
                               key={m.motorcycle_id}
                               style={[gStyles.motorcycleCard, isPicked && gStyles.motorcycleCardActive]}
                               onPress={() => applyRegisteredMotorcycle(m)}
-                              activeOpacity={0.88}
+                              activeOpacity={0.92}
                             >
                               {/* Top Product Image Container with Badges */}
                               <View
                                 style={{
                                   position: 'relative',
                                   width: '100%',
-                                  height: 180,
-                                  borderRadius: 14,
+                                  height: 185,
                                   overflow: 'hidden',
-                                  backgroundColor: '#F8FAFC',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  padding: 6,
+                                  backgroundColor: '#1E293B',
                                 }}
                               >
-                                {bikePhoto ? (
-                                  <Image
-                                    source={{ uri: bikePhoto }}
-                                    style={{ width: '100%', height: '100%' }}
-                                    resizeMode="contain"
-                                  />
-                                ) : (
-                                  <View style={{ alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                                    <BootstrapIcon name="bicycle" size={42} color="#94A3B8" />
-                                    <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>
-                                      No photo uploaded
-                                    </Text>
-                                  </View>
-                                )}
+                                <Image
+                                  source={{ uri: bikePhoto }}
+                                  style={{ width: '100%', height: '100%' }}
+                                  resizeMode="cover"
+                                />
 
                                 {/* Brand Badge (Top-Left) */}
                                 <View
                                   style={{
                                     position: 'absolute',
-                                    top: 10,
-                                    left: 10,
-                                    backgroundColor: 'rgba(15, 23, 42, 0.72)',
-                                    paddingHorizontal: 8,
-                                    paddingVertical: 3,
+                                    top: 12,
+                                    left: 12,
+                                    backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                                    paddingHorizontal: 10,
+                                    paddingVertical: 4.5,
                                     borderRadius: 6,
+                                    borderWidth: 1,
+                                    borderColor: 'rgba(255, 255, 255, 0.12)',
                                   }}
                                 >
                                   <Text
@@ -2365,126 +2628,140 @@ export default function GaragePageWeb({
                                       fontSize: 10.5,
                                       fontWeight: '800',
                                       color: '#FFFFFF',
-                                      letterSpacing: 0.4,
+                                      letterSpacing: 0.8,
+                                      textTransform: 'uppercase',
                                     }}
                                   >
-                                    {m.brand}
+                                    {m.brand ? m.brand.toUpperCase() : 'MOTORCYCLE'}
                                   </Text>
                                 </View>
 
-                                {/* Star / Status Badge */}
+                                {/* Top-Right Indicator Badge */}
                                 <View
                                   style={{
                                     position: 'absolute',
-                                    top: 10,
-                                    right: 10,
+                                    top: 12,
+                                    right: 12,
                                     width: 30,
                                     height: 30,
                                     borderRadius: 15,
-                                    backgroundColor: isPicked ? '#EA580C' : 'rgba(15, 23, 42, 0.55)',
+                                    backgroundColor: isPicked ? '#EA580C' : 'rgba(15, 23, 42, 0.80)',
+                                    borderWidth: isPicked ? 0 : 1,
+                                    borderColor: 'rgba(255, 255, 255, 0.18)',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                   }}
                                 >
                                   {isPicked ? (
-                                    <BootstrapIcon name="check-lg" size={13} color="#FFFFFF" />
-                                  ) : m.is_primary ? (
-                                    <BootstrapIcon name="star-fill" size={12} color="#FBBF24" />
+                                    <BootstrapIcon name="check" size={18} color="#FFFFFF" />
                                   ) : (
-                                    <BootstrapIcon name="bicycle" size={13} color="#FFFFFF" />
+                                    <View
+                                      style={{
+                                        width: 6,
+                                        height: 6,
+                                        borderRadius: 3,
+                                        backgroundColor: '#FFFFFF',
+                                      }}
+                                    />
                                   )}
                                 </View>
                               </View>
 
-                              {/* Card Middle: Title & Subtitle */}
-                              <View style={{ marginTop: 12, marginBottom: 8, paddingHorizontal: 2 }}>
+                              {/* Card Body: Title, Spec Tagline, Plate & Action */}
+                              <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 18 }}>
                                 <Text
                                   style={{
-                                    fontSize: 16,
-                                    fontWeight: '800',
-                                    color: '#0F172A',
-                                    letterSpacing: -0.2,
-                                  }}
-                                  numberOfLines={1}
-                                >
-                                  {m.year ? `${m.year} ` : ''}
-                                  {m.brand} {m.model}
-                                </Text>
-
-                                <Text
-                                  style={{
-                                    fontSize: 12,
+                                    fontSize: 10.5,
+                                    fontWeight: '700',
                                     color: '#64748B',
-                                    lineHeight: 16,
-                                    marginTop: 4,
+                                    letterSpacing: 0.8,
+                                    textTransform: 'uppercase',
+                                    marginBottom: 6,
+                                  }}
+                                >
+                                  REGISTERED MOTORCYCLE
+                                </Text>
+
+                                <Text
+                                  style={{
+                                    fontSize: 19,
+                                    fontWeight: '700',
+                                    color: '#0F172A',
+                                    letterSpacing: -0.3,
+                                    marginBottom: 4,
                                   }}
                                   numberOfLines={1}
                                 >
-                                  {m.nickname ? `"${m.nickname}" • ` : ''}
-                                  {m.engine_cc ? `${m.engine_cc}cc` : 'Registered Unit'}
-                                  {m.is_primary ? ' • Primary' : ''}
+                                  {bikeTitle}
                                 </Text>
-                              </View>
 
-                              {/* Card Bottom: Plate on Left + Pill Button on Right */}
-                              <View
-                                style={{
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  marginTop: 8,
-                                  paddingTop: 10,
-                                  borderTopWidth: 1,
-                                  borderTopColor: '#F1F5F9',
-                                  paddingHorizontal: 2,
-                                }}
-                              >
-                                <View>
-                                  <Text
-                                    style={{
-                                      fontSize: 9.5,
-                                      fontWeight: '800',
-                                      color: '#94A3B8',
-                                      letterSpacing: 0.5,
-                                      textTransform: 'uppercase',
-                                    }}
-                                  >
-                                    PLATE
-                                  </Text>
-                                  <Text
-                                    style={{
-                                      fontSize: 14.5,
-                                      fontWeight: '900',
-                                      color: '#0F172A',
-                                      letterSpacing: -0.2,
-                                      marginTop: 1,
-                                    }}
-                                  >
-                                    {m.plate_number || 'NO PLATE'}
-                                  </Text>
-                                </View>
+                                <Text
+                                  style={{
+                                    fontSize: 13,
+                                    color: '#64748B',
+                                    fontWeight: '500',
+                                    lineHeight: 18,
+                                    marginBottom: 16,
+                                  }}
+                                  numberOfLines={1}
+                                >
+                                  {specParts.join(' · ')}
+                                </Text>
 
+                                {/* Divider & Plate Row */}
                                 <View
                                   style={{
-                                    backgroundColor: isPicked ? '#EA580C' : '#0F172A',
-                                    paddingHorizontal: 16,
-                                    paddingVertical: 8,
-                                    borderRadius: 20,
                                     flexDirection: 'row',
                                     alignItems: 'center',
-                                    gap: 5,
+                                    justifyContent: 'space-between',
+                                    paddingTop: 14,
+                                    borderTopWidth: 1,
+                                    borderTopColor: '#F1F5F9',
                                   }}
                                 >
-                                  {isPicked && <BootstrapIcon name="check-lg" size={12} color="#FFFFFF" />}
-                                  <Text
+                                  <View>
+                                    <Text
+                                      style={{
+                                        fontSize: 10,
+                                        fontWeight: '700',
+                                        color: '#64748B',
+                                        letterSpacing: 0.6,
+                                        textTransform: 'uppercase',
+                                        marginBottom: 2,
+                                      }}
+                                    >
+                                      PLATE NUMBER
+                                    </Text>
+                                    <Text
+                                      style={{
+                                        fontSize: 15,
+                                        fontWeight: '700',
+                                        color: '#0F172A',
+                                        letterSpacing: -0.2,
+                                      }}
+                                    >
+                                      {m.plate_number ? m.plate_number.toUpperCase() : 'N/A-RJCX'}
+                                    </Text>
+                                  </View>
+
+                                  <View
                                     style={{
-                                      fontSize: 12,
-                                      fontWeight: '800',
-                                      color: '#FFFFFF',
+                                      backgroundColor: isPicked ? '#EA580C' : '#F1F5F9',
+                                      paddingHorizontal: isPicked ? 18 : 16,
+                                      paddingVertical: 8,
+                                      borderRadius: 8,
                                     }}
                                   >
-                                    {isPicked ? 'Selected' : 'Select'}
-                                  </Text>
+                                    <Text
+                                      style={{
+                                        fontSize: 13,
+                                        fontWeight: '600',
+                                        color: isPicked ? '#FFFFFF' : '#1E293B',
+                                      }}
+                                    >
+                                      {isPicked ? 'Selected' : 'Select bike'}
+                                    </Text>
+                                  </View>
                                 </View>
                               </View>
                             </TouchableOpacity>
@@ -2496,24 +2773,14 @@ export default function GaragePageWeb({
                         onPress={() => setIsRegisterBikeModalOpen(true)}
                         style={{
                           alignSelf: 'flex-start',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 8,
-                          marginTop: 14,
-                          backgroundColor: '#FFFFFF',
-                          borderWidth: 1.5,
-                          borderColor: '#CBD5E1',
-                          borderStyle: 'dashed',
-                          paddingHorizontal: 14,
-                          paddingVertical: 9,
-                          borderRadius: 10,
+                          marginTop: 18,
                           cursor: 'pointer',
+                          paddingVertical: 4,
                         }}
-                        activeOpacity={0.8}
+                        activeOpacity={0.75}
                       >
-                        <BootstrapIcon name="plus-lg" size={13} color="#EA580C" />
-                        <Text style={{ color: '#0F172A', fontSize: 12.5, fontWeight: '700' }}>
-                          Add another motorcycle
+                        <Text style={{ color: '#475569', fontSize: 13.5, fontWeight: '600' }}>
+                          + Add another motorcycle
                         </Text>
                       </TouchableOpacity>
                     </View>
@@ -2526,353 +2793,323 @@ export default function GaragePageWeb({
                   ════════════════════════════════════════════════════════════════ */}
               {bookingStep === 2 && (
                 <View>
-                  <View style={gStyles.stepSectionHeader}>
-                    <Text style={gStyles.stepSectionTitle}>Select Service Type</Text>
-                    <Text style={gStyles.stepSectionSubtitle}>
-                      Choose whether you need preventive maintenance (PMS) or specific repair services for
-                      your motorcycle.
-                    </Text>
-                  </View>
+                  {/* Top Subheader: Section Heading + Motorcycle Badge */}
+                  <View
+                    style={{
+                      flexDirection: isDesktop ? 'row' : 'column',
+                      alignItems: isDesktop ? 'flex-start' : 'stretch',
+                      justifyContent: 'space-between',
+                      gap: 16,
+                      marginBottom: 24,
+                    }}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: '700',
+                          color: '#EA580C',
+                          letterSpacing: 0.8,
+                          textTransform: 'uppercase',
+                          marginBottom: 8,
+                        }}
+                      >
+                        STEP 2 OF 5
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 24,
+                          fontWeight: '700',
+                          color: '#0F172A',
+                          letterSpacing: -0.3,
+                          marginBottom: 6,
+                        }}
+                      >
+                        Choose service type
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 13.5,
+                          color: '#64748B',
+                          lineHeight: 20,
+                        }}
+                      >
+                        Tell us what kind of care your motorcycle needs.
+                      </Text>
+                    </View>
 
-                  {/* Selected motorcycle pill */}
-                  {selectedMotorcycleLabel ? (
+                    {/* Selected Motorcycle Badge */}
                     <View
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
-                        gap: 6,
-                        backgroundColor: '#F0F7F3',
-                        paddingHorizontal: 12,
-                        paddingVertical: 5,
-                        borderRadius: 999,
+                        gap: 12,
+                        backgroundColor: '#FFFFFF',
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 14,
                         borderWidth: 1,
-                        borderColor: '#C8DDD3',
-                        alignSelf: 'flex-start',
-                        marginBottom: 16,
+                        borderColor: '#E2E8F0',
+                        boxShadow: '0 2px 8px rgba(15, 23, 42, 0.04)',
+                        alignSelf: isDesktop ? 'flex-start' : 'flex-start',
                       }}
                     >
-                      <BootstrapIcon name="bicycle" size={13} color="#EA580C" />
-                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#EA580C' }}>
-                        {selectedMotorcycleLabel} • {selectedEngineCcLabel}
-                        {pmsCatalog.ok && pmsCatalog.category ? ` • ${pmsCatalog.category.name}` : ''}
-                      </Text>
+                      <BootstrapIcon name="motorcycle" size={24} color="#EA580C" />
+                      <View>
+                        <Text
+                          style={{
+                            fontSize: 9.5,
+                            fontWeight: '700',
+                            color: '#64748B',
+                            letterSpacing: 0.6,
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          YOUR MOTORCYCLE
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 13.5,
+                            fontWeight: '700',
+                            color: '#0F172A',
+                            marginTop: 2,
+                          }}
+                        >
+                          {selectedMotorcycle
+                            ? `${selectedMotorcycle.brand || ''} ${selectedMotorcycle.model || ''}`.trim() || selectedMotorcycleLabel
+                            : (garageMotorcycles && garageMotorcycles[0]
+                                ? `${garageMotorcycles[0].brand || ''} ${garageMotorcycles[0].model || ''}`.trim()
+                                : selectedMotorcycleLabel || 'Suzuki Smash 125')}
+                        </Text>
+                      </View>
                     </View>
-                  ) : null}
+                  </View>
 
                   {/* Service Type Selection Cards */}
                   <View
                     style={{
                       flexDirection: isDesktop ? 'row' : 'column',
                       gap: 16,
-                      marginBottom: 16,
+                      marginBottom: 20,
                     }}
                   >
-                    {/* Preventive Maintenance (PMS) Card */}
+                    {/* Preventive maintenance Card */}
                     <TouchableOpacity
                       onPress={() => handleSelectServiceType('PMS')}
-                      activeOpacity={0.9}
+                      activeOpacity={0.88}
                       style={{
                         flex: 1,
                         minWidth: 260,
-                        backgroundColor: selectedServiceType === 'PMS' ? '#F0FDF4' : '#FFFFFF',
+                        backgroundColor: '#FFFFFF',
                         borderRadius: 16,
-                        borderWidth: selectedServiceType === 'PMS' ? 2 : 1.5,
-                        borderColor: selectedServiceType === 'PMS' ? '#EA580C' : '#E2E8F0',
-                        padding: 20,
+                        borderWidth: selectedServiceType === 'PMS' ? 1.5 : 1,
+                        borderColor: selectedServiceType === 'PMS' ? '#EA580C' : '#CBD5E1',
+                        padding: 22,
                         cursor: 'pointer',
                         boxShadow:
                           selectedServiceType === 'PMS'
-                            ? '0 6px 20px rgba(0, 0, 0, 0.12)'
-                            : '0 2px 4px rgba(15, 23, 42, 0.03)',
-                        gap: 14,
+                            ? '0 4px 16px rgba(234, 88, 12, 0.08)'
+                            : '0 2px 8px rgba(15, 23, 42, 0.03)',
                         transition: 'all 0.2s ease',
                       }}
                     >
-                      {/* Top Row: Icon & Radio */}
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                      >
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
+                        {/* Icon Container */}
                         <View
                           style={{
-                            width: 44,
-                            height: 44,
+                            width: 48,
+                            height: 48,
                             borderRadius: 12,
-                            backgroundColor: '#E8F5EE',
-                            borderWidth: 1,
-                            borderColor: '#C8DDD3',
+                            backgroundColor: '#FFF7ED',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            flexShrink: 0,
                           }}
                         >
-                          <BootstrapIcon name="shield-check" size={22} color="#EA580C" />
+                          <BootstrapIcon name="shield" size={22} color="#EA580C" />
                         </View>
-                        <View
-                          style={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: 12,
-                            backgroundColor: selectedServiceType === 'PMS' ? '#EA580C' : '#FFFFFF',
-                            borderWidth: selectedServiceType === 'PMS' ? 0 : 2,
-                            borderColor: '#CBD5E1',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          {selectedServiceType === 'PMS' && (
-                            <BootstrapIcon name="check-lg" size={13} color="#FFFFFF" />
-                          )}
-                        </View>
-                      </View>
 
-                      {/* Title & Badge */}
-                      <View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <Text
-                            style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', letterSpacing: -0.2 }}
-                          >
-                            Preventive Maintenance
-                          </Text>
+                        {/* Text and Radio Content */}
+                        <View style={{ flex: 1, minWidth: 0 }}>
                           <View
                             style={{
-                              backgroundColor: '#E8F5EE',
-                              paddingHorizontal: 7,
-                              paddingVertical: 2,
-                              borderRadius: 6,
-                              borderWidth: 1,
-                              borderColor: '#C8DDD3',
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              marginBottom: 4,
                             }}
                           >
                             <Text
                               style={{
-                                fontSize: 10,
-                                fontWeight: '800',
-                                color: '#EA580C',
-                                letterSpacing: 0.5,
+                                fontSize: 10.5,
+                                fontWeight: '700',
+                                color: '#64748B',
+                                letterSpacing: 0.6,
+                                textTransform: 'uppercase',
                               }}
                             >
-                              PMS
+                              RECOMMENDED CARE
                             </Text>
+
+                            {/* Radio Button */}
+                            <View
+                              style={{
+                                width: 22,
+                                height: 22,
+                                borderRadius: 11,
+                                borderWidth: selectedServiceType === 'PMS' ? 2 : 1.5,
+                                borderColor: selectedServiceType === 'PMS' ? '#EA580C' : '#CBD5E1',
+                                backgroundColor: '#FFFFFF',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              {selectedServiceType === 'PMS' && (
+                                <View
+                                  style={{
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: 5,
+                                    backgroundColor: '#EA580C',
+                                  }}
+                                />
+                              )}
+                            </View>
                           </View>
+
+                          <Text
+                            style={{
+                              fontSize: 16.5,
+                              fontWeight: '700',
+                              color: '#0F172A',
+                              letterSpacing: -0.2,
+                              marginBottom: 6,
+                            }}
+                          >
+                            Preventive maintenance
+                          </Text>
+
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              color: '#64748B',
+                              lineHeight: 19,
+                            }}
+                          >
+                            Routine tune-ups, fluids, inspections, and preventative care.
+                          </Text>
                         </View>
-                        <Text style={{ fontSize: 12.5, color: '#64748B', lineHeight: 18 }}>
-                          Routine maintenance, fluids, tune-ups, and inspections to keep your motorcycle
-                          running in peak condition.
-                        </Text>
-                      </View>
-
-                      {/* Key highlights */}
-                      <View style={{ gap: 6, paddingTop: 4 }}>
-                        {[
-                          'Regular Oil & Filter Replacement',
-                          'Minor & Major Engine Tune-up',
-                          'CVT Cleaning / Chain Lubrication',
-                          'Brake System & Safety Check',
-                        ].map((feature, i) => (
-                          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <BootstrapIcon name="check2" size={13} color="#EA580C" />
-                            <Text style={{ fontSize: 12, color: '#334155', fontWeight: '500' }}>
-                              {feature}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-
-                      {/* Footer in Card */}
-                      <View
-                        style={{
-                          marginTop: 'auto',
-                          paddingTop: 12,
-                          borderTopWidth: 1,
-                          borderTopColor: selectedServiceType === 'PMS' ? '#DCE9E2' : '#F1F5F9',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#EA580C' }}>
-                          {serviceCounts.pms} PMS services available
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: '800',
-                            color: selectedServiceType === 'PMS' ? '#EA580C' : '#94A3B8',
-                          }}
-                        >
-                          {selectedServiceType === 'PMS' ? 'Selected ✓' : 'Select →'}
-                        </Text>
                       </View>
                     </TouchableOpacity>
 
-                    {/* Repair Services Card */}
+                    {/* Repair services Card */}
                     <TouchableOpacity
                       onPress={() => handleSelectServiceType('Repair')}
-                      activeOpacity={0.9}
+                      activeOpacity={0.88}
                       style={{
                         flex: 1,
                         minWidth: 260,
-                        backgroundColor: selectedServiceType === 'Repair' ? '#FFFBEB' : '#FFFFFF',
+                        backgroundColor: '#FFFFFF',
                         borderRadius: 16,
-                        borderWidth: selectedServiceType === 'Repair' ? 2 : 1.5,
-                        borderColor: selectedServiceType === 'Repair' ? '#B45309' : '#E2E8F0',
-                        padding: 20,
+                        borderWidth: selectedServiceType === 'Repair' ? 1.5 : 1,
+                        borderColor: selectedServiceType === 'Repair' ? '#EA580C' : '#CBD5E1',
+                        padding: 22,
                         cursor: 'pointer',
                         boxShadow:
                           selectedServiceType === 'Repair'
-                            ? '0 6px 20px rgba(180, 83, 9, 0.12)'
-                            : '0 2px 4px rgba(15, 23, 42, 0.03)',
-                        gap: 14,
+                            ? '0 4px 16px rgba(234, 88, 12, 0.08)'
+                            : '0 2px 8px rgba(15, 23, 42, 0.03)',
                         transition: 'all 0.2s ease',
                       }}
                     >
-                      {/* Top Row: Icon & Radio */}
-                      <View
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                      >
+                      <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 14 }}>
+                        {/* Icon Container */}
                         <View
                           style={{
-                            width: 44,
-                            height: 44,
+                            width: 48,
+                            height: 48,
                             borderRadius: 12,
-                            backgroundColor: '#FEF3C7',
-                            borderWidth: 1,
-                            borderColor: '#FDE68A',
+                            backgroundColor: '#FFF7ED',
                             alignItems: 'center',
                             justifyContent: 'center',
+                            flexShrink: 0,
                           }}
                         >
-                          <BootstrapIcon name="tools" size={20} color="#B45309" />
+                          <BootstrapIcon name="screwdriver" size={22} color="#EA580C" />
                         </View>
-                        <View
-                          style={{
-                            width: 24,
-                            height: 24,
-                            borderRadius: 12,
-                            backgroundColor: selectedServiceType === 'Repair' ? '#B45309' : '#FFFFFF',
-                            borderWidth: selectedServiceType === 'Repair' ? 0 : 2,
-                            borderColor: '#CBD5E1',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          {selectedServiceType === 'Repair' && (
-                            <BootstrapIcon name="check-lg" size={13} color="#FFFFFF" />
-                          )}
-                        </View>
-                      </View>
 
-                      {/* Title & Badge */}
-                      <View>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <Text
-                            style={{ fontSize: 16, fontWeight: '800', color: '#0F172A', letterSpacing: -0.2 }}
-                          >
-                            Repair Services
-                          </Text>
+                        {/* Text and Radio Content */}
+                        <View style={{ flex: 1, minWidth: 0 }}>
                           <View
                             style={{
-                              backgroundColor: '#FEF3C7',
-                              paddingHorizontal: 7,
-                              paddingVertical: 2,
-                              borderRadius: 6,
-                              borderWidth: 1,
-                              borderColor: '#FDE68A',
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              marginBottom: 4,
                             }}
                           >
                             <Text
                               style={{
-                                fontSize: 10,
-                                fontWeight: '800',
-                                color: '#B45309',
-                                letterSpacing: 0.5,
+                                fontSize: 10.5,
+                                fontWeight: '700',
+                                color: '#64748B',
+                                letterSpacing: 0.6,
+                                textTransform: 'uppercase',
                               }}
                             >
                               REPAIR
                             </Text>
+
+                            {/* Radio Button */}
+                            <View
+                              style={{
+                                width: 22,
+                                height: 22,
+                                borderRadius: 11,
+                                borderWidth: selectedServiceType === 'Repair' ? 2 : 1.5,
+                                borderColor: selectedServiceType === 'Repair' ? '#EA580C' : '#CBD5E1',
+                                backgroundColor: '#FFFFFF',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                              }}
+                            >
+                              {selectedServiceType === 'Repair' && (
+                                <View
+                                  style={{
+                                    width: 10,
+                                    height: 10,
+                                    borderRadius: 5,
+                                    backgroundColor: '#EA580C',
+                                  }}
+                                />
+                              )}
+                            </View>
                           </View>
+
+                          <Text
+                            style={{
+                              fontSize: 16.5,
+                              fontWeight: '700',
+                              color: '#0F172A',
+                              letterSpacing: -0.2,
+                              marginBottom: 6,
+                            }}
+                          >
+                            Repair services
+                          </Text>
+
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              color: '#64748B',
+                              lineHeight: 19,
+                            }}
+                          >
+                            Diagnose an issue, replace a component, or repair damage.
+                          </Text>
                         </View>
-                        <Text style={{ fontSize: 12.5, color: '#64748B', lineHeight: 18 }}>
-                          Mechanical overhauls, electrical troubleshooting, and component replacements for
-                          broken or worn parts.
-                        </Text>
-                      </View>
-
-                      {/* Key highlights */}
-                      <View style={{ gap: 6, paddingTop: 4 }}>
-                        {[
-                          'Engine & Transmission Overhauls',
-                          'Electrical Diagnosis & Wiring Repairs',
-                          'Brake Caliper & Master Cylinder Fixes',
-                          'Suspension, Fork Oil & Chassis Service',
-                        ].map((feature, i) => (
-                          <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <BootstrapIcon name="check2" size={13} color="#B45309" />
-                            <Text style={{ fontSize: 12, color: '#334155', fontWeight: '500' }}>
-                              {feature}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-
-                      {/* Footer in Card */}
-                      <View
-                        style={{
-                          marginTop: 'auto',
-                          paddingTop: 12,
-                          borderTopWidth: 1,
-                          borderTopColor: selectedServiceType === 'Repair' ? '#FDE68A' : '#F1F5F9',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: '#B45309' }}>
-                          {serviceCounts.repair} repair services available
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: '800',
-                            color: selectedServiceType === 'Repair' ? '#B45309' : '#94A3B8',
-                          }}
-                        >
-                          {selectedServiceType === 'Repair' ? 'Selected ✓' : 'Select →'}
-                        </Text>
                       </View>
                     </TouchableOpacity>
-                  </View>
-
-                  {/* Informative helper note */}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 8,
-                      backgroundColor: '#F8FAFC',
-                      padding: 12,
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: '#E2E8F0',
-                    }}
-                  >
-                    <BootstrapIcon name="info-circle" size={14} color="#64748B" />
-                    <Text style={{ fontSize: 12, color: '#64748B', flex: 1 }}>
-                      Next step will display all available{' '}
-                      <Text style={{ fontWeight: '700', color: '#0F172A' }}>
-                        {selectedServiceType === 'Repair'
-                          ? 'Repair Services'
-                          : 'Preventive Maintenance (PMS) Services'}
-                      </Text>{' '}
-                      with labor rates tailored to your motorcycle's {selectedEngineCcLabel} engine.
-                    </Text>
                   </View>
                 </View>
               )}
@@ -2882,39 +3119,84 @@ export default function GaragePageWeb({
                   ════════════════════════════════════════════════════════════════ */}
               {bookingStep === 3 && (
                 <View>
-                  {/* Top instruction note & selected motorcycle tag */}
+                  {/* Top Subheader: Section Heading + Motorcycle Chip */}
                   <View
                     style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
+                      flexDirection: isDesktop ? 'row' : 'column',
+                      alignItems: isDesktop ? 'center' : 'flex-start',
                       justifyContent: 'space-between',
-                      flexWrap: 'wrap',
-                      gap: 8,
-                      marginBottom: 16,
+                      gap: 16,
+                      marginBottom: 20,
                     }}
                   >
-                    <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '500' }}>
-                      Choose the {selectedServiceType === 'Repair' ? 'repair' : 'preventive maintenance'}{' '}
-                      services you need. Prices shown are labor/service fees.
-                    </Text>
+                    <View style={{ flex: 1, minWidth: 260 }}>
+                      <Text
+                        style={{
+                          fontSize: 20,
+                          fontWeight: '600',
+                          color: '#0F172A',
+                          letterSpacing: -0.3,
+                        }}
+                      >
+                        What does your motorcycle need?
+                      </Text>
+                      <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
+                        Select one or more services. You can review everything before confirming.
+                      </Text>
+                    </View>
+
                     {selectedMotorcycleLabel ? (
                       <View
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
-                          gap: 6,
-                          backgroundColor: '#F0F7F3',
-                          paddingHorizontal: 10,
-                          paddingVertical: 4,
-                          borderRadius: 999,
+                          gap: 12,
+                          backgroundColor: '#F8FAFC',
                           borderWidth: 1,
-                          borderColor: '#C8DDD3',
+                          borderColor: '#E2E8F0',
+                          borderRadius: 14,
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)',
                         }}
                       >
-                        <BootstrapIcon name="bicycle" size={12} color="#EA580C" />
-                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#EA580C' }}>
-                          {selectedMotorcycleLabel} • {selectedEngineCcLabel}
-                        </Text>
+                        <View
+                          style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: 8,
+                            backgroundColor: '#FFFFFF',
+                            borderWidth: 1,
+                            borderColor: '#F1F5F9',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <BootstrapIcon name="bicycle" size={16} color="#EA580C" />
+                        </View>
+                        <View>
+                          <Text
+                            style={{
+                              fontSize: 9.5,
+                              fontWeight: '600',
+                              color: '#94A3B8',
+                              letterSpacing: 0.6,
+                              textTransform: 'uppercase',
+                            }}
+                          >
+                            YOUR MOTORCYCLE
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 12.5,
+                              fontWeight: '700',
+                              color: '#0F172A',
+                              marginTop: 1,
+                            }}
+                          >
+                            {selectedMotorcycleLabel} {selectedEngineCcLabel ? `· ${selectedEngineCcLabel}` : ''}
+                          </Text>
+                        </View>
                       </View>
                     ) : null}
                   </View>
@@ -2969,7 +3251,7 @@ export default function GaragePageWeb({
                             }}
                             activeOpacity={0.8}
                           >
-                            <Text style={{ fontSize: 12, fontWeight: '800', color: '#DC2626' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#DC2626' }}>
                               Try again
                             </Text>
                           </TouchableOpacity>
@@ -2978,30 +3260,33 @@ export default function GaragePageWeb({
                     </View>
                   ) : (
                     <View>
-                      {/* Compact Quick Search */}
+                      {/* Search Bar */}
                       <View
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
-                          gap: 8,
+                          gap: 10,
                           backgroundColor: '#FFFFFF',
                           borderWidth: 1.5,
                           borderColor: '#E2E8F0',
-                          borderRadius: 10,
-                          paddingHorizontal: 12,
-                          marginBottom: 18,
+                          borderRadius: 12,
+                          paddingHorizontal: 14,
+                          paddingVertical: 4,
+                          marginBottom: 20,
+                          transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
                         }}
                       >
-                        <BootstrapIcon name="search" size={13} color="#94A3B8" />
+                        <BootstrapIcon name="search" size={15} color="#94A3B8" />
                         <TextInput
                           style={{
                             flex: 1,
-                            paddingVertical: 9,
-                            fontSize: 13,
+                            paddingVertical: 10,
+                            fontSize: 13.5,
                             color: '#0F172A',
                             outlineStyle: 'none',
+                            backgroundColor: 'transparent',
                           }}
-                          placeholder="Search services (e.g. overhaul, brake, chain)..."
+                          placeholder="Search services"
                           placeholderTextColor="#94A3B8"
                           value={serviceSearch}
                           onChangeText={setServiceSearch}
@@ -3009,11 +3294,26 @@ export default function GaragePageWeb({
                         {serviceSearch ? (
                           <TouchableOpacity
                             onPress={() => setServiceSearch('')}
-                            style={{ cursor: 'pointer' }}
+                            style={{ cursor: 'pointer', padding: 4 }}
+                            activeOpacity={0.7}
+                            accessibilityLabel="Clear search"
                           >
-                            <BootstrapIcon name="x-circle-fill" size={14} color="#94A3B8" />
+                            <BootstrapIcon name="x-circle-fill" size={15} color="#94A3B8" />
                           </TouchableOpacity>
-                        ) : null}
+                        ) : (
+                          <View
+                            style={{
+                              backgroundColor: '#F8FAFC',
+                              borderWidth: 1,
+                              borderColor: '#E2E8F0',
+                              borderRadius: 6,
+                              paddingHorizontal: 7,
+                              paddingVertical: 2.5,
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, fontWeight: '600', color: '#94A3B8' }}>⌘ K</Text>
+                          </View>
+                        )}
                       </View>
 
                       {filteredPrimarySections.length === 0 ? (
@@ -3061,63 +3361,58 @@ export default function GaragePageWeb({
                               {section.groups.map((group) => {
                                 return (
                                   <View key={group.name} style={{ gap: 12 }}>
-                                    {/* Subsystem Category Header with icon & count */}
+                                    {/* Subsystem Category Header with icon, description & count */}
                                     <View
                                       style={{
                                         flexDirection: 'row',
                                         alignItems: 'center',
                                         justifyContent: 'space-between',
-                                        paddingBottom: 8,
-                                        borderBottomWidth: 1.5,
-                                        borderBottomColor: '#F1F5F9',
-                                        paddingHorizontal: 2,
+                                        paddingBottom: 10,
+                                        marginBottom: 14,
+                                        marginTop: 4,
                                       }}
                                     >
-                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                                         <View
                                           style={{
-                                            width: 28,
-                                            height: 28,
-                                            borderRadius: 8,
-                                            backgroundColor: '#F0F7F3',
+                                            width: 34,
+                                            height: 34,
+                                            borderRadius: 9,
+                                            backgroundColor: '#FFF7ED',
                                             borderWidth: 1,
-                                            borderColor: '#C8DDD3',
+                                            borderColor: '#FFEDD5',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                           }}
                                         >
                                           <ServiceCategoryIcon
                                             category={group.name}
-                                            size={14}
+                                            size={16}
                                             color="#EA580C"
                                           />
                                         </View>
-                                        <Text
-                                          style={{
-                                            fontSize: 13,
-                                            fontWeight: '900',
-                                            color: '#EA580C',
-                                            letterSpacing: 0.6,
-                                            textTransform: 'uppercase',
-                                          }}
-                                        >
-                                          {group.name}
-                                        </Text>
+                                        <View>
+                                          <Text
+                                            style={{
+                                              fontSize: 13,
+                                              fontWeight: '600',
+                                              color: '#0F172A',
+                                              letterSpacing: 0.5,
+                                              textTransform: 'uppercase',
+                                            }}
+                                          >
+                                            {group.name}
+                                          </Text>
+                                          <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                                            {SERVICE_CATEGORY_DESCRIPTIONS[group.name] || 'Preventive care for a smoother, safer ride'}
+                                          </Text>
+                                        </View>
                                       </View>
 
-                                      <View
-                                        style={{
-                                          backgroundColor: '#F1F5F9',
-                                          paddingHorizontal: 8,
-                                          paddingVertical: 2.5,
-                                          borderRadius: 6,
-                                        }}
-                                      >
-                                        <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B' }}>
-                                          {group.services.length}{' '}
-                                          {group.services.length === 1 ? 'service' : 'services'}
-                                        </Text>
-                                      </View>
+                                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#64748B' }}>
+                                        {group.services.length}{' '}
+                                        {group.services.length === 1 ? 'service' : 'services'}
+                                      </Text>
                                     </View>
 
                                     {/* Service Cards Grid (CSS Grid: 2 columns on desktop, 1 column on mobile) */}
@@ -3125,7 +3420,7 @@ export default function GaragePageWeb({
                                       style={{
                                         display: 'grid',
                                         gridTemplateColumns: isDesktop ? 'repeat(2, minmax(0, 1fr))' : '1fr',
-                                        gap: 14,
+                                        gap: 16,
                                         alignItems: 'stretch',
                                       }}
                                     >
@@ -3139,7 +3434,7 @@ export default function GaragePageWeb({
                                             onPress={() => handleToggleService(svc)}
                                             onMouseEnter={() => svc.available && setHoveredServiceId(svc.id)}
                                             onMouseLeave={() => setHoveredServiceId(null)}
-                                            activeOpacity={0.85}
+                                            activeOpacity={0.88}
                                             accessibilityRole="checkbox"
                                             accessibilityState={{
                                               checked: isPicked,
@@ -3147,48 +3442,35 @@ export default function GaragePageWeb({
                                             }}
                                             accessibilityLabel={`${svc.name}, Labor fee ${svc.available ? formatPhp(svc.price) : 'not configured'}. ${isPicked ? 'Selected' : 'Not selected'}`}
                                             style={{
-                                              backgroundColor: isPicked
-                                                ? '#DCFCE7'
-                                                : svc.available
-                                                  ? '#E8F6EE'
-                                                  : '#F1F5F3',
-                                              backgroundImage: isPicked
-                                                ? 'linear-gradient(135deg, #DCFCE7 0%, #BBF7D0 45%, #86EFAC 100%)'
-                                                : svc.available
-                                                  ? isHovered
-                                                    ? 'linear-gradient(135deg, #DCF3E6 0%, #C5ECD4 50%, #ACDFC1 100%)'
-                                                    : 'linear-gradient(135deg, #E8F6EE 0%, #D4F0DE 50%, #BFE7CF 100%)'
-                                                  : 'none',
+                                              backgroundColor: '#FFFFFF',
                                               borderRadius: 16,
                                               borderWidth: isPicked ? 2 : 1.5,
                                               borderColor: isPicked
                                                 ? '#EA580C'
                                                 : isHovered && svc.available
-                                                  ? '#4DAE7E'
-                                                  : '#8ECFB0',
-                                              padding: 16,
+                                                  ? '#CBD5E1'
+                                                  : '#E2E8F0',
+                                              padding: isPicked ? 17.5 : 18,
                                               display: 'flex',
                                               flexDirection: 'column',
                                               justifyContent: 'space-between',
-                                              minHeight: 185,
+                                              minHeight: 180,
                                               opacity: svc.available ? 1 : 0.55,
                                               cursor: svc.available ? 'pointer' : 'not-allowed',
-                                              outlineStyle: isHovered && svc.available ? 'solid' : 'none',
-                                              outlineColor: isPicked ? '#EA580C' : '#4DAE7E',
-                                              outlineWidth: isHovered && !isPicked ? 1 : 0,
+                                              outlineStyle: 'none',
                                               transition: 'all 200ms cubic-bezier(0.16, 1, 0.3, 1)',
                                               transform:
                                                 isHovered && svc.available
                                                   ? 'translateY(-2px)'
                                                   : 'translateY(0px)',
                                               boxShadow: isPicked
-                                                ? '0 6px 20px rgba(0, 0, 0, 0.18), 0 2px 4px rgba(0, 0, 0, 0.08)'
+                                                ? '0 4px 18px rgba(234, 88, 12, 0.12)'
                                                 : isHovered && svc.available
-                                                  ? '0 10px 24px rgba(0, 0, 0, 0.14), 0 3px 6px rgba(15, 23, 42, 0.04)'
-                                                  : '0 2px 8px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(15, 23, 42, 0.03)',
+                                                  ? '0 6px 16px rgba(15, 23, 42, 0.06)'
+                                                  : '0 1px 3px rgba(15, 23, 42, 0.03)',
                                             }}
                                           >
-                                            {/* Top: Category Badge & Selection Indicator */}
+                                            {/* Top: Badges & Selection Indicator */}
                                             <View
                                               style={{
                                                 flexDirection: 'row',
@@ -3197,66 +3479,78 @@ export default function GaragePageWeb({
                                                 marginBottom: 12,
                                               }}
                                             >
-                                              <View
-                                                style={{
-                                                  flexDirection: 'row',
-                                                  alignItems: 'center',
-                                                  gap: 5.5,
-                                                  backgroundColor: isPicked
-                                                    ? 'rgba(0, 0, 0, 0.12)'
-                                                    : 'rgba(255, 255, 255, 0.82)',
-                                                  paddingHorizontal: 8,
-                                                  paddingVertical: 3.5,
-                                                  borderRadius: 6,
-                                                  borderWidth: 1,
-                                                  borderColor: isPicked
-                                                    ? 'rgba(0, 0, 0, 0.22)'
-                                                    : 'rgba(0, 0, 0, 0.14)',
-                                                  boxShadow: '0 1px 2px rgba(0, 0, 0, 0.05)',
-                                                }}
-                                              >
-                                                <ServiceCategoryIcon
-                                                  category={group.name}
-                                                  size={11.5}
-                                                  color="#EA580C"
-                                                />
-                                                <Text
+                                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                                {/* Category Badge */}
+                                                <View
                                                   style={{
-                                                    fontSize: 10,
-                                                    fontWeight: '700',
-                                                    color: '#EA580C',
-                                                    letterSpacing: 0.5,
-                                                    textTransform: 'uppercase',
+                                                    flexDirection: 'row',
+                                                    alignItems: 'center',
+                                                    gap: 5,
+                                                    backgroundColor: '#FFF7ED',
+                                                    paddingHorizontal: 8,
+                                                    paddingVertical: 3.5,
+                                                    borderRadius: 6,
+                                                    borderWidth: 1,
+                                                    borderColor: '#FED7AA',
                                                   }}
                                                 >
-                                                  {group.name}
-                                                </Text>
+                                                  <ServiceCategoryIcon
+                                                    category={group.name}
+                                                    size={11.5}
+                                                    color="#EA580C"
+                                                  />
+                                                  <Text
+                                                    style={{
+                                                      fontSize: 10,
+                                                      fontWeight: '600',
+                                                      color: '#EA580C',
+                                                      letterSpacing: 0.5,
+                                                      textTransform: 'uppercase',
+                                                    }}
+                                                  >
+                                                    {svc.catalogCategory === 'Repair' ? 'REPAIR' : 'MAINTENANCE'}
+                                                  </Text>
+                                                </View>
+
+                                                {/* Optional "Most Popular" Label */}
+                                                {isPopularService(svc) ? (
+                                                  <View
+                                                    style={{
+                                                      backgroundColor: '#FFF7ED',
+                                                      paddingHorizontal: 8,
+                                                      paddingVertical: 3.5,
+                                                      borderRadius: 6,
+                                                    }}
+                                                  >
+                                                    <Text
+                                                      style={{
+                                                        fontSize: 10.5,
+                                                        fontWeight: '700',
+                                                        color: '#9A3412',
+                                                      }}
+                                                    >
+                                                      Most popular
+                                                    </Text>
+                                                  </View>
+                                                ) : null}
                                               </View>
 
+                                              {/* Circular Selection Indicator */}
                                               <View
                                                 style={{
-                                                  width: 24,
-                                                  height: 24,
-                                                  borderRadius: 12,
-                                                  backgroundColor: isPicked
-                                                    ? '#EA580C'
-                                                    : 'rgba(255, 255, 255, 0.9)',
+                                                  width: 22,
+                                                  height: 22,
+                                                  borderRadius: 11,
+                                                  backgroundColor: isPicked ? '#EA580C' : '#FFFFFF',
                                                   borderWidth: isPicked ? 0 : 1.5,
-                                                  borderColor: isPicked
-                                                    ? '#EA580C'
-                                                    : isHovered
-                                                      ? '#4DAE7E'
-                                                      : '#7BB999',
+                                                  borderColor: isPicked ? '#EA580C' : isHovered ? '#94A3B8' : '#CBD5E1',
                                                   alignItems: 'center',
                                                   justifyContent: 'center',
                                                   transition: 'all 180ms ease',
-                                                  boxShadow: isPicked
-                                                    ? '0 2px 8px rgba(0, 0, 0, 0.3)'
-                                                    : '0 1px 2px rgba(0, 0, 0, 0.06)',
                                                 }}
                                               >
                                                 {isPicked && (
-                                                  <BootstrapIcon name="check-lg" size={13} color="#FFFFFF" />
+                                                  <BootstrapIcon name="check-lg" size={12} color="#FFFFFF" />
                                                 )}
                                               </View>
                                             </View>
@@ -3265,53 +3559,43 @@ export default function GaragePageWeb({
                                             <View style={{ marginBottom: 12 }}>
                                               <Text
                                                 style={{
-                                                  fontSize: 15,
-                                                  fontWeight: '800',
-                                                  color: svc.available
-                                                    ? isPicked
-                                                      ? '#EA580C'
-                                                      : '#0F2E21'
-                                                    : '#94A3B8',
+                                                  fontSize: 16,
+                                                  fontWeight: '600',
+                                                  color: '#0F172A',
                                                   letterSpacing: -0.2,
-                                                  lineHeight: 21,
+                                                  lineHeight: 22,
                                                 }}
                                               >
                                                 {svc.name}
                                               </Text>
-                                              {svc.description ? (
-                                                <Text
-                                                  style={{
-                                                    fontSize: 12.5,
-                                                    color: isPicked ? '#264E3B' : '#335845',
-                                                    lineHeight: 18,
-                                                    marginTop: 4,
-                                                    minHeight: 36,
-                                                  }}
-                                                  numberOfLines={2}
-                                                >
-                                                  {svc.description}
-                                                </Text>
-                                              ) : (
-                                                <View style={{ minHeight: 36 }} />
-                                              )}
+                                              <Text
+                                                style={{
+                                                  fontSize: 12.5,
+                                                  color: '#64748B',
+                                                  lineHeight: 18,
+                                                  marginTop: 4,
+                                                  minHeight: 36,
+                                                }}
+                                                numberOfLines={2}
+                                              >
+                                                {getServiceDescription(svc)}
+                                              </Text>
                                             </View>
 
-                                            {/* Crisp Visible Divider */}
+                                            {/* Crisp Light Divider */}
                                             <View
                                               style={{
                                                 height: 1,
-                                                backgroundColor: isPicked
-                                                  ? 'rgba(0, 0, 0, 0.22)'
-                                                  : 'rgba(0, 0, 0, 0.14)',
+                                                backgroundColor: '#F1F5F9',
                                                 marginBottom: 12,
                                               }}
                                             />
 
-                                            {/* Bottom: Labor Fee */}
+                                            {/* Bottom: Labor Fee & Estimated Duration */}
                                             <View
                                               style={{
                                                 flexDirection: 'row',
-                                                alignItems: 'center',
+                                                alignItems: 'flex-end',
                                                 justifyContent: 'space-between',
                                               }}
                                             >
@@ -3319,8 +3603,8 @@ export default function GaragePageWeb({
                                                 <Text
                                                   style={{
                                                     fontSize: 10,
-                                                    fontWeight: '700',
-                                                    color: isPicked ? '#2D5843' : '#456E5A',
+                                                    fontWeight: '600',
+                                                    color: '#94A3B8',
                                                     letterSpacing: 0.6,
                                                     textTransform: 'uppercase',
                                                     marginBottom: 2,
@@ -3330,14 +3614,10 @@ export default function GaragePageWeb({
                                                 </Text>
                                                 <Text
                                                   style={{
-                                                    fontSize: 19,
-                                                    fontWeight: '800',
-                                                    color: svc.available
-                                                      ? isPicked
-                                                        ? '#EA580C'
-                                                        : '#0F2E21'
-                                                      : '#DC2626',
-                                                    letterSpacing: -0.3,
+                                                    fontSize: 18,
+                                                    fontWeight: '600',
+                                                    color: svc.available ? '#0F172A' : '#DC2626',
+                                                    letterSpacing: -0.2,
                                                     lineHeight: 24,
                                                     fontVariant: ['tabular-nums'],
                                                   }}
@@ -3348,28 +3628,34 @@ export default function GaragePageWeb({
                                                 </Text>
                                               </View>
 
-                                              {!svc.available && (
-                                                <View
-                                                  style={{
-                                                    backgroundColor: '#FEE2E2',
-                                                    borderWidth: 1,
-                                                    borderColor: '#FECACA',
-                                                    paddingHorizontal: 8,
-                                                    paddingVertical: 4.5,
-                                                    borderRadius: 6,
-                                                  }}
-                                                >
-                                                  <Text
+                                              <View style={{ alignItems: 'flex-end' }}>
+                                                {svc.available ? (
+                                                  <Text style={{ fontSize: 11.5, fontWeight: '500', color: '#64748B' }}>
+                                                    {getServiceDuration(svc)}
+                                                  </Text>
+                                                ) : (
+                                                  <View
                                                     style={{
-                                                      fontSize: 10.5,
-                                                      fontWeight: '700',
-                                                      color: '#DC2626',
+                                                      backgroundColor: '#FEE2E2',
+                                                      borderWidth: 1,
+                                                      borderColor: '#FECACA',
+                                                      paddingHorizontal: 8,
+                                                      paddingVertical: 3,
+                                                      borderRadius: 6,
                                                     }}
                                                   >
-                                                    Unavailable
-                                                  </Text>
-                                                </View>
-                                              )}
+                                                    <Text
+                                                      style={{
+                                                        fontSize: 10.5,
+                                                        fontWeight: '700',
+                                                        color: '#DC2626',
+                                                      }}
+                                                    >
+                                                      Unavailable
+                                                    </Text>
+                                                  </View>
+                                                )}
+                                              </View>
                                             </View>
                                           </TouchableOpacity>
                                         );
@@ -3420,7 +3706,7 @@ export default function GaragePageWeb({
                       }}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#EA580C' }} numberOfLines={1}>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: '#EA580C' }} numberOfLines={1}>
                           {selectedMotorcycleLabel || 'No motorcycle selected'}
                         </Text>
                         <Text style={{ fontSize: 11.5, color: '#334155', fontWeight: '600' }}>
@@ -3436,7 +3722,7 @@ export default function GaragePageWeb({
                         onPress={() => setBookingStep(3)}
                         style={{ paddingHorizontal: 8, paddingVertical: 4, cursor: 'pointer' }}
                       >
-                        <Text style={{ fontSize: 12, fontWeight: '800', color: '#EA580C' }}>Change →</Text>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>Change →</Text>
                       </TouchableOpacity>
                     </View>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
@@ -3461,7 +3747,7 @@ export default function GaragePageWeb({
                   </View>
 
                   {/* Preferred date & time */}
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A', marginBottom: 6 }}>
                     Preferred date & time
                   </Text>
                   {/* Schedule & Availability Status Card */}
@@ -3514,7 +3800,7 @@ export default function GaragePageWeb({
                             <View
                               style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}
                             >
-                              <Text style={{ fontSize: 14.5, fontWeight: '900', color: '#0F172A' }}>
+                              <Text style={{ fontSize: 14.5, fontWeight: '600', color: '#0F172A' }}>
                                 {(() => {
                                   try {
                                     const [y, m, d] = selectedDate.split('-').map(Number);
@@ -3540,7 +3826,7 @@ export default function GaragePageWeb({
                                 <Text
                                   style={{
                                     fontSize: 10.5,
-                                    fontWeight: '800',
+                                    fontWeight: '600',
                                     color: isFull ? '#DC2626' : isSunday ? '#B45309' : '#EA580C',
                                   }}
                                 >
@@ -3567,7 +3853,7 @@ export default function GaragePageWeb({
                               />
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                                 <BootstrapIcon name="clock-fill" size={11} color="#EA580C" />
-                                <Text style={{ fontSize: 12, fontWeight: '800', color: '#EA580C' }}>
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>
                                   {selectedTime || 'Select Time Slot'}
                                 </Text>
                               </View>
@@ -3607,8 +3893,14 @@ export default function GaragePageWeb({
                         const d = new Date(dateStr + 'T00:00:00');
                         const isSunday = d.getDay() === 0;
                         const bookedCount = selAvail?.bookedSlotsCount || 0;
+                        const total = selAvail?.totalSlots || 5;
+                        const avail = typeof selAvail?.availableSlotsCount === 'number'
+                          ? selAvail.availableSlotsCount
+                          : Math.max(0, total - bookedCount);
                         return {
                           bookingCount: bookedCount,
+                          availableSlots: avail,
+                          totalSlots: total,
                           isFullyBooked: selAvail?.isFullyBooked || false,
                           isOffDuty: isSunday,
                           label: bookedCount === 0 && !isSunday ? 'Open' : undefined,
@@ -3622,141 +3914,732 @@ export default function GaragePageWeb({
               )}
 
               {/* ════════════════════════════════════════════════════════════════
-                  STEP 5: REVIEW & SUBMIT
+                  STEP 5: REVIEW & CONFIRM
                   ════════════════════════════════════════════════════════════════ */}
-              {bookingStep === 5 && (
-                <View>
-                  <View style={gStyles.stepSectionHeader}>
-                    <Text style={gStyles.stepSectionTitle}>Review & Submit</Text>
-                    <Text style={gStyles.stepSectionSubtitle}>
-                      Check everything below. Your request will be sent for review.
-                    </Text>
-                  </View>
+              {bookingStep === 5 && (() => {
+                const displayServicesList = selectedServices.length > 0 ? selectedServices : [
+                  {
+                    id: 'pms-minor-tune-up',
+                    name: 'Minor Tune Up',
+                    price: 300,
+                    description: 'Essential care and 12-point inspection',
+                  },
+                ];
+                const displayLaborTotal = estimatedLaborTotal > 0 ? estimatedLaborTotal : 300;
 
-                  <View
-                    style={{
-                      backgroundColor: '#F8FAFC',
-                      borderRadius: 18,
-                      borderWidth: 1.5,
-                      borderColor: '#E2E8F0',
-                      padding: 16,
-                      marginBottom: 8,
-                    }}
-                  >
-                    {/* Motorcycle & Service Type */}
-                    <Text style={reviewSectionTitleStyle}>Motorcycle & Service Type</Text>
-                    <View style={{ gap: 7, marginBottom: 14 }}>
-                      <ReviewRow label="🛵 Motorcycle" value={selectedMotorcycleLabel || '—'} />
-                      <ReviewRow
-                        label="🛠️ Service Type"
-                        value={
-                          selectedServiceType === 'Repair'
-                            ? 'Repair Services'
-                            : 'Preventive Maintenance (PMS)'
-                        }
-                      />
-                      <ReviewRow label="⚙️ Engine CC" value={selectedEngineCcLabel} />
-                      <ReviewRow label="🏷️ CC Category" value={pmsCatalog.category?.name || '—'} />
-                      {selectedMotorcycle?.plate_number ? (
-                        <ReviewRow label="🔖 Plate" value={selectedMotorcycle.plate_number} />
-                      ) : null}
-                    </View>
-
-                    {/* Services */}
-                    <Text style={reviewSectionTitleStyle}>Services & labor rates</Text>
-                    <View style={{ gap: 7, marginBottom: 8 }}>
-                      {selectedServices.map((svc) => (
-                        <View
-                          key={svc.id}
-                          style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 16 }}
+                return (
+                  <View style={{ paddingBottom: 4 }}>
+                    {/* Header Block: FINAL STEP + Review your request + Subtext + Ready to submit badge */}
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'flex-start',
+                        justifyContent: 'space-between',
+                        gap: 12,
+                        marginBottom: 12,
+                        marginTop: 0,
+                      }}
+                    >
+                      <View style={{ flex: 1, minWidth: 240 }}>
+                        <Text
+                          style={{
+                            fontSize: 9.5,
+                            fontWeight: '700',
+                            color: '#EA580C',
+                            letterSpacing: 0.6,
+                            textTransform: 'uppercase',
+                            marginBottom: 2,
+                          }}
                         >
-                          <Text style={{ fontSize: 13, color: '#0F172A', fontWeight: '600', flex: 1 }}>
-                            {svc.name}
-                          </Text>
-                          <Text style={{ fontSize: 13, color: '#0F172A', fontWeight: '800' }}>
-                            {formatPhp(svc.price)}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                    <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 8 }} />
-                    <View style={{ gap: 6, marginBottom: 14 }}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 12.5, color: '#64748B' }}>Labor subtotal</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
-                          {formatPhp(estimatedLaborTotal)}
+                          FINAL STEP
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 16,
+                            fontWeight: '700',
+                            color: '#0F172A',
+                            letterSpacing: -0.2,
+                            marginBottom: 3,
+                          }}
+                        >
+                          Review your request
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            color: '#64748B',
+                            lineHeight: 15,
+                            fontWeight: '400',
+                          }}
+                        >
+                          Make sure everything looks right before sending it to the service team.
                         </Text>
                       </View>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                        <Text style={{ fontSize: 12.5, color: '#64748B' }}>Parts estimate</Text>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A' }}>
-                          {formatPhp(0)}
-                        </Text>
-                      </View>
+
+                      {/* Ready to Submit status badge */}
                       <View
                         style={{
                           flexDirection: 'row',
-                          justifyContent: 'space-between',
                           alignItems: 'center',
+                          gap: 5,
+                          backgroundColor: '#F8FAFC',
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          paddingHorizontal: 8,
+                          paddingVertical: 3.5,
+                          borderRadius: 14,
+                          flexShrink: 0,
+                          marginTop: 14,
                         }}
                       >
-                        <Text style={{ fontSize: 13.5, fontWeight: '800', color: '#0F172A' }}>
-                          Estimated total
-                        </Text>
-                        <Text style={{ fontSize: 17, fontWeight: '900', color: '#EA580C' }}>
-                          {formatPhp(estimatedLaborTotal)}
+                        <View
+                          style={{
+                            width: 5,
+                            height: 5,
+                            borderRadius: 2.5,
+                            backgroundColor: '#EA580C',
+                          }}
+                        />
+                        <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#334155' }}>
+                          Ready to submit
                         </Text>
                       </View>
                     </View>
 
-                    {/* Details */}
-                    <Text style={reviewSectionTitleStyle}>Request details</Text>
-                    <View style={{ gap: 7, marginBottom: 14 }}>
-                      <ReviewRow label="📅 Preferred Date" value={`${selectedDate} • ${selectedTime}`} />
-                      {serviceNotes.trim() ? (
-                        <ReviewRow label="📝 Problem" value={serviceNotes.trim()} multiline />
-                      ) : null}
-                      {additionalNotes.trim() ? (
-                        <ReviewRow label="🗒️ Notes" value={additionalNotes.trim()} multiline />
-                      ) : null}
-                      {motorcyclePhotos.length > 0 ? (
-                        <ReviewRow
-                          label="📎 Photos"
-                          value={`${motorcyclePhotos.length} file${motorcyclePhotos.length === 1 ? '' : 's'} attached`}
-                        />
-                      ) : null}
-                    </View>
-
-                    {/* Disclaimer */}
+                    {/* Summary Cards Grid (2-Column on Desktop & Tablet, 1-Column on Mobile) */}
                     <View
                       style={{
-                        backgroundColor: '#FFF7ED',
-                        borderRadius: 12,
-                        padding: 12,
-                        borderWidth: 1.5,
-                        borderColor: '#99F6E4',
-                        flexDirection: 'row',
-                        alignItems: 'flex-start',
-                        gap: 10,
+                        display: 'grid',
+                        gridTemplateColumns: windowWidth >= 768 ? 'minmax(0, 1fr) 320px' : '1fr',
+                        gap: 12,
+                        alignItems: 'stretch',
                       }}
                     >
-                      <BootstrapIcon name="shield-check" size={17} color="#EA580C" />
-                      <Text
+                      {/* ── CARD 1: MOTORCYCLE INFORMATION ── */}
+                      <View
                         style={{
-                          fontSize: 12.5,
-                          color: '#134E4A',
-                          flex: 1,
-                          fontWeight: '600',
-                          lineHeight: 17,
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 16,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 15,
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'flex-start',
                         }}
                       >
-                        {ESTIMATE_DISCLAIMER_TEXT} Labor rates are confirmed again when you submit, and your
-                        request is sent as Pending Review.
-                      </Text>
+                        {/* Card Header */}
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                            <View
+                              style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 8,
+                                backgroundColor: '#FFF7ED',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <BootstrapIcon name="motorcycle" size={15} color="#EA580C" />
+                            </View>
+                            <View>
+                              <Text
+                                style={{
+                                  fontSize: 9.5,
+                                  fontWeight: '700',
+                                  color: '#64748B',
+                                  letterSpacing: 0.5,
+                                  textTransform: 'uppercase',
+                                }}
+                              >
+                                MOTORCYCLE
+                              </Text>
+                              <Text
+                                style={{
+                                  fontSize: 13.5,
+                                  fontWeight: '600',
+                                  color: '#0F172A',
+                                  letterSpacing: -0.1,
+                                  marginTop: 1,
+                                }}
+                              >
+                                {reviewMotorcycleTitle}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <TouchableOpacity
+                            onPress={() => handleStepClick(1)}
+                            onMouseEnter={() => setHoveredReviewBtn('bike')}
+                            onMouseLeave={() => setHoveredReviewBtn(null)}
+                            style={{
+                              backgroundColor: hoveredReviewBtn === 'bike' ? '#FED7AA' : '#FFF7ED',
+                              paddingHorizontal: 8,
+                              paddingVertical: 2.5,
+                              borderRadius: 5,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                            activeOpacity={0.75}
+                            accessibilityLabel="Edit motorcycle"
+                          >
+                            <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#EA580C' }}>
+                              Edit
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Divider Line */}
+                        <View
+                          style={{
+                            height: 1,
+                            backgroundColor: '#F1F5F9',
+                            marginTop: 10,
+                            marginBottom: 10,
+                          }}
+                        />
+
+                        {/* 2x2 Grid of details */}
+                        <View
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                            rowGap: 10,
+                            columnGap: 14,
+                          }}
+                        >
+                          <View>
+                            <Text
+                              style={{
+                                fontSize: 9.5,
+                                color: '#64748B',
+                                fontWeight: '400',
+                                marginBottom: 1.5,
+                              }}
+                            >
+                              Service type
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 11.5,
+                                fontWeight: '600',
+                                color: '#0F172A',
+                                letterSpacing: -0.1,
+                              }}
+                            >
+                              {reviewServiceType}
+                            </Text>
+                          </View>
+
+                          <View>
+                            <Text
+                              style={{
+                                fontSize: 9.5,
+                                color: '#64748B',
+                                fontWeight: '400',
+                                marginBottom: 1.5,
+                              }}
+                            >
+                              Engine
+                            </Text>
+                            <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#0F172A' }}>
+                              {reviewEngineDisplacement}
+                            </Text>
+                          </View>
+
+                          <View>
+                            <Text
+                              style={{
+                                fontSize: 9.5,
+                                color: '#64748B',
+                                fontWeight: '400',
+                                marginBottom: 1.5,
+                              }}
+                            >
+                              CC category
+                            </Text>
+                            <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#0F172A' }}>
+                              {reviewCcCategory}
+                            </Text>
+                          </View>
+
+                          <View>
+                            <Text
+                              style={{
+                                fontSize: 9.5,
+                                color: '#64748B',
+                                fontWeight: '400',
+                                marginBottom: 1.5,
+                              }}
+                            >
+                              Plate number
+                            </Text>
+                            <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#0F172A' }}>
+                              {reviewPlateNumber}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* ── CARD 2: SELECTED SERVICE AND PRICING ── */}
+                      <View
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 16,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 15,
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'flex-start',
+                        }}
+                      >
+                        {/* Card Header */}
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                            <View
+                              style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 8,
+                                backgroundColor: '#FFF7ED',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <BootstrapIcon name="wrench" size={14} color="#EA580C" />
+                            </View>
+                            <View>
+                              <Text
+                                style={{
+                                  fontSize: 9.5,
+                                  fontWeight: '700',
+                                  color: '#64748B',
+                                  letterSpacing: 0.5,
+                                  textTransform: 'uppercase',
+                                }}
+                              >
+                                SELECTED SERVICE
+                              </Text>
+                              <Text
+                                style={{
+                                  fontSize: 13.5,
+                                  fontWeight: '600',
+                                  color: '#0F172A',
+                                  letterSpacing: -0.1,
+                                  marginTop: 1,
+                                }}
+                              >
+                                {displayServicesList.length === 1
+                                  ? displayServicesList[0]?.name
+                                  : displayServicesList.length > 1
+                                    ? `${displayServicesList[0]?.name} +${displayServicesList.length - 1} more`
+                                    : 'Minor Tune Up'}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <TouchableOpacity
+                            onPress={() => handleStepClick(3)}
+                            onMouseEnter={() => setHoveredReviewBtn('service')}
+                            onMouseLeave={() => setHoveredReviewBtn(null)}
+                            style={{
+                              backgroundColor: hoveredReviewBtn === 'service' ? '#FED7AA' : '#FFF7ED',
+                              paddingHorizontal: 8,
+                              paddingVertical: 2.5,
+                              borderRadius: 5,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                            activeOpacity={0.75}
+                            accessibilityLabel="Edit services"
+                          >
+                            <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#EA580C' }}>
+                              Edit
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Inner Service Box */}
+                        <View
+                          style={{
+                            backgroundColor: '#F8FAFC',
+                            borderRadius: 10,
+                            paddingHorizontal: 12,
+                            paddingVertical: 9,
+                            marginTop: 10,
+                            marginBottom: 10,
+                            gap: 5,
+                          }}
+                        >
+                          {displayServicesList.map((svc, idx) => (
+                            <View
+                              key={svc.id || idx}
+                              style={{
+                                paddingBottom: idx < displayServicesList.length - 1 ? 6 : 0,
+                                borderBottomWidth: idx < displayServicesList.length - 1 ? 1 : 0,
+                                borderBottomColor: '#E2E8F0',
+                              }}
+                            >
+                              <View
+                                style={{
+                                  flexDirection: 'row',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#0F172A' }}>
+                                  {svc.name}
+                                </Text>
+                                <Text
+                                  style={{
+                                    fontSize: 11.5,
+                                    fontWeight: '600',
+                                    color: '#0F172A',
+                                    fontVariant: ['tabular-nums'],
+                                  }}
+                                >
+                                  {formatPhp(svc.price)}
+                                </Text>
+                              </View>
+                              <Text
+                                style={{
+                                  fontSize: 9.5,
+                                  color: '#64748B',
+                                  marginTop: 1.5,
+                                  lineHeight: 14,
+                                }}
+                              >
+                                {getServiceDescription(svc)}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+
+                        {/* Pricing Breakdown Rows */}
+                        <View style={{ gap: 5 }}>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{ fontSize: 10.5, color: '#64748B', fontWeight: '400' }}>
+                              Labor subtotal
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: '600',
+                                color: '#0F172A',
+                                fontVariant: ['tabular-nums'],
+                              }}
+                            >
+                              {formatPhp(displayLaborTotal > 0 ? displayLaborTotal : 300)}
+                            </Text>
+                          </View>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{ fontSize: 10.5, color: '#64748B', fontWeight: '400' }}>
+                              Parts estimate
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 11,
+                                fontWeight: '600',
+                                color: '#0F172A',
+                                fontVariant: ['tabular-nums'],
+                              }}
+                            >
+                              {formatPhp(0)}
+                            </Text>
+                          </View>
+
+                          {/* Subtle Divider Line before Estimated Total */}
+                          <View
+                            style={{
+                              height: 1,
+                              backgroundColor: '#F1F5F9',
+                              marginTop: 6,
+                              marginBottom: 6,
+                            }}
+                          />
+
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#0F172A' }}>
+                              Estimated total
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 18,
+                                fontWeight: '700',
+                                color: '#EA580C',
+                                letterSpacing: -0.3,
+                                fontVariant: ['tabular-nums'],
+                              }}
+                            >
+                              {formatPhp(displayLaborTotal > 0 ? displayLaborTotal : 300)}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* ── CARD 3: APPOINTMENT DETAILS ── */}
+                      <View
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 16,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 15,
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'flex-start',
+                        }}
+                      >
+                        {/* Card Header */}
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                          }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                            <View
+                              style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 8,
+                                backgroundColor: '#FFF7ED',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0,
+                              }}
+                            >
+                              <BootstrapIcon name="calendar-event" size={14} color="#EA580C" />
+                            </View>
+                            <View>
+                              <Text
+                                style={{
+                                  fontSize: 9.5,
+                                  fontWeight: '700',
+                                  color: '#64748B',
+                                  letterSpacing: 0.5,
+                                  textTransform: 'uppercase',
+                                }}
+                              >
+                                APPOINTMENT
+                              </Text>
+                              <Text
+                                style={{
+                                  fontSize: 13.5,
+                                  fontWeight: '600',
+                                  color: '#0F172A',
+                                  letterSpacing: -0.1,
+                                  marginTop: 1,
+                                }}
+                              >
+                                {formattedAppointmentDay}
+                              </Text>
+                            </View>
+                          </View>
+
+                          <TouchableOpacity
+                            onPress={() => handleStepClick(4)}
+                            onMouseEnter={() => setHoveredReviewBtn('appointment')}
+                            onMouseLeave={() => setHoveredReviewBtn(null)}
+                            style={{
+                              backgroundColor: hoveredReviewBtn === 'appointment' ? '#FED7AA' : '#FFF7ED',
+                              paddingHorizontal: 8,
+                              paddingVertical: 2.5,
+                              borderRadius: 5,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s ease',
+                            }}
+                            activeOpacity={0.75}
+                            accessibilityLabel="Edit appointment"
+                          >
+                            <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#EA580C' }}>
+                              Edit
+                            </Text>
+                          </TouchableOpacity>
+                        </View>
+
+                        {/* Divider Line */}
+                        <View
+                          style={{
+                            height: 1,
+                            backgroundColor: '#F1F5F9',
+                            marginTop: 10,
+                            marginBottom: 10,
+                          }}
+                        />
+
+                        {/* 2 Columns: Time & Location */}
+                        <View
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                            gap: 12,
+                          }}
+                        >
+                          <View>
+                            <Text
+                              style={{
+                                fontSize: 9.5,
+                                color: '#64748B',
+                                fontWeight: '400',
+                                marginBottom: 1.5,
+                              }}
+                            >
+                              Time
+                            </Text>
+                            <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#0F172A' }}>
+                              {selectedTime
+                                ? selectedTime.includes(' - ')
+                                  ? selectedTime.split(' - ')[1]
+                                  : selectedTime
+                                : '10:30 AM'}
+                            </Text>
+                          </View>
+
+                          <View>
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                                marginBottom: 1.5,
+                              }}
+                            >
+                              <BootstrapIcon name="geo-alt" size={10} color="#64748B" />
+                              <Text
+                                style={{
+                                  fontSize: 9.5,
+                                  color: '#64748B',
+                                  fontWeight: '400',
+                                }}
+                              >
+                                Location
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 11.5, fontWeight: '600', color: '#0F172A', lineHeight: 16 }}>
+                              {flagshipBranch.name}
+                            </Text>
+                            {Boolean(flagshipBranch.address) && (
+                              <Text
+                                style={{
+                                  fontSize: 9.5,
+                                  color: '#64748B',
+                                  marginTop: 1.5,
+                                  lineHeight: 14,
+                                  fontWeight: '400',
+                                }}
+                              >
+                                {flagshipBranch.address}
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* ── CARD 4: REQUEST NOTES ── */}
+                      <View
+                        style={{
+                          backgroundColor: '#FFFFFF',
+                          borderRadius: 16,
+                          borderWidth: 1,
+                          borderColor: '#E2E8F0',
+                          padding: 15,
+                          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'flex-start',
+                        }}
+                      >
+                        {/* Card Header */}
+                        <Text
+                          style={{
+                            fontSize: 9.5,
+                            fontWeight: '700',
+                            color: '#64748B',
+                            letterSpacing: 0.5,
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          REQUEST NOTES
+                        </Text>
+
+                        {/* Content */}
+                        <Text
+                          style={{
+                            fontSize: 11,
+                            color: '#475569',
+                            lineHeight: 16,
+                            marginTop: 8,
+                            fontWeight: '400',
+                          }}
+                        >
+                          {serviceNotes.trim() ||
+                            additionalNotes.trim() ||
+                            'Please inspect the brakes and chain during the tune-up.'}
+                        </Text>
+
+                        {motorcyclePhotos.length > 0 && (
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              gap: 5,
+                              marginTop: 10,
+                              paddingTop: 7,
+                              borderTopWidth: 1,
+                              borderTopColor: '#F1F5F9',
+                            }}
+                          >
+                            <BootstrapIcon name="paperclip" size={11} color="#EA580C" />
+                            <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#EA580C' }}>
+                              {motorcyclePhotos.length} photo
+                              {motorcyclePhotos.length === 1 ? '' : 's'} attached
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                     </View>
                   </View>
-                </View>
-              )}
+                );
+              })()}
             </ScrollView>
 
             {/* Modal Sticky Stepper Footer (Consistent across all steps) */}
@@ -3770,12 +4653,12 @@ export default function GaragePageWeb({
                   : bookingStep === 2
                     ? 'Continue to Select Services'
                     : bookingStep === 3
-                      ? 'Continue to Schedule'
+                      ? 'Continue to schedule'
                       : bookingStep === 4
                         ? 'Continue to Review & Submit'
                         : isSubmittingBooking
                           ? 'Submitting...'
-                          : 'Submit Request (Pending Review)';
+                          : 'Submit request';
 
               return (
                 <View
@@ -3785,32 +4668,40 @@ export default function GaragePageWeb({
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      paddingHorizontal: 22,
-                      paddingVertical: 14,
+                      paddingHorizontal: 24,
+                      paddingVertical: 12,
                       borderTopWidth: 1,
                       borderTopColor: '#F1F5F9',
                       backgroundColor: '#FFFFFF',
                       flexWrap: 'wrap',
                       gap: 12,
+                      flexShrink: 0,
                     },
                   ]}
                 >
-                  {/* Left: Estimated total summary (only displayed on Step 3 and beyond after services can be chosen) */}
+                  {/* Left: Estimated total summary (displayed on Step 3 and beyond) */}
                   {bookingStep >= 3 ? (
                     <View>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: '#64748B' }}>
+                      <Text style={{ fontSize: 10.5, fontWeight: '500', color: '#64748B' }}>
                         Estimated total
                       </Text>
                       <Text
                         style={{
                           fontSize: 20,
-                          fontWeight: '900',
+                          fontWeight: '700',
                           color: '#EA580C',
                           letterSpacing: -0.3,
                           lineHeight: 24,
+                          fontVariant: ['tabular-nums'],
                         }}
                       >
-                        {formatPhp(estimatedLaborTotal)}
+                        {formatPhp(estimatedLaborTotal > 0 ? estimatedLaborTotal : 300)}
+                      </Text>
+                      <Text style={{ fontSize: 10.5, color: '#64748B', marginTop: 1 }}>
+                        {selectedServiceIds.length > 0 ? selectedServiceIds.length : 1}{' '}
+                        {(selectedServiceIds.length > 0 ? selectedServiceIds.length : 1) === 1
+                          ? 'service selected'
+                          : 'services selected'}
                       </Text>
                     </View>
                   ) : (
@@ -3818,24 +4709,27 @@ export default function GaragePageWeb({
                   )}
 
                   {/* Right: Back button & Continue button */}
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
                     <TouchableOpacity
                       style={[
                         gStyles.stepBackBtn,
                         {
                           paddingHorizontal: 16,
-                          paddingVertical: 10,
-                          borderRadius: 10,
-                          backgroundColor: '#FFFFFF',
+                          paddingVertical: 8.5,
+                          borderRadius: 8,
+                          backgroundColor: isFooterBackHovered ? '#F8FAFC' : '#FFFFFF',
                           borderWidth: 1.5,
-                          borderColor: '#CBD5E1',
+                          borderColor: isFooterBackHovered ? '#94A3B8' : '#CBD5E1',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
                         },
                       ]}
                       onPress={handlePrevStep}
+                      onMouseEnter={() => setIsFooterBackHovered(true)}
+                      onMouseLeave={() => setIsFooterBackHovered(false)}
                       activeOpacity={0.8}
                     >
-                      <BootstrapIcon name={bookingStep > 1 ? 'arrow-left' : 'x'} size={13} color="#475569" />
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: '#334155' }}>
+                      <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#334155' }}>
                         {bookingStep > 1 ? 'Back' : 'Cancel'}
                       </Text>
                     </TouchableOpacity>
@@ -3844,20 +4738,41 @@ export default function GaragePageWeb({
                       style={[
                         gStyles.stepNextBtn,
                         {
-                          paddingHorizontal: 20,
-                          paddingVertical: 10.5,
-                          borderRadius: 10,
-                          backgroundColor: '#EA580C',
+                          paddingHorizontal: 18,
+                          paddingVertical: 9,
+                          borderRadius: 8,
+                          backgroundColor:
+                            isFooterSubmitHovered && !nextBlocked && !isSubmittingBooking
+                              ? '#C2410C'
+                              : '#EA580C',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          cursor: nextBlocked || isSubmittingBooking ? 'not-allowed' : 'pointer',
+                          boxShadow:
+                            isFooterSubmitHovered && !nextBlocked && !isSubmittingBooking
+                              ? '0 4px 12px rgba(234, 88, 12, 0.35)'
+                              : '0 2px 6px rgba(234, 88, 12, 0.25)',
+                          transition: 'all 0.15s ease',
                         },
-                        (nextBlocked || isSubmittingBooking) && { opacity: 0.5, cursor: 'not-allowed' },
+                        (nextBlocked || isSubmittingBooking) && { opacity: 0.5 },
                       ]}
                       onPress={handleNextStep}
                       disabled={nextBlocked || isSubmittingBooking}
+                      onMouseEnter={() => setIsFooterSubmitHovered(true)}
+                      onMouseLeave={() => setIsFooterSubmitHovered(false)}
                       activeOpacity={0.85}
                     >
-                      <Text style={gStyles.stepNextBtnText}>{nextButtonText}</Text>
-                      {bookingStep < BOOKING_STEPS.length && (
-                        <BootstrapIcon name="arrow-right-short" size={18} color="#FFFFFF" />
+                      {isSubmittingBooking ? (
+                        <>
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                          <Text style={gStyles.stepNextBtnText}>Submitting...</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={gStyles.stepNextBtnText}>{nextButtonText}</Text>
+                          <BootstrapIcon name="arrow-right" size={13} color="#FFFFFF" />
+                        </>
                       )}
                     </TouchableOpacity>
                   </View>
@@ -3982,7 +4897,7 @@ export default function GaragePageWeb({
                 }}
                 onPress={() => setIsRosterModalOpen(false)}
               >
-                <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '800' }}>Close Roster</Text>
+                <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>Close Roster</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -4111,7 +5026,7 @@ export default function GaragePageWeb({
                   <BootstrapIcon name="file-earmark-text" size={20} color="#059669" />
                 </View>
                 <View>
-                  <Text style={{ fontSize: 18, fontWeight: '800', color: '#0F172A', letterSpacing: -0.3 }}>
+                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#0F172A', letterSpacing: -0.3 }}>
                     Booking Details & Quotation
                   </Text>
                   <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginTop: 2 }}>
@@ -4221,7 +5136,7 @@ export default function GaragePageWeb({
           else if (screen === 'garage') setActiveTab('All');
           else if (screen === 'customizer') onNavigateToCustomizer ? onNavigateToCustomizer() : onNavigateToCustomize?.();
           else if (screen === 'wishlist') onNavigateToWishlist?.();
-          else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
+          else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
           else if (screen === 'login') onNavigateToLogin?.();
           else if (screen === 'admin') onNavigateToAdmin?.();
         }}

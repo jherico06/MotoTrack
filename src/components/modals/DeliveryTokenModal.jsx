@@ -301,14 +301,14 @@ export default function DeliveryTokenModal({
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <Text style={styles.slipKicker}>Commercial Shipping Package</Text>
                   <View style={{ backgroundColor: isDark ? '#132A26' : '#FFF7ED', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '800', color: '#EA580C', fontFamily: 'monospace' }}>
+                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#EA580C', fontFamily: 'monospace' }}>
                       Item Nº: {slip.itemNo}
                     </Text>
                   </View>
                 </View>
 
                 {slip.productName ? (
-                  <Text style={{ fontSize: 14, fontWeight: '800', color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 6 }}>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 6 }}>
                     {slip.productName}
                   </Text>
                 ) : null}
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  title: { fontSize: 16, fontWeight: '800', color: '#0F172A', flex: 1 },
+  title: { fontSize: 16, fontWeight: '700', color: '#0F172A', flex: 1 },
   closeBtn: {
     width: 32,
     height: 32,
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 12,
   },
-  warnTitle: { fontSize: 13, fontWeight: '800', color: '#92400E', marginBottom: 4 },
+  warnTitle: { fontSize: 13, fontWeight: '600', color: '#92400E', marginBottom: 4 },
   warnBody: { fontSize: 12, color: '#78350F', lineHeight: 17 },
   qr: {
     width: 220,
@@ -461,13 +461,13 @@ const styles = StyleSheet.create({
   },
   slipKicker: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#143325',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
     marginBottom: 4,
   },
-  slipName: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
+  slipName: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
   slipLine: { fontSize: 13, fontWeight: '700', color: '#334155', marginTop: 2 },
   slipAddr: { fontSize: 13, color: '#475569', lineHeight: 18, marginTop: 4 },
   slipItems: { fontSize: 12, color: '#143325', marginTop: 8, lineHeight: 17 },
@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  primaryBtnText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  primaryBtnText: { color: '#fff', fontWeight: '600', fontSize: 14 },
   ghostBtn: {
     borderRadius: 12,
     height: 44,

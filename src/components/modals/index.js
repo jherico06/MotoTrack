@@ -22,6 +22,9 @@ export { default as EditCustomerSettingsModal } from './EditCustomerSettingsModa
 export { default as EditBrandModal } from './EditBrandModal.jsx';
 export { default as StaffAccountSettingsModal } from './StaffAccountSettingsModal.jsx';
 export { default as AdminAccountSettingsModal } from './AdminAccountSettingsModal.jsx';
+export { default as AdminPinSettingsModal } from './AdminPinSettingsModal.jsx';
 export { default as AdminOrderDetailsModal } from './AdminOrderDetailsModal.jsx';
 export { default as BookInstallationModal } from './BookInstallationModal.jsx';
+export { default as RequireLoginModal } from './RequireLoginModal.jsx';
+export { default as CustomerSubmitReportModal } from './CustomerSubmitReportModal.jsx';
 

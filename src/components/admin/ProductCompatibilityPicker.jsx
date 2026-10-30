@@ -244,7 +244,7 @@ function createStyles(t, isDark) {
       padding: 12,
       marginTop: 12,
     },
-    title: { fontSize: 14, fontWeight: '800', color: t.textPrimary },
+    title: { fontSize: 14, fontWeight: '600', color: t.textPrimary },
     sub: { fontSize: 12, color: t.textMuted, marginTop: 4, marginBottom: 8 },
     addForm: {
       flexDirection: 'row',

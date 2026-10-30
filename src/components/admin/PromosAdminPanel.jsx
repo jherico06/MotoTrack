@@ -114,7 +114,7 @@ function buildPromoModalStyles(tokens, isDark) {
     },
     title: {
       fontSize: 18,
-      fontWeight: '800',
+      fontWeight: '600',
       color: text,
       letterSpacing: -0.3,
       lineHeight: 24,
@@ -154,7 +154,7 @@ function buildPromoModalStyles(tokens, isDark) {
     },
     sectionTitle: {
       fontSize: 13,
-      fontWeight: '800',
+      fontWeight: '600',
       color: text,
       letterSpacing: -0.1,
     },
@@ -202,7 +202,7 @@ function buildPromoModalStyles(tokens, isDark) {
     },
     typeTitle: {
       fontSize: 13.5,
-      fontWeight: '800',
+      fontWeight: '600',
       color: text,
       letterSpacing: -0.1,
     },
@@ -262,7 +262,7 @@ function buildPromoModalStyles(tokens, isDark) {
     },
     suffix: {
       fontSize: 14,
-      fontWeight: '800',
+      fontWeight: '600',
       color: text,
       minWidth: 18,
     },
@@ -497,7 +497,7 @@ function buildPromoModalStyles(tokens, isDark) {
     },
     selectedTitle: {
       fontSize: 11.5,
-      fontWeight: '800',
+      fontWeight: '600',
       color: isDark ? '#A7F3D0' : BRAND,
       marginBottom: 2,
     },
@@ -516,21 +516,21 @@ function buildPromoModalStyles(tokens, isDark) {
     },
     previewEyebrow: {
       fontSize: 10.5,
-      fontWeight: '800',
+      fontWeight: '600',
       letterSpacing: 0.7,
       color: isDark ? '#A7F3D0' : '#166534',
       textTransform: 'uppercase',
     },
     previewCode: {
       fontSize: 17,
-      fontWeight: '800',
+      fontWeight: '600',
       color: text,
       fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
       letterSpacing: 0.4,
     },
     previewHeadline: {
       fontSize: 14,
-      fontWeight: '800',
+      fontWeight: '600',
       color: isDark ? '#A7F3D0' : BRAND,
       marginTop: -2,
     },
@@ -586,7 +586,7 @@ function buildPromoModalStyles(tokens, isDark) {
     },
     btnPrimaryText: {
       fontSize: 13,
-      fontWeight: '800',
+      fontWeight: '600',
       color: '#FFFFFF',
     },
   });
@@ -1413,7 +1413,7 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
                           borderRadius: 6,
                         }}
                       >
-                        <Text style={{ fontSize: 10, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '600', color: '#FFFFFF', letterSpacing: 0.5 }}>
                           ACTIVE BANNER PHOTO
                         </Text>
                       </View>
@@ -1728,11 +1728,11 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
                         zIndex: 2,
                       }}
                     >
-                      <Text style={{ fontSize: 9.5, fontWeight: '800', color: BRAND, letterSpacing: 0.5 }}>
+                      <Text style={{ fontSize: 9.5, fontWeight: '600', color: BRAND, letterSpacing: 0.5 }}>
                         HERO BANNER PREVIEW
                       </Text>
                       <Text
-                        style={{ fontSize: 13, fontWeight: '900', color: '#FFFFFF', marginTop: 2 }}
+                        style={{ fontSize: 13, fontWeight: '600', color: '#FFFFFF', marginTop: 2 }}
                         numberOfLines={1}
                       >
                         {preview.headline}

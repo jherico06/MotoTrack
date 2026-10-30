@@ -240,7 +240,7 @@ const navStyles = StyleSheet.create({
   aiBadgeText: {
     color: '#FFFFFF',
     fontSize: 7,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.2,
   },
   activeUnderline: {

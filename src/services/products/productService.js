@@ -20,6 +20,8 @@ let realtimeChannel = null;
 let productFetchCache = null;
 const PRODUCT_FETCH_TTL_MS = CACHE_TTL.PRODUCTS_MS;
 
+import { categoryService, DB_SEEDED_CATEGORIES } from './categoryService.js';
+
 /**
  * Map admin UI category labels (and aliases) → categories.category_id
  * Seeded IDs from 009_normalize_schema.sql
@@ -53,6 +55,14 @@ function categoryIdFromName(name) {
     .toLowerCase()
     .replace(/\s+/g, ' ');
   if (!key) return 'cat-03';
+
+  // Check dynamic categories from categoryService cache first
+  const dynamicCats = categoryService._cache || DB_SEEDED_CATEGORIES;
+  const dynamicMatch = dynamicCats.find(
+    (c) => c.name.toLowerCase() === key || (c.category_id && c.category_id.toLowerCase() === key)
+  );
+  if (dynamicMatch?.category_id) return dynamicMatch.category_id;
+
   if (CATEGORY_ID_BY_NAME[key]) return CATEGORY_ID_BY_NAME[key];
   // Partial / contains match for compound labels
   if (key.includes('tire') || key.includes('wheel') || key.includes('rim')) return 'cat-02';
@@ -1169,16 +1179,21 @@ export const productService = {
           .order('created_at', { ascending: false })
           .limit(40);
         if (!error && Array.isArray(data)) {
-          return data.map((r) => ({
-            id: r.review_id,
-            review_id: r.review_id,
-            productId: r.product_id,
-            orderId: r.order_id,
-            customerName: r.customer_name || 'Rider',
-            rating: Number(r.rating) || 5,
-            comment: r.comment || '',
-            createdAt: r.created_at,
-          }));
+          return data
+            .filter((r) => {
+              const rId = String(r.review_id || r.id || '');
+              return !rId.startsWith('rev-demo-') && r.customer_name !== 'Marco R.' && r.customer_name !== 'Aya Santos';
+            })
+            .map((r) => ({
+              id: r.review_id,
+              review_id: r.review_id,
+              productId: r.product_id,
+              orderId: r.order_id,
+              customerName: r.customer_name || 'Rider',
+              rating: Number(r.rating) || 5,
+              comment: r.comment || '',
+              createdAt: r.created_at,
+            }));
         }
       }
     } catch (e) {
@@ -1190,7 +1205,19 @@ export const productService = {
       const all = raw ? JSON.parse(raw) : [];
       if (!Array.isArray(all)) return [];
       return all
-        .filter((r) => String(r.productId || r.product_id) === id)
+        .filter((r) => {
+          const rId = String(r.review_id || r.id || '');
+          if (
+            rId.startsWith('rev-demo-') ||
+            r.customer_name === 'Marco R.' ||
+            r.customer_name === 'Aya Santos' ||
+            r.customerName === 'Marco R.' ||
+            r.customerName === 'Aya Santos'
+          ) {
+            return false;
+          }
+          return String(r.productId || r.product_id) === id;
+        })
         .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
     } catch {
       return [];

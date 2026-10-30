@@ -7,7 +7,7 @@
 | Node.js | Open Source |
 | Express.js | Open Source |
 | Supabase (PostgreSQL) | Open Source |
-| Google Gemini AI SDK | Free Tier |
+| Google Gemini AI API | $30 credits |
 | Visual Studio Code | Open Source |
 | Git & GitHub | Open Source |
 | Postman | Free Tier |

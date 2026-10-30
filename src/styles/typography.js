@@ -2,7 +2,7 @@
  * MOTOTRACK Typography System
  * 
  * Single source of truth for all typography standards across MOTOTRACK.
- * Font Family: Plus Jakarta Sans (ONLY approved font family).
+ * Font Family: Inter.
  * 
  * Standards:
  * - Page headers: 20px, weight 700
@@ -20,34 +20,34 @@
 import { Platform } from 'react-native';
 
 /**
- * Approved Font Family Stack — Plus Jakarta Sans strictly.
+ * Approved Font Family Stack — Inter.
  * System fallbacks are standard OS fallbacks only, no secondary brand fonts.
  */
 export const fontFamily = {
   sans: Platform.select({
-    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-    default: 'PlusJakartaSans',
+    web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+    default: 'Inter',
   }),
   // Weight-specific font names for Native platforms
   regular: Platform.select({
-    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    default: 'PlusJakartaSans-Regular',
+    web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    default: 'Inter-Regular',
   }),
   medium: Platform.select({
-    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    default: 'PlusJakartaSans-Medium',
+    web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    default: 'Inter-Medium',
   }),
   semiBold: Platform.select({
-    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    default: 'PlusJakartaSans-SemiBold',
+    web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    default: 'Inter-SemiBold',
   }),
   bold: Platform.select({
-    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    default: 'PlusJakartaSans-Bold',
+    web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    default: 'Inter-Bold',
   }),
   extraBold: Platform.select({
-    web: "'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
-    default: 'PlusJakartaSans-ExtraBold',
+    web: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+    default: 'Inter-Bold',
   }),
 };
 
@@ -59,7 +59,7 @@ export const fontWeights = {
   medium: '500',
   semiBold: '600',
   bold: '700',
-  extraBold: '800',
+  extraBold: '700',
 };
 
 /**
@@ -121,21 +121,21 @@ export const typography = {
     letterSpacing: letterSpacings.snug,
   },
 
-  // Section headers: 16px, weight 700
+  // Section headers: 16px, weight 600 (SemiBold)
   sectionHeader: {
     fontFamily: fontFamily.sans,
     fontSize: fontSizes.sectionHeader,
     lineHeight: lineHeights.sectionHeader,
-    fontWeight: fontWeights.bold,
+    fontWeight: fontWeights.semiBold,
     letterSpacing: letterSpacings.snug,
   },
 
-  // KPI figures: 28–32px, weight 800 with tabular numbers
+  // KPI figures: 28–30px, weight 700 with tabular numbers
   kpiFigure: {
     fontFamily: fontFamily.sans,
     fontSize: fontSizes.kpi,
     lineHeight: lineHeights.kpi,
-    fontWeight: fontWeights.extraBold,
+    fontWeight: fontWeights.bold,
     letterSpacing: letterSpacings.tight,
     fontVariant: ['tabular-nums'],
   },
@@ -144,7 +144,7 @@ export const typography = {
     fontFamily: fontFamily.sans,
     fontSize: fontSizes.kpiSm,
     lineHeight: 32,
-    fontWeight: fontWeights.extraBold,
+    fontWeight: fontWeights.bold,
     letterSpacing: letterSpacings.tight,
     fontVariant: ['tabular-nums'],
   },
@@ -275,14 +275,23 @@ export const typography = {
     fontFamily: fontFamily.sans,
     fontSize: fontSizes.sidebarNav,
     lineHeight: lineHeights.sidebarNav,
+    fontWeight: fontWeights.semiBold,
+    fontVariant: ['tabular-nums'],
+  },
+  currencyTotal: {
+    fontFamily: fontFamily.sans,
+    fontSize: 18,
+    lineHeight: 24,
     fontWeight: fontWeights.bold,
+    letterSpacing: letterSpacings.snug,
     fontVariant: ['tabular-nums'],
   },
   currencyLg: {
     fontFamily: fontFamily.sans,
-    fontSize: fontSizes.sectionHeader,
-    lineHeight: lineHeights.sectionHeader,
-    fontWeight: fontWeights.extraBold,
+    fontSize: fontSizes.pageHeader,
+    lineHeight: lineHeights.pageHeader,
+    fontWeight: fontWeights.bold,
+    letterSpacing: letterSpacings.snug,
     fontVariant: ['tabular-nums'],
   },
 };

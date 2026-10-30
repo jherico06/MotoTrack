@@ -66,7 +66,7 @@ export default function EditBrandModal({
       const trimmedName = storeName.trim() || 'MotoTrack';
       const trimmedTagline = (storeTagline || '').trim();
 
-      const res = systemSettingsService.saveSettings({
+      const res = await systemSettingsService.saveSettings({
         storeName: trimmedName,
         storeTagline: trimmedTagline,
         storeLogoUrl: storeLogoUrl.trim(),
@@ -148,7 +148,7 @@ export default function EditBrandModal({
                 <BootstrapIcon name="palette" size={20} color="#EA580C" />
               </View>
               <View>
-                <Text style={{ fontSize: 17, fontWeight: '800', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                <Text style={{ fontSize: 17, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
                   Edit System Name & Logo
                 </Text>
                 <Text style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 2 }}>
@@ -185,7 +185,7 @@ export default function EditBrandModal({
               <Text
                 style={{
                   fontSize: 12,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: isDarkMode ? '#94A3B8' : '#475569',
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
@@ -220,7 +220,7 @@ export default function EditBrandModal({
               <Text
                 style={{
                   fontSize: 12,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: isDarkMode ? '#94A3B8' : '#475569',
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
@@ -255,7 +255,7 @@ export default function EditBrandModal({
               <Text
                 style={{
                   fontSize: 12,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: isDarkMode ? '#94A3B8' : '#475569',
                   textTransform: 'uppercase',
                   letterSpacing: 0.5,
@@ -310,7 +310,7 @@ export default function EditBrandModal({
                 )}
 
                 <View style={{ flex: 1, gap: 8 }}>
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
                     {storeLogoUrl ? 'Custom Logo Asset Active' : 'Default MotoTrack Emblem Active'}
                   </Text>
                   <Text style={{ fontSize: 11.5, color: isDarkMode ? '#94A3B8' : '#64748B' }}>
@@ -334,7 +334,7 @@ export default function EditBrandModal({
                       activeOpacity={0.85}
                     >
                       <BootstrapIcon name="cloud-arrow-up-fill" size={14} color="#FFFFFF" />
-                      <Text style={{ fontSize: 12, fontWeight: '800', color: '#FFFFFF' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFFFFF' }}>
                         Upload Logo File
                       </Text>
                     </TouchableOpacity>
@@ -437,7 +437,7 @@ export default function EditBrandModal({
               activeOpacity={0.85}
             >
               <BootstrapIcon name="check-lg" size={15} color="#FFFFFF" />
-              <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: '#FFFFFF' }}>
                 {isSaving ? 'Saving...' : 'Save Brand Changes'}
               </Text>
             </TouchableOpacity>

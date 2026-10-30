@@ -22,9 +22,27 @@ function getApiBaseUrl() {
   if (fromEnv && fromEnv.startsWith('https://')) return fromEnv.replace(/\/+$/, '');
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location?.hostname) {
-      const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
-      return `${proto}//${window.location.hostname}:8787`;
+      const hostname = window.location.hostname;
+      const isLocalhost =
+        hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        hostname === '0.0.0.0';
+
+      if (isLocalhost) {
+        if (fromEnv && fromEnv.startsWith('http://') && !fromEnv.includes('192.168.')) {
+          return fromEnv.replace(/\/+$/, '');
+        }
+        const proto = window.location.protocol === 'https:' ? 'https:' : 'http:';
+        return `${proto}//${hostname}:8787`;
+      }
+
+      if (fromEnv && fromEnv.startsWith('https://')) {
+        return fromEnv.replace(/\/+$/, '');
+      }
+
+      return window.location.origin;
     }
+    if (fromEnv) return fromEnv.replace(/\/+$/, '');
     return 'http://127.0.0.1:8787';
   }
   if (fromEnv) return fromEnv.replace(/\/+$/, '');

@@ -62,8 +62,7 @@ class MotorcycleService {
     this.listeners = new Set();
     this.motorcycles = this._loadLocal();
     this._syncPromise = null;
-    // Background sync on init
-    this.syncFromSupabase();
+    // Note: Do not run unrestricted sync on init. Sync only when an authenticated user context is provided.
   }
 
   _loadLocal() {
@@ -76,7 +75,7 @@ class MotorcycleService {
           return parsed.filter((p) => !String(p.motorcycle_id || '').startsWith('moto-seed-'));
         }
       }
-    } catch (_e) {}
+    } catch (_e) { }
     return [];
   }
 
@@ -84,7 +83,7 @@ class MotorcycleService {
     this.motorcycles = list;
     try {
       appStorage.setItem(STORAGE_KEY, JSON.stringify(list));
-    } catch (_e) {}
+    } catch (_e) { }
     this._notify();
   }
 
@@ -92,19 +91,23 @@ class MotorcycleService {
     this.listeners.forEach((cb) => {
       try {
         cb(this.motorcycles);
-      } catch (_e) {}
+      } catch (_e) { }
     });
   }
 
   subscribe(callback) {
-    if (typeof callback !== 'function') return () => {};
+    if (typeof callback !== 'function') return () => { };
     this.listeners.add(callback);
     return () => {
       this.listeners.delete(callback);
     };
   }
 
-  async syncFromSupabase(userId, customerEmail) {
+  async syncFromSupabase(userId, customerEmail, { allowAll = false } = {}) {
+    if (!userId && !customerEmail && !allowAll) {
+      return [];
+    }
+
     if (this._syncPromise) return this._syncPromise;
 
     this._syncPromise = (async () => {
@@ -131,9 +134,23 @@ class MotorcycleService {
         const { data, error } = await query;
 
         if (!error && Array.isArray(data)) {
-          const hasChanged = JSON.stringify(this.motorcycles) !== JSON.stringify(data);
+          let nextList = [];
+          if (userId || customerEmail) {
+            const cleanUid = userId ? String(userId).trim() : '';
+            const cleanEmail = customerEmail ? String(customerEmail).trim().toLowerCase() : '';
+            const others = this.motorcycles.filter((m) => {
+              if (cleanUid && (m.user_id === cleanUid || m.customer_id === cleanUid)) return false;
+              if (cleanEmail && String(m.customer_email || '').trim().toLowerCase() === cleanEmail) return false;
+              return true;
+            });
+            nextList = [...others, ...data];
+          } else {
+            nextList = data;
+          }
+
+          const hasChanged = JSON.stringify(this.motorcycles) !== JSON.stringify(nextList);
           if (hasChanged) {
-            this._saveLocal(data);
+            this._saveLocal(nextList);
           }
           return data;
         }
@@ -153,7 +170,7 @@ class MotorcycleService {
    */
   getMotorcycles(userId, customerId, customerEmail) {
     if (!userId && !customerId && !customerEmail) {
-      return [...this.motorcycles];
+      return [];
     }
     const cleanUid = userId ? String(userId).trim() : '';
     const cleanCid = customerId ? String(customerId).trim() : '';
@@ -167,11 +184,19 @@ class MotorcycleService {
     });
   }
 
+  /**
+   * Get all motorcycles across all customers (admin only)
+   */
+  getAllMotorcycles() {
+    return [...this.motorcycles];
+  }
+
   getMotorcycleById(id) {
     return this.motorcycles.find((m) => m.motorcycle_id === id) || null;
   }
 
   getPrimaryMotorcycle(userId, customerId, customerEmail) {
+    if (!userId && !customerId && !customerEmail) return null;
     const list = this.getMotorcycles(userId, customerId, customerEmail);
     return list.find((m) => m.is_primary) || list[0] || null;
   }
@@ -282,7 +307,7 @@ class MotorcycleService {
           fileName: `motorcycles/${motorcycleId}-${Date.now()}.jpg`,
         });
         if (resolved.url) nextPhoto = resolved.url;
-      } catch (_e) {}
+      } catch (_e) { }
     }
 
     const updatedRecord = {
@@ -407,7 +432,7 @@ class MotorcycleService {
           .update({ is_primary: true })
           .eq('motorcycle_id', motorcycleId);
       }
-    } catch (_e) {}
+    } catch (_e) { }
 
     return { success: true };
   }

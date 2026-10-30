@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 10,
   },
-  title: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
+  title: { fontSize: 17, fontWeight: '700', color: '#0F172A' },
   closeBtn: {
     width: 32,
     height: 32,
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ECFDF5',
   },
   riderAvatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#E2E8F0' },
-  riderName: { fontSize: 13.5, fontWeight: '800', color: '#0F172A' },
+  riderName: { fontSize: 13.5, fontWeight: '600', color: '#0F172A' },
   riderSub: { fontSize: 11.5, color: '#64748B', marginTop: 2 },
   riderStatus: { fontSize: 10.5, fontWeight: '700', color: '#EA580C', marginTop: 2 },
   summaryBox: {
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 4,
   },
-  summaryTitle: { fontSize: 11, fontWeight: '800', color: '#64748B', marginBottom: 4, textTransform: 'uppercase' },
+  summaryTitle: { fontSize: 11, fontWeight: '600', color: '#64748B', marginBottom: 4, textTransform: 'uppercase' },
   summaryLine: { fontSize: 12.5, color: '#334155', fontWeight: '600' },
   checkRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
   checkbox: {
@@ -484,5 +484,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
+  primaryBtnText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
 });

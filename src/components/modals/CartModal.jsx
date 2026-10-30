@@ -275,7 +275,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                           <Text
                             style={{
                               fontSize: 11,
-                              fontWeight: '800',
+                              fontWeight: '500',
                               color: isSelected ? '#FFFFFF' : '#0F172A',
                             }}
                           >
@@ -306,7 +306,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                     style={[styles.checkoutBtn, { marginTop: 0, paddingHorizontal: 16, height: 42 }]}
                     onPress={() => applyPromo(promoCode)}
                   >
-                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Apply</Text>
+                    <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13 }}>Apply</Text>
                   </TouchableOpacity>
                 </View>
               </View>

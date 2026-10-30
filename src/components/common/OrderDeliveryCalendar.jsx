@@ -316,7 +316,7 @@ export default function OrderDeliveryCalendar({
                         styles.dayNumber,
                         {
                           color: numColor,
-                          fontWeight: isSelected || isToday ? '800' : '600',
+                          fontWeight: isSelected || isToday ? '600' : '500',
                         },
                       ]}
                     >
@@ -344,7 +344,7 @@ export default function OrderDeliveryCalendar({
                           color: isSelected
                             ? (isDarkMode ? '#A7F3D0' : '#EA580C')
                             : (isDarkMode ? '#94A3B8' : '#64748B'),
-                          fontWeight: isSelected ? '800' : '600',
+                          fontWeight: isSelected ? '600' : '500',
                         },
                       ]}
                     >
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   },
   monthTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     fontFamily: Platform.OS === 'web' ? 'Georgia, "Playfair Display", serif' : undefined,
     letterSpacing: -0.2,
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   },
   weekendText: {
     fontSize: 8,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#B45309',
     letterSpacing: 0.2,
   },

@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 22,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: -0.4,
     lineHeight: 26,
@@ -196,13 +196,13 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: -0.2,
   },
   statValueAccent: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: -0.3,
   },
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
   dutyPillText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   actions: {
     flexDirection: 'row',
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   },
   primaryBtnText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: -0.1,
   },

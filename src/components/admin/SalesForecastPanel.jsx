@@ -437,7 +437,7 @@ export default function SalesForecastPanel({
           }}
         >
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Text style={{ fontSize: 15, fontWeight: '800', color: tokens.foreground }}>{title}</Text>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: tokens.foreground }}>{title}</Text>
             <TouchableOpacity onPress={onClose}>
               <BootstrapIcon name="x-lg" size={16} color={tokens.mutedForeground} />
             </TouchableOpacity>
@@ -522,7 +522,7 @@ export default function SalesForecastPanel({
                   <BootstrapIcon name="box-seam" size={18} color={tokens.primary} />
                 </View>
                 <View>
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.foreground }}>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.foreground }}>
                     Select motorcycle part
                   </Text>
                   <Text style={{ fontSize: 11.5, color: tokens.mutedForeground, marginTop: 1 }}>
@@ -990,7 +990,7 @@ export default function SalesForecastPanel({
                     <Text
                       style={{
                         fontSize: 11.5,
-                        fontWeight: '800',
+                        fontWeight: '600',
                         color: tokens.mutedForeground,
                         letterSpacing: 0.5,
                       }}
@@ -1134,7 +1134,7 @@ export default function SalesForecastPanel({
                       borderBottomColor: tokens.border,
                     }}
                   >
-                    <Text style={{ fontSize: 12, fontWeight: '800', color: tokens.mutedForeground, letterSpacing: 0.5 }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.mutedForeground, letterSpacing: 0.5 }}>
                       HISTORY DATE RANGE
                     </Text>
                     <TouchableOpacity onPress={() => setLookbackPickerOpen(false)}>
@@ -1288,7 +1288,7 @@ export default function SalesForecastPanel({
           ]}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Text style={{ fontSize: 12, fontWeight: '800', color: tokens.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.5 }}>
               Forecast Confidence
             </Text>
             <View
@@ -1313,7 +1313,7 @@ export default function SalesForecastPanel({
               <Text
                 style={{
                   fontSize: 12,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color:
                     forecast.confidence?.level === 'HIGH'
                       ? '#059669'
@@ -1330,13 +1330,13 @@ export default function SalesForecastPanel({
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
             <Text style={{ fontSize: 12, color: tokens.mutedForeground, fontWeight: '600' }}>
               Historical periods:{' '}
-              <Text style={{ color: tokens.foreground, fontWeight: '800' }}>
+              <Text style={{ color: tokens.foreground, fontWeight: '600' }}>
                 {forecast.distinctPeriods ?? forecast.historical?.length ?? 0}
               </Text>
             </Text>
             <Text style={{ fontSize: 12, color: tokens.mutedForeground, fontWeight: '600' }}>
               Demand events:{' '}
-              <Text style={{ color: tokens.foreground, fontWeight: '800' }}>
+              <Text style={{ color: tokens.foreground, fontWeight: '600' }}>
                 {forecast.sba?.nonZeroObservations ?? 0}
               </Text>
             </Text>
@@ -1386,7 +1386,7 @@ export default function SalesForecastPanel({
             <Text
               style={{
                 fontSize: 13,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: tokens.foreground,
                 textTransform: 'uppercase',
                 letterSpacing: 0.5,
@@ -1405,7 +1405,7 @@ export default function SalesForecastPanel({
                 <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.mutedForeground }}>
                   Forecast Confidence
                 </Text>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: '#D97706', marginTop: 2 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: '#D97706', marginTop: 2 }}>
                   Low
                 </Text>
               </View>
@@ -1413,7 +1413,7 @@ export default function SalesForecastPanel({
                 <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.mutedForeground }}>
                   Historical Periods
                 </Text>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.foreground, marginTop: 2 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.foreground, marginTop: 2 }}>
                   {forecast.limitedDataMessage?.periods ?? forecast.distinctPeriods ?? 0}
                 </Text>
               </View>
@@ -1421,7 +1421,7 @@ export default function SalesForecastPanel({
                 <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.mutedForeground }}>
                   Demand Events
                 </Text>
-                <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.foreground, marginTop: 2 }}>
+                <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.foreground, marginTop: 2 }}>
                   {forecast.limitedDataMessage?.demandEvents ?? forecast.sba?.nonZeroObservations ?? 0}
                 </Text>
               </View>
@@ -1564,10 +1564,10 @@ export default function SalesForecastPanel({
                   backgroundColor: isDarkMode ? 'rgba(255,255,255,0.03)' : '#F8FAFC',
                 }}
               >
-                <Text style={{ fontSize: 11, fontWeight: '800', color: tokens.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: tokens.mutedForeground, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   Sales Trend
                 </Text>
-                <Text style={{ fontSize: 18, fontWeight: '800', color: tokens.foreground, marginTop: 6 }}>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.foreground, marginTop: 6 }}>
                   {forecast?.trendLabel}
                   {forecast?.trendPct != null ? (
                     <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.mutedForeground }}>
@@ -1605,7 +1605,7 @@ export default function SalesForecastPanel({
                 marginBottom: 12,
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '800', color: '#D97706' }}>
+              <Text style={{ fontSize: 13, fontWeight: '600', color: '#D97706' }}>
                 ⚠ Below reorder point
               </Text>
             </View>
@@ -1656,7 +1656,7 @@ export default function SalesForecastPanel({
                 alignItems: 'center',
               }}
             >
-              <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 13 }}>Restock</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 13 }}>Restock</Text>
             </TouchableOpacity>
           ) : null}
 
@@ -1718,7 +1718,7 @@ export default function SalesForecastPanel({
               </Text>
               {(forecast.whyReasons || []).map((reason, idx) => (
                 <View key={idx} style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
-                  <Text style={{ color: '#059669', fontWeight: '800' }}>✓</Text>
+                  <Text style={{ color: '#059669', fontWeight: '600' }}>✓</Text>
                   <Text style={{ flex: 1, fontSize: 13, color: tokens.foreground, lineHeight: 19 }}>
                     {reason}
                   </Text>
@@ -1741,7 +1741,7 @@ export default function SalesForecastPanel({
             </Text>
           ) : (
             <>
-              <Text style={{ fontSize: 16, fontWeight: '800', color: tokens.foreground, marginBottom: 12 }}>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.foreground, marginBottom: 12 }}>
                 {forecast.productName || selectedName}
               </Text>
               <View style={styles.metaGrid}>
@@ -1779,7 +1779,7 @@ export default function SalesForecastPanel({
                     paddingVertical: 9,
                   }}
                 >
-                  <Text style={{ color: '#FFF', fontWeight: '800', fontSize: 12.5 }}>
+                  <Text style={{ color: '#FFF', fontWeight: '600', fontSize: 12.5 }}>
                     Create Purchase Order
                   </Text>
                 </TouchableOpacity>
@@ -1914,7 +1914,7 @@ export default function SalesForecastPanel({
                         flex: h === 'Product' ? 2 : 1.2,
                         minWidth: h === 'Action' ? 100 : 90,
                         fontSize: 10.5,
-                        fontWeight: '800',
+                        fontWeight: '600',
                         color: tokens.mutedForeground,
                         textTransform: 'uppercase',
                         letterSpacing: 0.4,
@@ -1991,7 +1991,7 @@ export default function SalesForecastPanel({
                         <Text
                           style={{
                             fontSize: 12,
-                            fontWeight: '800',
+                            fontWeight: '600',
                             color: need > 0 ? '#FFF' : tokens.foreground,
                           }}
                         >
@@ -2416,7 +2416,7 @@ export default function SalesForecastPanel({
                       <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <BootstrapIcon name={getCategoryIcon(row.category)} size={16} color={tokens.primary} />
                         <View>
-                          <Text style={{ fontWeight: '800', color: tokens.foreground, fontSize: 14 }}>
+                          <Text style={{ fontWeight: '600', color: tokens.foreground, fontSize: 14 }}>
                             {row.category}
                           </Text>
                           <Text style={{ color: tokens.mutedForeground, fontSize: 12, marginTop: 2 }}>
@@ -2429,19 +2429,19 @@ export default function SalesForecastPanel({
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 6 }}>
                       <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
                         Stock{' '}
-                        <Text style={{ fontWeight: '800', color: tokens.foreground }}>
+                        <Text style={{ fontWeight: '600', color: tokens.foreground }}>
                           {row.currentStock}
                         </Text>
                       </Text>
                       <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
                         Forecast{' '}
-                        <Text style={{ fontWeight: '800', color: tokens.foreground }}>
+                        <Text style={{ fontWeight: '600', color: tokens.foreground }}>
                           {row.forecastedDemand == null ? '—' : row.forecastedDemand}
                         </Text>
                       </Text>
                       <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
                         Restock{' '}
-                        <Text style={{ fontWeight: '800', color: tokens.primary }}>
+                        <Text style={{ fontWeight: '600', color: tokens.primary }}>
                           {row.recommendedRestock == null
                             ? '—'
                             : row.recommendedRestock > 0
@@ -2469,7 +2469,7 @@ export default function SalesForecastPanel({
                   >
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontWeight: '800', color: tokens.foreground, fontSize: 14 }}>
+                        <Text style={{ fontWeight: '600', color: tokens.foreground, fontSize: 14 }}>
                           {row.productName}
                         </Text>
                         <Text style={{ color: tokens.mutedForeground, fontSize: 12, marginTop: 2 }}>
@@ -2481,19 +2481,19 @@ export default function SalesForecastPanel({
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 4 }}>
                       <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
                         Stock{' '}
-                        <Text style={{ fontWeight: '800', color: tokens.foreground }}>
+                        <Text style={{ fontWeight: '600', color: tokens.foreground }}>
                           {row.currentStock}
                         </Text>
                       </Text>
                       <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
                         Forecast{' '}
-                        <Text style={{ fontWeight: '800', color: tokens.foreground }}>
+                        <Text style={{ fontWeight: '600', color: tokens.foreground }}>
                           {row.forecastedDemand == null ? '—' : row.forecastedDemand}
                         </Text>
                       </Text>
                       <Text style={{ fontSize: 12, color: tokens.mutedForeground }}>
                         Restock{' '}
-                        <Text style={{ fontWeight: '800', color: tokens.primary }}>
+                        <Text style={{ fontWeight: '600', color: tokens.primary }}>
                           {row.recommendedRestock == null
                             ? '—'
                             : row.recommendedRestock > 0

@@ -298,6 +298,28 @@ export default function WishlistPageWeb({
               >
                 <Text style={wStyles.headerCenterBtnText}>Customize</Text>
               </TouchableOpacity>
+
+              {/* Garage Button */}
+              <TouchableOpacity
+                className="main-nav-tab"
+                style={wStyles.headerCenterBtn}
+                onPress={() => onNavigateToProfile?.('garage')}
+                activeOpacity={0.8}
+                title="Garage"
+              >
+                <Text style={wStyles.headerCenterBtnText}>Garage</Text>
+              </TouchableOpacity>
+
+              {/* Orders Button */}
+              <TouchableOpacity
+                className="main-nav-tab"
+                style={wStyles.headerCenterBtn}
+                onPress={() => onNavigateToOrders?.()}
+                activeOpacity={0.8}
+                title="Orders"
+              >
+                <Text style={wStyles.headerCenterBtnText}>Orders</Text>
+              </TouchableOpacity>
             </View>
           )}
 
@@ -346,7 +368,7 @@ export default function WishlistPageWeb({
                   if (screen === 'store' || screen === 'shop') onNavigateToStore?.();
                   else if (screen === 'orders') onNavigateToOrders?.();
                   else if (screen === 'notifications') onNavigateToProfile?.('notifications');
-                  else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
+                  else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
                   else if (screen === 'garage') onNavigateToGarage?.();
                 }}
                 currentUser={currentUser}
@@ -368,28 +390,6 @@ export default function WishlistPageWeb({
               )}
             </TouchableOpacity>
 
-            {/* Admin Badge */}
-            {currentUser?.role === 'admin' && (
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: 42,
-                  height: 42,
-                  borderRadius: 21,
-                  backgroundColor: 'transparent',
-                  borderWidth: 0,
-                  borderColor: 'transparent',
-                }}
-                onPress={() => onNavigateToAdmin?.()}
-                activeOpacity={0.8}
-                title="Admin Panel"
-              >
-                <BootstrapIcon name="shield-lock-fill" size={16} color="#EA580C" />
-              </TouchableOpacity>
-            )}
-
             {/* Auth: Sign In & Sign Up OR Logged In Profile */}
             {currentUser ? (
               <View style={[wStyles.loggedInContainer, { position: 'relative' }]}>
@@ -406,9 +406,9 @@ export default function WishlistPageWeb({
                   currentUser={currentUser}
                   isOpen={isUserDropdownOpen}
                   currentScreen="wishlist"
-                  showDashboard={true}
+                  showDashboard={false}
                   onClose={() => setIsUserDropdownOpen(false)}
-                  onNavigateToDashboard={() => onNavigateToProfile?.('overview')}
+                  onNavigateToDashboard={() => onNavigateToProfile?.('garage')}
                   onNavigateToOrders={() => onNavigateToOrders?.()}
                   onNavigateToProfile={(tab = 'profile') => onNavigateToProfile?.(typeof tab === 'string' ? tab : 'profile')}
                   onNavigateToSettings={() => onNavigateToProfile?.('settings')}
@@ -489,7 +489,7 @@ export default function WishlistPageWeb({
               <Text
                 style={{
                   fontSize: 16,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: isDarkMode ? '#E2E8F0' : '#0F172A',
                   marginBottom: 6,
                 }}
@@ -551,7 +551,7 @@ export default function WishlistPageWeb({
                           paddingVertical: 3,
                         }}
                       >
-                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '800' }}>
+                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '600' }}>
                           AI INSTALL
                         </Text>
                       </View>
@@ -573,7 +573,7 @@ export default function WishlistPageWeb({
                         activeOpacity={0.85}
                       >
                         <BootstrapIcon name="calendar-check" size={13} color="#FFFFFF" />
-                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>
+                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>
                           Book Installation
                         </Text>
                       </TouchableOpacity>
@@ -693,7 +693,7 @@ export default function WishlistPageWeb({
                     <View style={wStyles.priceRow} className="flex flex-row items-baseline gap-1.5 mb-1.5">
                       <Text
                         style={wStyles.priceMainText}
-                        className="text-[15px] font-extrabold text-[#EA580C]"
+                        className="text-[15px] font-semibold text-[#EA580C]"
                       >
                         ₱{Number(product.price || 0).toFixed(2)}
                       </Text>
@@ -707,7 +707,7 @@ export default function WishlistPageWeb({
                       <View style={wStyles.codTag} className="bg-amber-100 px-1.5 py-0.5 rounded">
                         <Text
                           style={wStyles.codTagText}
-                          className="text-[10px] font-extrabold text-amber-700"
+                          className="text-[10px] font-semibold text-amber-700"
                         >
                           COD
                         </Text>
@@ -861,7 +861,7 @@ export default function WishlistPageWeb({
           else if (screen === 'garage') onNavigateToGarage?.();
           else if (screen === 'customizer') onNavigateToCustomizer ? onNavigateToCustomizer() : onNavigateToCustomize?.();
           else if (screen === 'wishlist') { /* already here */ }
-          else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'overview');
+          else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
           else if (screen === 'login') onNavigateToLogin?.();
           else if (screen === 'admin') onNavigateToAdmin?.();
         }}

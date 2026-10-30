@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   headerSub: {
@@ -484,7 +484,7 @@ const styles = StyleSheet.create({
   },
   deliveryBannerTitle: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#15803D',
   },
   deliveryBannerSub: {
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
     marginBottom: 10,
   },
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   },
   starSentimentText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#D97706',
     marginTop: 4,
   },
@@ -600,7 +600,7 @@ const styles = StyleSheet.create({
   },
   tagPillTextActive: {
     color: '#15803D',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   commentInputWrap: {
     backgroundColor: '#F8FAFC',
@@ -701,7 +701,7 @@ const styles = StyleSheet.create({
   },
   submitBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 });

@@ -184,7 +184,7 @@ export default function EditCustomerSettingsModal({
                 <BootstrapIcon name="gear-fill" size={17} color="#EA580C" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16.5, fontWeight: '800', color: textPrimary, letterSpacing: -0.2 }} numberOfLines={1}>
+                <Text style={{ fontSize: 16.5, fontWeight: '600', color: textPrimary, letterSpacing: -0.2 }} numberOfLines={1}>
                   Edit Customer Settings
                 </Text>
                 <Text style={{ fontSize: 12, color: textSecondary, marginTop: 1 }} numberOfLines={1}>
@@ -272,7 +272,7 @@ export default function EditCustomerSettingsModal({
                   borderColor: '#86EFAC',
                 }}
               >
-                <Text style={{ fontSize: 10.5, fontWeight: '800', color: '#166534' }}>
+                <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#166534' }}>
                   Verified
                 </Text>
               </View>
@@ -571,7 +571,7 @@ export default function EditCustomerSettingsModal({
               ) : (
                 <>
                   <BootstrapIcon name="check-lg" size={14} color="#FFFFFF" />
-                  <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFFFFF' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#FFFFFF' }}>
                     Save Changes
                   </Text>
                 </>

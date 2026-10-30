@@ -53,7 +53,7 @@ export default function BookingSelect({
     return (
       <View style={{ marginBottom: 12 }}>
         {label ? (
-          <Text style={{ fontSize: 12.5, fontWeight: '800', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 6 }}>
+          <Text style={{ fontSize: 12.5, fontWeight: '500', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 6 }}>
             {label}
           </Text>
         ) : null}
@@ -65,7 +65,7 @@ export default function BookingSelect({
   return (
     <View style={{ marginBottom: 12, zIndex: isOpen ? 20 : 1 }}>
       {label ? (
-        <Text style={{ fontSize: 12.5, fontWeight: '800', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 6 }}>
+        <Text style={{ fontSize: 12.5, fontWeight: '500', color: isDark ? '#E2E8F0' : '#334155', marginBottom: 6 }}>
           {label}
         </Text>
       ) : null}
@@ -164,7 +164,7 @@ export default function BookingSelect({
                       <Text
                         style={{
                           fontSize: 13,
-                          fontWeight: active ? '800' : '600',
+                          fontWeight: active ? '600' : '500',
                           color: active ? accentColor : (isDark ? '#F8FAFC' : '#0F172A'),
                         }}
                       >

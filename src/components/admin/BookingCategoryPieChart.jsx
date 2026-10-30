@@ -389,7 +389,7 @@ export default function BookingCategoryPieChart({
             <Text
               style={{
                 fontSize: 16,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: colors.textPrimary,
                 letterSpacing: -0.3,
               }}
@@ -653,7 +653,7 @@ export default function BookingCategoryPieChart({
               <Text
                 style={{
                   fontSize: isDesktop ? 26 : 23,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   color: colors.textPrimary,
                   letterSpacing: -0.6,
                   lineHeight: isDesktop ? 30 : 27,
@@ -749,7 +749,7 @@ export default function BookingCategoryPieChart({
                 <Text
                   style={{
                     fontSize: 13,
-                    fontWeight: '800',
+                    fontWeight: '600',
                     color: colors.textPrimary,
                     width: 44,
                     textAlign: 'right',

@@ -378,7 +378,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
       border: 1px solid #EA580C !important;
       border-radius: 6px !important;
       font-size: 11px !important;
-      font-weight: 800 !important;
+      font-weight: 700 !important;
       padding: 3px 8px !important;
       box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
       white-space: nowrap !important;
@@ -401,7 +401,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
       border-radius: 20px;
       padding: 4px 10px;
       font-size: 11px;
-      font-weight: 800;
+      font-weight: 600;
       box-shadow: 0 4px 12px rgba(0,0,0,0.4);
       white-space: nowrap;
       display: flex; align-items: center; gap: 4px;
@@ -757,7 +757,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                 <BootstrapIcon name="clock-history" size={17} color="#EA580C" />
               </View>
               <Text style={styles.guaranteeText}>
-                <Text style={{ fontWeight: '800', color: '#EA580C' }}>Guaranteed On-Time Delivery</Text>{' '}
+                <Text style={{ fontWeight: '600', color: '#EA580C' }}>Guaranteed On-Time Delivery</Text>{' '}
                 assures that a delivery will be attempted by {arrivalRangeText.replace('Arriving ', '')}. Get
                 a coupon if your order arrives late.
               </Text>
@@ -770,7 +770,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                 <View style={styles.mapToolbarRow}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={styles.mapHudLiveDot} />
-                    <Text style={{ fontSize: 13, fontWeight: '800', color: '#0F172A' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>
                       Live GPS Tracking
                     </Text>
                     <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>
@@ -1051,7 +1051,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
               <View style={styles.freeReturnsLeft}>
                 <BootstrapIcon name="bag-check-fill" size={15} color="#EA580C" />
                 <Text style={styles.freeReturnsText}>
-                  <Text style={{ color: '#EA580C', fontWeight: '800' }}>Free returns</Text> at your
+                  <Text style={{ color: '#EA580C', fontWeight: '600' }}>Free returns</Text> at your
                   convenience (30-day policy)
                 </Text>
               </View>
@@ -1123,7 +1123,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     activeOpacity={0.8}
                   >
                     <BootstrapIcon name="geo-alt-fill" size={13} color="#EA580C" />
-                    <Text style={{ fontSize: 11.5, color: '#EA580C', fontWeight: '800', flex: 1 }}>
+                    <Text style={{ fontSize: 11.5, color: '#EA580C', fontWeight: '600', flex: 1 }}>
                       Use Profile Address: {currentUser.address.slice(0, 35)}...
                     </Text>
                   </TouchableOpacity>
@@ -1407,7 +1407,7 @@ const styles = StyleSheet.create({
   },
   headerMainTitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
     letterSpacing: -0.3,
   },
@@ -1431,7 +1431,7 @@ const styles = StyleSheet.create({
   headerGpsBtnText: {
     color: '#EA580C',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   scrollContent: {
@@ -1525,7 +1525,7 @@ const styles = StyleSheet.create({
   },
   stepLabelTextActive: {
     color: '#EA580C',
-    fontWeight: '900',
+    fontWeight: '600',
   },
   stepLabelTextCompleted: {
     color: '#0F172A',
@@ -1602,7 +1602,7 @@ const styles = StyleSheet.create({
   },
   mapModePillTextActive: {
     color: '#EA580C',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   openGoogleMapsBtn: {
     flexDirection: 'row',
@@ -1617,7 +1617,7 @@ const styles = StyleSheet.create({
   },
   openGoogleMapsBtnText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
 
@@ -1678,7 +1678,7 @@ const styles = StyleSheet.create({
   },
   googleMapLiveText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
 
@@ -1701,7 +1701,7 @@ const styles = StyleSheet.create({
   mapWaterLabel: {
     transform: [{ rotate: '-90deg' }],
     fontSize: 7.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0369A1',
     letterSpacing: 1.5,
     opacity: 0.7,
@@ -1717,7 +1717,7 @@ const styles = StyleSheet.create({
   },
   mapParkLabel: {
     fontSize: 7.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#047857',
   },
   mapCityBlock: {
@@ -1766,7 +1766,7 @@ const styles = StyleSheet.create({
   },
   mapHighwayLabel: {
     fontSize: 6.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#9A3412',
     letterSpacing: 0.5,
   },
@@ -1785,14 +1785,14 @@ const styles = StyleSheet.create({
   mapAvenueLabel: {
     transform: [{ rotate: '-90deg' }],
     fontSize: 6.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#64748B',
     letterSpacing: 0.5,
   },
   mapStreetNameTag: {
     position: 'absolute',
     fontSize: 7.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#475569',
     backgroundColor: 'rgba(255, 255, 255, 0.85)',
     paddingHorizontal: 3,
@@ -1832,7 +1832,7 @@ const styles = StyleSheet.create({
   },
   originMarkerBadgeText: {
     fontSize: 7.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 
@@ -1875,7 +1875,7 @@ const styles = StyleSheet.create({
   },
   destMarkerBadgeText: {
     fontSize: 7.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 
@@ -1936,7 +1936,7 @@ const styles = StyleSheet.create({
   riderTooltipNameRealistic: {
     color: '#FFFFFF',
     fontSize: 8.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   riderTooltipSpeedRealistic: {
     color: '#EAB308',
@@ -1956,7 +1956,7 @@ const styles = StyleSheet.create({
   },
   googleWatermarkText: {
     fontSize: 11,
-    fontWeight: '900',
+    fontWeight: '600',
     letterSpacing: -0.5,
   },
 
@@ -1983,7 +1983,7 @@ const styles = StyleSheet.create({
   },
   mapHudLiveText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 
@@ -2006,7 +2006,7 @@ const styles = StyleSheet.create({
   },
   riderNameSmall: {
     fontSize: 12.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   riderPlateText: {
@@ -2026,7 +2026,7 @@ const styles = StyleSheet.create({
   riderCallSmallText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 
   // 6. Address Card
@@ -2048,7 +2048,7 @@ const styles = StyleSheet.create({
   },
   addressRecipientName: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   addressPhone: {
@@ -2069,7 +2069,7 @@ const styles = StyleSheet.create({
   },
   changeAddressLinkText: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
   },
 
@@ -2105,7 +2105,7 @@ const styles = StyleSheet.create({
   },
   storeNameText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   browseShopBtn: {
@@ -2149,7 +2149,7 @@ const styles = StyleSheet.create({
   },
   itemPriceText: {
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
   },
   itemMetaRow: {
@@ -2182,7 +2182,7 @@ const styles = StyleSheet.create({
   freeReturnsPillText: {
     fontSize: 9.5,
     color: '#EA580C',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   genuinePill: {
     backgroundColor: '#F8FAFC',
@@ -2242,7 +2242,7 @@ const styles = StyleSheet.create({
   },
   codIndicatorText: {
     fontSize: 9.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
   paymentMethodLabel: {
@@ -2260,7 +2260,7 @@ const styles = StyleSheet.create({
   },
   totalPriceBig: {
     fontSize: 15,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#EA580C',
   },
 
@@ -2328,7 +2328,7 @@ const styles = StyleSheet.create({
   },
   secondaryBottomBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   primaryCancelBtn: {
@@ -2343,7 +2343,7 @@ const styles = StyleSheet.create({
   },
   primaryCancelBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#DC2626',
   },
 
@@ -2371,7 +2371,7 @@ const styles = StyleSheet.create({
   },
   editAddressTitle: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
   },
   editAddressInput: {
@@ -2410,7 +2410,7 @@ const styles = StyleSheet.create({
   },
   editAddressSaveText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 
@@ -2454,7 +2454,7 @@ const styles = StyleSheet.create({
   },
   callRiderName: {
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
   },
   callRiderPhone: {
@@ -2484,7 +2484,7 @@ const styles = StyleSheet.create({
   },
   callHangupText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
   },
 });

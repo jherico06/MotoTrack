@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
   },
   headerTitleText: {
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
     letterSpacing: -0.3,
   },
@@ -276,7 +276,7 @@ const styles = StyleSheet.create({
   },
   activeBadgeText: {
     fontSize: 8,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#047857',
     letterSpacing: 0.4,
   },
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
   },
   circleNumberText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#64748B',
   },
   circleNumberTextActive: {
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
   },
   statusLabelTextCurrent: {
     color: '#EA580C',
-    fontWeight: '900',
+    fontWeight: '600',
   },
   horizontalConnectorWrap: {
     flex: 1,

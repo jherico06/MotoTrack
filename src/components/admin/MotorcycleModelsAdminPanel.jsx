@@ -143,7 +143,7 @@ function createStyles(t, isDark) {
       padding: 16,
     },
     header: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 12 },
-    title: { fontSize: 16, fontWeight: '800', color: t.textPrimary },
+    title: { fontSize: 16, fontWeight: '700', color: t.textPrimary },
     sub: { fontSize: 12, color: t.textMuted, marginTop: 4 },
     refresh: {
       width: 36,

@@ -154,6 +154,14 @@ export function AuthProvider({ children }) {
     return res;
   };
 
+  const requestPasswordResetOtp = async ({ email }) => {
+    return await authService.requestPasswordResetOtp({ email });
+  };
+
+  const confirmPasswordResetOtp = async ({ email, otp, newPassword }) => {
+    return await authService.confirmPasswordResetOtp({ email, otp, newPassword });
+  };
+
   const login = async (email, password, requiredRole = null) => {
     const res = await authService.login(email, password, requiredRole);
     if (res.success) {
@@ -287,6 +295,8 @@ export function AuthProvider({ children }) {
     validatePasswordStrength,
     sendSignupOtp,
     verifySignupOtp,
+    requestPasswordResetOtp,
+    confirmPasswordResetOtp,
     login,
     loginCustomer,
     loginAdmin,

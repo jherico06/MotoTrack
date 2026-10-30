@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   },
   titleText: {
     fontSize: 18.5,
-    fontWeight: '900',
+    fontWeight: '600',
     color: '#0F172A',
     textAlign: 'center',
     letterSpacing: -0.3,
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   },
   itemHighlightText: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
     textAlign: 'center',
   },
   buttonsRow: {
@@ -261,7 +261,7 @@ const styles = StyleSheet.create({
   },
   cancelButtonText: {
     color: '#475569',
-    fontWeight: '800',
+    fontWeight: '600',
     fontSize: 13.5,
   },
   confirmButton: {
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '600',
     fontSize: 13.5,
     letterSpacing: 0.2,
   },

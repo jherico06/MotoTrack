@@ -115,15 +115,15 @@ export default function HeroBanner({
     <View
       style={{
         width: '100%',
-        backgroundColor: '#171C22',
-        borderRadius: 20,
+        backgroundColor: '#24272B',
+        borderRadius: 0,
         overflow: 'hidden',
         position: 'relative',
         minHeight: isDesktop ? 460 : isTablet ? 420 : 480,
-        marginBottom: 20,
-        borderWidth: 1,
-        borderColor: '#26313B',
-        boxShadow: '0 12px 32px rgba(0, 0, 0, 0.35)',
+        marginBottom: 0,
+        borderWidth: 0,
+        borderBottomWidth: 1,
+        borderBottomColor: '#26313B',
       }}
     >
       {/* ─── RIGHT BACKGROUND MOTORCYCLE PHOTO ─── */}
@@ -154,7 +154,7 @@ export default function HeroBanner({
             style={{
               width: '100%',
               height: '100%',
-              backgroundColor: '#171C22',
+              backgroundColor: '#24272B',
             }}
           />
         )}
@@ -169,26 +169,36 @@ export default function HeroBanner({
               right: 0,
               bottom: 0,
               background: isDesktop
-                ? 'linear-gradient(90deg, #171C22 0%, #171C22 18%, rgba(23, 28, 34, 0.92) 40%, rgba(23, 28, 34, 0.3) 75%, rgba(23, 28, 34, 0) 100%)'
-                : 'linear-gradient(180deg, rgba(23, 28, 34, 0.92) 0%, rgba(23, 28, 34, 0.75) 50%, #171C22 100%)',
+                ? 'linear-gradient(90deg, #24272B 0%, #24272B 18%, rgba(36, 39, 43, 0.92) 40%, rgba(36, 39, 43, 0.3) 75%, rgba(36, 39, 43, 0) 100%)'
+                : 'linear-gradient(180deg, rgba(36, 39, 43, 0.92) 0%, rgba(36, 39, 43, 0.75) 50%, #24272B 100%)',
               pointerEvents: 'none',
             }}
           />
         )}
       </View>
 
-      {/* ─── TOP RIGHT GEOMETRIC ACCENT & SUBTITLE (matching reference UI) ─── */}
-      {isDesktop && (
-        <View
-          style={{
-            position: 'absolute',
-            top: 24,
-            right: 28,
-            zIndex: 3,
-            alignItems: 'flex-end',
-            pointerEvents: 'none',
-          }}
-        >
+      {/* ─── INNER CONTENT WRAPPER (Aligned with site maxContainer 1360px grid) ─── */}
+      <View
+        style={{
+          width: '100%',
+          maxWidth: 1360,
+          marginHorizontal: 'auto',
+          position: 'relative',
+          zIndex: 2,
+        }}
+      >
+        {/* ─── TOP RIGHT GEOMETRIC ACCENT & SUBTITLE (matching reference UI) ─── */}
+        {isDesktop && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 24,
+              right: 24,
+              zIndex: 3,
+              alignItems: 'flex-end',
+              pointerEvents: 'none',
+            }}
+          >
           {/* Angular Orange Chevron Accent Ribbon */}
           {Platform.OS === 'web' && (
             <svg
@@ -218,7 +228,7 @@ export default function HeroBanner({
                   style={{
                     color: idx % 2 === 0 ? '#FF5A0A' : '#FFFFFF',
                     fontSize: 13,
-                    fontWeight: '900',
+                    fontWeight: '600',
                     letterSpacing: 2.5,
                     lineHeight: 16,
                     fontFamily: fontFamily.sans,
@@ -257,21 +267,21 @@ export default function HeroBanner({
         </View>
       )}
 
-      {/* ─── LEFT HERO CONTENT (Eyebrow, Headline, Subtitle, CTAs, Trust Indicators) ─── */}
-      <View
-        style={{
-          position: 'relative',
-          zIndex: 2,
-          paddingLeft: isDesktop ? 48 : isTablet ? 36 : 22,
-          paddingRight: isDesktop ? 48 : isTablet ? 36 : 22,
-          paddingTop: isDesktop ? 54 : 36,
-          paddingBottom: isDesktop ? 40 : 28,
-          maxWidth: isDesktop ? 680 : isTablet ? 560 : '100%',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-          minHeight: isDesktop ? 460 : isTablet ? 420 : 480,
-        }}
-      >
+        {/* ─── LEFT HERO CONTENT (Eyebrow, Headline, Subtitle, CTAs, Trust Indicators) ─── */}
+        <View
+          style={{
+            position: 'relative',
+            zIndex: 2,
+            paddingLeft: isDesktop ? 24 : isTablet ? 24 : 16,
+            paddingRight: isDesktop ? 24 : isTablet ? 24 : 16,
+            paddingTop: isDesktop ? 54 : 36,
+            paddingBottom: isDesktop ? 40 : 28,
+            maxWidth: isDesktop ? 680 : isTablet ? 560 : '100%',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            minHeight: isDesktop ? 460 : isTablet ? 420 : 480,
+          }}
+        >
         {/* Top: Eyebrow + Headline + Subtitle + CTAs */}
         <View>
           {/* Eyebrow / Subtitle Label */}
@@ -287,7 +297,7 @@ export default function HeroBanner({
               style={{
                 color: '#FF5A0A',
                 fontSize: isSmallMobile ? 11 : 12.5,
-                fontWeight: '900',
+                fontWeight: '600',
                 letterSpacing: 2.2,
                 textTransform: 'uppercase',
                 fontFamily: fontFamily.sans,
@@ -301,7 +311,7 @@ export default function HeroBanner({
           <Text
             style={{
               fontSize: isDesktop ? 46 : isTablet ? 38 : isSmallMobile ? 28 : 34,
-              fontWeight: '900',
+              fontWeight: '600',
               color: '#FFFFFF',
               lineHeight: isDesktop ? 54 : isTablet ? 44 : isSmallMobile ? 34 : 40,
               letterSpacing: -0.8,
@@ -357,7 +367,7 @@ export default function HeroBanner({
                 style={{
                   color: '#FFFFFF',
                   fontSize: 14,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   fontFamily: fontFamily.sans,
                 }}
               >
@@ -431,7 +441,7 @@ export default function HeroBanner({
                 style={{
                   color: '#FFFFFF',
                   fontSize: 12,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   fontFamily: fontFamily.sans,
                 }}
               >
@@ -469,7 +479,7 @@ export default function HeroBanner({
                 style={{
                   color: '#FFFFFF',
                   fontSize: 12,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   fontFamily: fontFamily.sans,
                 }}
               >
@@ -507,7 +517,7 @@ export default function HeroBanner({
                 style={{
                   color: '#FFFFFF',
                   fontSize: 12,
-                  fontWeight: '800',
+                  fontWeight: '600',
                   fontFamily: fontFamily.sans,
                 }}
               >
@@ -528,5 +538,6 @@ export default function HeroBanner({
         </View>
       </View>
     </View>
-  );
+  </View>
+);
 }

@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
   },
   headerSubtitle: {
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: '#EA580C',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   bodyScroll: {
     flex: 1,
@@ -488,13 +488,13 @@ const styles = StyleSheet.create({
   },
   heroBadgeText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#FFFFFF',
     letterSpacing: 0.5,
   },
   heroTitle: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#064E3B',
     lineHeight: 24,
     marginBottom: 8,
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
     marginBottom: 6,
   },
@@ -542,7 +542,7 @@ const styles = StyleSheet.create({
   },
   pillarTitle: {
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     marginBottom: 4,
   },
@@ -608,7 +608,7 @@ const styles = StyleSheet.create({
   },
   legalTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     marginBottom: 6,
   },
@@ -638,6 +638,6 @@ const styles = StyleSheet.create({
   doneBtnText: {
     color: '#FFFFFF',
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
 });

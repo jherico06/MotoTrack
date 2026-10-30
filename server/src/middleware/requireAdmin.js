@@ -35,6 +35,23 @@ export async function requireAdmin(req, res, next) {
       });
     }
 
+    const sessionToken = String(req.headers['x-admin-session-token'] || '').trim();
+    if (sessionToken) {
+      const { data: sessionResult, error: sessionErr } = await supabase.rpc(
+        'validate_admin_session',
+        {
+          p_user_id: adminUserId,
+          p_session_token: sessionToken,
+        }
+      );
+      if (!sessionErr && sessionResult && sessionResult.valid === false) {
+        return res.status(401).json({
+          success: false,
+          error: 'Admin security PIN session has expired. Please unlock with your PIN again.',
+        });
+      }
+    }
+
     req.admin = admin;
     return next();
   } catch (err) {

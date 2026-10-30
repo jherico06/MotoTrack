@@ -987,7 +987,7 @@ function createStyles(t, isDark) {
     chipTextActive: { color: '#FFFFFF' },
     row: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
     field: { flex: 1 },
-    label: { fontSize: 11, color: isDark ? t.textSecondary : '#475569', marginBottom: 5, fontWeight: '800' },
+    label: { fontSize: 11, color: isDark ? t.textSecondary : '#475569', marginBottom: 5, fontWeight: '500' },
     input: {
       backgroundColor: isDark ? t.bgCard : '#FFFFFF',
       borderWidth: 1.5,
@@ -1040,7 +1040,7 @@ function createStyles(t, isDark) {
       elevation: 2,
     },
     totalsTitle: {
-      fontWeight: '800',
+      fontWeight: '600',
       fontSize: 12.5,
       letterSpacing: 0.8,
       color: isDark ? t.accentBrand : '#EA580C',
@@ -1100,12 +1100,12 @@ function createStyles(t, isDark) {
     },
     totalsTotalLabel: {
       fontSize: 15.5,
-      fontWeight: '800',
+      fontWeight: '600',
       color: isDark ? t.textPrimary : '#0F172A',
     },
     totalsTotalValue: {
       fontSize: 17,
-      fontWeight: '800',
+      fontWeight: '600',
       color: isDark ? t.money : '#EA580C',
     },
     breakdownSubBox: {
@@ -1161,6 +1161,6 @@ function createStyles(t, isDark) {
       marginBottom: 12,
       gap: 4,
     },
-    estimateTitle: { fontSize: 13, fontWeight: '800', color: isDark ? t.statusPurpleText : '#4338CA' },
+    estimateTitle: { fontSize: 13, fontWeight: '600', color: isDark ? t.statusPurpleText : '#4338CA' },
   });
 }

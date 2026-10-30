@@ -32,6 +32,7 @@ import {
 import * as ExpoLinking from 'expo-linking';
 import { BootstrapIcon } from '../components/common';
 import CartModal from '../components/modals/CartModal.jsx';
+import RequireLoginModal from '../components/modals/RequireLoginModal.jsx';
 import ErrorBoundary from '../components/common/ErrorBoundary.jsx';
 import { adminSecurityService } from '../services/auth/adminSecurityService.js';
 import { authService } from '../services/auth/authService.js';
@@ -47,23 +48,14 @@ import {
 } from '../utils/permissions.js';
 import {
   useFonts,
-  PlusJakartaSans_200ExtraLight,
-  PlusJakartaSans_300Light,
-  PlusJakartaSans_400Regular,
-  PlusJakartaSans_500Medium,
-  PlusJakartaSans_600SemiBold,
-  PlusJakartaSans_700Bold,
-  PlusJakartaSans_800ExtraBold,
-} from '@expo-google-fonts/plus-jakarta-sans';
-import {
-  Manrope_200ExtraLight,
-  Manrope_300Light,
-  Manrope_400Regular,
-  Manrope_500Medium,
-  Manrope_600SemiBold,
-  Manrope_700Bold,
-  Manrope_800ExtraBold,
-} from '@expo-google-fonts/manrope';
+  Inter_200ExtraLight,
+  Inter_300Light,
+  Inter_400Regular,
+  Inter_500Medium,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  Inter_800ExtraBold,
+} from '@expo-google-fonts/inter';
 
 // Configure Android status bar to be translucent edge-to-edge
 if (Platform.OS === 'android') {
@@ -81,20 +73,20 @@ LogBox.ignoreLogs([
 ]);
 LogBox.ignoreAllLogs(true);
 
-// Enforce Plus Jakarta Sans as the default font across all React Native Text & TextInput elements
+// Enforce Inter as the default font across all React Native Text & TextInput elements
 try {
   if (Text.defaultProps == null) {
     Text.defaultProps = {};
   }
-  Text.defaultProps.style = [{ fontFamily: 'PlusJakartaSans' }, Text.defaultProps.style];
+  Text.defaultProps.style = [{ fontFamily: 'Inter' }, Text.defaultProps.style];
 
   if (TextInput.defaultProps == null) {
     TextInput.defaultProps = {};
   }
-  TextInput.defaultProps.style = [{ fontFamily: 'PlusJakartaSans' }, TextInput.defaultProps.style];
+  TextInput.defaultProps.style = [{ fontFamily: 'Inter' }, TextInput.defaultProps.style];
 } catch (_e) {}
 
-// Global Web Font Injection for Plus Jakarta Sans & Bootstrap Icons
+// Global Web Font Injection for Inter & Bootstrap Icons
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   const initSet = systemSettingsService.getSettings();
   document.title = initSet?.storeName
@@ -117,24 +109,26 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
     bsLink.href = 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css';
     document.head.appendChild(bsLink);
   }
-  if (!document.getElementById('plus-jakarta-google-font')) {
+  if (!document.getElementById('inter-google-font')) {
     const link = document.createElement('link');
-    link.id = 'plus-jakarta-google-font';
+    link.id = 'inter-google-font';
     link.rel = 'stylesheet';
     link.href =
-      'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap';
+      'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
     document.head.appendChild(link);
   }
-  if (!document.getElementById('plus-jakarta-global-styles')) {
+  if (!document.getElementById('inter-global-styles')) {
     const style = document.createElement('style');
-    style.id = 'plus-jakarta-global-styles';
+    style.id = 'inter-global-styles';
     style.innerHTML = `
       *, *::before, *::after {
-        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+        font-optical-sizing: none !important;
         box-sizing: border-box;
       }
       html, body, #root, #__next, [data-reactroot] {
-        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+        font-optical-sizing: none !important;
         -webkit-font-smoothing: antialiased;
         -moz-osx-font-smoothing: grayscale;
         text-rendering: optimizeLegibility;
@@ -153,11 +147,11 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
       }
       div, span, p, a, button, input, textarea, select, label, h1, h2, h3, h4, h5, h6,
       [class*="css-text"], [class*="r-fontFamily"], [dir="auto"], [dir] {
-        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
       }
-      /* Ensure React Native Web inner text elements always use Plus Jakarta Sans */
+      /* Ensure React Native Web inner text elements always use Inter */
       [class*="r-fontFamily-"] {
-        font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif !important;
       }
       code, pre, kbd, samp, .font-mono, [data-font="mono"], [style*="monospace"] {
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace !important;
@@ -245,6 +239,12 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
         width: 0 !important;
         margin: 0 !important;
       }
+      .main-nav-tab {
+        transition: opacity 0.15s ease, background-color 0.15s ease;
+      }
+      .main-nav-tab:hover {
+        opacity: 0.85;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -304,6 +304,10 @@ function MainAppRouter() {
         return 'rider-dashboard';
       }
       if (['login', 'signup', 'admin', 'garage', 'wishlist', 'shop', 'customizer', 'profile', 'notifications', 'confirm-delivery', 'rider-run', 'rider-dashboard'].includes(s)) {
+        const savedUser = authService.getCurrentUser();
+        if (!savedUser && ['garage', 'profile', 'orders', 'notifications', 'customizer'].includes(s)) {
+          return 'shop';
+        }
         return s;
       }
     } catch (_e) {}
@@ -321,10 +325,10 @@ function MainAppRouter() {
         const tab = new URLSearchParams(window.location.search).get('tab');
         if (s === 'orders' || tab === 'orders') return { tab: 'orders', key: 1 };
         if (s === 'notifications' || tab === 'notifications') return { tab: 'notifications', key: 1 };
-        if (tab) return { tab, key: 1 };
+        if (tab) return { tab: tab === 'overview' ? 'garage' : tab, key: 1 };
       }
     } catch (_e) {}
-    return { tab: 'overview', key: 0 };
+    return { tab: 'garage', key: 0 };
   });
 
   const [visitedScreens, setVisitedScreens] = useState(() => {
@@ -349,6 +353,33 @@ function MainAppRouter() {
   const { currentUser, logout, adminLogin, redirectReason, setRedirectReason } = useAuth();
   const { addToCart, cartItemCount, cartTotal, showToast } = useCart();
   const { wishlistCount } = useWishlist();
+
+  const [requireLoginModal, setRequireLoginModal] = useState({
+    visible: false,
+    title: 'Sign In Required',
+    message: 'Please log in first or create an account to access this feature.',
+    actionLabel: 'Sign In to Continue',
+    feature: 'general',
+  });
+
+  const promptRequireLogin = ({
+    title = 'Sign In Required',
+    message = 'Please log in first or create an account to access this feature.',
+    actionLabel = 'Sign In to Continue',
+    feature = 'general',
+  } = {}) => {
+    setRequireLoginModal({
+      visible: true,
+      title,
+      message,
+      actionLabel,
+      feature,
+    });
+  };
+
+  const closeRequireLoginModal = () => {
+    setRequireLoginModal((prev) => ({ ...prev, visible: false }));
+  };
 
   useEffect(() => {
     const applyBrandMeta = (s) => {
@@ -389,8 +420,28 @@ function MainAppRouter() {
       return;
     }
     if (screen === 'profile') {
-      handleNavigateToProfile(params?.tab || 'overview');
+      handleNavigateToProfile(params?.tab || 'garage');
       return;
+    }
+    if (!currentUser) {
+      if (screen === 'garage') {
+        promptRequireLogin({
+          title: 'Sign In to Book a Service',
+          message: 'Please log in first to book a pit service appointment or access your garage fleet.',
+          actionLabel: 'Sign In to Book',
+          feature: 'book',
+        });
+        return;
+      }
+      if (screen === 'customizer') {
+        promptRequireLogin({
+          title: 'Sign In to Customize',
+          message: 'Please log in first to customize motorcycle builds, save specs, and book custom installations.',
+          actionLabel: 'Sign In to Customize',
+          feature: 'customize',
+        });
+        return;
+      }
     }
     if (params?.product) {
       if (screen === 'customizer') {
@@ -421,23 +472,48 @@ function MainAppRouter() {
     }
   };
 
-  const handleNavigateToProfile = (tab = 'overview') => {
+  const handleNavigateToProfile = (tab = 'garage') => {
     const tabName = typeof tab === 'object' && tab !== null ? tab.tab : tab;
-    if (!currentUser && tabName !== 'orders' && tabName !== 'garage') {
-      setRedirectReason(
-        tabName === 'notifications'
-          ? 'Please sign in to view your notifications in your Customer Dashboard.'
-          : 'Please sign in to view your Customer Dashboard.'
-      );
-      navigateScreen('login');
-    } else {
+    if (!currentUser) {
+      if (tabName === 'orders') {
+        promptRequireLogin({
+          title: 'Sign In to View Orders',
+          message: 'Please log in first to view your order history, delivery telemetry, and live tracking.',
+          actionLabel: 'Sign In to View Orders',
+          feature: 'orders',
+        });
+      } else if (tabName === 'garage') {
+        promptRequireLogin({
+          title: 'Sign In to Access Garage',
+          message: 'Please log in first to view your motorcycle fleet, check parts fitment, and manage specs.',
+          actionLabel: 'Sign In to Access Garage',
+          feature: 'garage',
+        });
+      } else if (tabName === 'notifications') {
+        promptRequireLogin({
+          title: 'Sign In for Notifications',
+          message: 'Please log in first to view order updates, service alerts, and promotions.',
+          actionLabel: 'Sign In to View Notifications',
+          feature: 'general',
+        });
+      } else {
+        promptRequireLogin({
+          title: 'Sign In Required',
+          message: 'Please log in first to view and manage your account profile.',
+          actionLabel: 'Sign In to View Profile',
+          feature: 'general',
+        });
+      }
+      return;
+    }
+    {
       setProfileInitialTab({ tab: tabName, key: Date.now() });
       setCurrentScreen('profile');
       if (Platform.OS === 'web' && typeof window !== 'undefined' && window.history?.pushState) {
         try {
           const url = new URL(window.location.href);
           url.searchParams.set('screen', 'profile');
-          if (tabName && tabName !== 'overview') {
+          if (tabName && tabName !== 'garage') {
             url.searchParams.set('tab', tabName);
           } else {
             url.searchParams.delete('tab');
@@ -551,14 +627,24 @@ function MainAppRouter() {
     };
   }, []);
 
-  // If user logs out or session ends while on protected screen (profile, orders), return to storefront
+  // If user logs out or session ends while on protected screen, return to storefront
   useEffect(() => {
-    const rawTab = typeof profileInitialTab === 'object' && profileInitialTab !== null ? profileInitialTab.tab : profileInitialTab;
-    if (!currentUser && currentScreen === 'profile' && rawTab !== 'orders') {
-      const t = setTimeout(() => navigateScreen('shop'), 0);
-      return () => clearTimeout(t);
+    if (!currentUser) {
+      const protectedScreens = ['profile', 'garage', 'customizer', 'orders'];
+      if (protectedScreens.includes(currentScreen)) {
+        const t = setTimeout(() => {
+          navigateScreen('shop');
+          promptRequireLogin({
+            title: 'Sign In Required',
+            message: 'Please log in first or create an account to access that section.',
+            actionLabel: 'Sign In to Continue',
+            feature: 'general',
+          });
+        }, 0);
+        return () => clearTimeout(t);
+      }
     }
-  }, [currentUser, currentScreen, profileInitialTab]);
+  }, [currentUser, currentScreen]);
 
   // Staff must change temporary password before accessing role dashboards
   if (mustChangeStaffPassword(currentUser)) {
@@ -647,7 +733,7 @@ function MainAppRouter() {
           <Text
             style={{
               fontSize: 20,
-              fontWeight: '900',
+              fontWeight: '700',
               color: '#0F172A',
               textAlign: 'center',
               marginBottom: 8,
@@ -678,7 +764,7 @@ function MainAppRouter() {
             onPress={leaveBlockedAccount}
             activeOpacity={0.85}
           >
-            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Sign out</Text>
+            <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}>Sign out</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -785,7 +871,7 @@ function MainAppRouter() {
             <Text
               style={{
                 fontSize: 20,
-                fontWeight: '900',
+                fontWeight: '700',
                 color: '#0F172A',
                 textAlign: 'center',
                 marginBottom: 8,
@@ -821,7 +907,7 @@ function MainAppRouter() {
               activeOpacity={0.85}
             >
               <BootstrapIcon name="shield-lock-fill" size={15} color="#FFFFFF" />
-              <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 14 }}>Open Mobile Admin Console</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}>Open Mobile Admin Console</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={{
@@ -839,7 +925,7 @@ function MainAppRouter() {
               activeOpacity={0.85}
             >
               <BootstrapIcon name="arrow-left" size={14} color="#475569" />
-              <Text style={{ color: '#475569', fontWeight: '800', fontSize: 14 }}>Return to Store</Text>
+              <Text style={{ color: '#475569', fontWeight: '600', fontSize: 14 }}>Return to Store</Text>
             </TouchableOpacity>
           </View>
         </SafeAreaView>
@@ -866,7 +952,7 @@ function MainAppRouter() {
               setCustomizerProduct(params.product);
             }
             if (screen === 'profile') {
-              handleNavigateToProfile(params?.tab || 'overview');
+              handleNavigateToProfile(params?.tab || 'garage');
             } else if (screen === 'orders') {
               handleNavigateToProfile('orders');
             } else if (screen === 'notifications') {
@@ -983,14 +1069,33 @@ function MainAppRouter() {
 
   if (currentScreen === 'product-details') {
     return (
-      <ProductDetailsPage
-        product={selectedProductDetails}
-        onNavigateBack={() => navigateScreen('shop')}
-        onNavigateToStore={() => navigateScreen('shop')}
-        onNavigateToWishlist={() => navigateScreen('wishlist')}
-        onNavigateToOrders={() => handleNavigateToProfile('orders')}
-        onNavigateToLogin={() => navigateScreen('login')}
-      />
+      <View style={{ flex: 1 }}>
+        <ProductDetailsPage
+          product={selectedProductDetails}
+          onNavigateBack={() => navigateScreen('shop')}
+          onNavigateToStore={() => navigateScreen('shop')}
+          onNavigateToWishlist={() => navigateScreen('wishlist')}
+          onNavigateToOrders={() => handleNavigateToProfile('orders')}
+          onNavigateToLogin={() => navigateScreen('login')}
+          onRequireLogin={promptRequireLogin}
+        />
+        <RequireLoginModal
+          visible={requireLoginModal.visible}
+          title={requireLoginModal.title}
+          message={requireLoginModal.message}
+          actionLabel={requireLoginModal.actionLabel}
+          feature={requireLoginModal.feature}
+          onClose={closeRequireLoginModal}
+          onNavigateToLogin={(opts) => {
+            closeRequireLoginModal();
+            navigateScreen('login', opts);
+          }}
+          onNavigateToRegister={() => {
+            closeRequireLoginModal();
+            navigateScreen('signup');
+          }}
+        />
+      </View>
     );
   }
 
@@ -1028,6 +1133,7 @@ function MainAppRouter() {
         >
           <ShopPage
             onNavigateToWishlist={() => navigateScreen('wishlist')}
+            onRequireLogin={promptRequireLogin}
             onNavigateToScreen={(screen, params) => {
               if (params?.product) {
                 if (screen === 'customizer') {
@@ -1133,6 +1239,23 @@ function MainAppRouter() {
           />
         </View>
       )}
+
+      <RequireLoginModal
+        visible={requireLoginModal.visible}
+        title={requireLoginModal.title}
+        message={requireLoginModal.message}
+        actionLabel={requireLoginModal.actionLabel}
+        feature={requireLoginModal.feature}
+        onClose={closeRequireLoginModal}
+        onNavigateToLogin={(opts) => {
+          closeRequireLoginModal();
+          navigateScreen('login', opts);
+        }}
+        onNavigateToRegister={() => {
+          closeRequireLoginModal();
+          navigateScreen('signup');
+        }}
+      />
     </View>
   );
 }
@@ -1153,53 +1276,55 @@ function MainAppContainer() {
 
 export default function App() {
   const [fontsLoaded] = useFonts({
-    // Plus Jakarta Sans (Primary Application Font)
-    PlusJakartaSans: PlusJakartaSans_400Regular,
-    'Plus Jakarta Sans': PlusJakartaSans_400Regular,
-    'PlusJakartaSans-ExtraLight': PlusJakartaSans_200ExtraLight,
-    'PlusJakartaSans-Light': PlusJakartaSans_300Light,
-    'PlusJakartaSans-Regular': PlusJakartaSans_400Regular,
-    'PlusJakartaSans-Medium': PlusJakartaSans_500Medium,
-    'PlusJakartaSans-SemiBold': PlusJakartaSans_600SemiBold,
-    'PlusJakartaSans-Bold': PlusJakartaSans_700Bold,
-    'PlusJakartaSans-ExtraBold': PlusJakartaSans_800ExtraBold,
-    PlusJakartaSans_200ExtraLight,
-    PlusJakartaSans_300Light,
-    PlusJakartaSans_400Regular,
-    PlusJakartaSans_500Medium,
-    PlusJakartaSans_600SemiBold,
-    PlusJakartaSans_700Bold,
-    PlusJakartaSans_800ExtraBold,
-    // Native aliases mapped to Plus Jakarta Sans for instant adoption
-    Manrope: PlusJakartaSans_400Regular,
-    'Manrope-ExtraLight': PlusJakartaSans_200ExtraLight,
-    'Manrope-Light': PlusJakartaSans_300Light,
-    'Manrope-Regular': PlusJakartaSans_400Regular,
-    'Manrope-Medium': PlusJakartaSans_500Medium,
-    'Manrope-SemiBold': PlusJakartaSans_600SemiBold,
-    'Manrope-Bold': PlusJakartaSans_700Bold,
-    'Manrope-ExtraBold': PlusJakartaSans_800ExtraBold,
-    Manrope_200ExtraLight,
-    Manrope_300Light,
-    Manrope_400Regular,
-    Manrope_500Medium,
-    Manrope_600SemiBold,
-    Manrope_700Bold,
-    Manrope_800ExtraBold,
-    Inter: PlusJakartaSans_400Regular,
-    'Inter-Regular': PlusJakartaSans_400Regular,
-    'Inter-Light': PlusJakartaSans_300Light,
-    'Inter-Medium': PlusJakartaSans_500Medium,
-    'Inter-SemiBold': PlusJakartaSans_600SemiBold,
-    'Inter-Bold': PlusJakartaSans_700Bold,
-    'Inter-ExtraBold': PlusJakartaSans_800ExtraBold,
-    Poppins: PlusJakartaSans_400Regular,
-    'Poppins-Regular': PlusJakartaSans_400Regular,
-    'Poppins-Light': PlusJakartaSans_300Light,
-    'Poppins-Medium': PlusJakartaSans_500Medium,
-    'Poppins-SemiBold': PlusJakartaSans_600SemiBold,
-    'Poppins-Bold': PlusJakartaSans_700Bold,
-    'Poppins-ExtraBold': PlusJakartaSans_800ExtraBold,
+    // Inter (Primary Application Font)
+    Inter: Inter_400Regular,
+    'Inter': Inter_400Regular,
+    'Inter-ExtraLight': Inter_200ExtraLight,
+    'Inter-Light': Inter_300Light,
+    'Inter-Regular': Inter_400Regular,
+    'Inter-Medium': Inter_500Medium,
+    'Inter-SemiBold': Inter_600SemiBold,
+    'Inter-Bold': Inter_700Bold,
+    'Inter-ExtraBold': Inter_800ExtraBold,
+    Inter_200ExtraLight,
+    Inter_300Light,
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+    Inter_800ExtraBold,
+    // Native aliases mapped to Inter for backward compatibility
+    PlusJakartaSans: Inter_400Regular,
+    'Plus Jakarta Sans': Inter_400Regular,
+    'PlusJakartaSans-ExtraLight': Inter_200ExtraLight,
+    'PlusJakartaSans-Light': Inter_300Light,
+    'PlusJakartaSans-Regular': Inter_400Regular,
+    'PlusJakartaSans-Medium': Inter_500Medium,
+    'PlusJakartaSans-SemiBold': Inter_600SemiBold,
+    'PlusJakartaSans-Bold': Inter_700Bold,
+    'PlusJakartaSans-ExtraBold': Inter_800ExtraBold,
+    PlusJakartaSans_200ExtraLight: Inter_200ExtraLight,
+    PlusJakartaSans_300Light: Inter_300Light,
+    PlusJakartaSans_400Regular: Inter_400Regular,
+    PlusJakartaSans_500Medium: Inter_500Medium,
+    PlusJakartaSans_600SemiBold: Inter_600SemiBold,
+    PlusJakartaSans_700Bold: Inter_700Bold,
+    PlusJakartaSans_800ExtraBold: Inter_800ExtraBold,
+    Manrope: Inter_400Regular,
+    'Manrope-ExtraLight': Inter_200ExtraLight,
+    'Manrope-Light': Inter_300Light,
+    'Manrope-Regular': Inter_400Regular,
+    'Manrope-Medium': Inter_500Medium,
+    'Manrope-SemiBold': Inter_600SemiBold,
+    'Manrope-Bold': Inter_700Bold,
+    'Manrope-ExtraBold': Inter_800ExtraBold,
+    Poppins: Inter_400Regular,
+    'Poppins-Regular': Inter_400Regular,
+    'Poppins-Light': Inter_300Light,
+    'Poppins-Medium': Inter_500Medium,
+    'Poppins-SemiBold': Inter_600SemiBold,
+    'Poppins-Bold': Inter_700Bold,
+    'Poppins-ExtraBold': Inter_800ExtraBold,
   });
 
   return (

@@ -259,7 +259,7 @@ const styles = StyleSheet.create({
   },
   wrapCompact: { padding: 12 },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-  title: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
+  title: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
   sub: { fontSize: 12, color: '#64748B', marginTop: 2 },
   addBtn: {
     flexDirection: 'row',
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     padding: 16,
     maxHeight: '90%',
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A', marginBottom: 4 },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: '#0F172A', marginBottom: 4 },
   label: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6, marginTop: 4 },
   chip: {
     paddingHorizontal: 12,

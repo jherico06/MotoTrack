@@ -195,7 +195,7 @@ export default function ProductSizesEditor({
         activeOpacity={0.85}
       >
         <BootstrapIcon name="plus-lg" size={12} color="#EA580C" />
-        <Text style={{ fontSize: 12, fontWeight: '800', color: '#EA580C' }}>Add Size</Text>
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>Add Size</Text>
       </TouchableOpacity>
     </View>
   );

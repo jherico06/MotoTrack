@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -8,20 +8,26 @@ import {
   StyleSheet,
   ActivityIndicator,
   ScrollView,
-  Platform,
 } from 'react-native';
 import { BootstrapIcon } from '../common';
 import { useAuth } from '../../context';
 import { authService } from '../../services/auth/authService.js';
-import { adminSecurityService } from '../../services/auth/adminSecurityService.js';
 
 /**
- * Self-service account security for Store Administrators.
- * Allows changing login password and Admin Security PIN while unlocked.
+ * Self-service account & password modal for Store Administrators.
+ * Separated from Admin Security PIN management so password and PIN have independent modals.
  */
-export default function AdminAccountSettingsModal({ visible, onClose, onSaved, showToast = () => {} }) {
-  const { currentUser, updateProfile, changePassword } = useAuth();
+export default function AdminAccountSettingsModal({
+  visible,
+  onClose,
+  onSaved,
+  onSwitchToPin,
+  showToast = () => {},
+}) {
+  const { currentUser, updateProfile, changeEmail, changePassword } = useAuth();
 
+  const [prevVisible, setPrevVisible] = useState(false);
+  const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -30,53 +36,60 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
   const [showNewPwd, setShowNewPwd] = useState(false);
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
 
-  const [currentPin, setCurrentPin] = useState('');
-  const [newPin, setNewPin] = useState('');
-  const [confirmPin, setConfirmPin] = useState('');
-  const [showPins, setShowPins] = useState(false);
-
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Sync form state when modal becomes visible (standard React pattern without effect cascade)
+  if (visible && !prevVisible) {
+    setPrevVisible(true);
+    setEmail(currentUser?.email || '');
+    setName(currentUser?.name || currentUser?.fullName || '');
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowCurrentPwd(false);
+    setShowNewPwd(false);
+    setShowConfirmPwd(false);
+    setError('');
+    setSuccess('');
+  } else if (!visible && prevVisible) {
+    setPrevVisible(false);
+  }
 
   const pwdStrength = useMemo(
     () => authService.validatePasswordStrength(newPassword),
     [newPassword]
   );
 
-  useEffect(() => {
-    if (!visible || !currentUser) return;
-    setName(currentUser.name || currentUser.fullName || '');
-    setCurrentPassword('');
-    setNewPassword('');
-    setConfirmPassword('');
-    setCurrentPin('');
-    setNewPin('');
-    setConfirmPin('');
-    setShowCurrentPwd(false);
-    setShowNewPwd(false);
-    setShowConfirmPwd(false);
-    setShowPins(false);
-    setError('');
-    setSuccess('');
-    adminSecurityService.fetchPinFromSupabase(currentUser).catch(() => {});
-  }, [visible, currentUser]);
-
   const handleSave = async () => {
     setError('');
     setSuccess('');
 
+    const cleanEmail = email.trim().toLowerCase();
     const cleanName = name.trim();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setError('A valid login email address is required.');
+      return;
+    }
     if (!cleanName) {
       setError('Name is required.');
       return;
     }
 
-    const changingPassword = Boolean(currentPassword || newPassword || confirmPassword);
-    const changingPin = Boolean(currentPin || newPin || confirmPin);
+    const originalEmail = (currentUser?.email || '').trim().toLowerCase();
+    const originalName = (currentUser?.name || currentUser?.fullName || '').trim();
+    const changingEmail = cleanEmail !== originalEmail;
+    const changingName = cleanName !== originalName;
+    const changingPassword = Boolean( newPassword || confirmPassword );
 
-    if (!changingPassword && !changingPin && cleanName === (currentUser?.name || currentUser?.fullName || '')) {
-      setError('No changes to save.');
+    if (!changingEmail && !changingName && !changingPassword) {
+      setError('No changes to save. Update your email, full name, or enter a new password.');
+      return;
+    }
+
+    if (changingEmail && !currentPassword) {
+      setError('Enter your current password to authorize changing your login email.');
       return;
     }
 
@@ -97,27 +110,11 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
         setError('New password and confirmation do not match.');
         return;
       }
-      if (pwdStrength?.score != null && pwdStrength.score < 40) {
-        setError('Choose a stronger password (mix letters, numbers, and symbols).');
-        return;
-      }
-    }
-
-    if (changingPin) {
-      if (!currentPin.trim()) {
-        setError('Enter your current Admin PIN to set a new one.');
-        return;
-      }
-      if (!/^\d{4,6}$/.test(newPin.trim())) {
-        setError('New PIN must be 4 to 6 numeric digits.');
-        return;
-      }
-      if (newPin.trim() !== confirmPin.trim()) {
-        setError('New PIN and confirmation do not match.');
-        return;
-      }
-      if (newPin.trim() === currentPin.trim()) {
-        setError('New PIN cannot be the same as your current PIN.');
+      if (!pwdStrength?.isStrong) {
+        setError(
+          pwdStrength?.feedback ||
+            'Choose a strong password (min. 8 characters with uppercase, lowercase, number, and symbol).'
+        );
         return;
       }
     }
@@ -125,15 +122,31 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
     setSaving(true);
     try {
       const parts = [];
+      let updatedUser = currentUser;
 
-      const profileRes = await updateProfile({ name: cleanName });
-      if (!profileRes?.success) {
-        setError(profileRes?.error || 'Could not update profile.');
-        setSaving(false);
-        return;
-      }
-      if (cleanName !== (currentUser?.name || currentUser?.fullName || '')) {
+      if (changingName) {
+        const profileRes = await updateProfile({ name: cleanName });
+        if (!profileRes?.success) {
+          setError(profileRes?.error || 'Could not update profile.');
+          setSaving(false);
+          return;
+        }
+        updatedUser = profileRes.user || updatedUser;
         parts.push('name');
+      }
+
+      if (changingEmail) {
+        const emailRes = await changeEmail({
+          newEmail: cleanEmail,
+          currentPassword,
+        });
+        if (!emailRes?.success) {
+          setError(emailRes?.error || 'Email could not be updated.');
+          setSaving(false);
+          return;
+        }
+        updatedUser = emailRes.user || updatedUser;
+        parts.push('email');
       }
 
       if (changingPassword) {
@@ -142,30 +155,11 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
           newPassword,
         });
         if (!pwdRes?.success) {
-          setError(pwdRes?.error || 'Name saved, but password could not be updated.');
+          setError(pwdRes?.error || 'Password could not be updated.');
           setSaving(false);
           return;
         }
         parts.push('password');
-      }
-
-      if (changingPin) {
-        const pinRes = await adminSecurityService.setAdminPin(
-          currentPin.trim(),
-          newPin.trim(),
-          currentUser
-        );
-        if (!pinRes?.success) {
-          setError(
-            pinRes?.error ||
-              (parts.length
-                ? 'Other changes saved, but PIN could not be updated.'
-                : 'Could not update Admin PIN.')
-          );
-          setSaving(false);
-          return;
-        }
-        parts.push('PIN');
       }
 
       const message =
@@ -173,17 +167,14 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
           ? 'Account already up to date.'
           : parts.length === 1
             ? `${parts[0].charAt(0).toUpperCase()}${parts[0].slice(1)} updated successfully.`
-            : `Updated ${parts.join(', ').replace(/, ([^,]*)$/, ' and $1')}.`;
+            : `Updated ${parts.join(' and ')}.`;
 
       setSuccess(message);
       showToast(`✓ ${message}`);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
-      setCurrentPin('');
-      setNewPin('');
-      setConfirmPin('');
-      onSaved?.(profileRes.user || currentUser);
+      onSaved?.(updatedUser);
     } catch (_e) {
       setError('Something went wrong while saving your account.');
     } finally {
@@ -192,19 +183,19 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <View style={styles.sheet}>
           <View style={styles.header}>
             <View style={{ flex: 1, paddingRight: 12 }}>
               <View style={styles.titleRow}>
                 <View style={styles.iconWrap}>
-                  <BootstrapIcon name="shield-lock-fill" size={17} color="#EA580C" />
+                  <BootstrapIcon name="key-fill" size={17} color="#EA580C" />
                 </View>
-                <Text style={styles.title}>Admin Account</Text>
+                <Text style={styles.title}>Change Password & Account</Text>
               </View>
               <Text style={styles.subtitle}>
-                Change your login password and Admin Security PIN. Only you can update these.
+                Update your administrator display name and login password.
               </Text>
             </View>
             <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.7}>
@@ -213,11 +204,15 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
           </View>
 
           <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
-            <Text style={styles.label}>Login email (read-only)</Text>
+            <Text style={styles.label}>Login email</Text>
             <TextInput
-              style={[styles.input, styles.inputReadonly]}
-              value={currentUser?.email || ''}
-              editable={false}
+              style={styles.input}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              placeholder="admin@mototrack.com"
+              placeholderTextColor="#94A3B8"
             />
 
             <Text style={styles.label}>Full name</Text>
@@ -230,7 +225,9 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
             />
 
             <Text style={styles.section}>Change password</Text>
-            <Text style={styles.hint}>Leave blank if you only want to update your PIN or name.</Text>
+            <Text style={styles.hint}>
+              Enter your current login password and choose a new password (min. 8 characters).
+            </Text>
 
             <Text style={styles.label}>Current password</Text>
             <View style={styles.pwdWrap}>
@@ -240,7 +237,7 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
                 onChangeText={setCurrentPassword}
                 secureTextEntry={!showCurrentPwd}
                 autoCapitalize="none"
-                placeholder="Required only when changing password"
+                placeholder="Enter current login password"
                 placeholderTextColor="#94A3B8"
               />
               <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowCurrentPwd((v) => !v)}>
@@ -268,7 +265,7 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
               <View style={styles.strengthCard}>
                 <Text style={styles.strengthLabel}>
                   Strength:{' '}
-                  <Text style={{ color: pwdStrength.color, fontWeight: '900' }}>{pwdStrength.label}</Text>
+                  <Text style={{ color: pwdStrength.color, fontWeight: '600' }}>{pwdStrength.label}</Text>
                 </Text>
                 <View style={styles.strengthTrack}>
                   <View
@@ -297,58 +294,15 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
               </TouchableOpacity>
             </View>
 
-            <Text style={styles.section}>Change Admin Security PIN</Text>
-            <Text style={styles.hint}>
-              PIN locks the admin console after idle time. Must be 4–6 digits. Leave blank to keep current PIN.
-            </Text>
-
-            <View style={styles.pinToggleRow}>
-              <Text style={styles.label}>PIN fields</Text>
-              <TouchableOpacity
-                style={styles.pinToggleBtn}
-                onPress={() => setShowPins((v) => !v)}
-                activeOpacity={0.8}
-              >
-                <BootstrapIcon name={showPins ? 'eye-slash' : 'eye'} size={13} color="#EA580C" />
-                <Text style={styles.pinToggleText}>{showPins ? 'Hide' : 'Show'}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.label}>Current PIN</Text>
-            <TextInput
-              style={styles.input}
-              value={currentPin}
-              onChangeText={(v) => setCurrentPin(v.replace(/[^\d]/g, '').slice(0, 6))}
-              secureTextEntry={!showPins}
-              keyboardType="number-pad"
-              maxLength={6}
-              placeholder="Current 4–6 digit PIN"
-              placeholderTextColor="#94A3B8"
-            />
-
-            <Text style={styles.label}>New PIN</Text>
-            <TextInput
-              style={styles.input}
-              value={newPin}
-              onChangeText={(v) => setNewPin(v.replace(/[^\d]/g, '').slice(0, 6))}
-              secureTextEntry={!showPins}
-              keyboardType="number-pad"
-              maxLength={6}
-              placeholder="New 4–6 digit PIN"
-              placeholderTextColor="#94A3B8"
-            />
-
-            <Text style={styles.label}>Confirm new PIN</Text>
-            <TextInput
-              style={styles.input}
-              value={confirmPin}
-              onChangeText={(v) => setConfirmPin(v.replace(/[^\d]/g, '').slice(0, 6))}
-              secureTextEntry={!showPins}
-              keyboardType="number-pad"
-              maxLength={6}
-              placeholder="Re-enter new PIN"
-              placeholderTextColor="#94A3B8"
-            />
+            {onSwitchToPin ? (
+              <View style={styles.switchRow}>
+                <TouchableOpacity onPress={onSwitchToPin} activeOpacity={0.7}>
+                  <Text style={styles.switchLinkText}>
+                    Want to update your console lock PIN? Open Admin Security PIN →
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
             {error ? (
               <View style={styles.errorBox}>
@@ -376,7 +330,7 @@ export default function AdminAccountSettingsModal({ visible, onClose, onSaved, s
               {saving ? (
                 <ActivityIndicator color="#FFFFFF" />
               ) : (
-                <Text style={styles.saveText}>Save Changes</Text>
+                <Text style={styles.saveText}>Save Password</Text>
               )}
             </TouchableOpacity>
           </View>
@@ -390,32 +344,29 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: 'flex-end',
-    padding: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
   },
   sheet: {
     width: '100%',
-    maxWidth: 600,
+    maxWidth: 500,
     maxHeight: '92%',
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
+    borderRadius: 24,
     overflow: 'hidden',
     alignSelf: 'center',
-    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
     elevation: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 14,
     borderBottomWidth: 1,
@@ -440,15 +391,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
+  title: { fontSize: 17, fontWeight: '700', color: '#0F172A' },
   subtitle: { fontSize: 12, color: '#64748B', marginTop: 2, lineHeight: 17 },
-  body: { paddingHorizontal: 18, paddingTop: 14 },
-  label: { fontSize: 12, fontWeight: '700', color: '#475569', marginBottom: 6 },
+  body: { paddingHorizontal: 20, paddingTop: 16 },
+  label: { fontSize: 12, fontWeight: '600', color: '#475569', marginBottom: 6 },
   section: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#EA580C',
-    marginTop: 10,
+    marginTop: 6,
     marginBottom: 4,
     letterSpacing: 0.3,
   },
@@ -491,7 +442,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 12,
   },
-  strengthLabel: { fontSize: 11, fontWeight: '700', color: '#475569', marginBottom: 6 },
+  strengthLabel: { fontSize: 11, fontWeight: '600', color: '#475569', marginBottom: 6 },
   strengthTrack: {
     height: 6,
     borderRadius: 999,
@@ -499,22 +450,15 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   strengthFill: { height: '100%', borderRadius: 999 },
-  pinToggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 2,
+  switchRow: {
+    marginTop: 2,
+    marginBottom: 12,
   },
-  pinToggleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: '#F3F7F6',
+  switchLinkText: {
+    fontSize: 11.5,
+    fontWeight: '600',
+    color: '#EA580C',
   },
-  pinToggleText: { fontSize: 11, fontWeight: '800', color: '#EA580C' },
   errorBox: {
     backgroundColor: '#FEF2F2',
     borderRadius: 8,
@@ -550,14 +494,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  cancelText: { color: '#64748B', fontWeight: '700' },
+  cancelText: { color: '#64748B', fontWeight: '600' },
   saveBtn: {
     backgroundColor: '#EA580C',
     borderRadius: 14,
     paddingHorizontal: 18,
     paddingVertical: 12,
-    minWidth: 130,
+    minWidth: 140,
     alignItems: 'center',
   },
-  saveText: { color: '#FFFFFF', fontWeight: '800' },
+  saveText: { color: '#FFFFFF', fontWeight: '600' },
 });

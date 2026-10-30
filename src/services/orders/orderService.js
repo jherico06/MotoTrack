@@ -667,11 +667,22 @@ class OrderService {
    * options.force=true bypasses the short in-memory TTL (used after mutations).
    */
   async getUserOrders(userId, customerId, customerName, currentUser = null, options = {}) {
+    const hasUser = Boolean(
+      userId ||
+      customerId ||
+      currentUser?.id ||
+      currentUser?.user_id ||
+      currentUser?.customer_id
+    );
+    if (!hasUser && !options?.allowAll) {
+      return [];
+    }
+
     const force = Boolean(options?.force);
     const cacheKey = [
       userId || currentUser?.id || currentUser?.user_id || '',
       customerId || currentUser?.customer_id || '',
-      'u',
+      options?.allowAll ? 'all' : 'u',
     ].join('|');
 
     if (!force) {
@@ -684,7 +695,7 @@ class OrderService {
       }
     }
 
-    const run = this._getUserOrdersUncached(userId, customerId, customerName, currentUser);
+    const run = this._getUserOrdersUncached(userId, customerId, customerName, currentUser, options);
     ordersFetchInFlight = run;
     ordersFetchInFlightKey = cacheKey;
     try {
@@ -699,7 +710,17 @@ class OrderService {
     }
   }
 
-  async _getUserOrdersUncached(userId, customerId, customerName, currentUser = null) {
+  async _getUserOrdersUncached(userId, customerId, customerName, currentUser = null, options = {}) {
+    const hasUser = Boolean(
+      userId ||
+      customerId ||
+      currentUser?.id ||
+      currentUser?.user_id ||
+      currentUser?.customer_id
+    );
+    if (!hasUser && !options?.allowAll) {
+      return [];
+    }
     // Never sync create_order before fetch — that re-inserts rows deleted in Supabase.
     try {
       await this.syncPendingOrders({ skipCreates: true });
@@ -909,7 +930,7 @@ class OrderService {
   }
 
   async getAllOrders(options = {}) {
-    return this.getUserOrders(null, null, null, null, options);
+    return this.getUserOrders(null, null, null, null, { ...options, allowAll: true });
   }
 
   /** Public helper for UI filters / live subscriptions */

@@ -359,7 +359,7 @@ export default function BookInstallationModal({
                         <Text
                           style={[
                             styles.locationName,
-                            { color: INK, fontWeight: isSelected ? '800' : '700' },
+                            { color: INK, fontWeight: isSelected ? '600' : '500' },
                           ]}
                         >
                           {branch.name}
@@ -757,7 +757,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: -0.2,
   },
   headerSubtitle: {
@@ -851,7 +851,7 @@ const styles = StyleSheet.create({
   },
   serviceTitle: {
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   bikeModelRow: {
     flexDirection: 'row',
@@ -868,7 +868,7 @@ const styles = StyleSheet.create({
   },
   priceAmount: {
     fontSize: 19,
-    fontWeight: '900',
+    fontWeight: '600',
     letterSpacing: -0.3,
   },
   priceSublabel: {
@@ -888,7 +888,7 @@ const styles = StyleSheet.create({
   },
   freeBadgeText: {
     fontSize: 11.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#065F46',
   },
   feeNoteRow: {
@@ -915,7 +915,7 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     fontSize: 13.5,
-    fontWeight: '800',
+    fontWeight: '700',
     letterSpacing: -0.2,
   },
   sectionSub: {
@@ -1106,7 +1106,7 @@ const styles = StyleSheet.create({
   },
   footerPriceLabel: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.5,
   },
   footerPriceRow: {
@@ -1115,7 +1115,7 @@ const styles = StyleSheet.create({
   },
   footerPriceVal: {
     fontSize: 18,
-    fontWeight: '900',
+    fontWeight: '600',
     letterSpacing: -0.2,
   },
   footerPriceSub: {
@@ -1157,7 +1157,7 @@ const styles = StyleSheet.create({
   },
   confirmBtnText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#FFFFFF',
     letterSpacing: 0.1,
   },

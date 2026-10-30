@@ -36,6 +36,8 @@ export default function LoginPageWeb({
     validatePasswordStrength,
     sendSignupOtp,
     verifySignupOtp,
+    requestPasswordResetOtp,
+    confirmPasswordResetOtp,
   } = useAuth();
 
   // Active Mode: 'signin' | 'signup'
@@ -123,6 +125,97 @@ export default function LoginPageWeb({
   const [resendTimer, setResendTimer] = useState(60);
   const [canResend, setCanResend] = useState(false);
   const otpInputRefs = useRef([]);
+
+  // Forgot Password Modal State
+  const [forgotModalVisible, setForgotModalVisible] = useState(false);
+  const [forgotStep, setForgotStep] = useState(1); // 1 = Request OTP, 2 = Enter OTP + New Password
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+  const [forgotInfo, setForgotInfo] = useState('');
+
+  const handleOpenForgotPassword = () => {
+    setForgotEmail(signInEmail.trim());
+    setForgotStep(1);
+    setForgotOtp('');
+    setForgotNewPassword('');
+    setForgotConfirmPassword('');
+    setForgotError('');
+    setForgotInfo('');
+    setForgotModalVisible(true);
+  };
+
+  const handleRequestForgotOtp = async () => {
+    setForgotError('');
+    setForgotInfo('');
+    const cleanEmail = forgotEmail.trim().toLowerCase();
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setForgotError('Please enter a valid registered email address.');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const res = await requestPasswordResetOtp?.({ email: cleanEmail });
+      if (!res?.success) {
+        setForgotError(res?.error || 'Could not send password reset code.');
+        return;
+      }
+      setForgotStep(2);
+      setForgotInfo(res.message || `A 6-digit password reset code has been sent to ${cleanEmail}.`);
+    } catch (err) {
+      setForgotError(err?.message || 'Could not send password reset code.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleConfirmForgotPassword = async () => {
+    setForgotError('');
+    const cleanEmail = forgotEmail.trim().toLowerCase();
+    const cleanOtp = forgotOtp.replace(/\D/g, '').slice(0, 6);
+    if (cleanOtp.length !== 6) {
+      setForgotError('Please enter the 6-digit verification code sent to your email.');
+      return;
+    }
+    const analysis = validatePasswordStrength ? validatePasswordStrength(forgotNewPassword) : null;
+    if (analysis && !analysis.isStrong) {
+      setForgotError(
+        analysis.feedback ||
+          'New password must be at least 8 characters with uppercase, lowercase, number, and symbol.'
+      );
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setForgotError('New password and confirmation do not match.');
+      return;
+    }
+    setForgotLoading(true);
+    try {
+      const res = await confirmPasswordResetOtp?.({
+        email: cleanEmail,
+        otp: cleanOtp,
+        newPassword: forgotNewPassword,
+      });
+      if (!res?.success) {
+        setForgotError(res?.error || 'Password reset failed.');
+        return;
+      }
+      setForgotModalVisible(false);
+      setSignInEmail(cleanEmail);
+      setSignInPassword('');
+      setAuthSuccessNotification(
+        res.message || 'Password reset complete! You can now sign in with your new password.'
+      );
+    } catch (err) {
+      setForgotError(err?.message || 'Password reset failed.');
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   // Input Refs for smooth keyboard traversal & enter-to-submit
   const signInEmailRef = useRef(null);
@@ -451,7 +544,9 @@ export default function LoginPageWeb({
       {authSuccessNotification ? (
         <View style={authStyles.successBadge}>
           <BootstrapIcon name="check-circle" size={14} color="#065F46" />
-          <Text style={[authStyles.successBadgeText, { fontFamily: fontFamily.sans }]}>{authSuccessNotification}</Text>
+          <Text style={[authStyles.successBadgeText, { fontFamily: fontFamily.sans }]}>
+            {authSuccessNotification}
+          </Text>
         </View>
       ) : null}
 
@@ -463,12 +558,7 @@ export default function LoginPageWeb({
       )}
 
       {/* Email / Username Input */}
-      <View
-        style={[
-          authStyles.inputWrap,
-          focusedField === 'signInEmail' && authStyles.inputWrapFocused,
-        ]}
-      >
+      <View style={[authStyles.inputWrap, focusedField === 'signInEmail' && authStyles.inputWrapFocused]}>
         <BootstrapIcon
           name="envelope"
           size={16}
@@ -501,12 +591,7 @@ export default function LoginPageWeb({
       </View>
 
       {/* Password Input */}
-      <View
-        style={[
-          authStyles.inputWrap,
-          focusedField === 'signInPassword' && authStyles.inputWrapFocused,
-        ]}
-      >
+      <View style={[authStyles.inputWrap, focusedField === 'signInPassword' && authStyles.inputWrapFocused]}>
         <BootstrapIcon
           name="lock"
           size={16}
@@ -549,25 +634,20 @@ export default function LoginPageWeb({
           onPress={() => setRememberMe((prev) => !prev)}
           activeOpacity={0.8}
         >
-          <View
-            style={[
-              authStyles.rememberCheckbox,
-              rememberMe && authStyles.rememberCheckboxChecked,
-            ]}
-          >
-            {rememberMe ? (
-              <BootstrapIcon name="check" size={12} color="#FFFFFF" />
-            ) : null}
+          <View style={[authStyles.rememberCheckbox, rememberMe && authStyles.rememberCheckboxChecked]}>
+            {rememberMe ? <BootstrapIcon name="check" size={12} color="#FFFFFF" /> : null}
           </View>
           <Text style={[authStyles.rememberMeText, { fontFamily: fontFamily.sans }]}>Remember me</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={authStyles.forgotPasswordBtn}
-          onPress={() => alert('Password reset verification link sent to registered email.')}
+          onPress={handleOpenForgotPassword}
           activeOpacity={0.8}
         >
-          <Text style={[authStyles.forgotPasswordText, { fontFamily: fontFamily.sans }]}>Forgot Password?</Text>
+          <Text style={[authStyles.forgotPasswordText, { fontFamily: fontFamily.sans }]}>
+            Forgot Password?
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -659,12 +739,24 @@ export default function LoginPageWeb({
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
             <BootstrapIcon name="info-circle-fill" size={14} color="#B45309" />
-            <Text style={{ fontWeight: '800', fontSize: 12.5, color: '#92400E', fontFamily: fontFamily.sans }}>
+            <Text
+              style={{ fontWeight: '600', fontSize: 12.5, color: '#92400E', fontFamily: fontFamily.sans }}
+            >
               Google OAuth Setup Required
             </Text>
           </View>
-          <Text style={{ fontSize: 11.5, color: '#78350F', lineHeight: 16, marginBottom: 10, fontFamily: fontFamily.sans }}>
-            Google provider is not enabled yet in your Supabase project (vtbdmurblidtdghaotne). Enable Google in Supabase Dashboard &gt; Authentication &gt; Providers. In the meantime, you can test immediately with one click:
+          <Text
+            style={{
+              fontSize: 11.5,
+              color: '#78350F',
+              lineHeight: 16,
+              marginBottom: 10,
+              fontFamily: fontFamily.sans,
+            }}
+          >
+            Google provider is not enabled yet in your Supabase project (vtbdmurblidtdghaotne). Enable Google
+            in Supabase Dashboard &gt; Authentication &gt; Providers. In the meantime, you can test
+            immediately with one click:
           </Text>
 
           <TouchableOpacity
@@ -680,16 +772,26 @@ export default function LoginPageWeb({
             onPress={handleGoogleInstantTest}
             activeOpacity={0.85}
           >
-            <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12, fontFamily: fontFamily.sans }}>
+            <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 12, fontFamily: fontFamily.sans }}>
               ✓ Test Sign In as Google Rider (Instant)
             </Text>
           </TouchableOpacity>
 
-          <View style={{ backgroundColor: '#FFFFFF', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}>
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              padding: 8,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: '#FDE68A',
+            }}
+          >
             <Text style={{ fontSize: 10.5, color: '#64748B', marginBottom: 2, fontFamily: fontFamily.sans }}>
               Your Supabase Redirect URI:
             </Text>
-            <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#EA580C', fontFamily: fontFamily.sans }}>
+            <Text
+              style={{ fontSize: 10.5, fontWeight: '700', color: '#EA580C', fontFamily: fontFamily.sans }}
+            >
               https://vtbdmurblidtdghaotne.supabase.co/auth/v1/callback
             </Text>
           </View>
@@ -709,7 +811,9 @@ export default function LoginPageWeb({
         // ─── SIGN UP STEP 1: CREDENTIALS & STRONG PASSWORD ───
         <>
           <Text style={[authStyles.formHeading, { fontFamily: fontFamily.sans }]}>Create Account</Text>
-          <Text style={[authStyles.mutedSubtext, { fontFamily: fontFamily.sans }]}>Join {brandSettings.storeName || 'MotoTrack'} Community</Text>
+          <Text style={[authStyles.mutedSubtext, { fontFamily: fontFamily.sans }]}>
+            Join {brandSettings.storeName || 'MotoTrack'} Community
+          </Text>
 
           {signUpError.length > 0 && (
             <View style={authStyles.errorBadge}>
@@ -719,12 +823,7 @@ export default function LoginPageWeb({
           )}
 
           {/* Name */}
-          <View
-            style={[
-              authStyles.inputWrap,
-              focusedField === 'signUpName' && authStyles.inputWrapFocused,
-            ]}
-          >
+          <View style={[authStyles.inputWrap, focusedField === 'signUpName' && authStyles.inputWrapFocused]}>
             <BootstrapIcon
               name="person"
               size={16}
@@ -749,12 +848,7 @@ export default function LoginPageWeb({
           </View>
 
           {/* Email */}
-          <View
-            style={[
-              authStyles.inputWrap,
-              focusedField === 'signUpEmail' && authStyles.inputWrapFocused,
-            ]}
-          >
+          <View style={[authStyles.inputWrap, focusedField === 'signUpEmail' && authStyles.inputWrapFocused]}>
             <BootstrapIcon
               name="envelope"
               size={16}
@@ -781,12 +875,7 @@ export default function LoginPageWeb({
           </View>
 
           {/* Phone */}
-          <View
-            style={[
-              authStyles.inputWrap,
-              focusedField === 'signUpPhone' && authStyles.inputWrapFocused,
-            ]}
-          >
+          <View style={[authStyles.inputWrap, focusedField === 'signUpPhone' && authStyles.inputWrapFocused]}>
             <BootstrapIcon
               name="phone"
               size={16}
@@ -813,10 +902,7 @@ export default function LoginPageWeb({
 
           {/* Delivery Address */}
           <View
-            style={[
-              authStyles.inputWrap,
-              focusedField === 'signUpAddress' && authStyles.inputWrapFocused,
-            ]}
+            style={[authStyles.inputWrap, focusedField === 'signUpAddress' && authStyles.inputWrapFocused]}
           >
             <BootstrapIcon
               name="geo-alt"
@@ -844,10 +930,7 @@ export default function LoginPageWeb({
 
           {/* Password */}
           <View
-            style={[
-              authStyles.inputWrap,
-              focusedField === 'signUpPassword' && authStyles.inputWrapFocused,
-            ]}
+            style={[authStyles.inputWrap, focusedField === 'signUpPassword' && authStyles.inputWrapFocused]}
           >
             <BootstrapIcon
               name="lock"
@@ -889,8 +972,15 @@ export default function LoginPageWeb({
           {signUpPassword.length > 0 && (
             <View style={authStyles.strengthMeterBox}>
               <View style={authStyles.strengthHeader}>
-                <Text style={[authStyles.strengthLabel, { fontFamily: fontFamily.sans }]}>Password Strength:</Text>
-                <Text style={[authStyles.strengthBadge, { color: passwordAnalysis.color, fontFamily: fontFamily.sans }]}>
+                <Text style={[authStyles.strengthLabel, { fontFamily: fontFamily.sans }]}>
+                  Password Strength:
+                </Text>
+                <Text
+                  style={[
+                    authStyles.strengthBadge,
+                    { color: passwordAnalysis.color, fontFamily: fontFamily.sans },
+                  ]}
+                >
                   {passwordAnalysis.label} ({passwordAnalysis.score}%)
                 </Text>
               </View>
@@ -1067,7 +1157,9 @@ export default function LoginPageWeb({
           {signUpSuccessMsg ? (
             <View style={authStyles.successBadge}>
               <BootstrapIcon name="check-circle" size={13} color="#065F46" />
-              <Text style={[authStyles.successBadgeText, { fontFamily: fontFamily.sans }]}>{signUpSuccessMsg}</Text>
+              <Text style={[authStyles.successBadgeText, { fontFamily: fontFamily.sans }]}>
+                {signUpSuccessMsg}
+              </Text>
             </View>
           ) : null}
 
@@ -1084,7 +1176,11 @@ export default function LoginPageWeb({
               <TextInput
                 key={idx}
                 ref={(el) => (otpInputRefs.current[idx] = el)}
-                style={[authStyles.otpBox, digit ? authStyles.otpBoxFilled : null, { fontFamily: fontFamily.sans }]}
+                style={[
+                  authStyles.otpBox,
+                  digit ? authStyles.otpBoxFilled : null,
+                  { fontFamily: fontFamily.sans },
+                ]}
                 value={digit}
                 onChangeText={(val) => handleOtpChange(val, idx)}
                 onKeyPress={(e) => handleOtpKeyPress(e, idx)}
@@ -1111,13 +1207,17 @@ export default function LoginPageWeb({
 
           {/* Resend Timer Row */}
           <View style={authStyles.resendRow}>
-            <Text style={[authStyles.resendText, { fontFamily: fontFamily.sans }]}>Didn't receive code? </Text>
+            <Text style={[authStyles.resendText, { fontFamily: fontFamily.sans }]}>
+              Didn't receive code?{' '}
+            </Text>
             {canResend ? (
               <TouchableOpacity onPress={handleResendOtp} activeOpacity={0.8}>
                 <Text style={[authStyles.resendLink, { fontFamily: fontFamily.sans }]}>Resend Code</Text>
               </TouchableOpacity>
             ) : (
-              <Text style={[authStyles.resendCountdown, { fontFamily: fontFamily.sans }]}>Resend in {resendTimer}s</Text>
+              <Text style={[authStyles.resendCountdown, { fontFamily: fontFamily.sans }]}>
+                Resend in {resendTimer}s
+              </Text>
             )}
           </View>
         </View>
@@ -1172,7 +1272,7 @@ export default function LoginPageWeb({
           <Text
             style={{
               fontSize: 22,
-              fontWeight: '900',
+              fontWeight: '600',
               color: '#EA580C',
               textAlign: 'center',
               marginBottom: 8,
@@ -1192,7 +1292,9 @@ export default function LoginPageWeb({
               fontFamily: fontFamily.sans,
             }}
           >
-            Welcome to {brandSettings.storeName || 'MotoTrack'}, <Text style={{ fontWeight: '700', color: '#0F172A' }}>{createdUserName}</Text>! Your email has been verified. Please sign in with your password to continue to the storefront.
+            Welcome to {brandSettings.storeName || 'MotoTrack'},{' '}
+            <Text style={{ fontWeight: '700', color: '#0F172A' }}>{createdUserName}</Text>! Your email has
+            been verified. Please sign in with your password to continue to the storefront.
           </Text>
 
           <TouchableOpacity
@@ -1213,7 +1315,7 @@ export default function LoginPageWeb({
             <Text
               style={{
                 color: '#FFFFFF',
-                fontWeight: '900',
+                fontWeight: '600',
                 fontSize: 13.5,
                 letterSpacing: 0.5,
                 fontFamily: fontFamily.sans,
@@ -1222,6 +1324,238 @@ export default function LoginPageWeb({
               PROCEED TO SIGN IN ➔
             </Text>
           </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderForgotPasswordModal = () => {
+    if (!forgotModalVisible) return null;
+    const forgotPwdAnalysis = validatePasswordStrength
+      ? validatePasswordStrength(forgotNewPassword)
+      : { isStrong: forgotNewPassword.length >= 8, score: 100, color: '#10B981', label: 'Strong' };
+
+    return (
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(24, 26, 29, 0.85)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 999,
+          padding: 20,
+        }}
+      >
+        <View
+          style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 24,
+            padding: 32,
+            maxWidth: 460,
+            width: '100%',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.35)',
+            borderWidth: 1.5,
+            borderColor: '#E2E8F0',
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 14,
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View
+                style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 12,
+                  backgroundColor: '#FFF7ED',
+                  borderWidth: 1,
+                  borderColor: '#FED7AA',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}
+              >
+                <BootstrapIcon name="key-fill" size={18} color="#EA580C" />
+              </View>
+              <View>
+                <Text
+                  style={{ fontSize: 18, fontWeight: '700', color: '#0F172A', fontFamily: fontFamily.sans }}
+                >
+                  Account Password Recovery
+                </Text>
+                <Text style={{ fontSize: 12, color: '#64748B', fontFamily: fontFamily.sans }}>
+                  {forgotStep === 1
+                    ? 'Step 1 of 2 — Verify registered email'
+                    : 'Step 2 of 2 — Enter OTP & new password'}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity
+              onPress={() => setForgotModalVisible(false)}
+              style={{ padding: 6, cursor: 'pointer' }}
+              activeOpacity={0.7}
+            >
+              <BootstrapIcon name="x-lg" size={16} color="#64748B" />
+            </TouchableOpacity>
+          </View>
+
+          {forgotInfo ? (
+            <View style={[authStyles.successBadge, { marginBottom: 12 }]}>
+              <BootstrapIcon name="check-circle-fill" size={14} color="#059669" />
+              <Text style={[authStyles.successBadgeText, { fontFamily: fontFamily.sans }]}>{forgotInfo}</Text>
+            </View>
+          ) : null}
+
+          {forgotError ? (
+            <View style={[authStyles.errorBadge, { marginBottom: 12 }]}>
+              <BootstrapIcon name="exclamation-circle" size={14} color="#DC2626" />
+              <Text style={[authStyles.errorBadgeText, { fontFamily: fontFamily.sans }]}>{forgotError}</Text>
+            </View>
+          ) : null}
+
+          {forgotStep === 1 ? (
+            <>
+              <Text
+                style={{
+                  fontSize: 13,
+                  color: '#475569',
+                  lineHeight: 19,
+                  marginBottom: 14,
+                  fontFamily: fontFamily.sans,
+                }}
+              >
+                Enter your registered account or administrator email address. We will send a 6-digit
+                verification code to reset your password.
+              </Text>
+
+              <View style={[authStyles.inputWrap, { marginBottom: 18 }]}>
+                <BootstrapIcon name="envelope" size={16} color="#64748B" />
+                <TextInput
+                  style={[authStyles.textInput, { fontFamily: fontFamily.sans }]}
+                  placeholder="Registered Email Address"
+                  placeholderTextColor="#64748B"
+                  value={forgotEmail}
+                  onChangeText={(t) => {
+                    setForgotEmail(t);
+                    if (forgotError) setForgotError('');
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  returnKeyType="go"
+                  onSubmitEditing={handleRequestForgotOtp}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[authStyles.primaryTealBtn, forgotLoading && authStyles.primaryTealBtnDisabled]}
+                onPress={handleRequestForgotOtp}
+                disabled={forgotLoading}
+                activeOpacity={0.85}
+              >
+                <Text style={[authStyles.primaryTealBtnText, { fontFamily: fontFamily.sans }]}>
+                  {forgotLoading ? 'SENDING CODE...' : 'SEND 6-DIGIT RECOVERY CODE'}
+                </Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <View style={[authStyles.inputWrap, { marginBottom: 12 }]}>
+                <BootstrapIcon name="shield-lock" size={16} color="#EA580C" />
+                <TextInput
+                  style={[
+                    authStyles.textInput,
+                    { fontFamily: fontFamily.sans, letterSpacing: 3, fontWeight: '700' },
+                  ]}
+                  placeholder="6-Digit OTP Code"
+                  placeholderTextColor="#64748B"
+                  value={forgotOtp}
+                  onChangeText={(t) => {
+                    setForgotOtp(t.replace(/\D/g, '').slice(0, 6));
+                    if (forgotError) setForgotError('');
+                  }}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                />
+              </View>
+
+              <View style={[authStyles.inputWrap, { marginBottom: 12 }]}>
+                <BootstrapIcon name="lock" size={16} color="#64748B" />
+                <TextInput
+                  style={[authStyles.textInput, { fontFamily: fontFamily.sans }]}
+                  placeholder="New Strong Password"
+                  placeholderTextColor="#64748B"
+                  value={forgotNewPassword}
+                  onChangeText={(t) => {
+                    setForgotNewPassword(t);
+                    if (forgotError) setForgotError('');
+                  }}
+                  secureTextEntry={!showForgotPassword}
+                  autoCapitalize="none"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowForgotPassword(!showForgotPassword)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <BootstrapIcon name={showForgotPassword ? 'eye-slash' : 'eye'} size={16} color="#64748B" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={[authStyles.inputWrap, { marginBottom: 16 }]}>
+                <BootstrapIcon name="lock-fill" size={16} color="#64748B" />
+                <TextInput
+                  style={[authStyles.textInput, { fontFamily: fontFamily.sans }]}
+                  placeholder="Confirm New Password"
+                  placeholderTextColor="#64748B"
+                  value={forgotConfirmPassword}
+                  onChangeText={(t) => {
+                    setForgotConfirmPassword(t);
+                    if (forgotError) setForgotError('');
+                  }}
+                  secureTextEntry={!showForgotPassword}
+                  autoCapitalize="none"
+                  returnKeyType="go"
+                  onSubmitEditing={handleConfirmForgotPassword}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  authStyles.primaryTealBtn,
+                  (!forgotPwdAnalysis.isStrong || forgotLoading) && authStyles.primaryTealBtnDisabled,
+                ]}
+                onPress={handleConfirmForgotPassword}
+                disabled={!forgotPwdAnalysis.isStrong || forgotLoading}
+                activeOpacity={0.85}
+              >
+                <Text style={[authStyles.primaryTealBtnText, { fontFamily: fontFamily.sans }]}>
+                  {forgotLoading ? 'UPDATING PASSWORD...' : 'VERIFY OTP & RESET PASSWORD'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setForgotStep(1);
+                  setForgotError('');
+                }}
+                style={{ marginTop: 12, alignItems: 'center', cursor: 'pointer' }}
+                activeOpacity={0.75}
+              >
+                <Text
+                  style={{ fontSize: 12.5, color: '#EA580C', fontWeight: '600', fontFamily: fontFamily.sans }}
+                >
+                  ← Back / Resend code to {forgotEmail}
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       </View>
     );
@@ -1245,14 +1579,14 @@ export default function LoginPageWeb({
               activeOpacity={0.8}
             >
               <BootstrapIcon name="arrow-left" size={13} color="#475569" />
-              <Text style={[authStyles.mobileBackBtnText, { fontFamily: fontFamily.sans }]}>Back to Store</Text>
+              <Text style={[authStyles.mobileBackBtnText, { fontFamily: fontFamily.sans }]}>
+                Back to Store
+              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Form Container (Full Width up to 480px) */}
-          <View style={authStyles.mobileFormCard}>
-            {isSignUp ? signUpFormContent : signInFormContent}
-          </View>
+          <View style={authStyles.mobileFormCard}>{isSignUp ? signUpFormContent : signInFormContent}</View>
 
           {/* Compact Charcoal Welcome / Sign-Up / Sign-In Section */}
           <View style={authStyles.mobileWelcomeSection}>
@@ -1261,18 +1595,16 @@ export default function LoginPageWeb({
               {isSignUp ? 'Welcome Back!' : 'Hello!'}
             </Text>
             <Text style={[authStyles.mobileWelcomeSubtitle, { fontFamily: fontFamily.sans }]}>
-              {isSignUp ? `To ${brandSettings.storeName || 'MotoTrack'}` : `Welcome to ${brandSettings.storeName || 'MotoTrack'}`}
+              {isSignUp
+                ? `To ${brandSettings.storeName || 'MotoTrack'}`
+                : `Welcome to ${brandSettings.storeName || 'MotoTrack'}`}
             </Text>
             <Text style={[authStyles.mobileWelcomeText, { fontFamily: fontFamily.sans }]}>
               {isSignUp
                 ? 'Already have an account? Sign in with your registered email and password.'
                 : 'Enter your personal details, verify your email with OTP, and start your track journey.'}
             </Text>
-            <TouchableOpacity
-              style={authStyles.overlayGhostBtn}
-              onPress={toggleMode}
-              activeOpacity={0.85}
-            >
+            <TouchableOpacity style={authStyles.overlayGhostBtn} onPress={toggleMode} activeOpacity={0.85}>
               <Text style={[authStyles.overlayGhostBtnText, { fontFamily: fontFamily.sans }]}>
                 {isSignUp ? 'SIGN IN' : 'SIGN UP'}
               </Text>
@@ -1285,6 +1617,7 @@ export default function LoginPageWeb({
         </ScrollView>
 
         {renderSuccessModal()}
+        {renderForgotPasswordModal()}
       </View>
     );
   }
@@ -1340,7 +1673,9 @@ export default function LoginPageWeb({
             activeOpacity={0.8}
           >
             <BootstrapIcon name="arrow-left" size={14} color="#FFFFFF" />
-            <Text style={[authStyles.overlayStoreBtnText, { fontFamily: fontFamily.sans }]}>Back to Store</Text>
+            <Text style={[authStyles.overlayStoreBtnText, { fontFamily: fontFamily.sans }]}>
+              Back to Store
+            </Text>
           </TouchableOpacity>
 
           <View style={botanicalStyles.organicBlob} />
@@ -1350,7 +1685,9 @@ export default function LoginPageWeb({
               {isSignUp ? 'Welcome Back!' : 'Hello!'}
             </Text>
             <Text style={[authStyles.overlayHeadingLine2, { fontFamily: fontFamily.sans }]}>
-              {isSignUp ? `To ${brandSettings.storeName || 'MotoTrack'}` : `Welcome to ${brandSettings.storeName || 'MotoTrack'}`}
+              {isSignUp
+                ? `To ${brandSettings.storeName || 'MotoTrack'}`
+                : `Welcome to ${brandSettings.storeName || 'MotoTrack'}`}
             </Text>
 
             <Text style={[authStyles.overlaySubtext, { fontFamily: fontFamily.sans }]}>
@@ -1370,6 +1707,7 @@ export default function LoginPageWeb({
 
       {/* ─── SUCCESS REGISTRATION POPUP MODAL ─── */}
       {renderSuccessModal()}
+      {renderForgotPasswordModal()}
     </View>
   );
 }

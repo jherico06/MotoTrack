@@ -84,12 +84,12 @@ const styles = StyleSheet.create({
   },
   kicker: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#5EEAD4',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
-  title: { fontSize: 24, fontWeight: '900', color: '#FFFFFF', marginTop: 2 },
+  title: { fontSize: 24, fontWeight: '700', color: '#FFFFFF', marginTop: 2 },
   hint: { fontSize: 13, color: '#94A3B8', marginTop: 4, lineHeight: 18 },
   closeBtn: {
     width: 40,
@@ -117,9 +117,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: 4,
   },
-  cardTitle: { fontSize: 18, fontWeight: '900', color: '#F8FAFC', textAlign: 'center' },
+  cardTitle: { fontSize: 18, fontWeight: '700', color: '#F8FAFC', textAlign: 'center' },
   cardBody: { fontSize: 13, color: '#94A3B8', textAlign: 'center', lineHeight: 19, marginBottom: 8 },
-  label: { fontSize: 12, fontWeight: '800', color: '#CBD5E1', marginTop: 4 },
+  label: { fontSize: 12, fontWeight: '600', color: '#CBD5E1', marginTop: 4 },
   input: {
     borderWidth: 1.5,
     borderColor: '#334155',
@@ -137,7 +137,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: 4,
   },
-  primaryBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 15 },
+  primaryBtnText: { color: '#FFFFFF', fontWeight: '600', fontSize: 15 },
   cancelBtn: {
     marginTop: 16,
     minHeight: 44,

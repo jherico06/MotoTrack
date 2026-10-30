@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   },
   triggerMainTitle: {
     fontSize: 14.5,
-    fontWeight: '800',
+    fontWeight: '600',
     color: '#0F172A',
     letterSpacing: -0.2,
   },
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
   },
   optionLabelActive: {
     color: '#EA580C',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   optionCountBadge: {
     backgroundColor: '#E2E8F0',

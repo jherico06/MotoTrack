@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     }),
   },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  title: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
+  title: { fontSize: 17, fontWeight: '700', color: '#0F172A' },
   closeBtn: {
     width: 32,
     height: 32,
@@ -242,7 +242,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  meta: { fontSize: 14, fontWeight: '800', color: '#EA580C', marginBottom: 6 },
+  meta: { fontSize: 14, fontWeight: '600', color: '#EA580C', marginBottom: 6 },
   hint: { fontSize: 12, color: '#64748B', lineHeight: 18, marginBottom: 10 },
   warn: { fontSize: 12, color: '#B45309', backgroundColor: '#FFFBEB', padding: 8, borderRadius: 8, marginTop: 8 },
   qr: { width: 220, height: 220, alignSelf: 'center', marginVertical: 8 },
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryBtnText: { color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
+  primaryBtnText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
   secondaryBtn: {
     borderWidth: 1.5,
     borderColor: '#EA580C',
@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryBtnText: { color: '#EA580C', fontWeight: '800', fontSize: 14 },
+  secondaryBtnText: { color: '#EA580C', fontWeight: '600', fontSize: 14 },
   ghostBtn: { height: 40, alignItems: 'center', justifyContent: 'center' },
   ghostBtnText: { color: '#64748B', fontWeight: '700', fontSize: 13 },
 });
