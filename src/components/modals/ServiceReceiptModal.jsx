@@ -11,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { formatPhp, formatPhpDecimals, normalizeBookingStatus } from '../../utils/serviceQuotation.js';
@@ -39,6 +40,8 @@ export default function ServiceReceiptModal({
   isDarkMode = false,
   title = 'Official Service Receipt',
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768;
   const t = useMemo(() => getThemeTokens(isDarkMode), [isDarkMode]);
   const styles = useMemo(() => createStyles(t, isDarkMode), [t, isDarkMode]);
 
@@ -81,8 +84,13 @@ export default function ServiceReceiptModal({
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <View style={styles.sheet}>
+      <View style={[styles.overlay, isDesktop ? styles.overlayDesktop : styles.overlayMobile]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View style={[styles.sheet, isDesktop ? styles.sheetDesktop : styles.sheetMobile]}>
           <View style={styles.header}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
               <View style={styles.headerIconWrap}>
@@ -255,19 +263,31 @@ function createStyles(t, isDark) {
     overlay: {
       flex: 1,
       backgroundColor: 'rgba(15, 23, 42, 0.55)',
-      justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
-      alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
-      padding: Platform.OS === 'web' ? 16 : 0,
+      ...Platform.select({
+        web: { backdropFilter: 'blur(4px)' },
+      }),
+    },
+    overlayDesktop: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    overlayMobile: {
+      justifyContent: 'flex-end',
+      alignItems: 'stretch',
+      padding: 0,
+
+
     },
     sheet: {
       width: '100%',
-      maxWidth: Platform.OS === 'web' ? 520 : '100%',
+
       maxHeight: '92%',
       backgroundColor: isDark ? t.bgCard : '#FFFFFF',
       borderTopLeftRadius: 28,
       borderTopRightRadius: 28,
-      borderBottomLeftRadius: Platform.OS === 'web' ? 16 : 0,
-      borderBottomRightRadius: Platform.OS === 'web' ? 16 : 0,
+
+
       overflow: 'hidden',
       borderWidth: 1,
       borderColor: isDark ? t.borderInput : '#E2E8F0',
@@ -276,6 +296,18 @@ function createStyles(t, isDark) {
       shadowOpacity: 0.15,
       shadowRadius: 16,
       elevation: 20,
+    },
+    sheetDesktop: {
+      maxWidth: 540,
+      borderRadius: 24,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      maxHeight: '88%',
+    },
+    sheetMobile: {
+      maxWidth: '100%',
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
     },
     header: {
       flexDirection: 'row',

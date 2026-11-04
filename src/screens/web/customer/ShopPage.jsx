@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -46,6 +46,7 @@ import {
   UserProfileDropdown,
   UserProfileButton,
   BrandLogo,
+  HeaderSearchWidget,
   NotificationDropdown,
   ProductCardSkeleton,
   CustomerMobileNavDrawer,
@@ -57,6 +58,8 @@ import {
   COMPAT_STATUS,
 } from '../../../services/products/compatibilityService.js';
 import { promoService, PROMO_TYPES } from '../../../services/products/promoService.js';
+import { pmsPricingService } from '../../../services/bookings/pmsPricingService.js';
+import { DEFAULT_PMS_SERVICES, PMS_SERVICE_META } from '../../../utils/pmsCcPricing.js';
 import { createShopWebStyles } from '../../../styles/web/shopPage.web.styles.js';
 
 // Default motorcycle selection matching reference UI
@@ -84,6 +87,9 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
   const { isDarkMode, toggleDarkMode, tokens } = useTheme();
   const webStyles = useMemo(() => createShopWebStyles(isDarkMode), [isDarkMode]);
   const { width: windowWidth } = useWindowDimensions();
+  const isMobile = windowWidth < 768;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
+  const isDesktop = windowWidth >= 1024;
   const { currentUser, logout, setRedirectReason } = useAuth();
   const {
     cart,
@@ -123,6 +129,9 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchInputRef = useRef(null);
+  const searchContainerRef = useRef(null);
   const [filterSort, setFilterSort] = useState('all');
   const [buyNowFreeShipping, setBuyNowFreeShipping] = useState(false);
   const [buyNowFreeShippingPromoId, setBuyNowFreeShippingPromoId] = useState(null);
@@ -235,6 +244,82 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
     };
   }, []);
 
+  // Sync live PMS services configured in garage/admin
+  const [liveServices, setLiveServices] = useState(() => {
+    try {
+      const cached = pmsPricingService.getCachedCatalog?.();
+      return cached?.services?.length ? cached.services : DEFAULT_PMS_SERVICES;
+    } catch (_e) {
+      return DEFAULT_PMS_SERVICES;
+    }
+  });
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchServices = async () => {
+      try {
+        const cat = await pmsPricingService.loadCatalog().catch(() => null);
+        if (isMounted && cat?.services?.length) {
+          setLiveServices(cat.services);
+        }
+      } catch (_e) {}
+    };
+    fetchServices();
+    const unsub = pmsPricingService.subscribe?.((cat) => {
+      if (isMounted && cat?.services?.length) {
+        setLiveServices(cat.services);
+      }
+    });
+    return () => {
+      isMounted = false;
+      unsub?.();
+    };
+  }, []);
+
+  const popularServices = useMemo(() => {
+    const list = Array.isArray(liveServices) && liveServices.length ? liveServices : DEFAULT_PMS_SERVICES;
+    const activeList = list.filter((s) => s && s.isActive !== false);
+
+    // Prioritize key popular services, then fill with other active ones
+    const preferredIds = [
+      'pms-minor-tune-up',
+      'pms-major-tune-up',
+      'pms-replace-lubricate-cable',
+      'pms-replace-brake-pads',
+      'pms-replace-front-fork-oil',
+      'pms-replace-drive-chain',
+    ];
+
+    const prioritized = [];
+    preferredIds.forEach((id) => {
+      const found = activeList.find((s) => s.id === id);
+      if (found) prioritized.push(found);
+    });
+
+    activeList.forEach((s) => {
+      if (!prioritized.some((p) => p.id === s.id) && prioritized.length < 6) {
+        prioritized.push(s);
+      }
+    });
+
+    return prioritized.slice(0, 6).map((srv) => {
+      const meta = PMS_SERVICE_META[srv.id] || {};
+      const rawIcon = srv.icon || meta.icon || 'tools';
+      const icon =
+        rawIcon === 'wrench-adjustable' ? 'wrench' :
+        rawIcon === 'shield-shaded' ? 'shield-check' :
+        rawIcon === 'gear-wide-connected' ? 'gear-fill' :
+        rawIcon;
+
+      return {
+        id: srv.id,
+        name: srv.name,
+        category: srv.catalogCategory || meta.group || 'PMS',
+        icon,
+      };
+    });
+  }, [liveServices]);
+
   const handlePromoCardAction = (promo) => {
     if (!promo) {
       setSelectedCategory('All');
@@ -273,6 +358,33 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
     });
     return () => unsub?.();
   }, [currentUser?.id, currentUser?.customer_id, currentUser?.email]);
+
+  // Click-outside and Escape key handlers for smooth expandable header search bar
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !isSearchOpen) return;
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current) {
+        const domNode = searchContainerRef.current;
+        if (domNode.contains && !domNode.contains(e.target)) {
+          if (!searchQuery.trim()) {
+            setIsSearchOpen(false);
+          }
+        }
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsSearchOpen(false);
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isSearchOpen, searchQuery]);
 
   // Load products & subscribe to real-time inventory
   useEffect(() => {
@@ -680,13 +792,13 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
           : windowWidth < 360
             ? 1
             : 2;
-  const gapSize = windowWidth < 480 ? 10 : windowWidth < 768 ? 12 : 14;
+  const gapSize = windowWidth < 480 ? 10 : windowWidth < 1024 ? 12 : 14;
   const cardWidth = `calc(${100 / numColumns}% - ${((numColumns - 1) * gapSize) / numColumns}px)`;
 
   return (
     <View
       style={webStyles.container}
-      className={isDarkMode ? 'dark bg-[#11151A] min-h-screen' : 'bg-[#F3F6FA] min-h-screen'}
+      className={isDarkMode ? 'dark bg-[#11151A] min-h-screen' : 'bg-[#F3F4F6] min-h-screen'}
     >
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ToastNotification message={toastMessage} />
@@ -704,10 +816,28 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         scrollEventThrottle={16}
       >
         {/* ─── 1. FULL-WIDTH RESPONSIVE STICKY NAVBAR (Pinned at top: 0, hardware accelerated) ─── */}
-        <View style={webStyles.headerWrapper}>
-        <View style={[webStyles.headerInner, windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8 }]}>
-          {/* Left: Mobile Nav Toggle + Logo + Desktop Search */}
-          <View style={webStyles.headerLeft}>
+        <View
+          style={webStyles.headerWrapper}
+          className="web-header"
+          dataSet={{ webHeader: true }}
+          accessibilityRole="header"
+        >
+        <View
+          style={[
+            webStyles.headerInner,
+            isTablet && { paddingHorizontal: 18, paddingVertical: 10, minHeight: 60, gap: 12 },
+            windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8, minHeight: 56 },
+            windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
+          ]}
+        >
+          {/* Left: Mobile Nav Toggle + Logo */}
+          <View
+            style={[
+              webStyles.headerLeft,
+              windowWidth < 768 && { gap: 8 },
+              windowWidth < 400 && { gap: 4 },
+            ]}
+          >
             {windowWidth < 768 && (
               <TouchableOpacity
                 style={webStyles.mobileNavToggleBtn}
@@ -719,53 +849,25 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity
-              style={webStyles.logoWrap}
+            {windowWidth >= 768 && (<TouchableOpacity
+              style={[webStyles.logoWrap, isTablet && { marginRight: 4 }]}
               onPress={() => {
                 setSelectedCategory('All');
                 setSearchQuery('');
               }}
               activeOpacity={0.8}
             >
-              <BrandLogo size={windowWidth < 400 ? 28 : windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
-            </TouchableOpacity>
-
-            {/* Search Bar centered between MOTOTRACK and Shop */}
-            {windowWidth >= 1024 && (
-              <View style={webStyles.headerSearchSlot}>
-                <View
-                  style={[
-                    webStyles.navSearchContainer,
-                    isSearchFocused && { borderColor: '#FF5A0A', boxShadow: '0 0 0 1px #FF5A0A' },
-                  ]}
-                >
-                  <BootstrapIcon name="search" size={14} color={isSearchFocused ? '#FF5A0A' : '#94A3B8'} />
-                  <TextInput
-                    style={webStyles.navSearchInput}
-                    placeholder="Search products, brands, categories..."
-                    placeholderTextColor="#94A3B8"
-                    value={searchQuery}
-                    onChangeText={setSearchQuery}
-                    onFocus={() => setIsSearchFocused(true)}
-                    onBlur={() => setIsSearchFocused(false)}
-                  />
-                  {searchQuery.length > 0 && (
-                    <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
-                      <BootstrapIcon name="x-circle-fill" size={14} color="#94A3B8" />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            )}
+              <BrandLogo size={windowWidth < 768 ? 28 : isTablet ? 30 : windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
+            </TouchableOpacity>)}
           </View>
 
-          {/* Center Navigation: Shop, Book a Service, Customize (Desktop / Tablet only) */}
+          {/* Center Navigation: Choices (Shop, Book a Service, Customize, Garage, Orders) centered between MOTOTRACK and Search Bar */}
           {windowWidth >= 768 && (
-            <View style={webStyles.headerCenterNav}>
+            <View style={[webStyles.headerCenterNav, isTablet && { gap: 8 }]}>
               {/* Shop Button (Active) */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={webStyles.headerShopBtn}
+                style={[webStyles.headerShopBtn, isTablet && { height: 34, paddingHorizontal: 10 }]}
                 onPress={() => {
                   setSelectedCategory('All');
                   setSearchQuery('');
@@ -773,61 +875,89 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                 activeOpacity={0.8}
                 title="Shop"
               >
-                <Text style={webStyles.headerShopBtnText}>
+                <Text style={[webStyles.headerShopBtnText, isTablet && { fontSize: 13 }]}>
                   Shop
                 </Text>
               </TouchableOpacity>
 
-              {/* Repair Button */}
+              {/* Repair / Book a Service Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={webStyles.headerRepairBtn}
-                onPress={() => onNavigateToScreen?.('garage')}
+                style={[webStyles.headerRepairBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
+                onPress={() => onNavigateToScreen?.('garage', searchQuery?.trim() ? { search: searchQuery.trim() } : null)}
                 activeOpacity={0.8}
                 title="Book a Service"
               >
-                <Text style={webStyles.headerRepairBtnText}>Book a Service</Text>
+                <Text style={[webStyles.headerRepairBtnText, isTablet && { fontSize: 13 }]}>
+                  {isTablet ? 'Book Service' : 'Book a Service'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Appointments Button */}
+              <TouchableOpacity
+                className="main-nav-tab"
+                style={[webStyles.headerRepairBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
+                onPress={() => onNavigateToScreen?.('appointments')}
+                activeOpacity={0.8}
+                title="Appointments"
+              >
+                <Text style={[webStyles.headerRepairBtnText, isTablet && { fontSize: 13 }]}>
+                  Appointments
+                </Text>
               </TouchableOpacity>
 
               {/* Customize Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={webStyles.headerAiVisionBtn}
+                style={[webStyles.headerAiVisionBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => onNavigateToScreen?.('customizer')}
                 activeOpacity={0.85}
                 title="Customize"
               >
-                <Text style={webStyles.headerAiVisionBtnText}>Customize</Text>
+                <Text style={[webStyles.headerAiVisionBtnText, isTablet && { fontSize: 13 }]}>Customize</Text>
               </TouchableOpacity>
 
               {/* Garage Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={webStyles.headerGarageBtn}
+                style={[webStyles.headerGarageBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => onNavigateToScreen?.('profile', { tab: 'garage' })}
                 activeOpacity={0.8}
                 title="Garage"
               >
-                <Text style={webStyles.headerGarageBtnText}>Garage</Text>
+                <Text style={[webStyles.headerGarageBtnText, isTablet && { fontSize: 13 }]}>Garage</Text>
               </TouchableOpacity>
 
               {/* Orders Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={webStyles.headerOrdersBtn}
+                style={[webStyles.headerOrdersBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => onNavigateToScreen?.('orders')}
                 activeOpacity={0.8}
                 title="Orders"
               >
-                <Text style={webStyles.headerOrdersBtnText}>Orders</Text>
+                <Text style={[webStyles.headerOrdersBtnText, isTablet && { fontSize: 13 }]}>Orders</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {/* Right Header Navigation & Actions */}
-          <View style={[webStyles.headerActions, windowWidth < 768 && { gap: 8 }]}>
+          <View
+            style={[
+              webStyles.headerActions,
+              windowWidth < 768 && { gap: 6 },
+              windowWidth < 400 && { gap: 4 },
+            ]}
+          >
+            {/* Search Bar / Icon (Smooth appearance, placed before Wishlist) */}
+            <HeaderSearchWidget
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              isDark={isDarkMode}
+            />
+
             {/* Favorites Button (Icon Only with Badge) */}
-            <TouchableOpacity
+            {windowWidth >= 768 && (<TouchableOpacity
               style={webStyles.navActionIconBtn}
               onPress={handleNavigateToWishlist}
               activeOpacity={0.8}
@@ -839,7 +969,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   <Text style={webStyles.navBadgeText}>{wishlistCount}</Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </TouchableOpacity>)}
 
             {/* Notifications Button */}
             <View style={{ position: 'relative' }}>
@@ -869,11 +999,12 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                 onClose={() => setIsNotifDropdownOpen(false)}
                 onNavigateToScreen={onNavigateToScreen}
                 currentUser={currentUser}
+                topOffset={windowWidth < 1024 ? 104 : undefined}
               />
             </View>
 
             {/* Cart Button (Icon Only with Badge) */}
-            <TouchableOpacity
+            {windowWidth >= 768 && (<TouchableOpacity
               style={webStyles.navActionIconBtn}
               onPress={() => setIsCartOpen(true)}
               activeOpacity={0.85}
@@ -885,10 +1016,10 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   <Text style={webStyles.navBadgeText}>{cartItemCount}</Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </TouchableOpacity>)}
 
-            {/* Auth: Sign In & Sign Up OR Logged In Profile */}
-            {currentUser ? (
+            {/* Auth: Sign In & Sign Up OR Logged In Profile (Dropdown only on desktop/tablet; sidebar on mobile) */}
+            {currentUser && windowWidth >= 768 ? (
               <View style={[webStyles.loggedInContainer, { position: 'relative' }]}>
                 <UserProfileButton
                   currentUser={currentUser}
@@ -925,12 +1056,18 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                     logout();
                     showToast('Logged out successfully');
                   }}
+                  topOffset={windowWidth < 1024 ? 104 : undefined}
                 />
               </View>
             ) : (
               <View style={webStyles.authButtonsRow}>
                 <TouchableOpacity
-                  style={webStyles.signInHeaderBtn}
+                  style={[
+                    webStyles.signInHeaderBtn,
+                    windowWidth < 640 && { paddingHorizontal: 10, paddingVertical: 6, gap: 4 },
+                    windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 5 },
+                    windowWidth < 360 && { width: 34, height: 34, paddingHorizontal: 0, paddingVertical: 0, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
+                  ]}
                   onPress={() => {
                     setRedirectReason('');
                     onNavigateToScreen?.('login');
@@ -938,24 +1075,42 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   activeOpacity={0.85}
                 >
                   <BootstrapIcon name="person" size={16} color="#FFFFFF" />
-                  <Text style={webStyles.signInHeaderBtnText}>Sign In</Text>
+                  {windowWidth >= 360 && (
+                    <Text style={[webStyles.signInHeaderBtnText, windowWidth < 400 && { fontSize: 12 }]}>Sign In</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             )}
           </View>
         </View>
 
-        {/* Dedicated Mobile Search Row */}
-        {windowWidth < 1024 && (
-          <View style={webStyles.mobileSearchRow}>
-            <View style={webStyles.mobileSearchInputWrap}>
-              <BootstrapIcon name="search" size={14} color="#94A3B8" />
+        {/* Dedicated Mobile / Tablet Search Row */}
+        {windowWidth >= 768 && windowWidth < 1024 && (
+          <View
+            style={[
+              webStyles.mobileSearchRow,
+              isTablet && {
+                paddingVertical: 6,
+                paddingHorizontal: 18,
+              },
+            ]}
+          >
+            <View
+              style={[
+                webStyles.mobileSearchInputWrap,
+                isSearchFocused && { borderColor: '#FF5A0A', boxShadow: '0 0 0 1px #FF5A0A' },
+                isTablet && { maxWidth: 680, height: 38 },
+              ]}
+            >
+              <BootstrapIcon name="search" size={14} color={isSearchFocused ? '#FF5A0A' : '#94A3B8'} />
               <TextInput
-                style={webStyles.mobileSearchInput}
+                style={[webStyles.mobileSearchInput, isTablet && { fontSize: 13 }]}
                 placeholder="Search products, brands, categories..."
                 placeholderTextColor="#94A3B8"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
+                onFocus={() => setIsSearchFocused(true)}
+                onBlur={() => setIsSearchFocused(false)}
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
@@ -975,17 +1130,29 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
       />
 
       {/* ─── 2. MAIN STOREFRONT CONTENT ─── */}
-      <View style={webStyles.maxContainer}>
+      <View
+        style={[
+          webStyles.maxContainer,
+          isTablet && { paddingHorizontal: 20, paddingTop: 18 },
+          windowWidth < 480 && { paddingHorizontal: 12, paddingTop: 14 },
+          windowWidth < 768 && { paddingHorizontal: 16, paddingTop: 18 },
+        ]}
+      >
 
           {/* ─── 3. MOTORCYCLE COMPATIBILITY & SORTING TOOLBAR (Directly below Hero Banner) ─── */}
-          <View style={[webStyles.toolbarRow, { marginTop: 12, marginBottom: 20 }]}>
-            {/* Left Cluster: All Categories Dropdown, Motorcycle Dropdown & Compatible Only Toggle */}
-            <View style={[webStyles.toolbarLeftGroup, { flexWrap: 'wrap', gap: 10 }]}>
-              {/* 1. All Categories Dropdown */}
-              <View style={webStyles.categoryDropdownContainer}>
+          {(() => {
+            const renderCategoryDropdown = (isMobileMode) => (
+              <View
+                style={[
+                  webStyles.categoryDropdownContainer,
+                  isMobileMode && { flex: 1, minWidth: 0 },
+                ]}
+              >
                 <TouchableOpacity
                   style={[
                     webStyles.categoryDropdownBtn,
+                    isTablet && { paddingHorizontal: 10, paddingVertical: 7, minHeight: 36 },
+                    isMobileMode && { width: '100%', justifyContent: 'space-between' },
                     (isCategoryDropdownOpen || selectedCategory !== 'All') &&
                       webStyles.categoryDropdownBtnActive,
                   ]}
@@ -996,19 +1163,23 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   }}
                   activeOpacity={0.85}
                 >
-                  <BootstrapIcon
-                    name="grid-fill"
-                    size={13}
-                    color={selectedCategory !== 'All' ? '#FF5A0A' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      webStyles.categoryDropdownBtnText,
-                      selectedCategory !== 'All' && webStyles.categoryDropdownBtnTextActive,
-                    ]}
-                  >
-                    {selectedCategory === 'All' ? 'All Categories' : selectedCategory}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 }}>
+                    <BootstrapIcon
+                      name="grid-fill"
+                      size={13}
+                      color={selectedCategory !== 'All' ? '#FF5A0A' : '#64748B'}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        webStyles.categoryDropdownBtnText,
+                        isTablet && { fontSize: 12 },
+                        selectedCategory !== 'All' && webStyles.categoryDropdownBtnTextActive,
+                      ]}
+                    >
+                      {selectedCategory === 'All' ? 'All Categories' : selectedCategory}
+                    </Text>
+                  </View>
                   <BootstrapIcon
                     name={isCategoryDropdownOpen ? 'chevron-up' : 'chevron-down'}
                     size={12}
@@ -1079,15 +1250,25 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   </>
                 )}
               </View>
+            );
 
-              {/* 2. Motorcycle Selector Dropdown (Initially displaying Suzuki Smash 125 with Orange Accent) */}
-              <View style={webStyles.categoryDropdownContainer}>
+            const renderBikeDropdown = (isMobileMode) => (
+              <View
+                style={[
+                  webStyles.categoryDropdownContainer,
+                  isMobileMode && { flex: 1, minWidth: 0 },
+                ]}
+              >
                 <TouchableOpacity
                   style={[
                     webStyles.categoryDropdownBtn,
+                    isTablet && { paddingHorizontal: 10, paddingVertical: 7, minHeight: 36 },
+                    isMobileMode && { width: '100%', justifyContent: 'space-between' },
                     {
-                      borderColor: activeBike ? '#FF5A0A' : '#E2E8F0',
-                      backgroundColor: activeBike ? (isDarkMode ? '#251D18' : '#FFF9F5') : (isDarkMode ? '#1C2229' : '#FFFFFF'),
+                      borderColor: activeBike ? '#FF5A0A' : (isDarkMode ? '#334155' : '#E2E8F0'),
+                      backgroundColor: activeBike
+                        ? (isDarkMode ? '#251D18' : '#FFF9F5')
+                        : (isDarkMode ? '#1C2229' : '#FFFFFF'),
                     },
                   ]}
                   onPress={() => {
@@ -1097,20 +1278,23 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   }}
                   activeOpacity={0.85}
                 >
-                  <BootstrapIcon
-                    name="scooter"
-                    size={14}
-                    color={activeBike ? '#FF5A0A' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      webStyles.categoryDropdownBtnText,
-                      activeBike && { color: '#FF5A0A', fontWeight: '800' },
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {activeBike ? `${activeBike.brand} ${activeBike.model}` : 'Select Motorcycle'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 }}>
+                    <BootstrapIcon
+                      name="scooter"
+                      size={14}
+                      color={activeBike ? '#FF5A0A' : '#64748B'}
+                    />
+                    <Text
+                      style={[
+                        webStyles.categoryDropdownBtnText,
+                        activeBike && { color: '#FF5A0A', fontWeight: '800' },
+                        isTablet && { fontSize: 12, maxWidth: 140 },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {activeBike ? `${activeBike.brand} ${activeBike.model}` : 'Select Motorcycle'}
+                    </Text>
+                  </View>
                   <BootstrapIcon
                     name={isBikeDropdownOpen ? 'chevron-up' : 'chevron-down'}
                     size={12}
@@ -1126,7 +1310,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                       onPress={() => setIsBikeDropdownOpen(false)}
                       activeOpacity={1}
                     />
-                    <View style={[webStyles.categoryDropdownMenu, { minWidth: 270 }]}>
+                    <View style={[webStyles.categoryDropdownMenu, { minWidth: isMobileMode ? 250 : 270, maxWidth: 'calc(100vw - 32px)' }]}>
                       <View
                         style={{
                           paddingHorizontal: 14,
@@ -1234,7 +1418,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                           </>
                         )}
 
-                        {/* Popular Philippines Models (Suzuki Smash 125, NMAX, Click, etc.) */}
+                        {/* Popular Models */}
                         <View
                           style={{
                             paddingHorizontal: 14,
@@ -1308,20 +1492,29 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   </>
                 )}
               </View>
+            );
 
-              {/* 3. Compatible Only Toggle Filter Button */}
-              {activeBike && (
+            const renderCompatibleToggle = (isMobileMode) => {
+              if (!activeBike) return null;
+              return (
                 <TouchableOpacity
                   style={[
                     webStyles.categoryDropdownBtn,
+                    isTablet && { paddingHorizontal: 10, paddingVertical: 7, minHeight: 36 },
                     compatOnly
                       ? {
                           backgroundColor: '#FF5A0A',
                           borderColor: '#FF5A0A',
                         }
                       : {
-                          borderColor: '#E2E8F0',
+                          borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                          backgroundColor: isDarkMode ? '#1C2229' : '#FFFFFF',
                         },
+                    isMobileMode && {
+                      flexShrink: 0,
+                      paddingHorizontal: 12,
+                      justifyContent: 'center',
+                    },
                   ]}
                   onPress={() => setCompatOnly((v) => !v)}
                   activeOpacity={0.85}
@@ -1334,21 +1527,30 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   <Text
                     style={[
                       webStyles.categoryDropdownBtnText,
-                      compatOnly && { color: '#FFFFFF', fontWeight: '800' },
+                      compatOnly
+                        ? { color: '#FFFFFF', fontWeight: '800' }
+                        : { color: isDarkMode ? '#E2E8F0' : '#475569', fontWeight: '700' },
+                      { fontSize: isTablet ? 12 : 12.5 },
                     ]}
                   >
-                    Compatible Only
+                    {windowWidth < 380 ? 'Compatible' : 'Compatible Only'}
                   </Text>
                 </TouchableOpacity>
-              )}
-            </View>
+              );
+            };
 
-            {/* Sorting Dropdown */}
-            <View style={webStyles.sortingGroup}>
-              <View style={webStyles.categoryDropdownContainer}>
+            const renderSortDropdown = (isMobileMode) => (
+              <View
+                style={[
+                  webStyles.categoryDropdownContainer,
+                  isMobileMode && { flex: 1, minWidth: 0 },
+                ]}
+              >
                 <TouchableOpacity
                   style={[
                     webStyles.categoryDropdownBtn,
+                    isTablet && { paddingHorizontal: 10, paddingVertical: 7, minHeight: 36 },
+                    isMobileMode && { width: '100%', justifyContent: 'space-between' },
                     filterSort !== 'all' && webStyles.categoryDropdownBtnActive,
                   ]}
                   onPress={() => {
@@ -1358,25 +1560,29 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   }}
                   activeOpacity={0.85}
                 >
-                  <BootstrapIcon
-                    name="sort-down"
-                    size={13}
-                    color={filterSort !== 'all' ? '#FF5A0A' : '#64748B'}
-                  />
-                  <Text
-                    style={[
-                      webStyles.categoryDropdownBtnText,
-                      filterSort !== 'all' && webStyles.categoryDropdownBtnTextActive,
-                    ]}
-                  >
-                    {filterSort === 'all'
-                      ? 'Sort By'
-                      : filterSort === 'rating'
-                        ? 'Top Rated'
-                        : filterSort === 'price-low'
-                          ? 'Price: Low'
-                          : 'Price: High'}
-                  </Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, flex: 1, minWidth: 0 }}>
+                    <BootstrapIcon
+                      name="sort-down"
+                      size={13}
+                      color={filterSort !== 'all' ? '#FF5A0A' : '#64748B'}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        webStyles.categoryDropdownBtnText,
+                        isTablet && { fontSize: 12 },
+                        filterSort !== 'all' && webStyles.categoryDropdownBtnTextActive,
+                      ]}
+                    >
+                      {filterSort === 'all'
+                        ? 'Sort By'
+                        : filterSort === 'rating'
+                          ? 'Top Rated'
+                          : filterSort === 'price-low'
+                            ? 'Price: Low'
+                            : 'Price: High'}
+                    </Text>
+                  </View>
                   <BootstrapIcon
                     name={isSortDropdownOpen ? 'chevron-up' : 'chevron-down'}
                     size={12}
@@ -1441,8 +1647,52 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   </>
                 )}
               </View>
-            </View>
-          </View>
+            );
+
+            if (isMobile) {
+              return (
+                <View style={[webStyles.toolbarMobileContainer, { marginTop: 12, marginBottom: 18 }]}>
+                  {/* Row 1: Categories & Sort By (Balanced 2-Column Split) */}
+                  <View
+                    style={[
+                      webStyles.toolbarMobileRow,
+                      { zIndex: isCategoryDropdownOpen || isSortDropdownOpen ? 140 : 120 },
+                    ]}
+                  >
+                    {renderCategoryDropdown(true)}
+                    {renderSortDropdown(true)}
+                  </View>
+
+                  {/* Row 2: Motorcycle Fitment Selector & Compatible Only Toggle */}
+                  <View
+                    style={[
+                      webStyles.toolbarMobileRow,
+                      { zIndex: isBikeDropdownOpen ? 140 : 110 },
+                    ]}
+                  >
+                    {renderBikeDropdown(true)}
+                    {renderCompatibleToggle(true)}
+                  </View>
+                </View>
+              );
+            }
+
+            return (
+              <View style={[webStyles.toolbarRow, isTablet && { marginTop: 10, marginBottom: 14, gap: 8 }]}>
+                {/* Left Cluster: All Categories Dropdown, Motorcycle Dropdown & Compatible Only Toggle */}
+                <View style={[webStyles.toolbarLeftGroup, isTablet && { gap: 8 }]}>
+                  {renderCategoryDropdown(false)}
+                  {renderBikeDropdown(false)}
+                  {renderCompatibleToggle(false)}
+                </View>
+
+                {/* Sorting Dropdown */}
+                <View style={webStyles.sortingGroup}>
+                  {renderSortDropdown(false)}
+                </View>
+              </View>
+            );
+          })()}
 
           {/* ─── 4. MOTORCYCLE CATEGORIES ROW (8 attractive cards matching reference UI) ─── */}
           <ScrollView
@@ -1450,17 +1700,38 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{
               paddingBottom: 4,
-              width: windowWidth >= 1024 ? '100%' : 'auto',
+              paddingRight: isDesktop ? 0 : 16,
+              minWidth: '100%',
+              width: isDesktop ? '100%' : 'auto',
             }}
-            style={{ width: '100%', marginBottom: 28 }}
+            style={{ width: '100%', marginBottom: isTablet ? 20 : 28 }}
           >
-            <View style={webStyles.categoryRowWrap}>
+            <View
+              style={[
+                webStyles.categoryRowWrap,
+                !isDesktop && {
+                  width: 'auto',
+                  minWidth: '100%',
+                  justifyContent: 'flex-start',
+                },
+              ]}
+            >
               {displayCategories.map((cat) => {
                 const isActive = selectedCategory.toLowerCase() === cat.name.toLowerCase();
                 return (
                   <TouchableOpacity
                     key={cat.id}
-                    style={[webStyles.categoryCard, isActive && webStyles.categoryCardActive]}
+                    style={[
+                      webStyles.categoryCard,
+                      isActive && webStyles.categoryCardActive,
+                      isDesktop
+                        ? { flex: 1, minWidth: 0 }
+                        : {
+                            flexShrink: 0,
+                            minWidth: 104,
+                            paddingHorizontal: 8,
+                          },
+                    ]}
                     onPress={() => {
                       if (cat.isMore) {
                         setIsCategoryDropdownOpen((prev) => !prev);
@@ -1483,6 +1754,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                       style={[
                         webStyles.categoryCardLabel,
                         isActive && webStyles.categoryCardLabelActive,
+                        windowWidth < 1150 && { fontSize: 12, lineHeight: 15 },
                       ]}
                       numberOfLines={1}
                     >
@@ -1498,7 +1770,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
           <View
             id="catalog-products-section"
             style={{
-              marginBottom: 18,
+              marginBottom: isTablet ? 14 : 18,
               flexDirection: 'row',
               alignItems: 'flex-end',
               justifyContent: 'space-between',
@@ -1510,7 +1782,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               <Text
                 style={{
                   color: '#FF5A0A',
-                  fontSize: 11,
+                  fontSize: isTablet ? 10.5 : 11,
                   fontWeight: '900',
                   letterSpacing: 1.5,
                   textTransform: 'uppercase',
@@ -1521,7 +1793,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               </Text>
               <Text
                 style={{
-                  fontSize: 26,
+                  fontSize: isTablet ? 22 : isMobile ? 20 : 26,
                   fontWeight: '900',
                   color: isDarkMode ? '#FFFFFF' : '#111827',
                   letterSpacing: -0.5,
@@ -1529,7 +1801,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               >
                 Top Picks for Your Ride
               </Text>
-              <Text style={{ fontSize: 13, color: '#64748B', marginTop: 3 }}>
+              <Text style={{ fontSize: isTablet ? 12.5 : 13, color: '#64748B', marginTop: 3 }}>
                 High-quality products from trusted brands. Built for performance, designed for riders.
               </Text>
             </View>
@@ -1778,7 +2050,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
 
         {/* ─── 6. PROFESSIONAL SERVICE BANNER (Matching reference UI) ─── */}
         <View style={webStyles.serviceBannerWrap}>
-          <View style={webStyles.serviceBannerInner}>
+          <View style={[webStyles.serviceBannerInner, windowWidth < 800 && { flexDirection: 'column', padding: windowWidth < 480 ? 16 : 22, gap: 18 }]}>
             {/* Left: Headline & Service CTAs */}
             <View style={webStyles.serviceBannerLeft}>
               <Text style={webStyles.serviceBannerEyebrow}>PROFESSIONAL SERVICES</Text>
@@ -1786,7 +2058,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               <Text style={webStyles.serviceBannerSub}>
                 Keep your motorcycle in top condition with our expert technicians and quality service.
               </Text>
-              <View style={webStyles.serviceBannerBtns}>
+              <View style={[webStyles.serviceBannerBtns, windowWidth < 480 && { flexDirection: 'column', width: '100%' }]}>
                 <TouchableOpacity
                   style={webStyles.serviceBannerPrimaryBtn}
                   onPress={() => onNavigateToScreen?.('garage')}
@@ -1805,22 +2077,33 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               </View>
             </View>
 
-            {/* Center: Popular Services with Orange Icons */}
+            {/* Center: Popular Services dynamically derived from live services */}
             <View style={webStyles.serviceBannerCenter}>
               <Text style={webStyles.servicePopularTitle}>Popular Services</Text>
               <View style={webStyles.servicePopularList}>
-                {[
-                  { name: 'General Check-up', icon: 'wrench' },
-                  { name: 'Oil Change', icon: 'droplet-fill' },
-                  { name: 'Brake Service', icon: 'gear-fill' },
-                  { name: 'Tire Change', icon: 'circle' },
-                  { name: 'Chain & Sprocket', icon: 'link-45deg' },
-                  { name: 'Tune Up', icon: 'tools' },
-                ].map((srv) => (
-                  <View key={srv.name} style={webStyles.servicePopularItem}>
-                    <BootstrapIcon name={srv.icon} size={13} color="#FF5A0A" />
-                    <Text style={webStyles.servicePopularItemText}>{srv.name}</Text>
-                  </View>
+                {popularServices.map((srv) => (
+                  <TouchableOpacity
+                    key={srv.id || srv.name}
+                    style={webStyles.servicePopularItem}
+                    onPress={() => onNavigateToScreen?.('garage', { packageId: srv.id, searchQuery: srv.name })}
+                    activeOpacity={0.75}
+                  >
+                    <View
+                      style={{
+                        width: 18,
+                        height: 18,
+                        borderRadius: 4,
+                        backgroundColor: 'rgba(255, 90, 10, 0.12)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <BootstrapIcon name={srv.icon} size={11} color="#FF5A0A" />
+                    </View>
+                    <Text style={webStyles.servicePopularItemText} numberOfLines={1}>
+                      {srv.name}
+                    </Text>
+                  </TouchableOpacity>
                 ))}
               </View>
             </View>
@@ -1837,13 +2120,29 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  opacity: 0.35,
+                  opacity: 0.4,
                   width: '100%',
                   height: '100%',
                 }}
                 resizeMode="cover"
               />
-              <View style={{ zIndex: 2 }}>
+              <View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  backgroundColor: 'rgba(24, 24, 27, 0.45)',
+                }}
+              />
+              <View style={{ zIndex: 2, padding: 18 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 8 }}>
+                  <BootstrapIcon name="shield-check" size={12} color="#FF5A0A" />
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#FF5A0A', letterSpacing: 1.2, textTransform: 'uppercase' }}>
+                    CERTIFIED CARE
+                  </Text>
+                </View>
                 <Text style={webStyles.serviceBannerRightTitle}>
                   Expert Care{'\n'}
                   <Text style={{ color: '#FF5A0A' }}>for a Smoother Ride</Text>
@@ -1854,32 +2153,50 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         </View>
 
         {/* ─── 7. PROMOTIONAL CARDS (DYNAMICALLY LOADED FROM ACTIVE ADMIN PROMOS) ─── */}
-        <View style={webStyles.promoCardsRow}>
+        <View style={[webStyles.promoCardsRow, windowWidth < 768 && { flexDirection: 'column', gap: 14 }]}>
           {activePromos && activePromos.length > 0 ? (
             <>
               {activePromos.slice(0, 3).map((promo) => (
                 <View key={promo.promo_id || promo.code} style={webStyles.promoCard}>
-                  <Image
-                    source={{
-                      uri:
-                        promo.imageUrl ||
-                        promo.image_url ||
-                        (promo.promoType === PROMO_TYPES.FREE_SHIPPING
-                          ? 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80'
-                          : promo.promoType === PROMO_TYPES.FREE_INSTALLATION
-                            ? 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=400&q=80'
-                            : 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=400&q=80'),
-                    }}
+                  <View
                     style={{
                       position: 'absolute',
                       right: 0,
                       top: 0,
                       bottom: 0,
-                      width: '45%',
-                      opacity: 0.3,
+                      width: '50%',
+                      overflow: 'hidden',
                     }}
-                    resizeMode="cover"
-                  />
+                  >
+                    <Image
+                      source={{
+                        uri:
+                          promo.imageUrl ||
+                          promo.image_url ||
+                          (promo.promoType === PROMO_TYPES.FREE_SHIPPING
+                            ? 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80'
+                            : promo.promoType === PROMO_TYPES.FREE_INSTALLATION
+                              ? 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=400&q=80'
+                              : 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=400&q=80'),
+                      }}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        opacity: 0.32,
+                      }}
+                      resizeMode="cover"
+                    />
+                    <View
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(24, 24, 27, 0.45)',
+                      }}
+                    />
+                  </View>
                   <View style={{ zIndex: 2 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                       {promo.promoType === PROMO_TYPES.FREE_SHIPPING ? (
@@ -2041,22 +2358,43 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
             <>
               {/* Default fallback cards when no promo is activated by admin yet */}
               <View style={webStyles.promoCard}>
-                <Image
-                  source={{
-                    uri: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=400&q=80',
-                  }}
+                <View
                   style={{
                     position: 'absolute',
                     right: 0,
                     top: 0,
                     bottom: 0,
-                    width: '45%',
-                    opacity: 0.32,
+                    width: '50%',
+                    overflow: 'hidden',
                   }}
-                  resizeMode="cover"
-                />
+                >
+                  <Image
+                    source={{
+                      uri: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=400&q=80',
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0.35,
+                    }}
+                    resizeMode="cover"
+                  />
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(24, 24, 27, 0.45)',
+                    }}
+                  />
+                </View>
                 <View style={{ zIndex: 2 }}>
-                  <Text style={webStyles.promoCardTag}>SPECIAL OFFERS</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                    <BootstrapIcon name="tag-fill" size={12} color="#FF5A0A" />
+                    <Text style={webStyles.promoCardTag}>SPECIAL OFFERS</Text>
+                  </View>
                   <Text style={webStyles.promoCardTitle}>Rider Deals & Discounts</Text>
                   <Text style={webStyles.promoCardSub}>Quality motorcycle parts, ride in style.</Text>
                 </View>
@@ -2066,27 +2404,45 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   activeOpacity={0.85}
                 >
                   <Text style={webStyles.promoCardLinkText}>Shop Now</Text>
-                  <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
+                  <BootstrapIcon name="arrow-right" size={12} color="#FF5A0A" />
                 </TouchableOpacity>
               </View>
 
               <View style={webStyles.promoCard}>
-                <Image
-                  source={{
-                    uri: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80',
-                  }}
+                <View
                   style={{
                     position: 'absolute',
                     right: 0,
                     top: 0,
                     bottom: 0,
-                    width: '45%',
-                    opacity: 0.25,
+                    width: '50%',
+                    overflow: 'hidden',
                   }}
-                  resizeMode="cover"
-                />
+                >
+                  <Image
+                    source={{
+                      uri: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80',
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0.3,
+                    }}
+                    resizeMode="cover"
+                  />
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(24, 24, 27, 0.45)',
+                    }}
+                  />
+                </View>
                 <View style={{ zIndex: 2 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
                     <BootstrapIcon name="truck" size={12} color="#FF5A0A" />
                     <Text style={webStyles.promoCardTag}>FREE SHIPPING</Text>
                   </View>
@@ -2099,29 +2455,47 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   activeOpacity={0.85}
                 >
                   <Text style={webStyles.promoCardLinkText}>Shop Now</Text>
-                  <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
+                  <BootstrapIcon name="arrow-right" size={12} color="#FF5A0A" />
                 </TouchableOpacity>
               </View>
 
               <View style={webStyles.promoCard}>
-                <Image
-                  source={{
-                    uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=80',
-                  }}
+                <View
                   style={{
                     position: 'absolute',
                     right: 0,
                     top: 0,
                     bottom: 0,
-                    width: '45%',
-                    opacity: 0.28,
+                    width: '50%',
+                    overflow: 'hidden',
                   }}
-                  resizeMode="cover"
-                />
+                >
+                  <Image
+                    source={{
+                      uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=80',
+                    }}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      opacity: 0.35,
+                    }}
+                    resizeMode="cover"
+                  />
+                  <View
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      backgroundColor: 'rgba(24, 24, 27, 0.45)',
+                    }}
+                  />
+                </View>
                 <View style={{ zIndex: 2 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                    <BootstrapIcon name="gear-fill" size={12} color="#FF5A0A" />
-                    <Text style={webStyles.promoCardTag}>GENUINE PARTS ONLY</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                    <BootstrapIcon name="shield-check" size={12} color="#FF5A0A" />
+                    <Text style={webStyles.promoCardTag}>AUTHENTIC GUARANTEE</Text>
                   </View>
                   <Text style={webStyles.promoCardTitle}>Genuine Parts Only</Text>
                   <Text style={webStyles.promoCardSub}>
@@ -2134,7 +2508,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   activeOpacity={0.85}
                 >
                   <Text style={webStyles.promoCardLinkText}>Learn More</Text>
-                  <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
+                  <BootstrapIcon name="arrow-right" size={12} color="#FF5A0A" />
                 </TouchableOpacity>
               </View>
             </>
@@ -2144,8 +2518,8 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
 
         {/* ─── 8. FULL-WIDTH DARK CHARCOAL FOOTER (Flush with viewport & Admin-Editable) ─── */}
         <View style={webStyles.desktopFooter}>
-          <View style={webStyles.footerInner}>
-            <View style={webStyles.footerColumnsRow}>
+          <View style={[webStyles.footerInner, windowWidth < 480 && { paddingHorizontal: 16, paddingTop: 36, paddingBottom: 24 }]}>
+            <View style={[webStyles.footerColumnsRow, windowWidth < 640 && { gap: 24 }]}>
               {/* Column 1: Brand Info & Tagline */}
               <View style={webStyles.footerBrandCol}>
                 <TouchableOpacity

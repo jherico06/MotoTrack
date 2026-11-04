@@ -70,11 +70,36 @@ function mapServiceRows(services, prices, { includeInactive = false } = {}) {
     .sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
+const pmsListeners = new Set();
+
 export const pmsPricingService = {
   UNSUPPORTED_CC_MESSAGE,
   SERVICE_UNAVAILABLE_MESSAGE,
   ESTIMATE_DISCLAIMER,
   CATALOG_CATEGORIES,
+
+  subscribe(callback) {
+    if (typeof callback === 'function') {
+      pmsListeners.add(callback);
+      return () => pmsListeners.delete(callback);
+    }
+    return () => {};
+  },
+
+  notifyListeners(catalog) {
+    pmsListeners.forEach((fn) => {
+      try {
+        fn(catalog);
+      } catch (e) {
+        console.warn('Error in pmsPricingService listener:', e);
+      }
+    });
+  },
+
+  getCachedCatalog({ includeInactive = false } = {}) {
+    const cacheKey = includeInactive ? `${CACHE_KEY}_all` : CACHE_KEY;
+    return dataCache.get(cacheKey) || this.getDefaultCatalog();
+  },
 
   getDefaultCatalog() {
     return {
@@ -312,6 +337,7 @@ export const pmsPricingService = {
 
     this.invalidateCache();
     const refreshed = await this.loadCatalog({ forceRefresh: true, includeInactive: true });
+    this.notifyListeners(refreshed);
     const created = (refreshed.services || []).find((s) => s.id === serviceId) || {
       id: serviceId,
       name: cleanName,
@@ -391,6 +417,7 @@ export const pmsPricingService = {
 
     this.invalidateCache();
     const refreshed = await this.loadCatalog({ forceRefresh: true, includeInactive: true });
+    this.notifyListeners(refreshed);
     const updated = (refreshed.services || []).find((s) => s.id === id) || null;
     return { success: true, service: updated, catalog: refreshed };
   },

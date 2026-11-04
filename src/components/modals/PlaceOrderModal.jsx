@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, Modal, useWindowDimensions } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { shopStyles as styles } from '../../styles/shop.styles.js';
 import {
@@ -29,6 +29,8 @@ export default function PlaceOrderModal({
   onClose,
   onConfirm,
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768;
   const sizeEntries = useMemo(() => getProductSizeEntries(product), [product]);
   const colorEntries = useMemo(() => getProductColorEntries(product), [product]);
   const needsSize = productNeedsSizes(product);
@@ -109,9 +111,37 @@ export default function PlaceOrderModal({
     : `Add ${quantity} to Cart · ₱${lineTotal.toFixed(2)}`;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalSheet, { maxHeight: '90%' }]}>
+    <Modal visible={visible} transparent animationType={isDesktop ? 'fade' : 'slide'} onRequestClose={onClose}>
+      <View
+        style={[
+          styles.modalOverlay,
+          isDesktop && {
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View
+          style={[
+            styles.modalSheet,
+            { maxHeight: '90%' },
+            isDesktop && {
+              borderRadius: 24,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              maxWidth: 580,
+              alignSelf: 'center',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
+            },
+            windowWidth < 400 && { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 24 },
+          ]}
+        >
           <View style={styles.modalHeaderRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
               <View

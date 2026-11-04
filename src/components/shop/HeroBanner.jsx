@@ -61,7 +61,8 @@ export default function HeroBanner({
   const isDesktop = width >= 1024;
   const isTablet = width >= 768 && width < 1024;
   const isMobile = width < 768;
-  const isSmallMobile = width < 420;
+  const isSmallMobile = width < 480;
+  const isUltraSmall = width < 360;
 
   const [banner, setBanner] = useState(() => marketingBannerService.getBanner());
   const [imageError, setImageError] = useState(false);
@@ -119,7 +120,7 @@ export default function HeroBanner({
         borderRadius: 0,
         overflow: 'hidden',
         position: 'relative',
-        minHeight: isDesktop ? 460 : isTablet ? 420 : 480,
+        minHeight: isDesktop ? 460 : isTablet ? 340 : 480,
         marginBottom: 0,
         borderWidth: 0,
         borderBottomWidth: 1,
@@ -133,7 +134,7 @@ export default function HeroBanner({
           top: 0,
           right: 0,
           bottom: 0,
-          left: isDesktop ? '38%' : isTablet ? '25%' : 0,
+          left: isDesktop ? '38%' : isTablet ? '35%' : 0,
           opacity: isMobile ? 0.3 : 0.95,
           zIndex: 1,
         }}
@@ -170,6 +171,8 @@ export default function HeroBanner({
               bottom: 0,
               background: isDesktop
                 ? 'linear-gradient(90deg, #24272B 0%, #24272B 18%, rgba(36, 39, 43, 0.92) 40%, rgba(36, 39, 43, 0.3) 75%, rgba(36, 39, 43, 0) 100%)'
+                : isTablet
+                ? 'linear-gradient(90deg, #24272B 0%, #24272B 22%, rgba(36, 39, 43, 0.90) 48%, rgba(36, 39, 43, 0.28) 78%, rgba(36, 39, 43, 0) 100%)'
                 : 'linear-gradient(180deg, rgba(36, 39, 43, 0.92) 0%, rgba(36, 39, 43, 0.75) 50%, #24272B 100%)',
               pointerEvents: 'none',
             }}
@@ -272,14 +275,14 @@ export default function HeroBanner({
           style={{
             position: 'relative',
             zIndex: 2,
-            paddingLeft: isDesktop ? 24 : isTablet ? 24 : 16,
-            paddingRight: isDesktop ? 24 : isTablet ? 24 : 16,
-            paddingTop: isDesktop ? 54 : 36,
-            paddingBottom: isDesktop ? 40 : 28,
-            maxWidth: isDesktop ? 680 : isTablet ? 560 : '100%',
+            paddingLeft: isDesktop ? 24 : isTablet ? 24 : isUltraSmall ? 12 : 16,
+            paddingRight: isDesktop ? 24 : isTablet ? 24 : isUltraSmall ? 12 : 16,
+            paddingTop: isDesktop ? 54 : isTablet ? 28 : 36,
+            paddingBottom: isDesktop ? 40 : isTablet ? 20 : 28,
+            maxWidth: isDesktop ? 680 : isTablet ? 450 : '100%',
             flexDirection: 'column',
             justifyContent: 'space-between',
-            minHeight: isDesktop ? 460 : isTablet ? 420 : 480,
+            minHeight: isDesktop ? 460 : isTablet ? 340 : 480,
           }}
         >
         {/* Top: Eyebrow + Headline + Subtitle + CTAs */}
@@ -290,13 +293,13 @@ export default function HeroBanner({
               flexDirection: 'row',
               alignItems: 'center',
               gap: 8,
-              marginBottom: 12,
+              marginBottom: isTablet ? 8 : 12,
             }}
           >
             <Text
               style={{
                 color: '#FF5A0A',
-                fontSize: isSmallMobile ? 11 : 12.5,
+                fontSize: isSmallMobile ? 11 : isTablet ? 11.5 : 12.5,
                 fontWeight: '600',
                 letterSpacing: 2.2,
                 textTransform: 'uppercase',
@@ -310,13 +313,13 @@ export default function HeroBanner({
           {/* Headline: Dynamic banner title */}
           <Text
             style={{
-              fontSize: isDesktop ? 46 : isTablet ? 38 : isSmallMobile ? 28 : 34,
+              fontSize: isDesktop ? 46 : isTablet ? 30 : isUltraSmall ? 23 : isSmallMobile ? 26 : 34,
               fontWeight: '600',
               color: '#FFFFFF',
-              lineHeight: isDesktop ? 54 : isTablet ? 44 : isSmallMobile ? 34 : 40,
+              lineHeight: isDesktop ? 54 : isTablet ? 36 : isUltraSmall ? 29 : isSmallMobile ? 32 : 40,
               letterSpacing: -0.8,
               fontFamily: fontFamily.sans,
-              marginBottom: 14,
+              marginBottom: isTablet ? 8 : 14,
             }}
           >
             {renderBannerHeading(banner?.title)}
@@ -325,12 +328,12 @@ export default function HeroBanner({
           {/* Description */}
           <Text
             style={{
-              fontSize: isDesktop ? 15 : 13.5,
-              lineHeight: isDesktop ? 23 : 20,
+              fontSize: isDesktop ? 15 : isTablet ? 13 : 13.5,
+              lineHeight: isDesktop ? 23 : isTablet ? 18 : 20,
               color: '#CBD5E1',
               fontFamily: fontFamily.sans,
-              maxWidth: 480,
-              marginBottom: isDesktop ? 28 : 22,
+              maxWidth: isTablet ? 420 : 480,
+              marginBottom: isDesktop ? 28 : isTablet ? 16 : 22,
             }}
           >
             {banner?.description || ''}
@@ -341,9 +344,9 @@ export default function HeroBanner({
             style={{
               flexDirection: 'row',
               alignItems: 'center',
-              gap: 14,
+              gap: isTablet ? 10 : 14,
               flexWrap: 'wrap',
-              marginBottom: isDesktop ? 44 : 28,
+              marginBottom: isDesktop ? 44 : isTablet ? 20 : 28,
             }}
           >
             {/* Primary CTA: [ 🛒 Shop Parts -> ] */}
@@ -352,21 +355,24 @@ export default function HeroBanner({
               activeOpacity={0.88}
               style={{
                 backgroundColor: '#FF5A0A',
-                paddingHorizontal: isDesktop ? 24 : 20,
-                paddingVertical: isDesktop ? 13 : 11,
+                paddingHorizontal: isDesktop ? 24 : isTablet ? 16 : 18,
+                paddingVertical: isDesktop ? 13 : isTablet ? 9.5 : 11,
                 borderRadius: 12,
                 flexDirection: 'row',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: 8,
                 cursor: 'pointer',
                 boxShadow: '0 6px 20px rgba(255, 90, 10, 0.45)',
+                flex: isSmallMobile ? 1 : undefined,
+                minWidth: isSmallMobile ? '100%' : undefined,
               }}
             >
               <BootstrapIcon name="cart3" size={15} color="#FFFFFF" />
               <Text
                 style={{
                   color: '#FFFFFF',
-                  fontSize: 14,
+                  fontSize: isTablet ? 13 : 14,
                   fontWeight: '600',
                   fontFamily: fontFamily.sans,
                 }}
@@ -384,22 +390,25 @@ export default function HeroBanner({
                 backgroundColor: 'rgba(255, 255, 255, 0.08)',
                 borderWidth: 1,
                 borderColor: 'rgba(255, 255, 255, 0.22)',
-                paddingHorizontal: isDesktop ? 22 : 18,
-                paddingVertical: isDesktop ? 13 : 11,
+                paddingHorizontal: isDesktop ? 22 : isTablet ? 14 : 16,
+                paddingVertical: isDesktop ? 13 : isTablet ? 9.5 : 11,
                 borderRadius: 12,
                 flexDirection: 'row',
                 alignItems: 'center',
+                justifyContent: 'center',
                 gap: 8,
                 cursor: 'pointer',
                 backdropFilter: 'blur(8px)',
                 WebkitBackdropFilter: 'blur(8px)',
+                flex: isSmallMobile ? 1 : undefined,
+                minWidth: isSmallMobile ? '100%' : undefined,
               }}
             >
               <BootstrapIcon name="tools" size={14} color="#FFFFFF" />
               <Text
                 style={{
                   color: '#FFFFFF',
-                  fontSize: 14,
+                  fontSize: isTablet ? 13 : 14,
                   fontWeight: '700',
                   fontFamily: fontFamily.sans,
                 }}
@@ -415,9 +424,9 @@ export default function HeroBanner({
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            gap: isDesktop ? 32 : isTablet ? 20 : 16,
+            gap: isDesktop ? 32 : isTablet ? 16 : 16,
             flexWrap: 'wrap',
-            paddingTop: 16,
+            paddingTop: isTablet ? 12 : 16,
             borderTopWidth: 1,
             borderTopColor: 'rgba(255, 255, 255, 0.12)',
           }}
@@ -426,21 +435,21 @@ export default function HeroBanner({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <View
               style={{
-                width: 32,
-                height: 32,
+                width: isTablet ? 28 : 32,
+                height: isTablet ? 28 : 32,
                 borderRadius: 8,
                 backgroundColor: 'rgba(255, 90, 10, 0.15)',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <BootstrapIcon name="truck" size={15} color="#FF5A0A" />
+              <BootstrapIcon name="truck" size={isTablet ? 13 : 15} color="#FF5A0A" />
             </View>
             <View>
               <Text
                 style={{
                   color: '#FFFFFF',
-                  fontSize: 12,
+                  fontSize: isTablet ? 11 : 12,
                   fontWeight: '600',
                   fontFamily: fontFamily.sans,
                 }}
@@ -450,7 +459,7 @@ export default function HeroBanner({
               <Text
                 style={{
                   color: '#94A3B8',
-                  fontSize: 11,
+                  fontSize: isTablet ? 10 : 11,
                   fontWeight: '500',
                   fontFamily: fontFamily.sans,
                 }}
@@ -464,21 +473,21 @@ export default function HeroBanner({
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <View
               style={{
-                width: 32,
-                height: 32,
+                width: isTablet ? 28 : 32,
+                height: isTablet ? 28 : 32,
                 borderRadius: 8,
                 backgroundColor: 'rgba(255, 90, 10, 0.15)',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <BootstrapIcon name="shield-check" size={15} color="#FF5A0A" />
+              <BootstrapIcon name="shield-check" size={isTablet ? 13 : 15} color="#FF5A0A" />
             </View>
             <View>
               <Text
                 style={{
                   color: '#FFFFFF',
-                  fontSize: 12,
+                  fontSize: isTablet ? 11 : 12,
                   fontWeight: '600',
                   fontFamily: fontFamily.sans,
                 }}
@@ -488,7 +497,7 @@ export default function HeroBanner({
               <Text
                 style={{
                   color: '#94A3B8',
-                  fontSize: 11,
+                  fontSize: isTablet ? 10 : 11,
                   fontWeight: '500',
                   fontFamily: fontFamily.sans,
                 }}
@@ -498,25 +507,25 @@ export default function HeroBanner({
             </View>
           </View>
 
-          {/* Indicator 3: Expert Support Always */}
+          {/* Indicator 3: Expert Support */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <View
               style={{
-                width: 32,
-                height: 32,
+                width: isTablet ? 28 : 32,
+                height: isTablet ? 28 : 32,
                 borderRadius: 8,
                 backgroundColor: 'rgba(255, 90, 10, 0.15)',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
-              <BootstrapIcon name="headset" size={15} color="#FF5A0A" />
+              <BootstrapIcon name="headset" size={isTablet ? 13 : 15} color="#FF5A0A" />
             </View>
             <View>
               <Text
                 style={{
                   color: '#FFFFFF',
-                  fontSize: 12,
+                  fontSize: isTablet ? 11 : 12,
                   fontWeight: '600',
                   fontFamily: fontFamily.sans,
                 }}
@@ -526,7 +535,7 @@ export default function HeroBanner({
               <Text
                 style={{
                   color: '#94A3B8',
-                  fontSize: 11,
+                  fontSize: isTablet ? 10 : 11,
                   fontWeight: '500',
                   fontFamily: fontFamily.sans,
                 }}
@@ -539,5 +548,5 @@ export default function HeroBanner({
       </View>
     </View>
   </View>
-);
+  );
 }

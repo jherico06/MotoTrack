@@ -186,10 +186,88 @@ export function trimImageWhitespace(dataUri) {
 }
 
 /**
+ * Automatically resize and compress web image file using canvas before uploading.
+ * Handles large smartphone photos (e.g. 3MB - 15MB) down to compact Web-friendly images.
+ */
+export function compressWebImage(file, maxDimension = 640, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    if (typeof window === 'undefined' || typeof document === 'undefined') {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    let objectUrl = '';
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch (_e) {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+      return;
+    }
+
+    const img = new Image();
+    img.onload = () => {
+      try {
+        URL.revokeObjectURL(objectUrl);
+        let w = img.naturalWidth || img.width;
+        let h = img.naturalHeight || img.height;
+        if (!w || !h) {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+          return;
+        }
+
+        if (w > maxDimension || h > maxDimension) {
+          if (w > h) {
+            h = Math.round((h * maxDimension) / w);
+            w = maxDimension;
+          } else {
+            w = Math.round((w * maxDimension) / h);
+            h = maxDimension;
+          }
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.readAsDataURL(file);
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0, w, h);
+        const isPng = file.type === 'image/png';
+        const mime = isPng ? 'image/png' : 'image/jpeg';
+        const compressed = canvas.toDataURL(mime, quality);
+        resolve(compressed);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    img.onerror = () => {
+      try {
+        URL.revokeObjectURL(objectUrl);
+      } catch (_e) { }
+      reject(new Error('Failed to load image for compression'));
+    };
+    img.src = objectUrl;
+  });
+}
+
+/**
  * Pick an image from device files (supports Web browser file upload and Mobile camera roll)
  * Returns { success: boolean, uri?: string, error?: string, openSettings?: boolean }
  */
-export async function pickImageFromFile() {
+export async function pickImageFromFile(options = {}) {
   // 1. Web browser environment: Native HTML5 File Picker with Base64 Data URL
   if (Platform.OS === 'web' && typeof document !== 'undefined') {
     return new Promise((resolve) => {
@@ -199,33 +277,38 @@ export async function pickImageFromFile() {
         input.accept = 'image/*';
         input.style.display = 'none';
 
-        input.onchange = (e) => {
+        input.onchange = async (e) => {
           const file = e.target.files?.[0];
           if (!file) {
             resolve({ success: false, error: 'No file selected' });
             return;
           }
 
-          if (isImageTooLarge(file.size)) {
-            resolve(tooLargeError());
-            return;
-          }
+          try {
+            // Hard safety ceiling: reject files over 20MB before browser processing
+            if (file.size > 20 * 1024 * 1024) {
+              resolve({
+                success: false,
+                error: 'Image file is too large (over 20 MB). Please choose a smaller file.',
+              });
+              return;
+            }
 
-          const reader = new FileReader();
-          reader.onload = async () => {
-            const rawUri = reader.result;
-            if (isImageTooLarge(estimateDataUriBytes(rawUri))) {
+            const quality = typeof options.quality === 'number' ? options.quality : 0.85;
+            const maxDim = options.maxDimension || 640;
+            const compressedUri = await compressWebImage(file, maxDim, quality);
+
+            if (isImageTooLarge(estimateDataUriBytes(compressedUri))) {
               resolve(tooLargeError());
               return;
             }
+
             // Auto-trim transparent borders so emblems fill their container crisply
-            const trimmedUri = await trimImageWhitespace(rawUri);
+            const trimmedUri = await trimImageWhitespace(compressedUri);
             resolve({ success: true, uri: trimmedUri });
-          };
-          reader.onerror = () => {
-            resolve({ success: false, error: 'Failed to read image file' });
-          };
-          reader.readAsDataURL(file);
+          } catch (err) {
+            resolve({ success: false, error: err.message || 'Failed to process image' });
+          }
         };
 
         input.oncancel = () => {
@@ -237,7 +320,7 @@ export async function pickImageFromFile() {
         setTimeout(() => {
           try {
             document.body.removeChild(input);
-          } catch (e) {}
+          } catch (e) { }
         }, 3000);
       } catch (err) {
         resolve({ success: false, error: err.message || 'File picker failed' });
@@ -383,7 +466,7 @@ export async function pickVideoFromFile() {
         setTimeout(() => {
           try {
             document.body.removeChild(input);
-          } catch (_e) {}
+          } catch (_e) { }
         }, 3000);
       } catch (err) {
         resolve({ success: false, error: err.message || 'Video picker failed' });

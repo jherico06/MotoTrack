@@ -45,6 +45,7 @@ import CustomizerPageWeb from '../screens/web/customer/CustomizerPage.jsx';
 import ProfilePageWeb from '../screens/web/customer/ProfilePage.jsx';
 import NotificationsPageWeb from '../screens/web/customer/NotificationsPage.jsx';
 import RiderDashboardWeb from '../screens/web/rider/RiderDashboard.jsx';
+import ProductDetailsPageWeb from '../screens/web/customer/ProductDetailsPage.jsx';
 
 // ─── PLATFORM DISPATCH EXPORTS ───────────────────────────────────────────────
 export const ShopPage = selectNativeScreen(ShopPageAndroid, { ios: ShopPageIos, web: ShopPageWeb });
@@ -60,6 +61,6 @@ export const NotificationsPage = selectNativeScreen(NotificationsPageAndroid, { 
 export const DeliveryConfirmPage = selectNativeScreen(DeliveryConfirmPageShared);
 export const RiderRunPage = selectNativeScreen(RiderRunPageAndroid, { ios: RiderRunPageIos });
 export const RiderDashboard = selectNativeScreen(RiderDashboardAndroid, { ios: RiderDashboardIos, web: RiderDashboardWeb });
-export const ProductDetailsPage = selectNativeScreen(ProductDetailsPageShared);
+export const ProductDetailsPage = selectNativeScreen(ProductDetailsPageShared, { web: ProductDetailsPageWeb });
 export const StaffVerifyEmailPage = selectNativeScreen(StaffVerifyEmailPageShared);
 export const ForceChangePasswordPage = selectNativeScreen(ForceChangePasswordPageShared);

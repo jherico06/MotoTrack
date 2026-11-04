@@ -56,3 +56,7 @@
 | Use Case No.054 – AUDIT LOG | Records administrative system actions and security events for tracking and compliance. |
 | Use Case No.055 – ADMIN SECURITY LOCK | Automatically secures the administrative session with a PIN lock after a period of inactivity. |
 | Use Case No.056 – LOGOUT | Allows authenticated users to safely terminate their active session and log out of the system. |
+| Use Case No.057 – RATE DELIVERED ORDER & SUBMIT REPORT | Allows customers to submit ratings, reviews, and issue reports for delivered orders or services. |
+| Use Case No.058 – MANAGE MARKETING BANNERS | Allows administrators to create, update, and toggle storefront hero carousel slides and promotional banners. |
+| Use Case No.059 – MANAGE CUSTOMER FEEDBACK & REPORTS | Allows administrators to inspect, filter, and resolve customer ratings, reviews, and reported issues. |
+| Use Case No.060 – MANAGE PURCHASE ORDERS | Allows administrators to draft, submit, and receive purchase orders from suppliers to replenish stock. |

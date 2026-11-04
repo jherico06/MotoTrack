@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Platform,
+  StyleSheet,
   useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
@@ -26,10 +27,11 @@ export default function EditCustomerSettingsModal({
   onClose,
   onSave,
   isDarkMode = false,
-  showToast = () => {},
+  showToast = () => { },
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const isSmall = windowWidth < 600;
+  const isDesktop = windowWidth >= 768;
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -130,21 +132,26 @@ export default function EditCustomerSettingsModal({
         style={{
           flex: 1,
           backgroundColor: 'rgba(15, 23, 42, 0.65)',
-          justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
-          alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
-          padding: Platform.OS === 'web' ? 16 : 0,
+          justifyContent: isDesktop ? 'center' : 'flex-end',
+          alignItems: isDesktop ? 'center' : 'stretch',
+          padding: isDesktop ? 20 : 0,
         }}
       >
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          activeOpacity={1}
+          onPress={onClose}
+        />
         <View
           style={{
             backgroundColor: bgModal,
             width: '100%',
-            maxWidth: Platform.OS === 'web' ? 640 : '100%',
-            maxHeight: '90%',
+            maxWidth: isDesktop ? 640 : '100%',
+            maxHeight: isDesktop ? '88%' : '92%',
             borderTopLeftRadius: 28,
             borderTopRightRadius: 28,
-            borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
-            borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
+            borderBottomLeftRadius: isDesktop ? 24 : 0,
+            borderBottomRightRadius: isDesktop ? 24 : 0,
             borderWidth: 1,
             borderColor,
             overflow: 'hidden',

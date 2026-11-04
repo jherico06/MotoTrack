@@ -7,6 +7,7 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { shopStyles as styles } from '../../styles/shop.styles.js';
@@ -54,6 +55,8 @@ export default function ProductSpecsModal({
   onAddToCart,
   onBuyNow,
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768;
   const productSoldOut = isProductSoldOut(product);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -130,9 +133,37 @@ export default function ProductSpecsModal({
 
   return (
     <>
-      <Modal visible={visible && !orderModalOpen} transparent animationType="slide" onRequestClose={handleClose}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalSheet, { maxHeight: '92%' }]}>
+      <Modal visible={visible && !orderModalOpen} transparent animationType={isDesktop ? 'fade' : 'slide'} onRequestClose={handleClose}>
+        <View
+          style={[
+            styles.modalOverlay,
+            isDesktop && {
+              justifyContent: 'center',
+              alignItems: 'center',
+              padding: 20,
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+            activeOpacity={1}
+            onPress={handleClose}
+          />
+          <View
+            style={[
+              styles.modalSheet,
+              { maxHeight: '92%' },
+              isDesktop && {
+                borderRadius: 24,
+                borderTopLeftRadius: 24,
+                borderTopRightRadius: 24,
+                maxWidth: 620,
+                alignSelf: 'center',
+                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
+              },
+              windowWidth < 400 && { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 24 },
+            ]}
+          >
             <View style={styles.modalHeaderRow}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                 <View

@@ -20,6 +20,9 @@ export function createProductDetailsStyles(isDark = false) {
     rootContainer: {
       flex: 1,
       backgroundColor: bgMain,
+      maxWidth: 960,
+      width: '100%',
+      alignSelf: 'center',
     },
 
     // ─── TOP STICKY APP BAR (CHARCOAL PALETTE) ───────────────────────────────
@@ -111,6 +114,8 @@ export function createProductDetailsStyles(isDark = false) {
     heroImage: {
       width: '100%',
       height: 320,
+      maxHeight: 420,
+      aspectRatio: 1,
       backgroundColor: bgCard,
     },
     topTagPill: {
@@ -723,6 +728,9 @@ export function createProductDetailsStyles(isDark = false) {
       bottom: 0,
       left: 0,
       right: 0,
+      maxWidth: 960,
+      width: '100%',
+      alignSelf: 'center',
       backgroundColor: bgCard,
       borderTopWidth: 1,
       borderTopColor: border,

@@ -17,7 +17,7 @@ function computeVisibleXLabels(points, gW, isDesktop) {
   const total = points.length;
   if (total === 0) return new Set();
 
-  // On desktop with 16 or fewer points (such as the default 14-day daily telemetry)
+  // On desktop with 16 or fewer points (such as the default 7-day daily telemetry)
   // or when each point has ample width (>= 40px), show all labels without skipping any dates
   const stepW = gW / Math.max(1, total - 1);
   if ((isDesktop && total <= 16) || stepW >= 40) {
@@ -605,7 +605,7 @@ function SalesRevenueTrendChart({
             </Text>
             <Text style={{ fontSize: 11, color: isDark ? '#94A3B8' : tokens.textMuted }}>
               {granularity === 'daily'
-                ? 'Daily telemetry (last 14 days)'
+                ? 'Daily telemetry (last 7 days)'
                 : granularity === 'weekly'
                 ? 'Weekly telemetry (last 8 weeks)'
                 : 'Monthly telemetry (last 6 months)'}
@@ -1019,6 +1019,15 @@ export default function DashboardInsightsPanel({
   const isDark = Boolean(isDarkMode);
   const [chartGranularity, setChartGranularity] = useState('daily');
 
+  const trendData = useMemo(() => {
+    if (!insights || !tokens) return [];
+    if (insights?.revenueTrends?.[chartGranularity]) {
+      return insights.revenueTrends[chartGranularity];
+    }
+    const orderList = orders || insights?.orders || [];
+    return aggregateSalesTrend(orderList, chartGranularity);
+  }, [insights, tokens, orders, chartGranularity]);
+
   if (!insights || !tokens) return null;
 
   const sp = insights.salesPerformance || {};
@@ -1026,14 +1035,6 @@ export default function DashboardInsightsPanel({
   const ch = insights.salesByChannel || {};
   const pp = insights.productPerformance || { bestSelling: [], slowMoving: [] };
   const actions = insights.actionRequired || [];
-
-  const trendData = useMemo(() => {
-    if (insights?.revenueTrends?.[chartGranularity]) {
-      return insights.revenueTrends[chartGranularity];
-    }
-    const orderList = orders || insights?.orders || [];
-    return aggregateSalesTrend(orderList, chartGranularity);
-  }, [insights, orders, chartGranularity]);
 
   const periodSelector = (
     <View

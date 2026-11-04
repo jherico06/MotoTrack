@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderRadius: 16,
     padding: 18,
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#E2E8F0',
     marginBottom: 16,
     shadowColor: '#000000',
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
   },
   nodeItemContainer: {
     alignItems: 'center',
-    width: 90,
+    width: 96,
     zIndex: 2,
   },
   badgeSpace: {
@@ -315,7 +315,8 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     marginTop: 6,
-    lineHeight: 14,
+    lineHeight: 15,
+    paddingHorizontal: 2,
   },
   statusLabelTextDone: {
     color: '#0F172A',
@@ -323,7 +324,7 @@ const styles = StyleSheet.create({
   },
   statusLabelTextCurrent: {
     color: '#EA580C',
-    fontWeight: '600',
+    fontWeight: '700',
   },
   horizontalConnectorWrap: {
     flex: 1,

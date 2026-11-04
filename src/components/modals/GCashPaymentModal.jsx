@@ -177,9 +177,14 @@ export default function GCashPaymentModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={gStyles.overlay}>
-        <View style={[gStyles.container, isDesktop && gStyles.containerDesktop]}>
+    <Modal visible={visible} transparent animationType={isDesktop ? 'fade' : 'slide'} onRequestClose={onClose}>
+      <View style={[gStyles.overlay, isDesktop ? gStyles.overlayDesktop : gStyles.overlayMobile]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View style={[gStyles.container, isDesktop ? gStyles.containerDesktop : gStyles.containerMobile]}>
           {/* ─── 1. OFFICIAL GCASH HEADER & TEST MODE BADGE ─── */}
           <View style={gStyles.gcashHeader}>
             <View style={gStyles.gcashHeaderTop}>
@@ -512,18 +517,30 @@ const gStyles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
-    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
-    padding: Platform.OS === 'web' ? 16 : 0,
+    ...Platform.select({
+      web: { backdropFilter: 'blur(4px)' },
+    }),
+  },
+  overlayDesktop: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  overlayMobile: {
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
+    padding: 0,
+
+
   },
   container: {
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 440 : '100%',
+
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    borderBottomLeftRadius: Platform.OS === 'web' ? 24 : 0,
-    borderBottomRightRadius: Platform.OS === 'web' ? 24 : 0,
+
+
     overflow: 'hidden',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: -4 },
@@ -534,6 +551,16 @@ const gStyles = StyleSheet.create({
   },
   containerDesktop: {
     maxWidth: 440,
+
+    borderRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  containerMobile: {
+    maxWidth: '100%',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+
   },
 
   // 1. Header

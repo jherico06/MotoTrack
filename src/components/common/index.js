@@ -23,6 +23,7 @@ export { default as LiveDeliveryMap } from './LiveDeliveryMap.jsx';
 export { default as DeliveryTrackingPanel } from './DeliveryTrackingPanel.jsx';
 export { default as ServiceCategoryIcon } from './ServiceCategoryIcon.jsx';
 export { default as ToggleSwitch } from './ToggleSwitch.jsx';
+export { default as HeaderSearchWidget } from './HeaderSearchWidget.jsx';
 export {
   default as Skeleton,
   SkeletonText,

@@ -10,6 +10,7 @@ import {
   Easing,
   Platform,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { BootstrapIcon, BrandLogo, GoogleIcon } from '../../../components';
@@ -116,6 +117,7 @@ export default function LoginPageWeb({
   const [signUpPassword, setSignUpPassword] = useState('');
   const [signUpConfirmPassword, setSignUpConfirmPassword] = useState('');
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
+  const [showSignUpConfirmPassword, setShowSignUpConfirmPassword] = useState(false);
   const [signUpError, setSignUpError] = useState('');
   const [signUpSuccessMsg, setSignUpSuccessMsg] = useState('');
   const [isSignUpLoading, setIsSignUpLoading] = useState(false);
@@ -1565,55 +1567,880 @@ export default function LoginPageWeb({
   if (isMobile) {
     return (
       <View style={authStyles.mobilePageWrapper}>
-        <StatusBar style="dark" />
+        <StatusBar style="light" translucent backgroundColor="transparent" />
         <ScrollView
+          style={{ flex: 1, backgroundColor: '#1E2227' }}
           contentContainerStyle={authStyles.mobileScrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Top Bar with Back to Store */}
-          <View style={authStyles.mobileTopBar}>
-            <TouchableOpacity
-              style={authStyles.mobileBackBtn}
-              onPress={() => onNavigateToStore?.()}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name="arrow-left" size={13} color="#475569" />
-              <Text style={[authStyles.mobileBackBtnText, { fontFamily: fontFamily.sans }]}>
-                Back to Store
-              </Text>
-            </TouchableOpacity>
+          {/* ─── 1. DARK CHARCOAL HEADER SECTION ─── */}
+          <View style={authStyles.mobileTopHeaderSection}>
+            {/* Minimal circular wheel-inspired orange graphic */}
+            <View style={authStyles.mobileWheelGraphicWrap}>
+              <View style={authStyles.mobileWheelOuterRing} />
+            </View>
+
+            {/* Compact Top Navigation (Shop & Guest) */}
+            <View style={authStyles.mobileTopNavRow}>
+              <TouchableOpacity
+                style={authStyles.mobileNavLink}
+                onPress={() => onNavigateToStore?.()}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel="Return to Shop"
+              >
+                <BootstrapIcon name="chevron-left" size={13} color="#94A3B8" />
+                <Text style={[authStyles.mobileNavLinkText, { fontFamily: fontFamily.sans }]}>Shop</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={authStyles.mobileNavLink}
+                onPress={() => onNavigateToStore?.()}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel="Browse as Guest"
+              >
+                <Text style={[authStyles.mobileNavLinkText, { fontFamily: fontFamily.sans }]}>Guest</Text>
+                <BootstrapIcon name="chevron-right" size={13} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Bold, clean header titles */}
+            <Text style={[authStyles.mobileHeaderTitle, { fontFamily: fontFamily.sans }]}>
+              {isSignUp ? 'Join the ride.' : 'Welcome back.'}
+            </Text>
+            <Text style={[authStyles.mobileHeaderSubtitle, { fontFamily: fontFamily.sans }]}>
+              Motorparts made simple.
+            </Text>
           </View>
 
-          {/* Form Container (Full Width up to 480px) */}
-          <View style={authStyles.mobileFormCard}>{isSignUp ? signUpFormContent : signInFormContent}</View>
+          {/* ─── 2. WHITE BOTTOM SHEET WITH SOFTLY ROUNDED TOP CORNERS ─── */}
+          <View style={authStyles.mobileWhiteCardSheet}>
+            {!isSignUp ? (
+              // ─── MOBILE LOG IN FORM ───
+              <>
+                <Text style={[authStyles.mobileSheetTitle, { fontFamily: fontFamily.sans }]}>Log in</Text>
+                <Text style={[authStyles.mobileSheetSubtitle, { fontFamily: fontFamily.sans }]}>
+                  Access your orders and saved parts.
+                </Text>
 
-          {/* Compact Charcoal Welcome / Sign-Up / Sign-In Section */}
-          <View style={authStyles.mobileWelcomeSection}>
-            <View style={authStyles.mobileOrganicBlob} />
-            <Text style={[authStyles.mobileWelcomeTitle, { fontFamily: fontFamily.sans }]}>
-              {isSignUp ? 'Welcome Back!' : 'Hello!'}
-            </Text>
-            <Text style={[authStyles.mobileWelcomeSubtitle, { fontFamily: fontFamily.sans }]}>
-              {isSignUp
-                ? `To ${brandSettings.storeName || 'MotoTrack'}`
-                : `Welcome to ${brandSettings.storeName || 'MotoTrack'}`}
-            </Text>
-            <Text style={[authStyles.mobileWelcomeText, { fontFamily: fontFamily.sans }]}>
-              {isSignUp
-                ? 'Already have an account? Sign in with your registered email and password.'
-                : 'Enter your personal details, verify your email with OTP, and start your track journey.'}
-            </Text>
-            <TouchableOpacity style={authStyles.overlayGhostBtn} onPress={toggleMode} activeOpacity={0.85}>
-              <Text style={[authStyles.overlayGhostBtnText, { fontFamily: fontFamily.sans }]}>
-                {isSignUp ? 'SIGN IN' : 'SIGN UP'}
-              </Text>
-            </TouchableOpacity>
+                {authSuccessNotification ? (
+                  <View style={authStyles.mobileSuccessBanner}>
+                    <BootstrapIcon name="check-circle-fill" size={15} color="#059669" />
+                    <Text style={[authStyles.mobileSuccessBannerText, { fontFamily: fontFamily.sans }]}>
+                      {authSuccessNotification}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {signInError ? (
+                  <View style={authStyles.mobileErrorBanner} accessibilityRole="alert">
+                    <BootstrapIcon name="info-circle" size={15} color="#DC2626" />
+                    <Text style={[authStyles.mobileErrorBannerText, { fontFamily: fontFamily.sans }]}>
+                      {signInError}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {/* Email or Username Input */}
+                <View style={authStyles.mobileInputGroup}>
+                  <View
+                    style={[
+                      authStyles.mobileInputPill,
+                      focusedField === 'mobileSignInEmail' && authStyles.mobileInputPillFocused,
+                    ]}
+                  >
+                    <BootstrapIcon
+                      name="envelope"
+                      size={16}
+                      color={focusedField === 'mobileSignInEmail' ? '#EA580C' : '#94A3B8'}
+                    />
+                    <TextInput
+                      style={[authStyles.mobileTextInput, { fontFamily: fontFamily.sans }]}
+                      placeholder="Email or username"
+                      placeholderTextColor="#94A3B8"
+                      value={signInEmail}
+                      onChangeText={(text) => {
+                        setSignInEmail(text);
+                        if (signInError) setSignInError('');
+                      }}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      onFocus={() => setFocusedField('mobileSignInEmail')}
+                      onBlur={() => setFocusedField(null)}
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                      onSubmitEditing={() => {
+                        if (signInPassword.trim()) {
+                          handleSignInSubmit();
+                        } else {
+                          signInPasswordRef.current?.focus();
+                        }
+                      }}
+                      accessibilityLabel="Email or username"
+                    />
+                  </View>
+                </View>
+
+                {/* Password Input */}
+                <View style={authStyles.mobileInputGroup}>
+                  <View
+                    style={[
+                      authStyles.mobileInputPill,
+                      focusedField === 'mobileSignInPassword' && authStyles.mobileInputPillFocused,
+                    ]}
+                  >
+                    <BootstrapIcon
+                      name="lock"
+                      size={16}
+                      color={focusedField === 'mobileSignInPassword' ? '#EA580C' : '#94A3B8'}
+                    />
+                    <TextInput
+                      ref={signInPasswordRef}
+                      style={[authStyles.mobileTextInput, { fontFamily: fontFamily.sans }]}
+                      placeholder="Password"
+                      placeholderTextColor="#94A3B8"
+                      value={signInPassword}
+                      onChangeText={(text) => {
+                        setSignInPassword(text);
+                        if (signInError) setSignInError('');
+                      }}
+                      secureTextEntry={!showSignInPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      onFocus={() => setFocusedField('mobileSignInPassword')}
+                      onBlur={() => setFocusedField(null)}
+                      returnKeyType="go"
+                      onSubmitEditing={handleSignInSubmit}
+                      accessibilityLabel="Password"
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowSignInPassword(!showSignInPassword)}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      activeOpacity={0.7}
+                      style={{ cursor: 'pointer' }}
+                      accessibilityRole="button"
+                      accessibilityLabel={showSignInPassword ? 'Hide password' : 'Show password'}
+                    >
+                      <BootstrapIcon
+                        name={showSignInPassword ? 'eye-slash' : 'eye'}
+                        size={16}
+                        color="#94A3B8"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Remember Me & Forgot Password Row */}
+                <View style={authStyles.mobileOptionsRow}>
+                  <TouchableOpacity
+                    style={authStyles.mobileRememberRow}
+                    onPress={() => setRememberMe((prev) => !prev)}
+                    activeOpacity={0.8}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: rememberMe }}
+                    accessibilityLabel="Remember me"
+                  >
+                    <View
+                      style={[
+                        authStyles.mobileCheckbox,
+                        rememberMe && authStyles.mobileCheckboxChecked,
+                      ]}
+                    >
+                      {rememberMe ? (
+                        <BootstrapIcon name="check" size={11} color="#FFFFFF" />
+                      ) : null}
+                    </View>
+                    <Text style={[authStyles.mobileRememberText, { fontFamily: fontFamily.sans }]}>
+                      Remember me
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={handleOpenForgotPassword}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Forgot password"
+                  >
+                    <Text style={[authStyles.mobileForgotPasswordText, { fontFamily: fontFamily.sans }]}>
+                      Forgot password?
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Single Full-Width Orange Primary Button */}
+                <TouchableOpacity
+                  style={[authStyles.mobilePrimaryBtn, isSignInLoading && authStyles.mobilePrimaryBtnDisabled]}
+                  onPress={handleSignInSubmit}
+                  activeOpacity={0.85}
+                  disabled={isSignInLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Log in"
+                >
+                  {isSignInLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Text style={[authStyles.mobilePrimaryBtnText, { fontFamily: fontFamily.sans }]}>
+                        Log in
+                      </Text>
+                      <View style={authStyles.mobileBtnArrowBadge}>
+                        <BootstrapIcon name="chevron-right" size={12} color="#FFFFFF" />
+                      </View>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Social Divider */}
+                <View style={authStyles.mobileSocialDividerRow}>
+                  <View style={authStyles.mobileSocialDividerLine} />
+                  <Text style={[authStyles.mobileSocialDividerText, { fontFamily: fontFamily.sans }]}>
+                    or continue with
+                  </Text>
+                  <View style={authStyles.mobileSocialDividerLine} />
+                </View>
+
+                {/* Sign in with Google Button */}
+                <TouchableOpacity
+                  style={authStyles.mobileGoogleBtn}
+                  onPress={handleGoogleSignIn}
+                  activeOpacity={0.85}
+                  disabled={isGoogleLoading || isSignInLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue with Google"
+                >
+                  {isGoogleLoading ? (
+                    <ActivityIndicator size="small" color="#EA580C" />
+                  ) : (
+                    <>
+                      <GoogleIcon size={18} />
+                      <Text style={[authStyles.mobileGoogleBtnText, { fontFamily: fontFamily.sans }]}>
+                        Continue with Google
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Google OAuth Advisory / Test Mode */}
+                {googleAdvisory ? (
+                  <View
+                    style={{
+                      marginTop: 10,
+                      marginBottom: 16,
+                      padding: 14,
+                      backgroundColor: '#FFFBEB',
+                      borderRadius: 14,
+                      borderWidth: 1,
+                      borderColor: '#FDE68A',
+                      width: '100%',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontWeight: '700',
+                        fontSize: 13,
+                        color: '#92400E',
+                        marginBottom: 4,
+                        fontFamily: fontFamily.sans,
+                      }}
+                    >
+                      Google OAuth Setup Required
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: '#78350F',
+                        lineHeight: 17,
+                        marginBottom: 10,
+                        fontFamily: fontFamily.sans,
+                      }}
+                    >
+                      Google provider is not enabled yet in your Supabase project. You can test immediately:
+                    </Text>
+                    <TouchableOpacity
+                      style={{
+                        backgroundColor: '#EA580C',
+                        borderRadius: 10,
+                        paddingVertical: 9,
+                        paddingHorizontal: 12,
+                        alignItems: 'center',
+                        cursor: 'pointer',
+                      }}
+                      onPress={handleGoogleInstantTest}
+                      activeOpacity={0.85}
+                    >
+                      <Text
+                        style={{
+                          color: '#FFFFFF',
+                          fontWeight: '600',
+                          fontSize: 12,
+                          fontFamily: fontFamily.sans,
+                        }}
+                      >
+                        ✓ Test Sign In as Google Rider (Instant)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : null}
+
+                {/* Footer Switch */}
+                <View style={authStyles.mobileSwitchRow}>
+                  <Text style={[authStyles.mobileSwitchText, { fontFamily: fontFamily.sans }]}>
+                    New to {brandSettings.storeName || 'MotoTrack'}?{' '}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={toggleMode}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Create an account"
+                  >
+                    <Text style={[authStyles.mobileSwitchLink, { fontFamily: fontFamily.sans }]}>
+                      Create an account
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : signUpStep === 1 ? (
+              // ─── MOBILE SIGN UP STEP 1: CREDENTIALS & STRONG PASSWORD ───
+              <>
+                {/* Compact Back to login link */}
+                <TouchableOpacity
+                  style={authStyles.mobileSheetBackRow}
+                  onPress={toggleMode}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Back to login"
+                >
+                  <BootstrapIcon name="chevron-left" size={13} color="#64748B" />
+                  <Text style={[authStyles.mobileSheetBackText, { fontFamily: fontFamily.sans }]}>
+                    Back to login
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={[authStyles.mobileSheetTitle, { fontFamily: fontFamily.sans }]}>Sign up</Text>
+                <Text style={[authStyles.mobileSheetSubtitle, { fontFamily: fontFamily.sans }]}>
+                  Create your rider profile.
+                </Text>
+
+                {signUpError ? (
+                  <View style={authStyles.mobileErrorBanner} accessibilityRole="alert">
+                    <BootstrapIcon name="info-circle" size={15} color="#DC2626" />
+                    <Text style={[authStyles.mobileErrorBannerText, { fontFamily: fontFamily.sans }]}>
+                      {signUpError}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {/* 1. Full Name */}
+                <View style={authStyles.mobileInputGroup}>
+                  <View
+                    style={[
+                      authStyles.mobileInputPill,
+                      focusedField === 'mobileSignUpName' && authStyles.mobileInputPillFocused,
+                    ]}
+                  >
+                    <BootstrapIcon
+                      name="person"
+                      size={16}
+                      color={focusedField === 'mobileSignUpName' ? '#EA580C' : '#94A3B8'}
+                    />
+                    <TextInput
+                      ref={signUpNameRef}
+                      style={[authStyles.mobileTextInput, { fontFamily: fontFamily.sans }]}
+                      placeholder="Full name"
+                      placeholderTextColor="#94A3B8"
+                      value={signUpName}
+                      onChangeText={(t) => {
+                        setSignUpName(t);
+                        if (signUpError) setSignUpError('');
+                      }}
+                      onFocus={() => setFocusedField('mobileSignUpName')}
+                      onBlur={() => setFocusedField(null)}
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                      onSubmitEditing={() => signUpEmailRef.current?.focus()}
+                      accessibilityLabel="Full name"
+                    />
+                  </View>
+                </View>
+
+                {/* 2. Email Address */}
+                <View style={authStyles.mobileInputGroup}>
+                  <View
+                    style={[
+                      authStyles.mobileInputPill,
+                      focusedField === 'mobileSignUpEmail' && authStyles.mobileInputPillFocused,
+                    ]}
+                  >
+                    <BootstrapIcon
+                      name="envelope"
+                      size={16}
+                      color={focusedField === 'mobileSignUpEmail' ? '#EA580C' : '#94A3B8'}
+                    />
+                    <TextInput
+                      ref={signUpEmailRef}
+                      style={[authStyles.mobileTextInput, { fontFamily: fontFamily.sans }]}
+                      placeholder="Email address"
+                      placeholderTextColor="#94A3B8"
+                      value={signUpEmail}
+                      onChangeText={(t) => {
+                        setSignUpEmail(t);
+                        if (signUpError) setSignUpError('');
+                      }}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      onFocus={() => setFocusedField('mobileSignUpEmail')}
+                      onBlur={() => setFocusedField(null)}
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                      onSubmitEditing={() => signUpPhoneRef.current?.focus()}
+                      accessibilityLabel="Email address"
+                    />
+                  </View>
+                </View>
+
+                {/* 3. Phone Number */}
+                <View style={authStyles.mobileInputGroup}>
+                  <View
+                    style={[
+                      authStyles.mobileInputPill,
+                      focusedField === 'mobileSignUpPhone' && authStyles.mobileInputPillFocused,
+                    ]}
+                  >
+                    <BootstrapIcon
+                      name="telephone"
+                      size={16}
+                      color={focusedField === 'mobileSignUpPhone' ? '#EA580C' : '#94A3B8'}
+                    />
+                    <TextInput
+                      ref={signUpPhoneRef}
+                      style={[authStyles.mobileTextInput, { fontFamily: fontFamily.sans }]}
+                      placeholder="Contact number (+63 917...)"
+                      placeholderTextColor="#94A3B8"
+                      value={signUpPhone}
+                      onChangeText={(t) => {
+                        setSignUpPhone(t);
+                        if (signUpError) setSignUpError('');
+                      }}
+                      keyboardType="phone-pad"
+                      onFocus={() => setFocusedField('mobileSignUpPhone')}
+                      onBlur={() => setFocusedField(null)}
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                      onSubmitEditing={() => signUpAddressRef.current?.focus()}
+                      accessibilityLabel="Phone number"
+                    />
+                  </View>
+                </View>
+
+                {/* 4. Delivery Address */}
+                <View style={authStyles.mobileInputGroup}>
+                  <View
+                    style={[
+                      authStyles.mobileInputPill,
+                      focusedField === 'mobileSignUpAddress' && authStyles.mobileInputPillFocused,
+                    ]}
+                  >
+                    <BootstrapIcon
+                      name="geo-alt"
+                      size={16}
+                      color={focusedField === 'mobileSignUpAddress' ? '#EA580C' : '#94A3B8'}
+                    />
+                    <TextInput
+                      ref={signUpAddressRef}
+                      style={[authStyles.mobileTextInput, { fontFamily: fontFamily.sans }]}
+                      placeholder="Complete delivery address"
+                      placeholderTextColor="#94A3B8"
+                      value={signUpAddress}
+                      onChangeText={(t) => {
+                        setSignUpAddress(t);
+                        if (signUpError) setSignUpError('');
+                      }}
+                      autoCapitalize="words"
+                      onFocus={() => setFocusedField('mobileSignUpAddress')}
+                      onBlur={() => setFocusedField(null)}
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                      onSubmitEditing={() => signUpPasswordRef.current?.focus()}
+                      accessibilityLabel="Delivery address"
+                    />
+                  </View>
+                </View>
+
+                {/* 5. Password */}
+                <View style={authStyles.mobileInputGroup}>
+                  <View
+                    style={[
+                      authStyles.mobileInputPill,
+                      focusedField === 'mobileSignUpPassword' && authStyles.mobileInputPillFocused,
+                    ]}
+                  >
+                    <BootstrapIcon
+                      name="lock"
+                      size={16}
+                      color={focusedField === 'mobileSignUpPassword' ? '#EA580C' : '#94A3B8'}
+                    />
+                    <TextInput
+                      ref={signUpPasswordRef}
+                      style={[authStyles.mobileTextInput, { fontFamily: fontFamily.sans }]}
+                      placeholder="Create strong password"
+                      placeholderTextColor="#94A3B8"
+                      value={signUpPassword}
+                      onChangeText={(t) => {
+                        setSignUpPassword(t);
+                        if (signUpError) setSignUpError('');
+                      }}
+                      secureTextEntry={!showSignUpPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      onFocus={() => setFocusedField('mobileSignUpPassword')}
+                      onBlur={() => setFocusedField(null)}
+                      returnKeyType="next"
+                      blurOnSubmit={false}
+                      onSubmitEditing={() => signUpConfirmPasswordRef.current?.focus()}
+                      accessibilityLabel="Password"
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowSignUpPassword(!showSignUpPassword)}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      activeOpacity={0.7}
+                      style={{ cursor: 'pointer' }}
+                      accessibilityRole="button"
+                      accessibilityLabel={showSignUpPassword ? 'Hide password' : 'Show password'}
+                    >
+                      <BootstrapIcon
+                        name={showSignUpPassword ? 'eye-slash' : 'eye'}
+                        size={16}
+                        color="#94A3B8"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Real-time Password Strength Meter */}
+                {signUpPassword.length > 0 && (
+                  <View style={[authStyles.strengthMeterBox, { marginBottom: 14 }]}>
+                    <View style={authStyles.strengthHeader}>
+                      <Text style={[authStyles.strengthLabel, { fontFamily: fontFamily.sans }]}>
+                        Password Strength:
+                      </Text>
+                      <Text
+                        style={[
+                          authStyles.strengthBadge,
+                          { color: passwordAnalysis.color, fontFamily: fontFamily.sans },
+                        ]}
+                      >
+                        {passwordAnalysis.label} ({passwordAnalysis.score}%)
+                      </Text>
+                    </View>
+                    <View style={authStyles.meterTrack}>
+                      <View
+                        style={[
+                          authStyles.meterFill,
+                          {
+                            width: `${passwordAnalysis.score}%`,
+                            backgroundColor: passwordAnalysis.color,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <View style={authStyles.criteriaRow}>
+                      <View style={authStyles.criteriaChip}>
+                        <BootstrapIcon
+                          name={passwordAnalysis.criteria.minLength ? 'check-circle-fill' : 'circle'}
+                          size={10}
+                          color={passwordAnalysis.criteria.minLength ? '#10B981' : '#94A3B8'}
+                        />
+                        <Text
+                          style={[
+                            authStyles.criteriaChipText,
+                            passwordAnalysis.criteria.minLength && authStyles.criteriaChipTextActive,
+                            { fontFamily: fontFamily.sans },
+                          ]}
+                        >
+                          8+ Chars
+                        </Text>
+                      </View>
+                      <View style={authStyles.criteriaChip}>
+                        <BootstrapIcon
+                          name={passwordAnalysis.criteria.hasUppercase ? 'check-circle-fill' : 'circle'}
+                          size={10}
+                          color={passwordAnalysis.criteria.hasUppercase ? '#10B981' : '#94A3B8'}
+                        />
+                        <Text
+                          style={[
+                            authStyles.criteriaChipText,
+                            passwordAnalysis.criteria.hasUppercase && authStyles.criteriaChipTextActive,
+                            { fontFamily: fontFamily.sans },
+                          ]}
+                        >
+                          A-Z
+                        </Text>
+                      </View>
+                      <View style={authStyles.criteriaChip}>
+                        <BootstrapIcon
+                          name={passwordAnalysis.criteria.hasLowercase ? 'check-circle-fill' : 'circle'}
+                          size={10}
+                          color={passwordAnalysis.criteria.hasLowercase ? '#10B981' : '#94A3B8'}
+                        />
+                        <Text
+                          style={[
+                            authStyles.criteriaChipText,
+                            passwordAnalysis.criteria.hasLowercase && authStyles.criteriaChipTextActive,
+                            { fontFamily: fontFamily.sans },
+                          ]}
+                        >
+                          a-z
+                        </Text>
+                      </View>
+                      <View style={authStyles.criteriaChip}>
+                        <BootstrapIcon
+                          name={passwordAnalysis.criteria.hasNumber ? 'check-circle-fill' : 'circle'}
+                          size={10}
+                          color={passwordAnalysis.criteria.hasNumber ? '#10B981' : '#94A3B8'}
+                        />
+                        <Text
+                          style={[
+                            authStyles.criteriaChipText,
+                            passwordAnalysis.criteria.hasNumber && authStyles.criteriaChipTextActive,
+                            { fontFamily: fontFamily.sans },
+                          ]}
+                        >
+                          0-9
+                        </Text>
+                      </View>
+                      <View style={authStyles.criteriaChip}>
+                        <BootstrapIcon
+                          name={passwordAnalysis.criteria.hasSpecial ? 'check-circle-fill' : 'circle'}
+                          size={10}
+                          color={passwordAnalysis.criteria.hasSpecial ? '#10B981' : '#94A3B8'}
+                        />
+                        <Text
+                          style={[
+                            authStyles.criteriaChipText,
+                            passwordAnalysis.criteria.hasSpecial && authStyles.criteriaChipTextActive,
+                            { fontFamily: fontFamily.sans },
+                          ]}
+                        >
+                          !@#$
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* 6. Confirm Password */}
+                <View style={authStyles.mobileInputGroup}>
+                  <View
+                    style={[
+                      authStyles.mobileInputPill,
+                      focusedField === 'mobileSignUpConfirmPassword' && authStyles.mobileInputPillFocused,
+                    ]}
+                  >
+                    <BootstrapIcon
+                      name="lock"
+                      size={16}
+                      color={focusedField === 'mobileSignUpConfirmPassword' ? '#EA580C' : '#94A3B8'}
+                    />
+                    <TextInput
+                      ref={signUpConfirmPasswordRef}
+                      style={[authStyles.mobileTextInput, { fontFamily: fontFamily.sans }]}
+                      placeholder="Confirm password"
+                      placeholderTextColor="#94A3B8"
+                      value={signUpConfirmPassword}
+                      onChangeText={(t) => {
+                        setSignUpConfirmPassword(t);
+                        if (signUpError) setSignUpError('');
+                      }}
+                      secureTextEntry={!showSignUpConfirmPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      onFocus={() => setFocusedField('mobileSignUpConfirmPassword')}
+                      onBlur={() => setFocusedField(null)}
+                      returnKeyType="go"
+                      onSubmitEditing={handleRequestOtp}
+                      accessibilityLabel="Confirm password"
+                    />
+                    <TouchableOpacity
+                      onPress={() => setShowSignUpConfirmPassword(!showSignUpConfirmPassword)}
+                      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                      activeOpacity={0.7}
+                      style={{ cursor: 'pointer' }}
+                      accessibilityRole="button"
+                      accessibilityLabel={showSignUpConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                    >
+                      <BootstrapIcon
+                        name={showSignUpConfirmPassword ? 'eye-slash' : 'eye'}
+                        size={16}
+                        color="#94A3B8"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Terms and Privacy Notice */}
+                <Text style={[authStyles.mobileTermsText, { fontFamily: fontFamily.sans }]}>
+                  By continuing, you agree to our Terms of Service and Privacy Policy.
+                </Text>
+
+                {/* Single Full-Width Orange Primary Button */}
+                <TouchableOpacity
+                  style={[
+                    authStyles.mobilePrimaryBtn,
+                    (!passwordAnalysis.isStrong || isSignUpLoading) && authStyles.mobilePrimaryBtnDisabled,
+                  ]}
+                  onPress={handleRequestOtp}
+                  activeOpacity={0.85}
+                  disabled={!passwordAnalysis.isStrong || isSignUpLoading}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue to verify"
+                >
+                  {isSignUpLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Text style={[authStyles.mobilePrimaryBtnText, { fontFamily: fontFamily.sans }]}>
+                        Continue to verify
+                      </Text>
+                      <View style={authStyles.mobileBtnArrowBadge}>
+                        <BootstrapIcon name="chevron-right" size={12} color="#FFFFFF" />
+                      </View>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Footer Switch */}
+                <View style={authStyles.mobileSwitchRow}>
+                  <Text style={[authStyles.mobileSwitchText, { fontFamily: fontFamily.sans }]}>
+                    Already have an account?{' '}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={toggleMode}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Log in"
+                  >
+                    <Text style={[authStyles.mobileSwitchLink, { fontFamily: fontFamily.sans }]}>
+                      Log in
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              // ─── MOBILE SIGN UP STEP 2: 6-DIGIT OTP VERIFICATION ───
+              <View style={authStyles.otpContainer}>
+                <TouchableOpacity
+                  style={authStyles.otpBackBtn}
+                  onPress={() => setSignUpStep(1)}
+                  activeOpacity={0.8}
+                >
+                  <BootstrapIcon name="arrow-left" size={13} color="#EA580C" />
+                  <Text style={[authStyles.otpBackBtnText, { fontFamily: fontFamily.sans }]}>
+                    Back to details
+                  </Text>
+                </TouchableOpacity>
+
+                <View style={authStyles.otpHeader}>
+                  <View style={authStyles.otpBadge}>
+                    <BootstrapIcon name="shield-lock-fill" size={24} color="#EA580C" />
+                  </View>
+                  <Text style={[authStyles.mobileSheetTitle, { fontFamily: fontFamily.sans, textAlign: 'center' }]}>
+                    Enter OTP Code
+                  </Text>
+                  <Text style={[authStyles.otpSubtitle, { fontFamily: fontFamily.sans, textAlign: 'center' }]}>
+                    We sent a 6-digit code to <Text style={authStyles.otpEmailHighlight}>{signUpEmail}</Text>
+                  </Text>
+                </View>
+
+                {signUpSuccessMsg ? (
+                  <View style={authStyles.mobileSuccessBanner}>
+                    <BootstrapIcon name="check-circle-fill" size={13} color="#065F46" />
+                    <Text style={[authStyles.mobileSuccessBannerText, { fontFamily: fontFamily.sans }]}>
+                      {signUpSuccessMsg}
+                    </Text>
+                  </View>
+                ) : null}
+
+                {signUpError.length > 0 && (
+                  <View style={authStyles.mobileErrorBanner}>
+                    <BootstrapIcon name="exclamation-circle" size={13} color="#DC2626" />
+                    <Text style={[authStyles.mobileErrorBannerText, { fontFamily: fontFamily.sans }]}>
+                      {signUpError}
+                    </Text>
+                  </View>
+                )}
+
+                {/* 6 PIN Digit Input Boxes */}
+                <View style={authStyles.otpBoxesRow}>
+                  {otpDigits.map((digit, idx) => (
+                    <TextInput
+                      key={idx}
+                      ref={(el) => (otpInputRefs.current[idx] = el)}
+                      style={[
+                        authStyles.otpBox,
+                        digit ? authStyles.otpBoxFilled : null,
+                        { fontFamily: fontFamily.sans },
+                      ]}
+                      value={digit}
+                      onChangeText={(val) => handleOtpChange(val, idx)}
+                      onKeyPress={(e) => handleOtpKeyPress(e, idx)}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      selectTextOnFocus
+                      returnKeyType={idx === 5 ? 'go' : 'next'}
+                      onSubmitEditing={handleVerifyOtpAndCreate}
+                    />
+                  ))}
+                </View>
+
+                {/* Verify & Complete Button */}
+                <TouchableOpacity
+                  style={[authStyles.mobilePrimaryBtn, isSignUpLoading && authStyles.mobilePrimaryBtnDisabled]}
+                  onPress={handleVerifyOtpAndCreate}
+                  activeOpacity={0.85}
+                  disabled={isSignUpLoading}
+                >
+                  {isSignUpLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <Text style={[authStyles.mobilePrimaryBtnText, { fontFamily: fontFamily.sans }]}>
+                        VERIFY & CREATE ACCOUNT
+                      </Text>
+                      <View style={authStyles.mobileBtnArrowBadge}>
+                        <BootstrapIcon name="chevron-right" size={12} color="#FFFFFF" />
+                      </View>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                {/* Resend Timer Row */}
+                <View style={authStyles.resendRow}>
+                  <Text style={[authStyles.resendText, { fontFamily: fontFamily.sans }]}>
+                    Didn't receive code?{' '}
+                  </Text>
+                  {canResend ? (
+                    <TouchableOpacity onPress={handleResendOtp} activeOpacity={0.8}>
+                      <Text style={[authStyles.resendLink, { fontFamily: fontFamily.sans }]}>Resend Code</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <Text style={[authStyles.resendCountdown, { fontFamily: fontFamily.sans }]}>
+                      Resend in {resendTimer}s
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
           </View>
-
-          <Text style={[authStyles.modalFooterCopyright, { fontFamily: fontFamily.sans }]}>
-            © 2026 {brandSettings.storeName || 'MotoTrack'}. All Rights Reserved.
-          </Text>
         </ScrollView>
 
         {renderSuccessModal()}

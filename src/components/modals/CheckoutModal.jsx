@@ -9,6 +9,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Image,
+  useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { shopStyles as styles } from '../../styles/shop.styles.js';
@@ -26,6 +27,7 @@ export default function CheckoutModal({
   overrideTotal = null,
   overrideItems = null,
 }) {
+  const { width: windowWidth } = useWindowDimensions();
   const { currentUser, updateProfile } = useAuth();
   const {
     cart,
@@ -166,10 +168,40 @@ export default function CheckoutModal({
     }
   };
 
+  const isDesktop = windowWidth >= 768;
+
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalSheet, { maxHeight: '92%' }]}>
+    <Modal visible={visible} transparent animationType={isDesktop ? 'fade' : 'slide'} onRequestClose={onClose}>
+      <View
+        style={[
+          styles.modalOverlay,
+          isDesktop && {
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View
+          style={[
+            styles.modalSheet,
+            { maxHeight: '92%' },
+            isDesktop && {
+              borderRadius: 24,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              maxWidth: 640,
+              alignSelf: 'center',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
+            },
+            windowWidth < 400 && { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 24 },
+          ]}
+        >
           {/* ─── HEADER ─── */}
           <View style={styles.modalHeaderRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>

@@ -1,13 +1,12 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import BaseSignUpPage from '../../../../screens/mobile/auth/SignUpPage.jsx';
-import { iosTokens } from '../../theme/index.js';
 
 /**
  * SignUpPage (iOS Native Implementation - Apple Human Interface Guidelines)
  *
  * - HIG Inset Grouped registration form
- * - Cupertino-style inputs and OTP boxes
+ * - Cupertino-style inputs and pale-gray rounded pills
  * - Soft ambient button shadows and safe area clearance
  */
 export default function IosSignUpPage(props) {
@@ -21,6 +20,6 @@ export default function IosSignUpPage(props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: iosTokens.colors.background,
+    backgroundColor: '#1E2227',
   },
 });

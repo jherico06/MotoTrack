@@ -46,6 +46,7 @@ export default function AdminProfileLogsPanel({
   const [prevUserId, setPrevUserId] = useState(() => currentUser?.id || currentUser?.user_id || null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [adminImgError, setAdminImgError] = useState(false);
   const [profileSuccessMsg, setProfileSuccessMsg] = useState('');
 
   // ── Security: Email State ──
@@ -305,11 +306,11 @@ export default function AdminProfileLogsPanel({
   const displayEmail = currentUser?.email || 'jhericomaurin615@gmail.com';
   const initials = getInitials(displayName);
 
-  const hasCustomAvatar =
+  const hasCustomAvatar = Boolean(
     currentUser?.avatar &&
-    !currentUser.avatar.includes('photo-1535713875002') &&
-    !currentUser.avatar.includes('photo-1534528741775') &&
-    !currentUser.avatar.includes('ui-avatars.com');
+    typeof currentUser.avatar === 'string' &&
+    currentUser.avatar.trim().length > 0
+  );
 
   return (
     <View style={styles.container}>
@@ -323,8 +324,13 @@ export default function AdminProfileLogsPanel({
             {/* Squircle Avatar with Green Verified Badge */}
             <View style={styles.avatarContainer}>
               <View style={[styles.avatarSquircle, { backgroundColor: isDarkMode ? '#1E293B' : '#2D3748' }]}>
-                {hasCustomAvatar ? (
-                  <Image source={{ uri: currentUser.avatar }} style={styles.avatarImg} resizeMode="cover" />
+                {hasCustomAvatar && !adminImgError ? (
+                  <Image
+                    source={{ uri: currentUser.avatar }}
+                    style={styles.avatarImg}
+                    resizeMode="cover"
+                    onError={() => setAdminImgError(true)}
+                  />
                 ) : (
                   <Text style={styles.avatarInitialsText}>{initials}</Text>
                 )}

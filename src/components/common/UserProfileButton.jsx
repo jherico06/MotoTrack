@@ -1,21 +1,34 @@
 import React from 'react';
-import { View, TouchableOpacity, Image, StyleSheet, Platform } from 'react-native';
+import { View, TouchableOpacity, Image, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import BootstrapIcon from './BootstrapIcon.jsx';
 
-export default function UserProfileButton({ currentUser, onPress, size = 40 }) {
+export default function UserProfileButton({ currentUser, onPress, size = 40, hideOnMobile = true }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const [imageError, setImageError] = React.useState(false);
+
+  // Extract avatar URI from any standard field (avatar, photoUri, photoURL, avatar_url)
+  const rawAvatar =
+    currentUser?.avatar ||
+    currentUser?.photoUri ||
+    currentUser?.photoURL ||
+    currentUser?.avatar_url ||
+    null;
+
+  const avatarUri =
+    typeof rawAvatar === 'string' && rawAvatar.trim().length > 0 ? rawAvatar.trim() : null;
+
+  // Reset error state when avatar changes
+  React.useEffect(() => {
+    setImageError(false);
+  }, [avatarUri]);
+
+  // Hide profile button on phone / small screen sizes so profile dropdown is only accessed via the sidebar
+  if (hideOnMobile && windowWidth < 768) {
+    return null;
+  }
+
   const badgeSize = Math.round(size * 0.44); // ~18px for 40px avatar
   const iconSize = Math.max(9, Math.round(badgeSize * 0.52)); // ~10px
-
-  // Check if customer uploaded an avatar (not empty and not mock placeholder)
-  const isUploadedAvatar = Boolean(
-    currentUser?.avatar &&
-    typeof currentUser.avatar === 'string' &&
-    !currentUser.avatar.includes('photo-1535713875002') &&
-    !currentUser.avatar.includes('photo-1534528741775') &&
-    !currentUser.avatar.includes('ui-avatars.com')
-  );
-
-  const avatarUri = isUploadedAvatar ? (currentUser.avatar || currentUser.photoUri) : null;
 
   return (
     <TouchableOpacity
@@ -28,10 +41,11 @@ export default function UserProfileButton({ currentUser, onPress, size = 40 }) {
       {...(Platform.OS === 'web' ? { 'data-profile-button': 'true' } : {})}
     >
       <View style={[styles.avatarWrap, { width: size, height: size, borderRadius: size / 2 }]}>
-        {avatarUri ? (
+        {avatarUri && !imageError ? (
           <Image
             source={{ uri: avatarUri }}
             style={{ width: size, height: size, borderRadius: size / 2 }}
+            onError={() => setImageError(true)}
           />
         ) : (
           <View style={[styles.placeholderWrap, { width: size, height: size, borderRadius: size / 2 }]}>

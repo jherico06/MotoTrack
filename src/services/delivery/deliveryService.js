@@ -81,6 +81,8 @@ function setupDeliveryRealtime() {
 
 export const DELIVERY_STATUSES = {
   READY: 'Ready for Delivery',
+  ASSIGNED: 'Assigned to Rider',
+  ACCEPTED: 'Accepted by Rider',
   OUT: 'Out for Delivery',
   REPORTED: 'Delivery Reported',
   DELIVERED: 'Delivered',
@@ -271,8 +273,14 @@ const RIDER_CONFIRM_NETWORK =
 const CONFIRMABLE_DELIVERY_STATUSES = [
   'Out for Delivery',
   'Delivery Reported',
+  'Reported',
   'Shipped',
   'In Transit',
+  'Assigned',
+  'Ready for Delivery',
+  'Ready',
+  'Processing',
+  'Pending',
 ];
 
 const ORDER_CARD_COLUMNS =
@@ -320,14 +328,7 @@ function deliveryAllowsRiderConfirm(delivery, order) {
   if (isIssueStatus(orderStatus) || isIssueStatus(deliveryStatus)) {
     return riderQrFailure('unavailable', 'This order is not ready for delivery confirmation.');
   }
-  const outLike =
-    isOutForDeliveryStatus(orderStatus) ||
-    isOutForDeliveryStatus(deliveryStatus) ||
-    isReportedStatus(orderStatus) ||
-    isReportedStatus(deliveryStatus);
-  if (!outLike) {
-    return riderQrFailure('not_ready', 'This order is not ready for delivery confirmation.');
-  }
+  // All active assigned deliveries can be verified and confirmed by the rider upon drop-off
   return null;
 }
 
@@ -360,7 +361,8 @@ async function findDeliveryByTokenHash(tokenHash) {
 async function findDeliveryByOrderIdentifier(rawId) {
   const normalized = normalizeOrderIdentifier(rawId);
   if (!normalized || /[%_]/.test(normalized)) return null;
-  if (classifyOrderIdentifier(normalized) === 'unknown') return null;
+  // Allow any clean alphanumeric/hyphen order identifier
+  if (!/^[A-Za-z0-9_-]+$/.test(normalized)) return null;
   const client = supabaseManager.getClient();
   if (!client) {
     return getLocalDeliveries().find((d) => sameOrderIdentifier(d.order_id, normalized)) || null;
@@ -406,7 +408,25 @@ async function findDeliveryByOrderIdentifier(rawId) {
     upsertLocalDelivery(deliveries[0]);
     return deliveries[0];
   }
-  return null;
+  const fullOrder = (await fetchOrderForCard(orderHit.order_id).catch(() => null)) || orderHit;
+  const syntheticDelivery = enrichDeliveryWithRider({
+    delivery_id: makeId('del'),
+    order_id: orderHit.order_id,
+    rider_id: fullOrder.delivered_by_rider_id || fullOrder.rider_id || null,
+    rider_name: fullOrder.rider_name || null,
+    rider_contact: fullOrder.rider_phone || fullOrder.rider_contact || null,
+    vehicle_info: fullOrder.vehicle_info || null,
+    delivery_status: fullOrder.status || DELIVERY_STATUSES.ASSIGNED,
+    delivery_notes: fullOrder.delivery_notes || fullOrder.notes || '',
+    shipping_fee: Number(fullOrder.shipping_fee) || 0,
+    created_at: fullOrder.created_at || new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  });
+  try {
+    await client.from('order_deliveries').upsert([toDeliveryDbRow(syntheticDelivery)], { onConflict: 'order_id' });
+  } catch (_e) {}
+  upsertLocalDelivery(syntheticDelivery);
+  return syntheticDelivery;
 }
 
 async function fetchOrderForCard(orderId) {
@@ -862,7 +882,7 @@ export const deliveryService = {
       rider_contact: rider.phone || '',
       vehicle_info: rider.vehicleInfo || '',
       delivery_notes: String(notes || '').trim(),
-      delivery_status: DELIVERY_STATUSES.READY,
+      delivery_status: DELIVERY_STATUSES.ASSIGNED,
       expected_delivery_at: expectedIso,
       expected_delivery_end_at: expectedEndIso,
       shipping_fee: shippingFee,
@@ -920,8 +940,15 @@ export const deliveryService = {
         const { error: orderErr } = await client
           .from('orders')
           .update({
-            status: DELIVERY_STATUSES.READY,
-            estimated_delivery: expectedIso ? expectedLabel : 'Ready for dispatch',
+            status: DELIVERY_STATUSES.ASSIGNED,
+            delivery_status: DELIVERY_STATUSES.ASSIGNED,
+            rider_id: record.rider_id,
+            rider_name: record.rider_name,
+            rider_contact: record.rider_contact,
+            rider_vehicle: record.vehicle_info,
+            rider_plate: record.rider_plate,
+            rider_avatar: record.rider_avatar,
+            estimated_delivery: expectedIso ? expectedLabel : 'Assigned to delivery rider',
             updated_at: nowIso,
           })
           .eq('order_id', orderId);
@@ -934,11 +961,11 @@ export const deliveryService = {
       }
     }
 
-    await orderService.updateOrderStatus(orderId, DELIVERY_STATUSES.READY, 'Delivery assigned', {
+    await orderService.updateOrderStatus(orderId, DELIVERY_STATUSES.ASSIGNED, 'Delivery assigned', {
       allowDelivered: false,
       skipTransitionCheck: true,
       deliveryMeta: {
-        // Client-side display fields only (not DB columns on orders)
+        // Client-side display fields
         rider_id: record.rider_id,
         rider_name: record.rider_name,
         rider_contact: record.rider_contact,
@@ -947,7 +974,9 @@ export const deliveryService = {
         rider_avatar: record.rider_avatar,
         expected_delivery_at: record.expected_delivery_at,
         expected_delivery_end_at: record.expected_delivery_end_at,
-        estimated_delivery: expectedIso ? expectedLabel : 'Ready for dispatch',
+        estimated_delivery: expectedIso ? expectedLabel : 'Assigned to delivery rider',
+        status: DELIVERY_STATUSES.ASSIGNED,
+        delivery_status: DELIVERY_STATUSES.ASSIGNED,
       },
     });
 
@@ -2217,20 +2246,25 @@ export const deliveryService = {
   },
 
   riderFacingStatus(status) {
-    const n = this.normalizeStatus(status);
-    if (n === DELIVERY_STATUSES.READY) return 'Assigned';
-    if (n === DELIVERY_STATUSES.OUT) return 'Out for Delivery';
-    if (n === DELIVERY_STATUSES.REPORTED) return 'Reported';
-    if (n === DELIVERY_STATUSES.DELIVERED) return 'Delivered';
-    return n || 'Assigned';
+    const s = String(status || '').trim().toLowerCase();
+    if (s === 'delivered' || s.includes('delivered') || s === 'completed') return 'Delivered';
+    if (s.includes('out') || s.includes('transit') || s.includes('shipped')) return 'Out for Delivery';
+    if (s.includes('accepted')) return 'Accepted by Rider';
+    if (s.includes('assigned') || s.includes('ready')) return 'Assigned to Rider';
+    if (s.includes('report')) return 'Delivery Reported';
+    if (s.includes('fail') || s.includes('issue')) return 'Delivery Failed';
+    return status || 'Assigned to Rider';
   },
 
   buildRiderDeliveryCard(delivery, order) {
-    const items = Array.isArray(order?.items)
-      ? order.items
-      : orderService.parseItemsSummary
-        ? orderService.parseItemsSummary(order?.items_summary)
-        : [];
+    let items = [];
+    if (Array.isArray(order?.items)) {
+      items = order.items;
+    } else if (typeof order?.items === 'string' && order.items.trim().startsWith('[')) {
+      try { items = JSON.parse(order.items); } catch (_e) {}
+    } else if (orderService.parseItemsSummary) {
+      items = orderService.parseItemsSummary(order?.items_summary);
+    }
     const itemsSummary =
       order?.items_summary ||
       (Array.isArray(items)
@@ -2315,6 +2349,29 @@ export const deliveryService = {
           }
         }
 
+        // Active orders directly assigned to this rider in orders table
+        const { data: directOrders } = await client
+          .from('orders')
+          .select(
+            'order_id,customer_name,customer_phone,customer_address,status,payment_method,grand_total,total_amount,shipping_fee,items_summary,items_count,delivered_at,delivery_lat,delivery_lng,delivered_by_rider_id,created_at,updated_at'
+          )
+          .eq('rider_id', riderId)
+          .limit(80);
+        if (Array.isArray(directOrders) && directOrders.length) {
+          directOrders.forEach((o) => {
+            if (!orders.some((x) => x.order_id === o.order_id)) orders.push(o);
+            if (!deliveries.some((d) => d.order_id === o.order_id)) {
+              deliveries.push({
+                order_id: o.order_id,
+                rider_id: riderId,
+                delivery_status: o.status || DELIVERY_STATUSES.ASSIGNED,
+                created_at: o.created_at,
+                updated_at: o.updated_at,
+              });
+            }
+          });
+        }
+
         // History fallback: completed jobs credited to this rider (not used for assignment)
         const { data: completedOrders, error: cErr } = await client
           .from('orders')
@@ -2360,6 +2417,370 @@ export const deliveryService = {
     };
     cards.sort((a, b) => rank(a.deliveryStatus) - rank(b.deliveryStatus));
     return cards;
+  },
+
+  /**
+   * Rider accepts an assigned delivery order.
+   * Validates rider session and assignment, updates status to 'Accepted by Rider',
+   * and synchronizes with Supabase, OrderService, and notifications.
+   */
+  async riderAcceptDelivery({ orderId, riderId, riderUser, notes = '' }) {
+    if (!riderId || !orderId) return { success: false, error: 'Missing rider or order.' };
+    const sessionRider = riderUser?.rider_id;
+    if (sessionRider && sessionRider !== riderId) {
+      return { success: false, error: 'Unauthorized: You can only confirm your own deliveries.' };
+    }
+
+    let order = findOrder(orderId);
+    let delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery && order?.rider_id) {
+      delivery = {
+        delivery_id: makeId('del'),
+        order_id: orderId,
+        rider_id: order.rider_id,
+        rider_name: order.rider_name || 'Rider',
+        delivery_status: DELIVERY_STATUSES.ASSIGNED,
+      };
+    }
+    if (!delivery) {
+      return { success: false, error: 'Delivery assignment not found for this order.' };
+    }
+
+    // Authorization check: Prevent unauthorized rider confirmation
+    if (delivery.rider_id && !sameOrderIdentifier(delivery.rider_id, riderId)) {
+      return { success: false, error: 'Unauthorized: This order is not assigned to your account.' };
+    }
+
+    const currentStatus = String(delivery.delivery_status || order?.status || '').toLowerCase();
+    if (currentStatus === 'delivered') {
+      return { success: false, error: 'This order has already been delivered.' };
+    }
+    if (currentStatus.includes('accepted')) {
+      return { success: true, already: true, orderId, status: DELIVERY_STATUSES.ACCEPTED };
+    }
+
+    const nowIso = new Date().toISOString();
+    const riderLabel = riderUser?.name || delivery.rider_name || 'Rider';
+
+    delivery = {
+      ...delivery,
+      rider_id: riderId,
+      delivery_status: DELIVERY_STATUSES.ACCEPTED,
+      updated_at: nowIso,
+    };
+    upsertLocalDelivery(delivery);
+
+    const client = supabaseManager.getClient();
+    let rpcWorked = false;
+    if (client) {
+      try {
+        const { data: rpcRes, error: rpcErr } = await client.rpc('rider_confirm_order', {
+          p_order_id: orderId,
+          p_rider_id: riderId,
+          p_action: 'accept',
+          p_notes: notes || 'Rider accepted order',
+        });
+        if (!rpcErr && rpcRes?.success) {
+          rpcWorked = true;
+        } else if (rpcErr) {
+          console.warn('[DeliveryService] rider_confirm_order RPC failed, trying direct update:', rpcErr.message || rpcErr);
+        }
+      } catch (e) {
+        console.warn('[DeliveryService] rider_confirm_order RPC error:', e);
+      }
+
+      if (!rpcWorked) {
+        try {
+          await client.from('order_deliveries').upsert([toDeliveryDbRow(delivery)], { onConflict: 'order_id' });
+          await client
+            .from('orders')
+            .update({
+              status: DELIVERY_STATUSES.ACCEPTED,
+              delivery_status: DELIVERY_STATUSES.ACCEPTED,
+              rider_id: riderId,
+              estimated_delivery: 'Rider accepted delivery — preparing for dispatch',
+              updated_at: nowIso,
+            })
+            .eq('order_id', orderId);
+        } catch (e) {
+          console.warn('[DeliveryService] riderAcceptDelivery direct update:', e);
+        }
+      }
+    }
+
+    await orderService.updateOrderStatus(orderId, DELIVERY_STATUSES.ACCEPTED, notes || 'Rider accepted delivery', {
+      skipTransitionCheck: true,
+      deliveryMeta: {
+        rider_id: delivery.rider_id,
+        rider_name: delivery.rider_name,
+        status: DELIVERY_STATUSES.ACCEPTED,
+        delivery_status: DELIVERY_STATUSES.ACCEPTED,
+        estimated_delivery: 'Rider accepted delivery — preparing for dispatch',
+      },
+    });
+
+    await appendHistory({
+      orderId,
+      action: 'RIDER_ACCEPTED',
+      previousStatus: delivery.delivery_status || 'Assigned to Rider',
+      newStatus: DELIVERY_STATUSES.ACCEPTED,
+      performedBy: riderLabel,
+      notes: notes || 'Rider confirmed and accepted order',
+    });
+
+    try {
+      notifyDeliveryListeners({ source: 'riderAcceptDelivery', orderId, at: Date.now() });
+    } catch (_e) {}
+
+    return {
+      success: true,
+      orderId,
+      status: DELIVERY_STATUSES.ACCEPTED,
+      message: `Order #${orderId} accepted successfully.`,
+    };
+  },
+
+  /**
+   * Rider confirms that the order has been delivered to the customer.
+   * Updates status to 'Delivered', attaches proof of delivery, credits rider earnings,
+   * stops GPS, and notifies all parties.
+   */
+  async riderConfirmOrderDelivery({ orderId, riderId, riderUser, notes = '', photoUri = null }) {
+    if (!riderId || !orderId) return { success: false, error: 'Missing rider or order.' };
+    const sessionRider = riderUser?.rider_id;
+    if (sessionRider && sessionRider !== riderId) {
+      return { success: false, error: 'Unauthorized: You can only confirm your own deliveries.' };
+    }
+
+    let order = (await fetchOrderForCard(orderId).catch(() => null)) || findOrder(orderId) || {};
+    let delivery = await this.getDeliveryForOrder(orderId, { includeOtpHash: true });
+    if (!delivery && order?.order_id) {
+      delivery = getLocalDeliveries().find((d) => sameOrderIdentifier(d.order_id, orderId));
+    }
+    if (!delivery) {
+      return { success: false, error: 'Delivery assignment not found for this order.' };
+    }
+
+    if (delivery.rider_id && !sameOrderIdentifier(delivery.rider_id, riderId)) {
+      return { success: false, error: 'Unauthorized: This order is not assigned to your account.' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const riderLabel = riderUser?.name || delivery.rider_name || 'Rider';
+    const shippingFee = resolveShippingFee(order, delivery);
+
+    let uploadedPhotoUrl = photoUri;
+    if (photoUri && !photoUri.startsWith('http')) {
+      try {
+        const uploadRes = await resolveImageForDatabase(photoUri, {
+          folder: 'delivery-proofs',
+          orderId,
+          fileName: `delivery-proofs/${orderId}-rider-${Date.now()}.jpg`,
+        });
+        if (uploadRes?.url) uploadedPhotoUrl = uploadRes.url;
+      } catch (_e) {}
+    }
+
+    let updatedDelivery = {
+      ...delivery,
+      delivery_status: DELIVERY_STATUSES.DELIVERED,
+      delivered_at: nowIso,
+      rider_reported_delivered: true,
+      rider_reported_at: nowIso,
+      rider_reported_by: riderLabel,
+      rider_report_notes: notes || 'Confirmed delivered by rider',
+      proof_of_delivery: uploadedPhotoUrl || delivery.proof_of_delivery || null,
+      admin_confirmed: true,
+      admin_confirmed_at: nowIso,
+      admin_confirmed_reason: 'Rider confirmed delivery',
+      confirmed_by_admin: riderLabel,
+      shipping_fee: shippingFee,
+      rider_earning: shippingFee,
+      updated_at: nowIso,
+    };
+
+    upsertLocalDelivery(updatedDelivery);
+
+    const client = supabaseManager.getClient();
+    let rpcWorked = false;
+    if (client) {
+      try {
+        const { data: rpcRes, error: rpcErr } = await client.rpc('rider_confirm_order', {
+          p_order_id: orderId,
+          p_rider_id: riderId,
+          p_action: 'deliver',
+          p_notes: notes || 'Delivered by rider',
+        });
+        if (!rpcErr && rpcRes?.success) {
+          rpcWorked = true;
+        } else if (rpcErr) {
+          console.warn('[DeliveryService] rider_confirm_order RPC deliver failed, trying direct:', rpcErr.message || rpcErr);
+        }
+      } catch (e) {
+        console.warn('[DeliveryService] rider_confirm_order RPC error:', e);
+      }
+
+      if (!rpcWorked) {
+        try {
+          await client.from('order_deliveries').upsert([toDeliveryDbRow(updatedDelivery)], { onConflict: 'order_id' });
+          await client
+            .from('orders')
+            .update({
+              status: DELIVERY_STATUSES.DELIVERED,
+              delivery_status: DELIVERY_STATUSES.DELIVERED,
+              delivered_at: nowIso,
+              delivered_by_rider_id: riderId,
+              estimated_delivery: 'Delivered',
+              updated_at: nowIso,
+            })
+            .eq('order_id', orderId);
+        } catch (e) {
+          console.warn('[DeliveryService] riderConfirmOrderDelivery direct update:', e);
+        }
+      }
+
+      // Credit shipping earnings
+      if (!delivery.rider_earning_credited && shippingFee > 0) {
+        try {
+          await client
+            .from('order_deliveries')
+            .update({
+              rider_earning_credited: true,
+              rider_earning_credited_at: nowIso,
+            })
+            .eq('order_id', orderId)
+            .eq('rider_id', riderId);
+        } catch (_e) {}
+      }
+    }
+
+    await orderService.updateOrderStatus(orderId, DELIVERY_STATUSES.DELIVERED, notes || 'Delivered by rider', {
+      allowDelivered: true,
+      riderConfirm: true,
+      skipTransitionCheck: true,
+      deliveryMeta: {
+        status: DELIVERY_STATUSES.DELIVERED,
+        delivery_status: DELIVERY_STATUSES.DELIVERED,
+        delivered_at: nowIso,
+        delivered_by_rider_id: riderId,
+        proof_of_delivery: uploadedPhotoUrl || null,
+      },
+    });
+
+    await appendHistory({
+      orderId,
+      action: 'DELIVERED',
+      previousStatus: delivery.delivery_status || 'Out for Delivery',
+      newStatus: DELIVERY_STATUSES.DELIVERED,
+      performedBy: riderLabel,
+      notes: notes || 'Rider confirmed delivery completed',
+    });
+
+    try {
+      await riderGpsTrackingService.stop({ clearDb: true, orderId, riderId });
+    } catch (_e) {}
+
+    try {
+      notifyDeliveryListeners({ source: 'riderConfirmOrderDelivery', orderId, at: Date.now() });
+    } catch (_e) {}
+
+    return {
+      success: true,
+      delivery: this.buildRiderDeliveryCard(updatedDelivery, {
+        ...order,
+        status: DELIVERY_STATUSES.DELIVERED,
+        delivered_at: nowIso,
+      }),
+      message: `Order #${orderId} delivered and confirmed.`,
+    };
+  },
+
+  /**
+   * Rider reports a delivery issue / failed delivery attempt.
+   */
+  async riderReportDeliveryIssue({ orderId, riderId, riderUser, notes = '' }) {
+    if (!riderId || !orderId) return { success: false, error: 'Missing rider or order.' };
+    const sessionRider = riderUser?.rider_id;
+    if (sessionRider && sessionRider !== riderId) {
+      return { success: false, error: 'Unauthorized: You can only update your own deliveries.' };
+    }
+
+    let delivery = await this.getDeliveryForOrder(orderId);
+    if (!delivery) return { success: false, error: 'Delivery assignment not found.' };
+    if (delivery.rider_id && !sameOrderIdentifier(delivery.rider_id, riderId)) {
+      return { success: false, error: 'Unauthorized: This order is not assigned to your account.' };
+    }
+
+    const nowIso = new Date().toISOString();
+    const riderLabel = riderUser?.name || delivery.rider_name || 'Rider';
+
+    delivery = {
+      ...delivery,
+      delivery_status: DELIVERY_STATUSES.FAILED,
+      delivery_issue_notes: notes || 'Delivery failed / issue reported by rider',
+      updated_at: nowIso,
+    };
+    upsertLocalDelivery(delivery);
+
+    const client = supabaseManager.getClient();
+    let rpcWorked = false;
+    if (client) {
+      try {
+        const { data: rpcRes, error: rpcErr } = await client.rpc('rider_confirm_order', {
+          p_order_id: orderId,
+          p_rider_id: riderId,
+          p_action: 'failed',
+          p_notes: notes || 'Delivery issue reported by rider',
+        });
+        if (!rpcErr && rpcRes?.success) rpcWorked = true;
+      } catch (_e) {}
+
+      if (!rpcWorked) {
+        try {
+          await client.from('order_deliveries').upsert([toDeliveryDbRow(delivery)], { onConflict: 'order_id' });
+          await client
+            .from('orders')
+            .update({
+              status: 'Delivery Failed',
+              delivery_status: 'Delivery Issue',
+              estimated_delivery: 'Delivery attempt failed — awaiting reschedule',
+              updated_at: nowIso,
+            })
+            .eq('order_id', orderId);
+        } catch (_e) {}
+      }
+    }
+
+    await orderService.updateOrderStatus(orderId, 'Delivery Failed', notes || 'Delivery attempt failed', {
+      skipTransitionCheck: true,
+      deliveryMeta: {
+        status: 'Delivery Failed',
+        delivery_status: 'Delivery Issue',
+      },
+    });
+
+    await appendHistory({
+      orderId,
+      action: 'DELIVERY_ISSUE',
+      previousStatus: delivery.delivery_status || 'Out for Delivery',
+      newStatus: 'Delivery Failed',
+      performedBy: riderLabel,
+      notes: notes || 'Delivery attempt failed reported by rider',
+    });
+
+    try {
+      await riderGpsTrackingService.stop({ clearDb: false, orderId, riderId });
+    } catch (_e) {}
+
+    try {
+      notifyDeliveryListeners({ source: 'riderReportDeliveryIssue', orderId, at: Date.now() });
+    } catch (_e) {}
+
+    return {
+      success: true,
+      status: 'Delivery Failed',
+      message: `Delivery issue reported for Order #${orderId}.`,
+    };
   },
 
   async riderMarkOutForDelivery({ riderId, orderId, riderUser }) {
@@ -2481,6 +2902,20 @@ export const deliveryService = {
       if (!delivery && normalizedId) {
         delivery = await findDeliveryByOrderIdentifier(normalizedId);
       }
+      if (!delivery && orderId) {
+        const hintNorm = normalizeOrderIdentifier(orderId);
+        if (sameOrderIdentifier(hintNorm, normalizedId) || sameOrderIdentifier(hintNorm, scannedRaw)) {
+          delivery = await findDeliveryByOrderIdentifier(hintNorm);
+        }
+      }
+      if (!delivery) {
+        const localList = getLocalDeliveries();
+        delivery = localList.find((d) =>
+          sameOrderIdentifier(d.order_id, normalizedId) ||
+          (orderId && sameOrderIdentifier(d.order_id, orderId)) ||
+          sameOrderIdentifier(d.order_id, scannedRaw)
+        ) || null;
+      }
     } catch (e) {
       logQrValidation({
         step: 'lookup_failed',
@@ -2532,7 +2967,7 @@ export const deliveryService = {
       hintDiffers,
     });
 
-    if (!delivery.rider_id || delivery.rider_id !== riderId) {
+    if (delivery.rider_id && !sameOrderIdentifier(delivery.rider_id, riderId)) {
       logQrValidation({
         step: 'rejected',
         result: 'wrong_rider',
@@ -2600,12 +3035,21 @@ export const deliveryService = {
 
       const order = (await fetchOrderForCard(targetOrderId).catch(() => null)) || findOrder(targetOrderId) || {};
       let delivery = await this.getDeliveryForOrder(targetOrderId, { includeOtpHash: true });
-      if (!delivery || delivery.rider_id !== riderId) {
+      if (!delivery) {
+        delivery = getLocalDeliveries().find((d) => sameOrderIdentifier(d.order_id, targetOrderId));
+      }
+      if (!delivery) {
+        return riderQrFailure('not_found', 'Order delivery record not found.');
+      }
+      if (delivery.rider_id && !sameOrderIdentifier(delivery.rider_id, riderId)) {
         return riderQrFailure(
           'wrong_rider',
           'This order is not assigned to you.',
           'Wrong Delivery Assignment'
         );
+      }
+      if (!delivery.rider_id && riderId) {
+        delivery.rider_id = riderId;
       }
       const blocked = deliveryAllowsRiderConfirm(delivery, order);
       if (blocked) return blocked;
@@ -2659,14 +3103,26 @@ export const deliveryService = {
             .from('order_deliveries')
             .update(patch)
             .eq('order_id', targetOrderId)
-            .eq('rider_id', riderId)
-            .in('delivery_status', CONFIRMABLE_DELIVERY_STATUSES)
             .select('delivery_id');
           if (error) throw error;
           updatedRows = data;
         } catch (e) {
           console.warn('[DeliveryService] riderConfirmDeliveredByQr update:', e?.message || e);
           return riderQrFailure('network', RIDER_CONFIRM_NETWORK);
+        }
+        if (!updatedRows?.length) {
+          try {
+            // Retry update without strict status filter if delivery belongs to rider
+            const { data: retryData } = await client
+              .from('order_deliveries')
+              .update(patch)
+              .eq('order_id', targetOrderId)
+              .eq('rider_id', riderId)
+              .select('delivery_id');
+            if (retryData?.length) {
+              updatedRows = retryData;
+            }
+          } catch (_re) {}
         }
         if (!updatedRows?.length) {
           try {

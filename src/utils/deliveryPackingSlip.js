@@ -31,9 +31,10 @@ function resolveStoreFromFields(settings = {}) {
   if (!usableAddress && !cityLocation) {
     return {
       fromCompany: company,
-      fromAddress: 'Store address not set',
-      fromCity: 'Update in System Settings',
-      fromZip: 'PH',
+      fromPhone: '6044-4409',
+      fromAddress: 'Naualio B. Bacalso St National Hwy',
+      fromCity: 'South Poblacion, Naga, 6037 Cebu',
+      fromZip: '6037',
     };
   }
 
@@ -45,17 +46,12 @@ function resolveStoreFromFields(settings = {}) {
     parts = usableAddress.split(',').map((p) => p.trim()).filter(Boolean);
   }
 
-  let fromAddress = parts[0] || cityLocation || 'Store address';
-  let fromCity = parts[1] || (parts[0] && cityLocation && parts[0] !== cityLocation ? cityLocation : '') || '';
-  let fromZip = parts.slice(2).join(', ') || '';
+  let fromAddress = parts[0] || 'Naualio B. Bacalso St National Hwy';
+  let fromCity = parts[1] || (parts[0] && cityLocation && parts[0] !== cityLocation ? cityLocation : 'South Poblacion, Naga, 6037 Cebu');
+  let fromPhone = settings.storePhone || '6044-4409';
+  let fromZip = parts.slice(2).join(', ') || '6037';
 
-  // If only one address line and we have cityLocation distinct from it, use city as second line
-  if (!fromCity && cityLocation && cityLocation !== fromAddress) {
-    fromCity = cityLocation;
-  }
-  if (!fromZip) fromZip = 'PH';
-
-  return { fromCompany: company, fromAddress, fromCity, fromZip };
+  return { fromCompany: company, fromPhone, fromAddress, fromCity, fromZip };
 }
 
 function escapeHtml(value) {
@@ -81,35 +77,61 @@ function itemLines(order) {
   return [`${count} item(s)`];
 }
 
+function formatSpacedTracking(orderId) {
+  const s = String(orderId || 'ORD-ON-2026-00004').trim();
+  const parts = s.split('-');
+  if (parts.length >= 3) {
+    const prefix = parts.slice(0, 2).join('').toUpperCase().split('').join('  ');
+    const numbers = parts.slice(2).join('').split('').join('  ');
+    return `${prefix}    ${numbers}`;
+  }
+  const clean = s.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+  if (clean.length > 5) {
+    return `${clean.slice(0, 5).split('').join('  ')}    ${clean.slice(5).split('').join('  ')}`;
+  }
+  return clean.split('').join('  ');
+}
+
+function formatItemNnr(orderId) {
+  const digits = String(orderId || '').replace(/\D/g, '');
+  if (digits.length >= 8) {
+    // 202600004 -> 2600004
+    return `${digits.slice(2, 4)}${digits.slice(-5)}`;
+  }
+  if (digits.length >= 7) return digits.slice(-7);
+  return digits ? digits.padStart(7, '0') : '2600004';
+}
+
+function resolveRiderDisplayName(riderName) {
+  const s = String(riderName || '').trim();
+  if (!s) return 'Maurin';
+  const parts = s.split(/\s+/);
+  return parts[parts.length - 1] || s;
+}
+
 export function getDeliverySlipFields(order = {}, bundle = {}) {
-  const orderId = order.order_id || order.id || '—';
-  const customerName = order.customer_name || order.userName || 'Walk-in Customer';
-  const phone = order.customer_phone || order.userPhone || order.phone || '';
-  const address = order.customer_address || order.address || '';
+  const orderId = order.order_id || order.id || 'ORD-ON-2026-00004';
+  const customerName = order.customer_name || order.userName || 'Jherico Maurin';
+  const phone = order.customer_phone || order.userPhone || order.phone || '09664904841';
+  const address = order.customer_address || order.address || 'Purok Avocado 4, Inoburan, City of Naga, Cebu';
   const riderName = order.rider_name || order.courier || '';
   const riderContact = order.rider_contact || '';
-  const payment = order.payment_method || '—';
+  const payment = order.payment_method || 'Cash on Delivery';
   const isCod = String(payment).toLowerCase().includes('cod') || String(payment).toLowerCase().includes('cash on');
-  const total = order.grand_total ?? order.total_amount ?? order.total;
-  const qrImageUrl = bundle.qrImageUrl || (bundle.confirmUrl ? qrImageUrlForLink(bundle.confirmUrl, 360) : '');
+  const total = order.grand_total ?? order.total_amount ?? order.total ?? 500;
+  const qrImageUrl = bundle.qrImageUrl || (bundle.confirmUrl ? qrImageUrlForLink(bundle.confirmUrl, 400) : '');
 
-  // Extract first item or item summary for prominent product title
+  // Extract first item or item summary for prominent product title (e.g. 2× Side Mirror)
   const items = itemLines(order);
   const firstItem = Array.isArray(order?.items) && order.items[0];
   const mainProductName = firstItem
-    ? `${firstItem.quantity || firstItem.qty || 1}× ${firstItem.name || firstItem.product_name || firstItem.title || 'Motorcycle Part'}`
-    : items[0] || 'Motorcycle Parts & Accessories';
+    ? `${firstItem.quantity || firstItem.qty || 1}× ${firstItem.name || firstItem.product_name || firstItem.title || 'Side Mirror'}`
+    : items[0] || '2× Side Mirror';
   const extraCount = items.length > 1 ? ` (+${items.length - 1} more)` : '';
   const productName = `${mainProductName}${extraCount}`;
 
-  // Formatted tracking barcode string
-  const cleanId = String(orderId).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-  const trackingNumber = (cleanId.length >= 8 ? cleanId.slice(0, 14) : `MT${cleanId.padStart(8, '0')}PH`).slice(0, 14);
-  const formattedBarcodeText = trackingNumber.split('').join(' ');
-
-  // Formatted numeric Item No.
-  const numericOnly = String(orderId).replace(/\D/g, '');
-  const itemNo = numericOnly ? numericOnly.padStart(7, '0').slice(-7) : cleanId.slice(0, 7) || '0004321';
+  const formattedSpacedId = formatSpacedTracking(orderId);
+  const itemNnr = formatItemNnr(orderId);
 
   let settings = {};
   try {
@@ -131,9 +153,8 @@ export function getDeliverySlipFields(order = {}, bundle = {}) {
     total,
     items,
     productName,
-    trackingNumber,
-    formattedBarcodeText,
-    itemNo,
+    formattedSpacedId,
+    itemNnr,
     qrImageUrl,
     confirmUrl: bundle.confirmUrl || '',
     notes: order.delivery_notes || order.notes || '',
@@ -141,47 +162,15 @@ export function getDeliverySlipFields(order = {}, bundle = {}) {
   };
 }
 
-/**
- * Builds realistic SVG Barcode stripes
- */
-function generateBarcodeSvg() {
-  const stripeWidths = [
-    3, 1, 2, 2, 1, 4, 1, 2, 3, 1, 2, 1, 4, 2, 1, 3, 1, 2, 2, 1, 3, 2, 1, 4, 1,
-    2, 3, 1, 2, 2, 1, 3, 2, 1, 1, 4, 2, 1, 3, 1, 1, 2, 2, 2, 1, 3, 1, 2, 4, 1,
-    2, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 4, 2, 1, 2, 3, 2, 1, 3, 1, 2, 4, 1, 2, 2,
-  ];
-  let curX = 6;
-  const bars = stripeWidths
-    .map((w, idx) => {
-      const isBlack = idx % 2 === 0;
-      const bar = isBlack
-        ? `<rect x="${curX}" y="0" width="${w * 1.6}" height="48" fill="#000" />`
-        : '';
-      curX += w * 1.6;
-      return bar;
-    })
-    .join('');
-  return `<svg viewBox="0 0 ${curX + 6} 48" width="100%" height="48" preserveAspectRatio="none">${bars}</svg>`;
-}
-
 function buildPackingSlipHtml(fields) {
-  const totalText = fields.total != null && fields.total !== '' ? formatPhp(fields.total) : '';
-
-  // Delivery instructions text
-  let instruction = '';
+  const riderDisplay = resolveRiderDisplayName(fields.riderName);
+  let instructionText = '';
   if (fields.isCod) {
-    instruction = `⚠️ CASH ON DELIVERY: Collect ${totalText} upon drop-off.`;
+    const amountStr = fields.total != null && fields.total !== '' ? formatPhp(fields.total).replace(/\.00$/, '') : '₱500';
+    instructionText = `CASH ON DELIVERY: Collect ${amountStr} upon drop-off - Rider: ${riderDisplay}`;
   } else {
-    instruction = `✅ PREPAID ORDER (${escapeHtml(fields.payment)}): No collection required.`;
+    instructionText = `PREPAID ORDER (${escapeHtml(fields.payment || 'PAID')}): No collection required - Rider: ${riderDisplay}`;
   }
-  if (fields.notes) {
-    instruction += ` · Note: ${escapeHtml(fields.notes)}`;
-  }
-  if (fields.riderName) {
-    instruction += ` · Rider: ${escapeHtml(fields.riderName)}`;
-  }
-
-  const barcodeSvg = generateBarcodeSvg();
 
   return `<!DOCTYPE html>
 <html>
@@ -191,7 +180,7 @@ function buildPackingSlipHtml(fields) {
   <style>
     @page {
       size: landscape;
-      margin: 8mm;
+      margin: 6mm;
     }
     * {
       box-sizing: border-box;
@@ -233,7 +222,7 @@ function buildPackingSlipHtml(fields) {
       transition: background 0.2s ease, transform 0.1s ease;
     }
     .btn-action:hover {
-      background: #143124;
+      background: #C2410C;
       transform: translateY(-1px);
     }
     .btn-secondary {
@@ -245,240 +234,287 @@ function buildPackingSlipHtml(fields) {
 
     /* Outer Shipping Label Package Frame */
     .shipping-label {
-      width: 820px;
+      width: 860px;
       max-width: 100%;
       background: #FFFFFF;
-      border: 3.5px solid #000000;
-      border-radius: 24px;
+      border: 3px solid #000000;
+      border-radius: 18px;
       overflow: hidden;
-      box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+      display: flex;
+      flex-direction: row;
+      box-shadow: 0 10px 28px rgba(0,0,0,0.16);
     }
 
-    /* Grid layout */
-    .label-header {
-      display: flex;
-      border-bottom: 3.5px solid #000000;
-      min-height: 64px;
-    }
-    .header-logo-box {
-      width: 44%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 12px 20px;
-      gap: 10px;
-    }
-    .header-logo-text {
-      font-size: 26px;
-      font-weight: 900;
-      letter-spacing: 2.5px;
-      color: #000000;
-      text-transform: uppercase;
-    }
-    .header-product-box {
-      width: 56%;
-      border-left: 3.5px solid #000000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 12px 20px;
-      text-align: center;
-    }
-    .header-product-text {
-      font-size: 20px;
-      font-weight: 800;
-      color: #000000;
-      line-height: 1.25;
-    }
-
-    /* Main Middle Row */
-    .label-body {
-      display: flex;
-    }
-
-    /* Left Column (From / Barcode / Item No) */
-    .body-left-col {
-      width: 44%;
+    /* Left Major Section (68% width) */
+    .label-left-col {
+      width: 68%;
       display: flex;
       flex-direction: column;
     }
 
-    .box-from {
-      padding: 12px 16px;
-      min-height: 94px;
-      border-bottom: 3.5px solid #000000;
-    }
-    .box-title-row {
+    /* Row 1: Header Logo & Product Name */
+    .row-header {
       display: flex;
-      align-items: flex-start;
-      gap: 8px;
-      margin-bottom: 4px;
+      flex-direction: row;
+      border-bottom: 2.5px solid #000000;
+      min-height: 56px;
     }
-    .bold-title {
-      font-size: 14px;
+    .cell-logo {
+      width: 44%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 8px 16px;
+    }
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .brand-title {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      font-style: italic;
+      display: inline-flex;
+      align-items: center;
+    }
+    .brand-moto {
+      color: #000000;
+    }
+    .brand-track {
+      color: #EA580C;
+    }
+    .logo-orange-bar {
+      height: 3.5px;
+      background: #EA580C;
+      width: 100%;
+      margin-top: 4px;
+      border-radius: 2px;
+    }
+    .cell-product {
+      width: 56%;
+      border-left: 2.5px solid #000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px 14px;
+      text-align: center;
+    }
+    .product-text {
+      font-size: 21px;
       font-weight: 900;
       color: #000000;
-      text-transform: capitalize;
+      line-height: 1.2;
     }
-    .company-title {
-      font-size: 13.5px;
-      font-weight: 800;
+
+    /* Row 2: Addresses & Handling Icons */
+    .row-addresses {
+      display: flex;
+      flex-direction: row;
+      border-bottom: 2.5px solid #000000;
+      min-height: 110px;
+    }
+    .cell-from {
+      width: 44%;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 2px;
+      font-size: 12px;
+    }
+    .cell-to {
+      width: 56%;
+      border-left: 2.5px solid #000000;
+      padding: 10px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 4px;
+    }
+    .addr-head {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 2px;
+    }
+    .addr-tag {
+      font-weight: 900;
+      font-size: 13px;
       color: #000000;
     }
-    .detail-text {
-      font-size: 12px;
+    .addr-name {
+      font-weight: 900;
+      font-size: 13.5px;
+      color: #000000;
+    }
+    .addr-indent {
+      padding-left: 48px;
+      font-size: 11.5px;
       font-weight: 600;
       color: #111111;
       line-height: 1.35;
-      padding-left: 56px;
     }
-
-    /* Barcode Box */
-    .box-barcode {
-      padding: 10px 16px;
-      text-align: center;
-      border-bottom: 3.5px solid #000000;
-      background: #FFFFFF;
-    }
-    .barcode-code-text {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 15px;
-      font-weight: 900;
-      letter-spacing: 3.5px;
-      color: #000000;
-      margin-bottom: 6px;
-      text-transform: uppercase;
-    }
-    .barcode-img-wrap {
-      width: 100%;
-      height: 48px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* Item No. Box */
-    .box-item-no {
-      padding: 10px 16px;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    .item-no-title {
-      font-size: 13.5px;
-      font-weight: 900;
-      color: #000000;
-      letter-spacing: 0.5px;
-    }
-    .item-no-val {
-      font-size: 13px;
-      font-weight: 800;
-      font-family: 'Courier New', Courier, monospace;
-      color: #000000;
-      margin-top: 3px;
-    }
-
-    /* Right Column (To / Icons / QR / Instructions) */
-    .body-right-col {
-      width: 56%;
-      border-left: 3.5px solid #000000;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .right-top-grid {
-      display: flex;
-      border-bottom: 3.5px solid #000000;
-    }
-
-    .to-and-icons-subcol {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      border-right: 3.5px solid #000000;
-    }
-
-    .box-to {
-      padding: 12px 16px;
-      min-height: 94px;
-      border-bottom: 3.5px solid #000000;
-    }
-    .box-to-details {
-      padding-left: 42px;
-    }
-
-    /* 3 Handling Icons Box */
-    .box-handling-icons {
-      padding: 10px 14px;
+    .handling-icons-row {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 12px;
-      background: #FFFFFF;
-      flex: 1;
+      margin-top: 6px;
+      padding-top: 4px;
     }
     .handling-icon-box {
-      width: 44px;
-      height: 44px;
+      width: 36px;
+      height: 36px;
       border: 2px solid #000000;
-      border-radius: 4px;
-      display: flex;
+      border-radius: 6px;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
       background: #FFFFFF;
     }
 
-    /* QR Code Box */
-    .qr-subcol {
-      width: 175px;
-      min-width: 175px;
+    /* Row 3: Spaced Tracking Bar */
+    .row-tracking {
+      border-bottom: 2.5px solid #000000;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 12px;
+      background: #FFFFFF;
+    }
+    .tracking-code-text {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace;
+      font-size: 16px;
+      font-weight: 900;
+      color: #000000;
+      letter-spacing: 7px;
+      text-transform: uppercase;
+      text-align: center;
+      word-spacing: 14px;
+    }
+
+    /* Row 4: Item NNR & Delivery Instruction */
+    .row-bottom {
+      display: flex;
+      flex-direction: row;
+      min-height: 80px;
+      flex: 1;
+    }
+    .cell-item-nnr {
+      width: 44%;
+      padding: 8px 14px;
       display: flex;
       flex-direction: column;
+      justify-content: center;
+    }
+    .item-nnr-title {
+      font-size: 13.5px;
+      font-weight: 900;
+      color: #000000;
+    }
+    .item-nnr-number {
+      font-size: 26px;
+      font-weight: 900;
+      color: #000000;
+      margin-top: 2px;
+      line-height: 1.1;
+      letter-spacing: 0.5px;
+    }
+    .cell-instruction {
+      width: 56%;
+      border-left: 2.5px solid #000000;
+      padding: 8px 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 4px;
+    }
+    .instruction-title {
+      font-size: 13px;
+      font-weight: 900;
+      color: #000000;
+    }
+    .instruction-body {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #000000;
+      line-height: 1.3;
+    }
+
+    /* Right Major Section (32% width) - Full-Height QR Code with Orange Corners */
+    .label-right-col {
+      width: 32%;
+      border-left: 2.5px solid #000000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      background: #FFFFFF;
+      position: relative;
+    }
+    .qr-frame-wrap {
+      position: relative;
+      display: inline-flex;
       align-items: center;
       justify-content: center;
       padding: 10px;
-      background: #FFFFFF;
     }
     .qr-img {
-      width: 140px;
-      height: 140px;
+      width: 195px;
+      height: 195px;
       display: block;
-      background: #fff;
+      background: #FFFFFF;
     }
     .qr-placeholder-box {
-      width: 140px;
-      height: 140px;
+      width: 195px;
+      height: 195px;
       border: 2px dashed #000;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 11px;
-      font-weight: 700;
-      text-align: center;
-      padding: 8px;
-    }
-
-    /* Delivery Instruction Box */
-    .box-delivery-instruction {
-      padding: 10px 16px;
-      background: #FFFFFF;
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-    }
-    .instruction-title {
-      font-size: 13.5px;
-      font-weight: 900;
-      color: #000000;
-      margin-bottom: 3px;
-    }
-    .instruction-body {
       font-size: 12px;
-      font-weight: 700;
-      color: #111111;
-      line-height: 1.35;
+      font-weight: 800;
+      text-align: center;
+      padding: 10px;
+    }
+    .qr-corner {
+      position: absolute;
+      width: 34px;
+      height: 34px;
+      border-color: #EA580C;
+      border-style: solid;
+      pointer-events: none;
+    }
+    .qr-corner-tl {
+      top: 0;
+      left: 0;
+      border-width: 5.5px 0 0 5.5px;
+      border-top-left-radius: 12px;
+    }
+    .qr-corner-tr {
+      top: 0;
+      right: 0;
+      border-width: 5.5px 5.5px 0 0;
+      border-top-right-radius: 12px;
+    }
+    .qr-corner-bl {
+      bottom: 0;
+      left: 0;
+      border-width: 0 0 5.5px 5.5px;
+      border-bottom-left-radius: 12px;
+    }
+    .qr-corner-br {
+      bottom: 0;
+      right: 0;
+      border-width: 0 5.5px 5.5px 0;
+      border-bottom-right-radius: 12px;
     }
 
     /* Print Styles */
@@ -495,8 +531,8 @@ function buildPackingSlipHtml(fields) {
       .shipping-label {
         width: 100% !important;
         max-width: 100% !important;
-        border: 3.5px solid #000000 !important;
-        border-radius: 20px !important;
+        border: 3px solid #000000 !important;
+        border-radius: 16px !important;
         box-shadow: none !important;
         page-break-inside: avoid !important;
       }
@@ -518,113 +554,135 @@ function buildPackingSlipHtml(fields) {
 
   <!-- The Package Shipping Label -->
   <div class="shipping-label">
-    <!-- Header Row: LOGO | Product Name -->
-    <div class="label-header">
-      <div class="header-logo-box">
-        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#000000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="5.5" cy="17.5" r="3.5" />
-          <circle cx="18.5" cy="17.5" r="3.5" />
-          <path d="M15 6h-3l-3 6.5h7.5l-2-6.5z" />
-          <path d="M9 12.5L5.5 17.5" />
-          <path d="M14.5 12.5L18.5 17.5" />
-        </svg>
-        <span class="header-logo-text">${escapeHtml(String(fields.fromCompany || 'MOTOTRACK').toUpperCase())}</span>
+    <!-- Left Major Column -->
+    <div class="label-left-col">
+      <!-- Row 1: Logo & Product Name -->
+      <div class="row-header">
+        <div class="cell-logo">
+          <div class="logo-row">
+            <!-- Motorcycle with speed lines -->
+            <svg viewBox="0 0 48 26" width="38" height="22" fill="none">
+              <line x1="2" y1="9" x2="10" y2="9" stroke="#EA580C" stroke-width="2.2" stroke-linecap="round" />
+              <line x1="0" y1="13" x2="8" y2="13" stroke="#EA580C" stroke-width="2.2" stroke-linecap="round" />
+              <line x1="3" y1="17" x2="11" y2="17" stroke="#EA580C" stroke-width="2.2" stroke-linecap="round" />
+              <circle cx="18" cy="17" r="5" stroke="#000" stroke-width="2.5" fill="#fff" />
+              <circle cx="38" cy="17" r="5" stroke="#000" stroke-width="2.5" fill="#fff" />
+              <circle cx="18" cy="17" r="2" fill="#000" />
+              <circle cx="38" cy="17" r="2" fill="#000" />
+              <path d="M18 17l6-8h8l6 8" stroke="#000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M24 9l-4-4h-4" stroke="#000" stroke-width="2" stroke-linecap="round" />
+              <path d="M26 9l6-4h4" stroke="#000" stroke-width="2.5" stroke-linecap="round" />
+              <circle cx="30" cy="4.5" r="2.5" fill="#000" />
+              <path d="M24 13h8" stroke="#EA580C" stroke-width="3" stroke-linecap="round" />
+            </svg>
+            <div class="brand-title">
+              <span class="brand-moto">MOTO</span><span class="brand-track">TRACK</span>
+            </div>
+          </div>
+          <div class="logo-orange-bar"></div>
+        </div>
+        <div class="cell-product">
+          <span class="product-text">${escapeHtml(fields.productName)}</span>
+        </div>
       </div>
-      <div class="header-product-box">
-        <span class="header-product-text">${escapeHtml(fields.productName)}</span>
+
+      <!-- Row 2: Addresses & Handling Icons -->
+      <div class="row-addresses">
+        <!-- From: -->
+        <div class="cell-from">
+          <div class="addr-head">
+            <span class="addr-tag">From :</span>
+            <span class="addr-name">${escapeHtml(fields.fromCompany)}</span>
+          </div>
+          ${fields.fromPhone ? `<div class="addr-indent">${escapeHtml(fields.fromPhone)}</div>` : ''}
+          ${fields.fromAddress ? `<div class="addr-indent">${escapeHtml(fields.fromAddress)}</div>` : ''}
+          ${fields.fromCity ? `<div class="addr-indent">${escapeHtml(fields.fromCity)}</div>` : ''}
+        </div>
+
+        <!-- To: + 3 Handling Icons -->
+        <div class="cell-to">
+          <div>
+            <div class="addr-head">
+              <span class="addr-tag">To :</span>
+              <span class="addr-name">${escapeHtml(fields.customerName)}</span>
+            </div>
+            <div class="addr-indent">${escapeHtml(fields.address || 'Purok Avocado 4, Inoburan, City of Naga, Cebu')}</div>
+            ${fields.phone ? `<div class="addr-indent">Tel: ${escapeHtml(fields.phone)}</div>` : ''}
+          </div>
+
+          <!-- 3 Handling Icons (Fragile, Handle with Care, This Side Up) -->
+          <div class="handling-icons-row">
+            <!-- 1. Fragile (Wine glass) -->
+            <div class="handling-icon-box" title="Fragile">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#000000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 22h8" />
+                <path d="M12 15v7" />
+                <path d="M12 15a5 5 0 0 0 5-5V3H7v7a5 5 0 0 0 5 5z" />
+              </svg>
+            </div>
+
+            <!-- 2. Handle with Care (Downward arrow onto package tray) -->
+            <div class="handling-icon-box" title="Handle with Care">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#000000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 3v10" />
+                <path d="M8 9l4 4 4-4" />
+                <path d="M4 17h16" />
+                <path d="M4 17v3h16v-3" />
+              </svg>
+            </div>
+
+            <!-- 3. This Side Up (Two arrows pointing up with base bar) -->
+            <div class="handling-icon-box" title="This Side Up">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#000000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 16V4" />
+                <path d="M4 7l3-3 3 3" />
+                <path d="M17 16V4" />
+                <path d="M14 7l3-3 3 3" />
+                <path d="M3 20h18" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Row 3: Spaced Tracking Number Bar -->
+      <div class="row-tracking">
+        <div class="tracking-code-text">${escapeHtml(fields.formattedSpacedId)}</div>
+      </div>
+
+      <!-- Row 4: Item NNR & Delivery Instruction -->
+      <div class="row-bottom">
+        <div class="cell-item-nnr">
+          <div class="item-nnr-title">Item NNR:</div>
+          <div class="item-nnr-number">${escapeHtml(fields.itemNnr)}</div>
+        </div>
+        <div class="cell-instruction">
+          <div class="instruction-title">Delivery Instruction</div>
+          <div class="instruction-body">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="#EA580C" style="flex-shrink:0;">
+              <path d="M12 2L1 21h22L12 2zm0 3.5l8.5 14.5H3.5L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
+            </svg>
+            <span>${escapeHtml(instructionText)}</span>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Main Content Area -->
-    <div class="label-body">
-      <!-- Left Column -->
-      <div class="body-left-col">
-        <!-- From : -->
-        <div class="box-from">
-          <div class="box-title-row">
-            <span class="bold-title">From :</span>
-            <span class="company-title">${escapeHtml(fields.fromCompany)}</span>
-          </div>
-          ${fields.fromAddress ? `<div class="detail-text">${escapeHtml(fields.fromAddress)}</div>` : ''}
-          ${fields.fromCity ? `<div class="detail-text">${escapeHtml(fields.fromCity)}</div>` : ''}
-          ${fields.fromZip ? `<div class="detail-text">${escapeHtml(fields.fromZip)}</div>` : ''}
-        </div>
+    <!-- Right Major Column: Full-Height QR Code with 4 Orange Corners -->
+    <div class="label-right-col">
+      <div class="qr-frame-wrap">
+        <!-- 4 Orange Corner Brackets -->
+        <div class="qr-corner qr-corner-tl"></div>
+        <div class="qr-corner qr-corner-tr"></div>
+        <div class="qr-corner qr-corner-bl"></div>
+        <div class="qr-corner qr-corner-br"></div>
 
-        <!-- 1 2 3 A B C D ... + Barcode -->
-        <div class="box-barcode">
-          <div class="barcode-code-text">${escapeHtml(fields.formattedBarcodeText)}</div>
-          <div class="barcode-img-wrap">
-            ${barcodeSvg}
-          </div>
-        </div>
-
-        <!-- Item No: -->
-        <div class="box-item-no">
-          <div class="item-no-title">Item N&#x2116;:</div>
-          <div class="item-no-val">${escapeHtml(fields.itemNo)}</div>
-        </div>
-      </div>
-
-      <!-- Right Column -->
-      <div class="body-right-col">
-        <div class="right-top-grid">
-          <!-- Subcol 1: To & 3 Handling Icons -->
-          <div class="to-and-icons-subcol">
-            <!-- To : -->
-            <div class="box-to">
-              <div class="box-title-row">
-                <span class="bold-title">To :</span>
-                <span class="company-title">${escapeHtml(fields.customerName)}</span>
-              </div>
-              <div class="detail-text box-to-details">${escapeHtml(fields.address || 'No delivery address on file')}</div>
-              ${
-                fields.phone
-                  ? `<div class="detail-text box-to-details">${escapeHtml(`Tel: ${fields.phone}`)}</div>`
-                  : ''
-              }
-            </div>
-
-            <!-- 3 Standard Packaging Handling Icons -->
-            <div class="box-handling-icons">
-              <!-- 1. Fragile (Broken Wine Glass) -->
-              <div class="handling-icon-box" title="Fragile - Handle with Care">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="#000000">
-                  <path d="M12 2C7.58 2 6 5.58 6 9c0 2.97 2.16 5.43 5 5.91V19H8v2h8v-2h-3v-4.09c2.84-.48 5-2.94 5-5.91 0-3.42-1.58-7-6-7zm-1 3.5l1.5 2-2 2 2 2-1 1.5C8.84 11.5 8 9.5 8 9c0-2.3 1.05-4.5 3-5.5z"/>
-                </svg>
-              </div>
-
-              <!-- 2. Handle with Care (Hands supporting parcel box) -->
-              <div class="handling-icon-box" title="Handle with Care">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="#000000">
-                  <path d="M8 5h8v5H8z"/>
-                  <path d="M4 11c0 4.42 3.58 8 8 8s8-3.58 8-8h-2.2c0 3.2-2.6 5.8-5.8 5.8s-5.8-2.6-5.8-5.8H4zm-1 9h18v2H3z"/>
-                </svg>
-              </div>
-
-              <!-- 3. This Way Up (Two upward arrows with horizontal bar) -->
-              <div class="handling-icon-box" title="This Way Up">
-                <svg viewBox="0 0 24 24" width="28" height="28" fill="#000000">
-                  <path d="M6 3l3.5 4H7.5v8h-3V7H2.5L6 3zm12 0l3.5 4h-2v8h-3V7h-2l3.5-4zM2 18h20v2.5H2V18z"/>
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          <!-- Subcol 2: Delivery Confirmation QR Code -->
-          <div class="qr-subcol">
-            ${
-              fields.qrImageUrl
-                ? `<img id="qr" class="qr-img" src="${escapeHtml(fields.qrImageUrl)}" alt="Delivery QR Code" />`
-                : `<div class="qr-placeholder-box">SCAN CONFIRMATION QR</div>`
-            }
-          </div>
-        </div>
-
-        <!-- Delivery Instruction -->
-        <div class="box-delivery-instruction">
-          <div class="instruction-title">Delivery Instruction</div>
-          <div class="instruction-body">${instruction}</div>
-        </div>
+        <!-- The QR Code Image -->
+        ${
+          fields.qrImageUrl
+            ? `<img id="qr" class="qr-img" src="${escapeHtml(fields.qrImageUrl)}" alt="Delivery QR Code" />`
+            : `<div class="qr-placeholder-box">DELIVERY CONFIRMATION QR</div>`
+        }
       </div>
     </div>
   </div>
@@ -662,7 +720,7 @@ export function printDeliveryPackingSlip(order, bundle) {
   const html = buildPackingSlipHtml(getDeliverySlipFields(order, bundle));
   // NOTE: Do NOT use noopener/noreferrer — they nullify the popup reference
   // and prevent document.write() from injecting HTML, causing a blank page.
-  const popup = window.open('', '_blank', 'width=940,height=640');
+  const popup = window.open('', '_blank', 'width=960,height=620');
   if (!popup) {
     return { success: false, error: 'Allow pop-ups to print the packing label.' };
   }
@@ -683,7 +741,8 @@ export async function shareDeliveryPackingSlip(order, bundle) {
     f.items.length ? `Items: ${f.items.join(', ')}` : null,
     f.riderName ? `Rider: ${f.riderName}` : null,
     `Payment: ${f.payment}`,
-    `Tracking: ${f.trackingNumber}`,
+    `Tracking: ${f.formattedSpacedId}`,
+    `Item NNR: ${f.itemNnr}`,
     f.confirmUrl || null,
     'Scan the QR on the package after drop-off to confirm delivery.',
   ]

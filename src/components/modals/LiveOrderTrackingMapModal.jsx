@@ -656,17 +656,31 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   const shippingFeeValue = formatMoney(shippingFeeNum);
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
+    <Modal visible={visible} transparent animationType={isDesktop ? 'fade' : 'slide'} onRequestClose={onClose}>
+      <View
+        style={[
+          styles.modalOverlay,
+          isDesktop && {
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          activeOpacity={1}
+          onPress={onClose}
+        />
         <View style={[styles.modalContainer, isDesktop && styles.modalContainerDesktop]}>
           {/* ─── 1. TOP HEADER ─── */}
-          <View style={styles.headerRow}>
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.8}>
+          <View style={[styles.headerRow, windowWidth < 400 && { paddingHorizontal: 12, paddingVertical: 12 }]}>
+            <TouchableOpacity style={[styles.closeBtn, windowWidth < 400 && { marginRight: 8 }]} onPress={onClose} activeOpacity={0.8}>
               <BootstrapIcon name="x-lg" size={15} color="#64748B" />
             </TouchableOpacity>
 
             <View style={styles.headerTextWrap}>
-              <Text style={styles.headerMainTitle}>
+              <Text style={[styles.headerMainTitle, windowWidth < 380 && { fontSize: 15 }]} numberOfLines={1}>
                 {stepIndex === 0
                   ? 'Order placed'
                   : stepIndex === 1
@@ -688,7 +702,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, windowWidth < 400 && { paddingHorizontal: 12 }]}>
             {/* ─── 2. FOUR-STAGE TIMELINE PROGRESS STEPPER ─── */}
             <View style={styles.stepperCard}>
               <View style={styles.stepperTrackRow}>
@@ -741,6 +755,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                         styles.stepLabelText,
                         isCurrent && styles.stepLabelTextActive,
                         isPassed && styles.stepLabelTextCompleted,
+                        windowWidth < 360 && { fontSize: 9.5 },
                       ]}
                       numberOfLines={2}
                     >

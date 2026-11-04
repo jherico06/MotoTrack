@@ -215,7 +215,6 @@ export const PMS_SERVICE_GROUPS = Object.freeze([
   'Electrical Services',
   'Suspension and Chassis',
   'Drive System',
-  'Other Services',
 ]);
 
 /** Default group + short description + icon per service id */
@@ -399,7 +398,7 @@ export function enrichServiceMeta(service) {
   const fromDefault = DEFAULT_PMS_SERVICES.find((s) => s.id === service.id);
   return {
     ...service,
-    group: service.group || service.service_group || meta.group || 'Other Services',
+    group: service.group || service.service_group || meta.group || 'Tune-Up and Maintenance',
     description: service.description || meta.description || 'Fixed labor service',
     icon: service.icon || meta.icon || 'wrench',
     catalogCategory: normalizeCatalogCategory(
@@ -435,7 +434,7 @@ export function groupPmsCatalog(services = []) {
   const byGroup = new Map();
   for (const g of PMS_SERVICE_GROUPS) byGroup.set(g, []);
   for (const svc of services) {
-    const key = PMS_SERVICE_GROUPS.includes(svc.group) ? svc.group : 'Other Services';
+    const key = PMS_SERVICE_GROUPS.includes(svc.group) ? svc.group : 'Tune-Up and Maintenance';
     if (!byGroup.has(key)) byGroup.set(key, []);
     byGroup.get(key).push(svc);
   }

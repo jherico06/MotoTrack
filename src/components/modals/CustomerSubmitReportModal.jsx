@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   StyleSheet,
   TouchableWithoutFeedback,
+  useWindowDimensions,
+  Platform,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { ratingsReportsService, REPORT_CATEGORIES } from '../../services/feedback/ratingsReportsService.js';
@@ -23,6 +25,8 @@ export default function CustomerSubmitReportModal({
   onClose = () => {},
   onSubmitSuccess = () => {},
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768;
   const { showToast } = useCart();
   const [selectedCategory, setSelectedCategory] = useState('general_feedback');
   const [rating, setRating] = useState(0); // 0 = no rating provided
@@ -103,11 +107,11 @@ export default function CustomerSubmitReportModal({
   };
 
   return (
-    <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent={true} animationType={isDesktop ? 'fade' : 'slide'} onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop}>
+        <View style={[styles.backdrop, isDesktop ? styles.backdropDesktop : styles.backdropMobile]}>
           <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-            <View style={styles.modalCard}>
+            <View style={[styles.modalCard, isDesktop ? styles.modalCardDesktop : styles.modalCardMobile]}>
               {/* Header */}
               <View style={styles.header}>
                 <View style={styles.headerLeft}>
@@ -350,18 +354,23 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    ...Platform.select({
+      web: { backdropFilter: 'blur(4px)' },
+    }),
+  },
+  backdropDesktop: {
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 16,
+    padding: 20,
+  },
+  backdropMobile: {
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
+    padding: 0,
   },
   modalCard: {
     width: '100%',
-    maxWidth: 620,
-    maxHeight: '90%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
@@ -370,6 +379,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 24,
     elevation: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  modalCardDesktop: {
+    maxWidth: 620,
+    maxHeight: '88%',
+    borderRadius: 24,
+  },
+  modalCardMobile: {
+    maxWidth: '100%',
+    maxHeight: '92%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   header: {
     flexDirection: 'row',

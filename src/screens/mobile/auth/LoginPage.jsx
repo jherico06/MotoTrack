@@ -8,6 +8,9 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { loginPageStyles as styles } from '../../../styles/loginPage.styles.js';
@@ -23,7 +26,7 @@ export default function LoginPage({
   onNavigateToSignUp,
   onNavigateToStore,
 }) {
-  const { login, loginWithGoogle, loginWithGoogleSimulated } = useAuth();
+  const { login, loginWithGoogle, loginWithGoogleSimulated, requestPasswordResetOtp } = useAuth();
 
   const [email, setEmail] = useState(() => {
     try {
@@ -44,6 +47,16 @@ export default function LoginPage({
       return false;
     }
   });
+
+  // Google OAuth state
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [googleAdvisory, setGoogleAdvisory] = useState(null);
+
+  // Forgot password modal state
+  const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState({ type: '', text: '' });
 
   const passwordInputRef = useRef(null);
 
@@ -75,21 +88,31 @@ export default function LoginPage({
     }
   };
 
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const [googleAdvisory, setGoogleAdvisory] = useState(false);
-
   const handleGoogleLogin = async () => {
     setErrorMessage('');
-    setGoogleAdvisory(false);
+    setGoogleAdvisory(null);
     setIsGoogleLoading(true);
     try {
       const res = await loginWithGoogle();
       if (res?.success && res.user) {
         onLoginSuccess?.(res.user);
       } else if (res?.notEnabled) {
-        setGoogleAdvisory(true);
-      } else if (res?.cancelled) {
-        setErrorMessage(res.error || 'Google sign-in was closed before it finished.');
+        setGoogleAdvisory({
+          title: 'Google OAuth Setup Required',
+          message:
+            'Google OAuth provider is not enabled in your Supabase project. You can enable it in Supabase Dashboard → Authentication → Providers, or use instant test sign in.',
+          showInstantTest: true,
+        });
+      } else if (res?.redirectConfigNeeded || res?.cancelled) {
+        setGoogleAdvisory({
+          title: 'Supabase Redirect URL Required',
+          message:
+            'Google sign-in completed, but Supabase blocked the redirect back into Expo Go. To fix: add "exp://**" to your Supabase Redirect URLs.',
+          showInstantTest: true,
+        });
+        if (res?.error) {
+          setErrorMessage(res.error);
+        }
       } else if (res?.error) {
         setErrorMessage(res.error);
       }
@@ -102,7 +125,8 @@ export default function LoginPage({
 
   const handleGoogleInstantTest = async () => {
     setIsGoogleLoading(true);
-    setGoogleAdvisory(false);
+    setGoogleAdvisory(null);
+    setErrorMessage('');
     try {
       const res = await loginWithGoogleSimulated();
       if (res?.success && res.user) {
@@ -113,254 +137,402 @@ export default function LoginPage({
     }
   };
 
+  const handleSendPasswordReset = async () => {
+    const targetEmail = forgotEmail.trim() || email.trim();
+    if (!targetEmail || !targetEmail.includes('@')) {
+      setForgotMessage({ type: 'error', text: 'Please enter a valid email address.' });
+      return;
+    }
+
+    setForgotLoading(true);
+    setForgotMessage({ type: '', text: '' });
+    try {
+      if (requestPasswordResetOtp) {
+        const res = await requestPasswordResetOtp({ email: targetEmail });
+        if (res.success) {
+          setForgotMessage({
+            type: 'success',
+            text: res.message || `Password reset link sent to ${targetEmail}. Check your inbox.`,
+          });
+        } else {
+          setForgotMessage({ type: 'error', text: res.error || 'Failed to send reset link.' });
+        }
+      } else {
+        setForgotMessage({
+          type: 'success',
+          text: `Password reset instructions sent to ${targetEmail}. Check your inbox.`,
+        });
+      }
+    } catch (err) {
+      setForgotMessage({ type: 'error', text: err.message || 'Something went wrong.' });
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" translucent backgroundColor="transparent" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <ScrollView
-          style={{ flex: 1, backgroundColor: '#24272B' }}
-          contentContainerStyle={{ flexGrow: 1 }}
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.innerContainer}>
-            {/* Top Navigation Row (Back / Guest) */}
+          {/* ─── 1. DARK CHARCOAL HEADER SECTION ─── */}
+          <View style={styles.topHeaderSection}>
+            {/* Minimal circular wheel-inspired orange graphic */}
+            <View style={styles.wheelGraphicWrap}>
+              <View style={styles.wheelOuterRing} />
+            </View>
+
+            {/* Compact Top Navigation (Shop & Guest) */}
             <View style={styles.topNavRow}>
-              <TouchableOpacity style={styles.navBackBtn} onPress={onNavigateToStore} activeOpacity={0.7}>
-                <BootstrapIcon name="chevron-left" size={16} color="#FFFFFF" />
-                <Text style={styles.navBackText}>Shop</Text>
+              <TouchableOpacity
+                style={styles.navLink}
+                onPress={onNavigateToStore}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel="Return to Shop"
+              >
+                <BootstrapIcon name="chevron-left" size={13} color="#94A3B8" />
+                <Text style={styles.navLinkText}>Shop</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.navBackBtn} onPress={onNavigateToStore} activeOpacity={0.7}>
-                <Text style={styles.navBackText}>Guest ➔</Text>
+              <TouchableOpacity
+                style={styles.navLink}
+                onPress={onNavigateToStore}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel="Browse as Guest"
+              >
+                <Text style={styles.navLinkText}>Guest</Text>
+                <BootstrapIcon name="chevron-right" size={13} color="#94A3B8" />
               </TouchableOpacity>
             </View>
 
-            {/* ─── 1. TOP TEAL HEADER SECTION WITH PLANT ART ─── */}
-            <View style={styles.topHeroSection}>
-              <View style={styles.abstractOrganicShape}>
-                <View style={styles.abstractOrganicShapeInner} />
+            {/* Bold, clean header titles */}
+            <Text style={styles.headerTitle}>Welcome back.</Text>
+            <Text style={styles.headerSubtitle}>Motorparts made simple.</Text>
+          </View>
+
+          {/* ─── 2. WHITE BOTTOM SHEET WITH SOFTLY ROUNDED TOP CORNERS ─── */}
+          <View style={styles.whiteCardSheet}>
+            <Text style={styles.sheetTitle}>Log in</Text>
+            <Text style={styles.sheetSubtitle}>Access your orders and saved parts.</Text>
+
+            {/* Error Banner */}
+            {errorMessage ? (
+              <View style={styles.errorBanner} accessibilityRole="alert">
+                <BootstrapIcon name="info-circle" size={15} color="#DC2626" />
+                <Text style={styles.errorBannerText}>{errorMessage}</Text>
               </View>
+            ) : null}
 
-              <Text style={styles.heroTitle}>Hello!</Text>
-              <Text style={styles.heroSubtitle}>Welcome to MotoTrack Motorparts and Accessories</Text>
-            </View>
-
-            {/* ─── 2. WHITE CARD CONTAINER SHEET ─── */}
-            <View style={styles.whiteCardSheet}>
-              <Text style={styles.cardTitle}>Login</Text>
-
-              {/* Error Banner */}
-              {errorMessage ? (
-                <View style={styles.errorBanner}>
-                  <BootstrapIcon name="info-circle" size={14} color="#DC2626" />
-                  <Text style={styles.errorBannerText}>{errorMessage}</Text>
-                </View>
-              ) : null}
-
-              {/* Email Input */}
-              <View style={styles.inputGroup}>
-                <View style={[styles.inputPill, focusedField === 'email' && styles.inputPillFocused]}>
-                  <BootstrapIcon name="envelope" size={17} color="#94A3B8" />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Email or username"
-                    placeholderTextColor="#94A3B8"
-                    value={email}
-                    onChangeText={(text) => {
-                      setEmail(text);
-                      if (errorMessage) setErrorMessage('');
-                    }}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onFocus={() => setFocusedField('email')}
-                    onBlur={() => setFocusedField('')}
-                    returnKeyType="next"
-                    blurOnSubmit={false}
-                    onSubmitEditing={() => {
-                      if (password.trim()) {
-                        handleEmailLogin();
-                      } else {
-                        passwordInputRef.current?.focus();
-                      }
-                    }}
-                  />
-                </View>
-              </View>
-
-              {/* Password Input */}
-              <View style={styles.inputGroup}>
-                <View style={[styles.inputPill, focusedField === 'password' && styles.inputPillFocused]}>
-                  <BootstrapIcon name="lock" size={17} color="#94A3B8" />
-                  <TextInput
-                    ref={passwordInputRef}
-                    style={styles.textInput}
-                    placeholder="Password"
-                    placeholderTextColor="#94A3B8"
-                    value={password}
-                    onChangeText={(text) => {
-                      setPassword(text);
-                      if (errorMessage) setErrorMessage('');
-                    }}
-                    secureTextEntry={!showPassword}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    onFocus={() => setFocusedField('password')}
-                    onBlur={() => setFocusedField('')}
-                    returnKeyType="go"
-                    onSubmitEditing={handleEmailLogin}
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowPassword(!showPassword)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <BootstrapIcon name={showPassword ? 'eye-slash' : 'eye'} size={16} color="#94A3B8" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Remember me + Forgot Password */}
-              <View style={styles.forgotPasswordRow}>
-                <TouchableOpacity
-                  style={styles.rememberMeBtn}
-                  onPress={() => setRememberMe((prev) => !prev)}
-                  activeOpacity={0.8}
-                >
-                  <View
-                    style={[
-                      styles.rememberCheckbox,
-                      rememberMe && styles.rememberCheckboxChecked,
-                    ]}
-                  >
-                    {rememberMe ? (
-                      <BootstrapIcon name="check" size={11} color="#FFFFFF" />
-                    ) : null}
-                  </View>
-                  <Text style={styles.rememberMeText}>Remember me</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => {
-                    setErrorMessage('Password reset verification link sent to registered email.');
+            {/* Email or Username Input */}
+            <View style={styles.inputGroup}>
+              <View
+                style={[
+                  styles.inputPill,
+                  focusedField === 'email' && styles.inputPillFocused,
+                ]}
+              >
+                <BootstrapIcon
+                  name="envelope"
+                  size={16}
+                  color={focusedField === 'email' ? '#EA580C' : '#94A3B8'}
+                />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Email or username"
+                  placeholderTextColor="#94A3B8"
+                  value={email}
+                  onChangeText={(text) => {
+                    setEmail(text);
+                    if (errorMessage) setErrorMessage('');
                   }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onFocus={() => setFocusedField('email')}
+                  onBlur={() => setFocusedField('')}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => {
+                    if (password.trim()) {
+                      handleEmailLogin();
+                    } else {
+                      passwordInputRef.current?.focus();
+                    }
+                  }}
+                  accessibilityLabel="Email or username"
+                />
+              </View>
+            </View>
+
+            {/* Password Input */}
+            <View style={styles.inputGroup}>
+              <View
+                style={[
+                  styles.inputPill,
+                  focusedField === 'password' && styles.inputPillFocused,
+                ]}
+              >
+                <BootstrapIcon
+                  name="lock"
+                  size={16}
+                  color={focusedField === 'password' ? '#EA580C' : '#94A3B8'}
+                />
+                <TextInput
+                  ref={passwordInputRef}
+                  style={styles.textInput}
+                  placeholder="Password"
+                  placeholderTextColor="#94A3B8"
+                  value={password}
+                  onChangeText={(text) => {
+                    setPassword(text);
+                    if (errorMessage) setErrorMessage('');
+                  }}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onFocus={() => setFocusedField('password')}
+                  onBlur={() => setFocusedField('')}
+                  returnKeyType="go"
+                  onSubmitEditing={handleEmailLogin}
+                  accessibilityLabel="Password"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                   activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                  <BootstrapIcon
+                    name={showPassword ? 'eye-slash' : 'eye'}
+                    size={16}
+                    color="#94A3B8"
+                  />
                 </TouchableOpacity>
               </View>
+            </View>
 
-              {/* Primary Login Button */}
+            {/* Remember Me & Forgot Password Row */}
+            <View style={styles.optionsRow}>
               <TouchableOpacity
-                style={styles.primaryPillBtn}
-                onPress={handleEmailLogin}
-                activeOpacity={0.9}
-                disabled={isLoading}
+                style={styles.rememberRow}
+                onPress={() => setRememberMe((prev) => !prev)}
+                activeOpacity={0.8}
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: rememberMe }}
+                accessibilityLabel="Remember me"
               >
-                <Text style={styles.primaryPillBtnText}>
-                  {isLoading ? 'Logging In to Supabase...' : 'Login'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Or Continue With Divider */}
-              <View style={styles.socialDividerRow}>
-                <View style={styles.socialDividerLine} />
-                <Text style={styles.socialDividerText}>Or continue with</Text>
-                <View style={styles.socialDividerLine} />
-              </View>
-
-              {/* Sign in with Google Button */}
-              <TouchableOpacity
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 10,
-                  backgroundColor: '#FFFFFF',
-                  borderWidth: 1.5,
-                  borderColor: '#E5E7EB',
-                  borderRadius: 10,
-                  height: 48,
-                  paddingHorizontal: 16,
-                  shadowColor: '#EA580C',
-                  shadowOffset: { width: 0, height: 2 },
-                  shadowOpacity: 0.06,
-                  shadowRadius: 6,
-                  elevation: 1,
-                  marginBottom: 8,
-                }}
-                onPress={handleGoogleLogin}
-                activeOpacity={0.85}
-                disabled={isGoogleLoading || isLoading}
-              >
-                <GoogleIcon size={18} />
-                <Text style={{ color: '#1E293B', fontWeight: '700', fontSize: 14 }}>
-                  {isGoogleLoading ? 'Connecting to Google...' : 'Sign in with Google'}
-                </Text>
-              </TouchableOpacity>
-
-              {googleAdvisory && (
                 <View
-                  style={{
-                    marginBottom: 14,
-                    padding: 14,
-                    backgroundColor: '#FEF3C7',
-                    borderRadius: 14,
-                    borderWidth: 1,
-                    borderColor: '#FDE68A',
-                    width: '100%',
-                  }}
+                  style={[
+                    styles.checkbox,
+                    rememberMe && styles.checkboxChecked,
+                  ]}
                 >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                    <BootstrapIcon name="info-circle-fill" size={14} color="#B45309" />
-                    <Text style={{ fontWeight: '800', fontSize: 12.5, color: '#92400E' }}>
-                      Google OAuth Setup Required
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 11.5, color: '#78350F', lineHeight: 16, marginBottom: 10 }}>
-                    Google provider is not enabled yet in your Supabase project (vtbdmurblidtdghaotne). Enable Google in Supabase Dashboard &gt; Authentication &gt; Providers. In the meantime, you can test immediately with one click:
-                  </Text>
+                  {rememberMe ? (
+                    <BootstrapIcon name="check" size={11} color="#FFFFFF" />
+                  ) : null}
+                </View>
+                <Text style={styles.rememberText}>Remember me</Text>
+              </TouchableOpacity>
 
+              <TouchableOpacity
+                onPress={() => {
+                  setForgotEmail(email);
+                  setForgotMessage({ type: '', text: '' });
+                  setShowForgotModal(true);
+                }}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Forgot password"
+              >
+                <Text style={styles.forgotPasswordText}>Forgot password?</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Single Full-Width Orange Primary Button */}
+            <TouchableOpacity
+              style={[styles.primaryBtn, isLoading && styles.primaryBtnDisabled]}
+              onPress={handleEmailLogin}
+              activeOpacity={0.85}
+              disabled={isLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Log in"
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Text style={styles.primaryBtnText}>Log in</Text>
+                  <View style={styles.btnArrowBadge}>
+                    <BootstrapIcon name="chevron-right" size={12} color="#FFFFFF" />
+                  </View>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Social Divider */}
+            <View style={styles.socialDividerRow}>
+              <View style={styles.socialDividerLine} />
+              <Text style={styles.socialDividerText}>or continue with</Text>
+              <View style={styles.socialDividerLine} />
+            </View>
+
+            {/* Sign in with Google Button */}
+            <TouchableOpacity
+              style={styles.googleBtn}
+              onPress={handleGoogleLogin}
+              activeOpacity={0.85}
+              disabled={isGoogleLoading || isLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Continue with Google"
+            >
+              {isGoogleLoading ? (
+                <ActivityIndicator size="small" color="#EA580C" />
+              ) : (
+                <>
+                  <GoogleIcon size={18} />
+                  <Text style={styles.googleBtnText}>Continue with Google</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* Google OAuth Advisory / Test Mode */}
+            {googleAdvisory ? (
+              <View style={styles.googleAdvisoryBox}>
+                <Text style={styles.googleAdvisoryTitle}>{googleAdvisory.title}</Text>
+                <Text style={styles.googleAdvisoryText}>{googleAdvisory.message}</Text>
+                {googleAdvisory.showInstantTest ? (
                   <TouchableOpacity
-                    style={{
-                      backgroundColor: '#EA580C',
-                      borderRadius: 10,
-                      paddingVertical: 9,
-                      paddingHorizontal: 12,
-                      alignItems: 'center',
-                      marginBottom: 8,
-                    }}
+                    style={styles.googleInstantTestBtn}
                     onPress={handleGoogleInstantTest}
                     activeOpacity={0.85}
                   >
-                    <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>
-                      ✓ Test Sign In as Google Rider (Instant)
+                    <Text style={styles.googleInstantTestText}>
+                      ✓ Test Sign In as Rider (Instant)
                     </Text>
                   </TouchableOpacity>
-
-                  <View style={{ backgroundColor: '#FFFFFF', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#FDE68A' }}>
-                    <Text style={{ fontSize: 10.5, color: '#64748B', marginBottom: 2 }}>
-                      Your Supabase Redirect URI:
-                    </Text>
-                    <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#EA580C' }}>
-                      https://vtbdmurblidtdghaotne.supabase.co/auth/v1/callback
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              {/* Footer Switch to Sign Up */}
-              <View style={[styles.footerSwitchRow, { marginTop: 16 }]}>
-                <Text style={styles.footerSwitchText}>Don't have an account? </Text>
-                <TouchableOpacity onPress={onNavigateToSignUp} activeOpacity={0.8}>
-                  <Text style={styles.footerSwitchLink}>Sign Up with OTP</Text>
-                </TouchableOpacity>
+                ) : null}
               </View>
+            ) : null}
+
+            {/* Footer Switch: Easy Switch between Login and Signup */}
+            <View style={styles.switchRow}>
+              <Text style={styles.switchText}>New to MotoTrack? </Text>
+              <TouchableOpacity
+                onPress={onNavigateToSignUp}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Create an account"
+              >
+                <Text style={styles.switchLink}>Create an account</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
       <SafeAreaView style={{ flex: 0, backgroundColor: '#FFFFFF' }} />
+
+      {/* ─── FORGOT PASSWORD MODAL ─── */}
+      <Modal
+        visible={showForgotModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowForgotModal(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setShowForgotModal(false)}
+        >
+          <Pressable
+            style={styles.modalSheet}
+            onPress={(e) => e?.stopPropagation?.()}
+          >
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>Reset Password</Text>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setShowForgotModal(false)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSubtitle}>
+              Enter your registered MotoTrack email to receive password reset instructions.
+            </Text>
+
+            {forgotMessage.text ? (
+              <View
+                style={[
+                  styles.errorBanner,
+                  forgotMessage.type === 'success' && {
+                    backgroundColor: '#ECFDF5',
+                    borderColor: '#A7F3D0',
+                  },
+                ]}
+              >
+                <BootstrapIcon
+                  name={forgotMessage.type === 'success' ? 'check-circle' : 'info-circle'}
+                  size={15}
+                  color={forgotMessage.type === 'success' ? '#059669' : '#DC2626'}
+                />
+                <Text
+                  style={[
+                    styles.errorBannerText,
+                    forgotMessage.type === 'success' && { color: '#065F46' },
+                  ]}
+                >
+                  {forgotMessage.text}
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={styles.inputGroup}>
+              <View style={styles.inputPill}>
+                <BootstrapIcon name="envelope" size={16} color="#94A3B8" />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="name@example.com"
+                  placeholderTextColor="#94A3B8"
+                  value={forgotEmail}
+                  onChangeText={setForgotEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.primaryBtn, forgotLoading && styles.primaryBtnDisabled]}
+              onPress={handleSendPasswordReset}
+              activeOpacity={0.85}
+              disabled={forgotLoading}
+            >
+              {forgotLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryBtnText}>Send Reset Link</Text>
+              )}
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

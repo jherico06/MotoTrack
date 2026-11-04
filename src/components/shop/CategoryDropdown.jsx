@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { CATEGORY_PILLS } from '../../data/motorParts.js';
@@ -16,6 +17,7 @@ export default function CategoryDropdown({
   onSelectCategory = () => {},
   productsList = [],
 }) {
+  const { width: windowWidth } = useWindowDimensions();
   const [isOpen, setIsOpen] = useState(false);
   const [filterText, setFilterText] = useState('');
 
@@ -189,7 +191,7 @@ export default function CategoryDropdown({
                 return (
                   <TouchableOpacity
                     key={item.id}
-                    style={[styles.categoryOption, isSelected && styles.categoryOptionActive]}
+                    style={[styles.categoryOption, windowWidth < 380 && { width: '100%' }, isSelected && styles.categoryOptionActive]}
                     onPress={() => handleSelect(item.category)}
                     activeOpacity={0.75}
                   >

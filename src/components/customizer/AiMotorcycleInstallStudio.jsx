@@ -84,6 +84,46 @@ function bikePhoto(bike) {
   return bikePhotoUri(bike);
 }
 
+function getNextWeeklyTokenResetDate(baseDate = new Date()) {
+  const d = new Date(baseDate);
+  const currentUtcDay = d.getUTCDay();
+  const daysUntilNextMonday = ((8 - currentUtcDay) % 7) || 7;
+  const reset = new Date(d.getTime());
+  reset.setUTCDate(reset.getUTCDate() + daysUntilNextMonday);
+  reset.setUTCHours(0, 0, 0, 0);
+  return reset;
+}
+
+function formatTokenResetDisplay(resetDate) {
+  if (!resetDate) return 'Next Monday at 12:00 AM UTC';
+  try {
+    const now = new Date();
+    const diffMs = resetDate.getTime() - now.getTime();
+    const diffHours = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60)));
+    const diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+
+    const options = {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    };
+    const formatted = resetDate.toLocaleDateString(undefined, options);
+
+    let relative = '';
+    if (diffDays <= 1) {
+      relative = `(Tomorrow in ~${diffHours}h)`;
+    } else {
+      relative = `(in ${diffDays} days)`;
+    }
+
+    return `${formatted} ${relative}`;
+  } catch (_e) {
+    return 'Next Monday at 12:00 AM UTC';
+  }
+}
+
 function productImage(product) {
   return productImageUri(product);
 }
@@ -165,9 +205,10 @@ export default function AiMotorcycleInstallStudio({
     : (isDarkMode ? darkStylesMobile : lightStylesMobile);
   const BRAND = '#EA580C';
   const MUTED = isDarkMode ? '#94A3B8' : '#64748B';
+  const INK = isDarkMode ? '#F8FAFC' : '#172033';
   const { width } = useWindowDimensions();
   const isWide = isWebMode ? width >= 860 : width >= 1024;
-  const shouldHideToolbar = hideMobileToolbar || isWebMode;
+  const shouldHideToolbar = hideMobileToolbar || (isWebMode && isWide);
   const { addToCart, showToast } = useCart();
   const { addCustomizationToWishlist } = useWishlist();
 
@@ -260,6 +301,10 @@ export default function AiMotorcycleInstallStudio({
   const [savedCustomizationId, setSavedCustomizationId] = useState(null);
   const [saveNotice, setSaveNotice] = useState('');
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
+  const [tokenLimitModalOpen, setTokenLimitModalOpen] = useState(false);
+  const nextResetDate = useMemo(() => {
+    return getNextWeeklyTokenResetDate();
+  }, [tokenLimitModalOpen]);
   const [bookingBranch, setBookingBranch] = useState(
     () => GARAGE_BRANCHES?.[0]?.name || "D'Blockchain Motorparts and Accessories"
   );
@@ -1005,11 +1050,11 @@ export default function AiMotorcycleInstallStudio({
     }
 
     if (!aiUsage.isAdmin && aiUsage.weeklyUsed >= (aiUsage.weeklyLimit || 3)) {
-      setError("You've reached your weekly AI preview limit. You can generate another preview next week.");
+      setTokenLimitModalOpen(true);
       return;
     }
     if (!aiUsage.isAdmin && aiUsage.isCooldownActive) {
-      setError(`Please wait before generating another preview. Available again in ${cooldownCountdown || '30m'}.`);
+      setTokenLimitModalOpen(true);
       return;
     }
 
@@ -1137,6 +1182,7 @@ export default function AiMotorcycleInstallStudio({
         setInfo('');
 
         if (result.code === 'RATE_LIMIT' || result.reason) {
+          setTokenLimitModalOpen(true);
           setAiUsage((prev) => ({
             ...prev,
             allowed: false,
@@ -2305,15 +2351,21 @@ export default function AiMotorcycleInstallStudio({
               <TouchableOpacity
                 style={[
                   styles.installSelectedBtn,
-                  (selectedCount === 0 || isGenerationBlocked || loading) &&
+                  (selectedCount === 0 || loading) &&
                     styles.installSelectedBtnDisabled,
                 ]}
-                onPress={() => handleGenerate()}
-                disabled={selectedCount === 0 || isGenerationBlocked || loading}
+                onPress={() => {
+                  if (isGenerationBlocked) {
+                    setTokenLimitModalOpen(true);
+                    return;
+                  }
+                  handleGenerate();
+                }}
+                disabled={selectedCount === 0 || loading}
                 activeOpacity={0.88}
                 accessibilityRole="button"
                 accessibilityState={{
-                  disabled: selectedCount === 0 || isGenerationBlocked || loading,
+                  disabled: selectedCount === 0 || loading,
                 }}
                 accessibilityLabel="Install Selected Parts"
               >
@@ -2324,7 +2376,7 @@ export default function AiMotorcycleInstallStudio({
                     name="stars"
                     size={15}
                     color={
-                      selectedCount === 0 || isGenerationBlocked || loading
+                      selectedCount === 0 || loading
                         ? '#94A3B8'
                         : '#FFFFFF'
                     }
@@ -2333,16 +2385,12 @@ export default function AiMotorcycleInstallStudio({
                 <Text
                   style={[
                     styles.installSelectedBtnText,
-                    (selectedCount === 0 || isGenerationBlocked || loading) &&
+                    (selectedCount === 0 || loading) &&
                       styles.installSelectedBtnTextDisabled,
                   ]}
                 >
                   {loading
                     ? 'Installing Selected Parts...'
-                    : isConsecutiveCooldown
-                    ? `Cooldown (${cooldownCountdown || 'wait'})`
-                    : isWeeklyLimitReached
-                    ? 'Weekly Limit Reached (3 / 3)'
                     : 'Install Selected Parts'}
                 </Text>
               </TouchableOpacity>
@@ -2640,7 +2688,13 @@ export default function AiMotorcycleInstallStudio({
       ) : null}
 
       {/* 4. Motorcycle Preview Canvas */}
-      <View style={styles.canvasFrame}>
+      <View
+        style={[
+          styles.canvasFrame,
+          isWebMode && width < 480 && { minHeight: 250, height: 280, maxHeight: 320, borderRadius: 10 },
+          isWebMode && width >= 480 && width < 768 && { minHeight: 320, height: 380, maxHeight: 420 },
+        ]}
+      >
         {/* Floating Mode indicator tag / Segmented Control (Upper-Left) */}
         {isWebMode ? (
           <View style={styles.floatingModeTag}>
@@ -2898,10 +2952,16 @@ export default function AiMotorcycleInstallStudio({
       <TouchableOpacity
         style={[
           styles.generatePrimaryBtn,
-          (!readyToGenerate || isGenerationBlocked || loading) && styles.generatePrimaryBtnDisabled,
+          (!readyToGenerate || loading) && styles.generatePrimaryBtnDisabled,
         ]}
-        onPress={() => handleGenerate()}
-        disabled={!readyToGenerate || isGenerationBlocked || loading}
+        onPress={() => {
+          if (isGenerationBlocked) {
+            setTokenLimitModalOpen(true);
+            return;
+          }
+          handleGenerate();
+        }}
+        disabled={!readyToGenerate || loading}
         activeOpacity={0.88}
         accessibilityRole="button"
         accessibilityLabel="Generate AI Installation Preview"
@@ -2914,15 +2974,11 @@ export default function AiMotorcycleInstallStudio({
         <Text
           style={[
             styles.generatePrimaryBtnText,
-            (!readyToGenerate || isGenerationBlocked || loading) && styles.generatePrimaryBtnTextDisabled,
+            (!readyToGenerate || loading) && styles.generatePrimaryBtnTextDisabled,
           ]}
         >
           {loading
             ? 'Generating Preview...'
-            : isConsecutiveCooldown
-            ? `Cooldown (${cooldownCountdown || 'wait'})`
-            : isWeeklyLimitReached
-            ? 'Weekly Limit Reached (3 / 3)'
             : 'Generate Preview'}
         </Text>
       </TouchableOpacity>
@@ -3020,19 +3076,10 @@ export default function AiMotorcycleInstallStudio({
         </View>
       ) : null}
 
-      {/* 7. Preview Usage & Additional Actions Row */}
-      <View style={styles.auxiliarySection}>
-        <View style={styles.usageIndicator}>
-          {aiUsage.isAdmin ? (
-            <Text style={styles.usageText}>⚡ Unlimited Previews (Admin)</Text>
-          ) : (
-            <Text style={styles.usageText}>
-              Previews: {aiUsage.weeklyUsed} / {aiUsage.weeklyLimit || 3} this week
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.auxiliaryActionsRow}>
+      {/* 7. Additional Actions Row (Hidden token counter per request) */}
+      {(canAddToCart || resultUri) ? (
+        <View style={styles.auxiliarySection}>
+          <View style={styles.auxiliaryActionsRow}>
           {canAddToCart ? (
             <TouchableOpacity style={styles.auxActionBtn} onPress={handleAddToCart} activeOpacity={0.85}>
               <BootstrapIcon name="cart3" size={14} color={BRAND} />
@@ -3065,6 +3112,7 @@ export default function AiMotorcycleInstallStudio({
           ) : null}
         </View>
       </View>
+      ) : null}
     </View>
   );
 
@@ -3075,7 +3123,7 @@ export default function AiMotorcycleInstallStudio({
   return (
     <InstallThemeContext.Provider value={{ styles, BRAND, MUTED, isDark: isDarkMode, isWeb: isWebMode }}>
       <View style={[styles.root, isDarkMode && { backgroundColor: '#12161E' }]}>
-        {isWebMode && isWide ? (
+        {isWide ? (
           <View style={styles.twoColumnWorkspace}>
             <View style={styles.leftColumn}>
               {selectionSidebar}
@@ -3084,15 +3132,8 @@ export default function AiMotorcycleInstallStudio({
               {previewWorkspace}
             </View>
           </View>
-        ) : isWebMode ? (
-          <View style={[styles.studioCardWrapper, { maxWidth: '100%' }]}>
-            <View style={{ gap: 20 }}>
-              {selectionSidebar}
-              {previewWorkspace}
-            </View>
-          </View>
         ) : (
-          <View style={styles.studioCardWrapper}>
+          <View style={[styles.studioCardWrapper, isWebMode && { maxWidth: '100%' }]}>
             {mobileTab === 'selection' ? selectionSidebar : previewWorkspace}
           </View>
         )}
@@ -3332,6 +3373,114 @@ export default function AiMotorcycleInstallStudio({
                   })}
                 </ScrollView>
               )}
+            </View>
+          </View>
+        </Modal>
+
+        {/* Token Exhausted / Cooldown Notification Modal */}
+        <Modal
+          visible={tokenLimitModalOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setTokenLimitModalOpen(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.tokenLimitSheet}>
+              <View style={styles.tokenLimitBody}>
+                {/* Header row with badge & close button */}
+                <View style={styles.tokenLimitHeader}>
+                  <View style={styles.tokenLimitBadgeWrap}>
+                    <BootstrapIcon
+                      name={isWeeklyLimitReached ? 'hourglass-split' : 'stopwatch'}
+                      size={24}
+                      color={BRAND}
+                    />
+                  </View>
+                  <TouchableOpacity
+                    style={styles.modalCloseBtn}
+                    onPress={() => setTokenLimitModalOpen(false)}
+                    activeOpacity={0.7}
+                    accessibilityLabel="Close token notification"
+                  >
+                    <BootstrapIcon name="x" size={22} color={MUTED} />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Title & description */}
+                <View style={{ gap: 4 }}>
+                  <Text style={styles.tokenLimitTitle}>
+                    {isWeeklyLimitReached
+                      ? 'AI Preview Tokens Exhausted'
+                      : 'Preview Cooldown Active'}
+                  </Text>
+                  <Text style={styles.tokenLimitSubtitle}>
+                    {isWeeklyLimitReached
+                      ? "You have utilized all allocated AI preview tokens for this weekly cycle. Generations are capped to ensure high-speed visual rendering for all riders."
+                      : 'You have generated multiple previews in quick succession. Please allow the AI studio a brief cooldown before rendering your next build.'}
+                  </Text>
+                </View>
+
+                {/* Reset Information Card */}
+                <View style={styles.tokenResetCard}>
+                  <View style={styles.tokenResetRow}>
+                    <View style={styles.tokenResetIcon}>
+                      <BootstrapIcon
+                        name={isWeeklyLimitReached ? 'calendar-check' : 'clock-history'}
+                        size={16}
+                        color={BRAND}
+                      />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.tokenResetLabel}>
+                        {isWeeklyLimitReached ? 'Tokens Automatically Reset' : 'Available Again In'}
+                      </Text>
+                      <Text style={styles.tokenResetValue}>
+                        {isWeeklyLimitReached
+                          ? formatTokenResetDisplay(nextResetDate)
+                          : cooldownCountdown || `${Math.ceil((aiUsage.remainingSeconds || 900) / 60)} minutes`}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.tokenInfoBullets}>
+                    <View style={styles.tokenInfoItem}>
+                      <BootstrapIcon name="check2-circle" size={14} color="#16A34A" style={{ marginTop: 2 }} />
+                      <Text style={styles.tokenInfoText}>
+                        <Text style={styles.tokenInfoBulletBold}>3 Free Previews Weekly:</Text> Fresh token allowances refresh every Monday at 12:00 AM UTC.
+                      </Text>
+                    </View>
+                    <View style={styles.tokenInfoItem}>
+                      <BootstrapIcon name="check2-circle" size={14} color="#16A34A" style={{ marginTop: 2 }} />
+                      <Text style={styles.tokenInfoText}>
+                        <Text style={styles.tokenInfoBulletBold}>Full Store Access:</Text> You can still browse products, verify fitment, and schedule garage installations.
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                {/* Action buttons */}
+                <View style={styles.tokenActionsRow}>
+                  {savedBuilds.length > 0 ? (
+                    <TouchableOpacity
+                      style={styles.tokenSecondaryBtn}
+                      onPress={() => {
+                        setTokenLimitModalOpen(false);
+                        setSavedBuildsModalOpen(true);
+                      }}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.tokenSecondaryBtnText}>View Saved Previews</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  <TouchableOpacity
+                    style={styles.tokenDismissBtn}
+                    onPress={() => setTokenLimitModalOpen(false)}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.tokenDismissBtnText}>Got It</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
             </View>
           </View>
         </Modal>
@@ -5589,6 +5738,142 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     floatingSelectNavBtnText: {
       color: BRAND,
       fontSize: 12.5,
+      fontWeight: '700',
+    },
+    // ─── TOKEN LIMIT NOTIFICATION MODAL STYLES ───
+    tokenLimitSheet: {
+      width: '100%',
+      maxWidth: 520,
+      backgroundColor: SURFACE,
+      borderRadius: 24,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+      ...Platform.select({
+        web: { boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.25)' },
+        default: { elevation: 6 },
+      }),
+    },
+    tokenLimitBody: {
+      padding: 24,
+      gap: 18,
+    },
+    tokenLimitBadgeWrap: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: isDark ? 'rgba(234, 88, 12, 0.18)' : '#FFF1ED',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(234, 88, 12, 0.35)' : '#FDBA74',
+    },
+    tokenLimitHeader: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+    },
+    tokenLimitTitle: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: INK,
+      letterSpacing: -0.3,
+      marginTop: 4,
+    },
+    tokenLimitSubtitle: {
+      fontSize: 13,
+      color: MUTED,
+      lineHeight: 19,
+      marginTop: 4,
+    },
+    tokenResetCard: {
+      backgroundColor: isDark ? '#1E2923' : '#F8FAFC',
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: isDark ? '#2D3A33' : '#E2E8F0',
+      padding: 16,
+      gap: 12,
+    },
+    tokenResetRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    tokenResetIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      backgroundColor: isDark ? '#27352D' : '#EDF2F7',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tokenResetLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: MUTED,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    tokenResetValue: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: INK,
+      marginTop: 1,
+    },
+    tokenResetSub: {
+      fontSize: 12,
+      color: BRAND,
+      fontWeight: '600',
+    },
+    tokenInfoBullets: {
+      gap: 8,
+    },
+    tokenInfoItem: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+    },
+    tokenInfoText: {
+      fontSize: 12.5,
+      color: MUTED,
+      flex: 1,
+      lineHeight: 17,
+    },
+    tokenInfoBulletBold: {
+      fontWeight: '700',
+      color: INK,
+    },
+    tokenActionsRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 4,
+    },
+    tokenDismissBtn: {
+      flex: 1,
+      backgroundColor: BRAND,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tokenDismissBtnText: {
+      color: '#FFFFFF',
+      fontSize: 13,
+      fontWeight: '700',
+    },
+    tokenSecondaryBtn: {
+      flex: 1,
+      backgroundColor: isDark ? '#222F29' : '#F1F5F9',
+      borderWidth: 1,
+      borderColor: isDark ? '#33443B' : '#CBD5E1',
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    tokenSecondaryBtnText: {
+      color: INK,
+      fontSize: 13,
       fontWeight: '700',
     },
   });

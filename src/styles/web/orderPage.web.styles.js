@@ -6,15 +6,15 @@ export const orderWebStyles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   headerWrapper: {
-    backgroundColor: '#24272B',
+    backgroundColor: '#1E2227',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.10)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     position: 'sticky',
     top: 0,
     zIndex: 1000,
-    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+    boxShadow: 'none',
     minHeight: 67,
   },
   headerInner: {

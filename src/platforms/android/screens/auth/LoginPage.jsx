@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import BaseLoginPage from '../../../../screens/mobile/auth/LoginPage.jsx';
-import { androidTokens } from '../../theme/index.js';
 
 /**
  * LoginPage (Android Native Implementation - Material Design 3)
@@ -21,6 +20,6 @@ export default function AndroidLoginPage(props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: androidTokens.colors.background,
+    backgroundColor: '#1E2227',
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,17 +8,22 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  Modal,
+  Pressable,
+  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { signUpPageStyles as styles } from '../../../styles/signUpPage.styles.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import BootstrapIcon from '../../../components/common/BootstrapIcon.jsx';
 
-export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavigateToStore }) {
-  const { validatePasswordStrength, sendSignupOtp, verifySignupOtp } = useAuth();
-
-  // Step 1 = Form & Password, Step 2 = 6-Digit OTP Verification
-  const [step, setStep] = useState(1);
+export default function SignUpPage({
+  onSignUpSuccess,
+  onLoginSuccess,
+  onNavigateToLogin,
+  onNavigateToStore,
+}) {
+  const { register } = useAuth();
 
   // Form Fields
   const [name, setName] = useState('');
@@ -27,83 +32,52 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
   const [address, setAddress] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Password visibility
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Field focus tracking
   const [focusedField, setFocusedField] = useState('');
 
-  // OTP State
-  const [otpDigits, setOtpDigits] = useState(['', '', '', '', '', '']);
-  const [resendTimer, setResendTimer] = useState(60);
-  const [canResend, setCanResend] = useState(false);
-  const otpInputRefs = useRef([]);
-
-  // UI state
+  // State feedback
   const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Dynamic Password Analysis
-  const passwordAnalysis = validatePasswordStrength
-    ? validatePasswordStrength(password)
-    : {
-        score: 0,
-        strength: 'weak',
-        label: 'Weak',
-        color: '#DC2626',
-        isStrong: false,
-        criteria: {
-          minLength: false,
-          hasUppercase: false,
-          hasLowercase: false,
-          hasNumber: false,
-          hasSpecial: false,
-        },
-        feedback: 'Password must be at least 8 characters with upper, lower, number, and special character.',
-      };
+  // Legal Modals
+  const [activeLegalModal, setActiveLegalModal] = useState(null); // 'terms' | 'privacy' | null
 
-  // Resend Countdown
-  useEffect(() => {
-    let interval = null;
-    if (step === 2 && resendTimer > 0) {
-      interval = setInterval(() => {
-        setResendTimer((prev) => {
-          if (prev <= 1) {
-            setCanResend(true);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [step, resendTimer]);
+  // Input refs for keyboard navigation
+  const emailRef = useRef(null);
+  const phoneRef = useRef(null);
+  const addressRef = useRef(null);
+  const passwordRef = useRef(null);
+  const confirmPasswordRef = useRef(null);
 
-  // ─── STEP 1: SEND OTP ───
-  const handleRequestOtp = async () => {
+  const handleSignUp = async () => {
+    if (isLoading) return;
     setErrorMessage('');
-    setSuccessMessage('');
 
+    // Validations
     if (!name.trim()) {
       setErrorMessage('Please enter your full name.');
       return;
     }
-    if (!email.trim() || !email.includes('@')) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@') || !cleanEmail.includes('.')) {
       setErrorMessage('Please enter a valid email address.');
       return;
     }
-    if (!phone.trim()) {
-      setErrorMessage('Please enter your contact phone number.');
+    if (!phone.trim() || phone.trim().length < 7) {
+      setErrorMessage('Please enter a valid contact phone number.');
       return;
     }
-    if (!address.trim()) {
-      setErrorMessage('Please enter your delivery address.');
+    if (!address.trim() || address.trim().length < 5) {
+      setErrorMessage('Please enter your complete delivery address.');
       return;
     }
-    if (!passwordAnalysis.isStrong) {
-      setErrorMessage(
-        passwordAnalysis.feedback || 'Please choose a strong password fulfilling all security requirements.'
-      );
+    if (!password || password.length < 6) {
+      setErrorMessage('Password must be at least 6 characters long.');
       return;
     }
     if (password !== confirmPassword) {
@@ -112,494 +86,457 @@ export default function SignUpPage({ onSignUpSuccess, onNavigateToLogin, onNavig
     }
 
     setIsLoading(true);
-    const res = await sendSignupOtp({
-      email: email.trim(),
-      name: name.trim(),
-    });
-    setIsLoading(false);
-
-    if (!res.success) {
-      setErrorMessage(res.error || 'Failed to send OTP code.');
-      return;
-    }
-
-    setStep(2);
-    setResendTimer(60);
-    setCanResend(false);
-    setOtpDigits(['', '', '', '', '', '']);
-    setSuccessMessage(`Verification code sent to ${email.trim()}. Please check your Gmail.`);
-  };
-
-  // ─── RESEND OTP ───
-  const handleResendOtp = async () => {
-    if (!canResend) return;
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    setIsLoading(true);
-    const res = await sendSignupOtp({
-      email: email.trim(),
-      name: name.trim(),
-    });
-    setIsLoading(false);
-
-    if (res.success) {
-      setResendTimer(60);
-      setCanResend(false);
-      setSuccessMessage(`New code sent to ${email.trim()}. Please check your Gmail.`);
-    } else {
-      setErrorMessage(res.error || 'Failed to resend OTP.');
-    }
-  };
-
-  // ─── OTP DIGIT INPUT ───
-  const handleOtpChange = (text, index) => {
-    const cleanText = text.replace(/[^0-9]/g, '');
-    const newDigits = [...otpDigits];
-
-    if (cleanText.length > 1) {
-      const pasted = cleanText.slice(0, 6).split('');
-      for (let i = 0; i < 6; i++) {
-        newDigits[i] = pasted[i] || '';
-      }
-      setOtpDigits(newDigits);
-      if (otpInputRefs.current[5]) {
-        otpInputRefs.current[5].focus();
-      }
-      return;
-    }
-
-    newDigits[index] = cleanText;
-    setOtpDigits(newDigits);
-
-    if (cleanText && index < 5 && otpInputRefs.current[index + 1]) {
-      otpInputRefs.current[index + 1].focus();
-    }
-  };
-
-  const handleOtpKeyPress = (e, index) => {
-    if (e.nativeEvent.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      if (otpInputRefs.current[index - 1]) {
-        otpInputRefs.current[index - 1].focus();
-      }
-    }
-  };
-
-  // ─── STEP 2: VERIFY OTP & CREATE ACCOUNT IN SUPABASE ───
-  const handleVerifyOtpAndCreate = async () => {
-    setErrorMessage('');
-    const fullOtp = otpDigits.join('');
-
-    if (fullOtp.length < 6) {
-      setErrorMessage('Please enter the 6-digit verification code.');
-      return;
-    }
-
-    setIsLoading(true);
-    const res = await verifySignupOtp({
-      email: email.trim(),
-      otp: fullOtp,
-      registrationData: {
+    try {
+      const res = await register({
         name: name.trim(),
-        email: email.trim(),
+        email: cleanEmail,
         phone: phone.trim(),
         address: address.trim(),
         password: password,
         isAdmin: false,
-      },
-    });
-    setIsLoading(false);
+      });
 
-    if (!res.success) {
-      setErrorMessage(res.error || 'Verification failed. Please check the code.');
-      return;
+      if (res.success && res.user) {
+        if (onSignUpSuccess) {
+          onSignUpSuccess(res.user);
+        } else if (onLoginSuccess) {
+          onLoginSuccess(res.user);
+        }
+      } else {
+        setErrorMessage(res.error || 'Failed to create account. Please try again.');
+      }
+    } catch (err) {
+      setErrorMessage('An unexpected error occurred: ' + (err.message || 'Please try again.'));
+    } finally {
+      setIsLoading(false);
     }
-
-    onSignUpSuccess?.(res.user);
   };
 
   return (
     <View style={styles.container}>
       <StatusBar style="light" translucent backgroundColor="transparent" />
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.innerContainer}>
-          {/* ─── TOP TEAL HEADER SECTION ─── */}
-          <View style={styles.topHeroSection}>
-            <View style={styles.abstractOrganicShape}>
-              <View style={styles.abstractOrganicShapeInner} />
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* ─── 1. DARK CHARCOAL HEADER SECTION ─── */}
+          <View style={styles.topHeaderSection}>
+            {/* Minimal circular wheel-inspired orange graphic */}
+            <View style={styles.wheelGraphicWrap}>
+              <View style={styles.wheelOuterRing} />
             </View>
+
+            {/* Compact Top Navigation (Shop & Guest) */}
+            <View style={styles.topNavRow}>
+              <TouchableOpacity
+                style={styles.navLink}
+                onPress={onNavigateToStore}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel="Return to Shop"
+              >
+                <BootstrapIcon name="chevron-left" size={13} color="#94A3B8" />
+                <Text style={styles.navLinkText}>Shop</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.navLink}
+                onPress={onNavigateToStore}
+                activeOpacity={0.7}
+                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                accessibilityRole="button"
+                accessibilityLabel="Browse as Guest"
+              >
+                <Text style={styles.navLinkText}>Guest</Text>
+                <BootstrapIcon name="chevron-right" size={13} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Bold, clean header titles */}
+            <Text style={styles.headerTitle}>Join the ride.</Text>
+            <Text style={styles.headerSubtitle}>Motorparts made simple.</Text>
           </View>
 
-          {/* ─── WHITE CARD CONTAINER SHEET ─── */}
+          {/* ─── 2. WHITE BOTTOM SHEET WITH SOFTLY ROUNDED TOP CORNERS ─── */}
           <View style={styles.whiteCardSheet}>
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ flexGrow: 1 }}
-              keyboardShouldPersistTaps="handled"
+            {/* Compact Back to login link */}
+            <TouchableOpacity
+              style={styles.sheetBackRow}
+              onPress={onNavigateToLogin}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              accessibilityRole="button"
+              accessibilityLabel="Back to login"
             >
-              {step === 1 ? (
-                // ─── STEP 1: REGISTRATION FORM ───
-                <>
-                  <TouchableOpacity
-                    style={styles.backLinkRow}
-                    onPress={onNavigateToLogin}
-                    activeOpacity={0.8}
-                  >
-                    <BootstrapIcon name="arrow-left" size={14} color="#EA580C" />
-                    <Text style={styles.backLinkText}>Back to login</Text>
-                  </TouchableOpacity>
+              <BootstrapIcon name="chevron-left" size={13} color="#64748B" />
+              <Text style={styles.sheetBackText}>Back to login</Text>
+            </TouchableOpacity>
 
-                  <Text style={styles.cardTitle}>Sign Up</Text>
-                  <Text style={styles.cardSubtitle}>
-                    Create your rider profile with strong password security
-                  </Text>
+            <Text style={styles.sheetTitle}>Sign up</Text>
+            <Text style={styles.sheetSubtitle}>Create your rider profile.</Text>
 
-                  {errorMessage ? (
-                    <View style={styles.errorBanner}>
-                      <BootstrapIcon name="info-circle" size={14} color="#DC2626" />
-                      <Text style={styles.errorBannerText}>{errorMessage}</Text>
-                    </View>
-                  ) : null}
+            {/* Error Banner */}
+            {errorMessage ? (
+              <View style={styles.errorBanner} accessibilityRole="alert">
+                <BootstrapIcon name="info-circle" size={15} color="#DC2626" />
+                <Text style={styles.errorBannerText}>{errorMessage}</Text>
+              </View>
+            ) : null}
 
-                  {/* 1. Full Name */}
-                  <View style={styles.inputGroup}>
-                    <View style={[styles.inputPill, focusedField === 'name' && styles.inputPillFocused]}>
-                      <BootstrapIcon name="person" size={17} color="#94A3B8" />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="Full Name"
-                        placeholderTextColor="#94A3B8"
-                        value={name}
-                        onChangeText={(t) => {
-                          setName(t);
-                          if (errorMessage) setErrorMessage('');
-                        }}
-                        onFocus={() => setFocusedField('name')}
-                        onBlur={() => setFocusedField('')}
-                      />
-                    </View>
-                  </View>
+            {/* 1. Full Name */}
+            <View style={styles.inputGroup}>
+              <View
+                style={[
+                  styles.inputPill,
+                  focusedField === 'name' && styles.inputPillFocused,
+                ]}
+              >
+                <BootstrapIcon
+                  name="person"
+                  size={16}
+                  color={focusedField === 'name' ? '#EA580C' : '#94A3B8'}
+                />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Full name"
+                  placeholderTextColor="#94A3B8"
+                  value={name}
+                  onChangeText={(t) => {
+                    setName(t);
+                    if (errorMessage) setErrorMessage('');
+                  }}
+                  onFocus={() => setFocusedField('name')}
+                  onBlur={() => setFocusedField('')}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => emailRef.current?.focus()}
+                  accessibilityLabel="Full name"
+                />
+              </View>
+            </View>
 
-                  {/* 2. Email */}
-                  <View style={styles.inputGroup}>
-                    <View style={[styles.inputPill, focusedField === 'email' && styles.inputPillFocused]}>
-                      <BootstrapIcon name="envelope" size={17} color="#94A3B8" />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="Email Address"
-                        placeholderTextColor="#94A3B8"
-                        value={email}
-                        onChangeText={(t) => {
-                          setEmail(t);
-                          if (errorMessage) setErrorMessage('');
-                        }}
-                        autoCapitalize="none"
-                        keyboardType="email-address"
-                        onFocus={() => setFocusedField('email')}
-                        onBlur={() => setFocusedField('')}
-                      />
-                    </View>
-                  </View>
+            {/* 2. Email Address */}
+            <View style={styles.inputGroup}>
+              <View
+                style={[
+                  styles.inputPill,
+                  focusedField === 'email' && styles.inputPillFocused,
+                ]}
+              >
+                <BootstrapIcon
+                  name="envelope"
+                  size={16}
+                  color={focusedField === 'email' ? '#EA580C' : '#94A3B8'}
+                />
+                <TextInput
+                  ref={emailRef}
+                  style={styles.textInput}
+                  placeholder="Email address"
+                  placeholderTextColor="#94A3B8"
+                  value={email}
+                  onChangeText={(t) => {
+                    setEmail(t);
+                    if (errorMessage) setErrorMessage('');
+                  }}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onFocus={() => setFocusedField('email')}
+                  onBlur={() => setFocusedField('')}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => phoneRef.current?.focus()}
+                  accessibilityLabel="Email address"
+                />
+              </View>
+            </View>
 
-                  {/* 3. Phone */}
-                  <View style={styles.inputGroup}>
-                    <View style={[styles.inputPill, focusedField === 'phone' && styles.inputPillFocused]}>
-                      <BootstrapIcon name="phone" size={17} color="#94A3B8" />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="Phone Number (+63 917...)"
-                        placeholderTextColor="#94A3B8"
-                        value={phone}
-                        onChangeText={(t) => {
-                          setPhone(t);
-                          if (errorMessage) setErrorMessage('');
-                        }}
-                        keyboardType="phone-pad"
-                        onFocus={() => setFocusedField('phone')}
-                        onBlur={() => setFocusedField('')}
-                      />
-                    </View>
-                  </View>
+            {/* 3. Phone Number */}
+            <View style={styles.inputGroup}>
+              <View
+                style={[
+                  styles.inputPill,
+                  focusedField === 'phone' && styles.inputPillFocused,
+                ]}
+              >
+                <BootstrapIcon
+                  name="telephone"
+                  size={16}
+                  color={focusedField === 'phone' ? '#EA580C' : '#94A3B8'}
+                />
+                <TextInput
+                  ref={phoneRef}
+                  style={styles.textInput}
+                  placeholder="Phone number"
+                  placeholderTextColor="#94A3B8"
+                  value={phone}
+                  onChangeText={(t) => {
+                    setPhone(t);
+                    if (errorMessage) setErrorMessage('');
+                  }}
+                  keyboardType="phone-pad"
+                  onFocus={() => setFocusedField('phone')}
+                  onBlur={() => setFocusedField('')}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => addressRef.current?.focus()}
+                  accessibilityLabel="Phone number"
+                />
+              </View>
+            </View>
 
-                  {/* Delivery Address */}
-                  <View style={styles.inputGroup}>
-                    <View style={[styles.inputPill, focusedField === 'address' && styles.inputPillFocused]}>
-                      <BootstrapIcon name="geo-alt" size={17} color="#94A3B8" />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="Delivery Address (Street, City, Province)"
-                        placeholderTextColor="#94A3B8"
-                        value={address}
-                        onChangeText={(t) => {
-                          setAddress(t);
-                          if (errorMessage) setErrorMessage('');
-                        }}
-                        autoCapitalize="words"
-                        onFocus={() => setFocusedField('address')}
-                        onBlur={() => setFocusedField('')}
-                      />
-                    </View>
-                  </View>
+            {/* 4. Delivery Address */}
+            <View style={styles.inputGroup}>
+              <View
+                style={[
+                  styles.inputPill,
+                  focusedField === 'address' && styles.inputPillFocused,
+                ]}
+              >
+                <BootstrapIcon
+                  name="geo-alt"
+                  size={16}
+                  color={focusedField === 'address' ? '#EA580C' : '#94A3B8'}
+                />
+                <TextInput
+                  ref={addressRef}
+                  style={styles.textInput}
+                  placeholder="Delivery address"
+                  placeholderTextColor="#94A3B8"
+                  value={address}
+                  onChangeText={(t) => {
+                    setAddress(t);
+                    if (errorMessage) setErrorMessage('');
+                  }}
+                  autoCapitalize="words"
+                  onFocus={() => setFocusedField('address')}
+                  onBlur={() => setFocusedField('')}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => passwordRef.current?.focus()}
+                  accessibilityLabel="Delivery address"
+                />
+              </View>
+            </View>
 
-                  {/* 4. Password */}
-                  <View style={styles.inputGroup}>
-                    <View style={[styles.inputPill, focusedField === 'password' && styles.inputPillFocused]}>
-                      <BootstrapIcon name="lock" size={17} color="#94A3B8" />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="Password"
-                        placeholderTextColor="#94A3B8"
-                        value={password}
-                        onChangeText={(t) => {
-                          setPassword(t);
-                          if (errorMessage) setErrorMessage('');
-                        }}
-                        secureTextEntry={!showPassword}
-                        onFocus={() => setFocusedField('password')}
-                        onBlur={() => setFocusedField('')}
-                      />
-                      <TouchableOpacity
-                        onPress={() => setShowPassword(!showPassword)}
-                        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                      >
-                        <BootstrapIcon name={showPassword ? 'eye-slash' : 'eye'} size={16} color="#94A3B8" />
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+            {/* 5. Password */}
+            <View style={styles.inputGroup}>
+              <View
+                style={[
+                  styles.inputPill,
+                  focusedField === 'password' && styles.inputPillFocused,
+                ]}
+              >
+                <BootstrapIcon
+                  name="lock"
+                  size={16}
+                  color={focusedField === 'password' ? '#EA580C' : '#94A3B8'}
+                />
+                <TextInput
+                  ref={passwordRef}
+                  style={styles.textInput}
+                  placeholder="Password"
+                  placeholderTextColor="#94A3B8"
+                  value={password}
+                  onChangeText={(t) => {
+                    setPassword(t);
+                    if (errorMessage) setErrorMessage('');
+                  }}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onFocus={() => setFocusedField('password')}
+                  onBlur={() => setFocusedField('')}
+                  returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => confirmPasswordRef.current?.focus()}
+                  accessibilityLabel="Password"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  <BootstrapIcon
+                    name={showPassword ? 'eye-slash' : 'eye'}
+                    size={16}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
 
-                  {/* Real-time Password Strength Meter */}
-                  {password.length > 0 && (
-                    <View style={styles.strengthMeterWrap}>
-                      <View style={styles.strengthHeaderRow}>
-                        <Text style={styles.strengthLabelText}>Password Security:</Text>
-                        <Text style={[styles.strengthBadgeText, { color: passwordAnalysis.color }]}>
-                          {passwordAnalysis.label} ({passwordAnalysis.score}%)
-                        </Text>
-                      </View>
+            {/* 6. Confirm Password */}
+            <View style={styles.inputGroup}>
+              <View
+                style={[
+                  styles.inputPill,
+                  focusedField === 'confirmPassword' && styles.inputPillFocused,
+                ]}
+              >
+                <BootstrapIcon
+                  name="lock"
+                  size={16}
+                  color={focusedField === 'confirmPassword' ? '#EA580C' : '#94A3B8'}
+                />
+                <TextInput
+                  ref={confirmPasswordRef}
+                  style={styles.textInput}
+                  placeholder="Confirm password"
+                  placeholderTextColor="#94A3B8"
+                  value={confirmPassword}
+                  onChangeText={(t) => {
+                    setConfirmPassword(t);
+                    if (errorMessage) setErrorMessage('');
+                  }}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  onFocus={() => setFocusedField('confirmPassword')}
+                  onBlur={() => setFocusedField('')}
+                  returnKeyType="go"
+                  onSubmitEditing={handleSignUp}
+                  accessibilityLabel="Confirm password"
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                >
+                  <BootstrapIcon
+                    name={showConfirmPassword ? 'eye-slash' : 'eye'}
+                    size={16}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
 
-                      <View style={styles.meterTrack}>
-                        <View
-                          style={[
-                            styles.meterFill,
-                            {
-                              width: `${passwordAnalysis.score}%`,
-                              backgroundColor: passwordAnalysis.color,
-                            },
-                          ]}
-                        />
-                      </View>
+            {/* Terms and Privacy policy notice */}
+            <Text style={styles.termsText}>
+              By continuing, you agree to the{' '}
+              <Text
+                style={styles.termsLink}
+                onPress={() => setActiveLegalModal('terms')}
+              >
+                Terms
+              </Text>{' '}
+              and{' '}
+              <Text
+                style={styles.termsLink}
+                onPress={() => setActiveLegalModal('privacy')}
+              >
+                Privacy Policy
+              </Text>
+              .
+            </Text>
 
-                      <View style={styles.criteriaGrid}>
-                        <View style={styles.criteriaItem}>
-                          <BootstrapIcon
-                            name={passwordAnalysis.criteria.minLength ? 'check-circle-fill' : 'circle'}
-                            size={11}
-                            color={passwordAnalysis.criteria.minLength ? '#10B981' : '#94A3B8'}
-                          />
-                          <Text
-                            style={[
-                              styles.criteriaText,
-                              passwordAnalysis.criteria.minLength && styles.criteriaTextActive,
-                            ]}
-                          >
-                            Minimum 8 characters
-                          </Text>
-                        </View>
-                        <View style={styles.criteriaItem}>
-                          <BootstrapIcon
-                            name={passwordAnalysis.criteria.hasUppercase ? 'check-circle-fill' : 'circle'}
-                            size={11}
-                            color={passwordAnalysis.criteria.hasUppercase ? '#10B981' : '#94A3B8'}
-                          />
-                          <Text
-                            style={[
-                              styles.criteriaText,
-                              passwordAnalysis.criteria.hasUppercase && styles.criteriaTextActive,
-                            ]}
-                          >
-                            Uppercase letter (A-Z)
-                          </Text>
-                        </View>
-                        <View style={styles.criteriaItem}>
-                          <BootstrapIcon
-                            name={passwordAnalysis.criteria.hasLowercase ? 'check-circle-fill' : 'circle'}
-                            size={11}
-                            color={passwordAnalysis.criteria.hasLowercase ? '#10B981' : '#94A3B8'}
-                          />
-                          <Text
-                            style={[
-                              styles.criteriaText,
-                              passwordAnalysis.criteria.hasLowercase && styles.criteriaTextActive,
-                            ]}
-                          >
-                            Lowercase letter (a-z)
-                          </Text>
-                        </View>
-                        <View style={styles.criteriaItem}>
-                          <BootstrapIcon
-                            name={passwordAnalysis.criteria.hasNumber ? 'check-circle-fill' : 'circle'}
-                            size={11}
-                            color={passwordAnalysis.criteria.hasNumber ? '#10B981' : '#94A3B8'}
-                          />
-                          <Text
-                            style={[
-                              styles.criteriaText,
-                              passwordAnalysis.criteria.hasNumber && styles.criteriaTextActive,
-                            ]}
-                          >
-                            Number (0-9)
-                          </Text>
-                        </View>
-                        <View style={styles.criteriaItem}>
-                          <BootstrapIcon
-                            name={passwordAnalysis.criteria.hasSpecial ? 'check-circle-fill' : 'circle'}
-                            size={11}
-                            color={passwordAnalysis.criteria.hasSpecial ? '#10B981' : '#94A3B8'}
-                          />
-                          <Text
-                            style={[
-                              styles.criteriaText,
-                              passwordAnalysis.criteria.hasSpecial && styles.criteriaTextActive,
-                            ]}
-                          >
-                            Special symbol (!@#$...)
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  )}
-
-                  {/* 5. Confirm Password */}
-                  <View style={styles.inputGroup}>
-                    <View
-                      style={[
-                        styles.inputPill,
-                        focusedField === 'confirmPassword' && styles.inputPillFocused,
-                      ]}
-                    >
-                      <BootstrapIcon name="lock-fill" size={17} color="#94A3B8" />
-                      <TextInput
-                        style={styles.textInput}
-                        placeholder="Confirm Password"
-                        placeholderTextColor="#94A3B8"
-                        value={confirmPassword}
-                        onChangeText={(t) => {
-                          setConfirmPassword(t);
-                          if (errorMessage) setErrorMessage('');
-                        }}
-                        secureTextEntry={!showPassword}
-                        onFocus={() => setFocusedField('confirmPassword')}
-                        onBlur={() => setFocusedField('')}
-                      />
-                      {confirmPassword.length > 0 && (
-                        <BootstrapIcon
-                          name={password === confirmPassword ? 'check-circle-fill' : 'x-circle-fill'}
-                          size={16}
-                          color={password === confirmPassword ? '#10B981' : '#DC2626'}
-                        />
-                      )}
-                    </View>
-                  </View>
-
-                  {/* Continue Button */}
-                  <TouchableOpacity
-                    style={[
-                      styles.primaryPillBtn,
-                      (!passwordAnalysis.isStrong || isLoading) && styles.primaryPillBtnDisabled,
-                    ]}
-                    onPress={handleRequestOtp}
-                    activeOpacity={0.9}
-                    disabled={!passwordAnalysis.isStrong || isLoading}
-                  >
-                    <Text style={styles.primaryPillBtnText}>
-                      {isLoading ? 'Sending Verification Code...' : 'Continue (Send OTP)'}
-                    </Text>
-                  </TouchableOpacity>
-                </>
+            {/* Single Full-Width Orange Primary Button */}
+            <TouchableOpacity
+              style={[styles.primaryBtn, isLoading && styles.primaryBtnDisabled]}
+              onPress={handleSignUp}
+              activeOpacity={0.85}
+              disabled={isLoading}
+              accessibilityRole="button"
+              accessibilityLabel="Sign up"
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                // ─── STEP 2: OTP VERIFICATION SCREEN ───
                 <>
-                  <TouchableOpacity style={styles.backLinkRow} onPress={() => setStep(1)} activeOpacity={0.8}>
-                    <BootstrapIcon name="arrow-left" size={14} color="#EA580C" />
-                    <Text style={styles.backLinkText}>Edit registration details</Text>
-                  </TouchableOpacity>
-
-                  <View style={styles.otpHeroBox}>
-                    <View style={styles.otpIconBadge}>
-                      <BootstrapIcon name="shield-lock-fill" size={28} color="#EA580C" />
-                    </View>
-                    <Text style={styles.otpTitle}>Verify Your Email</Text>
-                    <Text style={styles.otpSubtitle}>
-                      We sent a 6-digit verification code to{' '}
-                      <Text style={styles.otpTargetEmail}>{email}</Text>
-                    </Text>
-                  </View>
-
-                  {successMessage ? (
-                    <View style={styles.successBanner}>
-                      <BootstrapIcon name="check-circle" size={14} color="#065F46" />
-                      <Text style={styles.successBannerText}>{successMessage}</Text>
-                    </View>
-                  ) : null}
-
-                  {errorMessage ? (
-                    <View style={styles.errorBanner}>
-                      <BootstrapIcon name="info-circle" size={14} color="#DC2626" />
-                      <Text style={styles.errorBannerText}>{errorMessage}</Text>
-                    </View>
-                  ) : null}
-
-                  {/* 6 Digit Input Boxes */}
-                  <View style={styles.otpInputsRow}>
-                    {otpDigits.map((digit, idx) => (
-                      <TextInput
-                        key={idx}
-                        ref={(el) => (otpInputRefs.current[idx] = el)}
-                        style={[
-                          styles.otpDigitBox,
-                          digit ? styles.otpDigitBoxActive : null,
-                          styles.otpDigitText,
-                        ]}
-                        value={digit}
-                        onChangeText={(val) => handleOtpChange(val, idx)}
-                        onKeyPress={(e) => handleOtpKeyPress(e, idx)}
-                        keyboardType="number-pad"
-                        maxLength={6}
-                        selectTextOnFocus
-                      />
-                    ))}
-                  </View>
-
-                  {/* Verify & Create Account Button */}
-                  <TouchableOpacity
-                    style={styles.primaryPillBtn}
-                    onPress={handleVerifyOtpAndCreate}
-                    activeOpacity={0.9}
-                    disabled={isLoading}
-                  >
-                    <Text style={styles.primaryPillBtnText}>
-                      {isLoading ? 'Creating Account in Supabase...' : 'Verify & Create Account'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  {/* Resend Row */}
-                  <View style={styles.resendRow}>
-                    <Text style={styles.resendText}>Didn't receive code? </Text>
-                    {canResend ? (
-                      <TouchableOpacity onPress={handleResendOtp} activeOpacity={0.8}>
-                        <Text style={styles.resendBtnText}>Resend Code</Text>
-                      </TouchableOpacity>
-                    ) : (
-                      <Text style={styles.resendBtnText}>Resend in {resendTimer}s</Text>
-                    )}
+                  <Text style={styles.primaryBtnText}>Sign up</Text>
+                  <View style={styles.btnArrowBadge}>
+                    <BootstrapIcon name="chevron-right" size={12} color="#FFFFFF" />
                   </View>
                 </>
               )}
-            </ScrollView>
+            </TouchableOpacity>
+
+            {/* Footer Switch: Easy Switch between Login and Signup */}
+            <View style={styles.switchRow}>
+              <Text style={styles.switchText}>Already have an account? </Text>
+              <TouchableOpacity
+                onPress={onNavigateToLogin}
+                activeOpacity={0.7}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                accessibilityRole="button"
+                accessibilityLabel="Log in"
+              >
+                <Text style={styles.switchLink}>Log in</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
       <SafeAreaView style={{ flex: 0, backgroundColor: '#FFFFFF' }} />
+
+      {/* ─── TERMS & PRIVACY MODAL ─── */}
+      <Modal
+        visible={Boolean(activeLegalModal)}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setActiveLegalModal(null)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setActiveLegalModal(null)}
+        >
+          <Pressable
+            style={styles.modalSheet}
+            onPress={(e) => e?.stopPropagation?.()}
+          >
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitle}>
+                {activeLegalModal === 'terms' ? 'Terms of Service' : 'Privacy Policy'}
+              </Text>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={() => setActiveLegalModal(null)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {activeLegalModal === 'terms' ? (
+                <Text style={styles.modalBody}>
+                  Welcome to MotoTrack. By using our platform, you agree to provide accurate rider
+                  and vehicle information for part compatibility, safe maintenance scheduling, and
+                  reliable order fulfillment. All genuine parts are backed by our authenticity
+                  guarantee and standard return policies.
+                </Text>
+              ) : (
+                <Text style={styles.modalBody}>
+                  MotoTrack is committed to protecting your privacy. Your contact and delivery
+                  details are used exclusively for order processing, logistics coordination, and
+                  security alerts. We do not sell or distribute your personal information to third
+                  parties.
+                </Text>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={styles.primaryBtn}
+              onPress={() => setActiveLegalModal(null)}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.primaryBtnText}>Got it</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }

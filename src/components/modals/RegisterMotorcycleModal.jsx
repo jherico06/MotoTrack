@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Platform,
+  useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import {
@@ -24,6 +25,8 @@ export default function RegisterMotorcycleModal({
   onClose,
   onSave,
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768;
   const isEditing = Boolean(motorcycle && motorcycle.motorcycle_id);
 
   const [brand, setBrand] = useState('Yamaha');
@@ -148,10 +151,21 @@ export default function RegisterMotorcycleModal({
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <View
+        style={[
+          styles.overlay,
+          isDesktop ? styles.overlayDesktop : styles.overlayMobile,
+        ]}
+      >
         <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} />
 
-        <View style={[styles.card, { backgroundColor: bgModal, borderColor: borderCol }]}>
+        <View
+          style={[
+            styles.card,
+            isDesktop ? styles.cardDesktop : styles.cardMobile,
+            { backgroundColor: bgModal, borderColor: borderCol },
+          ]}
+        >
           <View style={styles.accentBar} />
 
           <View style={[styles.header, { borderBottomColor: borderCol }]}>
@@ -476,24 +490,28 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
-    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
-    padding: Platform.OS === 'web' ? 16 : 0,
     ...Platform.select({
       web: { backdropFilter: 'blur(6px)' },
     }),
+  },
+  overlayDesktop: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  overlayMobile: {
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
+    padding: 0,
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
   },
   card: {
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 560 : '100%',
-    maxHeight: '90%',
+    maxHeight: '92%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    borderBottomLeftRadius: Platform.OS === 'web' ? 24 : 0,
-    borderBottomRightRadius: Platform.OS === 'web' ? 24 : 0,
     borderWidth: 1,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -503,6 +521,21 @@ const styles = StyleSheet.create({
     elevation: 20,
     display: 'flex',
     flexDirection: 'column',
+  },
+  cardDesktop: {
+    maxWidth: 580,
+    borderRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    maxHeight: '88%',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 30,
+  },
+  cardMobile: {
+    maxWidth: '100%',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   accentBar: {
     height: 4,

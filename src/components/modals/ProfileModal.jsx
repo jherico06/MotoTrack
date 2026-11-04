@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { shopStyles as styles } from '../../styles/shop.styles.js';
@@ -37,6 +38,8 @@ export default function ProfileModal({
   onNavigateToAdmin,
   showToast = () => {},
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768;
   const { currentUser, updateProfile, changeEmail, changePassword, getAccountLogs, logout } = useAuth();
   const { wishlistCount } = useWishlist();
 
@@ -297,9 +300,35 @@ export default function ProfileModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalSheet, { maxHeight: '94%' }]}>
+    <Modal visible={visible} transparent animationType={isDesktop ? 'fade' : 'slide'} onRequestClose={onClose}>
+      <View
+        style={[
+          styles.modalOverlay,
+          isDesktop && {
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View
+          style={[
+            styles.modalSheet,
+            {
+              maxHeight: isDesktop ? '88%' : '94%',
+              maxWidth: isDesktop ? 620 : '100%',
+              borderRadius: isDesktop ? 24 : 28,
+              borderBottomLeftRadius: isDesktop ? 24 : 0,
+              borderBottomRightRadius: isDesktop ? 24 : 0,
+              paddingHorizontal: windowWidth < 380 ? 12 : 20,
+            },
+          ]}
+        >
           {/* ─── HEADER ─── */}
           <View style={styles.modalHeaderRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>

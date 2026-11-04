@@ -13,7 +13,7 @@ function computeVisibleXLabels(points, gW, isDesktop) {
   const total = points.length;
   if (total === 0) return new Set();
 
-  // On desktop with 16 or fewer points (such as the default 14-day daily telemetry)
+  // On desktop with 16 or fewer points (such as the default 7-day daily telemetry)
   // or when each point has ample width (>= 40px), show all labels without skipping any dates
   const stepW = gW / Math.max(1, total - 1);
   if ((isDesktop && total <= 16) || stepW >= 40) {
@@ -288,7 +288,7 @@ export default function RevenueTrendChart({
   const resolvedSubtitle =
     subtitle ||
     (activeGranularity === 'daily'
-      ? 'Daily telemetry (last 14 days)'
+      ? 'Daily telemetry (last 7 days)'
       : activeGranularity === 'weekly'
       ? 'Weekly telemetry (last 8 weeks)'
       : 'Monthly telemetry (last 6 months)');

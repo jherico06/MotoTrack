@@ -23,7 +23,7 @@ export const customizerWebStyles = StyleSheet.create({
 
   // ─── 1. FULL-WIDTH DESKTOP STICKY NAVBAR (MATCHING APP PALETTE) ───
   headerWrapper: {
-    backgroundColor: '#24272B',
+    backgroundColor: '#1E2227',
     backdropFilter: 'blur(16px)',
     WebkitBackdropFilter: 'blur(16px)',
     position: 'sticky',
@@ -33,9 +33,9 @@ export const customizerWebStyles = StyleSheet.create({
     width: '100%',
     alignSelf: 'stretch',
     zIndex: 1000,
-    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.25)',
+    boxShadow: 'none',
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.10)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
     minHeight: 67,
     transform: 'translateZ(0)',
     WebkitTransform: 'translateZ(0)',
@@ -52,6 +52,15 @@ export const customizerWebStyles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: 20,
+  },
+  mobileNavToggleBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    cursor: 'pointer',
   },
   logoWrap: {
     flexDirection: 'row',
@@ -88,13 +97,14 @@ export const customizerWebStyles = StyleSheet.create({
     letterSpacing: 1.2,
   },
   headerLeft: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
     gap: 16,
+    flexShrink: 0,
   },
   headerCenterNav: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -135,11 +145,11 @@ export const customizerWebStyles = StyleSheet.create({
     color: '#FF5A0A',
   },
   headerActions: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 12,
+    flexShrink: 0,
   },
   navActionIconBtn: {
     width: 38,
@@ -1559,7 +1569,7 @@ export const customizerWebStyles = StyleSheet.create({
     borderRadius: 24,
     width: '100%',
     maxWidth: 520,
-    padding: 24,
+    padding: 16,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     boxShadow: '0 20px 50px rgba(0,0,0,0.2)',

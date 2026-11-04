@@ -45,6 +45,7 @@
     box-sizing: border-box;
   }
   html, body, #root, #__next, [data-reactroot] {
+    background-color: #F3F4F6;
     font-family: var(--font-family-sans) !important;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -470,7 +471,7 @@ html.dark .mototrack-sidebar-skeleton .mototrack-skeleton-shimmer {
   transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease !important;
 }
 .garage-book-btn:hover {
-  background-color: #F8FAFC !important;
+  background-color: #181A1D !important;
   transform: translateY(-1px) !important;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24) !important;
 }
@@ -482,9 +483,9 @@ html.dark .mototrack-sidebar-skeleton .mototrack-skeleton-shimmer {
   transition: background-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease !important;
 }
 .garage-register-btn:hover {
-  background-color: #EA580C !important;
+  background-color: #181A1D !important;
   transform: translateY(-1px) !important;
-  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.35) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2) !important;
 }
 .garage-register-btn:active {
   transform: translateY(0px) !important;

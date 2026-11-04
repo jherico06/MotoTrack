@@ -567,8 +567,6 @@ export default function CustomerServiceBookingCard({
       await reload();
     });
 
-  if (!bookingId) return null;
-
   const renderDueTimePanel = (variant = 'full') => {
     if (!showDueTime) return null;
     const overdue = dueCountdown?.overdue || isPastDeadline(booking.payment_deadline);
@@ -671,13 +669,15 @@ export default function CustomerServiceBookingCard({
     );
   }, [booking, moto]);
 
+  if (!bookingId) return null;
+
   const renderExpandedContent = () => (
-    <View style={{ marginTop: 12, gap: 12, paddingTop: 4 }}>
+    <View style={{ marginTop: isModalView ? 0 : 12, gap: 12, paddingTop: isModalView ? 0 : 4 }}>
       {/* 1. Service Progress Workflow Flowchart */}
       <BookingWorkflowTracker progress={progress} status={status} />
 
       {/* 2. Booking Details (2-Column Grid Layout) */}
-      <Section title="Booking Details" icon="bookmark" defaultOpen={true}>
+      <Section title="Booking Details" icon="bookmark" defaultOpen={!isModalView}>
         <View style={styles.twoColumnGrid}>
           {/* Column 1 */}
           <View style={styles.gridColumn}>
@@ -1620,7 +1620,7 @@ export default function CustomerServiceBookingCard({
             >
               <View
                 style={[
-                  styles.statusDot,
+                  styles.gridStatusDot,
                   {
                     backgroundColor: statusConfig.dot,
                   },
@@ -1700,32 +1700,166 @@ export default function CustomerServiceBookingCard({
     );
   }
 
-  // ─── STANDARD CARD VIEW (OR MODAL DIALOG BODY) ───
-  const CardContainer = isModalView ? View : TouchableOpacity;
-  const containerProps = isModalView
-    ? {
-        style: [
-          styles.card,
-          {
-            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#FED7AA'),
-            backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
-          },
-          style,
-        ],
-      }
-    : {
-        style: [
-          styles.card,
-          {
-            borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#FED7AA'),
-            backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
-            cursor: 'pointer',
-          },
-          style,
-        ],
-        onPress: handleCardPress,
-        activeOpacity: 0.92,
-      };
+  // ─── DEDICATED MODAL VIEW (CLEAN, FOCUSED RECEIPT & WORKFLOW) ───
+  if (isModalView) {
+    return (
+      <View style={styles.modalBodyContainer}>
+        {/* 1. Overview Summary Card */}
+        <View style={[styles.modalOverviewCard, isDarkMode && { backgroundColor: '#181E1B', borderColor: '#26332E' }]}>
+          {/* Header Row: Title, Price & Status */}
+          <View style={styles.modalOverviewHeader}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={[styles.modalServiceTitle, isDarkMode && { color: '#F1F5F9' }]}>
+                {booking?.service_title || booking?.package_name || 'Service Booking'}
+              </Text>
+              <Text style={[styles.modalServiceSub, isDarkMode && { color: '#94A3B8' }]}>
+                {booking?.cc_category_name ? `${booking.cc_category_name} Engine Displacement • ` : ''}
+                {booking?.service_type || 'Preventive Maintenance Service'}
+              </Text>
+            </View>
+
+            <View style={{ alignItems: 'flex-end', gap: 6 }}>
+              {finalTotal > 0 ? (
+                <Text style={[styles.modalPriceText, isDarkMode && { color: '#EA580C' }]}>
+                  {formatPhp(finalTotal)}
+                </Text>
+              ) : null}
+              <View
+                style={[
+                  styles.statusPill,
+                  {
+                    backgroundColor: semanticColors.bg,
+                    borderColor: semanticColors.border,
+                  },
+                ]}
+              >
+                <View style={[styles.statusDot, { backgroundColor: semanticColors.fg }]} />
+                <Text style={[styles.statusText, { color: semanticColors.fg }]}>
+                  {customerStatusLabel(status)}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Divider */}
+          <View style={[styles.modalCardDivider, isDarkMode && { backgroundColor: '#26332E' }]} />
+
+          {/* Key Details Grid */}
+          <View style={styles.modalKeyDetailsGrid}>
+            <View style={[styles.modalKeyDetailItem, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
+              <View style={[styles.modalIconBox, isDarkMode && { backgroundColor: '#26332E' }]}>
+                <BootstrapIcon name="bicycle" size={14} color="#EA580C" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalKeyDetailLabel}>MOTORCYCLE</Text>
+                <Text style={[styles.modalKeyDetailValue, isDarkMode && { color: '#F1F5F9' }]} numberOfLines={1}>
+                  {bikeLabel || 'Registered Bike'}
+                </Text>
+                {plate ? (
+                  <Text style={styles.modalKeyDetailSub}>Plate: {plate}</Text>
+                ) : null}
+              </View>
+            </View>
+
+            <View style={[styles.modalKeyDetailItem, isDarkMode && { backgroundColor: '#1C2622', borderColor: '#26332E' }]}>
+              <View style={[styles.modalIconBox, isDarkMode && { backgroundColor: '#26332E' }]}>
+                <BootstrapIcon name="calendar-event" size={14} color="#EA580C" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.modalKeyDetailLabel}>APPOINTMENT SCHEDULE</Text>
+                <Text style={[styles.modalKeyDetailValue, isDarkMode && { color: '#F1F5F9' }]}>
+                  {fmtDate(booking?.preferred_date || booking?.appointment_date)}
+                </Text>
+                <Text style={styles.modalKeyDetailSub}>
+                  {booking?.preferred_time || booking?.time_slot || 'Standard Hours'}
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* Single Consolidated Status Notice */}
+          {status === FLEX_BOOKING_STATUS.PENDING_REVIEW ? (
+            <View style={[styles.modalNoticeBox, isDarkMode && { backgroundColor: '#132A1E', borderColor: '#1B4D36' }]}>
+              <View style={{ marginTop: 2 }}>
+                <BootstrapIcon name="info-circle-fill" size={15} color="#059669" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalNoticeTitle, isDarkMode && { color: '#34D399' }]}>
+                  Request Submitted for Admin Review
+                </Text>
+                <Text style={[styles.modalNoticeBody, isDarkMode && { color: '#A7F3D0' }]}>
+                  Our shop team will review your requested schedule and parts availability. Once approved, you will receive a notification to review your quotation and pay the downpayment. No payment is required yet.
+                </Text>
+              </View>
+            </View>
+          ) : showDueTime ? (
+            renderDueTimePanel('full')
+          ) : booking?.current_stage ? (
+            <View style={[styles.modalNoticeBox, isDarkMode && { backgroundColor: '#132A1E', borderColor: '#1B4D36' }]}>
+              <View style={{ marginTop: 2 }}>
+                <BootstrapIcon name="info-circle-fill" size={15} color="#059669" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.modalNoticeTitle, isDarkMode && { color: '#34D399' }]}>
+                  Current Status
+                </Text>
+                <Text style={[styles.modalNoticeBody, isDarkMode && { color: '#A7F3D0' }]}>
+                  {booking.current_stage}
+                </Text>
+              </View>
+            </View>
+          ) : null}
+
+          {status === FLEX_BOOKING_STATUS.NEEDS_INFORMATION || booking?.info_request_notes ? (
+            <View style={styles.warnBox}>
+              <Text style={styles.warnTitle}>Shop needs more info</Text>
+              <Text style={styles.noteText}>{booking.info_request_notes}</Text>
+              {status === FLEX_BOOKING_STATUS.NEEDS_INFORMATION ? (
+                <View style={{ marginTop: 8, gap: 8 }}>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Type your reply…"
+                    value={infoReply}
+                    onChangeText={setInfoReply}
+                    multiline
+                  />
+                  <TouchableOpacity
+                    style={styles.btnAccept}
+                    onPress={(e) => {
+                      e?.stopPropagation?.();
+                      submitInfoReply();
+                    }}
+                    disabled={busy}
+                  >
+                    <Text style={styles.btnAcceptText}>Submit Information</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+
+        {/* 2. Expanded Content: Workflow Tracker + Accordions */}
+        {renderExpandedContent()}
+      </View>
+    );
+  }
+
+  // ─── STANDARD CARD VIEW (MAIN GARAGE LIST/GRID) ───
+  const CardContainer = TouchableOpacity;
+  const containerProps = {
+    style: [
+      styles.card,
+      {
+        borderColor: isDarkMode ? '#26332E' : (semanticColors.border || '#FED7AA'),
+        backgroundColor: isDarkMode ? '#151C19' : '#FFFFFF',
+        cursor: 'pointer',
+      },
+      style,
+    ],
+    onPress: handleCardPress,
+    activeOpacity: 0.92,
+  };
 
   return (
     <CardContainer {...containerProps}>
@@ -1953,7 +2087,7 @@ const styles = StyleSheet.create({
   },
   listColLeft: {
     flex: 1,
-    minWidth: 240,
+    minWidth: 160,
     gap: 6,
   },
   listRefRow: {
@@ -1986,7 +2120,7 @@ const styles = StyleSheet.create({
     color: '#334155',
   },
   listColCenter: {
-    minWidth: 180,
+    minWidth: 140,
     gap: 6,
     justifyContent: 'center',
   },
@@ -2030,7 +2164,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   listColRight: {
-    minWidth: 170,
+    minWidth: 130,
     alignItems: 'flex-end',
     gap: 8,
     justifyContent: 'center',
@@ -2474,7 +2608,7 @@ const styles = StyleSheet.create({
   },
   gridColumn: {
     flex: 1,
-    minWidth: 220,
+    minWidth: 160,
     gap: 10,
   },
   gridKvCell: {
@@ -2976,7 +3110,7 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 4,
   },
-  statusDot: {
+  gridStatusDot: {
     width: 7.5,
     height: 7.5,
     borderRadius: 4,
@@ -3072,5 +3206,121 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: 'rgba(255, 255, 255, 0.45)',
     textDecorationLine: 'underline',
+  },
+
+  // ─── DEDICATED MODAL STYLES ───
+  modalBodyContainer: {
+    width: '100%',
+    gap: 16,
+  },
+  modalOverviewCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 8,
+    elevation: 1,
+    gap: 16,
+    marginBottom: 4,
+  },
+  modalOverviewHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  modalServiceTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.3,
+  },
+  modalServiceSub: {
+    fontSize: 12.5,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 3,
+  },
+  modalPriceText: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#EA580C',
+    fontVariant: ['tabular-nums'],
+    letterSpacing: -0.3,
+  },
+  modalCardDivider: {
+    height: 1,
+    backgroundColor: '#F1F5F9',
+    width: '100%',
+  },
+  modalKeyDetailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+  },
+  modalKeyDetailItem: {
+    flex: 1,
+    minWidth: 200,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    backgroundColor: '#F8FAFC',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+  },
+  modalIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  modalKeyDetailLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  modalKeyDetailValue: {
+    fontSize: 13.5,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginTop: 1,
+  },
+  modalKeyDetailSub: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  modalNoticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    borderRadius: 12,
+    padding: 14,
+  },
+  modalNoticeTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#065F46',
+    marginBottom: 2,
+  },
+  modalNoticeBody: {
+    fontSize: 12.5,
+    color: '#047857',
+    lineHeight: 18,
   },
 });

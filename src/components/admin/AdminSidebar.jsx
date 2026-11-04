@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,9 @@ import {
   ScrollView,
   Platform,
   Image,
+  Animated,
+  Easing,
+  StyleSheet,
 } from 'react-native';
 import { BootstrapIcon, BrandLogo, Skeleton } from '../common';
 import { useAuth } from '../../context/AuthContext.jsx';
@@ -65,6 +68,88 @@ export default function AdminSidebar({
   const [isProfileHovered, setIsProfileHovered] = useState(false);
   const [avatarLoadError, setAvatarLoadError] = useState(false);
 
+  // ─── Mobile Drawer Smooth Slide & Fade Animation State ───
+  const [isMobileRendered, setIsMobileRendered] = useState(isMobileOpen);
+  const slideAnim = useRef(new Animated.Value(isMobileOpen ? 1 : 0)).current;
+  const fadeAnim = useRef(new Animated.Value(isMobileOpen ? 1 : 0)).current;
+  const isClosingRef = useRef(false);
+
+  // Prevent background scrolling while the mobile drawer is open on web
+  useEffect(() => {
+    if (isMobile && Platform.OS === 'web' && typeof document !== 'undefined') {
+      if (isMobileRendered) {
+        const originalOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return () => {
+          document.body.style.overflow = originalOverflow;
+        };
+      }
+    }
+  }, [isMobile, isMobileRendered]);
+
+  const handleCloseMobileWithAnimation = useCallback((callback) => {
+    if (isClosingRef.current) return;
+    isClosingRef.current = true;
+    slideAnim.stopAnimation();
+    fadeAnim.stopAnimation();
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 240,
+        easing: Easing.bezier(0.4, 0, 0.2, 1),
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 240,
+        useNativeDriver: Platform.OS !== 'web',
+      }),
+    ]).start(() => {
+      isClosingRef.current = false;
+      setIsMobileRendered(false);
+      onCloseMobile?.();
+      if (typeof callback === 'function') {
+        callback();
+      }
+    });
+  }, [slideAnim, fadeAnim, onCloseMobile]);
+
+  useEffect(() => {
+    if (!isMobile) return;
+
+    if (isMobileOpen) {
+      isClosingRef.current = false;
+      setIsMobileRendered(true);
+      slideAnim.stopAnimation();
+      fadeAnim.stopAnimation();
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.bezier(0.16, 1, 0.3, 1), // Premium easeOut spring effect
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: Platform.OS !== 'web',
+        }),
+      ]).start();
+    } else if (isMobileRendered && !isClosingRef.current) {
+      handleCloseMobileWithAnimation();
+    }
+  }, [isMobile, isMobileOpen, isMobileRendered, slideAnim, fadeAnim, handleCloseMobileWithAnimation]);
+
+  const drawerTranslateX = slideAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-290, 0],
+  });
+
+  const backdropOpacity = fadeAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 1],
+  });
+
   const auth = useAuth?.();
   const activeUser = currentUser || auth?.currentUser;
   const userAvatarUri = useMemo(() => {
@@ -104,8 +189,8 @@ export default function AdminSidebar({
       activeIcon: '#EA580C', // Orange icon when active
       activeText: '#FFFFFF',
       textPrimary: '#FFFFFF',
-      textSecondary: '#FFFFFF', // White icons and text for inactive navigation items
-      sectionLabel: '#9CA3AF', // Muted section label
+      textSecondary: '#9CA3AF', // Muted gray icons and text for inactive navigation items (turns #FFFFFF on hover)
+      sectionLabel: '#6B7280', // Subtle muted section label
       hoverBg: 'rgba(255, 255, 255, 0.08)',
       profileBg: 'rgba(255, 255, 255, 0.08)',
       profileHoverBg: 'rgba(255, 255, 255, 0.14)',
@@ -211,9 +296,14 @@ export default function AdminSidebar({
         {
           id: 'garage',
           label: 'Bookings',
-          icon: 'tools',
+          icon: 'calendar2-check-fill',
           needsAttention: garageBookings.some((b) => b.status === 'pending' || b.status === 'Pending' || b.status === 'waiting'),
           attentionTitle: 'Pending service bookings',
+        },
+        {
+          id: 'services',
+          label: 'Service Packages',
+          icon: 'tools',
         },
         {
           id: 'mechanics',
@@ -297,7 +387,7 @@ export default function AdminSidebar({
       setActiveNav(item.id);
     }
     if (isMobile) {
-      onCloseMobile?.();
+      handleCloseMobileWithAnimation();
     }
   };
 
@@ -343,7 +433,7 @@ export default function AdminSidebar({
               {isMobile ? (
                 /* Mobile Close Drawer Button */
                 <TouchableOpacity
-                  onPress={onCloseMobile}
+                  onPress={() => handleCloseMobileWithAnimation()}
                   style={{
                     width: 30,
                     height: 30,
@@ -509,7 +599,7 @@ export default function AdminSidebar({
               setActiveNav('profile');
             }
             if (isMobile) {
-              onCloseMobile?.();
+              handleCloseMobileWithAnimation();
             }
           }}
           onMouseEnter={() => setIsProfileHovered(true)}
@@ -608,9 +698,9 @@ export default function AdminSidebar({
     </View>
   );
 
-  // ─── 4A. MOBILE DRAWER RENDERING (Slide-out Drawer with Backdrop) ───
+  // ─── 4A. MOBILE DRAWER RENDERING (Smooth Slide-out Drawer with Backdrop) ───
   if (isMobile) {
-    if (!isMobileOpen) return null;
+    if (!isMobileRendered && !isMobileOpen) return null;
 
     return (
       <View
@@ -624,8 +714,8 @@ export default function AdminSidebar({
           flexDirection: 'row',
         }}
       >
-        {/* Backdrop Overlay */}
-        <TouchableOpacity
+        {/* Animated Fade Backdrop Overlay */}
+        <Animated.View
           style={{
             position: 'absolute',
             top: 0,
@@ -633,15 +723,20 @@ export default function AdminSidebar({
             right: 0,
             bottom: 0,
             backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            ...(Platform.OS === 'web' ? { backdropFilter: 'blur(3px)' } : {}),
+            opacity: backdropOpacity,
+            ...(Platform.OS === 'web' ? { backdropFilter: 'blur(4px)' } : {}),
           }}
-          onPress={onCloseMobile}
-          activeOpacity={1}
-          accessibilityLabel="Close Navigation Drawer"
-        />
+        >
+          <TouchableOpacity
+            style={StyleSheet.absoluteFill}
+            onPress={() => handleCloseMobileWithAnimation()}
+            activeOpacity={1}
+            accessibilityLabel="Close Navigation Drawer"
+          />
+        </Animated.View>
 
-        {/* Drawer Content Surface */}
-        <View
+        {/* Animated Slide Drawer Content Surface */}
+        <Animated.View
           style={{
             width: 270,
             maxWidth: '85%',
@@ -654,12 +749,14 @@ export default function AdminSidebar({
             paddingTop: 16,
             paddingBottom: 14,
             boxShadow: '4px 0 24px rgba(0, 0, 0, 0.35)',
+            transform: [{ translateX: drawerTranslateX }],
+            ...(Platform.OS === 'web' ? { willChange: 'transform' } : {}),
           }}
           role="navigation"
           aria-label="Admin Navigation Drawer"
         >
           {sidebarContent}
-        </View>
+        </Animated.View>
       </View>
     );
   }
@@ -685,7 +782,7 @@ export default function AdminSidebar({
         flexDirection: 'column',
         justifyContent: 'space-between',
         zIndex: 100,
-        transition: 'width 200ms cubic-bezier(0.4, 0, 0.2, 1), padding 200ms cubic-bezier(0.4, 0, 0.2, 1)',
+        transition: 'width 250ms cubic-bezier(0.16, 1, 0.3, 1), padding 250ms cubic-bezier(0.16, 1, 0.3, 1)',
       }}
       role="navigation"
       aria-label="Admin Navigation"

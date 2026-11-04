@@ -26,6 +26,7 @@ import {
   UserProfileDropdown,
   UserProfileButton,
   BrandLogo,
+  HeaderSearchWidget,
   NotificationDropdown,
   CustomerMobileNavDrawer,
 } from '../../../components/common';
@@ -56,6 +57,7 @@ export default function CustomizerPageWeb({
   initialSelectedProduct,
   onLogout,
   onOpenCart,
+  onNavigateToAppointments,
 }) {
   const { isDarkMode, toggleDarkMode, tokens } = useTheme();
   const { width: windowWidth } = useWindowDimensions();
@@ -553,21 +555,29 @@ export default function CustomizerPageWeb({
         scrollEventThrottle={16}
       >
         {/* ─── 1. NAVBAR ─── */}
-        <View style={[styles.headerWrapper, isDarkMode && { backgroundColor: '#151C19', borderBottomColor: '#26332E' }]}>
-        <View style={[styles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
+        <View
+          style={[styles.headerWrapper, isDarkMode && { backgroundColor: '#151C19', borderBottomColor: '#26332E' }]}
+          className="web-header"
+          dataSet={{ webHeader: true }}
+          accessibilityRole="header">
+        <View
+          style={[
+            styles.headerInner,
+            windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8, minHeight: 56 },
+            windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
+          ]}
+        >
           {/* Left: Mobile Nav Toggle + Logo */}
-          <View style={styles.headerLeft}>
+          <View
+            style={[
+              styles.headerLeft,
+              windowWidth < 768 && { gap: 8 },
+              windowWidth < 400 && { gap: 4 },
+            ]}
+          >
             {windowWidth < 768 && (
               <TouchableOpacity
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 6,
-                }}
+                style={styles.mobileNavToggleBtn}
                 onPress={() => setIsMobileNavOpen(true)}
                 activeOpacity={0.8}
                 accessibilityLabel="Open Navigation Menu"
@@ -575,9 +585,11 @@ export default function CustomizerPageWeb({
                 <BootstrapIcon name="list" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             )}
-            <TouchableOpacity style={styles.logoWrap} onPress={() => onNavigateToStore?.()} activeOpacity={0.8}>
-              <BrandLogo size={windowWidth < 400 ? 28 : windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
-            </TouchableOpacity>
+            {windowWidth >= 768 && (
+              <TouchableOpacity style={styles.logoWrap} onPress={() => onNavigateToStore?.()} activeOpacity={0.8}>
+                <BrandLogo size={windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Center Navigation: Shop, Book a Service, Customize (Desktop / Tablet only) */}
@@ -603,6 +615,20 @@ export default function CustomizerPageWeb({
                 title="Book a Service"
               >
                 <Text style={styles.headerCenterBtnText}>Book a Service</Text>
+              </TouchableOpacity>
+
+              {/* Appointments Button */}
+              <TouchableOpacity
+                className="main-nav-tab"
+                style={styles.headerCenterBtn}
+                onPress={() => {
+                  if (onNavigateToAppointments) onNavigateToAppointments();
+                  else onNavigateToGarage?.({ tab: 'appointments' });
+                }}
+                activeOpacity={0.8}
+                title="Appointments"
+              >
+                <Text style={styles.headerCenterBtnText}>Appointments</Text>
               </TouchableOpacity>
 
               {/* Customize Button (Active) */}
@@ -641,8 +667,14 @@ export default function CustomizerPageWeb({
             </View>
           )}
 
-          <View style={[styles.headerActions, windowWidth < 768 && { gap: 8 }]}>
-            <TouchableOpacity
+          <View style={[styles.headerActions, windowWidth < 400 ? { gap: 4 } : windowWidth < 768 ? { gap: 8 } : undefined]}>
+            {/* Search Bar / Icon (Smooth appearance, placed before Wishlist) */}
+            <HeaderSearchWidget
+              onSearch={(query) => onNavigateToStore?.({ search: query })}
+              isDark={isDarkMode}
+            />
+
+            {windowWidth >= 768 && (<TouchableOpacity
               style={styles.navActionIconBtn}
               onPress={() => onNavigateToWishlist?.()}
               activeOpacity={0.8}
@@ -654,7 +686,7 @@ export default function CustomizerPageWeb({
                   <Text style={styles.navBadgeText}>{wishlistCount}</Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </TouchableOpacity>)}
 
             <View style={{ position: 'relative' }}>
               <TouchableOpacity
@@ -689,7 +721,7 @@ export default function CustomizerPageWeb({
               />
             </View>
 
-            <TouchableOpacity
+            {windowWidth >= 768 && (<TouchableOpacity
               style={styles.navActionIconBtn}
               onPress={() => setIsCartModalOpen(true)}
               activeOpacity={0.85}
@@ -701,9 +733,9 @@ export default function CustomizerPageWeb({
                   <Text style={styles.navBadgeText}>{cartItemCount}</Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </TouchableOpacity>)}
 
-            {currentUser ? (
+            {currentUser && windowWidth >= 768 ? (
               <View style={[styles.loggedInContainer, { position: 'relative' }]}>
                 <UserProfileButton
                   currentUser={currentUser}
@@ -711,7 +743,7 @@ export default function CustomizerPageWeb({
                     setIsNotifDropdownOpen(false);
                     setIsUserDropdownOpen(!isUserDropdownOpen);
                   }}
-                  size={40}
+                  size={windowWidth < 400 ? 34 : 40}
                 />
                 <UserProfileDropdown
                   currentUser={currentUser}
@@ -739,12 +771,19 @@ export default function CustomizerPageWeb({
               </View>
             ) : (
               <TouchableOpacity
-                style={styles.signInHeaderBtn}
+                style={[
+                  styles.signInHeaderBtn,
+                  windowWidth < 640 && { paddingHorizontal: 10, paddingVertical: 6, gap: 4 },
+                  windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 5 },
+                  windowWidth < 360 && { width: 34, height: 34, paddingHorizontal: 0, paddingVertical: 0, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
+                ]}
                 onPress={() => onNavigateToLogin?.()}
                 activeOpacity={0.85}
               >
                 <BootstrapIcon name="person" size={16} color="#FFFFFF" />
-                <Text style={styles.signInHeaderBtnText}>Sign In</Text>
+                {windowWidth >= 360 && (
+                  <Text style={[styles.signInHeaderBtnText, windowWidth < 400 && { fontSize: 12 }]}>Sign In</Text>
+                )}
               </TouchableOpacity>
             )}
           </View>
@@ -752,7 +791,7 @@ export default function CustomizerPageWeb({
       </View>
 
       {/* ─── MAIN CONTENT ─── */}
-      <View style={styles.maxContainer}>
+      <View style={[styles.maxContainer, windowWidth < 480 && { paddingHorizontal: 12, paddingTop: 12 }, windowWidth >= 480 && windowWidth < 768 && { paddingHorizontal: 16, paddingTop: 16 }]}>
           <AiMotorcycleInstallStudio
             currentUser={currentUser}
             initialSelectedProduct={initialSelectedProduct}
@@ -922,6 +961,10 @@ export default function CustomizerPageWeb({
         onNavigateToScreen={(screen, params) => {
           if (screen === 'shop') onNavigateToStore?.();
           else if (screen === 'garage') onNavigateToGarage?.();
+          else if (screen === 'appointments') {
+            if (onNavigateToAppointments) onNavigateToAppointments();
+            else onNavigateToGarage?.({ tab: 'appointments' });
+          }
           else if (screen === 'customizer') { /* already here */ }
           else if (screen === 'wishlist') onNavigateToWishlist?.();
           else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');

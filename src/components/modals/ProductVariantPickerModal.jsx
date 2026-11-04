@@ -8,6 +8,7 @@ import {
   Modal,
   SafeAreaView,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { variantModalStyles as styles } from '../../styles/productVariantPickerModal.styles.js';
@@ -41,6 +42,8 @@ export default function ProductVariantPickerModal({
   isFreeShippingActive = false,
   activePromo = null,
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768;
   const colorEntries = useMemo(() => getProductColorEntries(product), [product]);
   const sizeEntries = useMemo(() => getProductSizeEntries(product), [product]);
   const needsColor = productHasColors(product);
@@ -154,17 +157,42 @@ export default function ProductVariantPickerModal({
     <Modal
       visible={visible}
       transparent
-      animationType="slide"
+      animationType={isDesktop ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={styles.modalOverlay}>
+      <View
+        style={[
+          styles.modalOverlay,
+          isDesktop && {
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          },
+        ]}
+      >
         <TouchableOpacity
           style={styles.backdropTouchable}
           activeOpacity={1}
           onPress={onClose}
         />
 
-        <View style={styles.modalSheet}>
+        <View
+          style={[
+            styles.modalSheet,
+            isDesktop && {
+              borderRadius: 24,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              maxWidth: 580,
+              width: '100%',
+              alignSelf: 'center',
+              minHeight: 'auto',
+              maxHeight: '90%',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
+            },
+            windowWidth < 400 && { paddingHorizontal: 4 },
+          ]}
+        >
           {/* Subtle drag handle */}
           <View style={styles.dragHandleBar} />
 
@@ -219,10 +247,10 @@ export default function ProductVariantPickerModal({
                 {activeColor && activeSize
                   ? `Selected: ${activeColor} • ${activeSize}`
                   : activeColor
-                  ? `Selected: ${activeColor}`
-                  : activeSize
-                  ? `Selected: ${activeSize}`
-                  : 'Please select an option'}
+                    ? `Selected: ${activeColor}`
+                    : activeSize
+                      ? `Selected: ${activeSize}`
+                      : 'Please select an option'}
               </Text>
             </View>
 
@@ -442,8 +470,8 @@ export default function ProductVariantPickerModal({
                 {isVariantSoldOut
                   ? 'Currently Sold Out'
                   : mode === 'buy'
-                  ? 'Buy now'
-                  : 'Add to Cart'}
+                    ? 'Buy now'
+                    : 'Add to Cart'}
               </Text>
               {!isVariantSoldOut && (
                 <Text style={styles.confirmBtnSub}>

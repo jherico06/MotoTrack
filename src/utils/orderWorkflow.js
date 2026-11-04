@@ -53,6 +53,8 @@ const STEP_INDEX = {
   [ORDER_STATUSES.PENDING_APPROVAL]: 0,
   [ORDER_STATUSES.PROCESSING]: 1,
   [ORDER_STATUSES.READY]: 2,
+  [ORDER_STATUSES.ASSIGNED]: 2,
+  [ORDER_STATUSES.ACCEPTED]: 2.5,
   [ORDER_STATUSES.OUT]: 3,
   [ORDER_STATUSES.REPORTED]: 4,
   [ORDER_STATUSES.DELIVERED]: 5,
@@ -73,6 +75,10 @@ export function getStatusExplanation(status) {
       return 'Order approved. Items are being prepared / packed for shipment.';
     case ORDER_STATUSES.READY:
       return 'Package is ready to be handed to the courier.';
+    case ORDER_STATUSES.ASSIGNED:
+      return 'Order assigned to rider. Waiting for rider confirmation and acceptance.';
+    case ORDER_STATUSES.ACCEPTED:
+      return 'Rider confirmed and accepted order. Preparing for delivery dispatch.';
     case ORDER_STATUSES.OUT:
       return 'Order has been handed to the courier and is in transit.';
     case ORDER_STATUSES.REPORTED:
@@ -114,6 +120,18 @@ export function getStatusTone(status, isDark = false) {
       border: isDark ? 'rgba(14,165,233,0.35)' : '#BAE6FD',
       color: isDark ? '#7DD3FC' : '#0369A1',
       icon: 'clipboard-check',
+    },
+    [ORDER_STATUSES.ASSIGNED]: {
+      bg: isDark ? 'rgba(234,88,12,0.15)' : '#FFF7ED',
+      border: isDark ? 'rgba(234,88,12,0.35)' : '#FED7AA',
+      color: isDark ? '#EA580C' : '#C2410C',
+      icon: 'person-badge',
+    },
+    [ORDER_STATUSES.ACCEPTED]: {
+      bg: isDark ? 'rgba(14,165,233,0.15)' : '#F0FDFA',
+      border: isDark ? 'rgba(14,165,233,0.35)' : '#99F6E4',
+      color: isDark ? '#0D9488' : '#0F766E',
+      icon: 'check2-square',
     },
     [ORDER_STATUSES.OUT]: {
       bg: isDark ? 'rgba(99,102,241,0.15)' : '#EEF2FF',
@@ -317,6 +335,30 @@ export function resolvePrimaryAction(order, deliveryDetail = null) {
       confirmBody: `Order ${order.order_id || order.id} will move to Out for Delivery.`,
       confirmText: 'Mark as Shipped',
       hint: 'Hand the package to the assigned courier, then mark shipped.',
+    };
+  }
+
+  if (status === ORDER_STATUSES.ASSIGNED) {
+    return {
+      id: 'awaiting_rider_acceptance',
+      kind: 'none',
+      label: 'Awaiting Rider Confirmation',
+      disabled: false,
+      hint: 'The assigned rider must review and confirm order acceptance on their dashboard.',
+    };
+  }
+
+  if (status === ORDER_STATUSES.ACCEPTED) {
+    return {
+      id: 'mark_shipped_accepted',
+      kind: 'advance',
+      label: 'Mark as Shipped',
+      nextStatus: ORDER_STATUSES.OUT,
+      needsConfirm: true,
+      confirmTitle: 'Dispatch Order?',
+      confirmBody: `Order ${order.order_id || order.id} was accepted by the rider and will move to Out for Delivery.`,
+      confirmText: 'Mark as Shipped',
+      hint: 'The rider can start the route directly from their dashboard.',
     };
   }
 

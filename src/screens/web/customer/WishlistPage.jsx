@@ -19,6 +19,7 @@ import {
   UserProfileDropdown,
   UserProfileButton,
   BrandLogo,
+  HeaderSearchWidget,
   NotificationDropdown,
   CustomerMobileNavDrawer,
 } from '../../../components/common';
@@ -49,6 +50,7 @@ export default function WishlistPageWeb({
   onNavigateToWishlist,
   onAddToCart,
   onLogout,
+  onNavigateToAppointments,
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const { currentUser, logout, setRedirectReason } = useAuth();
@@ -212,7 +214,7 @@ export default function WishlistPageWeb({
   const cardWidth = `calc(${100 / numColumns}% - ${((numColumns - 1) * gapSize) / numColumns}px)`;
 
   return (
-    <View style={[wStyles.container, isDarkMode && { backgroundColor: '#0F1412' }]} className={isDarkMode ? "bg-[#0F1412] min-h-screen" : "bg-slate-100 min-h-screen"}>
+    <View style={[wStyles.container, isDarkMode && { backgroundColor: '#0F1412' }]} className={isDarkMode ? "bg-[#0F1412] min-h-screen" : "bg-[#F3F4F6] min-h-screen"}>
       <StatusBar style={isDarkMode ? "light" : "dark"} />
       <ToastNotification message={toastMessage} />
 
@@ -229,21 +231,29 @@ export default function WishlistPageWeb({
         scrollEventThrottle={16}
       >
         {/* ─── RESPONSIVE TOP STICKY NAVBAR ─── */}
-        <View style={wStyles.headerWrapper}>
-        <View style={[wStyles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
+        <View
+          style={wStyles.headerWrapper}
+          className="web-header"
+          dataSet={{ webHeader: true }}
+          accessibilityRole="header">
+        <View
+          style={[
+            wStyles.headerInner,
+            windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8, minHeight: 56 },
+            windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
+          ]}
+        >
           {/* Left: Mobile Nav Toggle + Logo */}
-          <View style={wStyles.headerLeft}>
+          <View
+            style={[
+              wStyles.headerLeft,
+              windowWidth < 768 && { gap: 8 },
+              windowWidth < 400 && { gap: 4 },
+            ]}
+          >
             {windowWidth < 768 && (
               <TouchableOpacity
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 8,
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 6,
-                }}
+                style={wStyles.mobileNavToggleBtn}
                 onPress={() => setIsMobileNavOpen(true)}
                 activeOpacity={0.8}
                 accessibilityLabel="Open Navigation Menu"
@@ -251,13 +261,15 @@ export default function WishlistPageWeb({
                 <BootstrapIcon name="list" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              style={wStyles.logoWrap}
-              onPress={() => onNavigateToStore?.()}
-              activeOpacity={0.8}
-            >
-              <BrandLogo size={windowWidth < 400 ? 28 : windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
-            </TouchableOpacity>
+            {windowWidth >= 768 && (
+              <TouchableOpacity
+                style={wStyles.logoWrap}
+                onPress={() => onNavigateToStore?.()}
+                activeOpacity={0.8}
+              >
+                <BrandLogo size={windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Center Navigation: Store & Repair (Desktop / Tablet only) */}
@@ -283,6 +295,20 @@ export default function WishlistPageWeb({
                 title="Book a Service"
               >
                 <Text style={wStyles.headerCenterBtnText}>Book a Service</Text>
+              </TouchableOpacity>
+
+              {/* Appointments Button */}
+              <TouchableOpacity
+                className="main-nav-tab"
+                style={wStyles.headerCenterBtn}
+                onPress={() => {
+                  if (onNavigateToAppointments) onNavigateToAppointments();
+                  else onNavigateToGarage?.({ tab: 'appointments' });
+                }}
+                activeOpacity={0.8}
+                title="Appointments"
+              >
+                <Text style={wStyles.headerCenterBtnText}>Appointments</Text>
               </TouchableOpacity>
 
               {/* Customize Button */}
@@ -324,9 +350,21 @@ export default function WishlistPageWeb({
           )}
 
           {/* Right Header Actions */}
-          <View style={[wStyles.headerActions, windowWidth < 768 && { gap: 8 }]}>
+          <View
+            style={[
+              wStyles.headerActions,
+              windowWidth < 768 && { gap: 6 },
+              windowWidth < 400 && { gap: 4 },
+            ]}
+          >
+            {/* Search Bar / Icon (Smooth appearance, placed before Wishlist) */}
+            <HeaderSearchWidget
+              onSearch={(query) => onNavigateToStore?.({ search: query })}
+              isDark={isDarkMode}
+            />
+
             {/* Favorites Button */}
-            <TouchableOpacity
+            {windowWidth >= 768 && (<TouchableOpacity
               style={wStyles.navActionIconBtn}
               onPress={() => onNavigateToWishlist?.()}
               activeOpacity={0.8}
@@ -338,7 +376,7 @@ export default function WishlistPageWeb({
                   <Text style={wStyles.navBadgeText}>{wishlistCount}</Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </TouchableOpacity>)}
 
             {/* Notifications Button */}
             <View style={{ position: 'relative' }}>
@@ -376,7 +414,7 @@ export default function WishlistPageWeb({
             </View>
 
             {/* Cart Button */}
-            <TouchableOpacity
+            {windowWidth >= 768 && (<TouchableOpacity
               style={wStyles.navActionIconBtn}
               onPress={() => setIsCartOpen(true)}
               activeOpacity={0.85}
@@ -388,10 +426,10 @@ export default function WishlistPageWeb({
                   <Text style={wStyles.navBadgeText}>{cartItemCount}</Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </TouchableOpacity>)}
 
             {/* Auth: Sign In & Sign Up OR Logged In Profile */}
-            {currentUser ? (
+            {currentUser && windowWidth >= 768 ? (
               <View style={[wStyles.loggedInContainer, { position: 'relative' }]}>
                 <UserProfileButton
                   currentUser={currentUser}
@@ -399,7 +437,7 @@ export default function WishlistPageWeb({
                     setIsNotifDropdownOpen(false);
                     setIsUserDropdownOpen(!isUserDropdownOpen);
                   }}
-                  size={40}
+                  size={windowWidth < 400 ? 34 : 40}
                 />
 
                 <UserProfileDropdown
@@ -430,12 +468,19 @@ export default function WishlistPageWeb({
             ) : (
               <View style={wStyles.authButtonsRow}>
                 <TouchableOpacity
-                  style={wStyles.signInHeaderBtn}
+                  style={[
+                    wStyles.signInHeaderBtn,
+                    windowWidth < 640 && { paddingHorizontal: 10, paddingVertical: 6, gap: 4 },
+                    windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 5 },
+                    windowWidth < 360 && { width: 34, height: 34, paddingHorizontal: 0, paddingVertical: 0, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
+                  ]}
                   onPress={() => onNavigateToLogin?.()}
                   activeOpacity={0.85}
                 >
                   <BootstrapIcon name="person" size={16} color="#FFFFFF" />
-                  <Text style={wStyles.signInHeaderBtnText}>Sign In</Text>
+                  {windowWidth >= 360 && (
+                    <Text style={[wStyles.signInHeaderBtnText, windowWidth < 400 && { fontSize: 12 }]}>Sign In</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             )}
@@ -444,7 +489,7 @@ export default function WishlistPageWeb({
       </View>
 
       {/* ─── WISHLIST CONTENT ─── */}
-      <View style={wStyles.maxContainer}>
+      <View style={[wStyles.maxContainer, windowWidth < 480 && { paddingHorizontal: 12, paddingTop: 12 }, windowWidth >= 480 && windowWidth < 768 && { paddingHorizontal: 16, paddingTop: 16 }]}>
           {/* Top Title & Batch Actions Bar */}
           <View style={wStyles.actionBar}>
             <View>
@@ -859,7 +904,14 @@ export default function WishlistPageWeb({
         onNavigateToScreen={(screen, params) => {
           if (screen === 'shop') onNavigateToStore?.();
           else if (screen === 'garage') onNavigateToGarage?.();
-          else if (screen === 'customizer') onNavigateToCustomizer ? onNavigateToCustomizer() : onNavigateToCustomize?.();
+          else if (screen === 'appointments') {
+            if (onNavigateToAppointments) onNavigateToAppointments();
+            else onNavigateToGarage?.({ tab: 'appointments' });
+          }
+          else if (screen === 'customizer') {
+            if (onNavigateToCustomizer) onNavigateToCustomizer();
+            else onNavigateToCustomize?.();
+          }
           else if (screen === 'wishlist') { /* already here */ }
           else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
           else if (screen === 'login') onNavigateToLogin?.();

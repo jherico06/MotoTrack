@@ -127,6 +127,9 @@ export default function NotificationDropdown({
   currentUser,
   isAdmin: propIsAdmin = false,
   isDark = false,
+  topOffset,
+  rightOffset,
+  isMobile = false,
 }) {
   const containerRef = useRef(null);
   const hoverTimersRef = useRef(new Map());
@@ -306,7 +309,8 @@ export default function NotificationDropdown({
     }
   };
 
-  const dropdownWidth = Math.min(335, windowWidth - 24);
+  const isMobileScreen = windowWidth < 768 || isMobile;
+  const dropdownWidth = Math.min(340, windowWidth - 24);
   const t = getThemeTokens(isDark);
   const accentIcon = isDark ? t.accentBrand : '#856839';
   const mutedIcon = isDark ? t.textMuted : '#8E8B85';
@@ -324,13 +328,29 @@ export default function NotificationDropdown({
         style={[
           styles.dropdownContainer,
           {
-            width: dropdownWidth,
             backgroundColor: t.bgCard,
             borderColor: t.border,
             boxShadow: isDark
               ? '0 12px 32px -4px rgba(0, 0, 0, 0.45)'
               : '0 12px 32px -4px rgba(0, 0, 0, 0.14)',
           },
+          isMobileScreen
+            ? {
+                position: 'fixed',
+                top: topOffset ?? 64,
+                left: 12,
+                right: 12,
+                width: 'auto',
+                maxWidth: 360,
+                marginHorizontal: 'auto',
+                maxHeight: typeof topOffset === 'number' ? `calc(100vh - ${topOffset + 20}px)` : 'calc(100vh - 80px)',
+                zIndex: 99999,
+              }
+            : {
+                top: topOffset ?? '100%',
+                right: rightOffset ?? 0,
+                width: dropdownWidth,
+              },
         ]}
       >
         {/* Header */}

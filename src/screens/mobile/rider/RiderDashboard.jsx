@@ -1,4 +1,10 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   View,
   Text,
@@ -6,36 +12,60 @@ import {
   ScrollView,
   StyleSheet,
   ActivityIndicator,
+  TextInput,
   SafeAreaView,
-  Modal,
   RefreshControl,
-  Image,
+  KeyboardAvoidingView,
+  BackHandler,
+  Platform,
 } from 'react-native';
-import BootstrapIcon from '../../../components/common/BootstrapIcon.jsx';
 import { StatusBar } from 'expo-status-bar';
-import ExternalLink from '../../../components/common/ExternalLink.jsx';
+import { BootstrapIcon } from '../../../components/common/BootstrapIcon.jsx';
 import RiderQrScanSheet from '../../../components/modals/RiderQrScanSheet.jsx';
 import RiderDeliveryConfirmSheet from '../../../components/modals/RiderDeliveryConfirmSheet.jsx';
-import StaffAccountSettingsModal from '../../../components/modals/StaffAccountSettingsModal.jsx';
+import {
+  RiderTopHeader,
+  RiderProfileMenuModal,
+  RiderNotificationsModal,
+} from '../../../components/mobile/rider/RiderHeaderAndMenus.jsx';
+import RiderOrderCard from '../../../components/mobile/rider/RiderOrderCard.jsx';
+import RiderOrderDetailsSheet from '../../../components/mobile/rider/RiderOrderDetailsSheet.jsx';
+import RiderEarningsView from '../../../components/mobile/rider/RiderEarningsView.jsx';
+import RiderAccountView from '../../../components/mobile/rider/RiderAccountView.jsx';
+import {
+  RIDER_FONT,
+  cardShadowStyle,
+  getRiderPalette,
+  formatPhp,
+  formatHeroDate,
+  getGreetingByHour,
+  getFirstName,
+  isDeliveredOrder,
+  formatOrderCode,
+} from '../../../components/mobile/rider/riderTheme.js';
 import { pickImageFromFile } from '../../../utils/imagePickerHelper.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
+import { useTheme } from '../../../context/ThemeContext.jsx';
 import { deliveryService } from '../../../services/delivery/deliveryService.js';
-import { riderService } from '../../../services/staff/riderService.js';
+import {
+  riderService,
+  RIDER_STATUSES,
+} from '../../../services/staff/riderService.js';
+import { notificationService } from '../../../services/notifications/notificationService.js';
 import { riderGpsTrackingService } from '../../../services/delivery/riderGpsTrackingService.js';
-import { ANDROID_TOP_INSET } from '../../../utils/safeArea.js';
-import { describeRiderDeliveryDate } from '../../../utils/deliveryDate.js';
-import { areaFromAddress, googleMapsNavigateUrl } from '../../../utils/geo.js';
-import { colors } from '../../../styles/theme.js';
+import { appStorage } from '../../../services/system/storageAdapter.js';
+import {
+  ANDROID_TOP_INSET,
+  ANDROID_BOTTOM_INSET,
+} from '../../../utils/safeArea.js';
+import { areaFromAddress } from '../../../utils/geo.js';
 
-function formatPhp(amount) {
-  const n = Number(amount) || 0;
-  return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
-}
-
-function formatPhpExact(amount) {
-  const n = Number(amount) || 0;
-  return `₱${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+const DEFAULT_PREFS = {
+  pushNotifications: true,
+  smsUpdates: true,
+  twoFactorEnabled: false,
+  homeAddress: '',
+};
 
 function startOfWeek(date = new Date()) {
   const d = new Date(date);
@@ -44,26 +74,6 @@ function startOfWeek(date = new Date()) {
   d.setHours(0, 0, 0, 0);
   d.setDate(d.getDate() - diff);
   return d;
-}
-
-function statusTone(status) {
-  const s = String(status || '').toLowerCase();
-  if (s === 'delivered') {
-    return { bg: colors.successSoft, text: colors.successText, label: 'Delivered' };
-  }
-  if (s.includes('report')) {
-    return { bg: colors.successSoft, text: colors.successText, label: 'Reported — awaiting store' };
-  }
-  if (s.includes('out')) {
-    return { bg: colors.infoSoftAlt, text: colors.info, label: 'Out for Delivery' };
-  }
-  if (s.includes('assigned') || s.includes('ready')) {
-    return { bg: colors.warningSoftAlt, text: colors.warningText, label: 'Assigned' };
-  }
-  if (s.includes('issue') || s.includes('fail')) {
-    return { bg: colors.dangerSoft, text: colors.dangerText, label: status };
-  }
-  return { bg: colors.bgSubtle, text: colors.textSecondary, label: status || 'Assigned' };
 }
 
 function groupByArea(deliveries) {
@@ -76,52 +86,42 @@ function groupByArea(deliveries) {
   return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
 }
 
-function DeliveryDateRow({ start, end }) {
-  const info = describeRiderDeliveryDate(start, end);
-  if (!info) return null;
-  const tone =
-    info.tone === 'overdue'
-      ? { bg: colors.warningSoft, text: colors.warningText, icon: 'exclamation-triangle' }
-      : info.tone === 'today'
-        ? { bg: colors.accentSoft, text: colors.accentDark, icon: 'calendar-event' }
-        : info.tone === 'tomorrow'
-          ? { bg: colors.infoSoft, text: colors.info, icon: 'calendar-event' }
-          : { bg: colors.bgSubtle, text: colors.textSecondary, icon: 'calendar-event' };
-  return (
-    <View style={[styles.dateRow, { backgroundColor: tone.bg }]}>
-      <BootstrapIcon name={tone.icon} size={14} color={tone.text} />
-      <View style={{ flex: 1 }}>
-        <Text style={[styles.dateKicker, { color: tone.text }]}>{info.title}</Text>
-        <Text style={[styles.dateValue, { color: tone.text }]}>{info.dateLabel}</Text>
-        {info.timeLabel ? (
-          <Text style={[styles.dateTime, { color: tone.text }]}>Scheduled: {info.timeLabel}</Text>
-        ) : null}
-      </View>
-    </View>
-  );
-}
+export default function RiderDashboard({ onLogout, initialConfirmToken }) {
+  const { currentUser, updateProfile, changeEmail, changePassword } = useAuth();
+  const { isDarkMode, setDarkMode } = useTheme();
+  const palette = useMemo(() => getRiderPalette(isDarkMode), [isDarkMode]);
 
-function StatCard({ accent, iconBg, iconColor, icon, label, value, sub, valueColor, wide }) {
-  return (
-    <View style={[styles.statCard, wide && styles.statCardWide, { borderLeftColor: accent }]}>
-      <View style={[styles.statIconWrap, { backgroundColor: iconBg }]}>
-        <BootstrapIcon name={icon} size={18} color={iconColor} />
-      </View>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={[styles.statValue, { color: valueColor || accent }]}>{value}</Text>
-      <Text style={styles.statSub}>{sub}</Text>
-    </View>
-  );
-}
+  // Stable primitive user identifiers (prevent-usage-burn compliance)
+  const userUid = String(currentUser?.id || currentUser?.user_id || '');
+  const userEmail = String(currentUser?.email || '');
+  const userUsername = String(currentUser?.username || '');
+  const sessionRiderId = String(currentUser?.rider_id || '');
 
-export default function RiderDashboard({ onLogout }) {
-  const { currentUser } = useAuth();
-  const [riderId, setRiderId] = useState(currentUser?.rider_id || '');
+  // Navigation & Modal State
+  const [mainTab, setMainTab] = useState('home'); // 'home' | 'orders' | 'earnings' | 'account'
+  const [accountTab, setAccountTab] = useState('profile'); // 'profile' | 'preferences' | 'security'
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  // Rider Data State
+  const [riderId, setRiderId] = useState(sessionRiderId);
+  const [riderProfile, setRiderProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [deliveries, setDeliveries] = useState([]);
+  const [earningsLedger, setEarningsLedger] = useState([]);
   const [weekEarnings, setWeekEarnings] = useState(0);
+  const [prevWeekEarnings, setPrevWeekEarnings] = useState(0);
   const [error, setError] = useState('');
-  const [selected, setSelected] = useState(null);
+
+  // Order Filter & Search State ('all' | 'to_confirm' | 'delivered')
+  const [orderFilter, setOrderFilter] = useState('all');
+  const [ordersSubFilter, setOrdersSubFilter] = useState('all'); // 'all' | 'out' | 'assigned'
+  const [groupByAreaMode, setGroupByAreaMode] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Order Detail, QR Scan, Confirm & Proof Photo State
+  const [selectedOrder, setSelectedOrder] = useState(null);
   const [busyId, setBusyId] = useState('');
   const [scanOrder, setScanOrder] = useState(null);
   const [verified, setVerified] = useState(null);
@@ -130,21 +130,105 @@ export default function RiderDashboard({ onLogout }) {
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState('');
   const [confirmed, setConfirmed] = useState(null);
-  const [notice, setNotice] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
-  const [tab, setTab] = useState('active'); // 'active' | 'history'
-  const [podPhoto, setPodPhoto] = useState(null);   // staged photo for current detail
-  const [podBusy, setPodBusy] = useState(false);    // uploading indicator
-  const [accountOpen, setAccountOpen] = useState(false);
+  const [podPhoto, setPodPhoto] = useState(null);
+  const [podBusy, setPodBusy] = useState(false);
+
+  // Toast / Save Confirmation Feedback
+  const [feedbackToast, setFeedbackToast] = useState(null); // { text, isError }
+  const toastTimerRef = useRef(null);
+
+  // Notifications & Local Rider Preferences
+  const [rawNotifications, setRawNotifications] = useState([]);
+  const [readNotifIds, setReadNotifIds] = useState(() => new Set());
+  const [preferences, setPreferences] = useState(DEFAULT_PREFS);
+
+  const scanOpenTimerRef = useRef(null);
+  const subscribeDebounceRef = useRef(null);
+  const scanOrderRef = useRef(scanOrder);
+  scanOrderRef.current = scanOrder;
+  const consumedInitialTokenRef = useRef('');
+
+  const prefsStorageKey = useMemo(
+    () => `mototrack_rider_prefs_${userUid || sessionRiderId || 'default'}`,
+    [userUid, sessionRiderId]
+  );
+
+  const readNotifsStorageKey = useMemo(
+    () => `mototrack_rider_read_notifs_${userUid || sessionRiderId || 'default'}`,
+    [userUid, sessionRiderId]
+  );
+
+  // Hydrate persisted rider preferences & read notification IDs
+  useEffect(() => {
+    try {
+      const savedPrefs = appStorage.getItem(prefsStorageKey);
+      if (savedPrefs) {
+        const parsed = JSON.parse(savedPrefs);
+        if (parsed && typeof parsed === 'object') {
+          setPreferences({ ...DEFAULT_PREFS, ...parsed });
+        }
+      }
+      const savedRead = appStorage.getItem(readNotifsStorageKey);
+      if (savedRead) {
+        const arr = JSON.parse(savedRead);
+        if (Array.isArray(arr)) setReadNotifIds(new Set(arr));
+      }
+    } catch (_e) {}
+  }, [prefsStorageKey, readNotifsStorageKey]);
+
+  const showFeedback = useCallback((text, isError = false) => {
+    if (!text) return;
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setFeedbackToast({ text, isError });
+    toastTimerRef.current = setTimeout(() => {
+      setFeedbackToast(null);
+      toastTimerRef.current = null;
+    }, 3600);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (scanOpenTimerRef.current) clearTimeout(scanOpenTimerRef.current);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      if (subscribeDebounceRef.current) {
+        clearTimeout(subscribeDebounceRef.current);
+      }
+    };
+  }, []);
+
+  // Android Hardware Back Button Handling
+  useEffect(() => {
+    if (Platform.OS !== 'android') return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (profileMenuOpen) {
+        setProfileMenuOpen(false);
+        return true;
+      }
+      if (notificationsOpen) {
+        setNotificationsOpen(false);
+        return true;
+      }
+      if (selectedOrder) {
+        setSelectedOrder(null);
+        return true;
+      }
+      if (mainTab !== 'home') {
+        setMainTab('home');
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [profileMenuOpen, notificationsOpen, selectedOrder, mainTab]);
 
   const resolveRiderId = useCallback(async () => {
-    if (currentUser?.rider_id) return currentUser.rider_id;
+    if (sessionRiderId) return sessionRiderId;
     await riderService.fetchRiders();
-    const byUser = riderService.getRiderByUserId(currentUser?.id || currentUser?.user_id);
+    const byUser = riderService.getRiderByUserId(userUid);
     if (byUser?.id) return byUser.id;
-    const byName = riderService.getRiderByUsername(currentUser?.username || currentUser?.email);
+    const byName = riderService.getRiderByUsername(userUsername || userEmail);
     return byName?.id || '';
-  }, [currentUser]);
+  }, [sessionRiderId, userUid, userUsername, userEmail]);
 
   const load = useCallback(async () => {
     setError('');
@@ -152,37 +236,76 @@ export default function RiderDashboard({ onLogout }) {
     setRiderId(id);
     if (!id) {
       setDeliveries([]);
+      setEarningsLedger([]);
       setWeekEarnings(0);
-      setError('This login is not linked to a rider profile. Ask the admin to recreate the rider account.');
+      setPrevWeekEarnings(0);
+      setError(
+        'This login is not linked to a rider profile. Ask the MotoTrack admin to link your rider account.'
+      );
       setLoading(false);
+      setRefreshing(false);
       return;
     }
+
     try {
+      const profile = riderService.getRiderById(id);
+      if (profile) setRiderProfile(profile);
+
       const rows = await deliveryService.getMyDeliveries(id);
-      setDeliveries(rows);
+      setDeliveries(rows || []);
 
       const weekStart = startOfWeek();
-      let earned = 0;
+      const prevWeekStart = new Date(weekStart);
+      prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+
+      let earnedThisWeek = 0;
+      let earnedLastWeek = 0;
+      let ledgerRows = [];
+
       try {
-        const ledger = await riderService.getRiderEarnings(id, { limit: 200 });
-        earned = (ledger || []).reduce((sum, row) => {
+        ledgerRows = (await riderService.getRiderEarnings(id, { limit: 200 })) || [];
+        setEarningsLedger(ledgerRows);
+        ledgerRows.forEach((row) => {
           const at = row?.created_at ? new Date(row.created_at) : null;
-          if (!at || at < weekStart) return sum;
-          return sum + (Number(row.amount) || 0);
-        }, 0);
+          const amt = Number(row?.amount) || 0;
+          if (!at) return;
+          if (at >= weekStart) {
+            earnedThisWeek += amt;
+          } else if (at >= prevWeekStart && at < weekStart) {
+            earnedLastWeek += amt;
+          }
+        });
       } catch (_e) {}
 
-      if (earned <= 0) {
-        earned = (rows || []).reduce((sum, d) => {
-          if (String(d.deliveryStatus || '').toLowerCase() !== 'delivered') return sum;
+      if (earnedThisWeek <= 0) {
+        (rows || []).forEach((d) => {
+          if (!isDeliveredOrder(d)) return;
           const at = d.deliveredAt ? new Date(d.deliveredAt) : null;
-          if (!at || at < weekStart) return sum;
-          return sum + (Number(d.riderEarning || d.shippingFee) || 0);
-        }, 0);
+          const amt = Number(d.riderEarning || d.shippingFee) || 0;
+          if (!at) return;
+          if (at >= weekStart) {
+            earnedThisWeek += amt;
+          } else if (at >= prevWeekStart && at < weekStart) {
+            earnedLastWeek += amt;
+          }
+        });
       }
-      setWeekEarnings(earned);
 
-      // Resume GPS only for an already-active Out for Delivery job
+      setWeekEarnings(earnedThisWeek);
+      setPrevWeekEarnings(earnedLastWeek);
+
+      // Notifications
+      try {
+        const notifs =
+          notificationService.getCustomerNotifications?.(
+            userUid,
+            userEmail,
+            userUsername
+          ) || [];
+        setRawNotifications(notifs);
+      } catch (_e) {}
+
+      // Sync GPS watcher for active Out for Delivery jobs
       const activeOut = (rows || []).find((d) =>
         String(d.deliveryStatus || '')
           .toLowerCase()
@@ -191,7 +314,9 @@ export default function RiderDashboard({ onLogout }) {
       if (activeOut?.orderId && id) {
         const session = riderGpsTrackingService.getActiveSession();
         if (!session || session.orderId !== activeOut.orderId) {
-          riderGpsTrackingService.start({ orderId: activeOut.orderId, riderId: id }).catch(() => {});
+          riderGpsTrackingService
+            .start({ orderId: activeOut.orderId, riderId: id })
+            .catch(() => {});
         }
       } else if (!activeOut && riderGpsTrackingService.isTracking()) {
         riderGpsTrackingService.stop({ clearDb: true }).catch(() => {});
@@ -202,36 +327,58 @@ export default function RiderDashboard({ onLogout }) {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [resolveRiderId]);
+  }, [resolveRiderId, userUid, userEmail, userUsername]);
 
   useEffect(() => {
-    (async () => {
-      await load();
-    })();
+    load();
   }, [load]);
 
+  // Debounced subscription listeners (prevent-usage-burn compliance)
   useEffect(() => {
-    const unsub = deliveryService.subscribe(() => {
-      load();
+    const scheduleReload = () => {
+      if (subscribeDebounceRef.current) {
+        clearTimeout(subscribeDebounceRef.current);
+      }
+      subscribeDebounceRef.current = setTimeout(() => {
+        subscribeDebounceRef.current = null;
+        load();
+      }, 400);
+    };
+
+    const unsubDeliveries = deliveryService.subscribe(scheduleReload);
+    const unsubRiders = riderService.subscribe(scheduleReload);
+    const unsubNotifs = notificationService.subscribe?.(() => {
+      try {
+        const notifs =
+          notificationService.getCustomerNotifications?.(
+            userUid,
+            userEmail,
+            userUsername
+          ) || [];
+        setRawNotifications(notifs);
+      } catch (_e) {}
     });
-    const unsubRiders = riderService.subscribe(() => {
-      load();
-    });
+
     return () => {
-      unsub?.();
+      unsubDeliveries?.();
       unsubRiders?.();
-      // Stop GPS watcher when leaving rider dashboard (keeps last DB point until delivered)
+      unsubNotifs?.();
+      if (subscribeDebounceRef.current) {
+        clearTimeout(subscribeDebounceRef.current);
+      }
       riderGpsTrackingService.stop({ clearDb: false }).catch(() => {});
     };
-  }, [load]);
+  }, [load, userUid, userEmail, userUsername]);
 
-  const undelivered = useMemo(
-    () => deliveries.filter((d) => String(d.deliveryStatus || '').toLowerCase() !== 'delivered'),
+  // Derived Order Collections
+  const needConfirmationOrders = useMemo(
+    () => deliveries.filter((d) => !isDeliveredOrder(d)),
     [deliveries]
   );
-  const completed = useMemo(() => {
+
+  const deliveredOrders = useMemo(() => {
     return deliveries
-      .filter((d) => String(d.deliveryStatus || '').toLowerCase() === 'delivered')
+      .filter((d) => isDeliveredOrder(d))
       .slice()
       .sort((a, b) => {
         const at = a.deliveredAt ? new Date(a.deliveredAt).getTime() : 0;
@@ -239,11 +386,230 @@ export default function RiderDashboard({ onLogout }) {
         return bt - at;
       });
   }, [deliveries]);
-  const groups = useMemo(() => groupByArea(undelivered), [undelivered]);
+
+  const outForDeliveryCount = useMemo(
+    () =>
+      needConfirmationOrders.filter((d) =>
+        String(d.deliveryStatus || '').toLowerCase().includes('out')
+      ).length,
+    [needConfirmationOrders]
+  );
+
+  const assignedCount = useMemo(
+    () =>
+      needConfirmationOrders.filter((d) => {
+        const s = String(d.deliveryStatus || '').toLowerCase();
+        return s.includes('assigned') || s.includes('ready');
+      }).length,
+    [needConfirmationOrders]
+  );
+
+  const filteredOrders = useMemo(() => {
+    let list = [];
+    if (orderFilter === 'to_confirm') {
+      list = needConfirmationOrders;
+      if (mainTab === 'orders' && ordersSubFilter === 'out') {
+        list = list.filter((d) =>
+          String(d.deliveryStatus || '').toLowerCase().includes('out')
+        );
+      } else if (mainTab === 'orders' && ordersSubFilter === 'assigned') {
+        list = list.filter((d) => {
+          const s = String(d.deliveryStatus || '').toLowerCase();
+          return s.includes('assigned') || s.includes('ready');
+        });
+      }
+    } else if (orderFilter === 'delivered') {
+      list = deliveredOrders;
+    } else {
+      list = [...needConfirmationOrders, ...deliveredOrders];
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      list = list.filter(
+        (d) =>
+          String(d.orderId || '').toLowerCase().includes(q) ||
+          String(d.customerName || '').toLowerCase().includes(q) ||
+          String(d.customerAddress || '').toLowerCase().includes(q) ||
+          String(d.customerPhone || '').toLowerCase().includes(q)
+      );
+    }
+    return list;
+  }, [
+    orderFilter,
+    ordersSubFilter,
+    mainTab,
+    searchQuery,
+    needConfirmationOrders,
+    deliveredOrders,
+  ]);
+
+  const areaGroups = useMemo(() => {
+    if (!groupByAreaMode) return [];
+    return groupByArea(filteredOrders);
+  }, [groupByAreaMode, filteredOrders]);
+
+  // Unified Notifications Feed (merges service notifications + active dispatch alerts)
+  const notificationFeed = useMemo(() => {
+    const items = [];
+    (rawNotifications || []).forEach((n, idx) => {
+      const id = String(n.id || `svc-notif-${idx}`);
+      const isUnread =
+        (n.status === 'unread' || n.read === false) && !readNotifIds.has(id);
+      items.push({
+        id,
+        title: n.title || 'MotoTrack Update',
+        message: n.message || '',
+        orderId: n.meta?.orderId || '',
+        icon: 'bell',
+        unread: isUnread,
+        timeLabel: n.time || n.createdAt || 'Recent',
+      });
+    });
+
+    needConfirmationOrders.slice(0, 6).forEach((d) => {
+      const id = `dispatch-${d.orderId}`;
+      if (items.some((x) => x.orderId && x.orderId === d.orderId)) return;
+      items.push({
+        id,
+        title: String(d.deliveryStatus || '').toLowerCase().includes('out')
+          ? 'Active drop-off awaiting QR scan'
+          : 'New delivery assigned to you',
+        message: `${d.customerName || 'Customer'} · ${d.customerAddress || 'Tap to view route'}`,
+        orderId: d.orderId,
+        icon: 'truck',
+        unread: !readNotifIds.has(id),
+        timeLabel: 'Today',
+      });
+    });
+
+    return items;
+  }, [rawNotifications, needConfirmationOrders, readNotifIds]);
+
+  const unreadNotifCount = useMemo(
+    () => notificationFeed.filter((n) => n.unread).length,
+    [notificationFeed]
+  );
+
+  const handleMarkAllNotifsRead = useCallback(() => {
+    const next = new Set(readNotifIds);
+    notificationFeed.forEach((n) => next.add(n.id));
+    setReadNotifIds(next);
+    try {
+      appStorage.setItem(readNotifsStorageKey, JSON.stringify([...next]));
+      if (userUid) {
+        notificationService.markAllAsRead?.(userUid);
+      }
+    } catch (_e) {}
+    showFeedback('All notifications marked as read.');
+  }, [
+    readNotifIds,
+    notificationFeed,
+    readNotifsStorageKey,
+    userUid,
+    showFeedback,
+  ]);
+
+  // Weekly Earnings Subtitle
+  const weeklyEarningsSub = useMemo(() => {
+    if (prevWeekEarnings > 0 && weekEarnings > 0) {
+      const pct = Math.round(
+        ((weekEarnings - prevWeekEarnings) / prevWeekEarnings) * 100
+      );
+      if (pct >= 0) return `+${pct}% from last week`;
+      return `${pct}% from last week`;
+    }
+    if (weekEarnings > 0) {
+      return `${deliveredOrders.length} completed`;
+    }
+    return 'This week';
+  }, [weekEarnings, prevWeekEarnings, deliveredOrders.length]);
+
+  // QR Scanner & Delivery Confirmation Handlers
+  const openScannerFromDetail = useCallback((targetOrder) => {
+    if (!targetOrder) return;
+    setVerified(null);
+    setSelectedOrder(null);
+    if (scanOpenTimerRef.current) {
+      clearTimeout(scanOpenTimerRef.current);
+    }
+    const settleMs = Platform.OS === 'ios' ? 340 : 160;
+    scanOpenTimerRef.current = setTimeout(() => {
+      scanOpenTimerRef.current = null;
+      setScanOrder(targetOrder);
+    }, settleMs);
+  }, []);
+
+  const handleScanned = useCallback(
+    async (raw) => {
+      const currentScanOrder = scanOrderRef.current;
+      const hintOrderId = currentScanOrder?.orderId || null;
+      const hadScannerModal = Boolean(currentScanOrder);
+      const dismissStartedAt = Date.now();
+      setScanOrder(null);
+      setSelectedOrder(null);
+      setConfirmError('');
+      setConfirmed(null);
+      setCheckingScan(true);
+      setBusyId('scan');
+      try {
+        const res = await deliveryService.riderVerifyDeliveryQr({
+          riderId,
+          orderId: hintOrderId,
+          scannedRaw: raw,
+        });
+        if (!res.success) {
+          setVerified(null);
+          setConfirmOpen(false);
+          const title = res.title ? `${res.title}. ` : '';
+          showFeedback(
+            `${title}${res.error || 'Unable to verify this QR code.'}`,
+            true
+          );
+          return;
+        }
+        if (hadScannerModal) {
+          const minDismissMs = Platform.OS === 'ios' ? 360 : 180;
+          const remainingMs = minDismissMs - (Date.now() - dismissStartedAt);
+          if (remainingMs > 0) {
+            await new Promise((resolve) => setTimeout(resolve, remainingMs));
+          }
+        }
+        setVerified({
+          ...res.delivery,
+          scannedRaw: raw,
+          hintMismatch: Boolean(res.hintMismatch),
+        });
+        setConfirmOpen(true);
+      } catch (_e) {
+        setVerified(null);
+        setConfirmOpen(false);
+        showFeedback(
+          'Unable to verify the order. Please check your connection and try again.',
+          true
+        );
+      } finally {
+        setCheckingScan(false);
+        setBusyId('');
+      }
+    },
+    [riderId, showFeedback]
+  );
+
+  useEffect(() => {
+    if (
+      initialConfirmToken &&
+      !loading &&
+      riderId &&
+      consumedInitialTokenRef.current !== initialConfirmToken
+    ) {
+      consumedInitialTokenRef.current = initialConfirmToken;
+      handleScanned(initialConfirmToken);
+    }
+  }, [initialConfirmToken, loading, riderId, handleScanned]);
 
   const handleOutForDelivery = async (d) => {
     setBusyId(d.orderId);
-    setNotice('');
     try {
       const res = await deliveryService.riderMarkOutForDelivery({
         riderId,
@@ -251,7 +617,7 @@ export default function RiderDashboard({ onLogout }) {
         riderUser: currentUser,
       });
       if (!res.success) {
-        setNotice(res.error || 'Could not update status');
+        showFeedback(res.error || 'Could not update delivery status.', true);
         return;
       }
       const gps = await riderGpsTrackingService.start({
@@ -259,15 +625,19 @@ export default function RiderDashboard({ onLogout }) {
         riderId,
       });
       if (!gps.success) {
-        setNotice(
-          `Order #${d.orderId} is Out for Delivery. GPS: ${gps.error || 'unavailable'}`
+        showFeedback(
+          `${formatOrderCode(d.orderId)} is Out for Delivery (GPS unavailable).`
         );
       } else {
-        setNotice(`Order #${d.orderId} is now Out for Delivery — live GPS tracking active`);
+        showFeedback(
+          `${formatOrderCode(d.orderId)} is Out for Delivery · Live GPS active.`
+        );
       }
       await load();
-      setSelected((prev) =>
-        prev?.orderId === d.orderId ? { ...prev, deliveryStatus: 'Out for Delivery' } : prev
+      setSelectedOrder((prev) =>
+        prev?.orderId === d.orderId
+          ? { ...prev, deliveryStatus: 'Out for Delivery' }
+          : prev
       );
     } finally {
       setBusyId('');
@@ -279,45 +649,10 @@ export default function RiderDashboard({ onLogout }) {
     setDeliveries((prev) => {
       const exists = prev.some((row) => row.orderId === card.orderId);
       if (!exists) return [card, ...prev];
-      return prev.map((row) => (row.orderId === card.orderId ? { ...row, ...card } : row));
+      return prev.map((row) =>
+        row.orderId === card.orderId ? { ...row, ...card } : row
+      );
     });
-  };
-
-  const handleScanned = async (raw) => {
-    const hintOrderId = scanOrder?.orderId || null;
-    setScanOrder(null);
-    setNotice('');
-    setConfirmError('');
-    setConfirmed(null);
-    setCheckingScan(true);
-    setBusyId('scan');
-    try {
-      const res = await deliveryService.riderVerifyDeliveryQr({
-        riderId,
-        orderId: hintOrderId,
-        scannedRaw: raw,
-      });
-      if (!res.success) {
-        setVerified(null);
-        setConfirmOpen(false);
-        const title = res.title ? `${res.title}. ` : '';
-        setNotice(`${title}${res.error || 'Unable to verify this QR.'}`);
-        return;
-      }
-      setVerified({
-        ...res.delivery,
-        scannedRaw: raw,
-        hintMismatch: Boolean(res.hintMismatch),
-      });
-      setConfirmOpen(true);
-    } catch (_e) {
-      setVerified(null);
-      setConfirmOpen(false);
-      setNotice('Unable to verify the order. Please check your connection and try again.');
-    } finally {
-      setCheckingScan(false);
-      setBusyId('');
-    }
   };
 
   const closeConfirmPopup = () => {
@@ -329,25 +664,39 @@ export default function RiderDashboard({ onLogout }) {
   };
 
   const handleConfirmDelivery = async () => {
-    if (confirming || !verified?.orderId) return;
+    const target = verified || selectedOrder;
+    if (confirming || !target?.orderId) return;
     setConfirming(true);
     setConfirmError('');
     try {
-      const res = await deliveryService.riderConfirmDeliveredByQr({
-        riderId,
-        riderUser: currentUser,
-        orderId: verified.orderId,
-        scannedRaw: verified.scannedRaw,
-      });
+      let res;
+      if (target.scannedRaw) {
+        res = await deliveryService.riderConfirmDeliveredByQr({
+          riderId,
+          riderUser: currentUser,
+          orderId: target.orderId,
+          scannedRaw: target.scannedRaw,
+        });
+      } else {
+        res = await deliveryService.riderConfirmOrderDelivery({
+          riderId,
+          riderUser: currentUser,
+          orderId: target.orderId,
+          notes: 'Delivered by rider via MotoTrack mobile confirmation',
+          photoUri: podPhoto || target.deliveryPhoto || null,
+        });
+      }
       if (!res.success) {
         const title = res.title ? `${res.title}. ` : '';
-        setConfirmError(`${title}${res.error || 'Unable to confirm the delivery. Please check your connection and try again.'}`);
+        setConfirmError(
+          `${title}${res.error || 'Unable to confirm delivery. Please try again.'}`
+        );
         return;
       }
       applyDeliveredLocally(res.delivery);
       setConfirmed(res.delivery);
       setVerified(null);
-      setSelected(null);
+      setSelectedOrder(null);
       setPodPhoto(null);
       await riderGpsTrackingService.stop({
         clearDb: true,
@@ -355,7 +704,9 @@ export default function RiderDashboard({ onLogout }) {
         riderId,
       });
     } catch (_e) {
-      setConfirmError('Unable to confirm the delivery. Please check your connection and try again.');
+      setConfirmError(
+        'Unable to confirm delivery. Please check your connection and try again.'
+      );
     } finally {
       setConfirming(false);
     }
@@ -365,82 +716,461 @@ export default function RiderDashboard({ onLogout }) {
     setConfirmOpen(false);
     setConfirmed(null);
     setVerified(null);
-    setSelected(null);
+    setSelectedOrder(null);
     setPodPhoto(null);
+    showFeedback('Delivery confirmed and earnings credited.');
     await load();
   };
 
+  // Proof of Delivery Photo Handlers
   const handlePickPodPhoto = async () => {
     const res = await pickImageFromFile();
-    if (res.success) setPodPhoto(res.uri);
-    else if (res.error && res.error !== 'No file selected' && res.error !== 'Selection cancelled')
-      setNotice(res.error);
+    if (res.success) {
+      setPodPhoto(res.uri);
+    } else if (
+      res.error &&
+      res.error !== 'No file selected' &&
+      res.error !== 'Selection cancelled'
+    ) {
+      showFeedback(res.error, true);
+    }
   };
 
   const handleSavePodPhoto = async () => {
-    if (!podPhoto || !detail) return;
+    if (!podPhoto || !selectedOrder) return;
     setPodBusy(true);
     try {
       const res = await deliveryService.riderUploadProofPhoto({
         riderId,
-        orderId: detail.orderId,
+        orderId: selectedOrder.orderId,
         photoUri: podPhoto,
       });
       if (res.success) {
-        setNotice('Proof photo saved successfully.');
-        // Patch the selected delivery card with the photo so the preview persists
-        setSelected((prev) => prev ? { ...prev, deliveryPhoto: podPhoto } : prev);
+        showFeedback('Proof of delivery photo saved.');
+        setSelectedOrder((prev) =>
+          prev ? { ...prev, deliveryPhoto: podPhoto } : prev
+        );
         setPodPhoto(null);
         await load();
       } else {
-        setNotice(res.error || 'Could not save photo.');
+        showFeedback(res.error || 'Could not save photo.', true);
       }
     } finally {
       setPodBusy(false);
     }
   };
 
-  const detail = selected;
+  // Account & Availability Handlers
+  const availabilityStatus =
+    riderProfile?.status || RIDER_STATUSES.AVAILABLE;
+
+  const handleSelectAvailability = async (nextStatus) => {
+    if (!nextStatus) return;
+    setRiderProfile((prev) =>
+      prev
+        ? { ...prev, status: nextStatus }
+        : { id: riderId, status: nextStatus }
+    );
+    if (riderId) {
+      try {
+        await riderService.setRiderStatus(riderId, nextStatus);
+      } catch (_e) {}
+    }
+    showFeedback(`Availability updated to ${nextStatus}.`);
+  };
+
+  const handleCycleAvailability = () => {
+    const cur = String(availabilityStatus).toLowerCase();
+    const next =
+      cur === 'available'
+        ? RIDER_STATUSES.OFF_DUTY
+        : RIDER_STATUSES.AVAILABLE;
+    handleSelectAvailability(next);
+  };
+
+  const handleUpdatePreference = (key, value, feedbackMessage) => {
+    setPreferences((prev) => {
+      const next = { ...prev, [key]: value };
+      try {
+        appStorage.setItem(prefsStorageKey, JSON.stringify(next));
+      } catch (_e) {}
+      return next;
+    });
+    if (feedbackMessage) showFeedback(feedbackMessage);
+  };
+
+  const handleSavePersonalInfo = async ({
+    name,
+    phone,
+    email,
+    emailChanged,
+    currentPassword,
+    address,
+    avatar,
+  }) => {
+    if (emailChanged) {
+      const emailRes = await changeEmail({
+        newEmail: email,
+        currentPassword,
+      });
+      if (!emailRes?.success) {
+        return {
+          success: false,
+          error: emailRes?.error || 'Could not update email address.',
+        };
+      }
+    }
+
+    const profRes = await updateProfile({
+      name,
+      phone,
+      address,
+      avatar: avatar || undefined,
+    });
+    if (!profRes?.success) {
+      return {
+        success: false,
+        error: profRes?.error || 'Could not update profile.',
+      };
+    }
+
+    // Persist home address in local rider prefs & sync rider roster record
+    handleUpdatePreference('homeAddress', address);
+
+    if (riderId) {
+      try {
+        const rRes = await riderService.updateRider(riderId, {
+          name,
+          shortName: name.split(' ')[0],
+          phone,
+          avatar: avatar || riderProfile?.avatar,
+        });
+        if (rRes?.rider) setRiderProfile(rRes.rider);
+      } catch (_e) {}
+    }
+
+    return { success: true };
+  };
+
+  const riderFullName =
+    riderProfile?.name || currentUser?.name || 'Jherico Maurin';
+  const riderFirstName = getFirstName(riderFullName, 'Jherico');
+  const riderAvatar = riderProfile?.avatar || currentUser?.avatar || '';
+
+  // Reusable Filter Tabs & Search Block (shared across Home & Orders tabs)
+  const renderFiltersAndSearch = () => {
+    const tabs = [
+      { id: 'all', label: 'All', count: deliveries.length },
+      {
+        id: 'to_confirm',
+        label: 'To confirm',
+        count: needConfirmationOrders.length,
+      },
+      { id: 'delivered', label: 'Delivered', count: deliveredOrders.length },
+    ];
+
+    return (
+      <View style={styles.filtersBlock}>
+        {/* Segmented Filter Tabs */}
+        <View
+          style={[
+            styles.filterTrack,
+            { backgroundColor: palette.isDark ? palette.bgMuted : '#F1F3F5' },
+          ]}
+        >
+          {tabs.map((t) => {
+            const active = orderFilter === t.id;
+            return (
+              <TouchableOpacity
+                key={t.id}
+                style={[
+                  styles.filterTab,
+                  active && [
+                    styles.filterTabActive,
+                    { backgroundColor: palette.bgCard },
+                  ],
+                ]}
+                onPress={() => {
+                  setOrderFilter(t.id);
+                  setOrdersSubFilter('all');
+                }}
+                activeOpacity={0.82}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+              >
+                <Text
+                  style={[
+                    styles.filterTabLabel,
+                    {
+                      color: active ? palette.textPrimary : palette.textMuted,
+                      fontWeight: active ? '600' : '500',
+                    },
+                  ]}
+                >
+                  {t.label}
+                </Text>
+                <Text
+                  style={[
+                    styles.filterTabCount,
+                    {
+                      color:
+                        active && t.id === 'to_confirm'
+                          ? palette.orange
+                          : active
+                            ? palette.textMuted
+                            : palette.textSubtle,
+                      fontWeight: active ? '700' : '600',
+                    },
+                  ]}
+                >
+                  {t.count}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* Search Input */}
+        <View
+          style={[
+            styles.searchFieldWrap,
+            {
+              backgroundColor: palette.bgInput,
+              borderColor: palette.border,
+            },
+          ]}
+        >
+          <BootstrapIcon name="search" size={15} color={palette.textSubtle} />
+          <TextInput
+            style={[styles.searchInput, { color: palette.textPrimary }]}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search orders..."
+            placeholderTextColor={palette.textSubtle}
+            autoCapitalize="none"
+            returnKeyType="search"
+          />
+          {searchQuery ? (
+            <TouchableOpacity
+              onPress={() => setSearchQuery('')}
+              style={styles.clearSearchBtn}
+              accessibilityLabel="Clear search"
+            >
+              <BootstrapIcon
+                name="x-circle-fill"
+                size={15}
+                color={palette.textSubtle}
+              />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      </View>
+    );
+  };
+
+  const renderOrderCardsList = () => {
+    if (filteredOrders.length === 0) {
+      return (
+        <View style={styles.emptyOrdersBox}>
+          <View
+            style={[
+              styles.emptyIconCircle,
+              { backgroundColor: palette.bgMuted },
+            ]}
+          >
+            <BootstrapIcon
+              name={orderFilter === 'delivered' ? 'check-circle' : 'box-seam'}
+              size={24}
+              color={palette.textSubtle}
+            />
+          </View>
+          <Text style={[styles.emptyTitle, { color: palette.textPrimary }]}>
+            {searchQuery.trim()
+              ? 'No matching orders'
+              : orderFilter === 'delivered'
+                ? 'No delivered orders yet'
+                : orderFilter === 'to_confirm'
+                  ? 'All deliveries confirmed'
+                  : 'No assigned orders today'}
+          </Text>
+          <Text style={[styles.emptySubtitle, { color: palette.textMuted }]}>
+            {searchQuery.trim()
+              ? 'Try searching a different order number, customer name, or barangay.'
+              : orderFilter === 'delivered'
+                ? 'Orders you scan and confirm at drop-off will appear here.'
+                : 'New MotoTrack dispatches assigned to you will appear here automatically.'}
+          </Text>
+        </View>
+      );
+    }
+
+    if (mainTab === 'orders' && groupByAreaMode && areaGroups.length > 0) {
+      return areaGroups.map(([area, stops]) => (
+        <View key={area} style={styles.areaGroupSection}>
+          <View style={styles.areaGroupHeader}>
+            <BootstrapIcon name="geo-alt" size={13} color={palette.orange} />
+            <Text
+              style={[styles.areaGroupTitle, { color: palette.textSecondary }]}
+            >
+              {area}
+            </Text>
+            <View
+              style={[
+                styles.areaCountPill,
+                { backgroundColor: palette.orangeSoft },
+              ]}
+            >
+              <Text
+                style={[styles.areaCountText, { color: palette.orangeText }]}
+              >
+                {stops.length}
+              </Text>
+            </View>
+          </View>
+          {stops.map((d) => (
+            <RiderOrderCard
+              key={d.orderId}
+              delivery={d}
+              palette={palette}
+              onViewDetails={(order) => {
+                setPodPhoto(null);
+                setSelectedOrder(order);
+                setVerified(null);
+              }}
+              onScanConfirm={(order) => {
+                setVerified(null);
+                setScanOrder(order);
+              }}
+            />
+          ))}
+        </View>
+      ));
+    }
+
+    return filteredOrders.map((d) => (
+      <RiderOrderCard
+        key={d.orderId}
+        delivery={d}
+        palette={palette}
+        onViewDetails={(order) => {
+          setPodPhoto(null);
+          setSelectedOrder(order);
+          setVerified(null);
+        }}
+        onScanConfirm={(order) => {
+          setVerified(null);
+          setScanOrder(order);
+        }}
+      />
+    ));
+  };
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.brand} />
-          <Text style={styles.muted}>Loading your deliveries…</Text>
+      <SafeAreaView
+        style={[
+          styles.loadingSafe,
+          {
+            backgroundColor: palette.bgCanvas,
+            paddingTop: ANDROID_TOP_INSET,
+          },
+        ]}
+      >
+        <StatusBar
+          style={palette.isDark ? 'light' : 'dark'}
+          translucent
+          backgroundColor="transparent"
+        />
+        <View style={styles.loadingCenter}>
+          <View
+            style={[
+              styles.loadingLogoBadge,
+              { backgroundColor: palette.orange },
+            ]}
+          >
+            <BootstrapIcon name="qr-code-scan" size={22} color="#FFFFFF" />
+          </View>
+          <ActivityIndicator color={palette.orange} style={{ marginTop: 14 }} />
+          <Text style={[styles.loadingLabel, { color: palette.textMuted }]}>
+            Loading MotoTrack dispatch...
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.root}>
-      <SafeAreaView style={styles.safe}>
-        <StatusBar style="light" translucent backgroundColor="transparent" />
+    <View style={[styles.root, { backgroundColor: palette.bgCanvas }]}>
+      <SafeAreaView
+        style={[
+          styles.safeTop,
+          {
+            backgroundColor: palette.bgHeader,
+            paddingTop: ANDROID_TOP_INSET,
+          },
+        ]}
+      >
+        <StatusBar
+          style="light"
+          translucent
+          backgroundColor="transparent"
+        />
 
-        {/* ─── FIXED MOBILE RIDER HEADER (CHARCOAL) ─── */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Rider Dashboard</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <TouchableOpacity
-              onPress={() => setAccountOpen(true)}
-              style={styles.headerIconBtn}
-              accessibilityLabel="My Account"
-            >
-              <BootstrapIcon name="gear" size={16} color="#FFFFFF" />
-            </TouchableOpacity>
-            <TouchableOpacity onPress={onLogout} style={styles.headerIconBtn} accessibilityLabel="Log out">
-              <BootstrapIcon name="box-arrow-right" size={16} color="#F87171" />
-            </TouchableOpacity>
-          </View>
+        {/* Compact Sticky MotoTrack Header */}
+        <RiderTopHeader
+          palette={palette}
+          riderName={riderFullName}
+          riderAvatar={riderAvatar}
+          unreadCount={unreadNotifCount}
+          onPressLogo={() => setMainTab('home')}
+          onPressNotifications={() => setNotificationsOpen(true)}
+          onPressProfile={() => setProfileMenuOpen(true)}
+        />
+      </SafeAreaView>
+
+      {/* Save Confirmation / Feedback Toast */}
+      {feedbackToast ? (
+        <View
+          style={[
+            styles.toastBanner,
+            {
+              backgroundColor: feedbackToast.isError
+                ? palette.danger
+                : palette.charcoal,
+            },
+          ]}
+          pointerEvents="none"
+        >
+          <BootstrapIcon
+            name={
+              feedbackToast.isError
+                ? 'exclamation-circle'
+                : 'check-circle-fill'
+            }
+            size={15}
+            color={feedbackToast.isError ? '#FFFFFF' : '#FF4D00'}
+          />
+          <Text style={styles.toastText} numberOfLines={2}>
+            {feedbackToast.text}
+          </Text>
         </View>
+      ) : null}
 
+      {/* Main Content Area */}
+      <KeyboardAvoidingView
+        style={styles.flexOne}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
         <ScrollView
-          contentContainerStyle={styles.body}
+          style={[styles.flexOne, { backgroundColor: palette.bgCanvas }]}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
+              tintColor={palette.orange}
+              colors={[palette.orange]}
               onRefresh={() => {
                 setRefreshing(true);
                 load();
@@ -448,229 +1178,612 @@ export default function RiderDashboard({ onLogout }) {
             />
           }
         >
-
-          {undelivered.length > 0 ? (
-            <View style={styles.summaryRow}>
-              <View style={styles.summaryPill}>
-                <Text style={styles.summaryValue}>{undelivered.length}</Text>
-                <Text style={styles.summaryLabel}>To deliver</Text>
+          <View style={styles.mobileColumn}>
+            {error ? (
+              <View
+                style={[
+                  styles.errorAlert,
+                  {
+                    backgroundColor: palette.dangerSoft,
+                    borderColor: palette.dangerBorder,
+                  },
+                ]}
+              >
+                <BootstrapIcon
+                  name="exclamation-circle"
+                  size={16}
+                  color={palette.dangerText}
+                />
+                <Text
+                  style={[styles.errorAlertText, { color: palette.dangerText }]}
+                >
+                  {error}
+                </Text>
               </View>
-              <View style={styles.summaryPill}>
-                <Text style={styles.summaryValue}>{completed.length}</Text>
-                <Text style={styles.summaryLabel}>Delivered</Text>
-              </View>
-              <View style={styles.summaryPill}>
-                <Text style={styles.summaryValue}>{formatPhp(weekEarnings)}</Text>
-                <Text style={styles.summaryLabel}>This week</Text>
-              </View>
-            </View>
-          ) : (
-            <View style={styles.statsGrid}>
-              <StatCard
-                accent={colors.accent}
-                iconBg={colors.accentSoft}
-                iconColor={colors.accentDark}
-                icon="cash-stack"
-                label="Weekly earnings"
-                value={formatPhp(weekEarnings)}
-                sub="Shipping fees earned this week"
-                wide
-              />
-              <StatCard
-                accent={colors.info}
-                iconBg={colors.infoSoft}
-                iconColor={colors.info}
-                icon="truck"
-                label="Undelivered"
-                value={String(undelivered.length)}
-                sub="Still on your active route"
-              />
-              <StatCard
-                accent={colors.brand}
-                iconBg={colors.brandLight}
-                iconColor={colors.brand}
-                icon="bag-check-fill"
-                label="Delivered"
-                value={String(completed.length)}
-                valueColor={colors.text}
-                sub="Completed assignments"
-              />
-            </View>
-          )}
+            ) : null}
 
-          {error ? <Text style={styles.warn}>{error}</Text> : null}
-          {notice ? (
-            <Text
-              style={
-                /invalid|cannot|not assigned|not belong|error|unable/i.test(notice)
-                  ? styles.warn
-                  : styles.ok
-              }
-            >
-              {notice}
-            </Text>
-          ) : null}
-
-          <View style={styles.tabRow}>
-            <TouchableOpacity
-              style={[styles.tabBtn, tab === 'active' && styles.tabBtnActive]}
-              onPress={() => setTab('active')}
-            >
-              <Text style={[styles.tabText, tab === 'active' && styles.tabTextActive]}>
-                To deliver{undelivered.length ? ` · ${undelivered.length}` : ''}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tabBtn, tab === 'history' && styles.tabBtnActive]}
-              onPress={() => setTab('history')}
-            >
-              <Text style={[styles.tabText, tab === 'history' && styles.tabTextActive]}>
-                History{completed.length ? ` · ${completed.length}` : ''}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {tab === 'active' ? (
-            <>
-              <TouchableOpacity style={styles.scanFab} onPress={() => setScanOrder({ unbound: true })}>
-                <BootstrapIcon name="qr-code-scan" size={16} color={colors.white} />
-                <Text style={styles.scanFabText}>Scan order QR</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.sectionHead}>Active route</Text>
-
-              {groups.length === 0 ? (
-                <View style={styles.empty}>
-                  <BootstrapIcon name="inbox" size={26} color={colors.textSubtle} />
-                  <Text style={styles.emptyTitle}>Nothing to deliver</Text>
-                  <Text style={styles.muted}>
-                    New assignments show up here. Finished ones move to History.
-                  </Text>
-                </View>
-              ) : null}
-
-              {groups.map(([area, stops]) => (
-                <View key={area} style={styles.areaBlock}>
-                  <View style={styles.areaHead}>
-                    <BootstrapIcon name="geo-alt-fill" size={13} color={colors.brand} />
-                    <Text style={styles.areaTitle}>{area}</Text>
-                    <Text style={styles.areaCount}>{stops.length}</Text>
-                  </View>
-                  {stops.map((d) => {
-                    const tone = statusTone(d.deliveryStatus);
-                    return (
-                      <View key={d.orderId} style={styles.card}>
-                        <TouchableOpacity
-                          onPress={() => {
-                            setSelected(d);
-                            setVerified(null);
-                          }}
-                          activeOpacity={0.85}
-                        >
-                          <View style={styles.cardTop}>
-                            <Text style={styles.orderId}>#{d.orderId}</Text>
-                            <View style={[styles.badge, { backgroundColor: tone.bg }]}>
-                              <Text style={[styles.badgeText, { color: tone.text }]}>{tone.label}</Text>
-                            </View>
-                          </View>
-                          <Text style={styles.customer}>{d.customerName}</Text>
-                          <View style={styles.addressRow}>
-                            <BootstrapIcon name="geo-alt" size={13} color={colors.textMuted} />
-                            <Text style={[styles.address, styles.addressFlex]} numberOfLines={3}>
-                              {d.customerAddress || 'No address on file'}
-                            </Text>
-                          </View>
-                          <DeliveryDateRow start={d.expectedDeliveryAt} end={d.expectedDeliveryEndAt} />
-                          <Text style={styles.meta}>
-                            {formatPhpExact(d.totalAmount)} · {d.paymentStatus}
-                          </Text>
-                        </TouchableOpacity>
-                        <View style={styles.actions}>
-                          <ExternalLink
-                            href={googleMapsNavigateUrl(d.lat, d.lng, d.customerAddress)}
-                            style={styles.actionSlot}
-                          >
-                            <View style={styles.navBtn}>
-                              <BootstrapIcon name="geo-alt-fill" size={13} color={colors.white} />
-                              <Text style={styles.navBtnText}>Navigate</Text>
-                            </View>
-                          </ExternalLink>
-                          <TouchableOpacity
-                            style={[styles.ghostBtn, styles.actionSlot]}
-                            onPress={() => {
-                              setSelected(d);
-                              setVerified(null);
-                            }}
-                          >
-                            <Text style={styles.ghostBtnText}>Details</Text>
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={[styles.scanCardBtn, styles.actionSlot]}
-                            onPress={() => {
-                              setVerified(null);
-                              setScanOrder(d);
-                            }}
-                          >
-                            <BootstrapIcon name="qr-code-scan" size={13} color={colors.brand} />
-                            <Text style={styles.scanCardBtnText}>Scan</Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              ))}
-            </>
-          ) : (
-            <>
-              <Text style={styles.sectionHead}>Delivery history</Text>
-              {completed.length === 0 ? (
-                <View style={styles.empty}>
-                  <BootstrapIcon name="clock-history" size={26} color={colors.textSubtle} />
-                  <Text style={styles.emptyTitle}>No deliveries yet</Text>
-                  <Text style={styles.muted}>
-                    Confirmed deliveries will appear here after you finish a stop.
-                  </Text>
-                </View>
-              ) : (
-                completed.map((d) => (
-                  <TouchableOpacity
-                    key={d.orderId}
-                    style={styles.doneCard}
-                    onPress={() => setSelected(d)}
-                    activeOpacity={0.85}
+            {/* ─── TAB 1: HOME DASHBOARD ─── */}
+            {mainTab === 'home' ? (
+              <>
+                {/* Personalized Greeting & Date */}
+                <View style={styles.heroGreetingBlock}>
+                  <Text
+                    style={[styles.dateOverline, { color: palette.orange }]}
                   >
-                    <View style={styles.historyIcon}>
-                      <BootstrapIcon name="bag-check-fill" size={16} color={colors.brand} />
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.orderId}>#{d.orderId}</Text>
-                      <Text style={styles.customer}>{d.customerName}</Text>
-                      <Text style={styles.address} numberOfLines={1}>
-                        {d.customerAddress || 'No address on file'}
-                      </Text>
-                    </View>
-                    <View style={styles.historyMeta}>
-                      <Text style={styles.doneMeta}>
-                        {d.deliveredAt
-                          ? new Date(d.deliveredAt).toLocaleDateString(undefined, {
-                              month: 'short',
-                              day: 'numeric',
-                            })
-                          : 'Delivered'}
-                      </Text>
-                      <Text style={styles.historyEarn}>
-                        {formatPhp(d.riderEarning || d.shippingFee || 0)}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))
-              )}
-            </>
-          )}
-        </ScrollView>
-      </SafeAreaView>
+                    {formatHeroDate()}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.greetingTitle,
+                      { color: palette.textPrimary },
+                    ]}
+                  >
+                    {getGreetingByHour()}, {riderFirstName}
+                  </Text>
+                  <Text
+                    style={[styles.greetingSub, { color: palette.textMuted }]}
+                  >
+                    {needConfirmationOrders.length > 0
+                      ? `Here's what's happening with your deliveries today.`
+                      : 'All assigned routes are up to date today.'}
+                  </Text>
+                </View>
 
+                {/* 3 Summary KPI Cards */}
+                <View style={styles.summaryRow}>
+                  {/* Card 1: Needs confirmation */}
+                  <TouchableOpacity
+                    style={[
+                      styles.summaryCard,
+                      !palette.isDark && cardShadowStyle,
+                      {
+                        backgroundColor: palette.bgCard,
+                        borderColor:
+                          orderFilter === 'to_confirm'
+                            ? palette.orangeBorder
+                            : palette.border,
+                      },
+                    ]}
+                    onPress={() => setOrderFilter('to_confirm')}
+                    activeOpacity={0.82}
+                  >
+                    <View
+                      style={[
+                        styles.summaryIconBox,
+                        { backgroundColor: palette.orangeSoft },
+                      ]}
+                    >
+                      <BootstrapIcon
+                        name="clock"
+                        size={17}
+                        color={palette.orange}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.summaryLabel,
+                        { color: palette.textSecondary },
+                      ]}
+                      numberOfLines={2}
+                    >
+                      Needs confirmation
+                    </Text>
+                    <Text
+                      style={[
+                        styles.summaryFigure,
+                        { color: palette.textPrimary },
+                      ]}
+                    >
+                      {needConfirmationOrders.length}
+                    </Text>
+                    <Text
+                      style={[styles.summaryHint, { color: palette.textMuted }]}
+                      numberOfLines={1}
+                    >
+                      Ready to complete
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Card 2: Completed deliveries */}
+                  <TouchableOpacity
+                    style={[
+                      styles.summaryCard,
+                      !palette.isDark && cardShadowStyle,
+                      {
+                        backgroundColor: palette.bgCard,
+                        borderColor:
+                          orderFilter === 'delivered'
+                            ? palette.borderStrong
+                            : palette.border,
+                      },
+                    ]}
+                    onPress={() => setOrderFilter('delivered')}
+                    activeOpacity={0.82}
+                  >
+                    <View
+                      style={[
+                        styles.summaryIconBox,
+                        { backgroundColor: palette.completedIconBg },
+                      ]}
+                    >
+                      <BootstrapIcon
+                        name="check"
+                        size={17}
+                        color={palette.completedIconColor}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.summaryLabel,
+                        { color: palette.textSecondary },
+                      ]}
+                      numberOfLines={2}
+                    >
+                      Delivered
+                    </Text>
+                    <Text
+                      style={[
+                        styles.summaryFigure,
+                        { color: palette.textPrimary },
+                      ]}
+                    >
+                      {deliveredOrders.length}
+                    </Text>
+                    <Text
+                      style={[styles.summaryHint, { color: palette.textMuted }]}
+                      numberOfLines={1}
+                    >
+                      This week
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Card 3: Weekly earnings */}
+                  <TouchableOpacity
+                    style={[
+                      styles.summaryCard,
+                      !palette.isDark && cardShadowStyle,
+                      {
+                        backgroundColor: palette.bgCard,
+                        borderColor: palette.border,
+                      },
+                    ]}
+                    onPress={() => setMainTab('earnings')}
+                    activeOpacity={0.82}
+                  >
+                    <View
+                      style={[
+                        styles.summaryIconBox,
+                        { backgroundColor: palette.completedIconBg },
+                      ]}
+                    >
+                      <BootstrapIcon
+                        name="wallet2"
+                        size={17}
+                        color={palette.completedIconColor}
+                      />
+                    </View>
+                    <Text
+                      style={[
+                        styles.summaryLabel,
+                        { color: palette.textSecondary },
+                      ]}
+                      numberOfLines={2}
+                    >
+                      Weekly earnings
+                    </Text>
+                    <Text
+                      style={[
+                        styles.summaryFigure,
+                        { color: palette.textPrimary },
+                      ]}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.75}
+                    >
+                      {formatPhp(weekEarnings)}
+                    </Text>
+                    <Text
+                      style={[styles.summaryHint, { color: palette.textMuted }]}
+                      numberOfLines={1}
+                    >
+                      {weeklyEarningsSub}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Today's Orders Rounded Surface */}
+                <View
+                  style={[
+                    styles.ordersSheetContainer,
+                    {
+                      backgroundColor: palette.bgSheet,
+                      borderColor: palette.border,
+                    },
+                  ]}
+                >
+                  <View style={styles.ordersSheetHead}>
+                    <Text
+                      style={[
+                        styles.ordersSheetTitle,
+                        { color: palette.textPrimary },
+                      ]}
+                    >
+                      Today&apos;s orders
+                    </Text>
+                    <View
+                      style={[
+                        styles.orderCountChip,
+                        { backgroundColor: palette.bgMuted },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.orderCountChipText,
+                          { color: palette.textPrimary },
+                        ]}
+                      >
+                        {filteredOrders.length}{' '}
+                        {filteredOrders.length === 1 ? 'order' : 'orders'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {renderFiltersAndSearch()}
+                  {renderOrderCardsList()}
+                </View>
+              </>
+            ) : null}
+
+            {/* ─── TAB 2: ORDERS & ROUTE DISPATCH ─── */}
+            {mainTab === 'orders' ? (
+              <View style={styles.ordersPageWrap}>
+                <View style={styles.ordersPageHeader}>
+                  <View>
+                    <Text
+                      style={[
+                        styles.pageHeading,
+                        { color: palette.textPrimary },
+                      ]}
+                    >
+                      Delivery orders
+                    </Text>
+                    <Text
+                      style={[styles.pageSubheading, { color: palette.textMuted }]}
+                    >
+                      {needConfirmationOrders.length} active ·{' '}
+                      {deliveredOrders.length} delivered
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.areaToggleBtn,
+                      {
+                        backgroundColor: groupByAreaMode
+                          ? palette.orangeSoft
+                          : palette.bgCard,
+                        borderColor: groupByAreaMode
+                          ? palette.orangeBorder
+                          : palette.border,
+                      },
+                    ]}
+                    onPress={() => setGroupByAreaMode((v) => !v)}
+                    activeOpacity={0.8}
+                  >
+                    <BootstrapIcon
+                      name="geo-alt"
+                      size={13}
+                      color={
+                        groupByAreaMode ? palette.orange : palette.textSecondary
+                      }
+                    />
+                    <Text
+                      style={[
+                        styles.areaToggleText,
+                        {
+                          color: groupByAreaMode
+                            ? palette.orangeText
+                            : palette.textSecondary,
+                        },
+                      ]}
+                    >
+                      By area
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View
+                  style={[
+                    styles.ordersPageCard,
+                    {
+                      backgroundColor: palette.bgSheet,
+                      borderColor: palette.border,
+                    },
+                  ]}
+                >
+                  {renderFiltersAndSearch()}
+
+                  {orderFilter === 'to_confirm' &&
+                  needConfirmationOrders.length > 0 ? (
+                    <View style={styles.subChipRow}>
+                      {[
+                        {
+                          id: 'all',
+                          label: `All active (${needConfirmationOrders.length})`,
+                        },
+                        ...(outForDeliveryCount > 0
+                          ? [
+                              {
+                                id: 'out',
+                                label: `Out for delivery (${outForDeliveryCount})`,
+                              },
+                            ]
+                          : []),
+                        ...(assignedCount > 0
+                          ? [
+                              {
+                                id: 'assigned',
+                                label: `Assigned (${assignedCount})`,
+                              },
+                            ]
+                          : []),
+                      ].map((chip) => {
+                        const active = ordersSubFilter === chip.id;
+                        return (
+                          <TouchableOpacity
+                            key={chip.id}
+                            style={[
+                              styles.subChip,
+                              {
+                                backgroundColor: active
+                                  ? palette.charcoal
+                                  : palette.bgMuted,
+                                borderColor: active
+                                  ? palette.charcoal
+                                  : palette.border,
+                              },
+                            ]}
+                            onPress={() => setOrdersSubFilter(chip.id)}
+                            activeOpacity={0.8}
+                          >
+                            <Text
+                              style={[
+                                styles.subChipText,
+                                {
+                                  color: active
+                                    ? '#FFFFFF'
+                                    : palette.textSecondary,
+                                },
+                              ]}
+                            >
+                              {chip.label}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ) : null}
+
+                  {renderOrderCardsList()}
+                </View>
+              </View>
+            ) : null}
+
+            {/* ─── TAB 3: EARNINGS ─── */}
+            {mainTab === 'earnings' ? (
+              <RiderEarningsView
+                palette={palette}
+                deliveredOrders={deliveredOrders}
+                earningsLedger={earningsLedger}
+                weekEarnings={weekEarnings}
+                totalRiderEarnings={riderProfile?.totalEarnings || 0}
+                onSelectOrder={(order) => {
+                  setPodPhoto(null);
+                  setSelectedOrder(order);
+                }}
+              />
+            ) : null}
+
+            {/* ─── TAB 4: ACCOUNT MANAGEMENT ─── */}
+            {mainTab === 'account' ? (
+              <RiderAccountView
+                palette={palette}
+                accountTab={accountTab}
+                onChangeAccountTab={setAccountTab}
+                currentUser={currentUser}
+                riderProfile={riderProfile}
+                riderId={riderId}
+                availabilityStatus={availabilityStatus}
+                onSelectAvailability={handleSelectAvailability}
+                preferences={preferences}
+                onUpdatePreference={handleUpdatePreference}
+                isDarkMode={isDarkMode}
+                onToggleDarkMode={setDarkMode}
+                onSavePersonalInfo={handleSavePersonalInfo}
+                onChangePassword={changePassword}
+                onLogout={onLogout}
+                onShowFeedback={showFeedback}
+              />
+            ) : null}
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Floating QR Scan Button (Thumb-Accessible Bottom Right) */}
+      <TouchableOpacity
+        style={[
+          styles.floatingQrFab,
+          {
+            backgroundColor: palette.orange,
+          },
+        ]}
+        onPress={() => {
+          setVerified(null);
+          setScanOrder({ unbound: true });
+        }}
+        activeOpacity={0.86}
+        accessibilityRole="button"
+        accessibilityLabel="Scan delivery QR code"
+      >
+        <BootstrapIcon name="qr-code-scan" size={22} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      {/* Persistent 4-Tab Bottom Navigation */}
+      <View
+        style={[
+          styles.bottomNavWrap,
+          {
+            backgroundColor: palette.bgNav,
+            borderTopColor: palette.border,
+          },
+        ]}
+      >
+        <View style={styles.bottomNavInner}>
+          {[
+            {
+              id: 'home',
+              label: 'Home',
+              icon: 'grid',
+              activeIcon: 'grid-fill',
+              badge: 0,
+            },
+            {
+              id: 'orders',
+              label: 'Orders',
+              icon: 'receipt',
+              activeIcon: 'receipt',
+              badge: needConfirmationOrders.length,
+            },
+            {
+              id: 'earnings',
+              label: 'Earnings',
+              icon: 'currency-dollar',
+              activeIcon: 'currency-dollar',
+              badge: 0,
+            },
+            {
+              id: 'account',
+              label: 'Account',
+              icon: 'person',
+              activeIcon: 'person-fill',
+              badge: 0,
+            },
+          ].map((nav) => {
+            const active = mainTab === nav.id;
+            return (
+              <TouchableOpacity
+                key={nav.id}
+                style={styles.bottomNavItem}
+                onPress={() => setMainTab(nav.id)}
+                activeOpacity={0.75}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={nav.label}
+              >
+                <View style={styles.navIconContainer}>
+                  <BootstrapIcon
+                    name={active ? nav.activeIcon : nav.icon}
+                    size={20}
+                    color={active ? palette.orange : palette.textMuted}
+                  />
+                  {nav.badge > 0 ? (
+                    <View
+                      style={[
+                        styles.navCountBadge,
+                        {
+                          backgroundColor: palette.orange,
+                          borderColor: palette.bgNav,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.navCountBadgeText}>
+                        {nav.badge > 99 ? '99+' : nav.badge}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text
+                  style={[
+                    styles.bottomNavLabel,
+                    {
+                      color: active ? palette.orange : palette.textMuted,
+                      fontWeight: active ? '600' : '500',
+                    },
+                  ]}
+                >
+                  {nav.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Profile Quick Menu */}
+      <RiderProfileMenuModal
+        visible={profileMenuOpen}
+        onClose={() => setProfileMenuOpen(false)}
+        palette={palette}
+        riderName={riderFullName}
+        riderId={riderId}
+        riderAvatar={riderAvatar}
+        availabilityStatus={availabilityStatus}
+        onCycleAvailability={handleCycleAvailability}
+        onNavigateAccountTab={(subTab) => {
+          setAccountTab(subTab);
+          setMainTab('account');
+        }}
+        onNavigateMainTab={(tab) => setMainTab(tab)}
+        onLogout={onLogout}
+      />
+
+      {/* Notifications Bottom Sheet */}
+      <RiderNotificationsModal
+        visible={notificationsOpen}
+        onClose={() => setNotificationsOpen(false)}
+        palette={palette}
+        notifications={notificationFeed}
+        unreadCount={unreadNotifCount}
+        onMarkAllRead={handleMarkAllNotifsRead}
+        onSelectOrderFromNotif={(notif) => {
+          setNotificationsOpen(false);
+          if (notif?.orderId) {
+            const match = deliveries.find(
+              (d) => String(d.orderId) === String(notif.orderId)
+            );
+            if (match) {
+              setPodPhoto(null);
+              setSelectedOrder(match);
+              return;
+            }
+          }
+          setMainTab('orders');
+        }}
+      />
+
+      {/* Order Details Bottom Sheet */}
+      <RiderOrderDetailsSheet
+        visible={
+          Boolean(selectedOrder) && !scanOrder && !checkingScan && !confirmOpen
+        }
+        delivery={selectedOrder}
+        palette={palette}
+        busyId={busyId}
+        podPhoto={podPhoto}
+        podBusy={podBusy}
+        onClose={() => {
+          setSelectedOrder(null);
+          setVerified(null);
+          setPodPhoto(null);
+        }}
+        onStartRoute={handleOutForDelivery}
+        onScanConfirm={openScannerFromDetail}
+        onPickPodPhoto={handlePickPodPhoto}
+        onSavePodPhoto={handleSavePodPhoto}
+        onClearPodPhoto={() => setPodPhoto(null)}
+      />
+
+      {/* QR Code Camera / Scanner Sheet */}
       <RiderQrScanSheet
         visible={Boolean(scanOrder)}
         order={scanOrder?.orderId ? scanOrder : null}
@@ -678,15 +1791,30 @@ export default function RiderDashboard({ onLogout }) {
         onScanned={handleScanned}
       />
 
-      <Modal visible={checkingScan} transparent animationType="fade" onRequestClose={() => {}}>
-        <View style={styles.checkingScrim}>
-          <View style={styles.checkingCard}>
-            <ActivityIndicator color={colors.brand} />
-            <Text style={styles.checkingText}>Checking order...</Text>
+      {/* Scan Verification Loading Overlay */}
+      {checkingScan ? (
+        <View
+          style={[styles.checkingScrim, { backgroundColor: palette.scrim }]}
+          pointerEvents="auto"
+        >
+          <View
+            style={[
+              styles.checkingCard,
+              {
+                backgroundColor: palette.bgCard,
+                borderColor: palette.border,
+              },
+            ]}
+          >
+            <ActivityIndicator color={palette.orange} />
+            <Text style={[styles.checkingText, { color: palette.textPrimary }]}>
+              Verifying MotoTrack order...
+            </Text>
           </View>
         </View>
-      </Modal>
+      ) : null}
 
+      {/* Delivery Confirmation Sheet */}
       <RiderDeliveryConfirmSheet
         visible={confirmOpen && Boolean(verified || confirmed)}
         delivery={confirmed || verified}
@@ -698,635 +1826,468 @@ export default function RiderDashboard({ onLogout }) {
         onConfirm={handleConfirmDelivery}
         onDone={handleConfirmFinished}
       />
-
-      <Modal
-        visible={Boolean(detail) && !scanOrder && !confirmOpen}
-        animationType="slide"
-        onRequestClose={() => {
-          setSelected(null);
-          setVerified(null);
-        }}
-      >
-        {detail ? (
-          <SafeAreaView style={styles.safe}>
-            <ScrollView contentContainerStyle={styles.body}>
-              <View style={styles.sheetHead}>
-                <Text style={styles.sheetTitle}>Order #{detail.orderId}</Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelected(null);
-                    setVerified(null);
-                  }}
-                  style={styles.closeBtn}
-                >
-                  <BootstrapIcon name="x-lg" size={14} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-              <View
-                style={[
-                  styles.badge,
-                  {
-                    backgroundColor: statusTone(detail.deliveryStatus).bg,
-                    alignSelf: 'flex-start',
-                  },
-                ]}
-              >
-                <Text style={[styles.badgeText, { color: statusTone(detail.deliveryStatus).text }]}>
-                  {statusTone(detail.deliveryStatus).label}
-                </Text>
-              </View>
-
-              <Text style={styles.section}>Customer</Text>
-              <Text style={styles.customer}>{detail.customerName}</Text>
-              <Text style={styles.phone}>{detail.customerPhone || 'No phone'}</Text>
-              <Text style={styles.section}>Delivery address</Text>
-              <Text style={styles.address}>{detail.customerAddress || 'No address on file'}</Text>
-              <DeliveryDateRow start={detail.expectedDeliveryAt} end={detail.expectedDeliveryEndAt} />
-              {detail.landmark ? <Text style={styles.landmark}>Landmark: {detail.landmark}</Text> : null}
-
-              <Text style={styles.section}>Items</Text>
-              {(detail.items || []).length ? (
-                detail.items.map((it, idx) => (
-                  <Text key={idx} style={styles.itemLine}>
-                    {(it.name || it.product_name || 'Item')} × {it.quantity || 1}
-                  </Text>
-                ))
-              ) : (
-                <Text style={styles.address}>{detail.itemsSummary || '—'}</Text>
-              )}
-
-              <Text style={styles.section}>Payment</Text>
-              <Text style={styles.meta}>{formatPhpExact(detail.totalAmount)}</Text>
-              <Text style={styles.muted}>
-                {detail.paymentMethod} · {detail.paymentStatus}
-              </Text>
-
-              <View style={styles.actions}>
-                <ExternalLink href={googleMapsNavigateUrl(detail.lat, detail.lng, detail.customerAddress)}>
-                  <View style={styles.navBtn}>
-                    <BootstrapIcon name="geo-alt-fill" size={14} color={colors.white} />
-                    <Text style={styles.navBtnText}>Navigate</Text>
-                  </View>
-                </ExternalLink>
-                {detail.customerPhone ? (
-                  <ExternalLink href={`tel:${String(detail.customerPhone).replace(/[^\d+]/g, '')}`}>
-                    <View style={styles.ghostBtn}>
-                      <Text style={styles.ghostBtnText}>Call</Text>
-                    </View>
-                  </ExternalLink>
-                ) : null}
-              </View>
-
-              {detail.deliveryStatus === 'Assigned' ? (
-                <TouchableOpacity
-                  style={[styles.primaryBtn, busyId === detail.orderId && { opacity: 0.7 }]}
-                  disabled={busyId === detail.orderId}
-                  onPress={() => handleOutForDelivery(detail)}
-                >
-                  <Text style={styles.primaryBtnText}>Start — Out for Delivery</Text>
-                </TouchableOpacity>
-              ) : null}
-
-              {detail.deliveryStatus === 'Reported' ? (
-                <View style={[styles.secondaryBtn, { opacity: 0.95 }]}>
-                  <BootstrapIcon name="check-circle-fill" size={16} color={colors.successText || colors.brand} />
-                  <Text style={styles.secondaryBtnText}>Reported — waiting for store confirm</Text>
-                </View>
-              ) : null}
-
-              {detail.deliveryStatus !== 'Delivered' && detail.deliveryStatus !== 'Reported' ? (
-                <TouchableOpacity style={styles.secondaryBtn} onPress={() => setScanOrder(detail)}>
-                  <BootstrapIcon name="qr-code" size={16} color={colors.brand} />
-                  <Text style={styles.secondaryBtnText}>Scan order QR</Text>
-                </TouchableOpacity>
-              ) : null}
-
-              {/* ── PROOF OF DELIVERY PHOTO ── */}
-              {detail.deliveryStatus !== 'Delivered' ? (
-                <View style={styles.podSection}>
-                  <Text style={styles.section}>Proof of Delivery Photo</Text>
-
-                  {/* Existing saved photo */}
-                  {detail.deliveryPhoto && !podPhoto ? (
-                    <View style={styles.podPhotoWrap}>
-                      <Image
-                        source={{ uri: detail.deliveryPhoto }}
-                        style={styles.podPhotoPreview}
-                        resizeMode="cover"
-                      />
-                      <Text style={styles.podPhotoLabel}>Photo on file</Text>
-                      <TouchableOpacity
-                        style={styles.podChangeBtn}
-                        onPress={handlePickPodPhoto}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="camera" size={12} color={colors.brand} />
-                        <Text style={styles.podChangeBtnText}>Change photo</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : null}
-
-                  {/* New staged photo preview */}
-                  {podPhoto ? (
-                    <View style={styles.podPhotoWrap}>
-                      <Image
-                        source={{ uri: podPhoto }}
-                        style={styles.podPhotoPreview}
-                        resizeMode="cover"
-                      />
-                      <Text style={styles.podPhotoLabel}>New photo selected — not saved yet</Text>
-                    </View>
-                  ) : null}
-
-                  {/* Pick photo button (shown when no staged photo) */}
-                  {!podPhoto ? (
-                    <TouchableOpacity
-                      style={styles.podPickBtn}
-                      onPress={handlePickPodPhoto}
-                      activeOpacity={0.85}
-                    >
-                      <BootstrapIcon name="camera" size={14} color={colors.info} />
-                      <Text style={styles.podPickBtnText}>
-                        {detail.deliveryPhoto ? 'Replace Photo' : 'Add Proof Photo'}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
-
-                  {/* Save / Cancel row */}
-                  {podPhoto ? (
-                    <View style={styles.podActions}>
-                      <TouchableOpacity
-                        style={[styles.podSaveBtn, podBusy && { opacity: 0.6 }]}
-                        onPress={handleSavePodPhoto}
-                        disabled={podBusy}
-                        activeOpacity={0.85}
-                      >
-                        {podBusy ? (
-                          <ActivityIndicator size="small" color={colors.white} />
-                        ) : (
-                          <>
-                            <BootstrapIcon name="cloud-upload" size={14} color={colors.white} />
-                            <Text style={styles.podSaveBtnText}>Save Photo</Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.podCancelBtn}
-                        onPress={() => setPodPhoto(null)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={styles.podCancelBtnText}>Cancel</Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : null}
-                </View>
-              ) : null}
-
-              {/* Delivered — show saved photo read-only */}
-              {detail.deliveryStatus === 'Delivered' && detail.deliveryPhoto ? (
-                <View style={styles.podSection}>
-                  <Text style={styles.section}>Proof of Delivery</Text>
-                  <Image
-                    source={{ uri: detail.deliveryPhoto }}
-                    style={styles.podPhotoPreview}
-                    resizeMode="cover"
-                  />
-                </View>
-              ) : null}
-
-            </ScrollView>
-          </SafeAreaView>
-        ) : null}
-      </Modal>
-
-      <StaffAccountSettingsModal
-        visible={accountOpen}
-        onClose={() => setAccountOpen(false)}
-        onSaved={() => setAccountOpen(false)}
-      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  safe: { flex: 1, backgroundColor: '#24272B', paddingTop: ANDROID_TOP_INSET },
-  header: {
-    backgroundColor: '#24272B',
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  root: {
+    flex: 1,
+  },
+  flexOne: {
+    flex: 1,
+  },
+  safeTop: {
+    zIndex: 10,
+  },
+  loadingSafe: {
+    flex: 1,
+  },
+  loadingCenter: {
+    flex: 1,
     alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
   },
-  headerBrand: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#EA580C',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    marginTop: 2,
-    letterSpacing: -0.3,
-  },
-  headerSub: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  headerIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
-    backgroundColor: '#1E2124',
-    borderWidth: 1,
-    borderColor: '#363C44',
+  loadingLogoBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  body: { padding: 16, paddingBottom: 56, maxWidth: 560, width: '100%', alignSelf: 'center', backgroundColor: colors.bg },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
-  topRow: {
+  loadingLabel: {
+    fontFamily: RIDER_FONT,
+    fontSize: 13.5,
+    fontWeight: '500',
+    marginTop: 10,
+  },
+  toastBanner: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 104 : ANDROID_TOP_INSET + 68,
+    left: 16,
+    right: 16,
+    zIndex: 40,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 8,
+  },
+  toastText: {
+    flex: 1,
+    fontFamily: RIDER_FONT,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '500',
+    color: '#FFFFFF',
+  },
+  scrollContent: {
+    paddingBottom: 112,
+  },
+  mobileColumn: {
+    width: '100%',
+    maxWidth: 560,
+    alignSelf: 'center',
+  },
+  errorAlert: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    marginHorizontal: 16,
+    marginTop: 14,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  errorAlertText: {
+    flex: 1,
+    fontFamily: RIDER_FONT,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: '500',
+  },
+  heroGreetingBlock: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 14,
+  },
+  dateOverline: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11,
+    lineHeight: 15,
+    fontWeight: '700',
+    letterSpacing: 0.7,
+    textTransform: 'uppercase',
+  },
+  greetingTitle: {
+    fontFamily: RIDER_FONT,
+    fontSize: 23,
+    lineHeight: 29,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+    marginTop: 4,
+  },
+  greetingSub: {
+    fontFamily: RIDER_FONT,
+    fontSize: 13.5,
+    lineHeight: 19,
+    fontWeight: '400',
+    marginTop: 4,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    gap: 10,
+    marginBottom: 18,
+  },
+  summaryCard: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 13,
+    minHeight: 146,
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+  },
+  summaryIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  summaryLabel: {
+    fontFamily: RIDER_FONT,
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '500',
+    minHeight: 32,
+  },
+  summaryFigure: {
+    fontFamily: RIDER_FONT,
+    fontSize: 22,
+    lineHeight: 27,
+    fontWeight: '700',
+    letterSpacing: -0.4,
+    marginTop: 4,
+    fontVariant: ['tabular-nums'],
+  },
+  summaryHint: {
+    fontFamily: RIDER_FONT,
+    fontSize: 10.5,
+    lineHeight: 14,
+    fontWeight: '400',
+    marginTop: 4,
+    fontVariant: ['tabular-nums'],
+  },
+  ordersSheetContainer: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 12,
+    minHeight: 360,
+  },
+  ordersSheetHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 13,
+  },
+  ordersSheetTitle: {
+    fontFamily: RIDER_FONT,
+    fontSize: 17,
+    lineHeight: 22,
+    fontWeight: '700',
+    letterSpacing: -0.2,
+  },
+  orderCountChip: {
+    paddingHorizontal: 11,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  orderCountChipText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  filtersBlock: {
+    gap: 11,
     marginBottom: 14,
   },
-  brand: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.brand,
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-  },
-  title: { fontSize: 24, fontWeight: '800', color: colors.text, marginTop: 4, letterSpacing: -0.3 },
-  sub: { fontSize: 13, color: colors.textMuted, marginTop: 4 },
-  logoutBtn: {
-    width: 40,
-    height: 40,
+  filterTrack: {
+    flexDirection: 'row',
     borderRadius: 12,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    padding: 4,
+    gap: 4,
+  },
+  filterTab: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 9,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 6,
   },
-  logoutText: { fontSize: 12, fontWeight: '800', color: colors.textChip },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 16,
-  },
-  statCard: {
-    flexGrow: 1,
-    flexBasis: '46%',
-    minWidth: 148,
-    backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    borderLeftWidth: 4,
-    minHeight: 148,
-    shadowColor: colors.text,
+  filterTabActive: {
+    shadowColor: '#202426',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
     elevation: 1,
-    justifyContent: 'space-between',
   },
-  statCardWide: {
-    flexBasis: '100%',
-    minWidth: '100%',
-    minHeight: 132,
+  filterTabLabel: {
+    fontFamily: RIDER_FONT,
+    fontSize: 12.5,
+    lineHeight: 16,
   },
-  statIconWrap: {
-    width: 38,
-    height: 38,
+  filterTabCount: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11.5,
+    lineHeight: 15,
+    fontVariant: ['tabular-nums'],
+  },
+  searchFieldWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 44,
     borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontFamily: RIDER_FONT,
+    fontSize: 13.5,
+    fontWeight: '400',
+    paddingVertical: 8,
+  },
+  clearSearchBtn: {
+    padding: 4,
+  },
+  emptyOrdersBox: {
+    alignItems: 'center',
+    paddingVertical: 38,
+    paddingHorizontal: 20,
+  },
+  emptyIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
-  statLabel: {
-    fontSize: 11,
-    lineHeight: 16,
-    fontWeight: '600',
-    color: colors.textMuted,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  statValue: {
-    fontSize: 26,
-    lineHeight: 32,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  statSub: {
-    fontSize: 12,
-    lineHeight: 16,
-    color: colors.textSubtle,
-    fontWeight: '400',
-    marginTop: 6,
-  },
-  muted: { fontSize: 12, color: colors.textMuted, marginTop: 4, textAlign: 'center' },
-  ok: { fontSize: 13, fontWeight: '700', color: colors.successText, marginVertical: 8 },
-  warn: { fontSize: 13, fontWeight: '700', color: colors.dangerText, marginVertical: 8, lineHeight: 18 },
-  summaryRow: { flexDirection: 'row', gap: 8, marginBottom: 14 },
-  summaryPill: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    paddingVertical: 10,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-  },
-  summaryValue: { fontSize: 16, fontWeight: '800', color: colors.text },
-  summaryLabel: { fontSize: 11, fontWeight: '600', color: colors.textMuted, marginTop: 2 },
-  tabRow: {
-    flexDirection: 'row',
-    backgroundColor: colors.borderSoft,
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 14,
-    gap: 4,
-  },
-  tabBtn: {
-    flex: 1,
-    minHeight: 40,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  tabBtnActive: {
-    backgroundColor: colors.surface,
-    shadowColor: colors.text,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  tabText: { fontSize: 13, fontWeight: '700', color: colors.textMuted },
-  tabTextActive: { color: colors.brand },
-  scanFab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.brand,
-    borderRadius: 14,
-    minHeight: 48,
-    marginBottom: 18,
-  },
-  scanFabText: { color: colors.white, fontWeight: '800' },
-  sectionHead: {
+  emptyTitle: {
+    fontFamily: RIDER_FONT,
     fontSize: 15,
-    fontWeight: '900',
-    color: colors.text,
-    marginBottom: 10,
-  },
-  empty: { alignItems: 'center', paddingVertical: 36, gap: 8 },
-  emptyTitle: { fontSize: 15, fontWeight: '800', color: colors.textSecondary },
-  areaBlock: { marginBottom: 16 },
-  areaHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
-  areaTitle: {
-    flex: 1,
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.textChip,
-    textTransform: 'uppercase',
-  },
-  areaCount: { fontSize: 12, fontWeight: '800', color: colors.brand },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    marginBottom: 10,
-  },
-  doneCard: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  historyIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors.brandLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  historyMeta: { alignItems: 'flex-end', gap: 4 },
-  doneMeta: { fontSize: 11, fontWeight: '700', color: colors.textMuted },
-  historyEarn: { fontSize: 13, fontWeight: '800', color: colors.success },
-  cardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  orderId: { flex: 1, fontSize: 13, fontWeight: '900', color: colors.text, marginRight: 8 },
-  badge: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { fontSize: 10, fontWeight: '800' },
-  customer: { fontSize: 15, fontWeight: '800', color: colors.text, marginTop: 6 },
-  address: { fontSize: 13, color: colors.textMuted, marginTop: 4, lineHeight: 18 },
-  addressRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 4 },
-  addressFlex: { flex: 1, marginTop: 0 },
-  landmark: { fontSize: 12, color: colors.warningText, marginTop: 4, fontWeight: '700' },
-  phone: { fontSize: 13, color: colors.brand, marginTop: 4, fontWeight: '700' },
-  meta: { fontSize: 13, fontWeight: '800', color: colors.text, marginTop: 6 },
-  itemLine: { fontSize: 13, color: colors.textSecondary, marginTop: 2 },
-  section: {
-    marginTop: 14,
-    fontSize: 11,
-    fontWeight: '800',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-  },
-  actions: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  actionSlot: { flex: 1 },
-  dateRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    marginTop: 10,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-  },
-  dateKicker: { fontSize: 11, fontWeight: '800', letterSpacing: 0.2 },
-  dateValue: { fontSize: 13, fontWeight: '700', marginTop: 1 },
-  dateTime: { fontSize: 12, fontWeight: '600', marginTop: 2 },
-  navBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: colors.brand,
-    borderRadius: 11,
-    minHeight: 40,
-    paddingHorizontal: 8,
-  },
-  navBtnText: { color: colors.white, fontWeight: '800', fontSize: 12 },
-  ghostBtn: {
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
-    borderRadius: 11,
-    minHeight: 40,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
-  },
-  ghostBtnText: { fontWeight: '800', color: colors.textSecondary, fontSize: 12 },
-  scanCardBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderWidth: 1.5,
-    borderColor: colors.brand,
-    borderRadius: 11,
-    minHeight: 40,
-    paddingHorizontal: 8,
-    backgroundColor: colors.accentSoft,
-  },
-  scanCardBtnText: { fontWeight: '800', color: colors.brand, fontSize: 12 },
-  primaryBtn: {
-    backgroundColor: colors.brand,
-    borderRadius: 14,
-    minHeight: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 14,
-  },
-  primaryBtnText: { color: colors.white, fontWeight: '800' },
-  secondaryBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderWidth: 1.5,
-    borderColor: colors.brand,
-    borderRadius: 14,
-    minHeight: 46,
-    marginTop: 10,
-  },
-  secondaryBtnText: { color: colors.brand, fontWeight: '800' },
-  sheetHead: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  sheetTitle: { fontSize: 20, fontWeight: '900', color: colors.text },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.bgSubtle,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // ── Proof of Delivery photo styles ──
-  podSection: {
-    marginTop: 18,
-    paddingTop: 14,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-  },
-  podPhotoWrap: {
-    marginTop: 10,
-    marginBottom: 4,
-    gap: 6,
-  },
-  podPhotoPreview: {
-    width: '100%',
-    height: 190,
-    borderRadius: 14,
-    backgroundColor: colors.bgSubtle,
-  },
-  podPhotoLabel: {
-    fontSize: 11,
-    color: colors.textMuted,
+    lineHeight: 20,
     fontWeight: '600',
     textAlign: 'center',
   },
-  podPickBtn: {
+  emptySubtitle: {
+    fontFamily: RIDER_FONT,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: '400',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+  ordersPageWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 12,
+  },
+  ordersPageHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginTop: 10,
-    borderWidth: 1.5,
-    borderColor: colors.info,
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    paddingVertical: 13,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-    backgroundColor: colors.infoSoft,
+    justifyContent: 'space-between',
+    gap: 10,
   },
-  podPickBtnText: { color: colors.info, fontWeight: '800', fontSize: 13 },
-  podChangeBtn: {
+  pageHeading: {
+    fontFamily: RIDER_FONT,
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: '700',
+    letterSpacing: -0.25,
+  },
+  pageSubheading: {
+    fontFamily: RIDER_FONT,
+    fontSize: 12.5,
+    lineHeight: 17,
+    fontWeight: '400',
+    marginTop: 2,
+    fontVariant: ['tabular-nums'],
+  },
+  areaToggleBtn: {
+    minHeight: 38,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    alignSelf: 'flex-end',
   },
-  podChangeBtnText: { color: colors.brand, fontWeight: '700', fontSize: 12 },
-  podActions: {
+  areaToggleText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  ordersPageCard: {
+    borderRadius: 18,
+    borderWidth: 1,
+    padding: 15,
+  },
+  subChipRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
+    flexWrap: 'wrap',
+    gap: 7,
+    marginBottom: 13,
   },
-  podSaveBtn: {
-    flex: 1,
+  subChip: {
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  subChipText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11.5,
+    fontWeight: '600',
+    fontVariant: ['tabular-nums'],
+  },
+  areaGroupSection: {
+    marginBottom: 10,
+  },
+  areaGroupHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: colors.brand,
-    borderRadius: 12,
-    paddingVertical: 12,
+    gap: 6,
+    marginBottom: 8,
   },
-  podSaveBtnText: { color: colors.white, fontWeight: '800', fontSize: 13 },
-  podCancelBtn: {
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
-    borderRadius: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    justifyContent: 'center',
-  },
-  podCancelBtnText: { color: colors.textSecondary, fontWeight: '700', fontSize: 13 },
-  checkingScrim: {
+  areaGroupTitle: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    fontFamily: RIDER_FONT,
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+  },
+  areaCountPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  areaCountText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  floatingQrFab: {
+    position: 'absolute',
+    right: 18,
+    bottom: Platform.OS === 'ios' ? 96 : 80 + ANDROID_BOTTOM_INSET,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 25,
+    shadowColor: '#FF4D00',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.34,
+    shadowRadius: 12,
+    elevation: 7,
+  },
+  bottomNavWrap: {
+    borderTopWidth: 1,
+    paddingTop: 7,
+    paddingBottom:
+      Platform.OS === 'ios' ? 24 : Math.max(10, ANDROID_BOTTOM_INSET + 6),
+  },
+  bottomNavInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    maxWidth: 560,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  bottomNavItem: {
+    flex: 1,
+    minHeight: 46,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+  },
+  navIconContainer: {
+    position: 'relative',
+    width: 28,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navCountBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navCountBadgeText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 9.5,
+    lineHeight: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontVariant: ['tabular-nums'],
+  },
+  bottomNavLabel: {
+    fontFamily: RIDER_FONT,
+    fontSize: 11,
+    lineHeight: 14,
+  },
+  checkingScrim: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 50,
+    elevation: 12,
     alignItems: 'center',
     justifyContent: 'center',
     padding: 24,
   },
   checkingCard: {
-    backgroundColor: colors.surface,
     borderRadius: 16,
+    borderWidth: 1,
     paddingVertical: 22,
     paddingHorizontal: 28,
     alignItems: 'center',
     gap: 12,
-    minWidth: 200,
+    minWidth: 210,
   },
-  checkingText: { fontSize: 15, fontWeight: '700', color: colors.text },
+  checkingText: {
+    fontFamily: RIDER_FONT,
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });

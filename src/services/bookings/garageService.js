@@ -376,6 +376,19 @@ export function getPackageCategoryName(category) {
   return 'Shop Service Package';
 }
 
+export function isExcludedLegacyPackage(pkg) {
+  if (!pkg) return false;
+  const id = String(pkg.id || pkg.service_id || pkg.package_id || '').toLowerCase().trim();
+  const name = String(pkg.name || pkg.title || pkg.package_name || '').toLowerCase().trim();
+  if (id === 'pkg-pms-basic' || id === 'pkg-pms-standard' || id === 'pkg-pms-premium') {
+    return true;
+  }
+  if (name === 'basic pms' || name === 'standard pms' || name === 'premium pms') {
+    return true;
+  }
+  return false;
+}
+
 export function normalizeServicePackage(item) {
   if (!item) return null;
   const category = item.category || 'PMS';
@@ -443,6 +456,20 @@ try {
       const autoSeedMechIds = new Set(['tech-jayson', 'tech-mark', 'tech-alvin', 'tech-christian', 'tech-general']);
       const cleanedMechs = parsedMechs.filter((m) => m && !autoSeedMechIds.has(String(m.id)));
       storageAdapter.setItem(GARAGE_MECHANICS_STORAGE_KEY, JSON.stringify(cleanedMechs));
+    }
+  }
+} catch (_e) {}
+
+// Purge legacy basic/standard/premium PMS packages that are not on the active catalog
+try {
+  const savedServicesCheck = storageAdapter.getItem(GARAGE_SERVICES_STORAGE_KEY);
+  if (savedServicesCheck) {
+    const parsedServices = JSON.parse(savedServicesCheck);
+    if (Array.isArray(parsedServices)) {
+      const cleanedServices = parsedServices.filter((s) => !isExcludedLegacyPackage(s));
+      if (cleanedServices.length !== parsedServices.length) {
+        storageAdapter.setItem(GARAGE_SERVICES_STORAGE_KEY, JSON.stringify(cleanedServices));
+      }
     }
   }
 } catch (_e) {}
@@ -540,7 +567,8 @@ export const garageService = {
               const normalized = data
                 .map((item) => normalizeServicePackage(item))
                 .filter(Boolean)
-                .filter(isActivePackage);
+                .filter(isActivePackage)
+                .filter((item) => !isExcludedLegacyPackage(item));
 
               this.saveServices(normalized);
               return normalized;
@@ -561,11 +589,16 @@ export const garageService = {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed.map((item) => normalizeServicePackage(item)).filter(Boolean);
+          return parsed
+            .map((item) => normalizeServicePackage(item))
+            .filter(Boolean)
+            .filter((item) => !isExcludedLegacyPackage(item));
         }
       }
     } catch (e) {}
-    return GARAGE_SERVICES.map((item) => normalizeServicePackage(item));
+    return GARAGE_SERVICES
+      .map((item) => normalizeServicePackage(item))
+      .filter((item) => !isExcludedLegacyPackage(item));
   },
 
   getActivePackages(category) {

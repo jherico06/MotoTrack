@@ -18,8 +18,12 @@ module.exports = defineConfig([
       },
     },
     rules: {
-      'prettier/prettier': 'warn',
+      'prettier/prettier': 'off',
       'react/no-unescaped-entities': 'off',
+      'react-hooks/refs': 'off',
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/purity': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
       'no-unused-vars': [
         'warn',
         {

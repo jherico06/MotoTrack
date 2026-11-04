@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import BaseRiderDashboard from '../../../../screens/mobile/rider/RiderDashboard.jsx';
-import { androidTokens } from '../../theme/index.js';
+import { useTheme } from '../../../../context/ThemeContext.jsx';
+import { getRiderPalette } from '../../../../components/mobile/rider/riderTheme.js';
 
 /**
  * RiderDashboard (Android Native Implementation - Material Design 3)
@@ -11,8 +12,11 @@ import { androidTokens } from '../../theme/index.js';
  * - Native Android ripple effects on delivery actions
  */
 export default function AndroidRiderDashboard(props) {
+  const { isDarkMode } = useTheme();
+  const palette = getRiderPalette(isDarkMode);
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: palette.bgCanvas }]}>
       <BaseRiderDashboard {...props} platform="android" />
     </View>
   );
@@ -21,6 +25,6 @@ export default function AndroidRiderDashboard(props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: androidTokens.colors.background,
   },
 });
+

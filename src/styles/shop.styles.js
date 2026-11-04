@@ -6,7 +6,7 @@ export const shopStyles = StyleSheet.create({
   // ─── BASE CONTAINER ───
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F3F4F6',
   },
   safeArea: {
     flex: 1,
@@ -984,7 +984,7 @@ export const shopStyles = StyleSheet.create({
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     maxHeight: '90%',
-    paddingHorizontal: 22,
+    paddingHorizontal: 16,
     paddingTop: 20,
     paddingBottom: 32,
     shadowColor: '#000',

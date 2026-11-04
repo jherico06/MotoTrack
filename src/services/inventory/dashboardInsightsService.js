@@ -667,7 +667,7 @@ export function aggregateSalesTrend(orders = [], granularity = 'daily') {
   const SHORT_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   if (granularity === 'daily') {
-    const days = 14;
+    const days = 7;
     const buckets = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);

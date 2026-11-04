@@ -56,8 +56,13 @@ export default function CompanyInfoModal({
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={onClose}
     >
-      <View style={styles.backdrop}>
-        <View style={[styles.dialog, { maxWidth: isDesktop ? 760 : '100%' }]}>
+      <View style={[styles.backdrop, isDesktop ? styles.backdropDesktop : styles.backdropMobile]}>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFillObject}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View style={[styles.dialog, isDesktop ? styles.dialogDesktop : styles.dialogMobile]}>
           {/* Header */}
           <View style={styles.header}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -379,9 +384,18 @@ const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
-    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
-    padding: Platform.OS === 'web' ? 16 : 0,
+  },
+  backdropDesktop: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  backdropMobile: {
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
+    padding: 0,
+
+
     zIndex: 9999,
   },
   dialog: {
@@ -389,8 +403,8 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    borderBottomLeftRadius: Platform.OS === 'web' ? 22 : 0,
-    borderBottomRightRadius: Platform.OS === 'web' ? 22 : 0,
+
+
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.18,
@@ -400,6 +414,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     display: 'flex',
     flexDirection: 'column',
+  },
+  dialogDesktop: {
+    maxWidth: 760,
+    maxHeight: '88%',
+    borderRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  dialogMobile: {
+    maxWidth: '100%',
+    maxHeight: '92%',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   header: {
     flexDirection: 'row',

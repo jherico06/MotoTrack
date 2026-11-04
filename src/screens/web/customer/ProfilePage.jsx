@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -33,10 +33,12 @@ import {
 import {
   BootstrapIcon,
   BrandLogo,
+  HeaderSearchWidget,
   NotificationDropdown,
   UserProfileButton,
   UserProfileDropdown,
   CustomerServiceBookingCard,
+  CustomerMobileNavDrawer,
 } from '../../../components/common';
 import { normalizeBookingStatus } from '../../../utils/bookingWorkflow.js';
 import {
@@ -149,6 +151,7 @@ const MOTORCYCLE_BRANDS = ['Yamaha', 'Honda', 'Kawasaki', 'Suzuki', 'Ducati', 'B
 const MAIN_NAV_ITEMS = [
   { id: 'shop', label: 'Shop' },
   { id: 'booking', label: 'Book a Service' },
+  { id: 'appointments', label: 'Appointments' },
   { id: 'customize', label: 'Customize' },
   { id: 'garage', label: 'Garage' },
   { id: 'orders', label: 'Orders' },
@@ -267,6 +270,7 @@ export default function ProfilePage({
   onNavigateToAdmin,
   onNavigateToLogin,
   onLogout,
+  onNavigateToAppointments,
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 1024;
@@ -531,25 +535,35 @@ export default function ProfilePage({
     }
   };
 
-  const isUploadedAvatar = Boolean(
-    currentUser?.avatar &&
-    typeof currentUser.avatar === 'string' &&
-    !currentUser.avatar.includes('photo-1535713875002') &&
-    !currentUser.avatar.includes('photo-1534528741775') &&
-    !currentUser.avatar.includes('ui-avatars.com')
-  );
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
+  const rawCustomerAvatar =
+    currentUser?.avatar || currentUser?.photoUri || currentUser?.photoURL || currentUser?.avatar_url;
+  const userAvatarUri =
+    typeof rawCustomerAvatar === 'string' && rawCustomerAvatar.trim().length > 0
+      ? rawCustomerAvatar.trim()
+      : null;
+
+  useEffect(() => {
+    setAvatarLoadError(false);
+  }, [userAvatarUri]);
+
+  const isUploadedAvatar = Boolean(userAvatarUri);
 
   const handleUploadAvatar = async () => {
     try {
       const res = await pickImageFromFile();
-      if (res && res.uri) {
+      if (res && res.success && res.uri) {
         if (typeof updateProfile === 'function') {
           await updateProfile({ avatar: res.uri });
+          setAvatarLoadError(false);
           showToast('✓ Profile picture updated!');
         }
+      } else if (res?.error && res.error !== 'Selection cancelled') {
+        showToast(res.error);
       }
     } catch (e) {
       console.warn('Upload avatar error:', e);
+      showToast('Failed to upload profile picture. Please try again.');
     }
   };
 
@@ -557,6 +571,7 @@ export default function ProfilePage({
     try {
       if (typeof updateProfile === 'function') {
         await updateProfile({ avatar: null });
+        setAvatarLoadError(false);
         showToast('Profile photo removed. Default avatar restored.');
       }
     } catch (e) {
@@ -578,6 +593,26 @@ export default function ProfilePage({
       if (currentUser.bikeModel) setBikeModel(currentUser.bikeModel);
       if (currentUser.bikePlate) setBikePlate(currentUser.bikePlate);
       if (currentUser.bikeOdo) setBikeOdo(currentUser.bikeOdo);
+    }
+  }, [currentUser]);
+
+  const refreshOrders = useCallback(() => {
+    try {
+      if (currentUser?.id || currentUser?.user_id) {
+        orderService
+          .getUserOrders(
+            currentUser?.id || currentUser?.user_id,
+            currentUser?.customer_id,
+            currentUser?.name,
+            currentUser
+          )
+          .then((list) => setOrders(Array.isArray(list) ? list : []))
+          .catch(() => setOrders([]));
+      } else {
+        setOrders([]);
+      }
+    } catch (_e) {
+      setOrders([]);
     }
   }, [currentUser]);
 
@@ -630,23 +665,7 @@ export default function ProfilePage({
       }
     } catch (_e) {}
 
-    try {
-      if (currentUser?.id || currentUser?.user_id) {
-        orderService
-          .getUserOrders(
-            currentUser?.id || currentUser?.user_id,
-            currentUser?.customer_id,
-            currentUser?.name,
-            currentUser
-          )
-          .then((list) => setOrders(Array.isArray(list) ? list : []))
-          .catch(() => setOrders([]));
-      } else {
-        setOrders([]);
-      }
-    } catch (_e) {
-      setOrders([]);
-    }
+    refreshOrders();
 
     if (currentUser?.id && typeof getAccountLogs === 'function') {
       getAccountLogs(currentUser.id).then((logs) => {
@@ -1300,8 +1319,19 @@ export default function ProfilePage({
         scrollEventThrottle={16}
       >
         {/* ─── 1. SINGLE TOP NAVBAR ─── */}
-        <View style={styles.headerWrapper}>
-        <View style={[styles.headerInner, windowWidth < 768 && { paddingHorizontal: 16, paddingVertical: 10, gap: 10 }]}>
+        <View
+          style={styles.headerWrapper}
+          className="web-header"
+          dataSet={{ webHeader: true }}
+          accessibilityRole="header"
+        >
+        <View
+          style={[
+            styles.headerInner,
+            windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8, minHeight: 56 },
+            windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
+          ]}
+        >
           {/* LEFT: MotoTrack Logo + Mobile Menu Toggle */}
           <View style={styles.headerLeft}>
             {windowWidth < 1024 && (
@@ -1312,17 +1342,19 @@ export default function ProfilePage({
                 title="Navigation Menu"
                 accessibilityLabel="Navigation Menu"
               >
-                <BootstrapIcon name={isMobileNavOpen ? 'x-lg' : 'list'} size={18} color="#FFFFFF" />
+                <BootstrapIcon name="list" size={20} color="#FFFFFF" />
               </TouchableOpacity>
             )}
 
-            <TouchableOpacity
-              style={styles.logoWrap}
-              onPress={onNavigateToStore}
-              activeOpacity={0.8}
-            >
-              <BrandLogo size={windowWidth < 768 ? 32 : 42} textColor="#FFFFFF" />
-            </TouchableOpacity>
+            {windowWidth >= 768 && (
+              <TouchableOpacity
+                style={styles.logoWrap}
+                onPress={onNavigateToStore}
+                activeOpacity={0.8}
+              >
+                <BrandLogo size={windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* MAIN NAVIGATION (CENTERED): Shop | Book a Service | Customize | Garage | Orders */}
@@ -1341,6 +1373,9 @@ export default function ProfilePage({
                           onNavigateToStore?.();
                         } else if (item.id === 'booking') {
                           onNavigateToGarage?.();
+                        } else if (item.id === 'appointments') {
+                          if (onNavigateToAppointments) onNavigateToAppointments();
+                          else onNavigateToGarage?.({ tab: 'appointments' });
                         } else if (item.id === 'customize') {
                           if (onNavigateToCustomizer) onNavigateToCustomizer();
                           else onNavigateToStore?.();
@@ -1365,10 +1400,22 @@ export default function ProfilePage({
             </View>
           )}
 
-          {/* RIGHT: [Heart] | [Bell] | [Cart] | [⚙] | [Profile] */}
-          <View style={[styles.headerActions, windowWidth < 768 && { gap: 8 }]}>
+          {/* RIGHT: [Search] | [Heart] | [Bell] | [Cart] | [⚙] | [Profile] */}
+          <View
+            style={[
+              styles.headerActions,
+              windowWidth < 768 && { gap: 6 },
+              windowWidth < 400 && { gap: 4 },
+            ]}
+          >
+            {/* Search Bar / Icon (Smooth appearance, placed before Wishlist) */}
+            <HeaderSearchWidget
+              onSearch={(query) => onNavigateToStore?.({ search: query })}
+              isDark={isDarkMode}
+            />
+
             {/* Wishlist / Heart Icon [Heart] */}
-            <TouchableOpacity
+            {windowWidth >= 768 && (<TouchableOpacity
               style={styles.navActionIconBtn}
               onPress={onNavigateToWishlist}
               activeOpacity={0.8}
@@ -1380,7 +1427,7 @@ export default function ProfilePage({
                   <Text style={styles.navBadgeText}>{wishlistCount}</Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </TouchableOpacity>)}
 
             {/* Existing Notification / Bell Icon [Bell] */}
             <View style={{ position: 'relative' }}>
@@ -1422,7 +1469,7 @@ export default function ProfilePage({
             </View>
 
             {/* Cart Icon [Cart] */}
-            <TouchableOpacity
+            {windowWidth >= 768 && (<TouchableOpacity
               style={styles.navActionIconBtn}
               onPress={() => setIsCartOpen(true)}
               activeOpacity={0.85}
@@ -1434,11 +1481,11 @@ export default function ProfilePage({
                   <Text style={styles.navBadgeText}>{cartItemCount}</Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </TouchableOpacity>)}
 
 
             {/* User Profile Avatar [Profile] or Sign In */}
-            {currentUser ? (
+            {currentUser && windowWidth >= 768 ? (
               <View style={[styles.loggedInContainer, { position: 'relative' }]}>
                 <UserProfileButton
                   currentUser={currentUser}
@@ -1446,7 +1493,7 @@ export default function ProfilePage({
                     setIsNotifDropdownOpen(false);
                     setIsProfileDropdownOpen(!isProfileDropdownOpen);
                   }}
-                  size={40}
+                  size={windowWidth < 400 ? 34 : 40}
                 />
 
                 <UserProfileDropdown
@@ -1480,54 +1527,27 @@ export default function ProfilePage({
               </View>
             ) : (
               <TouchableOpacity
-                style={styles.signInHeaderBtn || styles.btnPrimary}
+                style={[
+                  styles.signInHeaderBtn || styles.btnPrimary,
+                  windowWidth < 640 && { paddingHorizontal: 10, paddingVertical: 6, gap: 4 },
+                  windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 5 },
+                  windowWidth < 360 && { width: 34, height: 34, paddingHorizontal: 0, paddingVertical: 0, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
+                ]}
                 onPress={onNavigateToLogin}
                 activeOpacity={0.85}
                 accessibilityRole="button"
                 accessibilityLabel="Sign In"
               >
                 <BootstrapIcon name="person" size={15} color="#FFFFFF" />
-                <Text style={styles.signInHeaderBtnText || styles.btnPrimaryText}>Sign In</Text>
+                {windowWidth >= 360 && (
+                  <Text style={styles.signInHeaderBtnText || styles.btnPrimaryText}>Sign In</Text>
+                )}
               </TouchableOpacity>
             )}
           </View>
         </View>
 
-        {/* Mobile Navigation Drawer for Screens < 1024px */}
-        {windowWidth < 1024 && isMobileNavOpen && (
-          <View style={styles.mobileNavDrawer}>
-            {MAIN_NAV_ITEMS.map((item) => {
-              const isActive = activeTab === item.id;
-              return (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[styles.mobileNavItem, isActive && styles.mobileNavItemActive]}
-                  onPress={() => {
-                    if (item.id === 'shop') {
-                      onNavigateToStore?.();
-                    } else if (item.id === 'booking') {
-                      onNavigateToGarage?.();
-                    } else if (item.id === 'customize') {
-                      if (onNavigateToCustomizer) onNavigateToCustomizer();
-                      else onNavigateToStore?.();
-                    } else {
-                      setActiveTab(item.id);
-                    }
-                    setIsMobileNavOpen(false);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.mobileNavItemText, isActive && styles.mobileNavItemTextActive]}>
-                    {item.label}
-                  </Text>
-                  {isActive && (
-                    <BootstrapIcon name="check2" size={16} color="#34D399" />
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
+
       </View>
 
       <View style={styles.adminLayout}>
@@ -1539,7 +1559,7 @@ export default function ProfilePage({
               { maxWidth: 1360, width: '100%', alignSelf: 'center' },
               isDesktop && { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 60 },
               isTablet && { paddingHorizontal: 18, paddingTop: 20, paddingBottom: 60 },
-              isMobile && { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 40 },
+              isMobile && (windowWidth < 400 ? { paddingHorizontal: 10, paddingTop: 12, paddingBottom: 32 } : { paddingHorizontal: 14, paddingTop: 16, paddingBottom: 40 }),
             ]}
           >
             {/* ───────────────────────────────────────────────────────── */}
@@ -1552,16 +1572,18 @@ export default function ProfilePage({
                   <View style={[styles.sectionCard, { paddingVertical: 48, alignItems: 'center' }]}>
                     <View
                       style={{
-                        width: 72,
-                        height: 72,
-                        borderRadius: 36,
-                        backgroundColor: isDarkMode ? 'rgba(77, 184, 150, 0.2)' : '#C8DDD3',
+                        width: 64,
+                        height: 64,
+                        borderRadius: 32,
+                        backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.28)' : '#FED7AA',
                         alignItems: 'center',
                         justifyContent: 'center',
                         marginBottom: 16,
                       }}
                     >
-                      <BootstrapIcon name="tools" size={32} color={tokens.brandPrimary} />
+                      <BootstrapIcon name="tools" size={28} color={tokens.brandPrimary} />
                     </View>
                     <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.textPrimary }}>
                       Your Garage is Currently Empty
@@ -1581,10 +1603,10 @@ export default function ProfilePage({
                     <TouchableOpacity
                       className="garage-register-btn"
                       style={{
-                        backgroundColor: '#16A34A',
-                        paddingHorizontal: 20,
+                        backgroundColor: isDarkMode ? '#334155' : '#24272B',
+                        paddingHorizontal: 18,
                         paddingVertical: 10,
-                        borderRadius: 10,
+                        borderRadius: 8,
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 6,
@@ -1594,15 +1616,15 @@ export default function ProfilePage({
                       onPress={handleOpenAddMotorcycle}
                       activeOpacity={0.85}
                     >
-                      <BootstrapIcon name="plus-circle-fill" size={14} color="#FFFFFF" />
-                      <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>
+                      <BootstrapIcon name="plus-lg" size={13} color="#FFFFFF" />
+                      <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>
                         Register Your First Motorcycle
                       </Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <View style={[styles.sectionCard, { marginBottom: 20 }]}>
-                    {/* Standardized Header */}
+                  <View style={{ marginBottom: 20 }}>
+                    {/* Header Toolbar */}
                     <View
                       style={{
                         flexDirection: isSmallMobile ? 'column' : 'row',
@@ -1610,7 +1632,7 @@ export default function ProfilePage({
                         alignItems: isSmallMobile ? 'flex-start' : 'center',
                         flexWrap: 'wrap',
                         gap: 16,
-                        marginBottom: 20,
+                        marginBottom: 22,
                       }}
                     >
                       {/* Left: Icon, Title, Count, Description */}
@@ -1620,14 +1642,14 @@ export default function ProfilePage({
                             width: 38,
                             height: 38,
                             borderRadius: 10,
-                            backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.16)' : '#F0FDF4',
+                            backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.06)' : '#F1F5F9',
                             borderWidth: 1,
-                            borderColor: isDarkMode ? 'rgba(22, 163, 74, 0.35)' : '#BBF7D0',
+                            borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0',
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
                         >
-                          <BootstrapIcon name="motorcycle" size={19} color="#16A34A" />
+                          <BootstrapIcon name="bicycle" size={18} color={isDarkMode ? '#F8FAFC' : '#24272B'} />
                         </View>
                         <View>
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -1643,47 +1665,46 @@ export default function ProfilePage({
                             </Text>
                             <View
                               style={{
-                                backgroundColor: isDarkMode ? '#1E293B' : '#133827',
-                                paddingHorizontal: 9,
-                                paddingVertical: 2.5,
+                                backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                                borderWidth: 1,
+                                borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                                paddingHorizontal: 8,
+                                paddingVertical: 2,
                                 borderRadius: 9999,
                               }}
                             >
-                              <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '700' }}>
+                              <Text style={{ color: tokens.textSecondary, fontSize: 11, fontWeight: '600' }}>
                                 {motorcycles.length} {motorcycles.length === 1 ? 'Motorcycle' : 'Motorcycles'}
                               </Text>
                             </View>
                           </View>
-                          <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 2 }}>
-                            Manage registered bikes, update specs, odometer logs, and pit booking profiles
+                          <Text style={{ fontSize: 12.5, color: tokens.textMuted, marginTop: 2 }}>
+                            Manage your registered motorcycles, specs, and service profiles
                           </Text>
                         </View>
                       </View>
 
                       {/* Right: Actions */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <TouchableOpacity
-                          className="garage-register-btn"
-                          style={{
-                            backgroundColor: '#16A34A',
-                            paddingHorizontal: 16,
-                            paddingVertical: 8.5,
-                            borderRadius: 10,
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            gap: 6,
-                            cursor: 'pointer',
-                            boxShadow: '0 1px 3px rgba(22, 163, 74, 0.25)',
-                          }}
-                          onPress={handleOpenAddMotorcycle}
-                          activeOpacity={0.85}
-                        >
-                          <BootstrapIcon name="plus-circle-fill" size={13} color="#FFFFFF" />
-                          <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '700' }}>
-                            Register Motorcycle
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
+                      <TouchableOpacity
+                        className="garage-register-btn"
+                        style={{
+                          backgroundColor: isDarkMode ? '#334155' : '#24272B',
+                          paddingHorizontal: 15,
+                          paddingVertical: 8,
+                          borderRadius: 8,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6,
+                          cursor: 'pointer',
+                        }}
+                        onPress={handleOpenAddMotorcycle}
+                        activeOpacity={0.85}
+                      >
+                        <BootstrapIcon name="plus-lg" size={13} color="#FFFFFF" />
+                        <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '600' }}>
+                          Register Motorcycle
+                        </Text>
+                      </TouchableOpacity>
                     </View>
 
                     {/* Responsive Grid */}
@@ -1702,443 +1723,432 @@ export default function ProfilePage({
                             }),
                       }}
                     >
-                    {motorcycles.map((bike) => {
-                      return (
-                        <View
-                          key={bike.motorcycle_id}
-                          className="garage-fleet-card"
-                          style={{
-                            width: '100%',
-                            borderRadius: 24,
-                            borderWidth: 1.5,
-                            borderColor: customerHeaderBorder,
-                            overflow: 'hidden',
-                            backgroundColor: customerHeaderBg,
-                            boxShadow: isDarkMode ? '0 4px 18px rgba(0, 0, 0, 0.35)' : '0 4px 18px rgba(0, 0, 0, 0.18)',
-                            elevation: 4,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'space-between',
-                          }}
-                        >
-                          {/* 1. Upper Image Showcase Section */}
+                      {motorcycles.map((bike) => {
+                        const formattedOdo = bike.odometer
+                          ? (String(bike.odometer).includes('km') ? bike.odometer : `${Number(bike.odometer).toLocaleString()} km`)
+                          : '0 km';
+
+                        return (
                           <View
+                            key={bike.motorcycle_id}
+                            className="garage-fleet-card"
                             style={{
-                              position: 'relative',
                               width: '100%',
-                              height: 230,
-                              backgroundColor: '#FFFFFF',
-                              borderTopLeftRadius: 22,
-                              borderTopRightRadius: 22,
+                              borderRadius: 16,
+                              borderWidth: 1,
+                              borderColor: tokens.border,
                               overflow: 'hidden',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              paddingHorizontal: 16,
-                              paddingTop: 12,
-                              paddingBottom: 22,
-                            }}
-                          >
-                            {/* Ambient showroom soft floor radial gradient */}
-                            <View
-                              style={[
-                                StyleSheet.absoluteFillObject,
-                                Platform.OS === 'web'
-                                  ? {
-                                      backgroundImage:
-                                        'radial-gradient(ellipse at 50% 86%, rgba(15, 23, 42, 0.07) 0%, rgba(15, 23, 42, 0.015) 50%, transparent 72%)',
-                                    }
-                                  : null,
-                              ]}
-                            />
-
-                            {/* Registered Motorcycle Image */}
-                            <Image
-                              source={{
-                                uri:
-                                  bike.photo_url ||
-                                  'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=900&q=80',
-                              }}
-                              style={{
-                                width: '100%',
-                                height: '100%',
-                              }}
-                              resizeMode="contain"
-                            />
-
-                            {/* Top Badges Row Floating Over Photo */}
-                            <View
-                              style={{
-                                position: 'absolute',
-                                top: 12,
-                                left: 12,
-                                right: 12,
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                zIndex: 5,
-                              }}
-                            >
-                              {/* Left Compact Reference & Engine-Size Labels */}
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <View
-                                  style={{
-                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.88)' : 'rgba(24, 26, 29, 0.92)',
-                                    borderWidth: 1,
-                                    borderColor: 'rgba(255, 255, 255, 0.2)',
-                                    paddingHorizontal: 11,
-                                    paddingVertical: 4.5,
-                                    borderRadius: 9999,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 10.5,
-                                      fontWeight: '700',
-                                      color: '#FFFFFF',
-                                      letterSpacing: 0.4,
-                                    }}
-                                  >
-                                    REF: {bike.plate_number || 'N/A'}
-                                  </Text>
-                                </View>
-
-                                <View
-                                  style={{
-                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.82)' : 'rgba(24, 26, 29, 0.92)',
-                                    borderWidth: 1,
-                                    borderColor: 'rgba(255, 255, 255, 0.16)',
-                                    paddingHorizontal: 10,
-                                    paddingVertical: 4.5,
-                                    borderRadius: 9999,
-                                  }}
-                                >
-                                  <Text
-                                    style={{
-                                      fontSize: 10.5,
-                                      fontWeight: '600',
-                                      color: '#E2E8F0',
-                                    }}
-                                  >
-                                    {bike.engine_cc ? `${bike.engine_cc} cc` : '150 cc'}
-                                  </Text>
-                                </View>
-                              </View>
-
-                              {/* Right Status / Set Primary Action Badge */}
-                              {bike.is_primary ? (
-                                <View
-                                  style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 5,
-                                    paddingHorizontal: 11,
-                                    paddingVertical: 4.5,
-                                    borderRadius: 9999,
-                                    borderWidth: 1.5,
-                                    backgroundColor: 'rgba(28, 19, 5, 0.92)',
-                                    borderColor: '#F59E0B',
-                                    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.15)',
-                                  }}
-                                >
-                                  <BootstrapIcon name="star-fill" size={10.5} color="#FBBF24" />
-                                  <Text
-                                    style={{
-                                      fontSize: 10.5,
-                                      fontWeight: '700',
-                                      color: '#FEF3C7',
-                                      letterSpacing: 0.2,
-                                    }}
-                                  >
-                                    Primary Ride
-                                  </Text>
-                                </View>
-                              ) : (
-                                <TouchableOpacity
-                                  onPress={() => handleSetPrimaryBike(bike)}
-                                  activeOpacity={0.8}
-                                  style={{
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 6,
-                                    paddingHorizontal: 11,
-                                    paddingVertical: 4.5,
-                                    borderRadius: 9999,
-                                    borderWidth: 1.5,
-                                    backgroundColor: isDarkMode ? 'rgba(17, 23, 21, 0.88)' : 'rgba(24, 26, 29, 0.92)',
-                                    borderColor: 'rgba(255, 255, 255, 0.3)',
-                                    cursor: 'pointer',
-                                    boxShadow: '0 1px 4px rgba(0, 0, 0, 0.15)',
-                                  }}
-                                >
-                                  <BootstrapIcon name="star" size={10.5} color="#CBDCEE" />
-                                  <Text
-                                    style={{
-                                      fontSize: 10.5,
-                                      fontWeight: '600',
-                                      color: '#CBDCEE',
-                                    }}
-                                  >
-                                    Set Primary
-                                  </Text>
-                                </TouchableOpacity>
-                              )}
-                            </View>
-
-                            {/* Center Pagination Indicator Dots Neatly Positioned Below Image */}
-                            <View
-                              style={{
-                                position: 'absolute',
-                                bottom: 8,
-                                left: 0,
-                                right: 0,
-                                flexDirection: 'row',
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                gap: 5,
-                                zIndex: 5,
-                              }}
-                            >
-                              <View style={{ width: 14, height: 3.5, borderRadius: 2, backgroundColor: customerHeaderBg }} />
-                              <View style={{ width: 3.5, height: 3.5, borderRadius: 2, backgroundColor: '#CBD5E1' }} />
-                              <View style={{ width: 3.5, height: 3.5, borderRadius: 2, backgroundColor: '#CBD5E1' }} />
-                              <View style={{ width: 3.5, height: 3.5, borderRadius: 2, backgroundColor: '#CBD5E1' }} />
-                            </View>
-                          </View>
-
-                          {/* 2. Lower Information Section (Customer Header Color #EA580C) */}
-                          <View
-                            style={{
-                              flex: 1,
-                              paddingHorizontal: 22,
-                              paddingTop: 18,
-                              paddingBottom: 22,
-                              backgroundColor: customerHeaderBg,
-                              borderBottomLeftRadius: 22,
-                              borderBottomRightRadius: 22,
+                              backgroundColor: tokens.bgCard,
+                              ...(Platform.OS === 'web'
+                                ? {
+                                    boxShadow: isDarkMode
+                                      ? '0 4px 20px rgba(0, 0, 0, 0.4)'
+                                      : '0 1px 3px rgba(0, 0, 0, 0.05), 0 6px 16px -4px rgba(0, 0, 0, 0.04)',
+                                  }
+                                : { elevation: 2 }),
                               display: 'flex',
                               flexDirection: 'column',
                               justifyContent: 'space-between',
                             }}
                           >
-                            {/* Upper Details Group */}
-                            <View>
-                              {/* Motorcycle Name & Nickname Label */}
+                            {/* 1. Upper Image Showcase Section */}
+                            <View
+                              style={{
+                                position: 'relative',
+                                width: '100%',
+                                height: 210,
+                                backgroundColor: isDarkMode ? '#14171A' : '#F8FAFC',
+                                borderBottomWidth: 1,
+                                borderBottomColor: tokens.borderLight,
+                                overflow: 'hidden',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                paddingHorizontal: 16,
+                                paddingTop: 16,
+                                paddingBottom: 16,
+                              }}
+                            >
+                              {/* Registered Motorcycle Image */}
+                              <Image
+                                source={{
+                                  uri:
+                                    bike.photo_url ||
+                                    'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=900&q=80',
+                                }}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                }}
+                                resizeMode="contain"
+                              />
+
+                              {/* Top Badges Row Floating Over Photo */}
                               <View
                                 style={{
+                                  position: 'absolute',
+                                  top: 12,
+                                  left: 12,
+                                  right: 12,
                                   flexDirection: 'row',
                                   justifyContent: 'space-between',
                                   alignItems: 'center',
-                                  gap: 10,
+                                  zIndex: 5,
                                 }}
                               >
-                                <Text
-                                  style={{
-                                    fontSize: 21,
-                                    fontWeight: '600',
-                                    color: '#FFFFFF',
-                                    letterSpacing: -0.4,
-                                    flex: 1,
-                                  }}
-                                  numberOfLines={1}
-                                >
-                                  {bike.brand} {bike.model}
-                                </Text>
-
-                                {bike.nickname ? (
+                                {/* Left: Plate & Displacement Badge */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                                   <View
                                     style={{
-                                      borderWidth: 1.5,
-                                      borderColor: 'rgba(255, 255, 255, 0.35)',
-                                      backgroundColor: 'transparent',
-                                      paddingHorizontal: 11,
-                                      paddingVertical: 3.5,
-                                      borderRadius: 9999,
+                                      backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.94)',
+                                      borderWidth: 1,
+                                      borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0',
+                                      paddingHorizontal: 9,
+                                      paddingVertical: 4,
+                                      borderRadius: 6,
+                                      ...(Platform.OS === 'web' ? { backdropFilter: 'blur(8px)' } : {}),
                                     }}
                                   >
                                     <Text
                                       style={{
-                                        fontSize: 11.5,
+                                        fontSize: 10.5,
                                         fontWeight: '700',
-                                        color: '#FFFFFF',
+                                        color: tokens.textPrimary,
+                                        letterSpacing: 0.4,
+                                        fontVariant: ['tabular-nums'],
+                                      }}
+                                    >
+                                      {bike.plate_number ? `REF: ${bike.plate_number}` : 'NO PLATE'}
+                                    </Text>
+                                  </View>
+
+                                  <View
+                                    style={{
+                                      backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.94)',
+                                      borderWidth: 1,
+                                      borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0',
+                                      paddingHorizontal: 8,
+                                      paddingVertical: 4,
+                                      borderRadius: 6,
+                                      ...(Platform.OS === 'web' ? { backdropFilter: 'blur(8px)' } : {}),
+                                    }}
+                                  >
+                                    <Text
+                                      style={{
+                                        fontSize: 10.5,
+                                        fontWeight: '600',
+                                        color: tokens.textSecondary,
+                                      }}
+                                    >
+                                      {bike.engine_cc ? `${bike.engine_cc} cc` : '150 cc'}
+                                    </Text>
+                                  </View>
+                                </View>
+
+                                {/* Right: Primary Status or Set Primary Action */}
+                                {bike.is_primary ? (
+                                  <View
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 4.5,
+                                      paddingHorizontal: 9,
+                                      paddingVertical: 4,
+                                      borderRadius: 6,
+                                      borderWidth: 1,
+                                      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
+                                      borderColor: isDarkMode ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A',
+                                    }}
+                                  >
+                                    <BootstrapIcon name="star-fill" size={10} color="#D97706" />
+                                    <Text
+                                      style={{
+                                        fontSize: 10.5,
+                                        fontWeight: '700',
+                                        color: isDarkMode ? '#FBBF24' : '#B45309',
                                         letterSpacing: 0.2,
                                       }}
                                     >
-                                      "{bike.nickname}"
+                                      Primary Ride
                                     </Text>
                                   </View>
-                                ) : null}
-                              </View>
-
-                              {/* Secondary Metadata Line */}
-                              <Text
-                                style={{
-                                  fontSize: 12.5,
-                                  fontWeight: '500',
-                                  color: '#94A3B8',
-                                  lineHeight: 18,
-                                  marginTop: 4,
-                                }}
-                                numberOfLines={1}
-                              >
-                                {bike.engine_cc ? `${bike.engine_cc} cc` : '150 cc'} · {bike.year || '2026'} · {bike.color ? `${bike.color} · ` : ''}{bike.odometer ? (String(bike.odometer).includes('km') ? bike.odometer : `${bike.odometer} km`) : '0 km'}
-                              </Text>
-
-                              {/* Compact Service-Readiness Indicator */}
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 7 }}>
-                                <BootstrapIcon name="check-circle-fill" size={12.5} color="#38BDF8" />
-                                <Text
-                                  style={{
-                                    fontSize: 12,
-                                    color: '#38BDF8',
-                                    fontWeight: '600',
-                                    lineHeight: 16,
-                                  }}
-                                >
-                                  {bike.notes || 'Pit service ready · Compatible specs verified'}
-                                </Text>
+                                ) : (
+                                  <TouchableOpacity
+                                    onPress={() => handleSetPrimaryBike(bike)}
+                                    activeOpacity={0.8}
+                                    style={{
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 4.5,
+                                      paddingHorizontal: 9,
+                                      paddingVertical: 4,
+                                      borderRadius: 6,
+                                      borderWidth: 1,
+                                      backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.94)',
+                                      borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0',
+                                      cursor: 'pointer',
+                                      ...(Platform.OS === 'web' ? { backdropFilter: 'blur(8px)' } : {}),
+                                    }}
+                                  >
+                                    <BootstrapIcon name="star" size={10} color={tokens.textMuted} />
+                                    <Text
+                                      style={{
+                                        fontSize: 10.5,
+                                        fontWeight: '600',
+                                        color: tokens.textSecondary,
+                                      }}
+                                    >
+                                      Set Primary
+                                    </Text>
+                                  </TouchableOpacity>
+                                )}
                               </View>
                             </View>
 
-                            {/* Lower Action & Odometer Group */}
-                            <View style={{ marginTop: 14 }}>
-                              {/* Subtle Divider */}
-                              <View
-                                style={{
-                                  height: 1,
-                                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                                  marginBottom: 12,
-                                }}
-                              />
-
-                              {/* Clearly Labeled Odometer Reading and Edit/Delete Actions Row */}
-                              <View
-                                style={{
-                                  flexDirection: 'row',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  marginBottom: 14,
-                                }}
-                              >
-                                <View>
+                            {/* 2. Lower Information Section */}
+                            <View
+                              style={{
+                                flex: 1,
+                                paddingHorizontal: 20,
+                                paddingTop: 18,
+                                paddingBottom: 20,
+                                backgroundColor: tokens.bgCard,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                justifyContent: 'space-between',
+                              }}
+                            >
+                              {/* Upper Details Group */}
+                              <View>
+                                {/* Motorcycle Name & Nickname Label */}
+                                <View
+                                  style={{
+                                    flexDirection: 'row',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    gap: 10,
+                                  }}
+                                >
                                   <Text
                                     style={{
-                                      fontSize: 10,
-                                      color: '#64748B',
-                                      fontWeight: '600',
-                                      textTransform: 'uppercase',
-                                      letterSpacing: 0.6,
+                                      fontSize: 18,
+                                      fontWeight: '700',
+                                      color: tokens.textPrimary,
+                                      letterSpacing: -0.3,
+                                      flex: 1,
+                                    }}
+                                    numberOfLines={1}
+                                  >
+                                    {bike.brand} {bike.model}
+                                  </Text>
+
+                                  {bike.nickname ? (
+                                    <View
+                                      style={{
+                                        borderWidth: 1,
+                                        borderColor: tokens.border,
+                                        backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.05)' : '#F1F5F9',
+                                        paddingHorizontal: 9,
+                                        paddingVertical: 3,
+                                        borderRadius: 6,
+                                      }}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: 11,
+                                          fontWeight: '600',
+                                          color: tokens.textSecondary,
+                                        }}
+                                      >
+                                        "{bike.nickname}"
+                                      </Text>
+                                    </View>
+                                  ) : null}
+                                </View>
+
+                                {/* Secondary Metadata Line */}
+                                <Text
+                                  style={{
+                                    fontSize: 12.5,
+                                    fontWeight: '500',
+                                    color: tokens.textMuted,
+                                    lineHeight: 18,
+                                    marginTop: 4,
+                                  }}
+                                  numberOfLines={1}
+                                >
+                                  {[
+                                    bike.engine_cc ? `${bike.engine_cc} cc` : null,
+                                    bike.year || null,
+                                    bike.color || null,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(' · ')}
+                                </Text>
+
+                                {/* Compact Service-Readiness Indicator */}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+                                  <View
+                                    style={{
+                                      width: 6,
+                                      height: 6,
+                                      borderRadius: 3,
+                                      backgroundColor: '#10B981',
+                                    }}
+                                  />
+                                  <Text
+                                    style={{
+                                      fontSize: 12,
+                                      color: isDarkMode ? '#34D399' : '#059669',
+                                      fontWeight: '500',
+                                      lineHeight: 16,
                                     }}
                                   >
-                                    ODOMETER LOG
+                                    {bike.notes || 'Pit service ready · Compatible specs verified'}
                                   </Text>
+                                </View>
+                              </View>
+
+                              {/* Lower Action & Odometer Group */}
+                              <View style={{ marginTop: 14 }}>
+                                {/* Subtle Divider */}
+                                <View
+                                  style={{
+                                    height: 1,
+                                    backgroundColor: tokens.borderLight,
+                                    marginBottom: 12,
+                                  }}
+                                />
+
+                                {/* Odometer Reading & Edit/Delete Actions */}
+                                <View
+                                  style={{
+                                    flexDirection: 'row',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    marginBottom: 14,
+                                  }}
+                                >
+                                  <View>
+                                    <Text
+                                      style={{
+                                        fontSize: 10,
+                                        color: tokens.textMuted,
+                                        fontWeight: '600',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: 0.6,
+                                      }}
+                                    >
+                                      ODOMETER LOG
+                                    </Text>
+                                    <Text
+                                      style={{
+                                        fontSize: 16,
+                                        fontWeight: '700',
+                                        color: tokens.textPrimary,
+                                        marginTop: 1,
+                                        fontVariant: ['tabular-nums'],
+                                      }}
+                                    >
+                                      {formattedOdo}
+                                    </Text>
+                                  </View>
+
+                                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <TouchableOpacity
+                                      onPress={() => handleOpenEditMotorcycle(bike)}
+                                      style={{
+                                        cursor: 'pointer',
+                                        paddingVertical: 5,
+                                        paddingHorizontal: 9,
+                                        borderRadius: 6,
+                                        borderWidth: 1,
+                                        borderColor: tokens.border,
+                                        backgroundColor: isDarkMode ? 'rgba(255, 255, 255, 0.04)' : '#F8FAFC',
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 5,
+                                      }}
+                                      activeOpacity={0.7}
+                                    >
+                                      <BootstrapIcon name="pencil" size={11} color={tokens.textSecondary} />
+                                      <Text
+                                        style={{
+                                          fontSize: 11.5,
+                                          fontWeight: '500',
+                                          color: tokens.textSecondary,
+                                        }}
+                                      >
+                                        Edit Specs
+                                      </Text>
+                                    </TouchableOpacity>
+
+                                    <TouchableOpacity
+                                      onPress={() => handlePromptDeleteBike(bike)}
+                                      style={{
+                                        cursor: 'pointer',
+                                        paddingVertical: 5,
+                                        paddingHorizontal: 9,
+                                        borderRadius: 6,
+                                        borderWidth: 1,
+                                        borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.25)' : '#FEE2E2',
+                                        backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.08)' : '#FEF2F2',
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: 5,
+                                      }}
+                                      activeOpacity={0.7}
+                                    >
+                                      <BootstrapIcon name="trash3" size={11} color="#EF4444" />
+                                      <Text
+                                        style={{
+                                          fontSize: 11.5,
+                                          fontWeight: '500',
+                                          color: '#EF4444',
+                                        }}
+                                      >
+                                        Delete
+                                      </Text>
+                                    </TouchableOpacity>
+                                  </View>
+                                </View>
+
+                                {/* Primary Action: Full-Width Book Pit Service Button */}
+                                <TouchableOpacity
+                                  className="garage-book-btn"
+                                  style={{
+                                    backgroundColor: isDarkMode ? '#334155' : '#24272B',
+                                    borderRadius: 9,
+                                    width: '100%',
+                                    paddingVertical: 11,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: 7,
+                                    boxShadow: isDarkMode ? '0 2px 6px rgba(0, 0, 0, 0.3)' : '0 2px 6px rgba(36, 39, 43, 0.25)',
+                                    cursor: 'pointer',
+                                  }}
+                                  onPress={onNavigateToGarage}
+                                  activeOpacity={0.88}
+                                >
                                   <Text
                                     style={{
-                                      fontSize: 17,
+                                      fontSize: 13,
                                       fontWeight: '600',
                                       color: '#FFFFFF',
-                                      marginTop: 2,
+                                      letterSpacing: 0.1,
                                     }}
                                   >
-                                    {bike.odometer ? (String(bike.odometer).includes('km') ? bike.odometer : `${bike.odometer} km`) : '0 km'}
+                                    Book Pit Service
                                   </Text>
-                                </View>
-
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                  <TouchableOpacity
-                                    onPress={() => handleOpenEditMotorcycle(bike)}
-                                    style={{
-                                      cursor: 'pointer',
-                                      paddingVertical: 5,
-                                      paddingHorizontal: 10,
-                                      borderRadius: 8,
-                                      backgroundColor: 'rgba(255, 255, 255, 0.06)',
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      gap: 5,
-                                    }}
-                                    activeOpacity={0.7}
-                                  >
-                                    <BootstrapIcon name="pencil-square" size={12} color="#38BDF8" />
-                                    <Text
-                                      style={{
-                                        fontSize: 12,
-                                        fontWeight: '600',
-                                        color: '#38BDF8',
-                                        textDecorationLine: 'underline',
-                                      }}
-                                    >
-                                      Edit Specs
-                                    </Text>
-                                  </TouchableOpacity>
-
-                                  <Text style={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: 10 }}>•</Text>
-
-                                  <TouchableOpacity
-                                    onPress={() => handlePromptDeleteBike(bike)}
-                                    style={{
-                                      cursor: 'pointer',
-                                      paddingVertical: 5,
-                                      paddingHorizontal: 9,
-                                      borderRadius: 8,
-                                      backgroundColor: 'rgba(239, 68, 68, 0.12)',
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      gap: 5,
-                                    }}
-                                    activeOpacity={0.7}
-                                  >
-                                    <BootstrapIcon name="trash3" size={12} color="#FCA5A5" />
-                                    <Text
-                                      style={{
-                                        fontSize: 12,
-                                        fontWeight: '600',
-                                        color: '#FCA5A5',
-                                        textDecorationLine: 'underline',
-                                      }}
-                                    >
-                                      Delete
-                                    </Text>
-                                  </TouchableOpacity>
-                                </View>
+                                  <BootstrapIcon name="arrow-right" size={13} color="#FFFFFF" />
+                                </TouchableOpacity>
                               </View>
-
-                              {/* Primary Action: Full-Width Book Pit Service Button */}
-                              <TouchableOpacity
-                                className="garage-book-btn"
-                                style={{
-                                  backgroundColor: '#FFFFFF',
-                                  borderRadius: 9999,
-                                  width: '100%',
-                                  paddingVertical: 13,
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  gap: 6,
-                                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.16)',
-                                  cursor: 'pointer',
-                                }}
-                                onPress={onNavigateToGarage}
-                                activeOpacity={0.9}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 13.5,
-                                    fontWeight: '700',
-                                    color: customerHeaderBg,
-                                    letterSpacing: 0.2,
-                                  }}
-                                >
-                                  Book Pit Service
-                                </Text>
-                                <BootstrapIcon name="arrow-right-short" size={18} color={customerHeaderBg} />
-                              </TouchableOpacity>
                             </View>
                           </View>
-                        </View>
-                      );
-                    })}
+                        );
+                      })}
+                    </View>
                   </View>
-                </View>
                 )}
               </View>
             )}
@@ -2186,7 +2196,7 @@ export default function ProfilePage({
                 </View>
 
                 {/* Orders Header & Filter Controls */}
-                <View style={[styles.sectionCard, { zIndex: isOrderFilterDropdownOpen ? 1000 : 10, marginBottom: 20 }]}>
+                <View style={{ zIndex: isOrderFilterDropdownOpen ? 1000 : 10, marginBottom: 20 }}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
                     <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.textPrimary }}>
                       Order History ({orders.length})
@@ -2703,11 +2713,12 @@ export default function ProfilePage({
                           boxShadow: '0 2px 6px rgba(15, 23, 42, 0.12)',
                         }}
                       >
-                        {currentUser?.avatar || currentUser?.photoUri ? (
+                        {userAvatarUri && !avatarLoadError ? (
                           <Image
-                            source={{ uri: currentUser?.avatar || currentUser?.photoUri }}
+                            source={{ uri: userAvatarUri }}
                             style={{ width: 72, height: 72, borderRadius: 36 }}
                             resizeMode="cover"
+                            onError={() => setAvatarLoadError(true)}
                           />
                         ) : (
                           <BootstrapIcon name="person-fill" size={36} color="#FFFFFF" />
@@ -5276,6 +5287,43 @@ export default function ProfilePage({
         onSubmitSuccess={() => {
           showToast?.('Your report has been logged and sent to MotoTrack administrators.');
         }}
+      />
+
+      {/* Mobile Customer Navigation Drawer */}
+      <CustomerMobileNavDrawer
+        isOpen={isMobileNavOpen}
+        onClose={() => setIsMobileNavOpen(false)}
+        currentScreen="profile"
+        onNavigateToScreen={(screen, params) => {
+          if (screen === 'shop') onNavigateToStore?.();
+          else if (screen === 'garage') onNavigateToGarage?.();
+          else if (screen === 'appointments') {
+            if (onNavigateToAppointments) onNavigateToAppointments();
+            else onNavigateToGarage?.({ tab: 'appointments' });
+          }
+          else if (screen === 'customizer') {
+            if (onNavigateToCustomizer) onNavigateToCustomizer();
+            else onNavigateToStore?.();
+          } else if (screen === 'wishlist') {
+            if (onNavigateToWishlist) onNavigateToWishlist();
+            else setActiveTab('wishlist');
+          }
+          else if (screen === 'orders') {
+            if (onNavigateToOrders) onNavigateToOrders();
+            else setActiveTab('orders');
+          }
+          else if (screen === 'profile') {
+            if (params?.tab) setActiveTab(params.tab);
+          }
+          else if (screen === 'login') onNavigateToLogin?.();
+          else if (screen === 'admin') onNavigateToAdmin?.();
+        }}
+        currentUser={currentUser}
+        unreadNotifCount={unreadNotifCount}
+        cartItemCount={cartItemCount}
+        onLoginPress={onNavigateToLogin}
+        onLogoutPress={logout}
+        onOpenCart={() => setIsCartOpen(true)}
       />
 
     </SafeAreaView>

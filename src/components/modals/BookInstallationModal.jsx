@@ -52,6 +52,7 @@ export default function BookInstallationModal({
   const { isDarkMode } = useTheme();
   const { width } = useWindowDimensions();
   const isMobile = width < 640;
+  const isDesktop = width >= 768;
 
   // Local state for inline validation warning
   const [phoneTouched, setPhoneTouched] = useState(false);
@@ -121,173 +122,184 @@ export default function BookInstallationModal({
       animationType={Platform.OS === 'web' ? 'fade' : 'slide'}
       onRequestClose={() => !busy && onClose?.()}
     >
-      <View style={styles.overlay}>
         <View
           style={[
-            styles.sheet,
-            {
-              backgroundColor: SURFACE,
-              borderColor: CARD_BORDER,
-              maxWidth: isMobile ? '100%' : 590,
-            },
+            styles.overlay,
+            isDesktop ? styles.overlayDesktop : styles.overlayMobile,
           ]}
         >
-          {/* ─── 1. FIXED HEADER ─── */}
+          <TouchableOpacity
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={() => !busy && onClose?.()}
+          />
           <View
             style={[
-              styles.header,
+              styles.sheet,
+              isDesktop ? styles.sheetDesktop : styles.sheetMobile,
               {
-                borderBottomColor: CARD_BORDER,
-                backgroundColor: isDarkMode ? '#19221E' : '#FFFFFF',
+                backgroundColor: SURFACE,
+                borderColor: CARD_BORDER,
+                maxWidth: isDesktop ? 600 : '100%',
               },
             ]}
           >
-            <View style={styles.headerTitleRow}>
-              <View
-                style={[
-                  styles.headerIconBadge,
-                  { backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA' },
-                ]}
-              >
-                <BootstrapIcon name="calendar2-check-fill" size={17} color="#EA580C" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.headerTitle, { color: INK }]}>Book Installation</Text>
-                <Text style={[styles.headerSubtitle, { color: MUTED }]}>
-                  Review your service and choose your preferred schedule.
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.closeButton,
-                { backgroundColor: isDarkMode ? '#232E29' : '#F1F5F9' },
-              ]}
-              onPress={() => !busy && onClose?.()}
-              disabled={busy}
-              activeOpacity={0.7}
-              accessibilityLabel="Close installation booking modal"
-            >
-              <BootstrapIcon name="x-lg" size={15} color={MUTED} />
-            </TouchableOpacity>
-          </View>
-
-          {/* ─── 2. SCROLLABLE CONTENT BODY ─── */}
-          <ScrollView
-            style={styles.scrollArea}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={true}
-            keyboardShouldPersistTaps="handled"
-          >
-            {/* Inline Error Banner if submission fails */}
-            {errorMessage ? (
-              <View style={styles.errorAlert}>
-                <BootstrapIcon name="exclamation-triangle-fill" size={15} color="#DC2626" />
-                <Text style={styles.errorAlertText}>{errorMessage}</Text>
-              </View>
-            ) : null}
-
-            {/* ─── MOTORCYCLE & SERVICE SUMMARY CARD ─── */}
+            {/* ─── 1. FIXED HEADER ─── */}
             <View
               style={[
-                styles.summaryCard,
+                styles.header,
                 {
-                  backgroundColor: CARD_BG,
-                  borderColor: CARD_BORDER,
+                  borderBottomColor: CARD_BORDER,
+                  backgroundColor: isDarkMode ? '#19221E' : '#FFFFFF',
                 },
               ]}
             >
-              {/* Motorcycle Preview Image: Object-fit contain to prevent cut off */}
-              {previewImageUri ? (
+              <View style={styles.headerTitleRow}>
                 <View
                   style={[
-                    styles.imageContainer,
-                    {
-                      backgroundColor: isDarkMode ? '#131A17' : '#FFFFFF',
-                      borderBottomColor: CARD_BORDER,
-                    },
+                    styles.headerIconBadge,
+                    { backgroundColor: '#FFF7ED', borderWidth: 1, borderColor: '#FED7AA' },
                   ]}
                 >
-                  <Image
-                    source={{ uri: previewImageUri }}
-                    style={styles.motorcycleImage}
-                    resizeMode="contain"
-                  />
-                  <View style={styles.imageOverlayBadge}>
-                    <BootstrapIcon name="check-circle-fill" size={12} color="#10B981" />
-                    <Text style={styles.imageOverlayBadgeText}>AI Fitted Setup</Text>
-                  </View>
+                  <BootstrapIcon name="calendar2-check-fill" size={17} color="#EA580C" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.headerTitle, { color: INK }]}>Book Installation</Text>
+                  <Text style={[styles.headerSubtitle, { color: MUTED }]}>
+                    Review your service and choose your preferred schedule.
+                  </Text>
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={[
+                  styles.closeButton,
+                  { backgroundColor: isDarkMode ? '#232E29' : '#F1F5F9' },
+                ]}
+                onPress={() => !busy && onClose?.()}
+                disabled={busy}
+                activeOpacity={0.7}
+                accessibilityLabel="Close installation booking modal"
+              >
+                <BootstrapIcon name="x-lg" size={15} color={MUTED} />
+              </TouchableOpacity>
+            </View>
+
+            {/* ─── 2. SCROLLABLE CONTENT BODY ─── */}
+            <ScrollView
+              style={styles.scrollArea}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={true}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Inline Error Banner if submission fails */}
+              {errorMessage ? (
+                <View style={styles.errorAlert}>
+                  <BootstrapIcon name="exclamation-triangle-fill" size={15} color="#DC2626" />
+                  <Text style={styles.errorAlertText}>{errorMessage}</Text>
                 </View>
               ) : null}
 
-              {/* Service & Price Info Row */}
-              <View style={styles.summaryDetails}>
-                <View style={styles.summaryInfoCol}>
-                  <Text style={[styles.serviceTitle, { color: INK }]} numberOfLines={1}>
-                    {displayService}
-                  </Text>
-                  <View style={styles.bikeModelRow}>
-                    <BootstrapIcon name="bicycle" size={13} color={BRAND} />
-                    <Text style={[styles.bikeModelText, { color: MUTED }]} numberOfLines={1}>
-                      {displayBike}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={styles.summaryPriceCol}>
-                  {freeInstallPromo ? (
-                    <View style={styles.freeBadge}>
-                      <BootstrapIcon name="tag-fill" size={11} color="#059669" />
-                      <Text style={styles.freeBadgeText}>
-                        FREE • {freeInstallPromo.code || 'PROMO'}
-                      </Text>
-                    </View>
-                  ) : (
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={[styles.priceAmount, { color: BRAND }]}>
-                        ₱{Number(laborFeePhp || 3250).toLocaleString()}
-                      </Text>
-                      <Text style={[styles.priceSublabel, { color: MUTED }]}>
-                        Estimated labor fee
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              {/* Fee notice note */}
+              {/* ─── MOTORCYCLE & SERVICE SUMMARY CARD ─── */}
               <View
                 style={[
-                  styles.feeNoteRow,
+                  styles.summaryCard,
                   {
-                    backgroundColor: isDarkMode ? 'rgba(77,184,150,0.06)' : '#F0FDF4',
-                    borderTopColor: CARD_BORDER,
+                    backgroundColor: CARD_BG,
+                    borderColor: CARD_BORDER,
                   },
                 ]}
               >
-                <BootstrapIcon name="info-circle" size={12} color={BRAND} />
-                <Text style={[styles.feeNoteText, { color: isDarkMode ? '#86EFAC' : '#166534' }]}>
-                  Labor fee estimate payable at shop bay. Parts, fabrication, or extra fluids
-                  finalized upon check-in.
-                </Text>
-              </View>
-            </View>
+                {/* Motorcycle Preview Image: Object-fit contain to prevent cut off */}
+                {previewImageUri ? (
+                  <View
+                    style={[
+                      styles.imageContainer,
+                      {
+                        backgroundColor: isDarkMode ? '#131A17' : '#FFFFFF',
+                        borderBottomColor: CARD_BORDER,
+                      },
+                    ]}
+                  >
+                    <Image
+                      source={{ uri: previewImageUri }}
+                      style={styles.motorcycleImage}
+                      resizeMode="contain"
+                    />
+                    <View style={styles.imageOverlayBadge}>
+                      <BootstrapIcon name="check-circle-fill" size={12} color="#10B981" />
+                      <Text style={styles.imageOverlayBadgeText}>AI Fitted Setup</Text>
+                    </View>
+                  </View>
+                ) : null}
 
-            {/* ─── SECTION 1: INSTALLATION LOCATION ─── */}
-            <View style={styles.sectionBlock}>
-              <View style={styles.sectionHeadingRow}>
-                <Text style={[styles.sectionHeading, { color: INK }]}>
-                  1. Installation Location
-                </Text>
-                <Text style={[styles.sectionSub, { color: MUTED }]}>
-                  Select your preferred MotoTrack pitstop bay
-                </Text>
+                {/* Service & Price Info Row */}
+                <View style={styles.summaryDetails}>
+                  <View style={styles.summaryInfoCol}>
+                    <Text style={[styles.serviceTitle, { color: INK }]} numberOfLines={1}>
+                      {displayService}
+                    </Text>
+                    <View style={styles.bikeModelRow}>
+                      <BootstrapIcon name="bicycle" size={13} color={BRAND} />
+                      <Text style={[styles.bikeModelText, { color: MUTED }]} numberOfLines={1}>
+                        {displayBike}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.summaryPriceCol}>
+                    {freeInstallPromo ? (
+                      <View style={styles.freeBadge}>
+                        <BootstrapIcon name="tag-fill" size={11} color="#059669" />
+                        <Text style={styles.freeBadgeText}>
+                          FREE • {freeInstallPromo.code || 'PROMO'}
+                        </Text>
+                      </View>
+                    ) : (
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[styles.priceAmount, { color: BRAND }]}>
+                          ₱{Number(laborFeePhp || 3250).toLocaleString()}
+                        </Text>
+                        <Text style={[styles.priceSublabel, { color: MUTED }]}>
+                          Estimated labor fee
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
+
+                {/* Fee notice note */}
+                <View
+                  style={[
+                    styles.feeNoteRow,
+                    {
+                      backgroundColor: isDarkMode ? 'rgba(77,184,150,0.06)' : '#F0FDF4',
+                      borderTopColor: CARD_BORDER,
+                    },
+                  ]}
+                >
+                  <BootstrapIcon name="info-circle" size={12} color={BRAND} />
+                  <Text style={[styles.feeNoteText, { color: isDarkMode ? '#86EFAC' : '#166534' }]}>
+                    Labor fee estimate payable at shop bay. Parts, fabrication, or extra fluids
+                    finalized upon check-in.
+                  </Text>
+                </View>
               </View>
 
-              {(branches && branches.length > 0
-                ? branches
-                : [
+              {/* ─── SECTION 1: INSTALLATION LOCATION ─── */}
+              <View style={styles.sectionBlock}>
+                <View style={styles.sectionHeadingRow}>
+                  <Text style={[styles.sectionHeading, { color: INK }]}>
+                    1. Installation Location
+                  </Text>
+                  <Text style={[styles.sectionSub, { color: MUTED }]}>
+                    Select your preferred MotoTrack pitstop bay
+                  </Text>
+                </View>
+
+                {(branches && branches.length > 0
+                  ? branches
+                  : [
                     {
                       id: 'central-naga',
                       name: "D'Blockchain Motorparts and Accessories",
@@ -297,399 +309,399 @@ export default function BookInstallationModal({
                       hours: 'Mon - Sun: 8:00 AM - 7:00 PM',
                     },
                   ]
-              ).map((branch) => {
-                const isSelected =
-                  selectedBranch === branch.name ||
-                  (!selectedBranch && branch.id === 'central-naga');
-                const isHovered = hoveredBranch === branch.name;
+                ).map((branch) => {
+                  const isSelected =
+                    selectedBranch === branch.name ||
+                    (!selectedBranch && branch.id === 'central-naga');
+                  const isHovered = hoveredBranch === branch.name;
 
-                return (
-                  <TouchableOpacity
-                    key={branch.name}
-                    style={[
-                      styles.locationCard,
-                      {
-                        backgroundColor: isSelected
-                          ? GREEN_BG
-                          : isHovered
-                          ? isDarkMode
-                            ? '#202A25'
-                            : '#F8FAFC'
-                          : CARD_BG,
-                        borderColor: isSelected
-                          ? BRAND
-                          : isHovered
-                          ? isDarkMode
-                            ? '#3A4B43'
-                            : '#CBD5E1'
-                          : CARD_BORDER,
-                      },
-                    ]}
-                    onPress={() => onSelectBranch?.(branch.name)}
-                    activeOpacity={0.85}
-                    {...(Platform.OS === 'web'
-                      ? {
+                  return (
+                    <TouchableOpacity
+                      key={branch.name}
+                      style={[
+                        styles.locationCard,
+                        {
+                          backgroundColor: isSelected
+                            ? GREEN_BG
+                            : isHovered
+                              ? isDarkMode
+                                ? '#202A25'
+                                : '#F8FAFC'
+                              : CARD_BG,
+                          borderColor: isSelected
+                            ? BRAND
+                            : isHovered
+                              ? isDarkMode
+                                ? '#3A4B43'
+                                : '#CBD5E1'
+                              : CARD_BORDER,
+                        },
+                      ]}
+                      onPress={() => onSelectBranch?.(branch.name)}
+                      activeOpacity={0.85}
+                      {...(Platform.OS === 'web'
+                        ? {
                           onMouseEnter: () => setHoveredBranch(branch.name),
                           onMouseLeave: () => setHoveredBranch(null),
                         }
-                      : {})}
-                  >
-                    <View style={styles.locationHeaderRow}>
-                      <View style={styles.locationTitleGroup}>
-                        <View
-                          style={[
-                            styles.locationIconBox,
-                            {
-                              backgroundColor: isSelected
-                                ? isDarkMode
-                                  ? 'rgba(77,184,150,0.2)'
-                                  : '#DCFCE7'
-                                : isDarkMode
-                                ? '#222F29'
-                                : '#EEF2F6',
-                            },
-                          ]}
-                        >
-                          <BootstrapIcon
-                            name="geo-alt-fill"
-                            size={14}
-                            color={isSelected ? BRAND : MUTED}
-                          />
+                        : {})}
+                    >
+                      <View style={styles.locationHeaderRow}>
+                        <View style={styles.locationTitleGroup}>
+                          <View
+                            style={[
+                              styles.locationIconBox,
+                              {
+                                backgroundColor: isSelected
+                                  ? isDarkMode
+                                    ? 'rgba(77,184,150,0.2)'
+                                    : '#DCFCE7'
+                                  : isDarkMode
+                                    ? '#222F29'
+                                    : '#EEF2F6',
+                              },
+                            ]}
+                          >
+                            <BootstrapIcon
+                              name="geo-alt-fill"
+                              size={14}
+                              color={isSelected ? BRAND : MUTED}
+                            />
+                          </View>
+                          <Text
+                            style={[
+                              styles.locationName,
+                              { color: INK, fontWeight: isSelected ? '600' : '500' },
+                            ]}
+                          >
+                            {branch.name}
+                          </Text>
                         </View>
-                        <Text
-                          style={[
-                            styles.locationName,
-                            { color: INK, fontWeight: isSelected ? '600' : '500' },
-                          ]}
-                        >
-                          {branch.name}
-                        </Text>
+
+                        {isSelected ? (
+                          <View style={styles.selectedBadge}>
+                            <BootstrapIcon name="check-circle-fill" size={11} color="#059669" />
+                            <Text style={styles.selectedBadgeText}>Selected</Text>
+                          </View>
+                        ) : (
+                          <View style={[styles.unselectedIndicator, { borderColor: SUBTLE }]} />
+                        )}
                       </View>
 
-                      {isSelected ? (
-                        <View style={styles.selectedBadge}>
-                          <BootstrapIcon name="check-circle-fill" size={11} color="#059669" />
-                          <Text style={styles.selectedBadgeText}>Selected</Text>
+                      <Text style={[styles.locationAddress, { color: MUTED }]}>
+                        {branch.address}
+                      </Text>
+
+                      <View style={styles.locationMetaRow}>
+                        <View style={styles.locationMetaItem}>
+                          <BootstrapIcon name="tools" size={11} color={SUBTLE} />
+                          <Text style={[styles.locationMetaText, { color: MUTED }]}>
+                            {branch.bays || '6 Pit Bays • Certified Mechanics'}
+                          </Text>
                         </View>
-                      ) : (
-                        <View style={[styles.unselectedIndicator, { borderColor: SUBTLE }]} />
-                      )}
-                    </View>
-
-                    <Text style={[styles.locationAddress, { color: MUTED }]}>
-                      {branch.address}
-                    </Text>
-
-                    <View style={styles.locationMetaRow}>
-                      <View style={styles.locationMetaItem}>
-                        <BootstrapIcon name="tools" size={11} color={SUBTLE} />
-                        <Text style={[styles.locationMetaText, { color: MUTED }]}>
-                          {branch.bays || '6 Pit Bays • Certified Mechanics'}
-                        </Text>
+                        <View style={styles.locationMetaItem}>
+                          <BootstrapIcon name="clock" size={11} color={SUBTLE} />
+                          <Text style={[styles.locationMetaText, { color: MUTED }]}>
+                            {branch.hours || '8:00 AM - 7:00 PM'}
+                          </Text>
+                        </View>
                       </View>
-                      <View style={styles.locationMetaItem}>
-                        <BootstrapIcon name="clock" size={11} color={SUBTLE} />
-                        <Text style={[styles.locationMetaText, { color: MUTED }]}>
-                          {branch.hours || '8:00 AM - 7:00 PM'}
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* ─── SECTION 2: CHOOSE A TIME SLOT ─── */}
-            <View style={styles.sectionBlock}>
-              <View style={styles.sectionHeadingRow}>
-                <Text style={[styles.sectionHeading, { color: INK }]}>
-                  2. Choose a Time Slot
-                </Text>
-                <Text style={[styles.sectionSub, { color: MUTED }]}>
-                  Available appointment windows for tomorrow
-                </Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
 
-              <View style={styles.slotsGrid}>
-                {(timeSlots && timeSlots.length > 0
-                  ? timeSlots
-                  : [
+              {/* ─── SECTION 2: CHOOSE A TIME SLOT ─── */}
+              <View style={styles.sectionBlock}>
+                <View style={styles.sectionHeadingRow}>
+                  <Text style={[styles.sectionHeading, { color: INK }]}>
+                    2. Choose a Time Slot
+                  </Text>
+                  <Text style={[styles.sectionSub, { color: MUTED }]}>
+                    Available appointment windows for tomorrow
+                  </Text>
+                </View>
+
+                <View style={styles.slotsGrid}>
+                  {(timeSlots && timeSlots.length > 0
+                    ? timeSlots
+                    : [
                       '09:00 AM - 10:30 AM',
                       '10:30 AM - 12:00 PM',
                       '01:30 PM - 03:00 PM',
                       '03:00 PM - 04:30 PM',
                       '04:30 PM - 06:00 PM',
                     ]
-                ).map((slot) => {
-                  const isSelected = selectedTimeSlot === slot;
-                  const isBooked = Boolean(slotAvailability[slot]);
-                  const isHovered = hoveredSlot === slot;
+                  ).map((slot) => {
+                    const isSelected = selectedTimeSlot === slot;
+                    const isBooked = Boolean(slotAvailability[slot]);
+                    const isHovered = hoveredSlot === slot;
 
-                  return (
-                    <TouchableOpacity
-                      key={slot}
-                      style={[
-                        styles.slotButton,
-                        {
-                          backgroundColor: isSelected
-                            ? BRAND
-                            : isBooked
-                            ? isDarkMode
-                              ? '#17201C'
-                              : '#F1F5F9'
-                            : isHovered
-                            ? isDarkMode
-                              ? '#202C26'
-                              : '#F0FDF4'
-                            : isDarkMode
-                            ? '#1B2420'
-                            : '#FFFFFF',
-                          borderColor: isSelected
-                            ? BRAND
-                            : isBooked
-                            ? isDarkMode
-                              ? '#222D28'
-                              : '#E2E8F0'
-                            : isHovered
-                            ? BRAND
-                            : CARD_BORDER,
-                          opacity: isBooked ? 0.6 : 1,
-                        },
-                      ]}
-                      onPress={() => !isBooked && onSelectTimeSlot?.(slot)}
-                      disabled={isBooked || busy}
-                      activeOpacity={0.8}
-                      {...(Platform.OS === 'web'
-                        ? {
+                    return (
+                      <TouchableOpacity
+                        key={slot}
+                        style={[
+                          styles.slotButton,
+                          {
+                            backgroundColor: isSelected
+                              ? BRAND
+                              : isBooked
+                                ? isDarkMode
+                                  ? '#17201C'
+                                  : '#F1F5F9'
+                                : isHovered
+                                  ? isDarkMode
+                                    ? '#202C26'
+                                    : '#F0FDF4'
+                                  : isDarkMode
+                                    ? '#1B2420'
+                                    : '#FFFFFF',
+                            borderColor: isSelected
+                              ? BRAND
+                              : isBooked
+                                ? isDarkMode
+                                  ? '#222D28'
+                                  : '#E2E8F0'
+                                : isHovered
+                                  ? BRAND
+                                  : CARD_BORDER,
+                            opacity: isBooked ? 0.6 : 1,
+                          },
+                        ]}
+                        onPress={() => !isBooked && onSelectTimeSlot?.(slot)}
+                        disabled={isBooked || busy}
+                        activeOpacity={0.8}
+                        {...(Platform.OS === 'web'
+                          ? {
                             onMouseEnter: () => setHoveredSlot(slot),
                             onMouseLeave: () => setHoveredSlot(null),
                           }
-                        : {})}
-                    >
-                      <View style={styles.slotButtonInner}>
-                        {isSelected ? (
-                          <BootstrapIcon name="check2" size={13} color="#FFFFFF" />
-                        ) : isBooked ? (
-                          <BootstrapIcon name="slash-circle" size={11} color={SUBTLE} />
-                        ) : (
-                          <BootstrapIcon
-                            name="clock"
-                            size={12}
-                            color={isHovered ? BRAND : SUBTLE}
-                          />
-                        )}
-                        <Text
-                          style={[
-                            styles.slotText,
-                            {
-                              color: isSelected
-                                ? '#FFFFFF'
-                                : isBooked
-                                ? SUBTLE
-                                : isHovered
-                                ? BRAND
-                                : INK,
-                              fontWeight: isSelected ? '700' : '600',
-                              textDecorationLine: isBooked ? 'line-through' : 'none',
-                            },
-                          ]}
-                        >
-                          {slot}
-                        </Text>
-                      </View>
-
-                      {isBooked ? (
-                        <View style={styles.bookedTag}>
-                          <Text style={styles.bookedTagText}>Full</Text>
+                          : {})}
+                      >
+                        <View style={styles.slotButtonInner}>
+                          {isSelected ? (
+                            <BootstrapIcon name="check2" size={13} color="#FFFFFF" />
+                          ) : isBooked ? (
+                            <BootstrapIcon name="slash-circle" size={11} color={SUBTLE} />
+                          ) : (
+                            <BootstrapIcon
+                              name="clock"
+                              size={12}
+                              color={isHovered ? BRAND : SUBTLE}
+                            />
+                          )}
+                          <Text
+                            style={[
+                              styles.slotText,
+                              {
+                                color: isSelected
+                                  ? '#FFFFFF'
+                                  : isBooked
+                                    ? SUBTLE
+                                    : isHovered
+                                      ? BRAND
+                                      : INK,
+                                fontWeight: isSelected ? '700' : '600',
+                                textDecorationLine: isBooked ? 'line-through' : 'none',
+                              },
+                            ]}
+                          >
+                            {slot}
+                          </Text>
                         </View>
-                      ) : null}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-            </View>
 
-            {/* ─── SECTION 3: CONTACT INFORMATION ─── */}
-            <View style={styles.sectionBlock}>
-              <View style={styles.sectionHeadingRow}>
-                <Text style={[styles.sectionHeading, { color: INK }]}>
-                  3. Contact Information
-                </Text>
-                <Text style={[styles.sectionSub, { color: MUTED }]}>
-                  Shop dispatch will send SMS updates and bay gate pass
-                </Text>
-              </View>
-
-              {/* Phone Field */}
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.inputLabel, { color: INK }]}>
-                  Contact Phone Number <Text style={{ color: '#DC2626' }}>*</Text>
-                </Text>
-                <View
-                  style={[
-                    styles.inputWrapper,
-                    {
-                      backgroundColor: isDarkMode ? '#1B2420' : '#FFFFFF',
-                      borderColor: showPhoneError ? '#DC2626' : CARD_BORDER,
-                    },
-                  ]}
-                >
-                  <View style={styles.inputIconBox}>
-                    <BootstrapIcon
-                      name="telephone-fill"
-                      size={13}
-                      color={showPhoneError ? '#DC2626' : BRAND}
-                    />
-                  </View>
-                  <TextInput
-                    style={[styles.inputField, { color: INK }]}
-                    placeholder="+63 9XX XXX XXXX"
-                    placeholderTextColor={SUBTLE}
-                    value={phone}
-                    onChangeText={(val) => {
-                      onChangePhone?.(val);
-                      if (phoneTouched) setPhoneTouched(false);
-                    }}
-                    onBlur={handlePhoneBlur}
-                    keyboardType="phone-pad"
-                    editable={!busy}
-                  />
-                  {isPhoneValid ? (
-                    <BootstrapIcon name="check-circle-fill" size={14} color="#10B981" />
-                  ) : null}
-                </View>
-
-                {showPhoneError ? (
-                  <Text style={styles.fieldErrorText}>
-                    Please enter a valid mobile number (e.g. +63 917 123 4567)
-                  </Text>
-                ) : (
-                  <Text style={[styles.fieldHelperText, { color: MUTED }]}>
-                    Required for SMS booking verification and pitstop status
-                  </Text>
-                )}
-              </View>
-
-              {/* Fitting Notes Field */}
-              <View style={styles.fieldGroup}>
-                <Text style={[styles.inputLabel, { color: INK }]}>
-                  Fitting & Special Notes{' '}
-                  <Text style={{ fontSize: 11, fontWeight: '500', color: MUTED }}>
-                    (Optional)
-                  </Text>
-                </Text>
-                <View
-                  style={[
-                    styles.textAreaWrapper,
-                    {
-                      backgroundColor: isDarkMode ? '#1B2420' : '#FFFFFF',
-                      borderColor: CARD_BORDER,
-                    },
-                  ]}
-                >
-                  <TextInput
-                    style={[styles.textAreaField, { color: INK }]}
-                    placeholder="e.g., torque specs, keep stock parts, dyno test after install..."
-                    placeholderTextColor={SUBTLE}
-                    value={notes}
-                    onChangeText={onChangeNotes}
-                    multiline
-                    numberOfLines={3}
-                    editable={!busy}
-                  />
+                        {isBooked ? (
+                          <View style={styles.bookedTag}>
+                            <Text style={styles.bookedTagText}>Full</Text>
+                          </View>
+                        ) : null}
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
-            </View>
-          </ScrollView>
 
-          {/* ─── 3. FIXED BOTTOM ACTION FOOTER ─── */}
-          <View
-            style={[
-              styles.footer,
-              {
-                borderTopColor: CARD_BORDER,
-                backgroundColor: isDarkMode ? '#18221E' : '#FFFFFF',
-              },
-            ]}
-          >
-            <View style={[styles.footerContentRow, isMobile && styles.footerContentCol]}>
-              {/* Compact Price Summary */}
-              <View style={styles.footerPriceBlock}>
-                <Text style={[styles.footerPriceLabel, { color: MUTED }]}>
-                  ESTIMATED LABOR
-                </Text>
-                <View style={styles.footerPriceRow}>
-                  {freeInstallPromo ? (
-                    <Text style={[styles.footerPriceVal, { color: '#059669' }]}>
-                      FREE{' '}
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: MUTED }}>
-                        (promo)
-                      </Text>
-                    </Text>
-                  ) : (
-                    <Text style={[styles.footerPriceVal, { color: BRAND }]}>
-                      ₱{Number(laborFeePhp || 3250).toLocaleString()}
-                    </Text>
-                  )}
+              {/* ─── SECTION 3: CONTACT INFORMATION ─── */}
+              <View style={styles.sectionBlock}>
+                <View style={styles.sectionHeadingRow}>
+                  <Text style={[styles.sectionHeading, { color: INK }]}>
+                    3. Contact Information
+                  </Text>
+                  <Text style={[styles.sectionSub, { color: MUTED }]}>
+                    Shop dispatch will send SMS updates and bay gate pass
+                  </Text>
                 </View>
-                <Text style={[styles.footerPriceSub, { color: SUBTLE }]}>
-                  Pay at shop pitstop
-                </Text>
-              </View>
 
-              {/* Action Buttons */}
-              <View style={[styles.footerActionsRow, isMobile && styles.footerActionsRowMobile]}>
-                {onWishlist ? (
-                  <TouchableOpacity
+                {/* Phone Field */}
+                <View style={styles.fieldGroup}>
+                  <Text style={[styles.inputLabel, { color: INK }]}>
+                    Contact Phone Number <Text style={{ color: '#DC2626' }}>*</Text>
+                  </Text>
+                  <View
                     style={[
-                      styles.wishlistBtn,
+                      styles.inputWrapper,
                       {
-                        borderColor: isDarkMode ? '#34463F' : '#CBD5E1',
-                        backgroundColor: isDarkMode ? '#1C2622' : '#FFFFFF',
+                        backgroundColor: isDarkMode ? '#1B2420' : '#FFFFFF',
+                        borderColor: showPhoneError ? '#DC2626' : CARD_BORDER,
                       },
                     ]}
-                    onPress={() => !busy && onWishlist()}
-                    disabled={busy}
-                    activeOpacity={0.8}
-                    accessibilityLabel="Save build to wishlist"
                   >
-                    <BootstrapIcon name="heart" size={14} color={BRAND} />
-                    <Text style={[styles.wishlistBtnText, { color: INK }]}>Wishlist</Text>
-                  </TouchableOpacity>
-                ) : null}
-
-                <TouchableOpacity
-                  style={[
-                    styles.confirmBtn,
-                    {
-                      backgroundColor: BRAND,
-                      opacity: busy || !isPhoneValid ? 0.6 : 1,
-                    },
-                  ]}
-                  onPress={handleConfirmPress}
-                  disabled={busy || !isPhoneValid}
-                  activeOpacity={0.85}
-                  accessibilityLabel="Confirm motorcycle installation booking"
-                >
-                  {busy ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 6 }} />
-                  ) : (
-                    <BootstrapIcon
-                      name="calendar-check"
-                      size={15}
-                      color="#FFFFFF"
-                      style={{ marginRight: 6 }}
+                    <View style={styles.inputIconBox}>
+                      <BootstrapIcon
+                        name="telephone-fill"
+                        size={13}
+                        color={showPhoneError ? '#DC2626' : BRAND}
+                      />
+                    </View>
+                    <TextInput
+                      style={[styles.inputField, { color: INK }]}
+                      placeholder="+63 9XX XXX XXXX"
+                      placeholderTextColor={SUBTLE}
+                      value={phone}
+                      onChangeText={(val) => {
+                        onChangePhone?.(val);
+                        if (phoneTouched) setPhoneTouched(false);
+                      }}
+                      onBlur={handlePhoneBlur}
+                      keyboardType="phone-pad"
+                      editable={!busy}
                     />
+                    {isPhoneValid ? (
+                      <BootstrapIcon name="check-circle-fill" size={14} color="#10B981" />
+                    ) : null}
+                  </View>
+
+                  {showPhoneError ? (
+                    <Text style={styles.fieldErrorText}>
+                      Please enter a valid mobile number (e.g. +63 917 123 4567)
+                    </Text>
+                  ) : (
+                    <Text style={[styles.fieldHelperText, { color: MUTED }]}>
+                      Required for SMS booking verification and pitstop status
+                    </Text>
                   )}
-                  <Text style={styles.confirmBtnText}>
-                    {busy ? 'Booking…' : 'Confirm Booking'}
+                </View>
+
+                {/* Fitting Notes Field */}
+                <View style={styles.fieldGroup}>
+                  <Text style={[styles.inputLabel, { color: INK }]}>
+                    Fitting & Special Notes{' '}
+                    <Text style={{ fontSize: 11, fontWeight: '500', color: MUTED }}>
+                      (Optional)
+                    </Text>
                   </Text>
-                </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.textAreaWrapper,
+                      {
+                        backgroundColor: isDarkMode ? '#1B2420' : '#FFFFFF',
+                        borderColor: CARD_BORDER,
+                      },
+                    ]}
+                  >
+                    <TextInput
+                      style={[styles.textAreaField, { color: INK }]}
+                      placeholder="e.g., torque specs, keep stock parts, dyno test after install..."
+                      placeholderTextColor={SUBTLE}
+                      value={notes}
+                      onChangeText={onChangeNotes}
+                      multiline
+                      numberOfLines={3}
+                      editable={!busy}
+                    />
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* ─── 3. FIXED BOTTOM ACTION FOOTER ─── */}
+            <View
+              style={[
+                styles.footer,
+                {
+                  borderTopColor: CARD_BORDER,
+                  backgroundColor: isDarkMode ? '#18221E' : '#FFFFFF',
+                },
+              ]}
+            >
+              <View style={[styles.footerContentRow, isMobile && styles.footerContentCol]}>
+                {/* Compact Price Summary */}
+                <View style={styles.footerPriceBlock}>
+                  <Text style={[styles.footerPriceLabel, { color: MUTED }]}>
+                    ESTIMATED LABOR
+                  </Text>
+                  <View style={styles.footerPriceRow}>
+                    {freeInstallPromo ? (
+                      <Text style={[styles.footerPriceVal, { color: '#059669' }]}>
+                        FREE{' '}
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: MUTED }}>
+                          (promo)
+                        </Text>
+                      </Text>
+                    ) : (
+                      <Text style={[styles.footerPriceVal, { color: BRAND }]}>
+                        ₱{Number(laborFeePhp || 3250).toLocaleString()}
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={[styles.footerPriceSub, { color: SUBTLE }]}>
+                    Pay at shop pitstop
+                  </Text>
+                </View>
+
+                {/* Action Buttons */}
+                <View style={[styles.footerActionsRow, isMobile && styles.footerActionsRowMobile]}>
+                  {onWishlist ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.wishlistBtn,
+                        {
+                          borderColor: isDarkMode ? '#34463F' : '#CBD5E1',
+                          backgroundColor: isDarkMode ? '#1C2622' : '#FFFFFF',
+                        },
+                      ]}
+                      onPress={() => !busy && onWishlist()}
+                      disabled={busy}
+                      activeOpacity={0.8}
+                      accessibilityLabel="Save build to wishlist"
+                    >
+                      <BootstrapIcon name="heart" size={14} color={BRAND} />
+                      <Text style={[styles.wishlistBtnText, { color: INK }]}>Wishlist</Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  <TouchableOpacity
+                    style={[
+                      styles.confirmBtn,
+                      {
+                        backgroundColor: BRAND,
+                        opacity: busy || !isPhoneValid ? 0.6 : 1,
+                      },
+                    ]}
+                    onPress={handleConfirmPress}
+                    disabled={busy || !isPhoneValid}
+                    activeOpacity={0.85}
+                    accessibilityLabel="Confirm motorcycle installation booking"
+                  >
+                    {busy ? (
+                      <ActivityIndicator size="small" color="#FFFFFF" style={{ marginRight: 6 }} />
+                    ) : (
+                      <BootstrapIcon
+                        name="calendar-check"
+                        size={15}
+                        color="#FFFFFF"
+                        style={{ marginRight: 6 }}
+                      />
+                    )}
+                    <Text style={styles.confirmBtnText}>
+                      {busy ? 'Booking…' : 'Confirm Booking'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </View>
         </View>
-      </View>
     </Modal>
   );
 }
@@ -698,22 +710,30 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.72)',
-    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
-    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
-    padding: Platform.OS === 'web' ? 16 : 0,
     ...Platform.select({
       web: {
         backdropFilter: 'blur(4px)',
       },
     }),
   },
+  overlayDesktop: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  overlayMobile: {
+    justifyContent: 'flex-end',
+    alignItems: 'stretch',
+    padding: 0,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
   sheet: {
     width: '100%',
     maxHeight: Platform.select({ web: '88vh', default: '88%' }),
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    borderBottomLeftRadius: Platform.OS === 'web' ? 20 : 0,
-    borderBottomRightRadius: Platform.OS === 'web' ? 20 : 0,
     borderWidth: 1,
     overflow: 'hidden',
     display: 'flex',
@@ -726,6 +746,15 @@ const styles = StyleSheet.create({
         elevation: 10,
       },
     }),
+  },
+  sheetDesktop: {
+    borderRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  sheetMobile: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
 
   // 1. Fixed Header

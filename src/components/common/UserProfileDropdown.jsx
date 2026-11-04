@@ -9,6 +9,7 @@ import {
   TouchableWithoutFeedback,
   Modal,
   TextInput,
+  useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from './BootstrapIcon.jsx';
 import ConfirmModal from '../modals/ConfirmModal.jsx';
@@ -31,6 +32,7 @@ export default function UserProfileDropdown({
   onLogout,
   onNavigateToDashboard,
   onNavigateToOrders,
+  onNavigateToAppointments,
   onNavigateToWishlist,
   onNavigateToScreen,
   isMobile = false,
@@ -41,6 +43,8 @@ export default function UserProfileDropdown({
   isDark,
   onToggleDarkMode,
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isMobileScreen = windowWidth < 768 || isMobile;
   const dropdownRef = useRef(null);
   const [currentView, setCurrentView] = useState('main'); // 'main' | 'settings_privacy'
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -63,7 +67,7 @@ export default function UserProfileDropdown({
   try {
     const wlCtx = useWishlist();
     wishlistCount = wlCtx?.wishlistCount || 0;
-  } catch (_e) {}
+  } catch (_e) { }
 
   // Internal theme state fallback if isDark is not passed as a controlled prop
   const [internalDarkMode, setInternalDarkMode] = useState(() => {
@@ -96,7 +100,7 @@ export default function UserProfileDropdown({
         if (typeof document !== 'undefined' && document.documentElement) {
           document.documentElement.classList.toggle('dark', next);
         }
-      } catch (_e) {}
+      } catch (_e) { }
     }
   };
 
@@ -190,7 +194,24 @@ export default function UserProfileDropdown({
     }
   }, []);
 
+  const [dropdownImgError, setDropdownImgError] = useState(false);
+  const rawDropdownAvatar =
+    currentUser?.avatar ||
+    currentUser?.photoUri ||
+    currentUser?.photoURL ||
+    currentUser?.avatar_url ||
+    null;
+  const avatarUri =
+    typeof rawDropdownAvatar === 'string' && rawDropdownAvatar.trim().length > 0
+      ? rawDropdownAvatar.trim()
+      : null;
+
+  useEffect(() => {
+    setDropdownImgError(false);
+  }, [avatarUri]);
+
   if (!currentUser) return null;
+  if (isMobileScreen) return null;
   if (
     !isOpen &&
     !isLogoutConfirmOpen &&
@@ -206,12 +227,6 @@ export default function UserProfileDropdown({
   }
 
   const isAdmin = currentUser?.role === 'admin';
-
-  const isUploadedAvatar = Boolean(
-    currentUser?.avatar &&
-    typeof currentUser.avatar === 'string' &&
-    (currentUser.avatar.startsWith('http') || currentUser.avatar.startsWith('data:image'))
-  );
 
   const handleOpenAccountSettings = () => {
     onClose();
@@ -386,15 +401,16 @@ export default function UserProfileDropdown({
         accessibilityHint="Navigates to your rider and motorcycle profile page"
         {...(Platform.OS === 'web'
           ? {
-              onMouseEnter: () => setHoveredItem('profile'),
-              onMouseLeave: () => setHoveredItem(null),
-            }
+            onMouseEnter: () => setHoveredItem('profile'),
+            onMouseLeave: () => setHoveredItem(null),
+          }
           : {})}
       >
-        {isUploadedAvatar ? (
+        {avatarUri && !dropdownImgError ? (
           <Image
-            source={{ uri: currentUser.avatar || currentUser.photoUri }}
+            source={{ uri: avatarUri }}
             style={[styles.avatarImg, { borderColor: theme.border, backgroundColor: theme.bgSub }]}
+            onError={() => setDropdownImgError(true)}
           />
         ) : (
           <View style={[styles.avatarFallback, { backgroundColor: theme.iconWrapBg, borderColor: theme.border }]}>
@@ -434,9 +450,9 @@ export default function UserProfileDropdown({
             activeOpacity={0.7}
             {...(Platform.OS === 'web'
               ? {
-                  onMouseEnter: () => setHoveredItem('dashboard'),
-                  onMouseLeave: () => setHoveredItem(null),
-                }
+                onMouseEnter: () => setHoveredItem('dashboard'),
+                onMouseLeave: () => setHoveredItem(null),
+              }
               : {})}
           >
             <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
@@ -446,6 +462,39 @@ export default function UserProfileDropdown({
             <BootstrapIcon name="chevron-right" size={16} color={theme.chevronColor} />
           </TouchableOpacity>
         )}
+
+        {/* My Appointments Choice */}
+        <TouchableOpacity
+          style={[
+            styles.menuItem,
+            hoveredItem === 'appointments' && { backgroundColor: theme.bgHover },
+          ]}
+          onPress={() => {
+            onClose?.();
+            if (onNavigateToAppointments) {
+              onNavigateToAppointments();
+            } else if (onNavigateToScreen) {
+              onNavigateToScreen('appointments');
+            } else if (onNavigateToDashboard) {
+              onNavigateToDashboard('appointments');
+            } else if (onNavigateToProfile) {
+              onNavigateToProfile('appointments');
+            }
+          }}
+          activeOpacity={0.7}
+          {...(Platform.OS === 'web'
+            ? {
+              onMouseEnter: () => setHoveredItem('appointments'),
+              onMouseLeave: () => setHoveredItem(null),
+            }
+            : {})}
+        >
+          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
+            <BootstrapIcon name="calendar-check-fill" size={16} color={theme.iconColor} />
+          </View>
+          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>My Appointments</Text>
+          <BootstrapIcon name="chevron-right" size={16} color={theme.chevronColor} />
+        </TouchableOpacity>
 
         {/* 2. Settings & privacy */}
         <TouchableOpacity
@@ -457,9 +506,9 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
           {...(Platform.OS === 'web'
             ? {
-                onMouseEnter: () => setHoveredItem('settings'),
-                onMouseLeave: () => setHoveredItem(null),
-              }
+              onMouseEnter: () => setHoveredItem('settings'),
+              onMouseLeave: () => setHoveredItem(null),
+            }
             : {})}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
@@ -479,9 +528,9 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
           {...(Platform.OS === 'web'
             ? {
-                onMouseEnter: () => setHoveredItem('help'),
-                onMouseLeave: () => setHoveredItem(null),
-              }
+              onMouseEnter: () => setHoveredItem('help'),
+              onMouseLeave: () => setHoveredItem(null),
+            }
             : {})}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
@@ -501,9 +550,9 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
           {...(Platform.OS === 'web'
             ? {
-                onMouseEnter: () => setHoveredItem('report'),
-                onMouseLeave: () => setHoveredItem(null),
-              }
+              onMouseEnter: () => setHoveredItem('report'),
+              onMouseLeave: () => setHoveredItem(null),
+            }
             : {})}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
@@ -528,9 +577,9 @@ export default function UserProfileDropdown({
           accessibilityState={{ checked: effectiveDarkMode }}
           {...(Platform.OS === 'web'
             ? {
-                onMouseEnter: () => setHoveredItem('darkmode'),
-                onMouseLeave: () => setHoveredItem(null),
-              }
+              onMouseEnter: () => setHoveredItem('darkmode'),
+              onMouseLeave: () => setHoveredItem(null),
+            }
             : {})}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
@@ -565,9 +614,9 @@ export default function UserProfileDropdown({
             activeOpacity={0.7}
             {...(Platform.OS === 'web'
               ? {
-                  onMouseEnter: () => setHoveredItem('admin'),
-                  onMouseLeave: () => setHoveredItem(null),
-                }
+                onMouseEnter: () => setHoveredItem('admin'),
+                onMouseLeave: () => setHoveredItem(null),
+              }
               : {})}
           >
             <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
@@ -591,9 +640,9 @@ export default function UserProfileDropdown({
           activeOpacity={0.7}
           {...(Platform.OS === 'web'
             ? {
-                onMouseEnter: () => setHoveredItem('logout'),
-                onMouseLeave: () => setHoveredItem(null),
-              }
+              onMouseEnter: () => setHoveredItem('logout'),
+              onMouseLeave: () => setHoveredItem(null),
+            }
             : {})}
         >
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
@@ -657,6 +706,23 @@ export default function UserProfileDropdown({
                 styles.dropdownContainer,
                 { backgroundColor: theme.bgCard, borderColor: theme.border },
                 align === 'left' ? { left: 0, right: 'auto' } : { right: 0, left: 'auto' },
+                isMobileScreen
+                  ? {
+                    position: 'fixed',
+                    top: topOffset ?? 64,
+                    right: 12,
+                    left: windowWidth < 350 ? 12 : 'auto',
+                    width: windowWidth < 350 ? 'auto' : Math.min(300, windowWidth - 24),
+                    maxWidth: 'calc(100vw - 24px)',
+                    maxHeight: typeof topOffset === 'number' ? `calc(100vh - ${topOffset + 20}px)` : 'calc(100vh - 80px)',
+                    overflowY: 'auto',
+                    zIndex: 99999,
+                  }
+                  : {
+                    top: topOffset ?? '100%',
+                    maxHeight: 'calc(100vh - 80px)',
+                    overflowY: 'auto',
+                  },
               ]}
             >
               {dropdownContent}
@@ -1138,8 +1204,8 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     ...(Platform.OS === 'web'
       ? {
-          boxShadow: '0 16px 36px -8px rgba(0, 0, 0, 0.14), 0 6px 12px -4px rgba(0, 0, 0, 0.05)',
-        }
+        boxShadow: '0 16px 36px -8px rgba(0, 0, 0, 0.14), 0 6px 12px -4px rgba(0, 0, 0, 0.05)',
+      }
       : {}),
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 12 },
@@ -1168,10 +1234,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     ...(Platform.OS === 'web'
       ? {
-          cursor: 'pointer',
-          userSelect: 'none',
-          transition: 'background-color 0.15s ease',
-        }
+        cursor: 'pointer',
+        userSelect: 'none',
+        transition: 'background-color 0.15s ease',
+      }
       : {}),
   },
   avatarImg: {
@@ -1232,10 +1298,10 @@ const styles = StyleSheet.create({
     marginVertical: 0.5,
     ...(Platform.OS === 'web'
       ? {
-          cursor: 'pointer',
-          userSelect: 'none',
-          transition: 'background-color 0.15s ease',
-        }
+        cursor: 'pointer',
+        userSelect: 'none',
+        transition: 'background-color 0.15s ease',
+      }
       : {}),
   },
   circularIconWrap: {

@@ -273,58 +273,123 @@ export default function DeliveryTokenModal({
                 </View>
               ) : null}
 
-              {bundle?.qrImageUrl ? (
-                <Image source={{ uri: bundle.qrImageUrl }} style={styles.qr} />
-              ) : busy ? (
-                <View style={[styles.qrPlaceholder, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
-                  <ActivityIndicator size="large" color="#EA580C" />
-                  <Text style={[styles.qrPlaceholderText, { marginTop: 10 }, isDark && { color: '#94A3B8' }]}>
-                    Generating QR code…
-                  </Text>
-                </View>
-              ) : (
-                <View style={[styles.qrPlaceholder, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
-                  <Text style={[styles.qrPlaceholderText, isDark && { color: '#94A3B8' }]}>
-                    {statusNote ||
-                      'No QR yet. Tap Generate QR below to create one, then print the packing label.'}
-                  </Text>
-                </View>
-              )}
-
-              {statusNote && bundle?.qrImageUrl ? (
+              {statusNote ? (
                 <Text style={[styles.meta, { color: isDark ? '#FBBF24' : '#B45309', marginBottom: 8 }]}>
                   {statusNote}
                 </Text>
               ) : null}
 
-              <View style={[styles.slipCard, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                  <Text style={styles.slipKicker}>Commercial Shipping Package</Text>
-                  <View style={{ backgroundColor: isDark ? '#132A26' : '#FFF7ED', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                    <Text style={{ fontSize: 10, fontWeight: '600', color: '#EA580C', fontFamily: 'monospace' }}>
-                      Item Nº: {slip.itemNo}
+              {/* Official MotoTrack Packaging Label Preview */}
+              <View style={styles.stickerPreviewCard}>
+                {/* Left section */}
+                <View style={styles.stickerLeftCol}>
+                  {/* Row 1: Logo & Product Name */}
+                  <View style={styles.stickerRowHeader}>
+                    <View style={styles.stickerCellLogo}>
+                      <View style={styles.stickerLogoRow}>
+                        <BootstrapIcon name="speedometer2" size={13} color="#EA580C" />
+                        <Text style={styles.stickerLogoText}>
+                          MOTO<Text style={{ color: '#EA580C' }}>TRACK</Text>
+                        </Text>
+                      </View>
+                      <View style={styles.stickerLogoBar} />
+                    </View>
+                    <View style={styles.stickerCellProduct}>
+                      <Text style={styles.stickerProductText} numberOfLines={2}>
+                        {slip.productName || '2× Side Mirror'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Row 2: Addresses & Handling Icons */}
+                  <View style={styles.stickerRowAddresses}>
+                    <View style={styles.stickerCellFrom}>
+                      <Text style={styles.stickerAddrHead}>
+                        From : <Text style={styles.stickerAddrName}>{slip.fromCompany || 'MotoTrack'}</Text>
+                      </Text>
+                      <Text style={styles.stickerAddrSub}>{slip.fromPhone || '6044-4409'}</Text>
+                      <Text style={styles.stickerAddrSub} numberOfLines={1}>{slip.fromAddress || 'Naualio B. Bacalso St'}</Text>
+                      <Text style={styles.stickerAddrSub} numberOfLines={1}>{slip.fromCity || 'South Poblacion, Naga, Cebu'}</Text>
+                    </View>
+
+                    <View style={styles.stickerCellTo}>
+                      <View>
+                        <Text style={styles.stickerAddrHead}>
+                          To : <Text style={styles.stickerAddrName}>{slip.customerName}</Text>
+                        </Text>
+                        <Text style={styles.stickerAddrSub} numberOfLines={2}>
+                          {slip.address || 'Purok Avocado 4, Inoburan, City of Naga, Cebu'}
+                        </Text>
+                        {slip.phone ? <Text style={styles.stickerAddrSub}>Tel: {slip.phone}</Text> : null}
+                      </View>
+
+                      {/* 3 Handling Icons */}
+                      <View style={styles.stickerIconsRow}>
+                        <View style={styles.stickerIconBox}>
+                          <BootstrapIcon name="cup-straw" size={11} color="#000000" />
+                        </View>
+                        <View style={styles.stickerIconBox}>
+                          <BootstrapIcon name="box-arrow-in-down" size={11} color="#000000" />
+                        </View>
+                        <View style={styles.stickerIconBox}>
+                          <BootstrapIcon name="arrow-up-circle" size={11} color="#000000" />
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Row 3: Spaced Order ID Bar */}
+                  <View style={styles.stickerRowTracking}>
+                    <Text style={styles.stickerTrackingText}>
+                      {slip.formattedSpacedId || 'O  R  D  O  M    2  0  2  6  0  0  0  0  4'}
                     </Text>
+                  </View>
+
+                  {/* Row 4: Item NNR & Instruction */}
+                  <View style={styles.stickerRowBottom}>
+                    <View style={styles.stickerCellNnr}>
+                      <Text style={styles.stickerNnrTitle}>Item NNR:</Text>
+                      <Text style={styles.stickerNnrVal}>{slip.itemNnr || '2600004'}</Text>
+                    </View>
+                    <View style={styles.stickerCellInstruction}>
+                      <Text style={styles.stickerInstructionTitle}>Delivery Instruction</Text>
+                      <View style={styles.stickerInstructionRow}>
+                        <BootstrapIcon name="exclamation-triangle-fill" size={11} color="#EA580C" />
+                        <Text style={styles.stickerInstructionBody} numberOfLines={2}>
+                          {slip.isCod
+                            ? `CASH ON DELIVERY: Collect ${slip.total != null ? formatPhp(slip.total).replace(/\.00$/, '') : '₱500'} upon drop-off - Rider: ${slip.riderName ? slip.riderName.split(' ').pop() : 'Maurin'}`
+                            : `PREPAID ORDER (${slip.payment || 'PAID'}): No collection required - Rider: ${slip.riderName ? slip.riderName.split(' ').pop() : 'Maurin'}`}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
 
-                {slip.productName ? (
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: isDark ? '#FFFFFF' : '#0F172A', marginBottom: 6 }}>
-                    {slip.productName}
-                  </Text>
-                ) : null}
+                {/* Right section: QR Code with Orange Corners */}
+                <View style={styles.stickerRightCol}>
+                  <View style={styles.stickerQrFrame}>
+                    {/* Orange Corners */}
+                    <View style={[styles.stickerCorner, styles.cornerTL]} />
+                    <View style={[styles.stickerCorner, styles.cornerTR]} />
+                    <View style={[styles.stickerCorner, styles.cornerBL]} />
+                    <View style={[styles.stickerCorner, styles.cornerBR]} />
 
-                <Text style={[styles.slipName, isDark && { color: '#F8FAFC' }]}>To: {slip.customerName}</Text>
-                {slip.phone ? <Text style={[styles.slipLine, isDark && { color: '#94A3B8' }]}>{slip.phone}</Text> : null}
-                <Text style={[styles.slipAddr, isDark && { color: '#CBD5E1' }]}>{slip.address || 'No address on file'}</Text>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderColor: isDark ? 'rgba(255,255,255,0.1)' : '#E2E8F0' }}>
-                  <Text style={styles.slipPay}>
-                    {slip.isCod ? 'Cash on Delivery' : slip.payment}
-                    {slip.total != null && slip.total !== '' ? ` · ${formatPhp(slip.total)}` : ''}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: '#64748B' }}>
-                    🍷 Fragile · 🤲 Care · ⬆️ Up
-                  </Text>
+                    {bundle?.qrImageUrl ? (
+                      <Image source={{ uri: bundle.qrImageUrl }} style={styles.stickerQrImg} resizeMode="contain" />
+                    ) : busy ? (
+                      <View style={styles.stickerQrEmpty}>
+                        <ActivityIndicator color="#EA580C" size="small" />
+                        <Text style={{ fontSize: 9, color: '#64748B', marginTop: 3 }}>Generating…</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.stickerQrEmpty}>
+                        <BootstrapIcon name="qr-code" size={20} color="#EA580C" />
+                        <Text style={{ fontSize: 9, color: '#64748B', textAlign: 'center', marginTop: 2 }}>
+                          No QR Code
+                        </Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
               </View>
 
@@ -398,13 +463,13 @@ const styles = StyleSheet.create({
   },
   sheet: {
     width: '100%',
-    maxWidth: 440,
-    maxHeight: '92%',
+    maxWidth: 620,
+    maxHeight: '94%',
     backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 18,
   },
-  scroll: { maxHeight: 520 },
+  scroll: { maxHeight: 540 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -420,7 +485,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  body: { fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 14 },
+  body: { fontSize: 13, color: '#64748B', lineHeight: 18, marginBottom: 12 },
   warnBox: {
     backgroundColor: '#FEF3C7',
     borderColor: '#F59E0B',
@@ -431,47 +496,241 @@ const styles = StyleSheet.create({
   },
   warnTitle: { fontSize: 13, fontWeight: '600', color: '#92400E', marginBottom: 4 },
   warnBody: { fontSize: 12, color: '#78350F', lineHeight: 17 },
-  qr: {
-    width: 220,
-    height: 220,
-    alignSelf: 'center',
-    borderRadius: 12,
-    backgroundColor: '#F8FAFC',
-    marginBottom: 10,
+  stickerPreviewCard: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2.5,
+    borderColor: '#000000',
+    borderRadius: 14,
+    overflow: 'hidden',
+    flexDirection: 'row',
+    marginBottom: 12,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
   },
-  qrPlaceholder: {
-    minHeight: 140,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+  stickerLeftCol: {
+    flex: 1,
+    borderRightWidth: 2,
+    borderRightColor: '#000000',
+  },
+  stickerRightCol: {
+    width: 134,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    marginBottom: 10,
+    padding: 8,
+    backgroundColor: '#FFFFFF',
   },
-  qrPlaceholderText: { color: '#64748B', textAlign: 'center', fontSize: 13, lineHeight: 18 },
-  slipCard: {
-    backgroundColor: '#FFF7ED',
-    borderWidth: 1,
-    borderColor: '#99F6E4',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 12,
+  stickerRowHeader: {
+    flexDirection: 'row',
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#000000',
+    minHeight: 46,
   },
-  slipKicker: {
+  stickerCellLogo: {
+    width: '45%',
+    padding: 6,
+    justifyContent: 'center',
+  },
+  stickerLogoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  stickerLogoText: {
+    fontFamily: Platform.OS === 'ios' ? 'HelveticaNeue-CondensedBlack' : 'sans-serif-black',
+    fontSize: 14,
+    fontWeight: '900',
+    fontStyle: 'italic',
+    color: '#000000',
+  },
+  stickerLogoBar: {
+    height: 2.5,
+    backgroundColor: '#EA580C',
+    width: '100%',
+    marginTop: 3,
+    borderRadius: 1,
+  },
+  stickerCellProduct: {
+    width: '55%',
+    borderLeftWidth: 1.5,
+    borderLeftColor: '#000000',
+    padding: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stickerProductText: {
+    fontSize: 13,
+    fontWeight: '900',
+    color: '#000000',
+    textAlign: 'center',
+  },
+  stickerRowAddresses: {
+    flexDirection: 'row',
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#000000',
+    minHeight: 76,
+  },
+  stickerCellFrom: {
+    width: '45%',
+    padding: 6,
+  },
+  stickerCellTo: {
+    width: '55%',
+    borderLeftWidth: 1.5,
+    borderLeftColor: '#000000',
+    padding: 6,
+    justifyContent: 'space-between',
+  },
+  stickerAddrHead: {
     fontSize: 10,
-    fontWeight: '600',
-    color: '#143325',
-    letterSpacing: 0.6,
-    textTransform: 'uppercase',
-    marginBottom: 4,
+    fontWeight: '800',
+    color: '#000000',
   },
-  slipName: { fontSize: 16, fontWeight: '600', color: '#0F172A' },
-  slipLine: { fontSize: 13, fontWeight: '700', color: '#334155', marginTop: 2 },
-  slipAddr: { fontSize: 13, color: '#475569', lineHeight: 18, marginTop: 4 },
-  slipItems: { fontSize: 12, color: '#143325', marginTop: 8, lineHeight: 17 },
-  slipPay: { fontSize: 12, fontWeight: '700', color: '#92400E', marginTop: 8 },
+  stickerAddrName: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  stickerAddrSub: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#334155',
+    lineHeight: 12,
+  },
+  stickerIconsRow: {
+    flexDirection: 'row',
+    gap: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 4,
+  },
+  stickerIconBox: {
+    width: 22,
+    height: 22,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  stickerRowTracking: {
+    borderBottomWidth: 1.5,
+    borderBottomColor: '#000000',
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  stickerTrackingText: {
+    fontSize: 10.5,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: 3,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    textAlign: 'center',
+  },
+  stickerRowBottom: {
+    flexDirection: 'row',
+    minHeight: 54,
+  },
+  stickerCellNnr: {
+    width: '45%',
+    padding: 6,
+    justifyContent: 'center',
+  },
+  stickerNnrTitle: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  stickerNnrVal: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#000000',
+    lineHeight: 18,
+    marginTop: 1,
+  },
+  stickerCellInstruction: {
+    width: '55%',
+    borderLeftWidth: 1.5,
+    borderLeftColor: '#000000',
+    padding: 6,
+    justifyContent: 'center',
+  },
+  stickerInstructionTitle: {
+    fontSize: 9.5,
+    fontWeight: '900',
+    color: '#000000',
+    marginBottom: 2,
+  },
+  stickerInstructionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  stickerInstructionBody: {
+    fontSize: 8.5,
+    fontWeight: '800',
+    color: '#000000',
+    lineHeight: 11,
+    flex: 1,
+  },
+  stickerQrFrame: {
+    width: 108,
+    height: 108,
+    position: 'relative',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 4,
+  },
+  stickerQrImg: {
+    width: 94,
+    height: 94,
+  },
+  stickerQrEmpty: {
+    width: 94,
+    height: 94,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stickerCorner: {
+    position: 'absolute',
+    width: 16,
+    height: 16,
+    borderColor: '#EA580C',
+  },
+  cornerTL: {
+    top: 0,
+    left: 0,
+    borderTopWidth: 3,
+    borderLeftWidth: 3,
+    borderTopLeftRadius: 6,
+  },
+  cornerTR: {
+    top: 0,
+    right: 0,
+    borderTopWidth: 3,
+    borderRightWidth: 3,
+    borderTopRightRadius: 6,
+  },
+  cornerBL: {
+    bottom: 0,
+    left: 0,
+    borderBottomWidth: 3,
+    borderLeftWidth: 3,
+    borderBottomLeftRadius: 6,
+  },
+  cornerBR: {
+    bottom: 0,
+    right: 0,
+    borderBottomWidth: 3,
+    borderRightWidth: 3,
+    borderBottomRightRadius: 6,
+  },
   meta: { fontSize: 12, color: '#047857', fontWeight: '700', textAlign: 'center', marginBottom: 8 },
   link: {
     fontSize: 11.5,

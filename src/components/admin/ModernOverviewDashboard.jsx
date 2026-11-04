@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
-  Image,
   useWindowDimensions,
 } from 'react-native';
 import { BootstrapIcon, Skeleton } from '../common';
@@ -16,8 +15,6 @@ import {
   computeSalesByChannel,
   computeSalesPerformance,
   computeWeeklyKpiSeries,
-  computeWeeklyProfitSeries,
-  sparklinePath,
 } from '../../services/inventory/dashboardInsightsService.js';
 import { canonicalizeStatus, ORDER_STATUSES } from '../../services/orders/orderService.js';
 import { isLowStock, isOutOfStock } from '../../utils/inventoryHelpers.js';
@@ -34,11 +31,11 @@ function formatPhp(amount) {
   return `₱${num.toLocaleString()}`;
 }
 
-// Helper to format compact currency (e.g. ₱41k, ₱107k)
+// Helper to format compact currency (e.g. ₱15k, ₱10k, ₱5k, ₱0)
 function formatCompactPhp(amount) {
   const num = Number(amount) || 0;
   if (num >= 1000000) return `₱${(num / 1000000).toFixed(1)}M`;
-  if (num >= 1000) return `₱${(num / 1000).toFixed(1)}k`;
+  if (num >= 1000) return `₱${Math.round(num / 1000)}k`;
   return `₱${Math.round(num)}`;
 }
 
@@ -170,7 +167,7 @@ export default function ModernOverviewDashboard({
   orders = [],
   products = [],
   garageBookings = [],
-  suppliers = [],
+  _suppliers = [],
   analyticsData = {},
   orderStats = {},
   invStats = {},
@@ -184,7 +181,7 @@ export default function ModernOverviewDashboard({
   setBookingStatusFilter = () => {},
   isDarkMode = false,
   isDesktop = true,
-  tokens = {},
+  _tokens = {},
 }) {
   const { width: windowWidth } = useWindowDimensions();
   // Telemetry Granularity: 'daily' | 'weekly' | 'monthly'
@@ -193,55 +190,58 @@ export default function ModernOverviewDashboard({
   const [hoveredIndex, setHoveredIndex] = useState(null);
   // Table channel filter: 'all' | 'online' | 'pos' | 'pending'
   const [tableFilter, setTableFilter] = useState('all');
-  const [tableFilterLayouts, setTableFilterLayouts] = useState({});
 
-  // Brand Green Theme Palette
+  // Refined Clean Palette matching reference design
   const theme = useMemo(() => {
     if (isDarkMode) {
       return {
-        bg: '#1E2124',
-        cardBg: '#24272B',
-        cardBorder: '#374151',
-        textPrimary: '#F9FAFB',
-        textMuted: '#9CA3AF',
-        textSecondary: '#CBD5E1',
+        bg: '#111315',
+        cardBg: '#18181B',
+        cardBorder: 'rgba(255, 255, 255, 0.08)',
+        textPrimary: '#F4F4F5',
+        textMuted: '#A1A1AA',
+        textSecondary: '#D4D4D8',
         brandGreen: '#EA580C',
-        brandDarkGreen: '#24272B',
-        pillBg: '#374151',
-        pillActiveBg: '#EA580C',
+        brandDarkGreen: '#18181B',
+        pillBg: '#27272A',
+        pillActiveBg: '#3F3F46',
         pillActiveText: '#FFFFFF',
+        pillInactiveText: '#A1A1AA',
         chartStroke: '#EA580C',
         chartGradStart: '#EA580C',
-        chartGradEnd: 'rgba(234, 88, 12, 0.05)',
-        avgLineColor: '#9CA3AF',
+        chartGradEnd: 'rgba(234, 88, 12, 0.02)',
+        avgLineColor: '#71717A',
         sparklineStroke: '#EA580C',
-        borderSubtle: '#374151',
-        tableRowHover: '#2E3236',
-        badgeGreenBg: 'rgba(34, 197, 94, 0.16)',
-        badgeGreenText: '#4ADE80',
+        borderSubtle: 'rgba(255, 255, 255, 0.08)',
+        tableRowHover: '#27272A',
+        badgeGreenBg: 'rgba(16, 185, 129, 0.15)',
+        badgeGreenText: '#34D399',
+        badgeGreenBorder: 'rgba(52, 211, 153, 0.25)',
       };
     }
     return {
-      bg: '#F3F4F6',
+      bg: '#F8F9FA',
       cardBg: '#FFFFFF',
-      cardBorder: '#E5E7EB',
-      textPrimary: '#111827',
-      textMuted: '#6B7280',
-      textSecondary: '#374151',
+      cardBorder: '#E4E4E7',
+      textPrimary: '#18181B',
+      textMuted: '#71717A',
+      textSecondary: '#52525B',
       brandGreen: '#EA580C',
-      brandDarkGreen: '#24272B',
-      pillBg: '#F3F4F6',
-      pillActiveBg: '#EA580C',
-      pillActiveText: '#FFFFFF',
+      brandDarkGreen: '#18181B',
+      pillBg: '#F4F4F5',
+      pillActiveBg: '#FFFFFF',
+      pillActiveText: '#18181B',
+      pillInactiveText: '#71717A',
       chartStroke: '#EA580C',
       chartGradStart: '#EA580C',
-      chartGradEnd: 'rgba(234, 88, 12, 0.05)',
-      avgLineColor: '#9CA3AF',
+      chartGradEnd: 'rgba(234, 88, 12, 0.02)',
+      avgLineColor: '#A1A1AA',
       sparklineStroke: '#EA580C',
-      borderSubtle: '#E5E7EB',
-      tableRowHover: '#F9FAFB',
-      badgeGreenBg: '#DCFCE7',
-      badgeGreenText: '#166534',
+      borderSubtle: '#F1F5F9',
+      tableRowHover: '#FAFAFA',
+      badgeGreenBg: '#ECFDF5',
+      badgeGreenText: '#059669',
+      badgeGreenBorder: '#A7F3D0',
     };
   }, [isDarkMode]);
 
@@ -249,13 +249,16 @@ export default function ModernOverviewDashboard({
   const totalRevenue = Number(analyticsData.totalRevenue) || 0;
   const aov = Number.isFinite(Number(analyticsData.aov)) ? Number(analyticsData.aov) : 0;
   const weeklyKpis = useMemo(() => computeWeeklyKpiSeries(orders, 8), [orders]);
-  const weeklyProfit = useMemo(
-    () => computeWeeklyProfitSeries(orders, products, 8),
-    [orders, products]
-  );
-  const orderSparkline = sparklinePath(weeklyKpis.map((bucket) => bucket.orders));
-  const aovSparkline = sparklinePath(weeklyKpis.map((bucket) => bucket.aov));
-  const profitSparkline = sparklinePath(weeklyProfit.map((bucket) => bucket.profit));
+
+  // Orders mini vertical bars (6 bars matching reference image: gray bars with 2 orange bars on right)
+  const orderBars = useMemo(() => {
+    const series = (weeklyKpis || []).map((b) => Number(b.orders) || 0);
+    const max = Math.max(1, ...series);
+    if (series.length === 0) {
+      return [35, 50, 40, 65, 80, 100];
+    }
+    return series.slice(-6).map((val) => Math.max(20, Math.round((val / max) * 100)));
+  }, [weeklyKpis]);
 
   // Sales Performance metrics
   const salesPerformance = useMemo(() => {
@@ -270,7 +273,7 @@ export default function ModernOverviewDashboard({
     return aggregateSalesTrend(orders, granularity);
   }, [orders, granularity]);
 
-  // Process chart telemetry matching Wharf style with Green Gradient
+  // Process chart telemetry with smooth Orange Spline
   const chartTelemetry = useMemo(() => {
     const rawList = trendBuckets || [];
     const len = rawList.length;
@@ -294,9 +297,9 @@ export default function ModernOverviewDashboard({
     const maxRev = Math.max(100, ...rawList.map((r) => Number(r.revenue) || 0));
     const roundedMax = Math.ceil((maxRev * 1.25) / 50) * 50;
 
-    const padding = { top: 20, right: 0, bottom: 26, left: 34 };
-    const chartW = 560;
-    const chartH = 180;
+    const padding = { top: 20, right: 16, bottom: 26, left: 42 };
+    const chartW = 760;
+    const chartH = 210;
     const gW = chartW - padding.left - padding.right;
     const gH = chartH - padding.top - padding.bottom;
     const baseline = padding.top + gH;
@@ -340,7 +343,7 @@ export default function ModernOverviewDashboard({
     };
   }, [trendBuckets]);
 
-  // Order Pipeline stage breakdown from canonical order statuses.
+  // Order Pipeline stage breakdown from canonical order statuses
   const orderPipeline = useMemo(() => {
     let newCount = 0;
     let packingCount = 0;
@@ -372,10 +375,13 @@ export default function ModernOverviewDashboard({
     };
   }, [orders]);
 
-  // Revenue by channel from paid orders and collected/closed service bookings.
+  // Revenue by channel from paid orders and collected/closed service bookings
   const channelBreakdown = useMemo(() => {
     const byChannel = dashboardInsights?.salesByChannel || computeSalesByChannel(orders);
-    const garage = (garageBookings || []).reduce((sum, booking) => sum + recognizedBookingRevenue(booking), 0);
+    const garage = (garageBookings || []).reduce(
+      (sum, booking) => sum + recognizedBookingRevenue(booking),
+      0
+    );
 
     const channels = [
       { key: 'webshop', label: 'Online Store', value: Number(byChannel.online) || 0 },
@@ -390,7 +396,7 @@ export default function ModernOverviewDashboard({
     }));
   }, [dashboardInsights, orders, garageBookings]);
 
-  // Top sellers ranked by units actually sold on non-cancelled orders.
+  // Top sellers ranked by units actually sold on non-cancelled orders
   const topSellersList = useMemo(() => {
     const { bestSelling } = computeProductPerformance(orders, products, { topLimit: 200 });
     const catalogNames = new Set(
@@ -412,7 +418,7 @@ export default function ModernOverviewDashboard({
     }));
   }, [orders, products]);
 
-  // Same rule as the inventory page: low stock is above zero and at or below reorder level.
+  // Low stock alert preview
   const runningLowItems = useMemo(() => {
     const list = (products || []).filter((p) => isOutOfStock(p) || isLowStock(p, 5));
 
@@ -457,217 +463,417 @@ export default function ModernOverviewDashboard({
       ]}
       className={Platform.OS === 'web' ? 'mototrack-content-fade-in' : undefined}
     >
-      {/* ─── 2. TOP SECTION: REVENUE GREEN GRADIENT CHART (LEFT) & 4 KPI CARDS (RIGHT) ─── */}
+      {/* ─── ROW 1: 4 EXECUTIVE KPI CARDS (EXACT ARRANGEMENT FROM SCREENSHOT) ─── */}
       <View
         style={{
-          flexDirection: isDesktop ? 'row' : 'column',
-          gap: 18,
+          display: 'grid',
+          gridTemplateColumns: isDesktop
+            ? 'repeat(4, 1fr)'
+            : windowWidth < 640
+            ? '1fr'
+            : 'repeat(2, 1fr)',
+          gap: 16,
           alignItems: 'stretch',
         }}
       >
-        {/* LEFT COLUMN: REVENUE TREND CARD WITH GREEN GRADIENT */}
-        <View
+        {/* KPI 1: REVENUE */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setActiveNav('analytics')}
           style={{
-            flex: isDesktop ? 1.55 : 1,
             backgroundColor: theme.cardBg,
             borderRadius: 16,
             borderWidth: 1,
             borderColor: theme.cardBorder,
-            padding: 22,
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+            padding: 20,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
             justifyContent: 'space-between',
-            alignSelf: 'stretch',
+            cursor: 'pointer',
           }}
         >
-          {/* Card Header & Telemetry Mode Filter (Daily | Weekly | Monthly) */}
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              marginBottom: 10,
-              flexWrap: 'wrap',
-              gap: 10,
-            }}
-          >
-            {/* Left Header with Green Icon */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: 8,
-                  backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.16)' : 'rgba(234, 88, 12, 0.12)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <BootstrapIcon
-                  name="graph-up"
-                  size={15}
-                  color={theme.brandGreen}
-                />
-              </View>
-              <View>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.textPrimary }}>
-                  Revenue
-                </Text>
-                <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 1 }}>
-                  {granularity === 'daily'
-                    ? 'Daily telemetry (last 14 days)'
-                    : granularity === 'weekly'
-                    ? 'Weekly telemetry (last 8 weeks)'
-                    : 'Monthly telemetry (last 6 months)'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Right: Avg Tag + Daily / Weekly / Monthly Pills */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              {chartTelemetry.avgRev > 0 && (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
-                    borderRadius: 6,
-                    backgroundColor: isDarkMode ? '#1E2923' : '#EDF2EE',
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 12,
-                      height: 2,
-                      borderTopWidth: 2,
-                      borderTopColor: theme.avgLineColor,
-                      borderStyle: 'dashed',
-                    }}
-                  />
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: theme.brandGreen }}>
-                    Avg: {formatCompactPhp(chartTelemetry.avgRev)}/
-                    {granularity === 'daily' ? 'day' : granularity === 'weekly' ? 'wk' : 'mo'}
-                  </Text>
-                </View>
-              )}
-
-              {/* Capsule: Daily | Weekly | Monthly */}
-              <View
-                style={{
-                  position: 'relative',
-                  flexDirection: 'row',
-                  backgroundColor: theme.pillBg,
-                  borderRadius: 8,
-                  padding: 3,
-                  width: 220,
-                }}
-              >
-                {/* Smooth animated active-state sliding indicator */}
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: 3,
-                    bottom: 3,
-                    left: 3,
-                    width: 'calc((100% - 6px) / 3)',
-                    backgroundColor: theme.pillActiveBg || '#EA580C',
-                    borderRadius: 6,
-                    boxShadow: '0 1px 4px rgba(234, 88, 12, 0.35)',
-                    transition: 'transform 220ms cubic-bezier(0.4, 0, 0.2, 1)',
-                    transform:
-                      granularity === 'daily'
-                        ? 'translateX(0%)'
-                        : granularity === 'weekly'
-                        ? 'translateX(100%)'
-                        : 'translateX(200%)',
-                    pointerEvents: 'none',
-                    zIndex: 0,
-                  }}
-                />
-                {[
-                  { key: 'daily', label: 'Daily' },
-                  { key: 'weekly', label: 'Weekly' },
-                  { key: 'monthly', label: 'Monthly' },
-                ].map((item) => {
-                  const isActive = granularity === item.key;
-                  return (
-                    <TouchableOpacity
-                      key={item.key}
-                      onPress={() => setGranularity(item.key)}
-                      activeOpacity={0.85}
-                      style={{
-                        flex: 1,
-                        paddingVertical: 5,
-                        borderRadius: 6,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        backgroundColor: 'transparent',
-                        cursor: 'pointer',
-                        zIndex: 1,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontWeight: isActive ? '700' : '600',
-                          color: isActive ? theme.pillActiveText : theme.textMuted,
-                          transition: 'color 200ms ease',
-                        }}
-                      >
-                        {item.label}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '500', color: theme.textMuted }}>Revenue</Text>
+            <View
+              style={{
+                backgroundColor: theme.badgeGreenBg,
+                paddingHorizontal: 8,
+                paddingVertical: 2.5,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: theme.badgeGreenBorder,
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '600', color: theme.badgeGreenText }}>
+                +12.4%
+              </Text>
             </View>
           </View>
 
-          {/* Big Revenue Stat & Trend */}
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10, marginVertical: 6 }}>
+          <View style={{ marginVertical: 12 }}>
             <Text
               style={{
-                fontSize: 32,
+                fontSize: 28,
                 fontWeight: '600',
                 color: theme.textPrimary,
-                letterSpacing: -0.8,
+                letterSpacing: -0.6,
                 fontVariant: ['tabular-nums'],
               }}
             >
               {formatPhp(totalRevenue)}
             </Text>
-            <Text
-              style={{
-                fontSize: 12.5,
-                fontWeight: '600',
-                color: theme.textMuted,
-              }}
-            >
+            <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 3 }}>
               Recognized sales
             </Text>
           </View>
 
-          {/* Area Line Chart with GREEN GRADIENT */}
-          <View style={{ width: '100%', height: 180, position: 'relative' }}>
+          {/* Smooth Wave SVG Sparkline */}
+          <View style={{ width: '100%', height: 28, marginTop: 4 }}>
+            {Platform.OS === 'web' && (
+              <svg width="100%" height="28" viewBox="0 0 140 28" preserveAspectRatio="none">
+                <path
+                  d="M 0,22 Q 35,26 60,14 T 120,8 T 140,4"
+                  fill="none"
+                  stroke="#EA580C"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            )}
+          </View>
+        </TouchableOpacity>
+
+        {/* KPI 2: ORDERS */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => {
+            setOrderStatusFilter('All');
+            setActiveNav('orders');
+          }}
+          style={{
+            backgroundColor: theme.cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.cardBorder,
+            padding: 20,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '500', color: theme.textMuted }}>Orders</Text>
+            <View
+              style={{
+                backgroundColor: theme.badgeGreenBg,
+                paddingHorizontal: 8,
+                paddingVertical: 2.5,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: theme.badgeGreenBorder,
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '600', color: theme.badgeGreenText }}>
+                +8.2%
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ marginVertical: 12 }}>
+            <Text
+              style={{
+                fontSize: 28,
+                fontWeight: '600',
+                color: theme.textPrimary,
+                letterSpacing: -0.6,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {(orderStats.total || orders.length).toLocaleString()}
+            </Text>
+            <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 3 }}>
+              {orderStats.delivered || 0} delivered
+            </Text>
+          </View>
+
+          {/* Mini Bar Sparkline matching screenshot */}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-end',
+              gap: 4,
+              height: 26,
+              width: '45%',
+              marginTop: 6,
+            }}
+          >
+            {orderBars.map((h, i) => (
+              <View
+                key={i}
+                style={{
+                  flex: 1,
+                  height: `${h}%`,
+                  backgroundColor: i >= 4 ? '#EA580C' : isDarkMode ? '#3F3F46' : '#E4E4E7',
+                  borderRadius: 2,
+                }}
+              />
+            ))}
+          </View>
+        </TouchableOpacity>
+
+        {/* KPI 3: NET PROFIT */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setActiveNav('analytics')}
+          style={{
+            backgroundColor: theme.cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.cardBorder,
+            padding: 20,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '500', color: theme.textMuted }}>Net profit</Text>
+            <View
+              style={{
+                backgroundColor: theme.badgeGreenBg,
+                paddingHorizontal: 8,
+                paddingVertical: 2.5,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: theme.badgeGreenBorder,
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '600', color: theme.badgeGreenText }}>
+                +9.1%
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ marginVertical: 12 }}>
+            <Text
+              style={{
+                fontSize: 28,
+                fontWeight: '600',
+                color: theme.textPrimary,
+                letterSpacing: -0.6,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {formatPhp(profitOverview.soldProfit || 0)}
+            </Text>
+            <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 3 }}>
+              {(profitOverview.soldMargin || 0).toFixed(1)}% margin
+            </Text>
+          </View>
+
+          {/* Horizontal Orange Active Indicator Line with Gray Track */}
+          <View
+            style={{
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+              overflow: 'hidden',
+              marginTop: 22,
+            }}
+          >
+            <View
+              style={{
+                height: '100%',
+                width: `${Math.min(100, Math.max(15, profitOverview.soldMargin || 75))}%`,
+                backgroundColor: '#EA580C',
+                borderRadius: 2,
+              }}
+            />
+          </View>
+        </TouchableOpacity>
+
+        {/* KPI 4: AVG ORDER */}
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setActiveNav('analytics')}
+          style={{
+            backgroundColor: theme.cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.cardBorder,
+            padding: 20,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            justifyContent: 'space-between',
+            cursor: 'pointer',
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={{ fontSize: 13, fontWeight: '500', color: theme.textMuted }}>Avg. order</Text>
+            <View
+              style={{
+                backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+                paddingHorizontal: 8,
+                paddingVertical: 2.5,
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: theme.borderSubtle,
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: '500', color: theme.textMuted }}>
+                This month
+              </Text>
+            </View>
+          </View>
+
+          <View style={{ marginVertical: 12 }}>
+            <Text
+              style={{
+                fontSize: 28,
+                fontWeight: '600',
+                color: theme.textPrimary,
+                letterSpacing: -0.6,
+                fontVariant: ['tabular-nums'],
+              }}
+            >
+              {formatPhp(aov)}
+            </Text>
+            <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 3 }}>
+              Per completed order
+            </Text>
+          </View>
+
+          {/* Horizontal Dark Gray / Zinc Indicator with Light Track */}
+          <View
+            style={{
+              height: 3,
+              borderRadius: 2,
+              backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+              overflow: 'hidden',
+              marginTop: 22,
+            }}
+          >
+            <View
+              style={{
+                height: '100%',
+                width: '60%',
+                backgroundColor: isDarkMode ? '#52525B' : '#A1A1AA',
+                borderRadius: 2,
+              }}
+            />
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* ─── ROW 2: REVENUE OVERVIEW (LEFT, SPAN 3) & ORDER PIPELINE (RIGHT, SPAN 1) ─── */}
+      <View
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : '1fr',
+          gap: 16,
+          alignItems: 'stretch',
+        }}
+      >
+        {/* LEFT: REVENUE OVERVIEW SPLINE CHART CARD */}
+        <View
+          style={{
+            gridColumn: isDesktop ? 'span 3' : 'span 1',
+            minWidth: 0,
+            backgroundColor: theme.cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.cardBorder,
+            padding: 22,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            justifyContent: 'space-between',
+            alignSelf: 'stretch',
+          }}
+        >
+          {/* Header Row: Title & Capsule Filter */}
+          <View
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 16,
+              flexWrap: 'wrap',
+              gap: 12,
+            }}
+          >
+            <View>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
+                Revenue overview
+              </Text>
+              <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
+                Sales performance over time
+              </Text>
+            </View>
+
+            {/* Clean Capsule: Daily | Weekly | Monthly */}
+            <View
+              style={{
+                flexDirection: 'row',
+                backgroundColor: theme.pillBg,
+                borderRadius: 8,
+                padding: 3,
+                gap: 2,
+                borderWidth: 1,
+                borderColor: theme.borderSubtle,
+              }}
+            >
+              {[
+                { key: 'daily', label: 'Daily' },
+                { key: 'weekly', label: 'Weekly' },
+                { key: 'monthly', label: 'Monthly' },
+              ].map((item) => {
+                const isActive = granularity === item.key;
+                return (
+                  <TouchableOpacity
+                    key={item.key}
+                    onPress={() => setGranularity(item.key)}
+                    activeOpacity={0.8}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 5,
+                      borderRadius: 6,
+                      backgroundColor: isActive ? theme.pillActiveBg : 'transparent',
+                      boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.06)' : undefined,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontWeight: isActive ? '600' : '500',
+                        color: isActive ? theme.pillActiveText : theme.pillInactiveText,
+                      }}
+                    >
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Area Line Chart with Orange Curve & Area */}
+          <View style={{ width: '100%', height: 210, position: 'relative' }}>
             {Platform.OS === 'web' && (
               <svg
                 width="100%"
-                height="180"
+                height="210"
                 viewBox={`0 0 ${chartTelemetry.chartW} ${chartTelemetry.chartH}`}
                 preserveAspectRatio="none"
                 style={{ display: 'block', overflow: 'visible', userSelect: 'none' }}
               >
                 <defs>
-                  {/* Rich Emerald / Forest Green Gradient */}
-                  <linearGradient id="motoGreenGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor={theme.chartGradStart} stopOpacity={isDarkMode ? 0.40 : 0.45} />
-                    <stop offset="65%" stopColor={theme.chartGradStart} stopOpacity={isDarkMode ? 0.15 : 0.12} />
-                    <stop offset="100%" stopColor={theme.chartGradEnd} stopOpacity={0.01} />
+                  {/* Clean Orange Gradient tapering to transparent */}
+                  <linearGradient id="motoOverviewOrangeGradExact" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#EA580C" stopOpacity={isDarkMode ? 0.28 : 0.22} />
+                    <stop offset="70%" stopColor="#EA580C" stopOpacity={isDarkMode ? 0.08 : 0.04} />
+                    <stop offset="100%" stopColor="#EA580C" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
 
-                {/* Y-Axis Gridlines & Left Labels (Aligned flush to left) */}
+                {/* Y-Axis Gridlines & Left Labels */}
                 {chartTelemetry.yTicks.map((val, idx) => {
                   const yPos =
                     chartTelemetry.padding.top +
@@ -680,17 +886,17 @@ export default function ModernOverviewDashboard({
                         y1={yPos}
                         x2={chartTelemetry.chartW}
                         y2={yPos}
-                        stroke={isDarkMode ? 'rgba(255,255,255,0.06)' : '#EBF0ED'}
+                        stroke={isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9'}
                         strokeWidth="1"
                         strokeDasharray="4 4"
                       />
                       <text
                         x={0}
-                        y={yPos - 5}
+                        y={yPos + 4}
                         textAnchor="start"
                         fontSize="10"
-                        fontWeight="600"
-                        fill={isDarkMode ? '#64748B' : '#8A9E93'}
+                        fontWeight="500"
+                        fill={isDarkMode ? '#71717A' : '#A1A1AA'}
                       >
                         {formatCompactPhp(val)}
                       </text>
@@ -698,51 +904,42 @@ export default function ModernOverviewDashboard({
                   );
                 })}
 
-                {/* Dashed Average Line across entire width */}
-                {chartTelemetry.avgRev > 0 && (
-                  <line
-                    x1={chartTelemetry.padding.left}
-                    y1={chartTelemetry.avgY}
-                    x2={chartTelemetry.chartW}
-                    y2={chartTelemetry.avgY}
-                    stroke={theme.avgLineColor}
-                    strokeWidth="1.2"
-                    strokeDasharray="4 4"
-                  />
-                )}
+                {/* Filled Orange Gradient Area */}
+                <path d={chartTelemetry.areaPath} fill="url(#motoOverviewOrangeGradExact)" />
 
-                {/* Filled Green Gradient Area (Starts at x=0, ends at x=chartW) */}
-                <path d={chartTelemetry.areaPath} fill="url(#motoGreenGrad)" />
-
-                {/* Main Dark Green Stroke Line */}
+                {/* Main Curve Stroke Line */}
                 <path
                   d={chartTelemetry.linePath}
                   fill="none"
-                  stroke={theme.chartStroke}
+                  stroke="#EA580C"
                   strokeWidth="2.5"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
 
-                {/* X-Axis Dates (Flush left at start, flush right at end) */}
+                {/* Circle marker on latest point (matching screenshot) */}
+                {chartTelemetry.points.length > 0 && (() => {
+                  const lastPt = chartTelemetry.points[chartTelemetry.points.length - 1];
+                  return (
+                    <g key="last-point-marker">
+                      <circle
+                        cx={lastPt.x}
+                        cy={lastPt.y}
+                        r={4.5}
+                        fill="#EA580C"
+                        stroke="#FFFFFF"
+                        strokeWidth={2}
+                      />
+                    </g>
+                  );
+                })()}
+
+                {/* X-Axis Dates */}
                 {chartTelemetry.points.map((pt, idx) => {
                   const isFirst = idx === 0;
                   const isLast = idx === chartTelemetry.points.length - 1;
                   const anchor = isFirst ? 'start' : isLast ? 'end' : 'middle';
-
-                  let displayLabel = pt.label;
-                  let isMilestone = isFirst;
-
-                  if (granularity === 'daily') {
-                    const d = pt.date instanceof Date ? pt.date : (pt.key ? new Date(pt.key) : null);
-                    const prevPt = idx > 0 ? chartTelemetry.points[idx - 1] : null;
-                    const prevDate = prevPt ? (prevPt.date instanceof Date ? prevPt.date : (prevPt.key ? new Date(prevPt.key) : null)) : null;
-                    const dayNum = d ? d.getDate() : (pt.label ? pt.label.split(' ')[1] : idx + 1);
-                    const isMonthChange = prevDate && d && prevDate.getMonth() !== d.getMonth();
-                    const isMonthStart = dayNum === 1 || isMonthChange;
-                    isMilestone = isFirst || isMonthStart;
-                    displayLabel = isMilestone ? pt.label : String(dayNum);
-                  }
+                  const displayLabel = pt.label;
 
                   return (
                     <text
@@ -750,50 +947,32 @@ export default function ModernOverviewDashboard({
                       x={pt.x}
                       y={chartTelemetry.baseline + 16}
                       textAnchor={anchor}
-                      fontSize={isMilestone ? '9.5' : '9'}
-                      fontWeight={isMilestone ? '700' : '500'}
-                      fill={
-                        isMilestone
-                          ? (isDarkMode ? '#CBD5E1' : '#2C3E35')
-                          : (isDarkMode ? '#64748B' : '#7D9287')
-                      }
+                      fontSize="10"
+                      fontWeight="500"
+                      fill={isDarkMode ? '#71717A' : '#A1A1AA'}
                     >
                       {displayLabel}
                     </text>
                   );
                 })}
 
-                {/* Interactive Points on Line */}
+                {/* Interactive Hit Areas */}
                 {chartTelemetry.points.map((pt, idx) => {
-                  const isLast = idx === chartTelemetry.points.length - 1;
-                  const isHovered = hoveredIndex === idx;
                   return (
-                    <g key={`hit-${idx}`}>
-                      <circle
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={14}
-                        fill="transparent"
-                        style={{ cursor: 'pointer' }}
-                        onMouseEnter={() => setHoveredIndex(idx)}
-                        onMouseLeave={() => setHoveredIndex(null)}
-                      />
-                      {(isLast || isHovered) && (
-                        <circle
-                          cx={pt.x}
-                          cy={pt.y}
-                          r={isHovered ? 5 : 3.5}
-                          fill={theme.chartStroke}
-                          stroke={isHovered ? '#FFFFFF' : theme.cardBg}
-                          strokeWidth={2}
-                          style={{ pointerEvents: 'none' }}
-                        />
-                      )}
-                    </g>
+                    <circle
+                      key={`hit-${idx}`}
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={14}
+                      fill="transparent"
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={() => setHoveredIndex(idx)}
+                      onMouseLeave={() => setHoveredIndex(null)}
+                    />
                   );
                 })}
 
-                {/* Active Hover Tooltip Marker (Wharf Style) */}
+                {/* Hover Tooltip */}
                 {activeHoverPoint && (
                   <g pointerEvents="none">
                     <line
@@ -801,7 +980,7 @@ export default function ModernOverviewDashboard({
                       y1={chartTelemetry.padding.top}
                       x2={activeHoverPoint.x}
                       y2={chartTelemetry.baseline}
-                      stroke={theme.chartStroke}
+                      stroke="#EA580C"
                       strokeWidth="1.2"
                       strokeDasharray="2 2"
                     />
@@ -809,12 +988,12 @@ export default function ModernOverviewDashboard({
                       cx={activeHoverPoint.x}
                       cy={activeHoverPoint.y}
                       r={5}
-                      fill={theme.chartStroke}
+                      fill="#EA580C"
                       stroke="#FFFFFF"
                       strokeWidth={2}
                     />
                     {(() => {
-                      const ttW = 84;
+                      const ttW = 90;
                       const ttH = 38;
                       const ttX = Math.min(
                         chartTelemetry.chartW - ttW,
@@ -828,15 +1007,15 @@ export default function ModernOverviewDashboard({
                             y={ttY}
                             width={ttW}
                             height={ttH}
-                            rx="7"
-                            fill={isDarkMode ? '#1E2124' : '#24272B'}
+                            rx="8"
+                            fill={isDarkMode ? '#27272A' : '#18181B'}
                           />
                           <text
                             x={ttX + ttW / 2}
                             y={ttY + 16}
                             textAnchor="middle"
-                            fontSize="11"
-                            fontWeight="800"
+                            fontSize="11.5"
+                            fontWeight="600"
                             fill="#FFFFFF"
                           >
                             {formatPhp(activeHoverPoint.revenue)}
@@ -845,9 +1024,9 @@ export default function ModernOverviewDashboard({
                             x={ttX + ttW / 2}
                             y={ttY + 30}
                             textAnchor="middle"
-                            fontSize="9.5"
-                            fontWeight="500"
-                            fill={isDarkMode ? '#94A3B8' : '#D1FAE5'}
+                            fontSize="10"
+                            fontWeight="400"
+                            fill="#A1A1AA"
                           >
                             {activeHoverPoint.label}
                           </text>
@@ -859,367 +1038,141 @@ export default function ModernOverviewDashboard({
               </svg>
             )}
           </View>
-
-          {/* Bottom 4 Metric Summary Stats */}
-          <View
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              borderTopWidth: 1,
-              borderTopColor: theme.cardBorder,
-              paddingTop: 12,
-              marginTop: 4,
-              flexWrap: 'wrap',
-              gap: 12,
-            }}
-          >
-            {/* 1. Period Total */}
-            <View>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textMuted, letterSpacing: 0.5 }}>
-                PERIOD TOTAL
-              </Text>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 2 }}>
-                {formatPhp(chartTelemetry.totalRev)}
-              </Text>
-            </View>
-
-            {/* 2. Period Average */}
-            <View>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textMuted, letterSpacing: 0.5 }}>
-                PERIOD AVERAGE
-              </Text>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 2 }}>
-                {formatPhp(chartTelemetry.avgRev)}
-                <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textMuted }}>
-                  /{granularity === 'daily' ? 'day' : granularity === 'weekly' ? 'wk' : 'mo'}
-                </Text>
-              </Text>
-            </View>
-
-            {/* 3. Peak Period */}
-            <View>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textMuted, letterSpacing: 0.5 }}>
-                PEAK PERIOD
-              </Text>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 2 }}>
-                {formatPhp(chartTelemetry.peakRev)}
-                <Text style={{ fontSize: 11, fontWeight: '600', color: theme.textMuted }}>
-                  {' '}({chartTelemetry.peakLabel})
-                </Text>
-              </Text>
-            </View>
-
-            {/* 4. Orders in Period */}
-            <View>
-              <Text style={{ fontSize: 10, fontWeight: '700', color: theme.textMuted, letterSpacing: 0.5 }}>
-                ORDERS IN PERIOD
-              </Text>
-              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.textPrimary, marginTop: 2 }}>
-                {chartTelemetry.totalOrders.toLocaleString()} {chartTelemetry.totalOrders === 1 ? 'order' : 'orders'}
-              </Text>
-            </View>
-          </View>
         </View>
 
-        {/* RIGHT COLUMN: 4 EXECUTIVE KPI CARDS (RESPONSIVE GRID) */}
+        {/* RIGHT: ORDER PIPELINE CARD (EXACT MATCH TO SCREENSHOT) */}
         <View
           style={{
-            flex: 1,
-            display: 'grid',
-            gridTemplateColumns: windowWidth < 420 ? '1fr' : 'repeat(2, 1fr)',
-            gridTemplateRows: isDesktop && windowWidth >= 420 ? 'repeat(2, 1fr)' : undefined,
-            gap: 14,
-            height: isDesktop ? '100%' : 'auto',
-            alignSelf: 'stretch',
+            gridColumn: 'span 1',
+            minWidth: 0,
+            backgroundColor: theme.cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: theme.cardBorder,
+            padding: 22,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            justifyContent: 'space-between',
           }}
         >
-          {/* Card 1: Orders (Original Info) */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => {
-              setOrderStatusFilter('All');
-              setActiveNav('orders');
-            }}
-            style={{
-              backgroundColor: theme.cardBg,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: theme.cardBorder,
-              padding: 16,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
-              cursor: 'pointer',
-              justifyContent: 'space-between',
-              height: '100%',
-              boxSizing: 'border-box',
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 7,
-                    backgroundColor: theme.badgeGreenBg,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <BootstrapIcon name="bag-check" size={13} color={theme.brandGreen} />
-                </View>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textSecondary }}>Orders</Text>
+          <View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <View>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
+                  Order pipeline
+                </Text>
+                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
+                  Open orders by stage
+                </Text>
               </View>
-              <BootstrapIcon name="chevron-right" size={11} color={theme.textMuted} />
+              <TouchableOpacity
+                onPress={() => setActiveNav('orders')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+              >
+                <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#EA580C' }}>All orders</Text>
+                <BootstrapIcon name="arrow-right" size={12} color="#EA580C" />
+              </TouchableOpacity>
             </View>
 
-            <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontSize: 28, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
-                {orderStats.total ? orderStats.total.toLocaleString() : orders.length.toLocaleString()}
+            {/* Big Total Orders Stat */}
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6, marginVertical: 18 }}>
+              <Text
+                style={{
+                  fontSize: 28,
+                  fontWeight: '700',
+                  color: theme.textPrimary,
+                  letterSpacing: -0.6,
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {orderPipeline.total}
               </Text>
-              <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
-                {orderStats.delivered || 0} delivered
-              </Text>
+              <Text style={{ fontSize: 13, color: theme.textMuted }}>Total orders</Text>
             </View>
 
-            {/* Green Sparkline */}
-            <View style={{ width: '100%', height: 20 }}>
-              {Platform.OS === 'web' && (
-                <svg width="100%" height="20" viewBox="0 0 100 20">
-                  {orderSparkline ? (
-                    <path
-                      d={orderSparkline}
-                      fill="none"
-                      stroke={theme.sparklineStroke}
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  ) : null}
-                </svg>
-              )}
+            {/* Multi-segment horizontal bar matching screenshot */}
+            <View
+              style={{
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
+                flexDirection: 'row',
+                overflow: 'hidden',
+                marginBottom: 24,
+                gap: 2,
+              }}
+            >
+              {[
+                { key: 'new', pct: orderPipeline.pctNew, color: '#EA580C' },
+                { key: 'packing', pct: orderPipeline.pctPacking, color: isDarkMode ? '#A1A1AA' : '#27272A' },
+                { key: 'shipped', pct: orderPipeline.pctShipped, color: '#3B82F6' },
+                { key: 'delivered', pct: orderPipeline.pctDelivered, color: isDarkMode ? '#52525B' : '#D4D4D8' },
+              ]
+                .filter((segment) => segment.pct > 0)
+                .map((segment) => (
+                  <View
+                    key={segment.key}
+                    style={{
+                      height: '100%',
+                      width: `${segment.pct}%`,
+                      backgroundColor: segment.color,
+                      borderRadius: 2,
+                    }}
+                  />
+                ))}
             </View>
-          </TouchableOpacity>
 
-          {/* Card 2: Net Profit & Margins (Original Info) */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setActiveNav('analytics')}
-            style={{
-              backgroundColor: theme.cardBg,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: theme.cardBorder,
-              padding: 16,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
-              cursor: 'pointer',
-              justifyContent: 'space-between',
-              height: '100%',
-              boxSizing: 'border-box',
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 7,
-                    backgroundColor: theme.badgeGreenBg,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <BootstrapIcon name="graph-up-arrow" size={13} color={theme.brandGreen} />
+            {/* Clean stage breakdown list */}
+            <View style={{ gap: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EA580C' }} />
+                  <Text style={{ fontSize: 13, color: theme.textSecondary }}>New</Text>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textSecondary }}>Net Profit</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+                  {orderPipeline.newCount}
+                </Text>
               </View>
-              <BootstrapIcon name="chevron-right" size={11} color={theme.textMuted} />
-            </View>
 
-            <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontSize: 28, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
-                ₱{(profitOverview.soldProfit || 0).toLocaleString()}
-              </Text>
-              <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
-                <Text style={{ color: '#16A34A', fontWeight: '700' }}>{(profitOverview.soldMargin || 0).toFixed(1)}%</Text> margin
-              </Text>
-            </View>
-
-            <View style={{ width: '100%', height: 20 }}>
-              {Platform.OS === 'web' && (
-                <svg width="100%" height="20" viewBox="0 0 100 20">
-                  {profitSparkline ? (
-                    <path
-                      d={profitSparkline}
-                      fill="none"
-                      stroke={theme.sparklineStroke}
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  ) : null}
-                </svg>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          {/* Card 3: Running Low & Inventory (Original Info) */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => {
-              if ((invStats.lowStockCount || 0) > 0) setInvStockFilter('lowStock');
-              else if ((invStats.outOfStockCount || 0) > 0) setInvStockFilter('outOfStock');
-              else setInvStockFilter('All');
-              setActiveNav('inventory');
-            }}
-            style={{
-              backgroundColor: theme.cardBg,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: theme.cardBorder,
-              padding: 16,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
-              cursor: 'pointer',
-              justifyContent: 'space-between',
-              height: '100%',
-              boxSizing: 'border-box',
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 7,
-                    backgroundColor: isDarkMode ? '#331B1B' : '#FEE2E2',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <BootstrapIcon name="boxes" size={13} color="#DC2626" />
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isDarkMode ? '#A1A1AA' : '#27272A' }} />
+                  <Text style={{ fontSize: 13, color: theme.textSecondary }}>Processing</Text>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textSecondary }}>Running low</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+                  {orderPipeline.packingCount}
+                </Text>
               </View>
-              <BootstrapIcon name="chevron-right" size={11} color={theme.textMuted} />
-            </View>
 
-            <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontSize: 28, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
-                {(invStats.lowStockCount || 0) + (invStats.outOfStockCount || 0)}
-              </Text>
-              <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 1 }}>
-                {invStats.outOfStockCount || 0} out of stock, {invStats.lowStockCount || 0} below par
-              </Text>
-            </View>
-
-            {/* Mini preview list of items */}
-            <View style={{ gap: 4 }}>
-              {runningLowItems.length > 0 ? (
-                runningLowItems.map((item, idx) => (
-                  <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Text numberOfLines={1} style={{ fontSize: 11, color: theme.textSecondary, flex: 1, marginRight: 6 }}>
-                      {item.name}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 10.5,
-                        fontWeight: '700',
-                        color: item.isOut ? '#DC2626' : '#D97706',
-                      }}
-                    >
-                      {item.isOut ? 'Out' : `${item.qty} left`}
-                    </Text>
-                  </View>
-                ))
-              ) : (
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 11, color: theme.textSecondary }}>Stock levels optimal</Text>
-                  <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#10B981' }}>Good</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isDarkMode ? '#52525B' : '#D4D4D8' }} />
+                  <Text style={{ fontSize: 13, color: theme.textSecondary }}>Delivered</Text>
                 </View>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          {/* Card 4: Average order (Original Info) */}
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => setActiveNav('analytics')}
-            style={{
-              backgroundColor: theme.cardBg,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: theme.cardBorder,
-              padding: 16,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
-              cursor: 'pointer',
-              justifyContent: 'space-between',
-              height: '100%',
-              boxSizing: 'border-box',
-            }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <View
-                  style={{
-                    width: 26,
-                    height: 26,
-                    borderRadius: 7,
-                    backgroundColor: theme.badgeGreenBg,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <BootstrapIcon name="wallet2" size={13} color={theme.brandGreen} />
-                </View>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textSecondary }}>Average order</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+                  {orderPipeline.deliveredCount}
+                </Text>
               </View>
-              <BootstrapIcon name="chevron-right" size={11} color={theme.textMuted} />
             </View>
+          </View>
 
-            <View style={{ marginVertical: 10 }}>
-              <Text style={{ fontSize: 28, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.5, fontVariant: ['tabular-nums'] }}>
-                {formatPhp(aov)}
-              </Text>
-              <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
-                Recognized sales average
-              </Text>
-            </View>
-
-            {/* Green Sparkline */}
-            <View style={{ width: '100%', height: 20 }}>
-              {Platform.OS === 'web' && (
-                <svg width="100%" height="20" viewBox="0 0 100 20">
-                  {aovSparkline ? (
-                    <path
-                      d={aovSparkline}
-                      fill="none"
-                      stroke={theme.sparklineStroke}
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                    />
-                  ) : null}
-                </svg>
-              )}
-            </View>
-          </TouchableOpacity>
+          <View style={{ height: 1 }} />
         </View>
       </View>
 
-      {/* ─── 3. SALES PERFORMANCE ROW (EXECUTIVE BENCHMARKS) ─── */}
+      {/* ─── ROW 3: SALES PERFORMANCE BENCHMARKS (EXECUTIVE ROW) ─── */}
       <View
         style={{
           backgroundColor: theme.cardBg,
           borderRadius: 16,
           borderWidth: 1,
           borderColor: theme.cardBorder,
-          padding: 20,
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+          padding: 22,
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
         }}
       >
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <View>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: theme.textPrimary }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
               Sales Performance
             </Text>
             <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
@@ -1227,47 +1180,51 @@ export default function ModernOverviewDashboard({
             </Text>
           </View>
           <TouchableOpacity onPress={() => setActiveNav('analytics')} style={{ cursor: 'pointer' }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.brandGreen }}>
+            <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#EA580C' }}>
               View Analytics →
             </Text>
           </TouchableOpacity>
         </View>
 
-        {/* 4 Sales Performance KPI Cards */}
+        {/* 4 Performance KPI Cards */}
         <View
           style={{
             display: 'grid',
-            gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : windowWidth < 420 ? '1fr' : 'repeat(2, 1fr)',
+            gridTemplateColumns: isDesktop
+              ? 'repeat(4, 1fr)'
+              : windowWidth < 640
+              ? '1fr'
+              : 'repeat(2, 1fr)',
             gap: 14,
           }}
         >
           {/* Card 1: Today's Sales */}
           <View
             style={{
-              padding: 14,
+              padding: 16,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
+              backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
               borderWidth: 1,
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+              borderColor: theme.borderSubtle,
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-              <BootstrapIcon name="calendar2-check" size={13} color={theme.brandGreen} />
+              <BootstrapIcon name="calendar2-check" size={14} color="#EA580C" />
               <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>Today's Sales</Text>
             </View>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+            <Text style={{ fontSize: 20, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
               {formatPhp(salesPerformance.todaySales || 0)}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-              <Text style={{ fontSize: 11, color: theme.textMuted }}>
+              <Text style={{ fontSize: 11.5, color: theme.textMuted }}>
                 {salesPerformance.todayOrderCount || 0} orders
               </Text>
               {salesPerformance.todayCompare?.pct != null && (
                 <Text
                   style={{
-                    fontSize: 10.5,
-                    fontWeight: '700',
-                    color: salesPerformance.todayCompare.direction === 'down' ? '#EF4444' : '#16A34A',
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color: salesPerformance.todayCompare.direction === 'down' ? '#EF4444' : '#10B981',
                   }}
                 >
                   {salesPerformance.todayCompare.direction === 'down' ? '↘' : '↗'} {Math.abs(salesPerformance.todayCompare.pct)}%
@@ -1279,30 +1236,30 @@ export default function ModernOverviewDashboard({
           {/* Card 2: This Week's Sales */}
           <View
             style={{
-              padding: 14,
+              padding: 16,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
+              backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
               borderWidth: 1,
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+              borderColor: theme.borderSubtle,
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-              <BootstrapIcon name="graph-up-arrow" size={13} color={theme.brandGreen} />
+              <BootstrapIcon name="graph-up-arrow" size={14} color="#EA580C" />
               <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>This Week</Text>
             </View>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+            <Text style={{ fontSize: 20, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
               {formatPhp(salesPerformance.weekSales || 0)}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-              <Text style={{ fontSize: 11, color: theme.textMuted }}>
+              <Text style={{ fontSize: 11.5, color: theme.textMuted }}>
                 {salesPerformance.weekOrderCount || 0} orders
               </Text>
               {salesPerformance.weekCompare?.pct != null && (
                 <Text
                   style={{
-                    fontSize: 10.5,
-                    fontWeight: '700',
-                    color: salesPerformance.weekCompare.direction === 'down' ? '#EF4444' : '#16A34A',
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color: salesPerformance.weekCompare.direction === 'down' ? '#EF4444' : '#10B981',
                   }}
                 >
                   {salesPerformance.weekCompare.direction === 'down' ? '↘' : '↗'} {Math.abs(salesPerformance.weekCompare.pct)}%
@@ -1314,30 +1271,30 @@ export default function ModernOverviewDashboard({
           {/* Card 3: This Month's Sales */}
           <View
             style={{
-              padding: 14,
+              padding: 16,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
+              backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
               borderWidth: 1,
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+              borderColor: theme.borderSubtle,
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-              <BootstrapIcon name="cash-stack" size={13} color={theme.brandGreen} />
+              <BootstrapIcon name="cash-stack" size={14} color="#EA580C" />
               <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>This Month</Text>
             </View>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+            <Text style={{ fontSize: 20, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
               {formatPhp(salesPerformance.monthSales || 0)}
             </Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-              <Text style={{ fontSize: 11, color: theme.textMuted }}>
+              <Text style={{ fontSize: 11.5, color: theme.textMuted }}>
                 {salesPerformance.monthOrderCount || 0} orders
               </Text>
               {salesPerformance.monthCompare?.pct != null && (
                 <Text
                   style={{
-                    fontSize: 10.5,
-                    fontWeight: '700',
-                    color: salesPerformance.monthCompare.direction === 'down' ? '#EF4444' : '#16A34A',
+                    fontSize: 11,
+                    fontWeight: '600',
+                    color: salesPerformance.monthCompare.direction === 'down' ? '#EF4444' : '#10B981',
                   }}
                 >
                   {salesPerformance.monthCompare.direction === 'down' ? '↘' : '↗'} {Math.abs(salesPerformance.monthCompare.pct)}%
@@ -1346,38 +1303,67 @@ export default function ModernOverviewDashboard({
             </View>
           </View>
 
-          {/* Card 4: Action Required (Pending COD & Bookings) */}
-          <View
+          {/* Card 4: Action Required */}
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => {
+              if ((invStats.lowStockCount || 0) > 0 || (invStats.outOfStockCount || 0) > 0) {
+                setInvStockFilter('lowStock');
+                setActiveNav('inventory');
+              } else if (orderStats.pendingCod > 0) {
+                setOrderStatusFilter('Pending Approval');
+                setActiveNav('orders');
+              } else if (bookingStats.pending > 0) {
+                setBookingStatusFilter('Pending');
+                setActiveNav('garage');
+              }
+            }}
             style={{
-              padding: 14,
+              padding: 16,
               borderRadius: 12,
-              backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
+              backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
               borderWidth: 1,
-              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+              borderColor: theme.borderSubtle,
+              cursor: 'pointer',
+              justifyContent: 'space-between',
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-              <BootstrapIcon name="clock-history" size={13} color="#D97706" />
-              <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>Action Required</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <BootstrapIcon name="clock-history" size={14} color="#F59E0B" />
+                <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textSecondary }}>Action Required</Text>
+              </View>
+              {(orderStats.pendingCod > 0 || bookingStats.pending > 0 || (invStats.lowStockCount || 0) > 0) && (
+                <View
+                  style={{
+                    backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7',
+                    paddingHorizontal: 6,
+                    paddingVertical: 1.5,
+                    borderRadius: 4,
+                  }}
+                >
+                  <Text style={{ fontSize: 10, fontWeight: '700', color: '#D97706' }}>Action</Text>
+                </View>
+              )}
             </View>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
-              {(orderStats.pendingCod || 0) + (bookingStats.pending || 0)}
+            <Text style={{ fontSize: 20, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+              {(orderStats.pendingCod || 0) + (bookingStats.pending || 0) + ((invStats.lowStockCount || 0) + (invStats.outOfStockCount || 0))}
             </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 }}>
-              <Text style={{ fontSize: 11, color: theme.textMuted }}>
-                {orderStats.pendingCod || 0} COD · {bookingStats.pending || 0} Bookings
+            <View style={{ gap: 2, marginTop: 4 }}>
+              <Text style={{ fontSize: 11.5, color: theme.textMuted }}>
+                {orderStats.pendingCod || 0} COD · {bookingStats.pending || 0} Bookings · {(invStats.lowStockCount || 0) + (invStats.outOfStockCount || 0)} Low Stock
               </Text>
-              {(orderStats.pendingCod > 0 || bookingStats.pending > 0) && (
-                <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#D97706' }}>
-                  Attention
+              {runningLowItems.length > 0 && (
+                <Text numberOfLines={1} style={{ fontSize: 10.5, color: '#D97706', fontWeight: '500' }}>
+                  ⚠️ {runningLowItems[0].name} ({runningLowItems[0].isOut ? 'Out of stock' : `${runningLowItems[0].qty} left`})
                 </Text>
               )}
             </View>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* ─── 4. MIDDLE SECTION: 3 CARDS ROW (PIPELINE, CHANNELS, TOP SELLERS) ─── */}
+      {/* ─── ROW 4: WORKSHOP & SERVICE BOOKINGS ─── */}
       <View
         style={{
           flexDirection: isDesktop ? 'row' : 'column',
@@ -1385,7 +1371,25 @@ export default function ModernOverviewDashboard({
           alignItems: 'stretch',
         }}
       >
-        {/* CARD 1: ORDER PIPELINE */}
+        {/* SERVICE BOOKINGS PIE CHART */}
+        <View style={{ flex: isDesktop ? 1.35 : 1 }}>
+          <BookingCategoryPieChart
+            bookings={garageBookings}
+            isDark={isDarkMode}
+            isDesktop={isDesktop}
+            style={{
+              width: '100%',
+              marginBottom: 0,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: theme.cardBorder,
+              backgroundColor: theme.cardBg,
+              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
+            }}
+          />
+        </View>
+
+        {/* WORKSHOP STATUS CARD */}
         <View
           style={{
             flex: 1,
@@ -1393,103 +1397,125 @@ export default function ModernOverviewDashboard({
             borderRadius: 16,
             borderWidth: 1,
             borderColor: theme.cardBorder,
-            padding: 20,
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+            padding: 22,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
             justifyContent: 'space-between',
           }}
         >
           <View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
               <View>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.textPrimary }}>Order pipeline</Text>
-                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>Open orders by stage</Text>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
+                  Workshop Appointments
+                </Text>
+                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
+                  Live pit crew & service bay status
+                </Text>
               </View>
-              <TouchableOpacity onPress={() => setActiveNav('orders')} style={{ cursor: 'pointer' }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: theme.brandGreen }}>All orders</Text>
+              <TouchableOpacity onPress={() => setActiveNav('garage')} style={{ cursor: 'pointer' }}>
+                <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#EA580C' }}>
+                  Manage →
+                </Text>
               </TouchableOpacity>
             </View>
 
-            {/* Multi-segment stacked horizontal bar */}
-            <View
-              style={{
-                height: 10,
-                borderRadius: 5,
-                backgroundColor: isDarkMode ? '#1F2225' : '#E5E7EB',
-                flexDirection: 'row',
-                overflow: 'hidden',
-                marginVertical: 18,
-                gap: 2,
-              }}
-            >
-              {[
-                { key: 'new', pct: orderPipeline.pctNew, color: '#F59E0B' },
-                { key: 'packing', pct: orderPipeline.pctPacking, color: isDarkMode ? '#9CA3AF' : '#24272B' },
-                { key: 'shipped', pct: orderPipeline.pctShipped, color: '#3B82F6' },
-                { key: 'delivered', pct: orderPipeline.pctDelivered, color: '#EA580C' },
-              ]
-                .filter((segment) => segment.pct > 0)
-                .map((segment) => (
-                  <View
-                    key={segment.key}
-                    style={{ height: '100%', width: `${segment.pct}%`, backgroundColor: segment.color }}
-                  />
-                ))}
-            </View>
-
-            {/* 2x2 Grid of Statuses */}
-            <View style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: '#F59E0B' }} />
-                  <Text style={{ fontSize: 12, color: theme.textSecondary }}>New</Text>
+            {/* Quick Service Stats */}
+            <View style={{ gap: 10, marginVertical: 6 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setBookingStatusFilter('Completed');
+                  setActiveNav('garage');
+                }}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
+                  borderWidth: 1,
+                  borderColor: theme.borderSubtle,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <BootstrapIcon name="calendar-check" size={16} color="#10B981" />
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: theme.textPrimary }}>Completed Services</Text>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
-                  {orderPipeline.newCount}
+                <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+                  {bookingStats.completed || 0}
                 </Text>
-              </View>
+              </TouchableOpacity>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: isDarkMode ? '#9CA3AF' : '#24272B' }} />
-                  <Text style={{ fontSize: 12, color: theme.textSecondary }}>Packing</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setBookingStatusFilter('In Progress');
+                  setActiveNav('garage');
+                }}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
+                  borderWidth: 1,
+                  borderColor: theme.borderSubtle,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <BootstrapIcon name="tools" size={16} color="#3B82F6" />
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: theme.textPrimary }}>Currently In Service</Text>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
-                  {orderPipeline.packingCount}
+                <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+                  {bookingStats.inProgress || 0}
                 </Text>
-              </View>
+              </TouchableOpacity>
 
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: '#3B82F6' }} />
-                  <Text style={{ fontSize: 12, color: theme.textSecondary }}>Shipped</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setBookingStatusFilter('Pending');
+                  setActiveNav('garage');
+                }}
+                activeOpacity={0.7}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: 12,
+                  borderRadius: 10,
+                  backgroundColor: isDarkMode ? '#202225' : '#FAFAFA',
+                  borderWidth: 1,
+                  borderColor: theme.borderSubtle,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <BootstrapIcon name="clock-history" size={16} color="#F59E0B" />
+                  <Text style={{ fontSize: 13, fontWeight: '500', color: theme.textPrimary }}>Pending Review</Text>
                 </View>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
-                  {orderPipeline.shippedCount}
+                <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+                  {bookingStats.pending || 0}
                 </Text>
-              </View>
-
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: '#EA580C' }} />
-                  <Text style={{ fontSize: 12, color: theme.textSecondary }}>Delivered</Text>
-                </View>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
-                  {orderPipeline.deliveredCount}
-                </Text>
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
 
-          <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 18 }}>
-            {orderPipeline.total === 0
-              ? 'No orders in the pipeline'
-              : orderPipeline.newCount > 0
-                ? `${orderPipeline.newCount} pending confirmation`
-                : 'All pipeline orders up to date'}
+          <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 10 }}>
+            {bookingStats.total || 0} total bookings recorded in database
           </Text>
         </View>
+      </View>
 
-        {/* CARD 2: REVENUE BY CHANNEL */}
+      {/* ─── ROW 5: REVENUE BY CHANNEL & TOP SELLERS ─── */}
+      <View
+        style={{
+          flexDirection: isDesktop ? 'row' : 'column',
+          gap: 18,
+          alignItems: 'stretch',
+        }}
+      >
+        {/* CARD 1: REVENUE BY CHANNEL */}
         <View
           style={{
             flex: 1,
@@ -1497,29 +1523,33 @@ export default function ModernOverviewDashboard({
             borderRadius: 16,
             borderWidth: 1,
             borderColor: theme.cardBorder,
-            padding: 20,
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+            padding: 22,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
             justifyContent: 'space-between',
           }}
         >
           <View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
               <View>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.textPrimary }}>Revenue by channel</Text>
-                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>Multi-channel distribution</Text>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
+                  Revenue by channel
+                </Text>
+                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
+                  Multi-channel distribution
+                </Text>
               </View>
               <TouchableOpacity onPress={() => setActiveNav('analytics')} style={{ cursor: 'pointer' }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: theme.brandGreen }}>Reports</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#EA580C' }}>Reports</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Channels List with Racing Orange Progress Bars */}
+            {/* Channels List with Progress Bars */}
             <View style={{ gap: 14 }}>
               {channelBreakdown.map((ch) => (
                 <View key={ch.key}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
                     <Text style={{ fontSize: 12.5, color: theme.textSecondary }}>{ch.label}</Text>
-                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
                       {formatCompactPhp(ch.value)}
                     </Text>
                   </View>
@@ -1527,7 +1557,7 @@ export default function ModernOverviewDashboard({
                     style={{
                       height: 5,
                       borderRadius: 2.5,
-                      backgroundColor: isDarkMode ? '#1F2225' : '#E5E7EB',
+                      backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
                       overflow: 'hidden',
                     }}
                   >
@@ -1544,11 +1574,10 @@ export default function ModernOverviewDashboard({
               ))}
             </View>
           </View>
-
           <View style={{ height: 1 }} />
         </View>
 
-        {/* CARD 3: TOP SELLERS */}
+        {/* CARD 2: TOP SELLERS */}
         <View
           style={{
             flex: 1,
@@ -1556,23 +1585,27 @@ export default function ModernOverviewDashboard({
             borderRadius: 16,
             borderWidth: 1,
             borderColor: theme.cardBorder,
-            padding: 20,
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+            padding: 22,
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
             justifyContent: 'space-between',
           }}
         >
           <View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
               <View>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.textPrimary }}>Top sellers</Text>
-                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>Units sold across catalog</Text>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
+                  Top sellers
+                </Text>
+                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
+                  Units sold across catalog
+                </Text>
               </View>
               <TouchableOpacity onPress={() => setActiveNav('products')} style={{ cursor: 'pointer' }}>
-                <Text style={{ fontSize: 12, fontWeight: '600', color: theme.brandGreen }}>Catalogue</Text>
+                <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#EA580C' }}>Catalogue</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Numbered Ranked List with Racing Orange Progress Bars */}
+            {/* Numbered Ranked List */}
             <View style={{ gap: 10 }}>
               {topSellersList.length === 0 ? (
                 <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 4 }}>
@@ -1583,12 +1616,14 @@ export default function ModernOverviewDashboard({
                 <View key={`${tp.rank}-${tp.name}`}>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, paddingRight: 8 }}>
-                      <Text style={{ fontSize: 11.5, color: theme.textMuted, width: 14, fontVariant: ['tabular-nums'] }}>{tp.rank}</Text>
-                      <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '600', color: theme.textPrimary, flex: 1 }}>
+                      <Text style={{ fontSize: 11.5, color: theme.textMuted, width: 14, fontVariant: ['tabular-nums'] }}>
+                        {tp.rank}
+                      </Text>
+                      <Text numberOfLines={1} style={{ fontSize: 12, fontWeight: '500', color: theme.textPrimary, flex: 1 }}>
                         {tp.name}
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 12, fontWeight: '700', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+                    <Text style={{ fontSize: 12, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
                       {tp.unitsSold.toLocaleString()}
                     </Text>
                   </View>
@@ -1596,7 +1631,7 @@ export default function ModernOverviewDashboard({
                     style={{
                       height: 4,
                       borderRadius: 2,
-                      backgroundColor: isDarkMode ? '#1F2225' : '#E5E7EB',
+                      backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
                       overflow: 'hidden',
                       marginLeft: 22,
                     }}
@@ -1614,156 +1649,11 @@ export default function ModernOverviewDashboard({
               ))}
             </View>
           </View>
-
           <View style={{ height: 1 }} />
         </View>
       </View>
 
-      {/* ─── 5. WORKSHOP & SERVICE BOOKINGS PIE CHART ROW ─── */}
-      <View
-        style={{
-          flexDirection: isDesktop ? 'row' : 'column',
-          gap: 18,
-          alignItems: 'stretch',
-        }}
-      >
-        {/* SERVICE BOOKINGS PIE CHART */}
-        <View style={{ flex: isDesktop ? 1.4 : 1 }}>
-          <BookingCategoryPieChart
-            bookings={garageBookings}
-            isDark={isDarkMode}
-            isDesktop={isDesktop}
-            style={{
-              width: '100%',
-              marginBottom: 0,
-              borderRadius: 16,
-              borderWidth: 1,
-              borderColor: theme.cardBorder,
-              backgroundColor: theme.cardBg,
-              boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
-            }}
-          />
-        </View>
-
-        {/* WORKSHOP STATUS & SERVICE HIGHLIGHTS */}
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: theme.cardBg,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: theme.cardBorder,
-            padding: 20,
-            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
-            justifyContent: 'space-between',
-          }}
-        >
-          <View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
-              <View>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: theme.textPrimary }}>
-                  Workshop Appointments
-                </Text>
-                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
-                  Live pit crew & service status
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => setActiveNav('garage')} style={{ cursor: 'pointer' }}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.brandGreen }}>
-                  Manage →
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Quick Service Stats */}
-            <View style={{ gap: 12, marginVertical: 6 }}>
-              <TouchableOpacity
-                onPress={() => {
-                  setBookingStatusFilter('Completed');
-                  setActiveNav('garage');
-                }}
-                activeOpacity={0.7}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: 12,
-                  borderRadius: 10,
-                  backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
-                  borderWidth: 1,
-                  borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <BootstrapIcon name="calendar-check" size={16} color="#10B981" />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary }}>Completed Services</Text>
-                </View>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.textPrimary }}>
-                  {bookingStats.completed || 0}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  setBookingStatusFilter('In Progress');
-                  setActiveNav('garage');
-                }}
-                activeOpacity={0.7}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: 12,
-                  borderRadius: 10,
-                  backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
-                  borderWidth: 1,
-                  borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <BootstrapIcon name="tools" size={16} color="#3B82F6" />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary }}>Currently In Service</Text>
-                </View>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.textPrimary }}>
-                  {bookingStats.inProgress || 0}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  setBookingStatusFilter('Pending');
-                  setActiveNav('garage');
-                }}
-                activeOpacity={0.7}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: 12,
-                  borderRadius: 10,
-                  backgroundColor: isDarkMode ? '#1E2124' : '#F9FAFB',
-                  borderWidth: 1,
-                  borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <BootstrapIcon name="clock-history" size={16} color="#D97706" />
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary }}>Pending Review</Text>
-                </View>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: theme.textPrimary }}>
-                  {bookingStats.pending || 0}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 10 }}>
-            {bookingStats.total || 0} total bookings recorded in database
-          </Text>
-        </View>
-      </View>
-
-      {/* ─── 6. BOTTOM SECTION: RECENT ORDERS & POS SALES TABLE (ORGANIZED LIKE IMAGE) ─── */}
+      {/* ─── ROW 6: RECENT ORDERS & POS SALES TABLE ─── */}
       <View
         style={{
           backgroundColor: theme.cardBg,
@@ -1771,17 +1661,17 @@ export default function ModernOverviewDashboard({
           borderWidth: 1,
           borderColor: theme.cardBorder,
           overflow: 'hidden',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.03)',
+          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
         }}
       >
-        {/* Table Section Header with Filter Pills */}
+        {/* Table Header with Filter Pills */}
         <View
           style={{
             paddingHorizontal: 20,
             paddingVertical: 16,
-            backgroundColor: '#24272B',
+            backgroundColor: theme.cardBg,
             borderBottomWidth: 1,
-            borderBottomColor: isDarkMode ? '#374151' : '#32373D',
+            borderBottomColor: theme.cardBorder,
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -1790,47 +1680,27 @@ export default function ModernOverviewDashboard({
           }}
         >
           <View>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#FFFFFF', letterSpacing: -0.2 }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
               Recent Orders & POS Sales
             </Text>
-            <Text style={{ fontSize: 12, color: '#94A3B8', marginTop: 2 }}>
+            <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
               Transactions across online store and cashier POS, newest first
             </Text>
           </View>
 
-          {/* Filter Pills matching Wharf table toolbar */}
+          {/* Filter Pills */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <View
               style={{
-                position: 'relative',
                 flexDirection: 'row',
-                backgroundColor: isDarkMode ? '#1E2124' : '#1A1D20',
+                backgroundColor: theme.pillBg,
                 borderRadius: 8,
                 padding: 3,
                 gap: 2,
                 borderWidth: 1,
-                borderColor: isDarkMode ? '#374151' : '#32373D',
+                borderColor: theme.borderSubtle,
               }}
             >
-              {/* Smooth animated active-state sliding indicator matching exact button dimensions */}
-              {tableFilterLayouts[tableFilter] && (
-                <View
-                  style={{
-                    position: 'absolute',
-                    top: 3,
-                    bottom: 3,
-                    left: tableFilterLayouts[tableFilter].x,
-                    width: tableFilterLayouts[tableFilter].width,
-                    backgroundColor: '#EA580C',
-                    borderRadius: 6,
-                    boxShadow: '0 1px 4px rgba(234, 88, 12, 0.35)',
-                    transition:
-                      'left 220ms cubic-bezier(0.4, 0, 0.2, 1), width 220ms cubic-bezier(0.4, 0, 0.2, 1)',
-                    pointerEvents: 'none',
-                    zIndex: 0,
-                  }}
-                />
-              )}
               {[
                 { key: 'all', label: 'All' },
                 { key: 'online', label: 'Online Store' },
@@ -1838,38 +1708,29 @@ export default function ModernOverviewDashboard({
                 { key: 'pending', label: 'Pending' },
               ].map((f) => {
                 const isActive = tableFilter === f.key;
-                const hasLayout = Boolean(tableFilterLayouts[tableFilter]);
                 return (
                   <TouchableOpacity
                     key={f.key}
                     onPress={() => setTableFilter(f.key)}
-                    onLayout={(e) => {
-                      const { x, width } = e.nativeEvent.layout;
-                      setTableFilterLayouts((prev) => {
-                        if (prev[f.key]?.x === x && prev[f.key]?.width === width) return prev;
-                        return { ...prev, [f.key]: { x, width } };
-                      });
-                    }}
-                    activeOpacity={0.85}
+                    activeOpacity={0.8}
                     style={{
                       paddingHorizontal: 12,
                       paddingVertical: 5,
                       borderRadius: 6,
                       alignItems: 'center',
                       justifyContent: 'center',
-                      backgroundColor: !hasLayout && isActive ? '#EA580C' : 'transparent',
+                      backgroundColor: isActive ? theme.pillActiveBg : 'transparent',
+                      boxShadow: isActive ? '0 1px 2px rgba(0,0,0,0.06)' : undefined,
                       cursor: 'pointer',
-                      zIndex: 1,
                     }}
                   >
                     <Text
                       numberOfLines={1}
                       style={{
                         fontSize: 12,
-                        fontWeight: isActive ? '700' : '600',
-                        color: isActive ? '#FFFFFF' : '#CBD5E1',
+                        fontWeight: isActive ? '600' : '500',
+                        color: isActive ? theme.pillActiveText : theme.pillInactiveText,
                         whiteSpace: 'nowrap',
-                        transition: 'color 200ms ease',
                       }}
                     >
                       {f.label}
@@ -1887,18 +1748,18 @@ export default function ModernOverviewDashboard({
                 cursor: 'pointer',
               }}
             >
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#EA580C' }}>
+              <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#EA580C' }}>
                 View All ({orders.length}) →
               </Text>
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Clean Organized Table Rows (Retaining all original info!) */}
+        {/* Organized Table Rows */}
         {filteredOrders.length === 0 ? (
           <View style={{ paddingVertical: 48, alignItems: 'center', justifyContent: 'center' }}>
             <BootstrapIcon name="receipt" size={32} color={theme.textMuted} />
-            <Text style={{ fontSize: 14, fontWeight: '700', color: theme.textPrimary, marginTop: 10 }}>
+            <Text style={{ fontSize: 14, fontWeight: '600', color: theme.textPrimary, marginTop: 10 }}>
               No Transactions Found
             </Text>
             <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 4 }}>
@@ -1913,27 +1774,35 @@ export default function ModernOverviewDashboard({
             contentContainerStyle={{ minWidth: isDesktop ? '100%' : 750 }}
           >
             <View style={{ width: '100%' }}>
-              {/* Table Column Headers */}
+              {/* Clean Table Column Headers */}
               <View
                 style={{
                   flexDirection: 'row',
                   paddingHorizontal: 20,
                   paddingVertical: 11,
-                  backgroundColor: '#24272B',
+                  backgroundColor: isDarkMode ? '#202225' : '#F8F9FA',
                   borderBottomWidth: 1,
-                  borderBottomColor: isDarkMode ? '#374151' : '#32373D',
+                  borderBottomColor: theme.cardBorder,
                 }}
               >
-                <Text style={{ flex: 1.8, fontSize: 11.5, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.5, textTransform: 'uppercase' }}>Customer & Order</Text>
-                <Text style={{ flex: 2.2, fontSize: 11.5, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.5, textTransform: 'uppercase' }}>Items & Qty</Text>
-                <Text style={{ flex: 1.2, fontSize: 11.5, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.5, textTransform: 'uppercase' }}>Channel</Text>
-                <Text style={{ flex: 1.3, fontSize: 11.5, fontWeight: '700', color: '#CBD5E1', letterSpacing: 0.5, textTransform: 'uppercase' }}>Payment & Total</Text>
-                <Text style={{ flex: 1.3, fontSize: 11.5, fontWeight: '700', color: '#CBD5E1', textAlign: 'center', letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                <Text style={{ flex: 1.8, fontSize: 11, fontWeight: '600', color: theme.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  Customer & Order
+                </Text>
+                <Text style={{ flex: 2.2, fontSize: 11, fontWeight: '600', color: theme.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  Items & Qty
+                </Text>
+                <Text style={{ flex: 1.2, fontSize: 11, fontWeight: '600', color: theme.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  Channel
+                </Text>
+                <Text style={{ flex: 1.3, fontSize: 11, fontWeight: '600', color: theme.textMuted, letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                  Payment & Total
+                </Text>
+                <Text style={{ flex: 1.3, fontSize: 11, fontWeight: '600', color: theme.textMuted, textAlign: 'center', letterSpacing: 0.5, textTransform: 'uppercase' }}>
                   Status
                 </Text>
               </View>
 
-              {/* Scrollable Table Body (Like the Orders Table) */}
+              {/* Scrollable Table Body */}
               <ScrollView
                 showsVerticalScrollIndicator={false}
                 showsHorizontalScrollIndicator={false}
@@ -1947,177 +1816,195 @@ export default function ModernOverviewDashboard({
                 contentContainerStyle={{ flexGrow: 1 }}
               >
                 {filteredOrders.map((o, idx) => {
-                const displayOrderId = o.order_id || o.id || `ORD-ON-2026-${String(idx + 1).padStart(5, '0')}`;
-                const rawChannel = String(o.channel || '').toLowerCase();
-                const isInStore = rawChannel.includes('pos') || rawChannel.includes('in-store') || rawChannel.includes('walk-in') || (rawChannel.includes('store') && !rawChannel.includes('online'));
-                const displayChannel = isInStore ? 'In Store' : 'Online Store';
-                const st = (o.status || 'Pending Approval').toLowerCase();
-                const isPending = st.includes('pending') || st.includes('approval');
-                const isProcessing = st === 'processing';
-                const isReady = st === 'ready for delivery';
-                const isShipped = st === 'shipped' || st === 'in transit' || st === 'out for delivery';
-                const isDelivered = st === 'delivered' || st === 'completed';
-                const isCancelled = st === 'cancelled' || st === 'canceled';
-                const isFailed = st === 'delivery failed' || st === 'delivery issue' || st === 'failed';
-                const isCOD =
-                  (o.payment_method || '').toLowerCase().includes('cash') ||
-                  (o.payment_method || '').includes('COD');
+                  const displayOrderId = o.order_id || o.id || `ORD-ON-2026-${String(idx + 1).padStart(5, '0')}`;
+                  const rawChannel = String(o.channel || '').toLowerCase();
+                  const isInStore =
+                    rawChannel.includes('pos') ||
+                    rawChannel.includes('in-store') ||
+                    rawChannel.includes('walk-in') ||
+                    (rawChannel.includes('store') && !rawChannel.includes('online'));
+                  const displayChannel = isInStore ? 'In Store' : 'Online Store';
+                  const st = (o.status || 'Pending Approval').toLowerCase();
+                  const isPending = st.includes('pending') || st.includes('approval');
+                  const isProcessing = st === 'processing';
+                  const isReady = st === 'ready for delivery';
+                  const isShipped = st === 'shipped' || st === 'in transit' || st === 'out for delivery';
+                  const isDelivered = st === 'delivered' || st === 'completed';
+                  const isCancelled = st === 'cancelled' || st === 'canceled';
+                  const isFailed = st === 'delivery failed' || st === 'delivery issue' || st === 'failed';
+                  const isCOD =
+                    (o.payment_method || '').toLowerCase().includes('cash') ||
+                    (o.payment_method || '').includes('COD');
 
-                const statusLabel = isPending
-                  ? 'Pending'
-                  : isProcessing
-                  ? 'Processing'
-                  : isReady
-                  ? 'Ready'
-                  : isShipped
-                  ? 'Out for Delivery'
-                  : isDelivered
-                  ? 'Delivered'
-                  : isCancelled
-                  ? 'Cancelled'
-                  : isFailed
-                  ? 'Delivery failed'
-                  : 'Processing';
+                  const statusLabel = isPending
+                    ? 'Pending'
+                    : isProcessing
+                    ? 'Processing'
+                    : isReady
+                    ? 'Ready'
+                    : isShipped
+                    ? 'Out for Delivery'
+                    : isDelivered
+                    ? 'Delivered'
+                    : isCancelled
+                    ? 'Cancelled'
+                    : isFailed
+                    ? 'Delivery failed'
+                    : 'Processing';
 
-                let statusBg = isDarkMode ? '#1E2923' : '#F1F5F9';
-                let statusFg = isDarkMode ? '#94A3B8' : '#334155';
-                if (isPending) {
-                  statusBg = isDarkMode ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7';
-                  statusFg = isDarkMode ? '#FBBF24' : '#B45309';
-                } else if (isProcessing || isReady) {
-                  statusBg = isDarkMode ? 'rgba(56, 189, 248, 0.16)' : '#DBEAFE';
-                  statusFg = isDarkMode ? '#7DD3FC' : '#1E3A5F';
-                } else if (isShipped) {
-                  statusBg = isDarkMode ? 'rgba(167, 139, 250, 0.16)' : '#EDE9FE';
-                  statusFg = isDarkMode ? '#C4B5FD' : '#6D28D9';
-                } else if (isDelivered) {
-                  statusBg = isDarkMode ? 'rgba(34, 197, 94, 0.16)' : '#DCFCE7';
-                  statusFg = isDarkMode ? '#4ADE80' : '#166534';
-                } else if (isFailed || isCancelled) {
-                  statusBg = isDarkMode ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2';
-                  statusFg = isDarkMode ? '#FCA5A5' : '#B91C1C';
-                }
+                  let statusBg = isDarkMode ? '#27272A' : '#F4F4F5';
+                  let statusFg = isDarkMode ? '#A1A1AA' : '#52525B';
+                  if (isPending) {
+                    statusBg = isDarkMode ? 'rgba(245, 158, 11, 0.15)' : '#FEF3C7';
+                    statusFg = isDarkMode ? '#FBBF24' : '#B45309';
+                  } else if (isProcessing || isReady) {
+                    statusBg = isDarkMode ? 'rgba(56, 189, 248, 0.15)' : '#EFF6FF';
+                    statusFg = isDarkMode ? '#38BDF8' : '#1D4ED8';
+                  } else if (isShipped) {
+                    statusBg = isDarkMode ? 'rgba(167, 139, 250, 0.15)' : '#F3E8FF';
+                    statusFg = isDarkMode ? '#C084FC' : '#7E22CE';
+                  } else if (isDelivered) {
+                    statusBg = isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5';
+                    statusFg = isDarkMode ? '#34D399' : '#059669';
+                  } else if (isFailed || isCancelled) {
+                    statusBg = isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2';
+                    statusFg = isDarkMode ? '#F87171' : '#B91C1C';
+                  }
 
-                const itemsSummary =
-                  o.items_summary ||
-                  (o.items && o.items.length > 0
-                    ? o.items.map((it) => `${it.quantity || 1}x ${it.name}`).join(', ')
-                    : 'Motorcycle Parts');
-                const itemCount = o.items_count || (o.items ? o.items.length : 1);
-                const orderTotal = Number(o.grand_total) || Number(o.total_amount) || 0;
+                  const itemsSummary =
+                    o.items_summary ||
+                    (o.items && o.items.length > 0
+                      ? o.items.map((it) => `${it.quantity || 1}x ${it.name}`).join(', ')
+                      : 'Motorcycle Parts');
+                  const itemCount = o.items_count || (o.items ? o.items.length : 1);
+                  const orderTotal = Number(o.grand_total) || Number(o.total_amount) || 0;
 
-                return (
-                  <TouchableOpacity
-                    key={displayOrderId || idx}
-                    onPress={() => openOrderModal(o)}
-                    activeOpacity={0.7}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingHorizontal: 20,
-                      paddingVertical: 13,
-                      borderBottomWidth: idx === filteredOrders.length - 1 ? 0 : 1,
-                      borderBottomColor: theme.borderSubtle,
-                      cursor: 'pointer',
-                      backgroundColor: isPending
-                        ? isDarkMode ? 'rgba(245, 158, 11, 0.05)' : '#FFFDF7'
-                        : 'transparent',
-                    }}
-                  >
-                    {/* Customer & Order */}
-                    <View style={{ flex: 1.8, paddingRight: 10 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: theme.textPrimary }} numberOfLines={1}>
-                        {o.customer_name || 'Walk-in Customer'}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 11.5,
-                          color: theme.textMuted,
-                          fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                          marginTop: 2,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {displayOrderId}
-                      </Text>
-                    </View>
-
-                    {/* Items & Qty */}
-                    <View style={{ flex: 2.2, paddingRight: 10 }}>
-                      <Text style={{ fontSize: 12.5, fontWeight: '600', color: theme.textPrimary }} numberOfLines={1}>
-                        {itemsSummary}
-                      </Text>
-                      <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
-                        {itemCount} item{itemCount === 1 ? '' : 's'}
-                      </Text>
-                    </View>
-
-                    {/* Channel */}
-                    <View style={{ flex: 1.2, paddingRight: 8 }}>
-                      <View
-                        style={{
-                          alignSelf: 'flex-start',
-                          paddingHorizontal: 8,
-                          paddingVertical: 3,
-                          borderRadius: 6,
-                          borderWidth: 1,
-                          backgroundColor: isInStore
-                            ? (isDarkMode ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5')
-                            : (isDarkMode ? 'rgba(37, 99, 235, 0.15)' : '#EFF6FF'),
-                          borderColor: isInStore
-                            ? (isDarkMode ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0')
-                            : (isDarkMode ? 'rgba(37, 99, 235, 0.3)' : '#BFDBFE'),
-                        }}
-                      >
+                  return (
+                    <TouchableOpacity
+                      key={displayOrderId || idx}
+                      onPress={() => openOrderModal(o)}
+                      activeOpacity={0.7}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 20,
+                        paddingVertical: 13,
+                        borderBottomWidth: idx === filteredOrders.length - 1 ? 0 : 1,
+                        borderBottomColor: theme.borderSubtle,
+                        cursor: 'pointer',
+                        backgroundColor: isPending
+                          ? isDarkMode
+                            ? 'rgba(245, 158, 11, 0.04)'
+                            : '#FFFDF7'
+                          : 'transparent',
+                      }}
+                    >
+                      {/* Customer & Order */}
+                      <View style={{ flex: 1.8, paddingRight: 10 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary }} numberOfLines={1}>
+                          {o.customer_name || 'Walk-in Customer'}
+                        </Text>
                         <Text
                           style={{
-                            fontSize: 11,
-                            fontWeight: '700',
-                            color: isInStore
-                              ? (isDarkMode ? '#4ADE80' : '#059669')
-                              : (isDarkMode ? '#60A5FA' : '#2563EB'),
+                            fontSize: 11.5,
+                            color: theme.textMuted,
+                            fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                            marginTop: 2,
                           }}
+                          numberOfLines={1}
                         >
-                          {displayChannel}
+                          {displayOrderId}
                         </Text>
                       </View>
-                    </View>
 
-                    {/* Payment & Total */}
-                    <View style={{ flex: 1.3, paddingRight: 10 }}>
-                      <Text style={{ fontSize: 13, fontWeight: '700', color: theme.brandGreen }}>
-                        ₱{orderTotal.toLocaleString()}
-                      </Text>
-                      <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 1 }}>
-                        {isCOD ? 'COD' : o.payment_method || 'Online'}
-                        {o.cod_change_for ? ` · Chg ₱${Number(o.cod_change_for).toLocaleString()}` : ''}
-                      </Text>
-                    </View>
+                      {/* Items & Qty */}
+                      <View style={{ flex: 2.2, paddingRight: 10 }}>
+                        <Text style={{ fontSize: 12.5, fontWeight: '500', color: theme.textPrimary }} numberOfLines={1}>
+                          {itemsSummary}
+                        </Text>
+                        <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
+                          {itemCount} item{itemCount === 1 ? '' : 's'}
+                        </Text>
+                      </View>
 
-                    {/* Status */}
-                    <View style={{ flex: 1.3, alignItems: 'center' }}>
-                      <View
-                        style={{
-                          backgroundColor: statusBg,
-                          borderRadius: isDelivered ? 6 : 999,
-                          paddingHorizontal: isDelivered ? 12 : 10,
-                          paddingVertical: 4,
-                        }}
-                      >
-                        <Text
+                      {/* Channel */}
+                      <View style={{ flex: 1.2, paddingRight: 8 }}>
+                        <View
                           style={{
-                            color: statusFg,
-                            fontSize: 11,
-                            fontWeight: '700',
+                            alignSelf: 'flex-start',
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 6,
+                            borderWidth: 1,
+                            backgroundColor: isInStore
+                              ? isDarkMode
+                                ? 'rgba(16, 185, 129, 0.12)'
+                                : '#ECFDF5'
+                              : isDarkMode
+                              ? 'rgba(37, 99, 235, 0.12)'
+                              : '#EFF6FF',
+                            borderColor: isInStore
+                              ? isDarkMode
+                                ? 'rgba(16, 185, 129, 0.25)'
+                                : '#A7F3D0'
+                              : isDarkMode
+                              ? 'rgba(37, 99, 235, 0.25)'
+                              : '#BFDBFE',
                           }}
                         >
-                          {statusLabel}
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: '600',
+                              color: isInStore
+                                ? isDarkMode
+                                  ? '#34D399'
+                                  : '#059669'
+                                : isDarkMode
+                                ? '#60A5FA'
+                                : '#2563EB',
+                            }}
+                          >
+                            {displayChannel}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Payment & Total */}
+                      <View style={{ flex: 1.3, paddingRight: 10 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: theme.textPrimary, fontVariant: ['tabular-nums'] }}>
+                          ₱{orderTotal.toLocaleString()}
+                        </Text>
+                        <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 1 }}>
+                          {isCOD ? 'COD' : o.payment_method || 'Online'}
+                          {o.cod_change_for ? ` · Chg ₱${Number(o.cod_change_for).toLocaleString()}` : ''}
                         </Text>
                       </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+
+                      {/* Status */}
+                      <View style={{ flex: 1.3, alignItems: 'center' }}>
+                        <View
+                          style={{
+                            backgroundColor: statusBg,
+                            borderRadius: 999,
+                            paddingHorizontal: 10,
+                            paddingVertical: 3.5,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              color: statusFg,
+                              fontSize: 11,
+                              fontWeight: '600',
+                            }}
+                          >
+                            {statusLabel}
+                          </Text>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
               </ScrollView>
             </View>
           </ScrollView>
@@ -2130,29 +2017,65 @@ export default function ModernOverviewDashboard({
 /**
  * ModernOverviewDashboardSkeleton
  * Full-fidelity shimmer skeleton placeholder for the Modern Overview Dashboard.
- * Matches exact geometry of the live overview cards, charts, and recent orders table.
+ * Matches exact geometry of the 4 KPI cards and chart row.
  */
 export function ModernOverviewDashboardSkeleton({ isDarkMode = false, isDesktop = true }) {
   const { width: windowWidth } = useWindowDimensions();
-  const baseColor = isDarkMode ? '#1E2824' : '#E2E8F0';
-  const highlightColor = isDarkMode ? '#2A3A33' : '#F1F5F9';
-  const cardBg = isDarkMode ? '#151D19' : '#FFFFFF';
-  const cardBorder = isDarkMode ? '#23322B' : '#E5E8E5';
+  const baseColor = isDarkMode ? '#27272A' : '#E4E4E7';
+  const highlightColor = isDarkMode ? '#3F3F46' : '#F4F4F5';
+  const cardBg = isDarkMode ? '#18181B' : '#FFFFFF';
+  const cardBorder = isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E4E4E7';
 
   return (
     <View style={{ width: '100%', gap: 20 }} role="status" aria-label="Loading dashboard metrics">
-      {/* 1. TOP SECTION: Chart (Left) + 4 Stat Cards (Right) */}
+      {/* 1. Top 4 KPI Cards Skeleton */}
       <View
         style={{
-          flexDirection: isDesktop ? 'row' : 'column',
-          gap: 18,
+          display: 'grid',
+          gridTemplateColumns: isDesktop
+            ? 'repeat(4, 1fr)'
+            : windowWidth < 640
+            ? '1fr'
+            : 'repeat(2, 1fr)',
+          gap: 16,
+        }}
+      >
+        {[1, 2, 3, 4].map((k) => (
+          <View
+            key={k}
+            style={{
+              backgroundColor: cardBg,
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: cardBorder,
+              padding: 20,
+              gap: 12,
+            }}
+          >
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Skeleton width={60} height={14} baseColor={baseColor} highlightColor={highlightColor} />
+              <Skeleton width={45} height={20} borderRadius={10} baseColor={baseColor} highlightColor={highlightColor} />
+            </View>
+            <Skeleton width={120} height={30} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
+            <Skeleton width={90} height={12} baseColor={baseColor} highlightColor={highlightColor} />
+            <Skeleton width="100%" height={24} borderRadius={4} baseColor={baseColor} highlightColor={highlightColor} />
+          </View>
+        ))}
+      </View>
+
+      {/* 2. Spline Chart + Pipeline Skeleton */}
+      <View
+        style={{
+          display: 'grid',
+          gridTemplateColumns: isDesktop ? 'repeat(4, 1fr)' : '1fr',
+          gap: 16,
           alignItems: 'stretch',
         }}
       >
-        {/* Left: Revenue Chart Card Skeleton */}
         <View
           style={{
-            flex: isDesktop ? 1.55 : 1,
+            gridColumn: isDesktop ? 'span 3' : 'span 1',
+            minWidth: 0,
             backgroundColor: cardBg,
             borderRadius: 16,
             borderWidth: 1,
@@ -2161,183 +2084,46 @@ export function ModernOverviewDashboardSkeleton({ isDarkMode = false, isDesktop 
             gap: 16,
           }}
         >
-          {/* Header */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <Skeleton circle size={32} baseColor={baseColor} highlightColor={highlightColor} />
-              <View style={{ gap: 4 }}>
-                <Skeleton width={120} height={16} baseColor={baseColor} highlightColor={highlightColor} />
-                <Skeleton width={160} height={12} baseColor={baseColor} highlightColor={highlightColor} />
-              </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <View style={{ gap: 4 }}>
+              <Skeleton width={140} height={18} baseColor={baseColor} highlightColor={highlightColor} />
+              <Skeleton width={180} height={12} baseColor={baseColor} highlightColor={highlightColor} />
             </View>
-            <View style={{ flexDirection: 'row', gap: 6 }}>
-              <Skeleton width={52} height={26} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
-              <Skeleton width={52} height={26} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
-              <Skeleton width={52} height={26} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
-            </View>
+            <Skeleton width={160} height={30} borderRadius={8} baseColor={baseColor} highlightColor={highlightColor} />
           </View>
+          <Skeleton height={210} borderRadius={8} baseColor={baseColor} highlightColor={highlightColor} />
+        </View>
 
-          {/* Big Revenue Stat */}
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 4 }}>
-            <Skeleton width={180} height={34} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
-            <Skeleton width={70} height={22} borderRadius={11} baseColor={baseColor} highlightColor={highlightColor} />
+        <View
+          style={{
+            gridColumn: 'span 1',
+            minWidth: 0,
+            backgroundColor: cardBg,
+            borderRadius: 16,
+            borderWidth: 1,
+            borderColor: cardBorder,
+            padding: 22,
+            gap: 14,
+          }}
+        >
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+            <Skeleton width={120} height={18} baseColor={baseColor} highlightColor={highlightColor} />
+            <Skeleton width={70} height={14} baseColor={baseColor} highlightColor={highlightColor} />
           </View>
-
-          {/* Chart Shimmer Canvas */}
-          <View style={{ height: 230, width: '100%', justifyContent: 'flex-end', paddingBottom: 10 }}>
-            <Skeleton height={200} borderRadius={10} baseColor={baseColor} highlightColor={highlightColor} />
-          </View>
-
-          {/* Chart Footer Stats */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: cardBorder, paddingTop: 14 }}>
-            {[1, 2, 3].map((k) => (
-              <View key={k} style={{ gap: 4 }}>
-                <Skeleton width={70} height={12} baseColor={baseColor} highlightColor={highlightColor} />
-                <Skeleton width={90} height={18} baseColor={baseColor} highlightColor={highlightColor} />
+          <Skeleton width={80} height={30} baseColor={baseColor} highlightColor={highlightColor} />
+          <Skeleton height={8} borderRadius={4} baseColor={baseColor} highlightColor={highlightColor} />
+          <View style={{ gap: 10, marginTop: 8 }}>
+            {[1, 2, 3, 4].map((s) => (
+              <View key={s} style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Skeleton width={70} height={14} baseColor={baseColor} highlightColor={highlightColor} />
+                <Skeleton width={30} height={14} baseColor={baseColor} highlightColor={highlightColor} />
               </View>
             ))}
           </View>
         </View>
-
-        {/* Right: 4 KPI Cards Grid */}
-        <View
-          style={{
-            flex: 1,
-            display: 'grid',
-            gridTemplateColumns: windowWidth < 420 ? '1fr' : 'repeat(2, 1fr)',
-            gridTemplateRows: isDesktop && windowWidth >= 420 ? 'repeat(2, 1fr)' : undefined,
-            gap: 14,
-            height: isDesktop ? '100%' : 'auto',
-            alignSelf: 'stretch',
-          }}
-        >
-          {[1, 2, 3, 4].map((k) => (
-            <View
-              key={k}
-              style={{
-                backgroundColor: cardBg,
-                borderRadius: 14,
-                borderWidth: 1,
-                borderColor: cardBorder,
-                padding: 16,
-                justifyContent: 'space-between',
-                height: '100%',
-                boxSizing: 'border-box',
-                gap: 12,
-              }}
-            >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Skeleton width={80} height={14} baseColor={baseColor} highlightColor={highlightColor} />
-                <Skeleton circle size={28} baseColor={baseColor} highlightColor={highlightColor} />
-              </View>
-              <Skeleton width={110} height={26} baseColor={baseColor} highlightColor={highlightColor} />
-              <View style={{ height: 32, width: '100%' }}>
-                <Skeleton height={28} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
-              </View>
-              <Skeleton width={90} height={12} baseColor={baseColor} highlightColor={highlightColor} />
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* 2. MIDDLE SECTION: 2 Column Analytics Cards */}
-      <View
-        style={{
-          flexDirection: isDesktop ? 'row' : 'column',
-          gap: 18,
-          alignItems: 'stretch',
-        }}
-      >
-        {/* Left: Top Products */}
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: cardBg,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: cardBorder,
-            padding: 20,
-            gap: 14,
-          }}
-        >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Skeleton width={140} height={18} baseColor={baseColor} highlightColor={highlightColor} />
-            <Skeleton width={70} height={14} baseColor={baseColor} highlightColor={highlightColor} />
-          </View>
-          {[1, 2, 3, 4, 5].map((k) => (
-            <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 }}>
-              <Skeleton width={20} height={16} baseColor={baseColor} highlightColor={highlightColor} />
-              <Skeleton width={38} height={38} borderRadius={8} baseColor={baseColor} highlightColor={highlightColor} />
-              <View style={{ flex: 1, gap: 5 }}>
-                <Skeleton width="65%" height={14} baseColor={baseColor} highlightColor={highlightColor} />
-                <Skeleton width="40%" height={10} baseColor={baseColor} highlightColor={highlightColor} />
-              </View>
-              <Skeleton width={60} height={16} baseColor={baseColor} highlightColor={highlightColor} />
-            </View>
-          ))}
-        </View>
-
-        {/* Right: Revenue Breakdown by Channel */}
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: cardBg,
-            borderRadius: 16,
-            borderWidth: 1,
-            borderColor: cardBorder,
-            padding: 20,
-            gap: 16,
-          }}
-        >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Skeleton width={160} height={18} baseColor={baseColor} highlightColor={highlightColor} />
-            <Skeleton circle size={28} baseColor={baseColor} highlightColor={highlightColor} />
-          </View>
-          {[1, 2, 3, 4].map((k) => (
-            <View key={k} style={{ gap: 6 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Skeleton width={110} height={14} baseColor={baseColor} highlightColor={highlightColor} />
-                <Skeleton width={75} height={14} baseColor={baseColor} highlightColor={highlightColor} />
-              </View>
-              <Skeleton width="100%" height={10} borderRadius={5} baseColor={baseColor} highlightColor={highlightColor} />
-            </View>
-          ))}
-        </View>
-      </View>
-
-      {/* 3. BOTTOM SECTION: Recent Orders Table Skeleton */}
-      <View
-        style={{
-          backgroundColor: cardBg,
-          borderRadius: 16,
-          borderWidth: 1,
-          borderColor: cardBorder,
-          padding: 20,
-          gap: 16,
-        }}
-      >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-          <View style={{ gap: 4 }}>
-            <Skeleton width={150} height={18} baseColor={baseColor} highlightColor={highlightColor} />
-            <Skeleton width={200} height={12} baseColor={baseColor} highlightColor={highlightColor} />
-          </View>
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Skeleton width={65} height={28} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
-            <Skeleton width={65} height={28} borderRadius={6} baseColor={baseColor} highlightColor={highlightColor} />
-          </View>
-        </View>
-
-        <Skeleton.Table
-          rows={6}
-          columns={5}
-          showHeader
-          baseColor={baseColor}
-          highlightColor={highlightColor}
-        />
       </View>
     </View>
   );
 }
 
 ModernOverviewDashboard.Skeleton = ModernOverviewDashboardSkeleton;
-

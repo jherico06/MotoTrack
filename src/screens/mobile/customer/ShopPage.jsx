@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, SafeAreaView, RefreshControl, useWindowDimensions, TouchableOpacity, Modal, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
@@ -16,14 +16,14 @@ import { useTheme } from '../../../context/ThemeContext.jsx';
 import { productNeedsSizes, withSelectedSize, isSizeSoldOut } from '../../../utils/productSizes.js';
 import { getRatedScore } from '../../../utils/productCatalog.js';
 
-// ─── COMPONENTS & MODALS ───────────────────────────────────────────────────
+// ─── COMPONENTS & MODALS ───
+import ProductCard from '../../../components/mobile/customer/ProductCard.jsx';
 import {
   BottomNavBar,
   ToastNotification,
   MobileHeader,
   HeroBanner,
   FilterChips,
-  ProductCard,
   ProductSpecsModal,
   CartModal,
   CheckoutModal,
@@ -41,6 +41,7 @@ import {
 import { motorcycleService } from '../../../services/products/motorcycleService.js';
 
 export default function ShopPage({ onNavigateToScreen }) {
+  const mainScrollRef = useRef(null);
   // Contexts
   const { currentUser, setRedirectReason, logout } = useAuth();
   const {
@@ -624,6 +625,7 @@ export default function ShopPage({ onNavigateToScreen }) {
       />
 
       <ScrollView
+        ref={mainScrollRef}
         style={[styles.container, isDarkMode && { backgroundColor: '#121518' }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -1052,7 +1054,8 @@ export default function ShopPage({ onNavigateToScreen }) {
       <BottomNavBar
         activeTab="Home"
         onTabChange={(tab) => {
-          if (tab === 'Home') {
+          if (tab === 'Home' || tab === 'Shop') {
+            mainScrollRef.current?.scrollTo({ y: 0, animated: true });
             setSelectedCategory('All');
             setSearchQuery('');
           } else if (tab === 'Search') {
@@ -1067,7 +1070,7 @@ export default function ShopPage({ onNavigateToScreen }) {
             }
           } else if (tab === 'Wishlist' || tab === 'Favorites') {
             onNavigateToScreen?.('wishlist');
-          } else if (tab === 'More') {
+          } else if (tab === 'Account' || tab === 'Profile' || tab === 'More') {
             if (!currentUser) {
               setRedirectReason?.('Please sign in to access your Customer Dashboard.');
               onNavigateToScreen?.('login');

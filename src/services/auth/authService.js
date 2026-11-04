@@ -835,8 +835,12 @@ export const authService = {
         if (isLanExpoGoRedirect(redirectUrl)) {
           return {
             success: false,
+            redirectConfigNeeded: true,
+            redirectUrl,
             error:
-              'iPhone cannot open your computer address after Google login. Stop Expo, run npx expo start --tunnel, reload Expo Go, then add the new exp://…exp.direct Redirect URL in Supabase.',
+              'Supabase Redirect URL needed: In Supabase Dashboard → Authentication → URL Configuration, add "exp://**" (or "' +
+              redirectUrl +
+              '") to Redirect URLs. Alternatively, run "npm run mobile" for Expo tunnel.',
           };
         }
 
@@ -844,16 +848,23 @@ export const authService = {
           return {
             success: false,
             cancelled: true,
+            redirectConfigNeeded: true,
+            redirectUrl,
             error:
-              'Google sign-in was closed before the app got the result. In Supabase → Authentication → URL Configuration, add this exact Redirect URL: ' +
-              redirectUrl,
+              'Google sign-in was closed before returning to MotoTrack. In Supabase Dashboard → Authentication → URL Configuration, add "exp://**" and "' +
+              redirectUrl +
+              '" to Redirect URLs.',
           };
         }
 
         return {
           success: false,
+          redirectConfigNeeded: true,
+          redirectUrl,
           error:
-            'Google sign-in did not return to the app. Add this Redirect URL in Supabase: ' + redirectUrl,
+            'Google sign-in did not return to the app. In Supabase Dashboard → Authentication → URL Configuration, add "exp://**" and "' +
+            redirectUrl +
+            '" to Redirect URLs.',
         };
       } catch (err) {
         console.error('[Google Auth Mobile] Error in mobile sign in:', err);

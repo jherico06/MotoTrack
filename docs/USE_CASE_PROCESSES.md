@@ -301,27 +301,141 @@ Companion catalog: [USE_CASES.md](./USE_CASES.md)
 
 ---
 
-## Mermaid overview (selected flows)
+## 25. Rate Delivered Order & Customer Feedback Process
+
+| INPUT | PROCESS | OUTPUT |
+| :---: | :---: | :---: |
+| Order ID, star rating (1–5), review text, issue category, photos | Verify delivered status, persist review/report, update product rating aggregates | Feedback recorded confirmation / Admin feedback log entry |
+
+```
+[ Star rating, review & issue details ] → [ Verify delivery & record feedback ] → [ Rating & Feedback Log Updated ]
+```
+
+---
+
+## 26. Return / Exchange Request Process
+
+| INPUT | PROCESS | OUTPUT |
+| :---: | :---: | :---: |
+| Delivered order ID, return reason, proof photo upload | Validate order return window, record return ticket, flag order status | Return ticket submitted / Admin review prompt |
+
+```
+[ Return reason & photo proof ] → [ Create return claim & update order state ] → [ Return Claim Pending Review ]
+```
+
+---
+
+## 27. Cart Management & Promo Voucher Process
+
+| INPUT | PROCESS | OUTPUT |
+| :---: | :---: | :---: |
+| Product variant selection, quantity increment/decrement, voucher code | Check real-time stock availability, validate voucher rules (min spend, expiry), compute discount | Updated cart subtotals and applied discount breakdown |
+
+```
+[ Cart items & promo code ] → [ Check stock & validate voucher rules ] → [ Updated Subtotal & Discount Applied ]
+```
+
+---
+
+## 28. Manage Marketing Banners Process
+
+| INPUT | PROCESS | OUTPUT |
+| :---: | :---: | :---: |
+| Banner image, headline title, badge, subtitle, target link, active status | Store banner configuration in admin settings and broadcast updates | Dynamic storefront hero banner updated |
+
+```
+[ Banner image & copy ] → [ Save marketing banner settings ] → [ Updated Storefront Hero Showcase ]
+```
+
+---
+
+## 29. Manage Purchase Orders Process
+
+| INPUT | PROCESS | OUTPUT |
+| :---: | :---: | :---: |
+| Supplier selection, items, restock quantities, unit costs, expected date | Generate purchase order record, track shipment status, increment stock on receiving | Created purchase order / inventory replenished |
+
+```
+[ Supplier & restock order items ] → [ Generate purchase order & receive shipment ] → [ Warehouse Inventory Replenished ]
+```
+
+---
+
+## 30. Motorcycle Models & Compatibility Process
+
+| INPUT | PROCESS | OUTPUT |
+| :---: | :---: | :---: |
+| Motorcycle brand, model name, displacement, years; product mapping | Store vehicle specifications and link part compatibility matrix | Updated compatibility master catalog |
+
+```
+[ Vehicle specs & part associations ] → [ Map vehicle compatibility matrix ] → [ Accurate Customer Fitment Badges ]
+```
+
+---
+
+## 31. Mechanic Vehicle Inspection & Estimate Process
+
+| INPUT | PROCESS | OUTPUT |
+| :---: | :---: | :---: |
+| Booking ID, odometer reading, checklist items, condition photos, parts & labor draft | Save inspection findings, transition booking status, compile quotation estimate for admin approval | Inspection report completed / quotation pending customer review |
+
+```
+[ Odometer, checklist & parts estimate ] → [ Record diagnostics & draft quotation ] → [ Quotation Ready for Review ]
+```
+
+---
+
+## 32. Audit Log & Security Lock Process
+
+| INPUT | PROCESS | OUTPUT |
+| :---: | :---: | :---: |
+| Administrative event (order status change, stock override, role update) or idle timer | Log immutable event to audit trail or trigger PIN lock screen | Secure audit trail record / screen locked until PIN verified |
+
+```
+[ Admin event / idle timeout ] → [ Record audit event / enforce PIN lock ] → [ Secure Audit Record / Locked Session ]
+```
+
+---
+
+## Mermaid overview (end-to-end system flows)
 
 ```mermaid
-flowchart LR
-  subgraph Registration
-    A1[User details] --> A2[Store in database] --> A3[Account created]
+flowchart TD
+  subgraph Customer Shopping & Checkout
+    A1[Browse & Compatibility Check] --> A2[Add to Cart & Apply Promo]
+    A2 --> A3[Checkout: COD or GCash]
+    A3 --> A4[Order Created: Pending Admin Approval]
   end
 
-  subgraph Login
-    B1[Credentials] --> B2[Verify role] --> B3[Dashboard / Homepage]
+  subgraph Admin Order Fulfillment & Dispatch
+    A4 --> B1[Admin Approves COD & Packs Order]
+    B1 --> B2[Assign Rider & Generate Delivery QR]
   end
 
-  subgraph Checkout
-    C1[Cart & payment] --> C2[Create order] --> C3[Order confirmation]
+  subgraph Rider Delivery Execution
+    B2 --> C1[Rider Accepts & Marks Out for Delivery]
+    C1 --> C2[Live GPS Broadcast & Google Maps Navigation]
+    C2 --> C3[Scan Delivery QR & Upload Proof of Delivery]
+    C3 --> C4[Order Delivered & Shipping Fee Earned]
   end
 
-  subgraph Delivery
-    D1[Assigned order] --> D2[GPS + QR confirm] --> D3[Delivered]
+  subgraph Customer Post-Delivery
+    C4 --> D1[Rate Order & Submit Feedback]
+    C4 --> D2[Optional: Request Return/Exchange]
   end
 
-  subgraph Garage
-    E1[Booking details] --> E2[Inspect & quote] --> E3[Service / Pickup]
+  subgraph Garage PMS & Repair Workflow
+    G1[Customer Books Service] --> G2[Admin Assigns Mechanic & Bay]
+    G2 --> G3[Mechanic Diagnostic Inspection]
+    G3 --> G4[Itemized Labor & Parts Quotation]
+    G4 --> G5[Customer Approves Quotation]
+    G5 --> G6[Mechanic Performs Repair & Updates Milestones]
+    G6 --> G7[Admin Scans Pickup QR & Releases Vehicle]
+  end
+
+  subgraph Inventory & Demand Forecasting
+    I1[Daily Sales & POS Transactions] --> I2[OLS Linear Regression Demand Forecast]
+    I2 --> I3[Safety Stock & Reorder Point Alerts]
+    I3 --> I4[Admin Purchase Order to Supplier]
   end
 ```

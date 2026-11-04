@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Platform,
   TouchableWithoutFeedback,
+  useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { orderService } from '../../services/orders/orderService.js';
@@ -41,6 +42,8 @@ export default function RateDeliveredOrderModal({
   onClose = () => {},
   onSubmitSuccess = () => {},
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const isDesktop = windowWidth >= 768;
   const { showToast } = useCart();
   const [itemsRatings, setItemsRatings] = useState({});
   const [courierRating, setCourierRating] = useState(5);
@@ -197,11 +200,11 @@ export default function RateDeliveredOrderModal({
   };
 
   return (
-    <Modal visible={visible} transparent={true} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} transparent={true} animationType={isDesktop ? 'fade' : 'slide'} onRequestClose={onClose}>
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop}>
+        <View style={[styles.backdrop, isDesktop && styles.backdropDesktop]}>
           <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-            <View style={styles.modalCard}>
+            <View style={[styles.modalCard, isDesktop && styles.modalCardDesktop, windowWidth < 380 && { paddingHorizontal: 12 }]}>
               {/* ─── HEADER ─── */}
               <View style={styles.header}>
                 <View style={styles.headerLeft}>
@@ -402,12 +405,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'flex-end',
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(4px)' } : {}),
+  },
+  backdropDesktop: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
   },
   modalCard: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    maxHeight: '90%',
+    maxHeight: '92%',
     paddingTop: 16,
     paddingBottom: Platform.OS === 'ios' ? 30 : 16,
     paddingHorizontal: 16,
@@ -416,6 +425,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 20,
+    width: '100%',
+  },
+  modalCardDesktop: {
+    maxWidth: 580,
+    borderRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    maxHeight: '85%',
+    paddingHorizontal: 24,
+    paddingTop: 20,
+    paddingBottom: 24,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.22,
+    shadowRadius: 30,
   },
   header: {
     flexDirection: 'row',

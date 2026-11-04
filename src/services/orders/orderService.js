@@ -71,9 +71,11 @@ export const ORDER_STATUSES = {
   PENDING_APPROVAL: 'Pending Approval',
   PROCESSING: 'Processing',
   READY: 'Ready for Delivery',
+  ASSIGNED: 'Assigned to Rider',
+  ACCEPTED: 'Accepted by Rider',
   OUT: 'Out for Delivery',
   REPORTED: 'Delivery Reported',
-  FAILED: 'Delivery Issue',
+  FAILED: 'Delivery Failed',
   RESCHEDULED: 'Rescheduled',
   DELIVERED: 'Delivered',
   CANCELLED: 'Cancelled',
@@ -81,7 +83,7 @@ export const ORDER_STATUSES = {
   REFUNDED: 'Refunded',
 };
 
-/** @deprecated Use ORDER_STATUSES.FAILED ('Delivery Issue') */
+/** @deprecated Use ORDER_STATUSES.FAILED ('Delivery Failed') */
 export const LEGACY_DELIVERY_FAILED = 'Delivery Failed';
 
 export function canonicalizeStatus(status) {
@@ -90,8 +92,10 @@ export function canonicalizeStatus(status) {
   if (s === 'shipped' || s === 'in transit' || s.includes('transit')) return ORDER_STATUSES.OUT;
   if (s.includes('pending') || s.includes('approval') || s === 'confirmed') return ORDER_STATUSES.PENDING_APPROVAL;
   if (s === 'processing') return ORDER_STATUSES.PROCESSING;
-  if (s === 'ready for delivery') return ORDER_STATUSES.READY;
-  if (s === 'out for delivery') return ORDER_STATUSES.OUT;
+  if (s === 'ready for delivery' || s === 'ready') return ORDER_STATUSES.READY;
+  if (s === 'assigned to rider' || s === 'assigned') return ORDER_STATUSES.ASSIGNED;
+  if (s === 'accepted by rider' || s === 'accepted') return ORDER_STATUSES.ACCEPTED;
+  if (s === 'out for delivery' || s === 'out') return ORDER_STATUSES.OUT;
   if (s === 'delivery reported' || s === 'reported') return ORDER_STATUSES.REPORTED;
   if (s === 'delivery failed' || s === 'delivery issue' || s === 'failed') return ORDER_STATUSES.FAILED;
   if (s === 'rescheduled') return ORDER_STATUSES.RESCHEDULED;
@@ -104,12 +108,14 @@ export function canonicalizeStatus(status) {
 
 const ALLOWED_TRANSITIONS = {
   [ORDER_STATUSES.PENDING_APPROVAL]: [ORDER_STATUSES.PROCESSING, ORDER_STATUSES.CANCELLED],
-  [ORDER_STATUSES.PROCESSING]: [ORDER_STATUSES.READY, ORDER_STATUSES.CANCELLED],
-  [ORDER_STATUSES.READY]: [ORDER_STATUSES.OUT, ORDER_STATUSES.CANCELLED],
-  [ORDER_STATUSES.OUT]: [ORDER_STATUSES.REPORTED, ORDER_STATUSES.FAILED],
+  [ORDER_STATUSES.PROCESSING]: [ORDER_STATUSES.READY, ORDER_STATUSES.ASSIGNED, ORDER_STATUSES.CANCELLED],
+  [ORDER_STATUSES.READY]: [ORDER_STATUSES.ASSIGNED, ORDER_STATUSES.ACCEPTED, ORDER_STATUSES.OUT, ORDER_STATUSES.CANCELLED],
+  [ORDER_STATUSES.ASSIGNED]: [ORDER_STATUSES.ACCEPTED, ORDER_STATUSES.READY, ORDER_STATUSES.OUT, ORDER_STATUSES.CANCELLED],
+  [ORDER_STATUSES.ACCEPTED]: [ORDER_STATUSES.OUT, ORDER_STATUSES.ASSIGNED, ORDER_STATUSES.FAILED, ORDER_STATUSES.CANCELLED],
+  [ORDER_STATUSES.OUT]: [ORDER_STATUSES.DELIVERED, ORDER_STATUSES.REPORTED, ORDER_STATUSES.FAILED],
   [ORDER_STATUSES.REPORTED]: [ORDER_STATUSES.DELIVERED, ORDER_STATUSES.FAILED],
-  [ORDER_STATUSES.FAILED]: [ORDER_STATUSES.RESCHEDULED],
-  [ORDER_STATUSES.RESCHEDULED]: [ORDER_STATUSES.READY, ORDER_STATUSES.CANCELLED],
+  [ORDER_STATUSES.FAILED]: [ORDER_STATUSES.RESCHEDULED, ORDER_STATUSES.ASSIGNED, ORDER_STATUSES.READY, ORDER_STATUSES.CANCELLED],
+  [ORDER_STATUSES.RESCHEDULED]: [ORDER_STATUSES.READY, ORDER_STATUSES.ASSIGNED, ORDER_STATUSES.CANCELLED],
   [ORDER_STATUSES.DELIVERED]: [ORDER_STATUSES.RETURN_REQUESTED],
   [ORDER_STATUSES.CANCELLED]: [],
   [ORDER_STATUSES.RETURN_REQUESTED]: [ORDER_STATUSES.REFUNDED, ORDER_STATUSES.DELIVERED],
@@ -121,22 +127,22 @@ export function assertStatusTransition(fromStatus, toStatus, options = {}) {
   const to = canonicalizeStatus(toStatus);
   if (from === to) return { ok: true, from, to };
 
-  if (options.adminCorrection) return { ok: true, from, to };
+  if (options.adminCorrection || options.skipTransitionCheck) return { ok: true, from, to };
 
-  // Delivered only from Delivery Reported (or admin override via allowDelivered)
+  // Delivered from Delivery Reported, Out for Delivery, or Accepted by Rider (with allowDelivered / riderConfirm)
   if (to === ORDER_STATUSES.DELIVERED) {
-    if (from === ORDER_STATUSES.REPORTED && options.allowDelivered) {
+    if ((from === ORDER_STATUSES.REPORTED || from === ORDER_STATUSES.OUT || from === ORDER_STATUSES.ACCEPTED) &&
+        (options.allowDelivered || options.riderConfirm)) {
       return { ok: true, from, to };
     }
-    if (from === ORDER_STATUSES.OUT && options.allowDelivered) {
-      return { ok: true, from, to };
+    if (!options.allowDelivered && !options.riderConfirm) {
+      return {
+        ok: false,
+        from,
+        to,
+        error: 'Orders become Delivered only after delivery confirmation by the rider or administrator.',
+      };
     }
-    return {
-      ok: false,
-      from,
-      to,
-      error: 'Orders become Delivered only after admin confirmation of a delivery report.',
-    };
   }
 
   const allowed = ALLOWED_TRANSITIONS[from] || [];
@@ -1884,6 +1890,7 @@ class OrderService {
   async updateOrderStatus(orderId, newStatus, notes = '', options = {}) {
     const {
       allowDelivered = false,
+      riderConfirm = false,
       skipTransitionCheck = false,
       deliveryMeta = null,
       adminCorrection = false,
@@ -1898,6 +1905,7 @@ class OrderService {
     if (!skipTransitionCheck) {
       const check = assertStatusTransition(canonicalOld, canonicalNew, {
         allowDelivered,
+        riderConfirm,
         adminCorrection,
       });
       if (!check.ok) {
@@ -1909,12 +1917,13 @@ class OrderService {
       canonicalNew === ORDER_STATUSES.DELIVERED &&
       canonicalOld === ORDER_STATUSES.OUT &&
       !allowDelivered &&
+      !riderConfirm &&
       !adminCorrection
     ) {
       return {
         success: false,
         error:
-          'Out for Delivery orders become Delivered only when an authorized admin marks them delivered.',
+          'Out for Delivery orders become Delivered only when an authorized rider or admin confirms them.',
       };
     }
 
@@ -1966,6 +1975,8 @@ class OrderService {
         if (canonicalNew === ORDER_STATUSES.PENDING_APPROVAL) est = 'Awaiting COD Approval';
         if (canonicalNew === ORDER_STATUSES.PROCESSING) est = 'Preparing & Packing at Warehouse';
         if (canonicalNew === ORDER_STATUSES.READY) est = 'Ready for courier dispatch';
+        if (canonicalNew === ORDER_STATUSES.ASSIGNED) est = 'Assigned to delivery rider';
+        if (canonicalNew === ORDER_STATUSES.ACCEPTED) est = 'Rider accepted delivery — preparing for dispatch';
         if (canonicalNew === ORDER_STATUSES.OUT) est = 'Out for Courier Delivery Today';
         if (canonicalNew === ORDER_STATUSES.FAILED) est = 'Delivery attempt failed';
         if (canonicalNew === ORDER_STATUSES.RESCHEDULED) est = 'Delivery rescheduled';

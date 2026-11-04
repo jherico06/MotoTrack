@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Image, TextInput, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image, TextInput, Modal, useWindowDimensions } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { shopStyles as styles } from '../../styles/shop.styles.js';
 import { useCart } from '../../context/CartContext.jsx';
 import { promoService } from '../../services/products/promoService.js';
 
 export default function CartModal({ visible, onClose, onProceedToCheckout }) {
+  const { width: windowWidth } = useWindowDimensions();
   const {
     cart,
     updateCartQuantity,
@@ -53,10 +54,40 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
     onProceedToCheckout?.(selectedCartItems);
   };
 
+  const isDesktop = windowWidth >= 768;
+
   return (
-    <Modal visible={visible} transparent animationType="slide">
-      <View style={styles.modalOverlay}>
-        <View style={styles.modalSheet}>
+    <Modal visible={visible} transparent animationType={isDesktop ? 'fade' : 'slide'} onRequestClose={onClose}>
+      <View
+        style={[
+          styles.modalOverlay,
+          isDesktop && {
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: 20,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <View
+          style={[
+            styles.modalSheet,
+            isDesktop && {
+              borderRadius: 24,
+              borderTopLeftRadius: 24,
+              borderTopRightRadius: 24,
+              maxHeight: '90%',
+              maxWidth: 580,
+              alignSelf: 'center',
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
+            },
+            windowWidth < 400 && { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 24 },
+          ]}
+        >
           <View style={styles.modalHeaderRow}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
               <View
@@ -161,6 +192,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                       key={product.id ? `cart-${product.id}-${lineSize || cIdx}` : `cart-item-${cIdx}`}
                       style={[
                         styles.cartItemRow,
+                        windowWidth < 380 && { gap: 8 },
                         !isChecked && { opacity: 0.72 },
                       ]}
                     >
@@ -191,7 +223,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                         </View>
                       </TouchableOpacity>
 
-                      <Image source={{ uri: product.image }} style={styles.cartItemThumb} />
+                      <Image source={{ uri: product.image }} style={[styles.cartItemThumb, windowWidth < 380 && { width: 48, height: 48 }]} />
                       <View style={styles.cartItemInfo}>
                         <Text style={styles.cartItemTitle} numberOfLines={1}>
                           {product.name}

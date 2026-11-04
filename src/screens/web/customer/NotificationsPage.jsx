@@ -149,6 +149,11 @@ export default function NotificationsPage({
     isAdmin ? notificationService.getDatabaseAlertsCount() : 0
   );
 
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(''), 2500);
+  };
+
   const handleSyncDatabase = async (isManual = false) => {
     if (isSyncing) return;
     setIsSyncing(true);
@@ -199,11 +204,6 @@ export default function NotificationsPage({
       handleSyncDatabase(false);
     }
   }, [isAdmin]);
-
-  const showToast = (msg) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(''), 2500);
-  };
 
   const handleMarkAllRead = async () => {
     if (isAdmin) {
@@ -339,7 +339,7 @@ export default function NotificationsPage({
   );
 
   return (
-    <SafeAreaView style={[styles.pageWrapper, { backgroundColor: isDarkMode ? '#0E1311' : '#F9F8F6' }]}>
+    <SafeAreaView style={[styles.pageWrapper, { backgroundColor: isDarkMode ? '#0E1311' : '#F3F4F6' }]}>
       {/* Toast Alert */}
       {Boolean(toastMessage) && (
         <View style={styles.toast}>
@@ -347,7 +347,7 @@ export default function NotificationsPage({
         </View>
       )}
 
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.scrollContainer, width < 480 && { paddingHorizontal: 12, paddingVertical: 16 }]} showsVerticalScrollIndicator={false}>
         {/* Top Action Header */}
         <View style={styles.topHeader}>
           <View style={styles.headerLeft}>
@@ -684,7 +684,7 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     flex: 1,
-    minWidth: 260,
+    minWidth: 180,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,

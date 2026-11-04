@@ -4,163 +4,141 @@ import { ANDROID_TOP_INSET } from '../utils/safeArea.js';
 export const loginPageStyles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#24272B',
+    backgroundColor: '#1E2227',
   },
-  innerContainer: {
+  keyboardAvoid: {
     flex: 1,
-    backgroundColor: '#24272B',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    backgroundColor: '#1E2227',
     justifyContent: 'space-between',
   },
 
-  // ─── TOP DECORATIVE ART & HERO ───
-  topHeroSection: {
-    backgroundColor: '#24272B',
-    paddingTop: 8,
-    paddingHorizontal: 28,
-    paddingBottom: 22,
+  // ─── TOP CHARCOAL HEADER SECTION ───
+  topHeaderSection: {
+    backgroundColor: '#1E2227',
+    paddingTop: Platform.OS === 'ios' ? 52 : ANDROID_TOP_INSET + 12,
+    paddingHorizontal: 24,
+    paddingBottom: 26,
     position: 'relative',
-    minHeight: 125,
-    justifyContent: 'center',
-  },
-  abstractOrganicShape: {
-    position: 'absolute',
-    top: -24,
-    left: -24,
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#EA580C',
-    opacity: 0.25,
-  },
-  abstractOrganicShapeInner: {
-    position: 'absolute',
-    top: 20,
-    left: 20,
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#24272B',
+    overflow: 'hidden',
   },
 
-  heroTitle: {
-    fontSize: 34,
-    fontWeight: '900',
+  // ─── MINIMAL CIRCULAR WHEEL-INSPIRED ORANGE GRAPHIC ───
+  wheelGraphicWrap: {
+    position: 'absolute',
+    bottom: -32,
+    left: -32,
+    width: 148,
+    height: 148,
+    pointerEvents: 'none',
+  },
+  wheelOuterRing: {
+    width: 148,
+    height: 148,
+    borderRadius: 74,
+    borderWidth: 22,
+    borderColor: '#C8531D',
+    opacity: 0.55,
+  },
+
+  // ─── COMPACT TOP NAVIGATION (SHOP & GUEST) ───
+  topNavRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    zIndex: 10,
+  },
+  navLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  navLinkText: {
+    color: '#94A3B8',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+
+  // ─── HEADER HEADINGS ───
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
     color: '#FFFFFF',
-    letterSpacing: -0.5,
+    letterSpacing: -0.4,
     marginBottom: 4,
   },
-  heroSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontWeight: '600',
+  headerSubtitle: {
+    fontSize: 13.5,
+    color: '#94A3B8',
+    fontWeight: '400',
   },
 
-  // ─── DECORATIVE PLANT POT GRAPHIC ───
-  plantDecorWrap: {
-    position: 'absolute',
-    right: 28,
-    bottom: -18,
-    alignItems: 'center',
-    zIndex: 20,
-  },
-  plantLeafGroup: {
-    alignItems: 'center',
-    marginBottom: -6,
-  },
-  leftLeaf: {
-    position: 'absolute',
-    bottom: 24,
-    left: -14,
-    width: 15,
-    height: 58,
-    backgroundColor: '#EA580C',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderBottomLeftRadius: 6,
-    borderBottomRightRadius: 6,
-    transform: [{ rotate: '-18deg' }],
-  },
-  centerLeaf: {
-    width: 18,
-    height: 80,
-    backgroundColor: '#EA580C',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    marginBottom: -8,
-    zIndex: 2,
-  },
-  rightLeaf: {
-    position: 'absolute',
-    bottom: 22,
-    right: -14,
-    width: 15,
-    height: 54,
-    backgroundColor: '#FB923C',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderBottomLeftRadius: 6,
-    borderBottomRightRadius: 6,
-    transform: [{ rotate: '20deg' }],
-  },
-  plantPot: {
-    width: 48,
-    height: 44,
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1.5,
-    borderColor: '#E5E7EB',
-  },
-  plantPotShadow: {
-    width: 52,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(0, 0, 0, 0.12)',
-    marginTop: 3,
-  },
-
-  // ─── WHITE CARD CONTAINER SHEET ───
+  // ─── WHITE BOTTOM SHEET ───
   whiteCardSheet: {
     flex: 1,
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    paddingHorizontal: 28,
-    paddingTop: 32,
-    paddingBottom: Platform.OS === 'ios' ? 32 : 24,
-    justifyContent: 'space-between',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
   },
-  cardTitle: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#111827',
-    marginBottom: 20,
+  sheetTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0F172A',
     letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  sheetSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '400',
+    marginBottom: 22,
   },
 
-  // ─── FORM INPUTS (PILL STYLE) ───
-  inputGroup: {
+  // ─── ERROR BANNER ───
+  errorBanner: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
     marginBottom: 14,
   },
+  errorBannerText: {
+    color: '#DC2626',
+    fontSize: 12.5,
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 17,
+  },
+
+  // ─── FORM INPUTS (PALE-GRAY PILL) ───
+  inputGroup: {
+    marginBottom: 12,
+  },
   inputPill: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 10,
-    height: 48,
-    paddingHorizontal: 18,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    height: 50,
+    paddingHorizontal: 15,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderWidth: 1,
-    borderColor: 'transparent',
   },
   inputPillFocused: {
     borderColor: '#EA580C',
@@ -170,31 +148,280 @@ export const loginPageStyles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     color: '#0F172A',
-    fontWeight: '600',
+    fontWeight: '500',
     ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
   },
 
-  forgotPasswordRow: {
+  // ─── REMEMBER ME & FORGOT PASSWORD ROW ───
+  optionsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: -4,
+    marginTop: 2,
     marginBottom: 18,
+  },
+  rememberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderRadius: 5,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: '#EA580C',
+    borderColor: '#EA580C',
+  },
+  rememberText: {
+    fontSize: 12.5,
+    color: '#64748B',
+    fontWeight: '500',
   },
   forgotPasswordText: {
     fontSize: 12.5,
     color: '#EA580C',
     fontWeight: '600',
   },
+
+  // ─── PRIMARY FULL-WIDTH ORANGE BUTTON ───
+  primaryBtn: {
+    backgroundColor: '#EA580C',
+    borderRadius: 14,
+    height: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  primaryBtnDisabled: {
+    opacity: 0.7,
+  },
+  primaryBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  btnArrowBadge: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 10,
+  },
+
+  // ─── SOCIAL DIVIDER ───
+  socialDividerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  socialDividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#F1F5F9',
+  },
+  socialDividerText: {
+    color: '#94A3B8',
+    fontSize: 11.5,
+    fontWeight: '500',
+    marginHorizontal: 12,
+  },
+
+  // ─── GOOGLE SIGN-IN BUTTON ───
+  googleBtn: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 14,
+    height: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginBottom: 18,
+  },
+  googleBtnText: {
+    color: '#0F172A',
+    fontSize: 13.5,
+    fontWeight: '600',
+  },
+
+  // ─── GOOGLE ADVISORY / FALLBACK ───
+  googleAdvisoryBox: {
+    marginBottom: 14,
+    padding: 12,
+    backgroundColor: '#FFFBEB',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+  },
+  googleAdvisoryTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#92400E',
+    marginBottom: 4,
+  },
+  googleAdvisoryText: {
+    fontSize: 11,
+    color: '#78350F',
+    lineHeight: 15,
+    marginBottom: 8,
+  },
+  googleInstantTestBtn: {
+    backgroundColor: '#EA580C',
+    borderRadius: 10,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  googleInstantTestText: {
+    color: '#FFFFFF',
+    fontSize: 11.5,
+    fontWeight: '700',
+  },
+
+  // ─── FOOTER SWITCH ROW ───
+  switchRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  switchText: {
+    fontSize: 12.5,
+    color: '#64748B',
+    fontWeight: '400',
+  },
+  switchLink: {
+    fontSize: 12.5,
+    color: '#EA580C',
+    fontWeight: '700',
+  },
+
+  // ─── FORGOT PASSWORD MODAL ───
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'flex-end',
+  },
+  modalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  modalCloseBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalSubtitle: {
+    fontSize: 12.5,
+    color: '#64748B',
+    lineHeight: 18,
+    marginBottom: 16,
+  },
+
+  // ─── BACKWARD COMPATIBILITY ALIASES ───
+  innerContainer: {
+    flex: 1,
+    backgroundColor: '#1E2227',
+    justifyContent: 'space-between',
+  },
+  topHeroSection: {
+    backgroundColor: '#1E2227',
+    paddingTop: Platform.OS === 'ios' ? 52 : ANDROID_TOP_INSET + 12,
+    paddingHorizontal: 24,
+    paddingBottom: 26,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    letterSpacing: -0.4,
+    marginBottom: 4,
+  },
+  heroSubtitle: {
+    fontSize: 13.5,
+    color: '#94A3B8',
+    fontWeight: '400',
+  },
+  cardTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#0F172A',
+    letterSpacing: -0.3,
+    marginBottom: 4,
+  },
+  primaryPillBtn: {
+    backgroundColor: '#EA580C',
+    borderRadius: 14,
+    height: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 18,
+  },
+  primaryPillBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+  },
+  footerSwitchRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  footerSwitchText: {
+    fontSize: 12.5,
+    color: '#64748B',
+    fontWeight: '400',
+  },
+  footerSwitchLink: {
+    fontSize: 12.5,
+    color: '#EA580C',
+    fontWeight: '700',
+  },
   rememberMeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    paddingVertical: 4,
   },
   rememberCheckbox: {
-    width: 16,
-    height: 16,
-    borderRadius: 4,
+    width: 18,
+    height: 18,
+    borderRadius: 5,
     borderWidth: 1.5,
     borderColor: '#CBD5E1',
     backgroundColor: '#FFFFFF',
@@ -207,146 +434,26 @@ export const loginPageStyles = StyleSheet.create({
   },
   rememberMeText: {
     fontSize: 12.5,
-    color: '#475569',
-    fontWeight: '600',
+    color: '#64748B',
+    fontWeight: '500',
   },
-
-  // ─── PRIMARY BUTTON ───
-  primaryPillBtn: {
-    backgroundColor: '#EA580C',
-    borderRadius: 10,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#EA580C',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  primaryPillBtnText: {
-    color: '#FFFFFF',
-    fontSize: 15.5,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-
-  // ─── SOCIAL LOGIN SECTION ───
-  socialDividerRow: {
+  forgotPasswordRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 18,
-    gap: 10,
-  },
-  socialDividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  socialDividerText: {
-    fontSize: 12,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-
-  socialButtonsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 14,
-    marginBottom: 16,
-  },
-  socialIconBtn: {
-    width: 48,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-
-  // ─── FOOTER SWITCH LINK ───
-  footerSwitchRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  footerSwitchText: {
-    fontSize: 13,
-    color: '#6B7280',
-    fontWeight: '600',
-  },
-  footerSwitchLink: {
-    fontSize: 13,
-    color: '#EA580C',
-    fontWeight: '800',
-  },
-
-  // ─── DEMO SHORTCUTS & ALERTS ───
-  errorBanner: {
-    backgroundColor: '#FEE2E2',
-    borderRadius: 14,
-    padding: 10,
-    marginBottom: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  errorBannerText: {
-    color: '#DC2626',
-    fontSize: 12,
-    fontWeight: '700',
-    flex: 1,
-  },
-  demoPillsRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  demoPillBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: '#FFF7ED',
-  },
-  demoPillText: {
-    fontSize: 11.5,
-    color: '#EA580C',
-    fontWeight: '700',
-  },
-
-  // Top Nav (Back / Guest)
-  topNavRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 52 : ANDROID_TOP_INSET + 12,
-    paddingBottom: 6,
-    zIndex: 30,
+    marginTop: 2,
+    marginBottom: 18,
   },
   navBackBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingVertical: 6,
-    paddingHorizontal: 8,
+    paddingHorizontal: 4,
   },
   navBackText: {
-    color: 'rgba(255, 255, 255, 0.9)',
+    color: '#94A3B8',
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: '500',
   },
 });

@@ -318,6 +318,8 @@ function MainAppRouter() {
   const [customizerProduct, setCustomizerProduct] = useState(null);
   const [selectedProductDetails, setSelectedProductDetails] = useState(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [garageParams, setGarageParams] = useState(null);
+  const [appointmentParams, setAppointmentParams] = useState(null);
   const [profileInitialTab, setProfileInitialTab] = useState(() => {
     try {
       const { screen: s } = parsePublicRoute();
@@ -333,13 +335,13 @@ function MainAppRouter() {
 
   const [visitedScreens, setVisitedScreens] = useState(() => {
     const s = getInitialScreen();
-    const canonical = s === 'services' ? 'garage' : s === 'orders' ? 'profile' : s;
+    const canonical = s === 'services' ? 'garage' : s === 'orders' ? 'profile' : s === 'appointments' ? 'appointments' : s;
     return new Set(['shop', canonical]);
   });
 
   useEffect(() => {
-    if (['shop', 'garage', 'services', 'customizer', 'profile', 'orders'].includes(currentScreen)) {
-      const canonical = currentScreen === 'services' ? 'garage' : currentScreen === 'orders' ? 'profile' : currentScreen;
+    if (['shop', 'garage', 'services', 'appointments', 'customizer', 'profile', 'orders'].includes(currentScreen)) {
+      const canonical = currentScreen === 'services' ? 'garage' : currentScreen === 'orders' ? 'profile' : currentScreen === 'appointments' ? 'appointments' : currentScreen;
       setVisitedScreens((prev) => {
         if (prev.has(canonical)) return prev;
         const next = new Set(prev);
@@ -442,6 +444,21 @@ function MainAppRouter() {
         });
         return;
       }
+      if (screen === 'appointments') {
+        promptRequireLogin({
+          title: 'Sign In to View Appointments',
+          message: 'Please log in first to view your service appointments and live status tracking.',
+          actionLabel: 'Sign In to View Appointments',
+          feature: 'appointments',
+        });
+        return;
+      }
+    }
+    if (screen === 'garage') {
+      setGarageParams(params);
+    }
+    if (screen === 'appointments') {
+      setAppointmentParams(params);
     }
     if (params?.product) {
       if (screen === 'customizer') {
@@ -474,6 +491,10 @@ function MainAppRouter() {
 
   const handleNavigateToProfile = (tab = 'garage') => {
     const tabName = typeof tab === 'object' && tab !== null ? tab.tab : tab;
+    if (tabName === 'appointments' || tabName === 'bookings') {
+      navigateScreen('appointments');
+      return;
+    }
     if (!currentUser) {
       if (tabName === 'orders') {
         promptRequireLogin({
@@ -699,7 +720,7 @@ function MainAppRouter() {
       <SafeAreaView
         style={{
           flex: 1,
-          backgroundColor: '#F6F8FC',
+          backgroundColor: '#F3F4F6',
           justifyContent: 'center',
           alignItems: 'center',
           padding: 24,
@@ -828,7 +849,7 @@ function MainAppRouter() {
         <SafeAreaView
           style={{
             flex: 1,
-            backgroundColor: '#F6F8FC',
+            backgroundColor: '#F3F4F6',
             justifyContent: 'center',
             alignItems: 'center',
             padding: 24,
@@ -1027,6 +1048,7 @@ function MainAppRouter() {
         onNavigateToStore={() => navigateScreen('shop')}
         onNavigateToOrders={() => handleNavigateToProfile('orders')}
         onNavigateToGarage={() => navigateScreen('garage')}
+        onNavigateToAppointments={() => navigateScreen('appointments')}
         onNavigateToLogin={() => navigateScreen('login')}
         onNavigateToProfile={(tab) => handleNavigateToProfile(tab || 'profile')}
         onNavigateToCustomizer={() => navigateScreen('customizer')}
@@ -1046,7 +1068,8 @@ function MainAppRouter() {
         <ProfilePage
           initialTab="notifications"
           onNavigateToStore={() => navigateScreen('shop')}
-          onNavigateToGarage={() => navigateScreen('garage')}
+          onNavigateToGarage={(params) => params?.tab === 'appointments' ? navigateScreen('appointments') : navigateScreen('garage')}
+          onNavigateToAppointments={() => navigateScreen('appointments')}
           onNavigateToOrders={() => handleNavigateToProfile('orders')}
           onNavigateToWishlist={() => navigateScreen('wishlist')}
           onNavigateToCustomizer={() => navigateScreen('customizer')}
@@ -1076,6 +1099,8 @@ function MainAppRouter() {
           onNavigateToStore={() => navigateScreen('shop')}
           onNavigateToWishlist={() => navigateScreen('wishlist')}
           onNavigateToOrders={() => handleNavigateToProfile('orders')}
+          onNavigateToScreen={(screen, params) => navigateScreen(screen, params)}
+          onNavigateToAppointments={() => navigateScreen('appointments')}
           onNavigateToLogin={() => navigateScreen('login')}
           onRequireLogin={promptRequireLogin}
         />
@@ -1103,6 +1128,8 @@ function MainAppRouter() {
   const activeTabScreen =
     currentScreen === 'services'
       ? 'garage'
+      : currentScreen === 'appointments'
+      ? 'appointments'
       : currentScreen === 'orders'
       ? 'profile'
       : currentScreen === 'profile'
@@ -1115,6 +1142,7 @@ function MainAppRouter() {
 
   const isShopActive = activeTabScreen === 'shop';
   const isGarageActive = activeTabScreen === 'garage';
+  const isAppointmentsActive = activeTabScreen === 'appointments';
   const isCustomizerActive = activeTabScreen === 'customizer';
   const isProfileActive = activeTabScreen === 'profile';
 
@@ -1168,9 +1196,12 @@ function MainAppRouter() {
           aria-hidden={!isGarageActive}
         >
           <GaragePage
+            activeView="book"
             onNavigateToStore={() => navigateScreen('shop')}
             onNavigateToWishlist={() => navigateScreen('wishlist')}
             onNavigateToOrders={() => handleNavigateToProfile('orders')}
+            onNavigateToAppointments={(b) => navigateScreen('appointments', b ? { booking: b } : null)}
+            onNavigateToGarage={() => navigateScreen('garage')}
             onNavigateToCustomizer={() => navigateScreen('customizer')}
             onNavigateToCustomize={() => navigateScreen('customizer')}
             onNavigateToLogin={() => {
@@ -1181,6 +1212,41 @@ function MainAppRouter() {
             onNavigateToAdmin={() => navigateScreen('admin')}
             onOpenCart={() => setIsCartOpen(true)}
             onLogout={handleLogout}
+            initialSearchQuery={garageParams?.search || ''}
+          />
+        </View>
+      )}
+
+      {/* 2b. Dedicated Appointments Screen (My Appointments & Tracking) */}
+      {visitedScreens.has('appointments') && (
+        <View
+          key="tab-layer-appointments"
+          style={[
+            tabShellStyles.tabLayer,
+            isAppointmentsActive ? tabShellStyles.tabActive : tabShellStyles.tabInactive,
+          ]}
+          pointerEvents={isAppointmentsActive ? 'auto' : 'none'}
+          aria-hidden={!isAppointmentsActive}
+        >
+          <GaragePage
+            activeView="appointments"
+            selectedBookingInitial={appointmentParams?.booking}
+            onNavigateToStore={() => navigateScreen('shop')}
+            onNavigateToWishlist={() => navigateScreen('wishlist')}
+            onNavigateToOrders={() => handleNavigateToProfile('orders')}
+            onNavigateToAppointments={() => navigateScreen('appointments')}
+            onNavigateToGarage={() => navigateScreen('garage')}
+            onNavigateToCustomizer={() => navigateScreen('customizer')}
+            onNavigateToCustomize={() => navigateScreen('customizer')}
+            onNavigateToLogin={() => {
+              setRedirectReason('Please sign in to view your garage appointments.');
+              navigateScreen('login');
+            }}
+            onNavigateToProfile={(tab) => handleNavigateToProfile(tab || 'profile')}
+            onNavigateToAdmin={() => navigateScreen('admin')}
+            onOpenCart={() => setIsCartOpen(true)}
+            onLogout={handleLogout}
+            initialSearchQuery={garageParams?.search || ''}
           />
         </View>
       )}
@@ -1200,6 +1266,7 @@ function MainAppRouter() {
             initialSelectedProduct={customizerProduct}
             onNavigateToStore={() => navigateScreen('shop')}
             onNavigateToGarage={() => navigateScreen('garage')}
+            onNavigateToAppointments={() => navigateScreen('appointments')}
             onNavigateToWishlist={() => navigateScreen('wishlist')}
             onNavigateToOrders={() => handleNavigateToProfile('orders')}
             onNavigateToLogin={() => {
@@ -1228,7 +1295,8 @@ function MainAppRouter() {
           <ProfilePage
             initialTab={profileInitialTab}
             onNavigateToStore={() => navigateScreen('shop')}
-            onNavigateToGarage={() => navigateScreen('garage')}
+            onNavigateToGarage={(params) => params?.tab === 'appointments' ? navigateScreen('appointments') : navigateScreen('garage')}
+            onNavigateToAppointments={() => navigateScreen('appointments')}
             onNavigateToOrders={() => handleNavigateToProfile('orders')}
             onNavigateToWishlist={() => navigateScreen('wishlist')}
             onNavigateToCustomizer={() => navigateScreen('customizer')}
@@ -1266,7 +1334,7 @@ function MainAppContainer() {
     <View
       style={[
         styles.rootContainer,
-        { backgroundColor: isDarkMode ? '#0F1412' : '#F8FAFC' },
+        { backgroundColor: isDarkMode ? '#0F1412' : '#F3F4F6' },
       ]}
     >
       <MainAppRouter />
@@ -1347,7 +1415,7 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     ...(Platform.OS === 'web' ? { minHeight: '100vh' } : {}),
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F3F4F6',
   },
 });
 
