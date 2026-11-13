@@ -53,6 +53,7 @@ export const COMPAT_STATUS = Object.freeze({
   INCOMPATIBLE: 'incompatible',
   UNAVAILABLE: 'unavailable',
   NO_BIKE: 'no_bike',
+  UNIVERSAL: 'universal',
 });
 
 export const compatibilityService = {
@@ -269,6 +270,106 @@ export const compatibilityService = {
     }
   },
 
+  /**
+   * Synchronously or semi-synchronously check compatibility for a single product and motorcycle.
+   * Handles pre-annotated product objects, structured fitment arrays,
+   * cached rows from dataCache, an optional compatMap, or legacy fitment strings.
+   * @param {Object|string} product
+   * @param {Object} bike
+   * @param {Map} [compatMap]
+   * @returns {'compatible'|'incompatible'|'unavailable'|'no_bike'|'universal'}
+   */
+  checkCompatibility(product, bike, compatMap) {
+    if (!bike?.brand || !bike?.model) return COMPAT_STATUS.NO_BIKE;
+    if (!product) return COMPAT_STATUS.UNAVAILABLE;
+
+    // 1. If product is just an ID string
+    const pid = typeof product === 'string' ? product : (product.id || product.product_id);
+
+    // 2. If product object already has a verified compatStatus (from annotateProducts or prior check)
+    if (product && typeof product === 'object' && product.compatStatus) {
+      if (Object.values(COMPAT_STATUS).includes(product.compatStatus)) {
+        return product.compatStatus;
+      }
+    }
+
+    // 3. Check for explicit universal fitment flags
+    if (
+      product &&
+      typeof product === 'object' &&
+      (product.is_universal === true ||
+        product.universal === true ||
+        norm(product.type) === 'universal' ||
+        norm(product.compatibility) === 'universal' ||
+        norm(product.compatibility) === 'all models')
+    ) {
+      return COMPAT_STATUS.COMPATIBLE;
+    }
+
+    // 4. Check compatMap if supplied or cached in dataCache
+    let map = compatMap;
+    if (!map) {
+      try {
+        const cached = dataCache.get(CacheKeys.productCompatibilityAll());
+        if (cached?.value && Array.isArray(cached.value)) {
+          const rows = cached.value.filter((r) => r.product_id === pid);
+          if (rows.length > 0) {
+            const hit = rows.some(
+              (r) =>
+                norm(r.brand) === 'universal' ||
+                norm(r.model) === 'all models' ||
+                (brandEquals(r.brand, bike.brand) && modelEquals(r.model, bike.model))
+            );
+            return hit ? COMPAT_STATUS.COMPATIBLE : COMPAT_STATUS.INCOMPATIBLE;
+          }
+        }
+      } catch (_e) {}
+    } else if (map instanceof Map) {
+      return this.getCompatStatus(pid, bike, map);
+    }
+
+    // 5. Check structured compatibility rows attached directly on product
+    const directRows =
+      product.product_compatibility ||
+      product.compatibility_rows ||
+      product.compatible_models;
+
+    if (Array.isArray(directRows) && directRows.length > 0) {
+      const hit = directRows.some((r) => {
+        if (typeof r === 'string') {
+          const rLower = norm(r);
+          return (
+            rLower === 'universal' ||
+            rLower === 'all models' ||
+            (rLower.includes(norm(bike.brand)) && rLower.includes(norm(bike.model)))
+          );
+        }
+        return (
+          norm(r?.brand) === 'universal' ||
+          norm(r?.model) === 'all models' ||
+          (brandEquals(r?.brand, bike.brand) && modelEquals(r?.model, bike.model))
+        );
+      });
+      return hit ? COMPAT_STATUS.COMPATIBLE : COMPAT_STATUS.INCOMPATIBLE;
+    }
+
+    // 6. Check textual compatibility string (e.g. "Honda ADV 160, Click 125")
+    if (typeof product.compatibility === 'string' && product.compatibility.trim()) {
+      const raw = norm(product.compatibility);
+      if (raw === 'universal' || raw === 'all models' || raw === 'all') {
+        return COMPAT_STATUS.COMPATIBLE;
+      }
+      const bNorm = norm(bike.brand);
+      const mNorm = norm(bike.model);
+      if (raw.includes(mNorm) || (bNorm && raw.includes(bNorm) && raw.includes(mNorm))) {
+        return COMPAT_STATUS.COMPATIBLE;
+      }
+      return COMPAT_STATUS.INCOMPATIBLE;
+    }
+
+    return COMPAT_STATUS.UNAVAILABLE;
+  },
+
   /** Annotate a product list in memory (no per-product network calls). */
   annotateProducts(products = [], bike, compatMap) {
     return (products || []).map((p) => {
@@ -317,5 +418,11 @@ export const compatibilityService = {
     return { success: true, rows };
   },
 };
+
+export function checkCompatibility(product, bike, compatMap) {
+  return compatibilityService.checkCompatibility(product, bike, compatMap);
+}
+
+export { bikeLabel };
 
 export default compatibilityService;

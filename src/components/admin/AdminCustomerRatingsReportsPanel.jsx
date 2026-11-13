@@ -340,15 +340,7 @@ export default function AdminCustomerRatingsReportsPanel({
       {/* ─────────────────────────────────────────────────────────────
           1. PAGE HEADER
       ────────────────────────────────────────────────────────────── */}
-      <View style={styles.headerRow}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.eyebrow}>CUSTOMER CARE</Text>
-          <Text style={[styles.pageTitle, isDarkMode && styles.textLight]}>Ratings & Reports</Text>
-          <Text style={styles.supportingText}>
-            Review customer feedback, respond to concerns, and track every case to resolution.
-          </Text>
-        </View>
-
+      <View style={[styles.headerRow, { justifyContent: 'flex-end', marginBottom: 16 }]}>
         <View style={styles.headerActions}>
           {/* Secondary Export Button */}
           <TouchableOpacity

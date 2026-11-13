@@ -17,6 +17,8 @@ import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { orderService } from '../../services/orders/orderService.js';
 import { productService } from '../../services/products/productService.js';
 import { useCart } from '../../context/CartContext.jsx';
+import { pickImageFromFile } from '../../utils/imagePickerHelper.js';
+import { uploadProductImage } from '../../utils/productImageUpload.js';
 
 const RATING_LABELS = {
   1: '1.0 - Poor',
@@ -49,6 +51,7 @@ export default function RateDeliveredOrderModal({
   const [courierRating, setCourierRating] = useState(5);
   const [overallFeedback, setOverallFeedback] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadingItemId, setUploadingItemId] = useState(null);
 
   // Normalize order items list
   const deliveredItems = useMemo(() => {
@@ -91,6 +94,11 @@ export default function RateDeliveredOrderModal({
           rating: existing?.rating || 5,
           comment: existing?.comment || '',
           tags: existing?.tags || ['Authentic Part'],
+          photos: Array.isArray(existing?.photos)
+            ? existing.photos
+            : existing?.photo
+            ? [existing.photo]
+            : [],
         };
       });
       setItemsRatings(initial);
@@ -108,7 +116,7 @@ export default function RateDeliveredOrderModal({
     setItemsRatings((prev) => ({
       ...prev,
       [itemId]: {
-        ...(prev[itemId] || { comment: '', tags: [] }),
+        ...(prev[itemId] || { comment: '', tags: [], photos: [] }),
         rating: ratingValue,
       },
     }));
@@ -118,7 +126,7 @@ export default function RateDeliveredOrderModal({
     setItemsRatings((prev) => ({
       ...prev,
       [itemId]: {
-        ...(prev[itemId] || { rating: 5, tags: [] }),
+        ...(prev[itemId] || { rating: 5, tags: [], photos: [] }),
         comment: text,
       },
     }));
@@ -126,12 +134,62 @@ export default function RateDeliveredOrderModal({
 
   const handleToggleTag = (itemId, tag) => {
     setItemsRatings((prev) => {
-      const current = prev[itemId] || { rating: 5, comment: '', tags: [] };
+      const current = prev[itemId] || { rating: 5, comment: '', tags: [], photos: [] };
       const hasTag = current.tags.includes(tag);
       const newTags = hasTag ? current.tags.filter((t) => t !== tag) : [...current.tags, tag];
       return {
         ...prev,
         [itemId]: { ...current, tags: newTags },
+      };
+    });
+  };
+
+  const handleAddPhoto = async (itemId) => {
+    const current = itemsRatings[itemId]?.photos || [];
+    if (current.length >= 3) {
+      showToast?.('Maximum 3 photos allowed per item.');
+      return;
+    }
+    setUploadingItemId(itemId);
+    try {
+      const res = await pickImageFromFile({
+        quality: 0.85,
+        maxDimension: 1024,
+      });
+      if (res.success && res.uri) {
+        setItemsRatings((prev) => {
+          const item = prev[itemId] || { rating: 5, comment: '', tags: [], photos: [] };
+          return {
+            ...prev,
+            [itemId]: {
+              ...item,
+              photos: [...(item.photos || []), res.uri],
+            },
+          };
+        });
+        showToast?.('✓ Photo attached');
+      } else if (res.error && res.error !== 'Selection cancelled' && res.error !== 'No file selected') {
+        showToast?.(res.error);
+      }
+    } catch (err) {
+      console.warn('Pick photo error:', err);
+      showToast?.('Failed to select photo');
+    } finally {
+      setUploadingItemId(null);
+    }
+  };
+
+  const handleRemovePhoto = (itemId, photoIndex) => {
+    setItemsRatings((prev) => {
+      const item = prev[itemId] || { rating: 5, comment: '', tags: [], photos: [] };
+      const nextPhotos = [...(item.photos || [])];
+      nextPhotos.splice(photoIndex, 1);
+      return {
+        ...prev,
+        [itemId]: {
+          ...item,
+          photos: nextPhotos,
+        },
       };
     });
   };
@@ -148,20 +206,47 @@ export default function RateDeliveredOrderModal({
           ? Number((itemScores.reduce((a, b) => a + b, 0) / itemScores.length).toFixed(1))
           : 5.0;
 
-      // 2. Submit reviews for each REAL product item to update the catalog rating
-      //    and review count. Skip fabricated fallback rows (e.g. summary-only
-      //    orders with no real product_id, like the throwaway `prod-order`
-      //    placeholder) — those would otherwise pollute the product catalog
-      //    with phony reviews that reference a non-existent product.
+      // 2. Upload any local data URIs to Supabase storage before saving
+      const finalItemsRatings = { ...itemsRatings };
+      for (const item of deliveredItems) {
+        const itemReview = finalItemsRatings[item.id];
+        if (itemReview && Array.isArray(itemReview.photos) && itemReview.photos.length > 0) {
+          const uploadedUrls = [];
+          for (const photo of itemReview.photos) {
+            if (typeof photo === 'string' && photo.startsWith('data:')) {
+              try {
+                const uploadRes = await uploadProductImage(photo, {
+                  folder: 'reviews',
+                  fileName: `reviews/rev-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}.jpg`,
+                });
+                if (uploadRes.success && uploadRes.url) {
+                  uploadedUrls.push(uploadRes.url);
+                } else {
+                  uploadedUrls.push(photo);
+                }
+              } catch {
+                uploadedUrls.push(photo);
+              }
+            } else {
+              uploadedUrls.push(photo);
+            }
+          }
+          finalItemsRatings[item.id] = {
+            ...itemReview,
+            photos: uploadedUrls,
+          };
+        }
+      }
+
+      // 3. Submit reviews for each REAL product item to update the catalog rating
       for (const item of deliveredItems) {
         const isFabricated =
-          item.product_id === 'prod-order' ||
           item.product_id === 'prod-order' ||
           (item.id && item.id.startsWith('item-summary')) ||
           (item.id && item.id.startsWith('prod-order'));
         if (isFabricated) continue;
 
-        const itemReview = itemsRatings[item.id] || { rating: 5, comment: '', tags: [] };
+        const itemReview = finalItemsRatings[item.id] || { rating: 5, comment: '', tags: [], photos: [] };
         const combinedComment = [
           itemReview.comment.trim(),
           itemReview.tags?.length > 0 ? `[${itemReview.tags.join(', ')}]` : '',
@@ -175,14 +260,15 @@ export default function RateDeliveredOrderModal({
           comment: combinedComment || 'Verified purchase from delivered order',
           customerName: currentUser?.name || order.customer_name || 'Rider',
           orderId: order.order_id || order.id,
+          photos: itemReview.photos || [],
         });
       }
 
-      // 3. Mark the order as rated in orderService
+      // 4. Mark the order as rated in orderService
       await orderService.submitOrderRating(order.order_id || order.id, {
         overallRating: avgScore,
         courierRating,
-        itemsRatings,
+        itemsRatings: finalItemsRatings,
         feedback: overallFeedback.trim(),
       });
 
@@ -319,6 +405,60 @@ export default function RateDeliveredOrderModal({
                           multiline={true}
                           numberOfLines={2}
                         />
+                      </View>
+
+                      {/* Product Photos Section */}
+                      <View style={styles.photosSection}>
+                        <View style={styles.photosHeaderRow}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <BootstrapIcon name="camera-fill" size={13} color="#EA580C" />
+                            <Text style={styles.photosLabel}>Product Photos</Text>
+                          </View>
+                          <Text style={styles.photosCount}>
+                            {(currentItemRating.photos?.length || 0)}/3 photos
+                          </Text>
+                        </View>
+
+                        <View style={styles.photosGrid}>
+                          {/* Attached Photo Thumbnails */}
+                          {(currentItemRating.photos || []).map((photoUri, pIdx) => (
+                            <View key={pIdx} style={styles.photoThumbWrap}>
+                              <Image source={{ uri: photoUri }} style={styles.photoThumb} resizeMode="cover" />
+                              <TouchableOpacity
+                                style={styles.removePhotoBtn}
+                                onPress={() => handleRemovePhoto(item.id, pIdx)}
+                                activeOpacity={0.8}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                              >
+                                <BootstrapIcon name="x-circle-fill" size={16} color="#EF4444" />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+
+                          {/* Add Photo Button Tile */}
+                          {(!currentItemRating.photos || currentItemRating.photos.length < 3) && (
+                            <TouchableOpacity
+                              style={styles.addPhotoTile}
+                              onPress={() => handleAddPhoto(item.id)}
+                              activeOpacity={0.75}
+                              disabled={uploadingItemId === item.id}
+                            >
+                              {uploadingItemId === item.id ? (
+                                <ActivityIndicator size="small" color="#EA580C" />
+                              ) : (
+                                <>
+                                  <View style={styles.addPhotoIconCircle}>
+                                    <BootstrapIcon name="camera" size={15} color="#EA580C" />
+                                  </View>
+                                  <Text style={styles.addPhotoText}>Add Photo</Text>
+                                </>
+                              )}
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                        <Text style={styles.photosHint}>
+                          Attach real photos of your delivered part or installation (max 3).
+                        </Text>
                       </View>
                     </View>
                   );
@@ -640,6 +780,94 @@ const styles = StyleSheet.create({
     minHeight: 44,
     textAlignVertical: 'top',
     ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+  },
+  photosSection: {
+    marginTop: 10,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    padding: 10,
+  },
+  photosHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  photosLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#334155',
+  },
+  photosCount: {
+    fontSize: 11,
+    color: '#64748B',
+    fontWeight: '600',
+  },
+  photosGrid: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 6,
+  },
+  photoThumbWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+  },
+  photoThumb: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 9,
+  },
+  removePhotoBtn: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  addPhotoTile: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    borderStyle: 'dashed',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    cursor: 'pointer',
+  },
+  addPhotoIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FFF7ED',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addPhotoText: {
+    fontSize: 9.5,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  photosHint: {
+    fontSize: 10.5,
+    color: '#94A3B8',
+    marginTop: 2,
   },
   courierSectionCard: {
     backgroundColor: '#F8FAFC',

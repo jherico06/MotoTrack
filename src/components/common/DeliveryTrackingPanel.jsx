@@ -15,6 +15,9 @@ export default function DeliveryTrackingPanel({
   followRider = false,
   title = 'Live Delivery Tracking',
   showWhenInactive = false,
+  hideHeader = false,
+  hideLegend = false,
+  hideFooter = false,
 }) {
   const orderId = order?.order_id || order?.id || order?.orderId;
   const status = statusOverride || order?.status || order?.delivery_status || 'Tracking';
@@ -62,12 +65,14 @@ export default function DeliveryTrackingPanel({
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{status}</Text>
+      {!hideHeader && (
+        <View style={styles.header}>
+          <Text style={styles.title}>{title}</Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{status}</Text>
+          </View>
         </View>
-      </View>
+      )}
 
       {loading && !riderLat ? (
         <View style={styles.loadingRow}>
@@ -90,13 +95,16 @@ export default function DeliveryTrackingPanel({
         lastUpdatedAt={lastUpdatedAt}
         height={height}
         followRider={followRider}
+        hideFooter={hideFooter}
       />
 
-      <View style={styles.legend}>
-        <Text style={styles.legendItem}>🏪 Store</Text>
-        <Text style={styles.legendItem}>🛵 Rider (live)</Text>
-        <Text style={styles.legendItem}>📍 Customer delivery</Text>
-      </View>
+      {!hideLegend && (
+        <View style={styles.legend}>
+          <Text style={styles.legendItem}>🏪 Store</Text>
+          <Text style={styles.legendItem}>🛵 Rider (live)</Text>
+          <Text style={styles.legendItem}>📍 Customer delivery</Text>
+        </View>
+      )}
     </View>
   );
 }

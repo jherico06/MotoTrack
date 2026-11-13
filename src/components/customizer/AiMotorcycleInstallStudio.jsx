@@ -31,6 +31,7 @@ import {
 import { GARAGE_BRANCHES, TIME_SLOTS } from '../../services/bookings/garageService.js';
 import { promoService } from '../../services/products/promoService.js';
 import { usdToPhp } from '../../utils/currency.js';
+import { systemSettingsService } from '../../services/system/systemSettingsService.js';
 import { useCart } from '../../context/CartContext.jsx';
 import { useWishlist } from '../../context/WishlistContext.jsx';
 import { useTheme } from '../../context/ThemeContext.jsx';
@@ -210,7 +211,7 @@ export default function AiMotorcycleInstallStudio({
   const isWide = isWebMode ? width >= 860 : width >= 1024;
   const shouldHideToolbar = hideMobileToolbar || (isWebMode && isWide);
   const { addToCart, showToast } = useCart();
-  const { addCustomizationToWishlist } = useWishlist();
+  const { addCustomizationToWishlist, toggleWishlist, isWishlisted } = useWishlist();
 
   const currentUserId = currentUser?.id || currentUser?.user_id;
   const currentUserEmail = currentUser?.email ? String(currentUser.email).trim().toLowerCase() : '';
@@ -308,6 +309,12 @@ export default function AiMotorcycleInstallStudio({
   const [bookingBranch, setBookingBranch] = useState(
     () => GARAGE_BRANCHES?.[0]?.name || "D'Blockchain Motorparts and Accessories"
   );
+  const [bookingDate, setBookingDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [bookingTimeSlot, setBookingTimeSlot] = useState(() => TIME_SLOTS?.[1] || '10:30 AM - 12:00 PM');
   const [bookingPhone, setBookingPhone] = useState(() => currentUser?.phone || '');
   const [bookingNotes, setBookingNotes] = useState('');
@@ -328,6 +335,7 @@ export default function AiMotorcycleInstallStudio({
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const canvasFrameRef = useRef(null);
   const canvasViewportRef = useRef(null);
   const zoomStateRef = useRef({ scale: 1, x: 0, y: 0 });
   const panDragRef = useRef({
@@ -338,6 +346,7 @@ export default function AiMotorcycleInstallStudio({
     originX: 0,
     originY: 0,
     moved: false,
+    startTime: 0,
   });
 
   useEffect(() => {
@@ -577,16 +586,21 @@ export default function AiMotorcycleInstallStudio({
     setGenerationState(GENERATION_STATES.IDLE);
   };
 
-  const handleLoadSavedBuild = (build) => {
+  const handleLoadSavedBuild = (build, { silent = false } = {}) => {
     if (!build) return;
+    const savedId = build.customization_id || build.id || null;
     const img = build.previewImageUrl || build.preview_image_url;
     if (img) setResultUri(img);
     if (build.motorcycleId) setSelectedBikeId(build.motorcycleId);
     if (build.previewPrompt) setPromptUsed(build.previewPrompt);
-    const bikeTitle =
-      build.name ||
+    const rawBikeLabel =
       build.motorcycleName ||
-      [build.motorcycleBrand, build.motorcycleModel].filter(Boolean).join(' ') ||
+      [build.motorcycleBrand, build.motorcycleModel].filter(Boolean).join(' ');
+    const bikeTitle =
+      rawBikeLabel ||
+      (build.name && build.name.includes(' with ')
+        ? build.name.split(' with ')[0]
+        : build.name) ||
       'Motorcycle';
     const buildItems = Array.isArray(build.items) ? build.items : [];
     const partNames = buildItems
@@ -623,13 +637,28 @@ export default function AiMotorcycleInstallStudio({
       generated_image_url: img,
       generated_prompt: build.previewPrompt || '',
     });
+    setSavedCustomizationId(savedId);
     setSavedToGarage(true);
     resetZoomAndPan();
     setPreviewMode('after');
     setGenerationState(GENERATION_STATES.COMPLETED);
     setSavedBuildsModalOpen(false);
-    setSaveNotice(`✓ Loaded saved preview for ${bikeTitle}!`);
-    setTimeout(() => setSaveNotice(''), 4500);
+    if (!silent) {
+      setSaveNotice(`✓ Loaded saved preview for ${bikeTitle}!`);
+      setTimeout(() => setSaveNotice(''), 4500);
+    }
+  };
+
+  const handleBookSavedBuild = (build) => {
+    if (!build) return;
+    if (!currentUser) {
+      setSavedBuildsModalOpen(false);
+      onRequireLogin?.();
+      return;
+    }
+    handleLoadSavedBuild(build, { silent: true });
+    setBookingPhone(currentUser?.phone || bookingPhone || '');
+    setBookingModalOpen(true);
   };
 
   const handleDeleteSavedBuild = async (buildId) => {
@@ -1505,7 +1534,7 @@ export default function AiMotorcycleInstallStudio({
 
   const effectiveFreeInstallPromo = selectedProductIdsKey ? freeInstallPromo : null;
 
-  const persistPreviewForWishlist = async () => {
+  const persistPreviewForWishlist = async ({ includeWishlist = !isWebMode } = {}) => {
     const { bike, setupName, items } = buildPreviewSnapshot();
     const res = await customizationService.createCustomization({
       customerId: currentUser?.customer_id || currentUser?.id,
@@ -1523,6 +1552,26 @@ export default function AiMotorcycleInstallStudio({
     const customization = res?.customization || null;
     const customizationId =
       customization?.customization_id || customization?.id || savedCustomizationId || null;
+
+    if (customizationId) setSavedCustomizationId(customizationId);
+
+    if (!includeWishlist) {
+      if (res?.success || customizationId) {
+        setSavedToGarage(true);
+        if (customization && (customization.previewImageUrl || customization.preview_image_url)) {
+          const cid = customization.customization_id || customization.id;
+          setSavedBuilds((prev) => {
+            const list = Array.isArray(prev) ? prev : [];
+            const filtered = cid
+              ? list.filter((b) => (b.customization_id || b.id) !== cid)
+              : list;
+            return [customization, ...filtered];
+          });
+        }
+      }
+      return { res, wishRes: null, customization, customizationId, setupName, bike, items };
+    }
+
     // Prefer uploaded storage URL — never stash multi‑MB data: URIs in wishlist storage
     const uploadedPreview =
       customization?.previewImageUrl || customization?.preview_image_url || '';
@@ -1544,7 +1593,6 @@ export default function AiMotorcycleInstallStudio({
       notes: customRequest || '',
       promptUsed: promptUsed || lastResult?.prompt_used || '',
     });
-    if (customizationId) setSavedCustomizationId(customizationId);
     if ((res?.success || customizationId) && wishRes?.success) {
       setSavedToGarage(true);
     }
@@ -1557,11 +1605,27 @@ export default function AiMotorcycleInstallStudio({
       onRequireLogin?.();
       return;
     }
+    if (isWebMode && savedToGarage && savedCustomizationId) {
+      setSaveNotice('✓ Already saved! Open Saved to view or book your preview.');
+      setTimeout(() => setSaveNotice(''), 4000);
+      return;
+    }
     setSavingToGarage(true);
     setSaveNotice('');
     try {
-      const { res, wishRes, customizationId } = await persistPreviewForWishlist();
-      if (wishRes?.success && customizationId) {
+      const { res, wishRes, customizationId } = await persistPreviewForWishlist({
+        includeWishlist: !isWebMode,
+      });
+      if (isWebMode) {
+        if (res?.success || customizationId) {
+          setSaveNotice('✓ Preview saved! Open Saved to view or book it.');
+          refreshSavedBuilds({ force: true });
+          setTimeout(() => setSaveNotice(''), 5000);
+        } else {
+          setSaveNotice(res?.error || 'Could not save preview.');
+          setTimeout(() => setSaveNotice(''), 4500);
+        }
+      } else if (wishRes?.success && customizationId) {
         setSaveNotice('✓ Preview saved — open Wishlist to see it!');
         refreshSavedBuilds({ force: true });
         setTimeout(() => setSaveNotice(''), 5000);
@@ -1596,8 +1660,9 @@ export default function AiMotorcycleInstallStudio({
     setBookingModalOpen(true);
   };
 
-  const handleConfirmInstallBooking = async () => {
-    if (!bookingPhone?.trim()) {
+  const handleConfirmInstallBooking = async (bookingData = {}) => {
+    const effectivePhone = (bookingData?.phone || bookingPhone || '').trim();
+    if (!effectivePhone) {
       setSaveNotice('Please enter your contact phone number.');
       setTimeout(() => setSaveNotice(''), 3500);
       return;
@@ -1611,7 +1676,7 @@ export default function AiMotorcycleInstallStudio({
       let prod;
 
       if (!customizationId && resultUri) {
-        const persisted = await persistPreviewForWishlist();
+        const persisted = await persistPreviewForWishlist({ includeWishlist: !isWebMode });
         customizationId = persisted.customizationId;
         bike = persisted.bike;
         bikeTitle = persisted.setupName?.split(' with ')[0] || buildPreviewSnapshot().bikeTitle;
@@ -1653,13 +1718,17 @@ export default function AiMotorcycleInstallStudio({
           partsTotalUsd: selectedParts.reduce((s, p) => s + Number(p.price || 0), 0),
           generatedImage: resultUri,
         },
-        branchName: bookingBranch,
-        appointmentDate: 'Tomorrow',
-        timeSlot: bookingTimeSlot,
+        branchName: bookingData?.branch || bookingBranch,
+        appointmentDate: bookingData?.date || bookingDate,
+        timeSlot: bookingData?.timeSlot || bookingTimeSlot,
         customerName: currentUser?.name || currentUser?.full_name || 'Rider',
-        customerPhone: bookingPhone.trim(),
+        customerPhone: effectivePhone,
         plateNumber: bike?.plate_number || selectedBike?.plate_number || 'Pending Plate',
-        notes: bookingNotes,
+        notes: bookingData?.notes !== undefined ? bookingData.notes : bookingNotes,
+        downpaymentPercent: bookingData?.downpaymentPercent,
+        downpaymentAmount: bookingData?.downpaymentAmount,
+        remainingBalance: bookingData?.remainingBalance,
+        paymentMethod: bookingData?.paymentMethod,
         currentUser,
       });
 
@@ -1667,7 +1736,8 @@ export default function AiMotorcycleInstallStudio({
       const feeMsg = booking?.installationFeeWaived
         ? ' Installation fee waived (promo)!'
         : '';
-      setSaveNotice(`✓ Installation booked! Ticket #${booking?.id || booking?.booking_id}.${feeMsg}`);
+      const dpMsg = booking?.downpayment_amount > 0 ? ` (₱${Number(booking.downpayment_amount).toLocaleString()} deposit)` : '';
+      setSaveNotice(`✓ Installation booked! Ticket #${booking?.id || booking?.booking_id}.${feeMsg}${dpMsg}`);
       setTimeout(() => setSaveNotice(''), 6000);
       onNavigateToGarage?.();
     } catch (err) {
@@ -1695,6 +1765,9 @@ export default function AiMotorcycleInstallStudio({
       (canvasViewportRef.current &&
         typeof canvasViewportRef.current.getBoundingClientRect === 'function' &&
         canvasViewportRef.current) ||
+      (canvasFrameRef.current &&
+        typeof canvasFrameRef.current.getBoundingClientRect === 'function' &&
+        canvasFrameRef.current) ||
       (fallbackEl &&
         typeof fallbackEl.getBoundingClientRect === 'function' &&
         fallbackEl) ||
@@ -1713,6 +1786,10 @@ export default function AiMotorcycleInstallStudio({
 
   const applyZoomAtPoint = useCallback(
     (targetScale, cursorOffsetX = 0, cursorOffsetY = 0, rectOverride = null) => {
+      if (targetScale <= 1.02) {
+        resetZoomAndPan();
+        return;
+      }
       const prev = zoomStateRef.current;
       const rect = rectOverride || getViewportRect();
       const next = computeCursorAnchoredZoom({
@@ -1729,10 +1806,10 @@ export default function AiMotorcycleInstallStudio({
       setZoomLevel(next.scale);
       setPanOffset({ x: next.x, y: next.y });
     },
-    [getViewportRect]
+    [getViewportRect, resetZoomAndPan]
   );
 
-  // Zoom controls (top-right buttons remain synced with cursor zoom & pan bounds)
+  // Zoom controls (remain synced with cursor zoom & pan bounds)
   const handleZoomIn = useCallback(() => {
     const nextTarget = Math.round((zoomStateRef.current.scale + 0.25) * 100) / 100;
     applyZoomAtPoint(nextTarget, 0, 0);
@@ -1748,44 +1825,102 @@ export default function AiMotorcycleInstallStudio({
   }, [resetZoomAndPan]);
 
   // Web cursor-anchored mouse wheel & trackpad pinch zoom (non-passive to prevent page scroll)
-  useEffect(() => {
-    if (Platform.OS !== 'web' || !canvasDisplayUri || loading || previewFailed) {
-      return undefined;
-    }
-    const node = canvasViewportRef.current;
-    if (!node || typeof node.addEventListener !== 'function') {
-      return undefined;
-    }
+  const handleWheelZoom = useCallback(
+    (e) => {
+      if (Platform.OS !== 'web') return;
+      if (typeof e.cancelable === 'boolean' && e.cancelable) {
+        e.preventDefault();
+      }
+      e.stopPropagation?.();
 
-    const onWheel = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-
-      const rect = getViewportRect(node);
+      const container = canvasViewportRef.current || canvasFrameRef.current;
+      const rect = getViewportRect(container);
       const centerX = rect.left + rect.width / 2;
       const centerY = rect.top + rect.height / 2;
-      const cursorOffsetX = e.clientX - centerX;
-      const cursorOffsetY = e.clientY - centerY;
+      const cursorOffsetX = (e.clientX != null ? e.clientX : centerX) - centerX;
+      const cursorOffsetY = (e.clientY != null ? e.clientY : centerY) - centerY;
 
       const normalizedDelta =
-        e.deltaMode === 1 ? e.deltaY * 18 : e.deltaMode === 2 ? e.deltaY * 120 : e.deltaY;
-      const clampedDelta = Math.max(-180, Math.min(180, normalizedDelta));
-      const sensitivity = e.ctrlKey ? 0.01 : 0.0024;
-      const factor = Math.exp(-clampedDelta * sensitivity);
+        e.deltaMode === 1 ? e.deltaY * 20 : e.deltaMode === 2 ? e.deltaY * 120 : e.deltaY;
+      const currentScale = zoomStateRef.current.scale;
 
-      applyZoomAtPoint(
-        zoomStateRef.current.scale * factor,
-        cursorOffsetX,
-        cursorOffsetY,
-        rect
-      );
+      let targetScale;
+      if (e.ctrlKey) {
+        // Trackpad pinch gesture (e.ctrlKey === true)
+        const factor = Math.exp(-normalizedDelta * 0.015);
+        targetScale = currentScale * factor;
+      } else if (Math.abs(normalizedDelta) >= 30) {
+        // Discrete mouse wheel notch: ~18% zoom in / ~15% zoom out per notch
+        const step = normalizedDelta < 0 ? 1.18 : 0.85;
+        targetScale = currentScale * step;
+      } else {
+        // Precision smooth wheel / trackpad scroll
+        const factor = Math.exp(-normalizedDelta * 0.008);
+        targetScale = currentScale * factor;
+      }
+
+      if (targetScale <= 1.04) {
+        resetZoomAndPan();
+        return;
+      }
+
+      targetScale = Math.min(3.5, Math.max(1.0, Math.round(targetScale * 100) / 100));
+      applyZoomAtPoint(targetScale, cursorOffsetX, cursorOffsetY, rect);
+    },
+    [applyZoomAtPoint, getViewportRect, resetZoomAndPan]
+  );
+
+  const setCanvasFrameNode = useCallback(
+    (node) => {
+      if (canvasFrameRef.current && canvasFrameRef.current._wheelFn) {
+        canvasFrameRef.current.removeEventListener?.('wheel', canvasFrameRef.current._wheelFn);
+        canvasFrameRef.current._wheelFn = null;
+      }
+      canvasFrameRef.current = node;
+      if (node && typeof node.addEventListener === 'function') {
+        node.addEventListener('wheel', handleWheelZoom, { passive: false });
+        node._wheelFn = handleWheelZoom;
+      }
+    },
+    [handleWheelZoom]
+  );
+
+  const setCanvasViewportNode = useCallback(
+    (node) => {
+      if (canvasViewportRef.current && canvasViewportRef.current._wheelFn) {
+        canvasViewportRef.current.removeEventListener?.('wheel', canvasViewportRef.current._wheelFn);
+        canvasViewportRef.current._wheelFn = null;
+      }
+      canvasViewportRef.current = node;
+      if (node && typeof node.addEventListener === 'function') {
+        node.addEventListener('wheel', handleWheelZoom, { passive: false });
+        node._wheelFn = handleWheelZoom;
+      }
+    },
+    [handleWheelZoom]
+  );
+
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const frame = canvasFrameRef.current;
+    const viewport = canvasViewportRef.current;
+
+    const attach = (el) => {
+      if (!el || typeof el.addEventListener !== 'function') return null;
+      el.addEventListener('wheel', handleWheelZoom, { passive: false });
+      return () => {
+        el.removeEventListener?.('wheel', handleWheelZoom);
+      };
     };
 
-    node.addEventListener('wheel', onWheel, { passive: false });
+    const cleanupFrame = attach(frame);
+    const cleanupViewport = attach(viewport);
+
     return () => {
-      node.removeEventListener('wheel', onWheel);
+      cleanupFrame?.();
+      cleanupViewport?.();
     };
-  }, [canvasDisplayUri, loading, previewFailed, applyZoomAtPoint, getViewportRect]);
+  }, [handleWheelZoom, canvasDisplayUri, previewMode, loading, previewFailed]);
 
   const handleCanvasPointerDown = useCallback((e) => {
     if (Platform.OS !== 'web') return;
@@ -1804,6 +1939,7 @@ export default function AiMotorcycleInstallStudio({
       originX: zoomStateRef.current.x,
       originY: zoomStateRef.current.y,
       moved: false,
+      startTime: Date.now(),
     };
   }, []);
 
@@ -1820,7 +1956,8 @@ export default function AiMotorcycleInstallStudio({
       const dx = e.clientX - drag.startX;
       const dy = e.clientY - drag.startY;
 
-      if (!drag.moved && Math.hypot(dx, dy) > 5) {
+      // Only engage panning if movement is significant (avoids micro-jitter on click)
+      if (!drag.moved && Math.hypot(dx, dy) > 8) {
         drag.moved = true;
         if (zoomStateRef.current.scale > 1.01) {
           setIsPanning(true);
@@ -1858,11 +1995,12 @@ export default function AiMotorcycleInstallStudio({
         // Ignore release errors
       }
       const wasMoved = drag.moved;
+      const elapsed = Date.now() - (drag.startTime || 0);
       panDragRef.current.active = false;
       setIsPanning(false);
 
-      // Clean click without dragging: zoom in to 200% anchored at cursor, or reset to 100% Fit
-      if (!wasMoved) {
+      // Clean, quick click (< 350ms, not dragged):
+      if (!wasMoved && elapsed < 350) {
         const rect = getViewportRect(e.currentTarget);
         const cursorOffsetX = e.clientX - (rect.left + rect.width / 2);
         const cursorOffsetY = e.clientY - (rect.top + rect.height / 2);
@@ -1871,6 +2009,28 @@ export default function AiMotorcycleInstallStudio({
         } else {
           resetZoomAndPan();
         }
+      }
+    },
+    [applyZoomAtPoint, getViewportRect, resetZoomAndPan]
+  );
+
+  const handleCanvasDoubleClick = useCallback(
+    (e) => {
+      if (Platform.OS !== 'web') return;
+      e.preventDefault?.();
+      e.stopPropagation?.();
+
+      const container = canvasViewportRef.current || canvasFrameRef.current;
+      const rect = getViewportRect(container);
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const cursorOffsetX = (e.clientX || centerX) - centerX;
+      const cursorOffsetY = (e.clientY || centerY) - centerY;
+
+      if (zoomStateRef.current.scale <= 1.05) {
+        applyZoomAtPoint(CLICK_ZOOM_TARGET, cursorOffsetX, cursorOffsetY, rect);
+      } else {
+        resetZoomAndPan();
       }
     },
     [applyZoomAtPoint, getViewportRect, resetZoomAndPan]
@@ -1938,14 +2098,19 @@ export default function AiMotorcycleInstallStudio({
       {/* SECTION 1: Select your motorcycle */}
       <View style={styles.sidebarCard}>
         <View style={styles.sidebarCardHeader}>
-          <Text style={styles.sidebarTitle}>1. Select your motorcycle</Text>
+          <View style={styles.sidebarTitleWrap}>
+            <View style={styles.sectionStepBadge}>
+              <Text style={styles.sectionStepBadgeText}>1</Text>
+            </View>
+            <Text style={styles.sidebarTitle}>Select your motorcycle</Text>
+          </View>
           <TouchableOpacity
             style={styles.registerLink}
             onPress={openRegister}
             disabled={loading}
             activeOpacity={0.8}
           >
-            <BootstrapIcon name="plus-circle" size={13} color={BRAND} />
+            <BootstrapIcon name="plus-circle" size={12} color={BRAND} />
             <Text style={styles.registerLinkText}>Register Motorcycle</Text>
           </TouchableOpacity>
         </View>
@@ -1994,7 +2159,7 @@ export default function AiMotorcycleInstallStudio({
                         </View>
                       )}
                       {selected ? (
-                        <View style={styles.checkBadge}>
+                        <View style={styles.bikeCheckBadge}>
                           <BootstrapIcon name="check" size={12} color="#FFFFFF" />
                         </View>
                       ) : null}
@@ -2022,7 +2187,12 @@ export default function AiMotorcycleInstallStudio({
       {/* SECTION 2: Select part to install */}
       <View style={[styles.sidebarCard, openFilter && styles.sidebarCardRaised]}>
         <View style={styles.sidebarCardHeader}>
-          <Text style={styles.sidebarTitle}>2. Select part to install</Text>
+          <View style={styles.sidebarTitleWrap}>
+            <View style={styles.sectionStepBadge}>
+              <Text style={styles.sectionStepBadgeText}>2</Text>
+            </View>
+            <Text style={styles.sidebarTitle}>Select part to install</Text>
+          </View>
           {partMode === 'catalog' ? (
             <View
               style={[
@@ -2205,7 +2375,25 @@ export default function AiMotorcycleInstallStudio({
                     partMode === 'catalog' && !selected && isMaxSelectionReached;
                   const img = productImage(product);
                   const price = formatPartPrice(product);
-                  const badgeLabel = product.brand || product.category || 'Universal';
+                  const brandUpper = product.brand ? String(product.brand).toUpperCase() : 'AFTERMARKET';
+                  const isFav = isWishlisted ? isWishlisted(product.id || product.product_id) : false;
+
+                  // Check compatibility with selected bike
+                  let isCompatible = true;
+                  let isIncompatible = false;
+                  if (selectedBike) {
+                    const status = compatibilityService.getCompatStatus(product.id || product.product_id, selectedBike, compatMap);
+                    if (status === 'incompatible' || status === compatibilityService.COMPAT_STATUS?.INCOMPATIBLE) {
+                      isIncompatible = true;
+                      isCompatible = false;
+                    } else if (status === 'compatible' || status === compatibilityService.COMPAT_STATUS?.COMPATIBLE || status === 'universal') {
+                      isCompatible = true;
+                    }
+                  }
+
+                  const stockNum = product.stock ?? product.stock_quantity ?? 15;
+                  const hasReviews = Boolean(product.reviews || (product.rating && product.rating > 0));
+
                   return (
                     <View key={id} style={styles.partSlot}>
                       <TouchableOpacity
@@ -2223,8 +2411,18 @@ export default function AiMotorcycleInstallStudio({
                       >
                         <View style={styles.partImageWrap}>
                           <Image source={{ uri: img }} style={styles.partThumb} resizeMode="cover" />
+
+                          {/* Top-Left Badge: Selection Check or Bike Compatibility Status */}
                           {selected ? (
                             <View style={styles.checkBadge}>
+                              <BootstrapIcon name="check" size={12} color="#FFFFFF" />
+                            </View>
+                          ) : isIncompatible ? (
+                            <View style={[styles.checkBadge, styles.incompatBadge]}>
+                              <BootstrapIcon name="x" size={12} color="#FFFFFF" />
+                            </View>
+                          ) : selectedBike && isCompatible ? (
+                            <View style={[styles.checkBadge, styles.compatBadge]}>
                               <BootstrapIcon name="check" size={12} color="#FFFFFF" />
                             </View>
                           ) : limitLocked ? (
@@ -2232,22 +2430,57 @@ export default function AiMotorcycleInstallStudio({
                               <Text style={styles.limitLockBadgeText}>Max 3</Text>
                             </View>
                           ) : null}
+
+                          {/* Top-Right: Wishlist Heart */}
+                          <TouchableOpacity
+                            style={styles.partCardWishlistBtn}
+                            onPress={(e) => {
+                              e?.stopPropagation?.();
+                              if (toggleWishlist && (product.id || product.product_id)) {
+                                toggleWishlist(product.id || product.product_id);
+                              }
+                            }}
+                            activeOpacity={0.75}
+                            accessibilityLabel="Toggle Wishlist"
+                          >
+                            <BootstrapIcon
+                              name={isFav ? 'heart-fill' : 'heart'}
+                              size={12}
+                              color={isFav ? '#EF4444' : isDarkMode ? '#94A3B8' : '#64748B'}
+                            />
+                          </TouchableOpacity>
                         </View>
-                        <Text style={styles.partTitle} numberOfLines={2}>
+
+                        {/* Brand Name (Uppercase subtle tracking) */}
+                        <Text style={styles.partCardBrand} numberOfLines={1}>
+                          {brandUpper}
+                        </Text>
+
+                        {/* Product Title */}
+                        <Text style={styles.partCardTitle} numberOfLines={1}>
                           {product.name}
                         </Text>
-                        {price ? <Text style={styles.partPrice}>{price}</Text> : null}
-                        <View style={styles.partCardFooterRow}>
-                          <View style={styles.badgePill}>
-                            <Text style={styles.badgePillText} numberOfLines={1}>
-                              {badgeLabel}
-                            </Text>
-                          </View>
-                          {selected ? (
-                            <View style={styles.selectedStateTag}>
-                              <Text style={styles.selectedStateTagText}>Selected</Text>
+
+                        {/* Price */}
+                        {price ? <Text style={styles.partCardPrice}>{price}</Text> : null}
+
+                        {/* Rating and Stock Line */}
+                        <View style={styles.partCardMetaRow}>
+                          {hasReviews ? (
+                            <View style={styles.partCardRatingWrap}>
+                              <BootstrapIcon name="star-fill" size={9.5} color="#F59E0B" />
+                              <Text style={styles.partCardRatingText}>
+                                {Number(product.rating || 5).toFixed(1)} ({product.reviews || 1})
+                              </Text>
                             </View>
-                          ) : null}
+                          ) : (
+                            <View style={styles.partCardRatingWrap}>
+                              <BootstrapIcon name="star" size={9.5} color="#94A3B8" />
+                              <Text style={styles.partCardRatingText}>No ratings yet</Text>
+                            </View>
+                          )}
+                          <Text style={styles.partCardMetaDot}>•</Text>
+                          <Text style={styles.partCardStockText}>{stockNum} in stock</Text>
                         </View>
                       </TouchableOpacity>
                     </View>
@@ -2689,24 +2922,21 @@ export default function AiMotorcycleInstallStudio({
 
       {/* 4. Motorcycle Preview Canvas */}
       <View
+        ref={Platform.OS === 'web' ? setCanvasFrameNode : undefined}
         style={[
           styles.canvasFrame,
           isWebMode && width < 480 && { minHeight: 250, height: 280, maxHeight: 320, borderRadius: 10 },
           isWebMode && width >= 480 && width < 768 && { minHeight: 320, height: 380, maxHeight: 420 },
         ]}
+        {...(Platform.OS === 'web'
+          ? {
+              onWheel: handleWheelZoom,
+              onDoubleClick: handleCanvasDoubleClick,
+            }
+          : {})}
       >
-        {/* Floating Mode indicator tag / Segmented Control (Upper-Left) */}
-        {isWebMode ? (
-          <View style={styles.floatingModeTag}>
-            <Text style={styles.floatingModeTagText}>
-              {previewMode === 'before'
-                ? 'BEFORE: ORIGINAL'
-                : resultUri
-                ? 'AFTER: INSTALLED'
-                : 'AFTER: PENDING RESULT'}
-            </Text>
-          </View>
-        ) : (
+        {/* Mobile-Only Floating Segmented Control (Upper-Left) */}
+        {!isWebMode && (
           <View style={styles.floatingBeforeAfterSegment}>
             <TouchableOpacity
               style={[
@@ -2756,90 +2986,9 @@ export default function AiMotorcycleInstallStudio({
           </View>
         )}
 
-        {/* Floating Zoom Controls: Zoom Out / % / Zoom In / Fit (Upper-Right) */}
-        <View style={styles.floatingZoomGroup}>
-          <TouchableOpacity
-            style={styles.zoomButton}
-            onPress={handleZoomOut}
-            disabled={zoomLevel <= MIN_CANVAS_ZOOM}
-            activeOpacity={0.7}
-            accessibilityLabel="Zoom Out"
-          >
-            <BootstrapIcon
-              name="dash"
-              size={16}
-              color={
-                zoomLevel <= MIN_CANVAS_ZOOM
-                  ? '#94A3B8'
-                  : isDarkMode
-                    ? '#F8FAFC'
-                    : '#172033'
-              }
-            />
-          </TouchableOpacity>
-          <View style={styles.zoomDivider} />
-          <View style={styles.zoomReadoutBox} pointerEvents="none">
-            <Text style={styles.zoomLevelReadout}>{Math.round(zoomLevel * 100)}%</Text>
-          </View>
-          <View style={styles.zoomDivider} />
-          <TouchableOpacity
-            style={styles.zoomButton}
-            onPress={handleZoomIn}
-            disabled={zoomLevel >= MAX_CANVAS_ZOOM}
-            activeOpacity={0.7}
-            accessibilityLabel="Zoom In"
-          >
-            <BootstrapIcon
-              name="plus"
-              size={16}
-              color={
-                zoomLevel >= MAX_CANVAS_ZOOM
-                  ? '#94A3B8'
-                  : isDarkMode
-                    ? '#F8FAFC'
-                    : '#172033'
-              }
-            />
-          </TouchableOpacity>
-          <View style={styles.zoomDivider} />
-          <TouchableOpacity
-            style={[styles.zoomButton, styles.zoomFitButton]}
-            onPress={handleFitScreen}
-            activeOpacity={0.7}
-            accessibilityLabel="Fit to Screen"
-          >
-            <BootstrapIcon name="arrows-fullscreen" size={11} color={isDarkMode ? '#F8FAFC' : '#172033'} />
-            <Text style={styles.zoomFitText}>Fit</Text>
-          </TouchableOpacity>
-        </View>
-
-        {Platform.OS === 'web' && canvasDisplayUri && !loading && !previewFailed ? (
-          <View pointerEvents="none" style={styles.floatingZoomHint}>
-            <BootstrapIcon
-              name={zoomLevel > 1.05 ? 'arrows-move' : 'zoom-in'}
-              size={11}
-              color={BRAND}
-            />
-            <Text style={styles.floatingZoomHintText}>
-              {zoomLevel > 1.05
-                ? 'Drag to pan · Scroll to zoom · Click to reset'
-                : 'Scroll or click to zoom at cursor'}
-            </Text>
-          </View>
-        ) : null}
-
         {/* Canvas Display Content */}
         {loading ? (
-          <View style={styles.canvasLoadingOverlay}>
-            <View style={styles.canvasLoadingCard}>
-              <ActivityIndicator size="large" color={BRAND} />
-              <Text style={styles.canvasLoadingTitle}>AI Installation In Progress</Text>
-              <Text style={styles.canvasLoadingSubtitle}>
-                Precision-fitting {partDisplayName || 'selected parts'} onto {selectedBike?.nickname || selectedBike?.name || 'motorcycle'}...
-              </Text>
-              <GenerationProgress phase={genPhase} partCount={activeProducts.length} />
-            </View>
-          </View>
+          <AiMatrixLoadingView />
         ) : previewFailed ? (
           <View style={styles.canvasErrorCard}>
             <BootstrapIcon name="exclamation-circle-fill" size={32} color="#DC2626" />
@@ -2858,7 +3007,7 @@ export default function AiMotorcycleInstallStudio({
           </View>
         ) : canvasDisplayUri ? (
           <View
-            ref={canvasViewportRef}
+            ref={Platform.OS === 'web' ? setCanvasViewportNode : canvasViewportRef}
             style={[
               styles.canvasImageWrapper,
               Platform.OS === 'web' &&
@@ -2870,6 +3019,8 @@ export default function AiMotorcycleInstallStudio({
             ]}
             {...(Platform.OS === 'web'
               ? {
+                  onWheel: handleWheelZoom,
+                  onDoubleClick: handleCanvasDoubleClick,
                   onPointerDown: handleCanvasPointerDown,
                   onPointerMove: handleCanvasPointerMove,
                   onPointerUp: handleCanvasPointerUp,
@@ -2946,6 +3097,25 @@ export default function AiMotorcycleInstallStudio({
             )}
           </View>
         )}
+
+        {/* Sleek Minimal Floating Zoom Pill (Web only, shown when zoomed in) */}
+        {Platform.OS === 'web' && zoomLevel > 1.02 && (
+          <View style={styles.canvasZoomPill} pointerEvents="box-none">
+            <Text style={styles.canvasZoomPillText}>
+              {Math.round(zoomLevel * 100)}%
+            </Text>
+            <View style={styles.canvasZoomPillDivider} />
+            <TouchableOpacity
+              style={styles.canvasZoomPillReset}
+              onPress={resetZoomAndPan}
+              activeOpacity={0.7}
+              accessibilityLabel="Reset zoom to fit"
+            >
+              <BootstrapIcon name="arrows-angle-contract" size={11} color="#FFFFFF" />
+              <Text style={styles.canvasZoomPillResetText}>Fit</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* 5. Generate Preview Button (Full-width directly below canvas) */}
@@ -2985,32 +3155,38 @@ export default function AiMotorcycleInstallStudio({
 
       {/* 6. Secondary Action Cards */}
       <View style={styles.secondaryCardsRow}>
-        {/* Card 1: Save to Wishlist */}
+        {/* Card 1: Save preview (web) / Save to Wishlist (mobile) */}
         <TouchableOpacity
           style={[styles.secondaryCard, (!resultUri || loading) && styles.secondaryCardDisabled]}
           onPress={handleSaveToGarage}
           disabled={!resultUri || loading || savingToGarage}
           activeOpacity={0.85}
           accessibilityRole="button"
-          accessibilityLabel="Save preview to Wishlist"
+          accessibilityLabel={isWebMode ? (savedToGarage ? 'Preview saved' : 'Save preview') : 'Save preview to Wishlist'}
         >
           {savingToGarage ? (
             <ActivityIndicator size="small" color={BRAND} />
           ) : (
             <BootstrapIcon
-              name={savedToGarage ? 'heart-fill' : 'heart'}
+              name={savedToGarage ? 'bookmark-fill' : 'bookmark'}
               size={16}
-              color={!resultUri ? '#94A3B8' : savedToGarage ? '#EF4444' : BRAND}
+              color={!resultUri ? '#94A3B8' : savedToGarage ? '#EA580C' : BRAND}
             />
           )}
           <Text
             style={[
               styles.secondaryCardText,
               !resultUri && styles.secondaryCardTextDisabled,
-              savedToGarage && { color: '#EF4444' },
+              savedToGarage && { color: '#EA580C' },
             ]}
           >
-            {savedToGarage ? 'Saved to Wishlist' : 'Save to Wishlist'}
+            {isWebMode
+              ? savedToGarage
+                ? 'Saved'
+                : 'Save'
+              : savedToGarage
+                ? 'Saved to Wishlist'
+                : 'Save to Wishlist'}
           </Text>
         </TouchableOpacity>
 
@@ -3246,11 +3422,14 @@ export default function AiMotorcycleInstallStudio({
           motorcycle={selectedBike?.raw || selectedBike}
           bikeTitle={buildPreviewSnapshot().bikeTitle}
           serviceName={buildPreviewSnapshot().pTitle}
-          laborFeePhp={usdToPhp(AI_INSTALLATION_FEE_USD)}
+          laborFeePhp={systemSettingsService.getCustomizationLaborFee?.() ?? 3250}
+          partsCostPhp={combinedSelectedPrice || 0}
           freeInstallPromo={effectiveFreeInstallPromo}
           branches={GARAGE_BRANCHES}
           selectedBranch={bookingBranch}
           onSelectBranch={setBookingBranch}
+          selectedDate={bookingDate}
+          onSelectDate={setBookingDate}
           timeSlots={TIME_SLOTS}
           selectedTimeSlot={bookingTimeSlot}
           onSelectTimeSlot={setBookingTimeSlot}
@@ -3314,7 +3493,9 @@ export default function AiMotorcycleInstallStudio({
                   <BootstrapIcon name="image" size={32} color={BRAND} />
                   <Text style={styles.emptyTitle}>No saved previews yet</Text>
                   <Text style={styles.emptyBody}>
-                    Generate a preview in the studio and tap "Save Preview" to access your builds anytime.
+                    {isWebMode
+                      ? 'Generate a preview in the studio and click "Save" to access your builds anytime.'
+                      : 'Generate a preview in the studio and tap "Save Preview" to access your builds anytime.'}
                   </Text>
                 </View>
               ) : (
@@ -3344,7 +3525,7 @@ export default function AiMotorcycleInstallStudio({
                           <Text style={styles.savedCardPart} numberOfLines={1}>
                             {pTitle}
                           </Text>
-                          <View style={{ flexDirection: 'row', gap: 8, marginTop: 4 }}>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
                             <TouchableOpacity
                               style={styles.loadStudioBtn}
                               onPress={() => handleLoadSavedBuild(build)}
@@ -3352,6 +3533,18 @@ export default function AiMotorcycleInstallStudio({
                             >
                               <Text style={styles.loadStudioBtnText}>Load in Studio</Text>
                             </TouchableOpacity>
+                            {isWebMode && (
+                              <TouchableOpacity
+                                style={styles.bookSavedBtn}
+                                onPress={() => handleBookSavedBuild(build)}
+                                activeOpacity={0.85}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Book installation for ${bTitle}`}
+                              >
+                                <BootstrapIcon name="calendar-check" size={12} color="#FFFFFF" />
+                                <Text style={styles.bookSavedBtnText}>Book</Text>
+                              </TouchableOpacity>
+                            )}
                             <TouchableOpacity
                               style={styles.iconBtn}
                               onPress={() => handleSaveImage(img)}
@@ -3528,6 +3721,239 @@ function FilterSelect({ label, value, options, open, onToggle, onChange, disable
   );
 }
 
+function AiMatrixLoadingView() {
+  const canvasRef = useRef(null);
+  const [progress, setProgress] = useState(14);
+
+  // Progressive timer starting at 14% matching reference UI
+  useEffect(() => {
+    let current = 14;
+    const interval = setInterval(() => {
+      const step =
+        current < 35 ? Math.floor(Math.random() * 4) + 2 :
+        current < 70 ? Math.floor(Math.random() * 3) + 1 :
+        current < 90 ? Math.floor(Math.random() * 2) + 1 :
+        current < 98 ? (Math.random() > 0.6 ? 1 : 0) : 0;
+      current = Math.min(98, current + step);
+      setProgress(current);
+    }, 450);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  // Animated Glowing Matrix Dots Canvas
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animId;
+    const startTime = performance.now();
+
+    const resize = () => {
+      if (!canvas.parentElement) return;
+      const rect = canvas.parentElement.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+    };
+
+    resize();
+    window.addEventListener('resize', resize);
+
+    const render = (now) => {
+      const t = (now - startTime) / 1000;
+      const rect = canvas.parentElement?.getBoundingClientRect() || { width: 600, height: 420 };
+      const width = rect.width;
+      const height = rect.height;
+
+      ctx.clearRect(0, 0, width, height);
+
+      // Solid deep black background
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, width, height);
+
+      // Grid of matrix dots
+      const spacing = 18;
+      const cols = Math.floor(width / spacing);
+      const rows = Math.floor(height / spacing);
+      const offsetX = (width - cols * spacing) / 2 + spacing / 2;
+      const offsetY = (height - rows * spacing) / 2 + spacing / 2;
+
+      // Two glowing wave centers matching reference image
+      const c1 = {
+        x: width * 0.38 + Math.sin(t * 0.7) * 14,
+        y: height * 0.34 + Math.cos(t * 0.6) * 12,
+      };
+      const c2 = {
+        x: width * 0.68 + Math.cos(t * 0.55) * 14,
+        y: height * 0.66 + Math.sin(t * 0.7) * 12,
+      };
+
+      const maxR1 = Math.min(width, height) * 0.44;
+      const maxR2 = Math.min(width, height) * 0.40;
+
+      for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) {
+          const x = offsetX + i * spacing;
+          const y = offsetY + j * spacing;
+
+          const d1 = Math.hypot(x - c1.x, y - c1.y);
+          const d2 = Math.hypot(x - c2.x, y - c2.y);
+
+          const w1 = Math.max(0, 1 - d1 / maxR1) * (0.55 + 0.45 * Math.sin(d1 * 0.08 - t * 3.4));
+          const w2 = Math.max(0, 1 - d2 / maxR2) * (0.55 + 0.45 * Math.sin(d2 * 0.08 - t * 2.9));
+          const intensity = Math.min(1, Math.max(w1, w2));
+
+          if (intensity > 0.14) {
+            const glow = (intensity - 0.14) / 0.86;
+            const radius = 1.3 + glow * 1.6;
+
+            ctx.save();
+            if (glow > 0.6) {
+              ctx.shadowColor = '#38BDF8';
+              ctx.shadowBlur = 7 * glow;
+              ctx.fillStyle = glow > 0.82 ? '#E0F2FE' : '#38BDF8';
+            } else if (glow > 0.3) {
+              ctx.fillStyle = '#60A5FA';
+              ctx.shadowColor = '#0284C7';
+              ctx.shadowBlur = 3 * glow;
+            } else {
+              ctx.fillStyle = '#3B82F6';
+              ctx.shadowBlur = 0;
+            }
+
+            ctx.beginPath();
+            ctx.arc(x, y, radius, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 4-point micro cross on brightest center dots
+            if (glow > 0.65) {
+              const arm = 2.2 * glow;
+              ctx.fillRect(x - arm, y - 0.5, arm * 2, 1);
+              ctx.fillRect(x - 0.5, y - arm, 1, arm * 2);
+            }
+            ctx.restore();
+          } else {
+            // Faint base matrix dots
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = 'rgba(29, 78, 216, 0.22)';
+            ctx.beginPath();
+            ctx.arc(x, y, 1.1, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      animId = requestAnimationFrame(render);
+    };
+
+    animId = requestAnimationFrame(render);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return (
+    <View style={matrixStyles.container}>
+      {/* HTML5 Canvas on Web */}
+      {Platform.OS === 'web' ? (
+        <canvas
+          ref={canvasRef}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: '100%',
+            height: '100%',
+            display: 'block',
+            backgroundColor: '#000000',
+          }}
+        />
+      ) : (
+        <View style={matrixStyles.fallbackGrid}>
+          <ActivityIndicator size="large" color="#38BDF8" />
+        </View>
+      )}
+
+      {/* Top-Left: "Creating image" */}
+      <View style={matrixStyles.headerBox} pointerEvents="none">
+        <Text style={matrixStyles.headerText}>Creating image</Text>
+      </View>
+
+      {/* Bottom-Right: Capsule badge with percentage (e.g. "14%") */}
+      <View style={matrixStyles.progressBadge} pointerEvents="none">
+        <Text style={matrixStyles.progressText}>{progress}%</Text>
+      </View>
+    </View>
+  );
+}
+
+const matrixStyles = StyleSheet.create({
+  container: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: '#000000',
+    borderRadius: 12,
+    overflow: 'hidden',
+    zIndex: 50,
+  },
+  headerBox: {
+    position: 'absolute',
+    top: 20,
+    left: 24,
+    zIndex: 60,
+  },
+  headerText: {
+    color: '#FFFFFF',
+    fontSize: 14.5,
+    fontWeight: '600',
+    letterSpacing: -0.2,
+  },
+  progressBadge: {
+    position: 'absolute',
+    bottom: 20,
+    right: 24,
+    zIndex: 60,
+    backgroundColor: 'rgba(24, 24, 27, 0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.12)',
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 5.5,
+    ...Platform.select({
+      web: {
+        backdropFilter: 'blur(8px)',
+        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.5)',
+      },
+      default: {
+        shadowColor: '#000000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.4,
+        shadowRadius: 4,
+        elevation: 3,
+      },
+    }),
+  },
+  progressText: {
+    color: '#38BDF8',
+    fontSize: 13.5,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    fontFamily: Platform.OS === 'web' ? 'monospace' : undefined,
+  },
+  fallbackGrid: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#000000',
+  },
+});
+
 function GenerationProgress({ phase, partCount = 1 }) {
   const { styles, BRAND } = React.useContext(InstallThemeContext);
   const rows = [
@@ -3574,6 +4000,7 @@ function GenerationProgress({ phase, partCount = 1 }) {
 // ─────────────────────────────────────────────────────────────────────────
 function createInstallStudioStyles(isDark = false, isWeb = false) {
   const BRAND = '#EA580C';
+  const HEADER_BG = isDark ? '#151C19' : '#1E2227';
   const BRAND_SOFT = isDark ? 'rgba(234, 88, 12, 0.15)' : '#FFF7ED';
   const INK = isDark ? '#F8FAFC' : '#172033';
   const MUTED = isDark ? '#94A3B8' : '#64748B';
@@ -3635,16 +4062,16 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
       borderRadius: 12,
       paddingVertical: 12,
       paddingHorizontal: 12,
       borderWidth: 1.5,
-      borderColor: BRAND,
+      borderColor: HEADER_BG,
       ...Platform.select({
-        web: { boxShadow: '0 2px 8px rgba(234, 88, 12, 0.28)' },
+        web: { boxShadow: isDark ? '0 2px 8px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(30, 34, 39, 0.28)' },
         default: {
-          shadowColor: '#EA580C',
+          shadowColor: isDark ? '#000000' : '#1E2227',
           shadowOffset: { width: 0, height: 2 },
           shadowOpacity: 0.28,
           shadowRadius: 4,
@@ -3653,8 +4080,8 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       }),
     },
     toolbarBtnCanvasActive: {
-      backgroundColor: BRAND,
-      borderColor: BRAND,
+      backgroundColor: HEADER_BG,
+      borderColor: HEADER_BG,
     },
     toolbarBtnText: {
       fontSize: 13,
@@ -3699,26 +4126,29 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     beforeAfterSegment: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: isDark ? '#232D3B' : '#E2E8F0',
-      borderRadius: isWeb ? 8 : 8,
+      backgroundColor: isDark ? '#161C19' : '#F1F5F9',
+      borderRadius: 8,
       padding: 3,
       borderWidth: 1,
       borderColor: LINE,
     },
     beforeAfterPill: {
-      paddingHorizontal: isWeb ? 12 : 12,
+      paddingHorizontal: 12,
       paddingVertical: 5,
-      borderRadius: isWeb ? 6 : 6,
+      borderRadius: 6,
     },
     beforeAfterPillActive: {
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
+      ...Platform.select({
+        web: { boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+      }),
     },
     beforeAfterPillInactive: {
       backgroundColor: 'transparent',
     },
     beforeAfterText: {
       fontSize: 12,
-      fontWeight: '700',
+      fontWeight: '600',
     },
     beforeAfterTextActive: {
       color: '#FFFFFF',
@@ -3732,8 +4162,8 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       gap: 6,
       paddingVertical: 5,
       paddingHorizontal: 10,
-      borderRadius: isWeb ? 8 : 14,
-      backgroundColor: isDark ? '#1E2530' : '#F8FAFC',
+      borderRadius: 8,
+      backgroundColor: isDark ? '#161C19' : '#F8FAFC',
       borderWidth: 1,
       borderColor: LINE,
     },
@@ -3744,7 +4174,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     savedCountChip: {
       backgroundColor: isDark ? 'rgba(16, 185, 129, 0.2)' : '#ECFDF5',
-      borderRadius: isWeb ? 6 : 999,
+      borderRadius: 6,
       paddingHorizontal: 6,
       paddingVertical: 1,
       borderWidth: 1,
@@ -3752,7 +4182,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     savedCountChipText: {
       fontSize: 11,
-      fontWeight: '800',
+      fontWeight: '700',
       color: '#065F46',
     },
 
@@ -3892,7 +4322,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       borderRadius: 9,
     },
     mobileTabBtnActive: {
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
     },
     mobileTabBtnText: {
       fontSize: 13,
@@ -3936,9 +4366,9 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       backgroundColor: SURFACE,
       borderWidth: 1,
       borderColor: LINE,
-      borderRadius: isWeb ? 12 : 16,
-      padding: 14,
-      gap: 12,
+      borderRadius: isWeb ? 14 : 16,
+      padding: isWeb ? 16 : 14,
+      gap: 14,
       ...Platform.select({
         web: { boxShadow: '0 1px 3px rgba(15, 23, 42, 0.04)' },
         default: {
@@ -3959,11 +4389,35 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       justifyContent: 'space-between',
       gap: 8,
     },
+    sidebarTitleWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+      minWidth: 0,
+    },
+    sectionStepBadge: {
+      width: 20,
+      height: 20,
+      borderRadius: 6,
+      backgroundColor: isDark ? '#232D3B' : '#F1F5F9',
+      borderWidth: 1,
+      borderColor: LINE,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    sectionStepBadgeText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: MUTED,
+    },
     sidebarTitle: {
-      fontSize: 14,
+      fontSize: 14.5,
       fontWeight: '700',
       color: INK,
       letterSpacing: -0.2,
+      flexShrink: 1,
     },
     selectionCounterPill: {
       paddingHorizontal: 9,
@@ -3989,12 +4443,17 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     registerLink: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
-      paddingVertical: 2,
-      paddingHorizontal: 4,
+      gap: 5,
+      paddingVertical: 4,
+      paddingHorizontal: 9,
+      borderRadius: 6,
+      backgroundColor: isDark ? 'rgba(234, 88, 12, 0.12)' : '#FFF7ED',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(234, 88, 12, 0.25)' : '#FFEDD5',
+      flexShrink: 0,
     },
     registerLinkText: {
-      fontSize: 12,
+      fontSize: 11.5,
       fontWeight: '600',
       color: BRAND,
     },
@@ -4010,41 +4469,71 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       paddingBottom: 8,
     },
     bikeCard: {
-      borderWidth: 1.5,
+      borderWidth: 1,
       borderColor: LINE,
-      borderRadius: isWeb ? 8 : 12,
+      borderRadius: isWeb ? 10 : 12,
       backgroundColor: SURFACE,
-      padding: 7,
+      padding: 8,
       gap: 3,
+      ...Platform.select({
+        web: {
+          boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)',
+          transition: 'all 0.15s ease',
+        },
+      }),
     },
     bikeCardSelected: {
-      borderColor: BRAND,
-      backgroundColor: BRAND_SOFT,
+      borderColor: isDark ? '#FFFFFF' : HEADER_BG,
+      backgroundColor: isDark ? '#222B26' : '#FAFAFA',
+      ...Platform.select({
+        web: {
+          boxShadow: isDark
+            ? '0 0 0 1px #FFFFFF, 0 2px 6px rgba(0,0,0,0.3)'
+            : '0 0 0 1px #1E2227, 0 2px 6px rgba(0,0,0,0.06)',
+        },
+      }),
     },
     bikeImageWrapper: {
       position: 'relative',
       width: '100%',
-      height: isWeb ? 80 : 76,
-      borderRadius: isWeb ? 6 : 8,
+      height: isWeb ? 84 : 76,
+      borderRadius: 8,
       overflow: 'hidden',
-      backgroundColor: isDark ? '#1C2622' : '#EEF2F4',
+      backgroundColor: isDark ? '#1C2622' : '#F8FAFC',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     bikeThumb: {
       width: '100%',
       height: '100%',
     },
-    checkBadge: {
+    bikeCheckBadge: {
       position: 'absolute',
       top: 5,
       right: 5,
-      width: 18,
-      height: 18,
-      borderRadius: 9,
-      backgroundColor: BRAND,
+      width: 19,
+      height: 19,
+      borderRadius: 9.5,
+      backgroundColor: HEADER_BG,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1.5,
       borderColor: '#FFFFFF',
+      zIndex: 5,
+    },
+    checkBadge: {
+      position: 'absolute',
+      top: 5,
+      left: 5,
+      width: 19,
+      height: 19,
+      borderRadius: 9.5,
+      backgroundColor: '#10B981',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1.5,
+      borderColor: '#FFFFFF',
+      zIndex: 5,
     },
     bikeTitle: {
       marginTop: 3,
@@ -4086,7 +4575,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       paddingVertical: 6,
       paddingHorizontal: 12,
       borderRadius: 8,
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
     },
     emptyRegisterBtnText: {
       color: '#FFFFFF',
@@ -4097,28 +4586,34 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     // ─── PART SELECTION TABS & CATALOG ───
     pillTabs: {
       flexDirection: 'row',
-      backgroundColor: isDark ? '#18221E' : '#F1F5F9',
-      borderRadius: isWeb ? 8 : 10,
+      backgroundColor: isDark ? '#161C19' : '#F1F5F9',
+      borderRadius: isWeb ? 9 : 10,
       padding: 3,
+      borderWidth: 1,
+      borderColor: LINE,
       gap: 4,
     },
     pillTab: {
       flex: 1,
       paddingVertical: 7,
-      borderRadius: isWeb ? 6 : 8,
+      borderRadius: isWeb ? 7 : 8,
       alignItems: 'center',
       justifyContent: 'center',
     },
     pillTabActive: {
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
+      ...Platform.select({
+        web: { boxShadow: '0 1px 3px rgba(0,0,0,0.1)' },
+      }),
     },
     pillTabText: {
-      fontSize: 12,
-      fontWeight: '700',
+      fontSize: 12.5,
+      fontWeight: '600',
       color: MUTED,
     },
     pillTabTextActive: {
       color: '#FFFFFF',
+      fontWeight: '600',
     },
     selectionLimitBlock: {
       gap: 5,
@@ -4285,24 +4780,32 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       paddingBottom: 8,
     },
     partCard: {
-      borderWidth: 1.5,
+      borderWidth: 1,
       borderColor: LINE,
-      borderRadius: isWeb ? 8 : 12,
+      borderRadius: isWeb ? 10 : 12,
       backgroundColor: SURFACE,
-      padding: 7,
-      gap: 3,
-    },
-    partCardSelected: {
-      borderColor: BRAND,
-      backgroundColor: BRAND_SOFT,
+      padding: 8,
+      gap: 2,
       ...Platform.select({
         web: {
-          boxShadow: '0 0 0 1px #EA580C, 0 2px 8px rgba(234, 88, 12, 0.14)',
+          boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)',
+          transition: 'all 0.15s ease',
+        },
+      }),
+    },
+    partCardSelected: {
+      borderColor: isDark ? '#FFFFFF' : HEADER_BG,
+      backgroundColor: isDark ? '#222B26' : '#FAFAFA',
+      ...Platform.select({
+        web: {
+          boxShadow: isDark
+            ? '0 0 0 1px #FFFFFF, 0 2px 6px rgba(0,0,0,0.3)'
+            : '0 0 0 1px #1E2227, 0 2px 6px rgba(0,0,0,0.06)',
         },
       }),
     },
     partCardLimitReached: {
-      opacity: 0.46,
+      opacity: 0.44,
       backgroundColor: isDark ? '#151A23' : '#F8FAFC',
       borderColor: LINE,
       ...Platform.select({
@@ -4312,11 +4815,12 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     limitLockBadge: {
       position: 'absolute',
       top: 5,
-      right: 5,
+      left: 5,
       paddingHorizontal: 6,
       paddingVertical: 2,
       borderRadius: 6,
       backgroundColor: isDark ? 'rgba(23, 32, 51, 0.9)' : 'rgba(36, 39, 43, 0.82)',
+      zIndex: 5,
     },
     limitLockBadgeText: {
       fontSize: 9,
@@ -4327,14 +4831,83 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     partImageWrap: {
       position: 'relative',
       width: '100%',
-      height: isWeb ? 80 : 74,
-      borderRadius: isWeb ? 6 : 8,
+      height: isWeb ? 88 : 76,
+      borderRadius: 8,
       overflow: 'hidden',
-      backgroundColor: isDark ? '#1C2622' : '#EEF2F4',
+      backgroundColor: isDark ? '#1C2622' : '#F8FAFC',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     partThumb: {
       width: '100%',
       height: '100%',
+    },
+    partCardWishlistBtn: {
+      position: 'absolute',
+      top: 5,
+      right: 5,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: isDark ? 'rgba(30, 34, 38, 0.88)' : 'rgba(255, 255, 255, 0.92)',
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.05)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 5,
+    },
+    compatBadge: {
+      backgroundColor: '#10B981',
+    },
+    incompatBadge: {
+      backgroundColor: '#EF4444',
+    },
+    partCardBrand: {
+      marginTop: 5,
+      fontSize: 9.5,
+      fontWeight: '600',
+      color: '#94A3B8',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+    },
+    partCardTitle: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: INK,
+      lineHeight: 16,
+    },
+    partCardPrice: {
+      fontSize: 12.5,
+      fontWeight: '700',
+      color: BRAND,
+      fontVariant: ['tabular-nums'],
+      marginTop: 1,
+    },
+    partCardMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      marginTop: 3,
+      flexWrap: 'nowrap',
+    },
+    partCardRatingWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+    },
+    partCardRatingText: {
+      fontSize: 10,
+      color: MUTED,
+      fontVariant: ['tabular-nums'],
+    },
+    partCardMetaDot: {
+      fontSize: 9,
+      color: isDark ? '#475569' : '#CBD5E1',
+    },
+    partCardStockText: {
+      fontSize: 10,
+      fontWeight: '500',
+      color: isDark ? '#34D399' : '#059669',
     },
     partTitle: {
       marginTop: 3,
@@ -4504,7 +5077,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       paddingHorizontal: 10,
       paddingVertical: 5,
       borderRadius: 6,
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
     },
     inlineOverrideBtnText: {
       fontSize: 11,
@@ -4515,14 +5088,14 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       width: '100%',
       height: isWeb ? 40 : 44,
       borderRadius: isWeb ? 8 : 10,
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 7,
       paddingHorizontal: 12,
       ...Platform.select({
-        web: { boxShadow: '0 2px 8px rgba(234, 88, 12, 0.24)' },
+        web: { boxShadow: isDark ? '0 2px 8px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(30, 34, 39, 0.24)' },
       }),
     },
     installSelectedBtnDisabled: {
@@ -4724,7 +5297,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       borderRadius: 16,
     },
     switchPillActive: {
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
     },
     switchPillText: {
       fontSize: 12,
@@ -4860,10 +5433,10 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       minHeight: isWeb ? 480 : 320,
       height: isWeb ? 540 : 420,
       maxHeight: isWeb ? 620 : 520,
-      borderRadius: isWeb ? 12 : 18,
+      borderRadius: isWeb ? 14 : 18,
       backgroundColor: CANVAS_STUDIO,
       borderWidth: 1,
-      borderColor: isDark ? '#2D3748' : '#D0D7DE',
+      borderColor: isDark ? '#2D3748' : '#E2E8F0',
       overflow: 'hidden',
       position: 'relative',
       alignItems: 'center',
@@ -4873,8 +5446,8 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
         web: {
           backgroundImage: isDark
             ? 'radial-gradient(circle at 50% 60%, #252F3E 0%, #171E27 100%)'
-            : 'radial-gradient(circle at 50% 60%, #F3F5F7 0%, #E6E9EC 70%, #D8DCE0 100%)',
-          boxShadow: 'inset 0 1px 4px rgba(0,0,0,0.04)',
+            : 'radial-gradient(circle at 50% 60%, #F8FAFC 0%, #EEF2F6 70%, #E2E8F0 100%)',
+          boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.03)',
         },
       }),
     },
@@ -5013,7 +5586,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       borderRadius: 7,
     },
     floatingBeforeAfterPillActive: {
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
     },
     floatingBeforeAfterPillInactive: {
       backgroundColor: 'transparent',
@@ -5079,6 +5652,57 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
         },
       }),
     },
+    // Floating zoom indicator and reset pill (appears when zoomed in on Web)
+    canvasZoomPill: {
+      position: 'absolute',
+      bottom: 14,
+      right: 14,
+      zIndex: 30,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: isDark ? 'rgba(15, 23, 42, 0.90)' : 'rgba(30, 41, 59, 0.92)',
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 20,
+      gap: 8,
+      borderWidth: 1,
+      borderColor: isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.18)',
+      ...Platform.select({
+        web: {
+          backdropFilter: 'blur(8px)',
+          boxShadow: '0 4px 12px rgba(0, 0, 0, 0.22)',
+          userSelect: 'none',
+        },
+        default: {
+          elevation: 4,
+        },
+      }),
+    },
+    canvasZoomPillText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: '#F8FAFC',
+      fontVariant: ['tabular-nums'],
+      letterSpacing: 0.3,
+    },
+    canvasZoomPillDivider: {
+      width: 1,
+      height: 12,
+      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    },
+    canvasZoomPillReset: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 4,
+      paddingVertical: 2,
+      borderRadius: 12,
+    },
+    canvasZoomPillResetText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: '#F8FAFC',
+    },
     // Empty state inside canvas
     canvasEmptyState: {
       alignItems: 'center',
@@ -5116,7 +5740,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       paddingVertical: 8,
       paddingHorizontal: 16,
       borderRadius: 8,
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
     },
     emptyCanvasRegisterBtnText: {
       color: '#FFFFFF',
@@ -5232,7 +5856,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       width: '100%',
       height: isWeb ? 42 : 52,
       borderRadius: isWeb ? 8 : 16,
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
@@ -5240,9 +5864,9 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       paddingHorizontal: isWeb ? 16 : 18,
       marginBottom: isWeb ? 10 : 12,
       ...Platform.select({
-        web: { boxShadow: '0 4px 14px rgba(234, 88, 12, 0.28)' },
+        web: { boxShadow: isDark ? '0 4px 14px rgba(0, 0, 0, 0.4)' : '0 4px 14px rgba(30, 34, 39, 0.28)' },
         default: {
-          shadowColor: '#EA580C',
+          shadowColor: isDark ? '#000000' : '#1E2227',
           shadowOffset: { width: 0, height: 3 },
           shadowOpacity: 0.28,
           shadowRadius: 6,
@@ -5277,7 +5901,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       height: isWeb ? 40 : 48,
       borderRadius: isWeb ? 8 : 14,
       backgroundColor: SURFACE,
-      borderWidth: 1.5,
+      borderWidth: 1,
       borderColor: LINE,
       flexDirection: 'row',
       alignItems: 'center',
@@ -5301,7 +5925,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     secondaryCardText: {
       fontSize: isWeb ? 12.5 : 13,
-      fontWeight: '700',
+      fontWeight: '600',
       color: INK,
     },
     secondaryCardTextDisabled: {
@@ -5315,7 +5939,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       height: isWeb ? 40 : 46,
       borderRadius: isWeb ? 8 : 14,
       backgroundColor: SURFACE,
-      borderWidth: 1.5,
+      borderWidth: 1,
       borderColor: LINE,
       flexDirection: 'row',
       alignItems: 'center',
@@ -5340,7 +5964,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     compareFullBtnText: {
       fontSize: isWeb ? 12.5 : 13,
-      fontWeight: '700',
+      fontWeight: '600',
       color: INK,
     },
     compareFullBtnTextDisabled: {
@@ -5372,8 +5996,8 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       color: '#94A3B8',
     },
     bookInstallBtn: {
-      backgroundColor: BRAND,
-      borderColor: BRAND,
+      backgroundColor: HEADER_BG,
+      borderColor: HEADER_BG,
     },
     freeInstallBanner: {
       flexDirection: 'row',
@@ -5515,16 +6139,16 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      backgroundColor: isDark ? '#232D3B' : '#F1F5F9',
+      backgroundColor: isDark ? '#161C19' : '#F8FAFC',
       borderWidth: 1,
-      borderColor: isDark ? '#2D3748' : '#E2E8F0',
+      borderColor: LINE,
       paddingVertical: 7,
       paddingHorizontal: 12,
       borderRadius: isWeb ? 8 : 10,
     },
     auxActionBtnText: {
       fontSize: 12,
-      fontWeight: '700',
+      fontWeight: '600',
       color: INK,
     },
     auxiliaryButtons: {
@@ -5681,12 +6305,26 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
       fontWeight: '600',
     },
     loadStudioBtn: {
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
       paddingHorizontal: 10,
       paddingVertical: 5,
       borderRadius: 6,
     },
     loadStudioBtnText: {
+      color: '#FFFFFF',
+      fontSize: 11,
+      fontWeight: '700',
+    },
+    bookSavedBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: BRAND,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 6,
+    },
+    bookSavedBtnText: {
       color: '#FFFFFF',
       fontSize: 11,
       fontWeight: '700',
@@ -5850,7 +6488,7 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     tokenDismissBtn: {
       flex: 1,
-      backgroundColor: BRAND,
+      backgroundColor: HEADER_BG,
       paddingVertical: 12,
       borderRadius: 10,
       alignItems: 'center',

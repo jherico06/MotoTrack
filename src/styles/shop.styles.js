@@ -1123,7 +1123,7 @@ export const shopStyles = StyleSheet.create({
   },
   checkoutBtn: {
     backgroundColor: '#EA580C',
-    borderRadius: 18,
+    borderRadius: 8,
     height: 50,
     justifyContent: 'center',
     alignItems: 'center',

@@ -70,6 +70,8 @@ export const DEFAULT_SYSTEM_SETTINGS = {
   /** Hours after booking is created before unpaid downpayment bookings auto-cancel */
   downpaymentDueHours: 1,
   laborRatePerHour: 350,
+  /** Customization / AI installation base labor fee in PHP */
+  customizationLaborFee: 3250,
 
   // Alert & Notification Preferences
   enableOrderNotifications: true,
@@ -128,7 +130,7 @@ export const DEFAULT_SYSTEM_SETTINGS = {
   // Column 4: Stay Connected & Newsletter
   footerStayConnectedTitle: 'Stay Connected',
   footerNewsletterSubtitle: 'Get the latest updates, promos and more.',
-  footerNewsletterEnabled: true,
+  footerNewsletterEnabled: false,
   footerNewsletterPlaceholder: 'Enter your email address',
   footerSocialFacebook: 'https://facebook.com/mototrack',
   footerSocialInstagram: 'https://instagram.com/mototrack',
@@ -496,6 +498,11 @@ class SystemSettingsService {
     if (typeof callback !== 'function') return () => {};
     this.subscribers.add(callback);
     return () => this.subscribers.delete(callback);
+  }
+
+  getCustomizationLaborFee() {
+    const fee = Number(this.settings?.customizationLaborFee);
+    return Number.isFinite(fee) && fee >= 0 ? fee : 3250;
   }
 
   notify() {

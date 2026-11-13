@@ -20,7 +20,9 @@ import { getThemeTokens } from '../../styles/theme.js';
 import ServiceQuotationPanel from './ServiceQuotationPanel.jsx';
 import PickupQrScannerPanel from './PickupQrScannerPanel.jsx';
 import { garageService } from '../../services/bookings/garageService.js';
+import { rescheduleService, ADMIN_RESCHEDULE_REASONS, STANDARD_TIME_SLOTS } from '../../services/bookings/rescheduleService.js';
 import { serviceQuotationService } from '../../services/bookings/serviceQuotationService.js';
+import { systemSettingsService } from '../../services/system/systemSettingsService.js';
 import { getOptimizedImageUrl } from '../../utils/imageUrl.js';
 import { isPmsFixedBooking } from '../../utils/pmsCcPricing.js';
 import {
@@ -35,64 +37,93 @@ import {
 
 // ── 1. LIFECYCLE STEPS & STATUS HELPERS ──
 
+export const DEFAULT_PIT_MECHANICS = [
+  {
+    id: 'mech-01',
+    name: 'Master Tech Marco De Guzman',
+    shortName: 'Marco',
+    specialization: 'Diagnostic & Engine Overhaul',
+    experience: '8+ Years Master Tech',
+    bay: 'Bay 1 (Master Diagnostic Cell)',
+    rating: 4.9,
+    status: 'Available',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=300&q=80',
+  },
+  {
+    id: 'mech-02',
+    name: 'Senior Tech Bryan Santos',
+    shortName: 'Bryan',
+    specialization: 'CVT Tuning & Major PMS',
+    experience: '6 Years Track & Street Specialist',
+    bay: 'Bay 2 (Express PMS Bay)',
+    rating: 4.8,
+    status: 'Available',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=300&q=80',
+  },
+  {
+    id: 'mech-03',
+    name: 'Tech Arnel Villanueva',
+    shortName: 'Arnel',
+    specialization: 'ECU Diagnostics & Electrical',
+    experience: '5 Years High-Tech Diagnostics',
+    bay: 'Bay 3 (Precision Bay)',
+    rating: 4.9,
+    status: 'Available',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=300&q=80',
+  },
+];
+
 export const BOOKING_FULFILLMENT_STEPS = [
   {
     key: 'pending',
     status: FLEX_BOOKING_STATUS.PENDING_REVIEW,
-    label: 'Pending Review',
+    label: 'Review',
     shortLabel: 'Review',
   },
   {
-    key: 'approved',
-    status: FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT,
-    label: 'Downpayment',
-    shortLabel: 'Downpayment',
-  },
-  { key: 'scheduled', status: FLEX_BOOKING_STATUS.SCHEDULED, label: 'Scheduled', shortLabel: 'Scheduled' },
-  {
     key: 'in_service',
     status: FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS,
-    label: 'In Service',
-    shortLabel: 'In Bay',
+    label: 'In bay',
+    shortLabel: 'In bay',
   },
   {
-    key: 'service_completed',
-    status: FLEX_BOOKING_STATUS.SERVICE_COMPLETED,
-    label: 'Service Done',
-    shortLabel: 'Completed',
-  },
-  {
-    key: 'picked_up',
+    key: 'complete',
     status: FLEX_BOOKING_STATUS.COMPLETED,
-    label: 'Handover / Released',
-    shortLabel: 'Released',
+    label: 'Complete',
+    shortLabel: 'Complete',
   },
 ];
 
 const STEP_INDEX = {
   [FLEX_BOOKING_STATUS.PENDING_REVIEW]: 0,
   Pending: 0,
-  [FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT]: 1,
-  [FLEX_BOOKING_STATUS.APPROVED]: 1,
-  [FLEX_BOOKING_STATUS.CONFIRMED]: 2,
-  [FLEX_BOOKING_STATUS.SCHEDULED]: 2,
-  Confirmed: 2,
-  [FLEX_BOOKING_STATUS.UNDER_INSPECTION]: 3,
-  [FLEX_BOOKING_STATUS.ESTIMATE_SUBMITTED]: 3,
-  [FLEX_BOOKING_STATUS.QUOTATION_SENT]: 3,
-  [FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL]: 3,
-  [FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS]: 3,
-  [FLEX_BOOKING_STATUS.ADDITIONAL_APPROVAL_REQUIRED]: 3,
-  'In Progress': 3,
-  [FLEX_BOOKING_STATUS.SERVICE_COMPLETED]: 4,
-  [FLEX_BOOKING_STATUS.FOR_FINAL_BILLING]: 4,
-  [FLEX_BOOKING_STATUS.AWAITING_FINAL_PAYMENT]: 4,
-  [FLEX_BOOKING_STATUS.FULLY_PAID]: 4,
-  [FLEX_BOOKING_STATUS.READY_FOR_PICKUP]: 4,
-  'Service Done': 4,
-  [FLEX_BOOKING_STATUS.COMPLETED]: 5,
-  Paid: 5,
-  Closed: 5,
+  'Pending Review': 0,
+  [FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT]: 0,
+  [FLEX_BOOKING_STATUS.APPROVED]: 0,
+  [FLEX_BOOKING_STATUS.RESERVED]: 0,
+  Reserved: 0,
+  [FLEX_BOOKING_STATUS.CONFIRMED]: 0,
+  [FLEX_BOOKING_STATUS.SCHEDULED]: 0,
+  Confirmed: 0,
+  Scheduled: 0,
+  [FLEX_BOOKING_STATUS.UNDER_INSPECTION]: 1,
+  [FLEX_BOOKING_STATUS.ESTIMATE_SUBMITTED]: 1,
+  [FLEX_BOOKING_STATUS.QUOTATION_SENT]: 1,
+  [FLEX_BOOKING_STATUS.AWAITING_CUSTOMER_APPROVAL]: 1,
+  [FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS]: 1,
+  [FLEX_BOOKING_STATUS.ADDITIONAL_APPROVAL_REQUIRED]: 1,
+  'In Progress': 1,
+  'In Service': 1,
+  [FLEX_BOOKING_STATUS.SERVICE_COMPLETED]: 2,
+  [FLEX_BOOKING_STATUS.FOR_FINAL_BILLING]: 2,
+  [FLEX_BOOKING_STATUS.AWAITING_FINAL_PAYMENT]: 2,
+  [FLEX_BOOKING_STATUS.FULLY_PAID]: 2,
+  [FLEX_BOOKING_STATUS.READY_FOR_PICKUP]: 2,
+  'Service Done': 2,
+  [FLEX_BOOKING_STATUS.COMPLETED]: 2,
+  Completed: 2,
+  Paid: 2,
+  Closed: 2,
   [FLEX_BOOKING_STATUS.CANCELLED]: -1,
   [FLEX_BOOKING_STATUS.REJECTED]: -1,
   [FLEX_BOOKING_STATUS.CUSTOMER_DECLINED]: -1,
@@ -101,6 +132,7 @@ const STEP_INDEX = {
 
 function getBookingStepStates(status) {
   const norm = normalizeBookingStatus(status);
+  const currentStepIndex = STEP_INDEX[norm] != null ? STEP_INDEX[norm] : (STEP_INDEX[status] ?? 0);
   const currentIdx = STEP_INDEX[norm] != null ? STEP_INDEX[norm] : (STEP_INDEX[status] ?? 0);
   const isCancelled =
     norm === FLEX_BOOKING_STATUS.CANCELLED ||
@@ -127,9 +159,22 @@ function getBookingStepStates(status) {
 
 function getBookingStatusExplanation(status, booking) {
   const norm = normalizeBookingStatus(status);
+  const currentStepIndex = STEP_INDEX[norm] != null ? STEP_INDEX[norm] : (STEP_INDEX[status] ?? 0);
   const basePrice = Number(booking?.pricePhp || booking?.labor_subtotal || 2500);
+  const rawBookingPercent = Number(
+    booking?.downpayment_percent ??
+    booking?.downpaymentPercent ??
+    booking?.downpayment_percentage
+  );
+  const rawDp = Number(booking?.downpayment_amount ?? booking?.amount_paid);
+  const rawTotal = Number(booking?.final_service_total || booking?.pricePhp || booking?.labor_subtotal || basePrice);
+  const dpPercent = Number.isFinite(rawBookingPercent) && rawBookingPercent > 0
+    ? rawBookingPercent
+    : (rawTotal > 0 && rawDp > 0 ? Math.round((rawDp / rawTotal) * 100) : Number(systemSettingsService.getSettings()?.downpaymentPercent || 20));
   const dpAmount = Number(
-    booking?.downpayment_amount !== undefined ? booking.downpayment_amount : Math.round(basePrice * 0.2)
+    booking?.downpayment_amount !== undefined && booking?.downpayment_amount !== null
+      ? booking.downpayment_amount
+      : Math.round(basePrice * (dpPercent / 100))
   );
 
   switch (norm) {
@@ -137,7 +182,9 @@ function getBookingStatusExplanation(status, booking) {
       return 'Customer submitted a new appointment request. Review requested services and approve to request the required downpayment or decline with a reason.';
     case FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT:
     case FLEX_BOOKING_STATUS.APPROVED:
-      return `Booking is approved. Waiting for customer to settle the 20% downpayment (₱${dpAmount.toLocaleString()}) to confirm their bay schedule.`;
+      return `Booking is approved. Waiting for customer to settle the ${dpPercent}% downpayment (₱${dpAmount.toLocaleString()}) to confirm their bay schedule.`;
+    case FLEX_BOOKING_STATUS.RESERVED:
+      return `Downpayment of ₱${dpAmount.toLocaleString()} has been paid and verified. The pit bay slot is reserved for the customer pending technician allocation / bay check-in.`;
     case FLEX_BOOKING_STATUS.CONFIRMED:
       return 'Downpayment has been verified. The appointment date and arrival time window are confirmed for the customer.';
     case FLEX_BOOKING_STATUS.SCHEDULED:
@@ -152,22 +199,17 @@ function getBookingStatusExplanation(status, booking) {
     case FLEX_BOOKING_STATUS.AWAITING_FINAL_PAYMENT:
       return 'Final service invoice is prepared. Awaiting collection of remaining balance prior to customer motorcycle release.';
     case FLEX_BOOKING_STATUS.READY_FOR_PICKUP:
-      return 'Service work is finished and payments are settled. The motorcycle is staged and ready for customer handover and QR verification.';
+      return 'Motorcycle service and road test verification are completed. Customer has been notified that the vehicle is ready for release.';
     case FLEX_BOOKING_STATUS.COMPLETED:
-      return 'Customer verified handover and received their motorcycle. All services and payments are complete.';
-    case FLEX_BOOKING_STATUS.REJECTED:
-      return booking?.rejection_reason
-        ? `Booking declined: "${booking.rejection_reason}"`
-        : 'This booking request was declined by the administrator.';
+      return 'Work order fulfilled, bike released to customer, and full payment settled.';
     case FLEX_BOOKING_STATUS.CANCELLED:
-      return 'This appointment was cancelled and will not proceed through fulfillment.';
-    case FLEX_BOOKING_STATUS.BOOKING_EXPIRED:
-      return 'The appointment expired and was cancelled automatically because the required downpayment was not received by the deadline.';
+      return 'Booking was cancelled.';
+    case FLEX_BOOKING_STATUS.REJECTED:
+      return 'Booking request was declined by workshop administrator.';
     default:
-      return 'Review booking details and progress the service through each stage of fulfillment.';
+      return 'Active workshop service request.';
   }
 }
-
 function getBookingStatusTone(status, isDark = false) {
   const norm = normalizeBookingStatus(status);
   switch (norm) {
@@ -186,6 +228,13 @@ function getBookingStatusTone(status, isDark = false) {
         border: isDark ? 'rgba(234, 88, 12, 0.35)' : '#FED7AA',
         color: isDark ? '#FB923C' : '#C2410C',
         icon: 'credit-card-2-front-fill',
+      };
+    case FLEX_BOOKING_STATUS.RESERVED:
+      return {
+        bg: isDark ? 'rgba(16, 185, 129, 0.16)' : '#ECFDF5',
+        border: isDark ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0',
+        color: isDark ? '#34D399' : '#047857',
+        icon: 'bookmark-check-fill',
       };
     case FLEX_BOOKING_STATUS.CONFIRMED:
     case FLEX_BOOKING_STATUS.SCHEDULED:
@@ -260,7 +309,15 @@ function resolveBookingPrimaryAction(booking) {
   if (!booking) return null;
   const norm = normalizeBookingStatus(booking.status);
   const isDpPaid =
-    booking.downpayment_status === 'Paid' || booking.downpayment_paid || Number(booking.amount_paid || 0) > 0;
+    booking.downpayment_status === 'Paid' ||
+    booking.downpayment_status === 'Settled' ||
+    booking.downpayment_paid === true ||
+    booking.deposit_paid === true ||
+    Number(booking.amount_paid || 0) > 0 ||
+    booking.payment_status === 'DOWNPAYMENT_PAID' ||
+    booking.payment_status === 'FULLY_PAID' ||
+    Boolean(booking.downpayment_paid_at) ||
+    !booking.is_walk_in;
   const basePrice = Number(booking.pricePhp || booking.labor_subtotal || 2500);
   const dpAmount = Number(
     booking.downpayment_amount !== undefined ? booking.downpayment_amount : Math.round(basePrice * 0.2)
@@ -296,57 +353,26 @@ function resolveBookingPrimaryAction(booking) {
     };
   }
 
-  if (norm === FLEX_BOOKING_STATUS.PENDING_REVIEW) {
+  if (
+    norm === FLEX_BOOKING_STATUS.PENDING_REVIEW ||
+    norm === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT ||
+    norm === FLEX_BOOKING_STATUS.APPROVED ||
+    norm === FLEX_BOOKING_STATUS.RESERVED
+  ) {
     return {
       kind: 'approve',
-      label: 'Approve Booking',
+      label: 'Approve booking',
       icon: 'check2-circle',
-      hint: 'Review requested services and approve to notify the customer and request their 20% downpayment.',
+      hint: 'Customer has submitted their appointment. Review requested services and approve to confirm.',
       needsConfirm: true,
       confirmTitle: 'Approve Service Appointment?',
-      confirmBody:
-        'This will approve the appointment and notify the customer to pay the required 20% downpayment.',
+      confirmBody: 'Approve this appointment and confirm the scheduled time slot for the customer?',
       secondaryReject: true,
-    };
-  }
-
-  if (norm === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT || norm === FLEX_BOOKING_STATUS.APPROVED) {
-    if (isDpPaid) {
-      return {
-        kind: 'confirm_schedule',
-        label: 'Confirm Bay Appointment',
-        icon: 'calendar-check-fill',
-        hint: `Downpayment of ₱${dpAmount.toLocaleString()} has been verified. Confirm the arrival schedule.`,
-        needsConfirm: false,
-        secondaryReschedule: true,
-      };
-    }
-    return {
-      kind: 'record_dp',
-      label: 'Record Downpayment (Cash / In-Store)',
-      icon: 'cash-stack',
-      hint: 'Customer is prompted to pay downpayment via GCash. If paid in person, record it now to lock schedule.',
-      infoBanner: `20% downpayment (₱${dpAmount.toLocaleString()}) required before bay schedule is locked.`,
-      needsConfirm: true,
-      confirmTitle: 'Record Downpayment as Paid?',
-      confirmBody: `Mark downpayment of ₱${dpAmount.toLocaleString()} as received via cash/in-store payment?`,
-      secondaryReschedule: true,
-      secondaryReject: true,
-    };
-  }
-
-  if (norm === FLEX_BOOKING_STATUS.CONFIRMED) {
-    return {
-      kind: 'schedule',
-      label: 'Schedule Arrival Window',
-      icon: 'calendar2-check-fill',
-      hint: 'Downpayment is verified. Confirm the appointment date and arrival time window.',
-      needsConfirm: false,
       secondaryReschedule: true,
     };
   }
 
-  if (norm === FLEX_BOOKING_STATUS.SCHEDULED) {
+  if (norm === FLEX_BOOKING_STATUS.CONFIRMED || norm === FLEX_BOOKING_STATUS.SCHEDULED) {
     return {
       kind: 'start_service',
       label: 'Start Service in Bay',
@@ -470,7 +496,7 @@ function buildBookingActivity(booking) {
     add(
       'dp_paid',
       'Downpayment Verified',
-      `20% Downpayment (₱${booking.downpayment_amount || 0}) paid via ${booking.downpayment_method || 'GCash'}`,
+      `${(booking.downpayment_percent ?? (booking.final_service_total && booking.downpayment_amount ? Math.round((booking.downpayment_amount / booking.final_service_total) * 100) : (systemSettingsService.getSettings()?.downpaymentPercent || 20)))}% Downpayment (₱${(booking.downpayment_amount || 0).toLocaleString()}) paid via ${booking.downpayment_method || 'Online (GCash / Card)'}`,
       booking.downpayment_paid_at || booking.approved_at,
       'shield-check',
       '#059669'
@@ -668,104 +694,123 @@ function Section({ title, right, children, tokens, isDark, style }) {
   );
 }
 
-function WorkflowStepper({ status, tokens, isDark, isDesktop }) {
+function WorkflowStepper({ status, tokens, isDark }) {
   const steps = useMemo(() => getBookingStepStates(status), [status]);
+
   return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{
+    <View
+      style={{
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 4,
-        minWidth: isDesktop ? '100%' : undefined,
+        justifyContent: 'space-between',
+        width: '100%',
+        paddingVertical: 2,
       }}
     >
       {steps.map((step, idx) => {
         const done = step.state === 'done';
         const current = step.state === 'current';
         const failed = step.state === 'failed';
-        const color = failed
-          ? '#DC2626'
+
+        // Matching BookingProgressIndicator.jsx exactly:
+        // Active: #EA580C orange circle with white number
+        // Completed: #1E2227 charcoal circle with white check
+        // Upcoming: #F4F4F5 with #E4E4E7 border and #71717A text
+        const circleBg = current
+          ? '#EA580C'
           : done
-            ? isDark
-              ? '#EA580C'
-              : '#059669'
-            : current
-              ? getBookingStatusTone(step.status, isDark).color
-              : tokens.textMuted || '#94A3B8';
-        const bg = current
-          ? getBookingStatusTone(step.status, isDark).bg
+            ? '#1E2227'
+            : failed
+              ? '#DC2626'
+              : isDark
+                ? tokens.bgElevated
+                : '#F4F4F5';
+
+        const circleBorder = current
+          ? '#EA580C'
           : done
-            ? isDark
-              ? 'rgba(16, 185, 129, 0.12)'
-              : '#ECFDF5'
-            : isDark
-              ? tokens.bgElevated || '#1E293B'
-              : '#F8FAFC';
+            ? '#1E2227'
+            : failed
+              ? '#DC2626'
+              : isDark
+                ? tokens.border
+                : '#E4E4E7';
+
+        const numColor = current || done || failed
+          ? '#FFFFFF'
+          : isDark
+            ? tokens.textMuted
+            : '#71717A';
+
+        const labelColor = current
+          ? (isDark ? '#F97316' : '#18181B')
+          : done
+            ? (isDark ? '#F1F5F9' : '#27272A')
+            : failed
+              ? '#DC2626'
+              : isDark
+                ? tokens.textMuted
+                : '#71717A';
+
         return (
-          <View key={step.key} style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ alignItems: 'center', minWidth: isDesktop ? 96 : 84 }}>
+          <React.Fragment key={step.key}>
+            {/* Inline Node: Circle and Label side-by-side matching BookingProgressIndicator */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 2 }}>
               <View
                 style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 14,
-                  backgroundColor: bg,
-                  borderWidth: 1.5,
-                  borderColor: color,
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: circleBg,
+                  borderWidth: 1,
+                  borderColor: circleBorder,
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
                 {done ? (
-                  <BootstrapIcon name="check-lg" size={12} color={color} />
+                  <BootstrapIcon name="check" size={13} color="#FFFFFF" />
                 ) : failed ? (
-                  <BootstrapIcon name="x-lg" size={11} color={color} />
+                  <BootstrapIcon name="x" size={13} color="#FFFFFF" />
                 ) : (
-                  <View
+                  <Text
                     style={{
-                      width: current ? 10 : 6,
-                      height: current ? 10 : 6,
-                      borderRadius: 5,
-                      backgroundColor: color,
+                      fontSize: 11.5,
+                      fontWeight: '700',
+                      color: numColor,
+                      fontVariant: ['tabular-nums'],
                     }}
-                  />
+                  >
+                    {idx + 1}
+                  </Text>
                 )}
               </View>
               <Text
                 style={{
-                  fontSize: 10.5,
-                  fontWeight: current ? '700' : '500',
-                  color:
-                    current || done
-                      ? isDark
-                        ? tokens.textPrimary
-                        : '#0F172A'
-                      : tokens.textMuted || '#64748B',
-                  marginTop: 6,
-                  textAlign: 'center',
-                  maxWidth: 92,
+                  fontSize: 12.5,
+                  fontWeight: current ? '700' : done ? '600' : '500',
+                  color: labelColor,
                 }}
-                numberOfLines={2}
               >
                 {step.shortLabel}
               </Text>
             </View>
-            {idx < steps.length - 1 ? (
+
+            {/* Connecting Divider Line matching BookingProgressIndicator */}
+            {idx < steps.length - 1 && (
               <View
                 style={{
-                  width: isDesktop ? 22 : 14,
-                  height: 2,
-                  backgroundColor: done ? (isDark ? '#EA580C' : '#A7F3D0') : tokens.border || '#E2E8F0',
-                  marginBottom: 20,
+                  flex: 1,
+                  height: 1.5,
+                  backgroundColor: done ? '#1E2227' : (isDark ? tokens.border : '#E4E4E7'),
+                  marginHorizontal: 12,
                 }}
               />
-            ) : null}
-          </View>
+            )}
+          </React.Fragment>
         );
       })}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -892,7 +937,131 @@ function AdminBookingDetailsPanelInner({
     booking?.actual_labor_hours != null ? String(booking.actual_labor_hours) : ''
   );
 
+  const [mechanicsList, setMechanicsList] = useState(() => {
+    const fromStorage = garageService.getMechanics();
+    return Array.isArray(fromStorage) && fromStorage.length > 0 ? fromStorage : DEFAULT_PIT_MECHANICS;
+  });
+  const [selectedMechanic, setSelectedMechanic] = useState(null);
+  const [allBookings, setAllBookings] = useState(() => garageService.getLocalBookings());
+
+  useEffect(() => {
+    garageService.fetchMechanics({ force: true })
+      .then((mechs) => {
+        if (Array.isArray(mechs) && mechs.length > 0) setMechanicsList(mechs);
+      })
+      .catch(() => {});
+    garageService.getAllBookings()
+      .then((bks) => {
+        if (Array.isArray(bks) && bks.length > 0) setAllBookings(bks);
+      })
+      .catch(() => {});
+  }, [booking?.booking_id, booking?.id]);
+
+  const preferredDate = booking?.preferred_date || booking?.appointment_date || booking?.date || '';
+  const preferredTime = booking?.preferred_time || booking?.time_slot || booking?.time || '09:00 AM';
+
+  const displayMechanics = useMemo(() => {
+    const list = mechanicsList && mechanicsList.length > 0 ? mechanicsList : DEFAULT_PIT_MECHANICS;
+    return list.map((mech) => {
+      const mechName = mech.name || mech.shortName || '';
+      const mechId = mech.id;
+      const conflict = allBookings.find((b) => {
+        const bId = b.booking_id || b.id;
+        const curId = booking?.booking_id || booking?.id;
+        if (bId === curId) return false;
+        const bStatus = normalizeBookingStatus(b.status);
+        if (
+          bStatus === FLEX_BOOKING_STATUS.CANCELLED ||
+          bStatus === FLEX_BOOKING_STATUS.REJECTED ||
+          bStatus === FLEX_BOOKING_STATUS.COMPLETED
+        ) {
+          return false;
+        }
+        const bMech = b.mechanic || '';
+        const bMechId = b.mechanic_id;
+        const isSameMech =
+          (bMechId && mechId && String(bMechId) === String(mechId)) ||
+          (mechName && bMech && (bMech.toLowerCase().includes(mechName.toLowerCase().split(' ')[0]) || mechName.toLowerCase().includes(bMech.toLowerCase().split(' ')[0])));
+        if (!isSameMech) return false;
+
+        const bDate = String(b.preferred_date || b.appointment_date || b.date || '').split('T')[0];
+        const reqDate = String(preferredDate).split('T')[0];
+        if (bDate && reqDate && bDate !== reqDate) return false;
+
+        const bTime = String(b.preferred_time || b.time_slot || b.time || '').toLowerCase();
+        const reqTime = String(preferredTime).toLowerCase();
+        const timeConflict = bTime && reqTime && (bTime.includes(reqTime.slice(0, 5)) || reqTime.includes(bTime.slice(0, 5)));
+        return Boolean(timeConflict);
+      });
+
+      const isCurrentAssigned = Boolean(
+        booking?.mechanic &&
+        (booking.mechanic === mechName || booking.mechanic.includes(mech.shortName || mechName))
+      );
+
+      return {
+        ...mech,
+        isAvailable: !conflict,
+        isCurrentAssigned,
+        conflictBooking: conflict ? (conflict.booking_id || conflict.id) : null,
+      };
+    });
+  }, [mechanicsList, allBookings, preferredDate, preferredTime, booking?.booking_id, booking?.id, booking?.mechanic]);
+
+  const handleAssignMechanic = async (mech) => {
+    if (!mech || !bookingId) return;
+    await withBusy(async () => {
+      await garageService.updateBooking(bookingId, {
+        mechanic: mech.name,
+        mechanic_id: mech.id,
+        mechanic_assigned_at: new Date().toISOString(),
+        mechanic_assignment_status: 'assigned',
+        current_stage: `Appointment Confirmed • Assigned to ${mech.name}`,
+      });
+      onToast?.(`✓ Assigned to ${mech.name}`);
+      await refresh();
+    });
+  };
+
+  const [sysSettings, setSysSettings] = useState(() => systemSettingsService.getSettings());
+
+  useEffect(() => {
+    const unsub = systemSettingsService.subscribe((updated) => {
+      if (updated) setSysSettings(updated);
+    });
+    return unsub;
+  }, []);
+
+  const adminPitPercent = useMemo(() => {
+    if (sysSettings?.requireDownpayment === false) return 0;
+    const p = Number(sysSettings?.downpaymentPercent);
+    return Number.isFinite(p) && p >= 0 && p <= 100 ? p : 20;
+  }, [sysSettings]);
+
+  const downpaymentPercent = useMemo(() => {
+    const rawBookingPercent = Number(
+      booking?.downpayment_percent ??
+      booking?.downpaymentPercent ??
+      booking?.downpayment_percentage
+    );
+    if (Number.isFinite(rawBookingPercent) && rawBookingPercent > 0 && rawBookingPercent <= 100) {
+      return rawBookingPercent;
+    }
+    const rawDp = Number(booking?.downpayment_amount ?? booking?.amount_paid);
+    const rawTotal = Number(booking?.final_service_total || booking?.pricePhp || booking?.labor_subtotal || 0);
+    if (rawTotal > 0 && rawDp > 0) {
+      const ratio = Math.round((rawDp / rawTotal) * 100);
+      if (ratio > 0 && ratio <= 100) {
+        return ratio;
+      }
+    }
+    return adminPitPercent;
+  }, [booking, adminPitPercent]);
+
+  const remainingPercent = Math.max(0, 100 - downpaymentPercent);
   const status = booking?.status || '';
+  const norm = normalizeBookingStatus(status);
+  const currentStepIndex = STEP_INDEX[norm] != null ? STEP_INDEX[norm] : (STEP_INDEX[status] ?? 0);
   const tone = useMemo(() => getBookingStatusTone(status, isDark), [status, isDark]);
   const explanation = useMemo(() => getBookingStatusExplanation(status, booking), [status, booking]);
   const primary = useMemo(() => resolveBookingPrimaryAction(booking), [booking]);
@@ -951,15 +1120,23 @@ function AdminBookingDetailsPanelInner({
     isPmsFixed && serviceTotals.labor > 0 ? serviceTotals.labor : booking?.pricePhp || 2500
   );
   const dpAmount = Number(
-    booking?.downpayment_amount !== undefined ? booking.downpayment_amount : Math.round(basePrice * 0.2)
+    booking?.downpayment_amount !== undefined && booking?.downpayment_amount !== null
+      ? booking.downpayment_amount
+      : Math.round(basePrice * (downpaymentPercent / 100))
   );
   const quoteTotal = bookingQuotationTotal(booking);
   const finalTotal = Number(booking?.final_service_total || quoteTotal || basePrice);
   const isDpPaid =
     booking?.downpayment_status === 'Paid' ||
-    booking?.downpayment_paid ||
-    Number(booking?.amount_paid || 0) > 0;
-  const remainingBalance = Math.max(0, finalTotal - (isDpPaid ? dpAmount : 0));
+    booking?.downpayment_status === 'Settled' ||
+    booking?.downpayment_paid === true ||
+    booking?.deposit_paid === true ||
+    Number(booking?.amount_paid || 0) > 0 ||
+    booking?.payment_status === 'DOWNPAYMENT_PAID' ||
+    booking?.payment_status === 'FULLY_PAID' ||
+    Boolean(booking?.downpayment_paid_at) ||
+    !booking?.is_walk_in;
+  const remainingBalance = Math.max(0, finalTotal - (Number(dpAmount) > 0 ? dpAmount : (isDpPaid ? dpAmount : 0)));
   const payStatus = bookingPaymentStatus(booking);
 
   const media = useMemo(() => {
@@ -1018,6 +1195,23 @@ function AdminBookingDetailsPanelInner({
     });
   };
 
+  const handleRecordDownpayment = async () => {
+    if (!bookingId) return;
+    await withBusy(async () => {
+      await garageService.updateBooking(bookingId, {
+        downpayment_status: 'Paid',
+        downpayment_paid: true,
+        deposit_paid: true,
+        amount_paid: dpAmount,
+        downpayment_method: 'Cash / In-Store',
+        downpayment_paid_at: new Date().toISOString(),
+        current_stage: 'Downpayment verified by admin',
+      });
+      onToast?.(`✓ Downpayment of ₱${dpAmount.toLocaleString()} recorded as Paid. You can now approve this booking.`);
+      await refresh();
+    });
+  };
+
   const runPrimary = async () => {
     if (!primary || primary.disabled || !bookingId) return;
 
@@ -1028,14 +1222,28 @@ function AdminBookingDetailsPanelInner({
             isPmsFixed && serviceTotals.labor > 0
               ? serviceTotals.labor
               : Number(booking?.labor_subtotal ?? booking?.quoted_service_rate ?? 0) || 0;
-          await garageService.approveBooking(bookingId, null, {
+          const chosenMech =
+            selectedMechanic ||
+            displayMechanics.find((m) => m.isCurrentAssigned) ||
+            displayMechanics.find((m) => m.isAvailable) ||
+            null;
+          await garageService.approveBooking(bookingId, chosenMech?.name || null, {
             flexible: true,
             approvedBy: 'admin',
+            isAlreadyPaid: true,
+            mechanicId: chosenMech?.id || null,
+            mechanicName: chosenMech?.name || null,
+            customerEmail: booking?.customer_email || booking?.userEmail || booking?.email,
+            customerName: booking?.customer_name,
             ...(approvalTotal > 0
               ? { estimatedServiceCost: approvalTotal, estimated_service_total: approvalTotal }
               : {}),
           });
-          onToast?.('✓ Booking approved — customer notified for downpayment');
+          onToast?.(
+            chosenMech?.name
+              ? `✓ Booking approved & assigned to ${chosenMech.name} · Customer notified by email`
+              : '✓ Booking approved · Customer notified by email'
+          );
         } else if (primary.kind === 'record_dp') {
           await garageService.updateBooking(bookingId, {
             downpayment_status: 'Paid',
@@ -1229,538 +1437,1014 @@ function AdminBookingDetailsPanelInner({
       >
         <View style={styles.wrap}>
           {/* ─────────────────────────────────────────────────────────────
-          SECTION 1: BOOKING STATUS & WORKFLOW STEPPER
+          PROCESS TRACKER PILL (EXACTLY MATCHING CUSTOMER BOOKING UI)
       ────────────────────────────────────────────────────────────── */}
-          <Section title="Booking Status" tokens={tokens} isDark={isDark}>
-            <View
-              style={{
-                backgroundColor: tone.bg,
-                borderWidth: 1,
-                borderColor: tone.border,
-                borderRadius: 10,
-                padding: 13,
-                marginBottom: 14,
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text
-                  style={{
-                    fontSize: 10.5,
-                    fontWeight: '700',
-                    color: tone.color,
-                    textTransform: 'uppercase',
-                    letterSpacing: 0.6,
-                  }}
-                >
-                  Current Status
-                </Text>
-                {busy && (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <ActivityIndicator size="small" color={tone.color} />
-                    <Text style={{ fontSize: 11, color: tone.color, fontWeight: '600' }}>Updating…</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: tone.color, marginTop: 4 }}>
-                {statusLabel(status)}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 12.5,
-                  color: isDark ? tokens.textPrimary : '#0F172A',
-                  marginTop: 6,
-                  lineHeight: 18,
-                }}
-              >
-                {explanation}
-              </Text>
-            </View>
+          <View
+            style={{
+              backgroundColor: isDark ? tokens.bgCard : '#FFFFFF',
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: isDark ? tokens.border : '#E4E4E7',
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              shadowColor: '#000000',
+              shadowOpacity: 0.02,
+              shadowRadius: 4,
+              shadowOffset: { width: 0, height: 1 },
+              elevation: 1,
+              marginBottom: 12,
+            }}
+          >
+            <WorkflowStepper status={status} tokens={tokens} isDark={isDark} />
+          </View>
 
+          {/* ─────────────────────────────────────────────────────────────
+          CENTERED TITLE & SUBTITLE (EXACTLY MATCHING CUSTOMER BOOKING UI)
+      ────────────────────────────────────────────────────────────── */}
+          <View style={{ alignItems: 'center', marginBottom: 12, paddingHorizontal: 12 }}>
             <Text
               style={{
-                fontSize: 10.5,
-                fontWeight: '600',
-                color: tokens?.textMuted || '#64748B',
-                textTransform: 'uppercase',
-                letterSpacing: 0.5,
-                marginBottom: 8,
+                fontSize: 22,
+                fontWeight: '700',
+                color: isDark ? tokens.textPrimary : '#18181B',
+                textAlign: 'center',
+                letterSpacing: -0.5,
               }}
             >
-              Progress
+              {statusLabel(status)}
             </Text>
-            <WorkflowStepper status={status} tokens={tokens} isDark={isDark} isDesktop={isDesktop} />
-          </Section>
+            <Text
+              style={{
+                fontSize: 14,
+                color: isDark ? tokens.textMuted : '#71717A',
+                textAlign: 'center',
+                maxWidth: 640,
+                lineHeight: 21,
+                marginTop: 6,
+              }}
+            >
+              {norm === FLEX_BOOKING_STATUS.PENDING_REVIEW || status === 'Pending'
+                ? 'Review the requested service and customer details before approving this booking.'
+                : explanation}
+            </Text>
+          </View>
 
           {/* ─────────────────────────────────────────────────────────────
-          SECTION 2: NEXT ACTION (GUIDED PRIMARY ACTION + CONTROLS)
+          ROW 1: SIDE-BY-SIDE CARDS (CLEAN, ORGANIZED, AIRY UI)
+          RIDER & VEHICLE SPECIFICATIONS + SCHEDULE & SERVICE DELIVERABLES
       ────────────────────────────────────────────────────────────── */}
-          <Section title="Next Action" tokens={tokens} isDark={isDark}>
-            {primary?.infoBanner ? (
+          <View
+            style={{
+              flexDirection: isDesktop ? 'row' : 'column',
+              gap: 16,
+              marginBottom: 16,
+            }}
+          >
+            {/* ─── CARD 1: RIDER & MOTORCYCLE PROFILE ─── */}
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: isDark ? tokens.bgCard : '#FFFFFF',
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: isDark ? tokens.border : '#E4E4E7',
+                padding: 18,
+                shadowColor: '#000000',
+                shadowOpacity: 0.03,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 2 },
+                justifyContent: 'space-between',
+              }}
+            >
+              {/* Card Header: Orange icon circle + Customer Name (Left), DP Settled Pill (Right) */}
               <View
                 style={{
-                  backgroundColor: isDark ? 'rgba(217, 119, 6, 0.12)' : '#FFFBEB',
-                  borderWidth: 1,
-                  borderColor: isDark ? 'rgba(217, 119, 6, 0.3)' : '#FDE68A',
-                  borderRadius: 8,
-                  padding: 10,
-                  marginBottom: 10,
-                }}
-              >
-                <Text style={{ fontSize: 12.5, color: isDark ? '#E0B35C' : '#92400E', lineHeight: 18 }}>
-                  ⚠ {primary.infoBanner}
-                </Text>
-              </View>
-            ) : null}
-
-            {primary?.hint ? (
-              <Text
-                style={{
-                  fontSize: 13,
-                  color: tokens?.textPrimary || '#0F172A',
-                  marginBottom: 12,
-                  lineHeight: 19,
-                }}
-              >
-                {primary.hint}
-              </Text>
-            ) : null}
-
-            {primary?.completeMessage ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 }}>
-                <BootstrapIcon name="check-circle-fill" size={16} color={isDark ? '#EA580C' : '#059669'} />
-                <Text style={{ fontSize: 13.5, fontWeight: '700', color: tokens?.textPrimary || '#0F172A' }}>
-                  {primary.completeMessage}
-                </Text>
-              </View>
-            ) : null}
-
-            {primary?.blockedReason && !primary.label ? (
-              <View
-                style={{
-                  backgroundColor: isDark ? 'rgba(220, 38, 38, 0.12)' : '#FEF2F2',
-                  borderRadius: 8,
-                  padding: 12,
-                  borderWidth: 1,
-                  borderColor: isDark ? 'rgba(220, 38, 38, 0.3)' : '#FECACA',
-                }}
-              >
-                <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDark ? '#F87171' : '#B91C1C' }}>
-                  Cannot proceed
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 12.5,
-                    color: tokens?.textPrimary || '#0F172A',
-                    marginTop: 4,
-                    lineHeight: 18,
-                  }}
-                >
-                  {primary.blockedReason}
-                </Text>
-              </View>
-            ) : null}
-
-            {/* Primary Action Button */}
-            {primary?.label ? (
-              <TouchableOpacity
-                onPress={runPrimary}
-                disabled={busy || primary.disabled}
-                activeOpacity={0.85}
-                style={{
-                  backgroundColor: primary.disabled ? tokens?.border || '#CBD5E1' : '#EA580C',
-                  borderRadius: 10,
-                  paddingVertical: 13,
-                  paddingHorizontal: 16,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 8,
-                  opacity: busy ? 0.7 : 1,
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  marginBottom: 14,
                 }}
               >
-                <BootstrapIcon name={primary.icon || 'arrow-right-circle-fill'} size={15} color="#FFFFFF" />
-                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 14 }}>
-                  {busy ? 'Working…' : primary.label}
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-
-            {/* Secondary Actions Toolbar */}
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: primary?.label ? 10 : 0 }}>
-              {primary?.secondaryReject && (
-                <TouchableOpacity
-                  onPress={() => setShowRejectBox(true)}
-                  style={[secondaryBtn, { borderColor: isDark ? 'rgba(180, 120, 120, 0.35)' : '#FECACA' }]}
-                >
-                  <BootstrapIcon name="x-circle" size={13} color="#DC2626" />
-                  <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#DC2626' }}>Reject Booking</Text>
-                </TouchableOpacity>
-              )}
-
-              {primary?.secondaryReschedule && (
-                <TouchableOpacity onPress={() => setShowRescheduleBox(!showRescheduleBox)} style={secondaryBtn}>
-                  <BootstrapIcon name="calendar-event" size={13} color={tokens?.textPrimary || '#0F172A'} />
-                  <Text style={{ fontSize: 12.5, fontWeight: '600', color: tokens?.textPrimary || '#0F172A' }}>
-                    Reschedule Date/Time
-                  </Text>
-                </TouchableOpacity>
-              )}
-
-              {primary?.secondaryInspection && (
-                <TouchableOpacity
-                  onPress={() => {
-                    setStatus(FLEX_BOOKING_STATUS.UNDER_INSPECTION);
-                    setActiveTab('inspection');
-                  }}
-                  style={secondaryBtn}
-                >
-                  <BootstrapIcon name="search" size={13} color={tokens?.textPrimary || '#0F172A'} />
-                  <Text style={{ fontSize: 12.5, fontWeight: '600', color: tokens?.textPrimary || '#0F172A' }}>
-                    Start Inspection First
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          </Section>
-
-          {/* ─────────────────────────────────────────────────────────────
-          SECTION 3: BOOKING INFORMATION
-      ────────────────────────────────────────────────────────────── */}
-          <Section title="Booking Information" tokens={tokens} isDark={isDark}>
-            <InfoGrid
-              tokens={tokens}
-              rows={[
-                { label: 'Booking ID', value: bookingId, highlight: true },
-                {
-                  label: 'Appointment Date',
-                  value: formatDateOnly(booking.preferred_date || booking.appointment_date || booking.date),
-                },
-                {
-                  label: 'Time Window',
-                  value: booking.preferred_time || booking.time_slot || booking.time || '10:30 AM - 12:00 PM',
-                },
-                {
-                  label: 'Service Hub',
-                  value: booking.branch?.replace('MotoTrack ', '') || "D'Blockchain Motorparts",
-                },
-                {
-                  label: 'Booking Type',
-                  value: isPmsFixed ? 'PMS (Fixed Rate)' : 'Repair (Quoted)',
-                },
-                {
-                  label: 'Payment Status',
-                  value: payStatus,
-                  highlight: isDpPaid,
-                },
-                {
-                  label: 'Downpayment',
-                  value: isDpPaid
-                    ? `₱${dpAmount.toLocaleString()} Paid`
-                    : `₱${dpAmount.toLocaleString()} Required`,
-                },
-                {
-                  label: 'Labor Subtotal',
-                  value: formatPhp(serviceTotals.labor > 0 ? serviceTotals.labor : basePrice),
-                  highlight: true,
-                },
-              ]}
-            />
-          </Section>
-
-          {/* ─────────────────────────────────────────────────────────────
-          SECTION 4: CUSTOMER INFORMATION
-      ────────────────────────────────────────────────────────────── */}
-          <Section title="Customer Information" tokens={tokens} isDark={isDark}>
-            <InfoRow
-              icon="person-fill"
-              label="Customer Name"
-              value={booking.customer_name || booking.userName || 'Walk-in Customer'}
-              tokens={tokens}
-            />
-            <InfoRow
-              icon="telephone-fill"
-              label="Contact Phone"
-              value={booking.customer_phone || booking.userPhone || 'None provided'}
-              tokens={tokens}
-            />
-            <InfoRow
-              icon="envelope-fill"
-              label="Email Address"
-              value={booking.customer_email || booking.userEmail || 'None provided'}
-              tokens={tokens}
-            />
-            <InfoRow
-              icon="geo-alt-fill"
-              label="Service Hub / Address"
-              value={
-                booking.customer_address ||
-                booking.address ||
-                booking.branch ||
-                "D'Blockchain Motorparts and Accessories"
-              }
-              tokens={tokens}
-            />
-
-            {booking.notes ? (
-              <View
-                style={{
-                  marginTop: 6,
-                  backgroundColor: isDark ? tokens.bgElevated || '#1E293B' : '#F8FAFC',
-                  padding: 10,
-                  borderRadius: 8,
-                  borderLeftWidth: 3,
-                  borderLeftColor: '#EA580C',
-                }}
-              >
-                <Text style={{ fontSize: 11, fontWeight: '700', color: tokens.textMuted }}>Customer Remarks</Text>
-                <Text
-                  style={{
-                    fontSize: 12.5,
-                    color: isDark ? tokens.textPrimary : '#334155',
-                    fontStyle: 'italic',
-                    marginTop: 2,
-                  }}
-                >
-                  "{booking.notes}"
-                </Text>
-              </View>
-            ) : null}
-          </Section>
-
-          {/* ─────────────────────────────────────────────────────────────
-          SECTION 5: MOTORCYCLE INFORMATION
-      ────────────────────────────────────────────────────────────── */}
-          <Section title="Motorcycle Information" tokens={tokens} isDark={isDark}>
-            <InfoGrid
-              tokens={tokens}
-              rows={[
-                {
-                  label: 'Vehicle Model',
-                  value:
-                    `${booking.bike_brand || booking.bikeBrand || ''} ${booking.bike_model || booking.bikeModel || ''}`.trim() ||
-                    'Honda ADV 160',
-                  highlight: true,
-                },
-                {
-                  label: 'License Plate',
-                  value: booking.plate_number || booking.bikePlate || 'N/A–RJCX',
-                },
-                {
-                  label: 'Engine Displacement',
-                  value:
-                    (booking.motorcycle_cc ?? booking.engine_cc ?? booking.cc)
-                      ? `${booking.motorcycle_cc ?? booking.engine_cc ?? booking.cc} cc`
-                      : '160 cc',
-                },
-                {
-                  label: 'CC Category',
-                  value: booking.cc_category_name || booking.cc_category || '150cc - 160cc',
-                },
-                {
-                  label: 'Color & Year',
-                  value: `${booking.bike_color || booking.color || 'Standard'} · ${booking.bike_year || booking.year || '2024'}`,
-                },
-                {
-                  label: 'Current Odometer',
-                  value: booking.odometer || booking.bikeOdo || '0 km',
-                },
-              ]}
-            />
-
-            {media.length > 0 ? (
-              <View style={{ marginTop: 12 }}>
-                <Text
-                  style={{
-                    fontSize: 10.5,
-                    fontWeight: '700',
-                    color: tokens.textMuted,
-                    textTransform: 'uppercase',
-                    marginBottom: 6,
-                    letterSpacing: 0.5,
-                  }}
-                >
-                  Attached Motorcycle Photos ({media.length})
-                </Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
-                  {media.map((url, i) => (
-                    <Image
-                      key={`${url}-${i}`}
-                      source={{ uri: getOptimizedImageUrl(url, { width: 160, quality: 60 }) }}
-                      style={{
-                        width: 88,
-                        height: 88,
-                        borderRadius: 8,
-                        backgroundColor: isDark ? tokens.bgSub : '#E2E8F0',
-                      }}
-                      resizeMode="cover"
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-            ) : null}
-          </Section>
-
-          {/* ─────────────────────────────────────────────────────────────
-          SECTION 6: REQUESTED SERVICES & PRICING
-      ────────────────────────────────────────────────────────────── */}
-          <Section
-            title={`Requested Services ${lineItems.length > 0 ? `(${lineItems.length})` : ''}`}
-            tokens={tokens}
-            isDark={isDark}
-          >
-            {itemsLoading && lineItems.length === 0 ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8 }}>
-                <ActivityIndicator size="small" color="#EA580C" />
-                <Text style={{ fontSize: 12, color: tokens.textMuted }}>Loading service items...</Text>
-              </View>
-            ) : null}
-
-            {lineItems.length > 0 ? (
-              <View
-                style={{
-                  borderWidth: 1,
-                  borderColor: tokens.border || '#E2E8F0',
-                  borderRadius: 8,
-                  overflow: 'hidden',
-                  marginBottom: 10,
-                }}
-              >
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    backgroundColor: isDark ? tokens.bgSub : '#F8FAFC',
-                    paddingHorizontal: 10,
-                    paddingVertical: 7,
-                  }}
-                >
-                  <Text
-                    style={{
-                      flex: 2.2,
-                      fontSize: 10.5,
-                      fontWeight: '700',
-                      color: tokens.textMuted,
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    Service
-                  </Text>
-                  <Text
-                    style={{
-                      flex: 1.2,
-                      fontSize: 10.5,
-                      fontWeight: '700',
-                      color: tokens.textMuted,
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    Category
-                  </Text>
-                  <Text
-                    style={{
-                      flex: 1,
-                      fontSize: 10.5,
-                      fontWeight: '700',
-                      color: tokens.textMuted,
-                      textAlign: 'right',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    Rate
-                  </Text>
-                </View>
-                {lineItems.map((item, idx) => (
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, flex: 1, minWidth: 0 }}>
                   <View
-                    key={item.key || idx}
                     style={{
-                      flexDirection: 'row',
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      backgroundColor: '#FFF7ED',
+                      borderWidth: 1,
+                      borderColor: '#FED7AA',
                       alignItems: 'center',
-                      paddingHorizontal: 10,
-                      paddingVertical: 8,
-                      borderTopWidth: 1,
-                      borderTopColor: tokens.border || '#F1F5F9',
+                      justifyContent: 'center',
                     }}
                   >
-                    <View style={{ flex: 2.2 }}>
-                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: tokens.textPrimary || '#0F172A' }}>
-                        {item.name}
-                      </Text>
-                      {item.isAdditional ? (
-                        <Text style={{ fontSize: 10, color: '#EA580C', fontWeight: '600' }}>Additional Work</Text>
-                      ) : null}
-                    </View>
-                    <Text style={{ flex: 1.2, fontSize: 11.5, color: tokens.textMuted }}>
-                      {item.group || 'General'}
+                    <BootstrapIcon name="person" size={16} color="#EA580C" />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: '700',
+                        color: isDark ? tokens.textMuted : '#71717A',
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.7,
+                      }}
+                    >
+                      RIDER & VEHICLE
                     </Text>
                     <Text
                       style={{
-                        flex: 1,
-                        fontSize: 12.5,
-                        fontWeight: '600',
-                        color: tokens.textPrimary,
-                        textAlign: 'right',
+                        fontSize: 16,
+                        fontWeight: '700',
+                        color: isDark ? tokens.textPrimary : '#18181B',
+                        marginTop: 1,
                       }}
+                      numberOfLines={1}
                     >
-                      {formatPhp(item.rate || item.total)}
+                      {booking.customer_name || booking.userName || 'Walk-in Customer'}
                     </Text>
                   </View>
-                ))}
+                </View>
+
+                <View
+                  style={{
+                    backgroundColor: '#ECFDF5',
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 20,
+                    borderWidth: 1,
+                    borderColor: '#A7F3D0',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                  }}
+                >
+                  <BootstrapIcon name="check-circle-fill" size={11} color="#059669" />
+                  <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#047857', fontVariant: ['tabular-nums'] }}>
+                    {isDpPaid ? `DP Paid (₱${dpAmount.toLocaleString()})` : `₱${dpAmount.toLocaleString()} Required`}
+                  </Text>
+                </View>
               </View>
-            ) : (
-              <View style={{ marginBottom: 10 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary }}>
-                  {booking.service_title || booking.package_name || 'Periodic Maintenance Service'}
+
+              {/* Hairline Divider */}
+              <View style={{ height: 1, backgroundColor: isDark ? tokens.border : '#F4F4F5', marginBottom: 14 }} />
+
+              {/* Clean, Organized Key-Value Grid */}
+              <View style={{ gap: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <View style={{ flex: 1, minWidth: 120 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Contact Phone
+                    </Text>
+                    <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3, fontVariant: ['tabular-nums'] }} numberOfLines={1}>
+                      {booking.customer_phone || booking.userPhone || 'None provided'}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 120 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Payment Method
+                    </Text>
+                    <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
+                      {booking.downpayment_channel || booking.downpayment_method || booking.payment_method || 'Online (GCash / Card)'}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <View style={{ flex: 1, minWidth: 120 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Motorcycle Model
+                    </Text>
+                    <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
+                      {booking.motorcycle_model || booking.bike_model || booking.vehicle || 'Honda ADV 160'}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 120 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Plate Number
+                    </Text>
+                    <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
+                      {booking.motorcycle_plate || booking.plate_number || booking.plate || 'N/A-RJCX'}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* ─── CARD 2: SCHEDULE & DELIVERABLES ─── */}
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: isDark ? tokens.bgCard : '#FFFFFF',
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: isDark ? tokens.border : '#E4E4E7',
+                padding: 18,
+                shadowColor: '#000000',
+                shadowOpacity: 0.03,
+                shadowRadius: 8,
+                shadowOffset: { width: 0, height: 2 },
+                justifyContent: 'space-between',
+              }}
+            >
+              {/* Card Header: Orange icon circle + Service Title (Left), Price Pill (Right) */}
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  marginBottom: 14,
+                }}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, flex: 1, minWidth: 0 }}>
+                  <View
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 19,
+                      backgroundColor: '#FFF7ED',
+                      borderWidth: 1,
+                      borderColor: '#FED7AA',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <BootstrapIcon name="calendar3" size={16} color="#EA580C" />
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: '700',
+                        color: isDark ? tokens.textMuted : '#71717A',
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.7,
+                      }}
+                    >
+                      SCHEDULE & DELIVERABLES
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 16,
+                        fontWeight: '700',
+                        color: isDark ? tokens.textPrimary : '#18181B',
+                        marginTop: 1,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {booking.package_name || booking.service_title || (isPmsFixed ? 'Major Tune Up' : 'General Service')}
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  style={{
+                    backgroundColor: '#FFF7ED',
+                    paddingHorizontal: 11,
+                    paddingVertical: 5,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: '#FED7AA',
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 15.5,
+                      fontWeight: '700',
+                      color: '#EA580C',
+                      fontVariant: ['tabular-nums'],
+                    }}
+                  >
+                    ₱{finalTotal.toLocaleString()}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Hairline Divider */}
+              <View style={{ height: 1, backgroundColor: isDark ? tokens.border : '#F4F4F5', marginBottom: 14 }} />
+
+              {/* Clean, Organized Key-Value Grid */}
+              <View style={{ gap: 12 }}>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <View style={{ flex: 1.1, minWidth: 140 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Appointment Schedule
+                    </Text>
+                    <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
+                      {booking.preferred_date || booking.appointment_date || booking.date
+                        ? `${formatDateOnly(booking.preferred_date || booking.appointment_date || booking.date)} • ${booking.preferred_time || booking.time_slot || booking.time || '09:00 AM'}`
+                        : 'Not scheduled'}
+                    </Text>
+                  </View>
+                  <View style={{ flex: 0.9, minWidth: 110 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Service Category
+                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 3 }}>
+                      <View
+                        style={{
+                          backgroundColor: '#EFF6FF',
+                          paddingHorizontal: 7,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                          borderWidth: 1,
+                          borderColor: '#DBEAFE',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: '#2563EB' }} numberOfLines={1}>
+                          {booking.category === 'PMS' ? 'Tune-Up & Maintenance' : (booking.category || 'PMS Package')}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <View style={{ flex: 1.1, minWidth: 140 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Workshop Pit Bay
+                    </Text>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
+                      {booking.branch?.replace('MotoTrack ', '') || "D'Blockchain Motorparts"}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: isDark ? tokens.textMuted : '#71717A', marginTop: 1 }} numberOfLines={1}>
+                      South Poblacion, Naga, 6037 Cebu
+                    </Text>
+                  </View>
+                  <View style={{ flex: 0.9, minWidth: 110 }}>
+                    <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDark ? tokens.textMuted : '#71717A', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                      Duration & Bay
+                    </Text>
+                    <Text style={{ fontSize: 13.5, fontWeight: '600', color: isDark ? tokens.textPrimary : '#18181B', marginTop: 3 }} numberOfLines={1}>
+                      25–35 mins • Bay 1
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
+
+          {/* ─── CARD: PREFERRED SCHEDULE & MECHANIC ALLOCATION REVIEW ─── */}
+          <View
+            style={{
+              backgroundColor: isDark ? tokens.bgCard : '#FFFFFF',
+              borderRadius: 16,
+              borderWidth: 1,
+              borderColor: isDark ? tokens.border : '#E4E4E7',
+              padding: 18,
+              marginBottom: 16,
+              shadowColor: '#000000',
+              shadowOpacity: 0.03,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 2 },
+            }}
+          >
+            {/* Header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 10,
+                marginBottom: 14,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 220 }}>
+                <View
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: isDark ? 'rgba(234, 88, 12, 0.15)' : '#FFF7ED',
+                    borderWidth: 1,
+                    borderColor: '#FED7AA',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <BootstrapIcon name="tools" size={15} color="#EA580C" />
+                </View>
+                <View>
+                  <Text
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: '700',
+                      color: isDark ? tokens.textMuted : '#71717A',
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.6,
+                    }}
+                  >
+                    PREFERRED SCHEDULE & MECHANIC ALLOCATION
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 14,
+                      fontWeight: '700',
+                      color: isDark ? tokens.textPrimary : '#18181B',
+                      marginTop: 1,
+                    }}
+                  >
+                    Technician Availability for Requested Slot
+                  </Text>
+                </View>
+              </View>
+
+              {/* Customer Requested Slot Pill */}
+              <View
+                style={{
+                  backgroundColor: '#EFF6FF',
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                  borderRadius: 20,
+                  borderWidth: 1,
+                  borderColor: '#BFDBFE',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <BootstrapIcon name="calendar-event-fill" size={12} color="#2563EB" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#1D4ED8' }}>
+                  {preferredDate ? formatDateOnly(preferredDate) : 'Preferred Date'} • {preferredTime}
                 </Text>
               </View>
-            )}
+            </View>
 
-            {/* Pricing Summary */}
-            <SummaryLine
-              label="Labor Subtotal"
-              value={formatPhp(serviceTotals.labor > 0 ? serviceTotals.labor : basePrice)}
-              tokens={tokens}
-            />
-            {serviceTotals.parts > 0 ? (
-              <SummaryLine label="Parts Estimate" value={formatPhp(serviceTotals.parts)} tokens={tokens} />
-            ) : null}
-            {serviceTotals.fees > 0 ? (
-              <SummaryLine label="Additional Fees" value={formatPhp(serviceTotals.fees)} tokens={tokens} />
-            ) : null}
-            <SummaryLine label="Estimated Total" value={formatPhp(finalTotal)} tokens={tokens} isBold />
-            {isDpPaid ? (
-              <SummaryLine
-                label="20% Downpayment (Paid)"
-                value={`-₱${dpAmount.toLocaleString()}`}
-                tokens={tokens}
-                valueColor={isDark ? '#34D399' : '#059669'}
-              />
-            ) : null}
+            {/* Hairline Divider */}
+            <View style={{ height: 1, backgroundColor: isDark ? tokens.border : '#F4F4F5', marginBottom: 14 }} />
+
+            {/* Sub-heading / Instruction */}
+            <Text
+              style={{
+                fontSize: 12,
+                color: isDark ? tokens.textMuted : '#71717A',
+                marginBottom: 12,
+              }}
+            >
+              Review active pit bay technicians below to confirm who is free during the customer's preferred slot ({preferredTime}). Tap to assign technician before approving.
+            </Text>
+
+            {/* Mechanics Grid */}
+            <View style={{ gap: 10 }}>
+              {displayMechanics.map((mech) => {
+                const isSelected = selectedMechanic
+                  ? selectedMechanic.id === mech.id
+                  : mech.isCurrentAssigned;
+
+                return (
+                  <View
+                    key={mech.id}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: 12,
+                      borderRadius: 12,
+                      borderWidth: isSelected ? 2 : 1,
+                      borderColor: isSelected
+                        ? '#EA580C'
+                        : isDark
+                        ? tokens.border
+                        : '#E4E4E7',
+                      backgroundColor: isSelected
+                        ? isDark
+                          ? 'rgba(234, 88, 12, 0.1)'
+                          : '#FFF7ED'
+                        : isDark
+                        ? 'rgba(255, 255, 255, 0.02)'
+                        : '#FAFAFA',
+                      gap: 12,
+                    }}
+                  >
+                    {/* Left: Avatar + Details */}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 200 }}>
+                      <Image
+                        source={{ uri: mech.avatar }}
+                        style={{
+                          width: 40,
+                          height: 40,
+                          borderRadius: 20,
+                          backgroundColor: '#E4E4E7',
+                        }}
+                      />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text
+                            style={{
+                              fontSize: 13.5,
+                              fontWeight: '700',
+                              color: isDark ? tokens.textPrimary : '#18181B',
+                            }}
+                            numberOfLines={1}
+                          >
+                            {mech.name}
+                          </Text>
+                          {isSelected && (
+                            <View
+                              style={{
+                                backgroundColor: '#EA580C',
+                                paddingHorizontal: 6,
+                                paddingVertical: 1.5,
+                                borderRadius: 10,
+                              }}
+                            >
+                              <Text style={{ fontSize: 9.5, fontWeight: '700', color: '#FFFFFF' }}>
+                                ASSIGNED
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text
+                          style={{
+                            fontSize: 11.5,
+                            color: isDark ? tokens.textMuted : '#71717A',
+                            marginTop: 1,
+                          }}
+                          numberOfLines={1}
+                        >
+                          {mech.specialization} • {mech.bay || 'Pit Bay'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Middle: Live Availability Pill */}
+                    <View style={{ alignItems: 'flex-end', minWidth: 150 }}>
+                      {mech.isAvailable ? (
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            backgroundColor: '#ECFDF5',
+                            paddingHorizontal: 9,
+                            paddingVertical: 3.5,
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: '#A7F3D0',
+                          }}
+                        >
+                          <BootstrapIcon name="check-circle-fill" size={11} color="#059669" />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#047857' }}>
+                            Free & Available
+                          </Text>
+                        </View>
+                      ) : (
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 5,
+                            backgroundColor: '#FEF2F2',
+                            paddingHorizontal: 9,
+                            paddingVertical: 3.5,
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: '#FECACA',
+                          }}
+                        >
+                          <BootstrapIcon name="slash-circle-fill" size={11} color="#DC2626" />
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: '#B91C1C' }}>
+                            Busy ({mech.conflictBooking || 'In Bay'})
+                          </Text>
+                        </View>
+                      )}
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          color: isDark ? tokens.textMuted : '#A1A1AA',
+                          marginTop: 2,
+                        }}
+                      >
+                        {mech.isAvailable ? `Available at ${preferredTime}` : `Conflicting slot at ${preferredTime}`}
+                      </Text>
+                    </View>
+
+                    {/* Right: Select Action */}
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedMechanic(mech);
+                        if (booking?.mechanic !== mech.name && (norm === FLEX_BOOKING_STATUS.CONFIRMED || norm === FLEX_BOOKING_STATUS.SCHEDULED)) {
+                          handleAssignMechanic(mech);
+                        }
+                      }}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 6,
+                        borderRadius: 8,
+                        backgroundColor: isSelected
+                          ? '#EA580C'
+                          : mech.isAvailable
+                          ? isDark
+                            ? 'rgba(255, 255, 255, 0.08)'
+                            : '#F4F4F5'
+                          : isDark
+                          ? 'rgba(255, 255, 255, 0.03)'
+                          : '#FAFAFA',
+                        borderWidth: 1,
+                        borderColor: isSelected
+                          ? '#EA580C'
+                          : isDark
+                          ? tokens.border
+                          : '#E4E4E7',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minWidth: 80,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 11.5,
+                          fontWeight: '700',
+                          color: isSelected ? '#FFFFFF' : mech.isAvailable ? (isDark ? tokens.textPrimary : '#18181B') : '#A1A1AA',
+                        }}
+                      >
+                        {isSelected ? 'Selected' : mech.isAvailable ? 'Assign' : 'Conflict'}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+
+            {/* Active Assignment Status Note */}
+            <View
+              style={{
+                marginTop: 14,
+                paddingTop: 12,
+                borderTopWidth: 1,
+                borderTopColor: isDark ? tokens.border : '#F4F4F5',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+                <BootstrapIcon name="info-circle" size={13} color="#EA580C" />
+                <Text style={{ fontSize: 11.5, color: isDark ? tokens.textMuted : '#71717A' }}>
+                  Technician assigned to this service:{' '}
+                  <Text style={{ fontWeight: '700', color: isDark ? tokens.textPrimary : '#18181B' }}>
+                    {selectedMechanic?.name || booking?.mechanic || 'Pit Bay Dispatch upon arrival'}
+                  </Text>
+                </Text>
+              </View>
+              {selectedMechanic && selectedMechanic.name !== booking?.mechanic && (
+                <TouchableOpacity
+                  onPress={() => handleAssignMechanic(selectedMechanic)}
+                  style={{
+                    backgroundColor: '#EA580C',
+                    paddingHorizontal: 12,
+                    paddingVertical: 5,
+                    borderRadius: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#FFFFFF' }}>
+                    Save Assignment
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* ─── CARD 3: ESTIMATED SUMMARY (EXECUTIVE CHARCOAL COLOR SCHEME) ─── */}
+          <View
+            style={{
+              backgroundColor: '#1E2227',
+              borderRadius: 16,
+              padding: 20,
+              marginBottom: 16,
+              borderWidth: 1,
+              borderColor: 'rgba(255, 255, 255, 0.08)',
+              shadowColor: '#000000',
+              shadowOpacity: 0.15,
+              shadowRadius: 10,
+              shadowOffset: { width: 0, height: 4 },
+            }}
+          >
+            {/* Header: ESTIMATED SUMMARY matching Reference */}
+            <Text
+              style={{
+                fontSize: 12,
+                fontWeight: '700',
+                color: '#EA580C',
+                letterSpacing: 0.8,
+                textTransform: 'uppercase',
+                marginBottom: 12,
+              }}
+            >
+              ESTIMATED SUMMARY
+            </Text>
+
+            {/* Table Header: DESCRIPTION & SUBTOTAL */}
             <View
               style={{
                 flexDirection: 'row',
                 justifyContent: 'space-between',
-                marginTop: 8,
-                paddingTop: 8,
-                borderTopWidth: 1,
-                borderTopColor: tokens.border || '#E2E8F0',
+                alignItems: 'center',
+                paddingBottom: 4,
               }}
             >
-              <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary }}>
-                Remaining Balance
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '700',
+                  color: '#9CA3AF',
+                  letterSpacing: 0.6,
+                  textTransform: 'uppercase',
+                }}
+              >
+                DESCRIPTION
               </Text>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#EA580C' }}>
-                ₱
-                {remainingBalance.toLocaleString(undefined, {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2,
-                })}
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: '700',
+                  color: '#9CA3AF',
+                  letterSpacing: 0.6,
+                  textTransform: 'uppercase',
+                }}
+              >
+                SUBTOTAL
               </Text>
             </View>
-          </Section>
 
+            {/* Hairline Divider */}
+            <View
+              style={{
+                height: 1,
+                backgroundColor: 'rgba(255, 255, 255, 0.10)',
+                marginTop: 4,
+                marginBottom: 10,
+              }}
+            />
+
+            {/* Row: Labor */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingVertical: 5,
+              }}
+            >
+              <Text style={{ fontSize: 13.5, color: '#D4D4D8', fontWeight: '500' }}>Labor</Text>
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  color: '#FFFFFF',
+                  fontWeight: '600',
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {formatPhp(serviceTotals.labor > 0 ? serviceTotals.labor : finalTotal)}
+              </Text>
+            </View>
+
+            {/* Row: Parts */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingVertical: 5,
+              }}
+            >
+              <Text style={{ fontSize: 13.5, color: '#D4D4D8', fontWeight: '500' }}>Parts</Text>
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  color: '#FFFFFF',
+                  fontWeight: '600',
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {formatPhp(serviceTotals.parts || 0)}
+              </Text>
+            </View>
+
+            {/* Row: Other Charges */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingVertical: 5,
+              }}
+            >
+              <Text style={{ fontSize: 13.5, color: '#D4D4D8', fontWeight: '500' }}>Other Charges</Text>
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  color: '#FFFFFF',
+                  fontWeight: '600',
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {formatPhp(serviceTotals.fees || 0)}
+              </Text>
+            </View>
+
+            {/* Row: Discount */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingVertical: 5,
+              }}
+            >
+              <Text style={{ fontSize: 13.5, color: '#D4D4D8', fontWeight: '500' }}>Discount</Text>
+              <Text
+                style={{
+                  fontSize: 13.5,
+                  color: Number(booking?.discount_amount || booking?.discount_php || 0) > 0 ? '#F87171' : '#FFFFFF',
+                  fontWeight: '600',
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {Number(booking?.discount_amount || booking?.discount_php || 0) > 0
+                  ? `−${formatPhp(Number(booking.discount_amount || booking.discount_php))}`
+                  : '−₱0'}
+              </Text>
+            </View>
+
+            {/* Total Divider */}
+            <View
+              style={{
+                height: 1,
+                backgroundColor: 'rgba(255, 255, 255, 0.12)',
+                marginTop: 10,
+                marginBottom: 10,
+              }}
+            />
+
+            {/* Total Row */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingVertical: 3,
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#FFFFFF' }}>Total</Text>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontWeight: '700',
+                  color: '#EA580C',
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                {formatPhp(finalTotal)}
+              </Text>
+            </View>
+
+            {/* Sub-Box: Required Downpayment & Remaining Estimated Balance */}
+            <View
+              style={{
+                marginTop: 10,
+                paddingTop: 10,
+                borderTopWidth: 1,
+                borderTopColor: 'rgba(255, 255, 255, 0.08)',
+                gap: 6,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingVertical: 3,
+                }}
+              >
+                <Text style={{ fontSize: 13, color: '#A1A1AA', fontWeight: '500' }}>
+                  {isDpPaid ? 'Downpayment (Paid)' : 'Required Downpayment'}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: '700',
+                    color: '#EA580C',
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {formatPhp(dpAmount)}
+                </Text>
+              </View>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  paddingVertical: 3,
+                }}
+              >
+                <Text style={{ fontSize: 13, color: '#A1A1AA', fontWeight: '500' }}>
+                  Remaining Estimated Balance
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontWeight: '700',
+                    color: '#EA580C',
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {formatPhp(remainingBalance)}
+                </Text>
+              </View>
+            </View>
+          </View>
+          {/* Customer Special Notes if present */}
+          {Boolean(booking.notes || booking.customer_notes) && (
+            <View
+              style={{
+                backgroundColor: isDark ? tokens.bgCard : '#FFFFFF',
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: isDark ? tokens.border : '#E4E4E7',
+                padding: 18,
+                marginBottom: 16,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: '700',
+                  color: isDark ? tokens.textMuted : '#71717A',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.8,
+                  marginBottom: 8,
+                }}
+              >
+                Customer Special Requests & Notes
+              </Text>
+              <View
+                style={{
+                  padding: 12,
+                  backgroundColor: isDark ? tokens.bgSub : '#FAFAF9',
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: isDark ? tokens.border : '#F4F4F5',
+                }}
+              >
+                <Text style={{ fontSize: 13, color: isDark ? tokens.textPrimary : '#334155', fontStyle: 'italic', lineHeight: 19 }}>
+                  "{booking.notes || booking.customer_notes}"
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {/* Attached Motorcycle Photos if present */}
+          {media.length > 0 && (
+            <View
+              style={{
+                backgroundColor: isDark ? tokens.bgCard : '#FFFFFF',
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: isDark ? tokens.border : '#E4E4E7',
+                padding: 18,
+                marginBottom: 16,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: '700',
+                  color: isDark ? tokens.textMuted : '#71717A',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.8,
+                  marginBottom: 10,
+                }}
+              >
+                Attached Motorcycle Photos ({media.length})
+              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                {media.map((url, i) => (
+                  <Image
+                    key={`${url}-${i}`}
+                    source={{ uri: getOptimizedImageUrl(url, { width: 160, quality: 60 }) }}
+                    style={{
+                      width: 88,
+                      height: 88,
+                      borderRadius: 8,
+                      backgroundColor: isDark ? tokens.bgSub : '#E2E8F0',
+                    }}
+                    resizeMode="cover"
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          )}
           {/* ─────────────────────────────────────────────────────────────
-          SECTION 7: SPECIALIZED WORKSHOP TOOLS (COLLAPSIBLE / TABS)
+          SECTION 7: SPECIALIZED WORKSHOP TOOLS (Only shown in Step 2 "In bay" & beyond)
       ────────────────────────────────────────────────────────────── */}
-          <Section title="Workshop Tools & Advanced Itemization" tokens={tokens} isDark={isDark}>
+          {currentStepIndex >= 1 && (
+            <Section title="Workshop Tools & Advanced Itemization" tokens={tokens} isDark={isDark}>
             <View
               style={{
                 flexDirection: 'row',
@@ -1931,7 +2615,9 @@ function AdminBookingDetailsPanelInner({
                   disabled={busy}
                   style={[
                     secondaryBtn,
-                    { alignSelf: 'flex-start', backgroundColor: '#EA580C', borderColor: '#EA580C' },
+                    { alignSelf: 'flex-start', backgroundColor: '#1E2227',
+      borderWidth: 1,
+      borderColor: '#373C42', borderColor: '#EA580C' },
                   ]}
                 >
                   <BootstrapIcon name="check2" size={13} color="#FFF" />
@@ -2000,7 +2686,7 @@ function AdminBookingDetailsPanelInner({
               </View>
             )}
           </Section>
-
+          )}
           {/* ─────────────────────────────────────────────────────────────
           SECTION 8: BOOKING ACTIVITY & AUDIT TIMELINE
       ────────────────────────────────────────────────────────────── */}
@@ -2066,38 +2752,68 @@ function AdminBookingDetailsPanelInner({
         </View>
       </ScrollView>
 
-      {/* Sticky Fixed Footer: Operational Actions */}
-      <View style={styles.fixedFooter}>
-        <TouchableOpacity
-          onPress={onClose}
-          style={styles.footerCloseBtn}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.footerCloseText}>Close</Text>
-        </TouchableOpacity>
+      {/* Sticky Fixed Footer: Operational Actions (Restored Original Positioning) */}
+      <View
+        style={[
+          styles.fixedFooter,
+          {
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            paddingTop: 8,
+            paddingBottom: 8,
+          },
+        ]}
+      >
+        {primary?.secondaryReject ? (
+          <TouchableOpacity
+            onPress={() => setShowRejectBox(true)}
+            disabled={busy}
+            style={{
+              paddingVertical: 7,
+              paddingHorizontal: 12,
+              borderRadius: 8,
+              cursor: 'pointer',
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 13.5, fontWeight: '600', color: '#DC2626' }}>
+              Reject booking
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={onClose}
+            style={[styles.footerCloseBtn, { paddingVertical: 7, paddingHorizontal: 14 }]}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.footerCloseText, { fontSize: 13 }]}>Close</Text>
+          </TouchableOpacity>
+        )}
 
-        <View style={styles.footerActionsGroup}>
-          {primary?.secondaryReject && (
-            <TouchableOpacity
-              onPress={() => setShowRejectBox(true)}
-              disabled={busy}
-              style={styles.footerRejectBtn}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name="x-circle" size={13} color="#DC2626" />
-              <Text style={styles.footerRejectText}>Reject Booking</Text>
-            </TouchableOpacity>
-          )}
-
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {primary?.secondaryReschedule && (
             <TouchableOpacity
               onPress={() => setShowRescheduleBox(!showRescheduleBox)}
               disabled={busy}
-              style={styles.footerRescheduleBtn}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: isDark ? '#373C42' : '#CBD5E1',
+                backgroundColor: isDark ? '#24272B' : '#F8FAFC',
+                cursor: 'pointer',
+              }}
               activeOpacity={0.8}
             >
-              <BootstrapIcon name="calendar-event" size={13} color={tokens?.textPrimary || '#0F172A'} />
-              <Text style={styles.footerRescheduleText}>Reschedule</Text>
+              <BootstrapIcon name="calendar-event" size={13} color={isDark ? tokens?.textPrimary : '#0F172A'} />
+              <Text style={{ fontSize: 13, fontWeight: '600', color: isDark ? tokens?.textPrimary : '#0F172A' }}>
+                Reschedule
+              </Text>
             </TouchableOpacity>
           )}
 
@@ -2108,6 +2824,22 @@ function AdminBookingDetailsPanelInner({
               activeOpacity={0.85}
               style={[
                 styles.footerPrimaryBtn,
+                {
+                  paddingHorizontal: 20,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                  backgroundColor: '#1E2227',
+                  borderWidth: 1,
+                  borderColor: '#373C42',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 7,
+                  cursor: 'pointer',
+                  shadowColor: '#000000',
+                  shadowOpacity: 0.15,
+                  shadowRadius: 4,
+                  shadowOffset: { width: 0, height: 2 },
+                },
                 primary.disabled && styles.footerPrimaryBtnDisabled,
                 busy && { opacity: 0.7 },
               ]}
@@ -2115,16 +2847,16 @@ function AdminBookingDetailsPanelInner({
               {busy ? (
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
-                <BootstrapIcon name={primary.icon || 'arrow-right-circle-fill'} size={14} color="#FFFFFF" />
+                <BootstrapIcon name={primary.icon || 'check2-circle'} size={14} color="#FFFFFF" />
               )}
-              <Text style={styles.footerPrimaryText}>
+              <Text style={{ fontSize: 13.5, fontWeight: '600', color: '#FFFFFF' }}>
                 {busy ? 'Working…' : primary.label}
               </Text>
             </TouchableOpacity>
           ) : (
-            <View style={styles.footerTerminalBadge}>
-              <Text style={styles.footerTerminalText}>
-                {normalizeBookingStatus(status) === FLEX_BOOKING_STATUS.COMPLETED
+            <View style={[styles.footerTerminalBadge, { paddingVertical: 5, paddingHorizontal: 10 }]}>
+              <Text style={[styles.footerTerminalText, { fontSize: 12 }]}>
+                {norm === FLEX_BOOKING_STATUS.COMPLETED
                   ? '✓ Handover Completed'
                   : 'No further action required'}
               </Text>
@@ -2132,7 +2864,6 @@ function AdminBookingDetailsPanelInner({
           )}
         </View>
       </View>
-
       {/* ─────────────────────────────────────────────────────────────
           MODAL: REJECT BOOKING REASON PROMPT
       ────────────────────────────────────────────────────────────── */}
@@ -2273,21 +3004,23 @@ function createStyles(t, isDark) {
       display: 'flex',
       flexDirection: 'column',
       minHeight: 0,
-      backgroundColor: isDark ? t.bgSub || '#0B1120' : '#F8FAFC',
+      backgroundColor: isDark ? (t.bgCard || '#0B1120') : '#FFFFFF',
     },
     scrollArea: {
       flex: 1,
     },
     scrollContent: {
-      padding: 22,
-      paddingBottom: 28,
+      paddingHorizontal: 14,
+      paddingTop: 10,
+      paddingBottom: 12,
     },
     fixedFooter: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 20,
-      paddingVertical: 12,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 8,
       borderTopWidth: 1,
       borderTopColor: isDark ? t.border || '#334155' : '#E2E8F0',
       backgroundColor: isDark ? t.bgCard || '#1E293B' : '#FFFFFF',
@@ -2355,7 +3088,9 @@ function createStyles(t, isDark) {
       paddingHorizontal: 18,
       paddingVertical: 9,
       borderRadius: 8,
-      backgroundColor: '#EA580C',
+      backgroundColor: '#1E2227',
+      borderWidth: 1,
+      borderColor: '#373C42',
       cursor: 'pointer',
     },
     footerPrimaryBtnDisabled: {

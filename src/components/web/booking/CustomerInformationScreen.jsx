@@ -41,6 +41,7 @@ export default function CustomerInformationScreen({
   onBack,
   onContinue,
   showToast,
+  onChangeBike,
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
@@ -184,19 +185,41 @@ export default function CustomerInformationScreen({
             </View>
           </View>
 
-          <View
-            style={{
-              backgroundColor: '#F8FAFC',
-              paddingHorizontal: 14,
-              paddingVertical: 7,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-            }}
-          >
-            <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>
-              Package rates calculated for <Text style={{ fontWeight: '700', color: '#0F172A', fontVariant: ['tabular-nums'] }}>{motoCc}cc</Text>
-            </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            <View
+              style={{
+                backgroundColor: '#F8FAFC',
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#E2E8F0',
+              }}
+            >
+              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>
+                Package rates calculated for <Text style={{ fontWeight: '700', color: '#0F172A', fontVariant: ['tabular-nums'] }}>{motoCc}cc</Text>
+              </Text>
+            </View>
+
+            {typeof onChangeBike === 'function' && (
+              <TouchableOpacity
+                onPress={onChangeBike}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                  borderRadius: 8,
+                  backgroundColor: '#FFF7ED',
+                  borderWidth: 1,
+                  borderColor: '#FED7AA',
+                  cursor: 'pointer',
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#EA580C' }}>
+                  Change Bike
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>

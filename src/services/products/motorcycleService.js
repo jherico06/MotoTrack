@@ -457,10 +457,10 @@ class MotorcycleService {
   /**
    * Set a motorcycle as the customer's primary ride
    */
-  async setPrimaryMotorcycle(motorcycleId, userId) {
+  async setPrimaryMotorcycle(motorcycleId, userId, customerEmail) {
     const updatedList = this.motorcycles.map((m) => ({
       ...m,
-      is_primary: m.motorcycle_id === motorcycleId,
+      is_primary: String(m.motorcycle_id || m.id) === String(motorcycleId),
     }));
     this._saveLocal(updatedList);
 
@@ -472,6 +472,12 @@ class MotorcycleService {
             .from('customer_motorcycles')
             .update({ is_primary: false })
             .eq('user_id', userId);
+        }
+        if (customerEmail) {
+          await client
+            .from('customer_motorcycles')
+            .update({ is_primary: false })
+            .ilike('customer_email', customerEmail);
         }
         await client
           .from('customer_motorcycles')

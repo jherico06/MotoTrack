@@ -19,7 +19,7 @@ import UserProfileDropdown from '../../../components/common/UserProfileDropdown.
 import UserProfileButton from '../../../components/common/UserProfileButton.jsx';
 import NotificationDropdown from '../../../components/common/NotificationDropdown.jsx';
 import CompatibilityIndicator from '../../../components/shop/CompatibilityIndicator.jsx';
-import CartModal from '../../../components/modals/CartModal.jsx';
+import CartPage from './CartPage.jsx';
 import CheckoutModal from '../../../components/modals/CheckoutModal.jsx';
 import GCashPaymentModal from '../../../components/modals/GCashPaymentModal.jsx';
 import ProductVariantPickerModal from '../../../components/modals/ProductVariantPickerModal.jsx';
@@ -35,6 +35,7 @@ import { useAuth } from '../../../context/AuthContext.jsx';
 import { useCart } from '../../../context/CartContext.jsx';
 import { useWishlist } from '../../../context/WishlistContext.jsx';
 import { useTheme } from '../../../context/ThemeContext.jsx';
+import { useWebSavedWishlistCount } from '../../../components/web/useWebSavedWishlistCount.js';
 
 import {
   getProductSizeEntries,
@@ -105,7 +106,8 @@ export default function ProductDetailsPageWeb({
 
   const { currentUser, logout, setRedirectReason } = useAuth();
   const { addToCart, cartItemCount, cartTotal, toastMessage, showToast } = useCart();
-  const { isWishlisted, toggleWishlist, wishlistCount } = useWishlist();
+  const { isWishlisted, toggleWishlist, wishlist } = useWishlist();
+  const savedWishlistCount = useWebSavedWishlistCount(wishlist);
   const { isDarkMode, toggleDarkMode, tokens } = useTheme();
 
   // Navigation state
@@ -137,6 +139,33 @@ export default function ProductDetailsPageWeb({
   const [activeBike, setActiveBike] = useState(() => {
     return userBikes.find((b) => b.is_primary) || userBikes[0] || null;
   });
+
+  // Compatibility matrix and active motorcycle sync
+  const [compatMap, setCompatMap] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const map = await compatibilityService.getCompatibilityMap?.();
+        if (alive && map) setCompatMap(map);
+        const userId = currentUser?.id || currentUser?.user_id || currentUser?.customer_id;
+        if (userId) {
+          const bike = await compatibilityService.getActiveMotorcycle?.(userId);
+          if (alive && bike) setActiveBike(bike);
+        }
+      } catch (_e) {}
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (userBikes.length > 0 && !activeBike) {
+      setActiveBike(userBikes.find((b) => b.is_primary) || userBikes[0] || null);
+    }
+  }, [userBikes, activeBike]);
 
   // Variant selections
   const [selectedSize, setSelectedSize] = useState('');
@@ -190,9 +219,12 @@ export default function ProductDetailsPageWeb({
 
   // Compatibility resolution
   const compatStatus = useMemo(() => {
-    if (!product || !activeBike) return COMPAT_STATUS.UNIVERSAL;
-    return compatibilityService.checkCompatibility(product, activeBike);
-  }, [product, activeBike]);
+    if (!product || !activeBike) return COMPAT_STATUS.UNIVERSAL || 'universal';
+    if (typeof compatibilityService?.checkCompatibility === 'function') {
+      return compatibilityService.checkCompatibility(product, activeBike, compatMap);
+    }
+    return product?.compatStatus || COMPAT_STATUS.UNAVAILABLE || 'unavailable';
+  }, [product, activeBike, compatMap]);
 
   // Price & Inventory calculations
   const productSoldOut = isProductSoldOut(product);
@@ -470,7 +502,7 @@ export default function ProductDetailsPageWeb({
               {[
                 { id: 'shop', label: 'Shop', active: true, onPress: onNavigateToStore },
                 { id: 'garage', label: 'Book a Service', onPress: () => onNavigateToScreen?.('garage') },
-                { id: 'appointments', label: 'Appointments', onPress: () => onNavigateToScreen?.('appointments') },
+                
                 { id: 'customizer', label: 'Customize', onPress: () => onNavigateToScreen?.('customizer') },
                 { id: 'orders', label: 'Orders', onPress: onNavigateToOrders },
               ].map((item) => (
@@ -508,9 +540,10 @@ export default function ProductDetailsPageWeb({
               }}
               onPress={onNavigateToWishlist}
               activeOpacity={0.8}
+              title="Saved Wishlist"
             >
-              <BootstrapIcon name="heart" size={16} color="#FFFFFF" />
-              {wishlistCount > 0 && (
+              <BootstrapIcon name="bookmark" size={16} color="#FFFFFF" />
+              {savedWishlistCount > 0 && (
                 <View
                   style={{
                     position: 'absolute',
@@ -525,7 +558,7 @@ export default function ProductDetailsPageWeb({
                     paddingHorizontal: 3,
                   }}
                 >
-                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFFFFF' }}>{wishlistCount}</Text>
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#FFFFFF' }}>{savedWishlistCount}</Text>
                 </View>
               )}
             </TouchableOpacity>)}
@@ -686,7 +719,7 @@ export default function ProductDetailsPageWeb({
                   <CompatibilityIndicator
                     status={compatStatus}
                     bike={activeBike}
-                    message={product.compatMessage}
+                    message={product?.compatMessage || (activeBike ? compatibilityService?.formatCompatMessage?.(compatStatus, activeBike) : '')}
                   />
                 </View>
 
@@ -709,11 +742,12 @@ export default function ProductDetailsPageWeb({
                   }}
                   onPress={() => toggleWishlist(product.id)}
                   activeOpacity={0.8}
+                  title={isFav ? "Saved to Wishlist" : "Save to Wishlist"}
                 >
                   <BootstrapIcon
-                    name={isFav ? 'heart-fill' : 'heart'}
+                    name={isFav ? 'bookmark-fill' : 'bookmark'}
                     size={16}
-                    color={isFav ? '#EF4444' : '#64748B'}
+                    color={isFav ? '#EA580C' : '#64748B'}
                   />
                 </TouchableOpacity>
 
@@ -1116,7 +1150,7 @@ export default function ProductDetailsPageWeb({
                       backgroundColor: isDarkMode ? '#1E293B' : '#FFF7ED',
                       borderWidth: 1.5,
                       borderColor: '#EA580C',
-                      borderRadius: 12,
+                      borderRadius: 8,
                       paddingVertical: 13,
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -1136,7 +1170,7 @@ export default function ProductDetailsPageWeb({
                     style={{
                       flex: 1,
                       backgroundColor: '#EA580C',
-                      borderRadius: 12,
+                      borderRadius: 8,
                       paddingVertical: 13,
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -1228,6 +1262,25 @@ export default function ProductDetailsPageWeb({
                               {rev.comment}
                             </Text>
                           ) : null}
+                          {Array.isArray(rev.photos) && rev.photos.length > 0 && (
+                            <View style={{ flexDirection: 'row', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                              {rev.photos.map((pUri, pIdx) => (
+                                <Image
+                                  key={pIdx}
+                                  source={{ uri: pUri }}
+                                  style={{
+                                    width: 58,
+                                    height: 58,
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: isDarkMode ? '#2D3742' : '#E2E8F0',
+                                    backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                                  }}
+                                  resizeMode="cover"
+                                />
+                              ))}
+                            </View>
+                          )}
                         </View>
                       ))}
                     </View>
@@ -1275,7 +1328,7 @@ export default function ProductDetailsPageWeb({
                 borderColor: '#EA580C',
                 paddingHorizontal: isSmallMobile ? 12 : 16,
                 paddingVertical: 10,
-                borderRadius: 10,
+                borderRadius: 8,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 6,
@@ -1292,7 +1345,7 @@ export default function ProductDetailsPageWeb({
                 backgroundColor: '#EA580C',
                 paddingHorizontal: isSmallMobile ? 14 : 20,
                 paddingVertical: 10,
-                borderRadius: 10,
+                borderRadius: 8,
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 6,
@@ -1308,13 +1361,18 @@ export default function ProductDetailsPageWeb({
       )}
 
       {/* ─── MODALS ─── */}
-      <CartModal
+      <CartPage
         visible={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         onProceedToCheckout={() => {
           setIsCartOpen(false);
           setIsCheckoutOpen(true);
         }}
+        onNavigateToStore={onNavigateToStore}
+        onNavigateToWishlist={onNavigateToWishlist}
+        onNavigateToOrders={onNavigateToOrders}
+        onNavigateToLogin={onNavigateToLogin}
+        onNavigateToScreen={onNavigateToScreen}
       />
 
       <CheckoutModal

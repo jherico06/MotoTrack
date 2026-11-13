@@ -802,9 +802,6 @@ export default function ModernOverviewDashboard({
               <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
                 Revenue overview
               </Text>
-              <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
-                Sales performance over time
-              </Text>
             </View>
 
             {/* Clean Capsule: Daily | Weekly | Monthly */}
@@ -1060,9 +1057,6 @@ export default function ModernOverviewDashboard({
                 <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
                   Order pipeline
                 </Text>
-                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
-                  Open orders by stage
-                </Text>
               </View>
               <TouchableOpacity
                 onPress={() => setActiveNav('orders')}
@@ -1174,9 +1168,6 @@ export default function ModernOverviewDashboard({
           <View>
             <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
               Sales Performance
-            </Text>
-            <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
-              Executive revenue telemetry and order benchmarks across operational periods
             </Text>
           </View>
           <TouchableOpacity onPress={() => setActiveNav('analytics')} style={{ cursor: 'pointer' }}>
@@ -1408,9 +1399,6 @@ export default function ModernOverviewDashboard({
                 <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
                   Workshop Appointments
                 </Text>
-                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
-                  Live pit crew & service bay status
-                </Text>
               </View>
               <TouchableOpacity onPress={() => setActiveNav('garage')} style={{ cursor: 'pointer' }}>
                 <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#EA580C' }}>
@@ -1534,9 +1522,6 @@ export default function ModernOverviewDashboard({
                 <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
                   Revenue by channel
                 </Text>
-                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
-                  Multi-channel distribution
-                </Text>
               </View>
               <TouchableOpacity onPress={() => setActiveNav('analytics')} style={{ cursor: 'pointer' }}>
                 <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#EA580C' }}>Reports</Text>
@@ -1595,9 +1580,6 @@ export default function ModernOverviewDashboard({
               <View>
                 <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
                   Top sellers
-                </Text>
-                <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
-                  Units sold across catalog
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setActiveNav('products')} style={{ cursor: 'pointer' }}>
@@ -1682,9 +1664,6 @@ export default function ModernOverviewDashboard({
           <View>
             <Text style={{ fontSize: 16, fontWeight: '700', color: theme.textPrimary, letterSpacing: -0.2 }}>
               Recent Orders & POS Sales
-            </Text>
-            <Text style={{ fontSize: 12, color: theme.textMuted, marginTop: 2 }}>
-              Transactions across online store and cashier POS, newest first
             </Text>
           </View>
 

@@ -19,11 +19,15 @@ import BookingProgressIndicator from './BookingProgressIndicator.jsx';
 import PackageCard from './PackageCard.jsx';
 import PackageDetailsModal from './PackageDetailsModal.jsx';
 import AdminPackageEditorModal from './AdminPackageEditorModal.jsx';
+import CustomerMotorcyclesModal from './CustomerMotorcyclesModal.jsx';
 import CustomerInformationScreen from './CustomerInformationScreen.jsx';
 import BookingInformationScreen from './BookingInformationScreen.jsx';
 import BookingReviewScreen from './BookingReviewScreen.jsx';
+import BookingPaymentScreen from './BookingPaymentScreen.jsx';
 import BookingSuccessScreen from './BookingSuccessScreen.jsx';
 import { garageService } from '../../../services/bookings/garageService.js';
+import { xenditPaymentService } from '../../../services/payments/xenditPaymentService.js';
+import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import { pmsPricingService } from '../../../services/bookings/pmsPricingService.js';
 import { DEFAULT_PMS_SERVICES } from '../../../utils/pmsCcPricing.js';
 import { motorcycleService } from '../../../services/products/motorcycleService.js';
@@ -31,10 +35,11 @@ import { motorcycleService } from '../../../services/products/motorcycleService.
 export default function PackageFirstBookingWorkflow({
   currentUser,
   garageMotorcycles = [],
-  existingBookings: _existingBookings = [],
+  existingBookings = [],
   onAddNewMotorcycle: _onAddNewMotorcycle,
   onBookingCreated,
   onViewBookingDetails,
+  onNavigateToAppointments,
   onNavigateToLogin: _onNavigateToLogin,
   onNavigateToStore: _onNavigateToStore,
   showToast,
@@ -44,11 +49,13 @@ export default function PackageFirstBookingWorkflow({
 }) {
   // ─── STEPPER STATE (4 CLEAN STEPS) ───
   // Step 1: Choose Service
-  // Step 2: Motorcycle
-  // Step 3: Schedule
-  // Step 4: Confirm (Review & Payment)
-  // Step 5: Success
+  // Step 2: Rider Info & Motorcycle
+  // Step 3: Schedule & Venue
+  // Step 4: Review Booking
+  // Step 5: Downpayment Checkout
+  // Step 6: Success
   const [currentStep, setCurrentStep] = useState(1);
+  const [downpaymentData, setDownpaymentData] = useState(null);
 
   // ─── SEARCH & FILTER STATE ───
   const [internalSearchQuery, setInternalSearchQuery] = useState('');
@@ -94,6 +101,7 @@ export default function PackageFirstBookingWorkflow({
 
   // ─── MOTORCYCLE STATE (STEP 2: AUTO-BINDS TO PRIMARY MOTORCYCLE) ───
   const [selectedMotorcycleId, setSelectedMotorcycleId] = useState('');
+  const [isChangeBikeModalOpen, setIsChangeBikeModalOpen] = useState(false);
 
   // ─── CUSTOMER CONTACT INFORMATION (STEP 2) ───
   const [firstName, setFirstName] = useState(() => {
@@ -220,17 +228,35 @@ export default function PackageFirstBookingWorkflow({
 
   // Combined list of user's garage motorcycles
   const allMotorcycles = useMemo(() => {
+    let list = [];
     if (Array.isArray(garageMotorcycles) && garageMotorcycles.length > 0) {
-      return garageMotorcycles;
-    }
-    if (currentUser) {
+      list = [...garageMotorcycles];
+    } else if (currentUser) {
       try {
-        return motorcycleService.getMotorcycles(currentUser) || [];
+        list = motorcycleService.getMotorcycles(currentUser) || [];
       } catch (_e) {
-        return [];
+        list = [];
       }
     }
-    return [];
+    if (list.length === 0 && currentUser) {
+      try {
+        list = motorcycleService.getAllMotorcycles() || [];
+      } catch (_e) { }
+    }
+    if (list.length === 0) {
+      list = [
+        {
+          motorcycle_id: 'moto-adv160-default',
+          brand: 'Honda',
+          model: 'ADV 160',
+          engine_cc: 160,
+          plate_number: 'N/A-RJCX',
+          year: 2024,
+          is_primary: true,
+        },
+      ];
+    }
+    return list;
   }, [garageMotorcycles, currentUser]);
 
   // Primary motorcycle in fleet
@@ -299,6 +325,58 @@ export default function PackageFirstBookingWorkflow({
     });
   }, [packagesCatalog, selectedCategory, searchQuery]);
 
+  // ─── SWITCH & REGISTER PRIMARY MOTORCYCLE (DYNAMIC CC RATES) ───
+  const handleSelectMotorcycle = async (bike) => {
+    if (!bike) return;
+    const bikeId = bike.motorcycle_id || bike.id;
+    const rawCc =
+      bike.engine_displacement ??
+      bike.engine_cc ??
+      bike.engineCc ??
+      bike.cc ??
+      parseInt((bike.model || '').match(/\b(\d{2,4})\b/)?.[1] || '150', 10);
+    const bikeCc = parseInt(rawCc, 10) || 150;
+
+    // Immediately update active selected bike in workflow
+    setSelectedMotorcycleId(bikeId);
+
+    // Automatically make this motorcycle the customer's primary bike
+    try {
+      const uid = currentUser?.id || currentUser?.user_id;
+      const uemail = currentUser?.email;
+      await motorcycleService.setPrimaryMotorcycle(bikeId, uid, uemail);
+      if (bike.motorcycle_id) {
+        await motorcycleService.updateMotorcycle(bike.motorcycle_id, { is_primary: true });
+      }
+    } catch (err) {
+      console.warn('[PackageFirstBookingWorkflow] Error persisting primary bike:', err);
+    }
+
+    showToast?.(`✓ ${bike.brand} ${bike.model} (${bikeCc} CC) set as primary ride. Package rates updated!`);
+    setIsChangeBikeModalOpen(false);
+  };
+
+  const handleAddNewMotorcycle = async (newBikeData) => {
+    const uid = currentUser?.id || currentUser?.user_id || 'usr-rider-01';
+    const uemail = currentUser?.email || 'jhericomaurin67@gmail.com';
+    const res = await motorcycleService.addMotorcycle({
+      ...newBikeData,
+      user_id: uid,
+      customer_email: uemail,
+      is_primary: true,
+    });
+
+    if (res?.success && res?.motorcycle) {
+      const newBikeId = res.motorcycle.motorcycle_id || res.motorcycle.id;
+      setSelectedMotorcycleId(newBikeId);
+      const cc = res.motorcycle.engine_cc || newBikeData.engine_cc;
+      showToast?.(`✓ Registered ${res.motorcycle.brand} ${res.motorcycle.model} (${cc} CC) as primary bike! Service rates updated.`);
+      setIsChangeBikeModalOpen(false);
+    } else {
+      throw new Error(res?.warning || 'Could not register motorcycle.');
+    }
+  };
+
   // Display all active packages matching category and search query
   const displayPackages = useMemo(() => {
     return filteredPackages;
@@ -311,7 +389,7 @@ export default function PackageFirstBookingWorkflow({
       selectedMotorcycle?.engine_cc ??
       selectedMotorcycle?.engineCc ??
       selectedMotorcycle?.cc ??
-      0;
+      parseInt((selectedMotorcycle?.model || '').match(/\b(\d{2,4})\b/)?.[1] || '0', 10);
     const engineCc = parseInt(rawCc, 10) || 0;
 
     let matchedCategory = '125cc and below';
@@ -319,11 +397,11 @@ export default function PackageFirstBookingWorkflow({
     if (engineCc <= 125) {
       matchedCategory = '125cc and below';
       matchedCategoryId = 'cc-125-below';
-    } else if (engineCc <= 160) {
+    } else if (engineCc < 200) {
       matchedCategory = '150cc–160cc';
       matchedCategoryId = 'cc-150-160';
-    } else if (engineCc > 160) {
-      matchedCategory = 'Big Bikes';
+    } else {
+      matchedCategory = 'Big Bikes (200cc+)';
       matchedCategoryId = 'cc-big-bikes';
     }
 
@@ -347,7 +425,9 @@ export default function PackageFirstBookingWorkflow({
     });
 
     const subtotal = items.reduce((sum, item) => sum + item.price, 0);
-    const downpaymentAmount = Math.round(subtotal * 0.2);
+    const adminSettings = systemSettingsService.getSettings();
+    const adminDpPct = Number.isFinite(Number(adminSettings?.downpaymentPercent)) ? Number(adminSettings.downpaymentPercent) : 20;
+    const downpaymentAmount = Math.round(subtotal * (adminDpPct / 100));
     const balanceRemaining = subtotal - downpaymentAmount;
 
     return {
@@ -375,7 +455,7 @@ export default function PackageFirstBookingWorkflow({
   };
 
   // ─── FINAL BOOKING SUBMISSION ───
-  const handleConfirmBooking = async () => {
+  const handleConfirmBooking = async (paymentDetails) => {
     if (!selectedPackages.length || !selectedMotorcycle) {
       showToast?.('Please ensure package(s) and motorcycle are selected.');
       return;
@@ -391,7 +471,12 @@ export default function PackageFirstBookingWorkflow({
       );
 
       const calculatedSubtotal = pricingData?.subtotal ?? selectedPackagesSubtotal;
-      const downpayment = pricingData?.downpaymentAmount ?? Math.round(calculatedSubtotal * 0.2);
+      const adminSettings = systemSettingsService.getSettings();
+      const adminDpPct = Number.isFinite(Number(adminSettings?.downpaymentPercent)) ? Number(adminSettings.downpaymentPercent) : 20;
+      const downpaymentPercent = paymentDetails?.downpaymentPercent ?? adminDpPct;
+      const downpayment = paymentDetails?.downpaymentAmount ?? Math.round(calculatedSubtotal * (downpaymentPercent / 100));
+      const remainingBalance = paymentDetails?.remainingBalance ?? Math.max(0, calculatedSubtotal - downpayment);
+      const chosenPaymentMethod = paymentDetails?.paymentMethod || paymentMethod || 'GCash';
 
       const bookingPayload = {
         booking_mode: 'package',
@@ -408,10 +493,20 @@ export default function PackageFirstBookingWorkflow({
         estimated_total: calculatedSubtotal,
         total_amount: calculatedSubtotal,
         downpayment_amount: downpayment,
-        downpayment_required: paymentMethod !== 'Cash',
-        downpayment_method: paymentMethod,
-        downpayment_ref: paymentMethod === 'GCash' ? gcashReference : null,
-        payment_method: paymentMethod,
+        downpayment_percent: downpaymentPercent,
+        remaining_balance: remainingBalance,
+        downpayment_required: true,
+        downpayment_status: 'Paid',
+        downpayment_paid: true,
+        amount_paid: downpayment,
+        downpayment_paid_at: new Date().toISOString(),
+        downpayment_channel: paymentDetails?.paymentMethod || paymentMethod,
+        downpayment_method: paymentDetails?.paymentMethod || paymentMethod,
+        downpayment_ref: paymentDetails?.transactionRef || (paymentMethod === 'GCash' ? gcashReference : null),
+        payment_method: paymentDetails?.paymentMethod || paymentMethod,
+        payment_status: 'DOWNPAYMENT_PAID',
+        deposit_paid: true,
+        transaction_ref: paymentDetails?.transactionRef || null,
         motorcycle_id: selectedMotorcycle.motorcycle_id || selectedMotorcycle.id,
         motorcycle_cc: engineCc,
         cc_category_id:
@@ -428,7 +523,7 @@ export default function PackageFirstBookingWorkflow({
         customer_notes: customerNotes,
         additional_notes: customerNotes,
         photos: motorcyclePhotos,
-        status: 'pending',
+        status: 'Reserved',
         user_id: currentUser?.id || currentUser?.user_id,
         customer_name: `${firstName} ${lastName}`.trim() || currentUser?.name || currentUser?.fullName || 'Valued Customer',
         customer_email: email || currentUser?.email || '',
@@ -438,15 +533,33 @@ export default function PackageFirstBookingWorkflow({
 
       const result = await garageService.addBooking(bookingPayload);
       if (result && (result.id || result.booking_id)) {
+        const createdBookingId = result.id || result.booking_id;
         const finalBooking = {
           ...bookingPayload,
           ...result,
-          bookingReference: result.id || result.booking_id,
+          bookingReference: createdBookingId,
         };
+
+        // Record the transaction in Supabase payments table linked to the created booking
+        try {
+          await xenditPaymentService.recordPaymentTransaction({
+            bookingId: createdBookingId,
+            customerId: bookingPayload.user_id,
+            amount: downpayment,
+            paymentMethod: chosenPaymentMethod,
+            referenceNumber: paymentDetails?.transactionRef || (chosenPaymentMethod.includes('GCash') ? gcashReference : `XND-${Date.now()}`),
+            transactionRef: paymentDetails?.transactionRef,
+            status: 'Completed',
+            notes: `Downpayment for booking #${createdBookingId} via ${chosenPaymentMethod}`,
+          });
+        } catch (dbErr) {
+          console.warn('[PackageFirstBookingWorkflow] Database payment log notice:', dbErr);
+        }
+
         setSubmittedBookingResult(finalBooking);
         onBookingCreated?.(finalBooking);
-        setCurrentStep(5); // Show success screen
-        showToast?.('Booking request submitted! Status: Pending Review.');
+        setCurrentStep(6); // Show success screen
+        showToast?.('Downpayment processed! Your slot is guaranteed.');
       } else {
         throw new Error(result?.error || 'Could not save service booking.');
       }
@@ -460,8 +573,8 @@ export default function PackageFirstBookingWorkflow({
 
   return (
     <View style={{ flex: 1, backgroundColor: 'transparent', minHeight: '100vh', width: '100%' }}>
-      {/* ─── 1. HORIZONTAL 4-STEP BOOKING PROGRESS INDICATOR ─── */}
-      {currentStep <= 4 && (
+      {/* ─── 1. HORIZONTAL 5-STEP BOOKING PROGRESS INDICATOR ─── */}
+      {currentStep <= 5 && (
         <BookingProgressIndicator
           currentStep={currentStep}
           onStepClick={(stepId) => {
@@ -469,12 +582,14 @@ export default function PackageFirstBookingWorkflow({
             else if (stepId === 2 && selectedPackageIds.length > 0) setCurrentStep(2);
             else if (stepId === 3 && firstName.trim() && lastName.trim() && mobileNumber.trim()) setCurrentStep(3);
             else if (stepId === 4 && preferredDate && preferredTimeSlot) setCurrentStep(4);
+            else if (stepId === 5 && preferredDate && preferredTimeSlot) setCurrentStep(5);
           }}
           canNavigateToStep={(stepId) => {
             if (stepId === 1) return true;
             if (stepId === 2) return selectedPackageIds.length > 0;
             if (stepId === 3) return selectedPackageIds.length > 0 && !!firstName.trim() && !!lastName.trim();
             if (stepId === 4) return selectedPackageIds.length > 0 && !!preferredDate && !!preferredTimeSlot;
+            if (stepId === 5) return selectedPackageIds.length > 0 && !!preferredDate && !!preferredTimeSlot;
             return false;
           }}
         />
@@ -586,6 +701,70 @@ export default function PackageFirstBookingWorkflow({
                   </TouchableOpacity>
                 );
               })}
+
+              {/* ─── VIEW BOOKING BUTTON (BESIDE PMS & REPAIR) ─── */}
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 14,
+                  paddingVertical: 7,
+                  borderRadius: 8,
+                  backgroundColor: '#FFFFFF',
+                  borderWidth: 1,
+                  borderColor: '#EA580C',
+                  cursor: 'pointer',
+                  shadowColor: '#EA580C',
+                  shadowOpacity: 0.08,
+                  shadowRadius: 6,
+                  shadowOffset: { width: 0, height: 1 },
+                }}
+                onPress={() => {
+                  if (onNavigateToAppointments) {
+                    onNavigateToAppointments();
+                  } else if (onViewBookingDetails) {
+                    onViewBookingDetails();
+                  }
+                }}
+                activeOpacity={0.8}
+                title="View Appointments & Bookings"
+              >
+                <BootstrapIcon
+                  name="calendar-check"
+                  size={12}
+                  color="#EA580C"
+                />
+                <Text
+                  style={{
+                    fontSize: 12.5,
+                    fontWeight: '700',
+                    color: '#EA580C',
+                  }}
+                >
+                  View Booking
+                </Text>
+                {existingBookings.length > 0 && (
+                  <View
+                    style={{
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
+                      borderRadius: 8,
+                      backgroundColor: '#EA580C',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10.5,
+                        fontWeight: '700',
+                        color: '#FFFFFF',
+                      }}
+                    >
+                      {existingBookings.length}
+                    </Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
 
             {/* Active Motorcycle CC Pricing Indicator Banner */}
@@ -614,7 +793,7 @@ export default function PackageFirstBookingWorkflow({
                   </Text>
                 </View>
                 <TouchableOpacity
-                  onPress={() => setCurrentStep(2)}
+                  onPress={() => setIsChangeBikeModalOpen(true)}
                   style={{
                     paddingHorizontal: 12,
                     paddingVertical: 5,
@@ -624,6 +803,7 @@ export default function PackageFirstBookingWorkflow({
                     borderColor: '#FED7AA',
                     cursor: 'pointer',
                   }}
+                  activeOpacity={0.8}
                 >
                   <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#EA580C' }}>
                     Change Bike
@@ -876,7 +1056,7 @@ export default function PackageFirstBookingWorkflow({
           />
         )}
 
-        {/* ─── STEP 4: CONFIRM & BOOKING REVIEW ─── */}
+        {/* ─── STEP 4: REVIEW BOOKING ─── */}
         {currentStep === 4 && (
           <BookingReviewScreen
             currentUser={currentUser}
@@ -898,8 +1078,18 @@ export default function PackageFirstBookingWorkflow({
             motorcyclePhotos={motorcyclePhotos}
             isSubmitting={isSubmitting}
             onBack={() => setCurrentStep(3)}
-            onConfirmBooking={handleConfirmBooking}
-            onConfirm={handleConfirmBooking}
+            onProceedToPayment={(dpData) => {
+              setDownpaymentData(dpData);
+              setCurrentStep(5);
+            }}
+            onConfirmBooking={(dpData) => {
+              setDownpaymentData(dpData);
+              setCurrentStep(5);
+            }}
+            onConfirm={(dpData) => {
+              setDownpaymentData(dpData);
+              setCurrentStep(5);
+            }}
             onEditSection={(sectionKey) => {
               if (sectionKey === 'packages' || sectionKey === 1 || sectionKey === 0) setCurrentStep(1);
               else if (sectionKey === 'motorcycle' || sectionKey === 2 || sectionKey === 'riderInfo') setCurrentStep(2);
@@ -908,10 +1098,37 @@ export default function PackageFirstBookingWorkflow({
           />
         )}
 
-        {/* ─── STEP 5: BOOKING SUCCESS ─── */}
-        {currentStep === 5 && submittedBookingResult && (
+        {/* ─── STEP 5: DOWNPAYMENT CHECKOUT ─── */}
+        {currentStep === 5 && (
+          <BookingPaymentScreen
+            currentUser={currentUser}
+            firstName={firstName}
+            lastName={lastName}
+            mobileNumber={mobileNumber}
+            email={email}
+            selectedMotorcycle={selectedMotorcycle}
+            selectedPackages={selectedPackages}
+            pricingData={pricingData}
+            preferredDate={preferredDate}
+            preferredTimeSlot={preferredTimeSlot}
+            downpaymentData={downpaymentData}
+            isSubmitting={isSubmitting}
+            onBack={() => setCurrentStep(4)}
+            onCompletePayment={handleConfirmBooking}
+            showToast={showToast}
+          />
+        )}
+
+        {/* ─── STEP 6: BOOKING SUCCESS ─── */}
+        {currentStep === 6 && submittedBookingResult && (
           <BookingSuccessScreen
             bookingResult={submittedBookingResult}
+            selectedMotorcycle={selectedMotorcycle}
+            selectedPackages={selectedPackages}
+            pricingData={pricingData}
+            preferredDate={preferredDate}
+            preferredTimeSlot={preferredTimeSlot}
+            paymentMethod={paymentMethod}
             onViewDetails={() => onViewBookingDetails?.(submittedBookingResult)}
             onBookAnother={() => {
               setSelectedPackageIds([]);
@@ -989,6 +1206,16 @@ export default function PackageFirstBookingWorkflow({
           showToast?.(`Service package "${updatedPkgData.title}" saved successfully!`);
           setEditingAdminPackage(null);
         }}
+      />
+
+      {/* ─── MODAL: SWITCH / SELECT PRIMARY MOTORCYCLE ─── */}
+      <CustomerMotorcyclesModal
+        visible={isChangeBikeModalOpen}
+        onClose={() => setIsChangeBikeModalOpen(false)}
+        motorcycles={allMotorcycles}
+        selectedMotorcycleId={selectedMotorcycleId}
+        onSelectMotorcycle={handleSelectMotorcycle}
+        onAddNewMotorcycle={handleAddNewMotorcycle}
       />
     </View>
   );

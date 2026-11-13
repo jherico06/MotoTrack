@@ -1,16 +1,228 @@
 import React, { createContext, useContext, useState, useMemo, useRef, useEffect } from 'react';
+import { Platform } from 'react-native';
+import { useAuth } from './AuthContext.jsx';
 import { promoService, PROMO_TYPES } from '../services/products/promoService.js';
-import { cartLineKey, isSizeSoldOut, productNeedsSizes, withSelectedSize } from '../utils/productSizes.js';
+import {
+  cartLineKey,
+  getSizeStock,
+  isSizeSoldOut,
+  productNeedsSizes,
+  withSelectedSize,
+} from '../utils/productSizes.js';
 
 const CartContext = createContext(null);
+const WEB_CART_STORAGE_PREFIX = 'mototrack_web_cart_v1_';
 
 function lineKeyOf(item) {
-  return cartLineKey(item.product?.id, item.size || item.product?.selectedSize || '');
+  return cartLineKey(item.product?.id ?? item.product?.product_id, item.size || item.product?.selectedSize || '');
+}
+
+function isWebLocalStorageAvailable() {
+  return (
+    Platform.OS === 'web' &&
+    typeof window !== 'undefined' &&
+    typeof window.localStorage !== 'undefined' &&
+    window.localStorage !== null
+  );
+}
+
+function getWebCartStorageKey(ownerKey) {
+  return `${WEB_CART_STORAGE_PREFIX}${ownerKey || 'guest'}`;
+}
+
+function stripDataUri(value) {
+  if (typeof value !== 'string') return '';
+  const trimmed = value.trim();
+  if (!trimmed || /^data:/i.test(trimmed)) return '';
+  return trimmed;
+}
+
+/**
+ * Strip inline data: base64 image URIs before persisting to browser storage
+ * to prevent storage quota failures.
+ */
+function sanitizeProductForStorage(product, { minimal = false } = {}) {
+  if (!product || typeof product !== 'object') return null;
+  const pid = product.id ?? product.product_id ?? null;
+  if (pid == null) return null;
+
+  const cleanImage = stripDataUri(product.image);
+  const cleanImageUrl = stripDataUri(product.image_url);
+  const cleanThumb = stripDataUri(product.thumbnail);
+  const resolvedImage = cleanImage || cleanImageUrl || cleanThumb || '';
+
+  if (minimal) {
+    return {
+      id: pid,
+      product_id: product.product_id ?? pid,
+      name: product.name || 'Item',
+      brand: product.brand || '',
+      category: product.category || '',
+      price: Number(product.price) || 0,
+      basePrice: product.basePrice,
+      stock: product.stock,
+      selectedSize: product.selectedSize || '',
+      sizes: Array.isArray(product.sizes) ? product.sizes : undefined,
+      sizeOptions: product.sizeOptions,
+      size_options: product.size_options,
+      sizeStocks: product.sizeStocks || product.size_stocks || undefined,
+      image: resolvedImage,
+    };
+  }
+
+  const next = {
+    ...product,
+    id: pid,
+    image: resolvedImage,
+  };
+  if ('image_url' in next) next.image_url = cleanImageUrl;
+  if ('imageUrl' in next) next.imageUrl = stripDataUri(next.imageUrl);
+  if ('thumbnail' in next) next.thumbnail = cleanThumb;
+  if (Array.isArray(next.images)) {
+    next.images = next.images.map(stripDataUri).filter(Boolean).slice(0, 6);
+  }
+  return next;
+}
+
+function resolvePositiveMaxStock(product, size) {
+  const rawStock = size ? getSizeStock(product, size) : Number(product?.stock);
+  return Number.isFinite(rawStock) && rawStock > 0 ? rawStock : Infinity;
+}
+
+function normalizePersistedCartItems(rawItems) {
+  if (!Array.isArray(rawItems)) return [];
+  const normalized = [];
+  const seen = new Set();
+
+  for (const raw of rawItems) {
+    if (!raw || typeof raw !== 'object' || !raw.product) continue;
+    const cleanProduct = sanitizeProductForStorage(raw.product);
+    if (!cleanProduct) continue;
+
+    const size = String(raw.size || cleanProduct.selectedSize || '').trim();
+    const key = cartLineKey(cleanProduct.id, size);
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const sizedProduct = size ? withSelectedSize(cleanProduct, size) : cleanProduct;
+    const maxStock = resolvePositiveMaxStock(sizedProduct, size);
+    const quantity = Math.min(Math.max(1, Math.floor(Number(raw.quantity) || 1)), maxStock);
+
+    normalized.push({
+      product: sizedProduct,
+      quantity,
+      size,
+      lineKey: key,
+    });
+  }
+  return normalized;
+}
+
+function loadWebCartState(ownerKey) {
+  if (!isWebLocalStorageAvailable()) {
+    return { cart: [], selectedLineKeys: [] };
+  }
+  try {
+    const raw = window.localStorage.getItem(getWebCartStorageKey(ownerKey));
+    if (!raw) return { cart: [], selectedLineKeys: [] };
+    const parsed = JSON.parse(raw);
+    const items = normalizePersistedCartItems(Array.isArray(parsed) ? parsed : parsed?.cart);
+    const validKeySet = new Set(items.map((item) => lineKeyOf(item)));
+    const storedSelection = Array.isArray(parsed?.selectedLineKeys)
+      ? parsed.selectedLineKeys.map(String).filter((k) => validKeySet.has(k))
+      : items.map((item) => lineKeyOf(item));
+    return { cart: items, selectedLineKeys: storedSelection };
+  } catch (_e) {
+    return { cart: [], selectedLineKeys: [] };
+  }
+}
+
+function saveWebCartState(ownerKey, cartItems, selectedLineKeys) {
+  if (!isWebLocalStorageAvailable()) return;
+  const storageKey = getWebCartStorageKey(ownerKey);
+  const validCart = normalizePersistedCartItems(cartItems);
+
+  if (validCart.length === 0) {
+    try {
+      window.localStorage.removeItem(storageKey);
+    } catch (_e) {}
+    return;
+  }
+
+  const validKeySet = new Set(validCart.map((item) => lineKeyOf(item)));
+  const cleanSelection = (Array.isArray(selectedLineKeys) ? selectedLineKeys : [])
+    .map(String)
+    .filter((k) => validKeySet.has(k));
+
+  const serialize = (minimal) =>
+    JSON.stringify({
+      cart: validCart.map((item) => ({
+        product: sanitizeProductForStorage(item.product, { minimal }),
+        quantity: item.quantity,
+        size: item.size || '',
+        lineKey: item.lineKey || lineKeyOf(item),
+      })),
+      selectedLineKeys: cleanSelection,
+      updatedAt: Date.now(),
+    });
+
+  try {
+    window.localStorage.setItem(storageKey, serialize(false));
+  } catch (_quotaErr) {
+    try {
+      window.localStorage.setItem(storageKey, serialize(true));
+    } catch (_e) {}
+  }
+}
+
+function mergeGuestCartIntoUserState(guestItems, guestSelectedKeys, userState) {
+  const merged = [...(userState.cart || [])];
+  const mergedMap = new Map(merged.map((item, idx) => [lineKeyOf(item), idx]));
+
+  for (const guestItem of normalizePersistedCartItems(guestItems)) {
+    const key = lineKeyOf(guestItem);
+    const existingIdx = mergedMap.get(key);
+    if (existingIdx != null) {
+      const existing = merged[existingIdx];
+      const maxStock = resolvePositiveMaxStock(
+        existing.product || guestItem.product,
+        existing.size || guestItem.size || ''
+      );
+      merged[existingIdx] = {
+        ...existing,
+        quantity: Math.min(existing.quantity + guestItem.quantity, maxStock),
+      };
+    } else {
+      mergedMap.set(key, merged.length);
+      merged.push(guestItem);
+    }
+  }
+
+  const validKeys = new Set(merged.map((item) => lineKeyOf(item)));
+  const selectionSet = new Set([
+    ...(userState.selectedLineKeys || []).filter((k) => validKeys.has(k)),
+    ...(guestSelectedKeys || []).filter((k) => validKeys.has(k)),
+  ]);
+
+  return {
+    cart: merged,
+    selectedLineKeys: Array.from(selectionSet),
+  };
 }
 
 export function CartProvider({ children }) {
-  const [cart, setCart] = useState([]);
-  const [selectedLineKeys, setSelectedLineKeys] = useState([]);
+  const { currentUser } = useAuth();
+  const cartOwnerKey = currentUser?.id ? String(currentUser.id) : 'guest';
+
+  const initialWebStateRef = useRef(null);
+  if (initialWebStateRef.current === null) {
+    initialWebStateRef.current = loadWebCartState(cartOwnerKey);
+  }
+
+  const [cart, setCart] = useState(() => initialWebStateRef.current.cart);
+  const [selectedLineKeys, setSelectedLineKeys] = useState(
+    () => initialWebStateRef.current.selectedLineKeys
+  );
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromoId, setAppliedPromoId] = useState(null);
   const [appliedPromoMeta, setAppliedPromoMeta] = useState(null);
@@ -23,9 +235,47 @@ export function CartProvider({ children }) {
   const [toastMessage, setToastMessage] = useState('');
 
   const shippingRate = 150;
-  const selectionInitializedRef = useRef(false);
+  const selectionInitializedRef = useRef(initialWebStateRef.current.cart.length > 0);
+  const prevOwnerRef = useRef(cartOwnerKey);
+  const cartSnapshotRef = useRef({ cart, selectedLineKeys });
+  cartSnapshotRef.current = { cart, selectedLineKeys };
   const revalidateTimerRef = useRef(null);
   const isFreeShipping = promoFreeShipping || autoFreeShipping;
+
+  // Handle web user sign-in / sign-out / account transitions without leaking across users
+  useEffect(() => {
+    if (!isWebLocalStorageAvailable()) return;
+    const prevOwner = prevOwnerRef.current;
+    if (prevOwner === cartOwnerKey) return;
+
+    const { cart: prevCart, selectedLineKeys: prevSelected } = cartSnapshotRef.current;
+    prevOwnerRef.current = cartOwnerKey;
+
+    if (prevOwner === 'guest' && cartOwnerKey !== 'guest' && prevCart.length > 0) {
+      const userSaved = loadWebCartState(cartOwnerKey);
+      const merged = mergeGuestCartIntoUserState(prevCart, prevSelected, userSaved);
+      try {
+        window.localStorage.removeItem(getWebCartStorageKey('guest'));
+      } catch (_e) {}
+      selectionInitializedRef.current = merged.cart.length > 0;
+      setCart(merged.cart);
+      setSelectedLineKeys(merged.selectedLineKeys);
+      saveWebCartState(cartOwnerKey, merged.cart, merged.selectedLineKeys);
+      return;
+    }
+
+    const nextState = loadWebCartState(cartOwnerKey);
+    selectionInitializedRef.current = nextState.cart.length > 0;
+    setCart(nextState.cart);
+    setSelectedLineKeys(nextState.selectedLineKeys);
+  }, [cartOwnerKey]);
+
+  // Persist web cart & item selection across browser refreshes and tab closes
+  useEffect(() => {
+    if (!isWebLocalStorageAvailable()) return;
+    if (prevOwnerRef.current !== cartOwnerKey) return;
+    saveWebCartState(cartOwnerKey, cart, selectedLineKeys);
+  }, [cartOwnerKey, cart, selectedLineKeys]);
 
   // Initialize selection when cart first gets items
   useEffect(() => {

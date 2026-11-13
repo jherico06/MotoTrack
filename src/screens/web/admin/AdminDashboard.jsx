@@ -31,6 +31,10 @@ import {
   MECHANIC_AVATAR_PRESETS,
   getPackagePricePhp,
 } from '../../../services/bookings/garageService.js';
+import {
+  rescheduleService,
+  RESCHEDULE_STATUS,
+} from '../../../services/bookings/rescheduleService.js';
 import { pmsPricingService } from '../../../services/bookings/pmsPricingService.js';
 import {
   DEFAULT_PMS_SERVICES,
@@ -74,7 +78,7 @@ import { usdToPhp } from '../../../utils/currency.js';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import NotificationsPage from '../customer/NotificationsPage.jsx';
 import { auditLogService } from '../../../services/system/auditLogService.js';
-import { AdminSidebar, SalesForecastPanel, SalesAnalyticsPanel, RevenueTrendChart, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, ServiceQuotationPanel, PickupQrScannerPanel, AdminBookingDetailsPanel, MotorcycleModelsAdminPanel, ProductCompatibilityPicker, AdminSystemSettingsPanel, PromosAdminPanel, RiderProfileCard, DashboardInsightsPanel, AdminProfileLogsPanel, ModernOverviewDashboard, AdminCustomerRatingsReportsPanel } from '../../../components/admin';
+import { AdminSidebar, SalesForecastPanel, SalesAnalyticsPanel, RevenueTrendChart, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, ServiceQuotationPanel, PickupQrScannerPanel, AdminBookingDetailsPanel, MotorcycleModelsAdminPanel, ProductCompatibilityPicker, AdminSystemSettingsPanel, PromosAdminPanel, RiderProfileCard, DashboardInsightsPanel, AdminProfileLogsPanel, ModernOverviewDashboard, AdminCustomerRatingsReportsPanel, AdminRescheduleModal } from '../../../components/admin';
 import { ratingsReportsService } from '../../../services/feedback/ratingsReportsService.js';
 import {
   buildDashboardInsights,
@@ -538,6 +542,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const [garageBookings, setGarageBookings] = useState([]);
   const [bookingSearchQuery, setBookingSearchQuery] = useState('');
   const [bookingStatusFilter, setBookingStatusFilter] = useState('All'); // 'All' | 'Confirmed' | 'In Progress' | 'Completed' | 'Cancelled'
+  const [rescheduleRequests, setRescheduleRequests] = useState(() => rescheduleService.getAllRequests());
+  const [rescheduleFilter, setRescheduleFilter] = useState('All'); // 'All' | 'Pending Review' | 'Approved' | 'Rejected' | 'Cancelled'
+  const [rescheduleSearchQuery, setRescheduleSearchQuery] = useState('');
+  const [selectedRescheduleForModal, setSelectedRescheduleForModal] = useState(null);
   const [isBookingStatusDropdownOpen, setIsBookingStatusDropdownOpen] = useState(false);
   const [bookingCategoryFilter, setBookingCategoryFilter] = useState('All'); // 'All' | 'Repair' | 'PMS' | 'Installation'
   const [bookingViewMode, setBookingViewMode] = useState('table'); // 'table' | 'calendar'
@@ -2177,11 +2185,86 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     }
   };
 
+  // ─── RESCHEDULE REQUESTS COMPUTATIONS & SUBSCRIPTION ───
+  useEffect(() => {
+    const handleReschedUpdated = (e) => {
+      if (e?.detail) setRescheduleRequests(e.detail);
+      else setRescheduleRequests(rescheduleService.getAllRequests());
+    };
+    window.addEventListener('mototrack_reschedule_requests_updated', handleReschedUpdated);
+    return () => {
+      window.removeEventListener('mototrack_reschedule_requests_updated', handleReschedUpdated);
+    };
+  }, []);
+
+  const pendingReschedulesCount = useMemo(() => {
+    return rescheduleRequests.filter(
+      (r) => r.status === RESCHEDULE_STATUS.PENDING_REVIEW || r.status === RESCHEDULE_STATUS.ALTERNATIVE_SUGGESTED
+    ).length;
+  }, [rescheduleRequests]);
+
+  const filteredReschedules = useMemo(() => {
+    const q = rescheduleSearchQuery.toLowerCase().trim();
+    return rescheduleRequests.filter((r) => {
+      if (rescheduleFilter !== 'All') {
+        if (rescheduleFilter === 'Pending Review' && r.status !== RESCHEDULE_STATUS.PENDING_REVIEW && r.status !== RESCHEDULE_STATUS.ALTERNATIVE_SUGGESTED) {
+          return false;
+        }
+        if (r.status !== rescheduleFilter) return false;
+      }
+      if (!q) return true;
+      return (
+        (r.id && r.id.toLowerCase().includes(q)) ||
+        (r.booking_id && r.booking_id.toLowerCase().includes(q)) ||
+        (r.customer_name && r.customer_name.toLowerCase().includes(q)) ||
+        (r.motorcycle_model && r.motorcycle_model.toLowerCase().includes(q)) ||
+        (r.plate_number && r.plate_number.toLowerCase().includes(q)) ||
+        (r.reason && r.reason.toLowerCase().includes(q))
+      );
+    });
+  }, [rescheduleRequests, rescheduleFilter, rescheduleSearchQuery]);
+
   // ─── GARAGE & BOOKINGS COMPUTATIONS & ACTIONS ───
+  const needsApprovalCount = useMemo(() => {
+    return garageBookings.filter((b) => {
+      const n = normalizeBookingStatus(b.status);
+      const isPaid =
+        b.downpayment_status === 'Paid' ||
+        b.downpayment_paid === true ||
+        b.deposit_paid === true ||
+        Number(b.amount_paid || 0) > 0;
+      const isPending =
+        n === FLEX_BOOKING_STATUS.PENDING_REVIEW ||
+        n === FLEX_BOOKING_STATUS.RESERVED ||
+        String(b.status).toLowerCase() === 'pending' ||
+        String(b.status).toLowerCase() === 'reserved';
+      return (
+        isPending ||
+        (isPaid &&
+          n !== FLEX_BOOKING_STATUS.CONFIRMED &&
+          n !== FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS &&
+          n !== FLEX_BOOKING_STATUS.COMPLETED &&
+          n !== FLEX_BOOKING_STATUS.CANCELLED)
+      );
+    }).length;
+  }, [garageBookings]);
+
   const bookingStats = useMemo(() => {
     const s = computeBookingDashboardStats(garageBookings);
     return {
       ...s,
+      reserved:
+        s.reserved ??
+        garageBookings.filter((b) => {
+          const n = normalizeBookingStatus(b.status);
+          return (
+            n === FLEX_BOOKING_STATUS.RESERVED ||
+            String(b.status).toLowerCase() === 'reserved' ||
+            b.downpayment_status === 'Paid' ||
+            b.downpayment_paid === true ||
+            b.deposit_paid === true
+          );
+        }).length,
       // Legacy aliases used by existing Garage stat cards / filters
       confirmed:
         s.approved +
@@ -2225,6 +2308,22 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
             normalized === FLEX_BOOKING_STATUS.CANCELLED ||
             normalized === FLEX_BOOKING_STATUS.REJECTED ||
             normalized === FLEX_BOOKING_STATUS.CUSTOMER_DECLINED;
+        } else if (filterKey === 'Needs Approval' || filterKey === 'Reserved' || filterKey === FLEX_BOOKING_STATUS.RESERVED) {
+          matchStatus =
+            normalized === FLEX_BOOKING_STATUS.RESERVED ||
+            normalized === FLEX_BOOKING_STATUS.PENDING_REVIEW ||
+            String(b.status).toLowerCase() === 'reserved' ||
+            String(b.status).toLowerCase() === 'pending' ||
+            b.downpayment_status === 'Paid' ||
+            b.downpayment_paid === true ||
+            b.deposit_paid === true;
+        } else if (filterKey === 'Reserved_Only') {
+          matchStatus =
+            normalized === FLEX_BOOKING_STATUS.RESERVED ||
+            String(b.status).toLowerCase() === 'reserved' ||
+            b.downpayment_status === 'Paid' ||
+            b.downpayment_paid === true ||
+            b.deposit_paid === true;
         } else if (filterKey === 'Pending') {
           matchStatus = normalized === FLEX_BOOKING_STATUS.PENDING_REVIEW;
         } else if (filterKey === 'Confirmed') {
@@ -2522,6 +2621,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       flexible,
       mechanicId: mechObj?.id,
       approvedBy: 'admin',
+      customerEmail: booking?.customer_email || booking?.userEmail || booking?.email,
+      customerName: booking?.customer_name,
     });
     setGarageBookings(updated);
     const next = Array.isArray(updated)
@@ -2532,7 +2633,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       setEditBkStatus(next?.status || (flexible ? 'APPROVED' : 'Confirmed'));
       setEditBkMechanic(mechanic);
     }
-    showToast(`✓ Booking #${bookingId} confirmed! Assigned to ${mechanic}.`);
+    showToast(`✓ Booking #${bookingId} approved! Customer notified by email to bring bike on scheduled time.`);
   };
 
   // 2. Advisor Rejects Booking
@@ -4292,8 +4393,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         return 'Management / Customers';
       case 'ratings_reports':
         return 'Management / Ratings & Reports';
-      case 'supabase':
-        return 'System / Database';
       case 'audit':
         return 'System / Activity Logs';
       case 'notifications':
@@ -4343,8 +4442,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
         return 'Customers';
       case 'ratings_reports':
         return 'Ratings & Reports';
-      case 'supabase':
-        return 'Database';
       case 'audit':
         return 'Activity Logs';
       case 'notifications':
@@ -6562,9 +6659,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       >
                         Orders Ledger ({filteredOrdersList.length} shown)
                       </Text>
-                      <Text style={{ fontSize: 12, color: isDarkMode ? '#A1A1AA' : '#71717A', marginTop: 2 }}>
-                        Transactions across online store and cashier POS, newest first
-                      </Text>
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                       <TouchableOpacity
@@ -8610,35 +8704,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 {/* Bookings Header Toolbar */}
                 <View
                   style={{
-                    flexDirection: isDesktop ? 'row' : 'column',
-                    alignItems: isDesktop ? 'center' : 'flex-start',
-                    justifyContent: 'space-between',
-                    gap: 12,
-                    marginBottom: 20,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'flex-end',
+                    marginBottom: 16,
                   }}
                 >
-                  <View>
-                    <Text
-                      style={{
-                        fontSize: 20,
-                        fontWeight: '700',
-                        color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                        letterSpacing: -0.3,
-                      }}
-                    >
-                      Customer Bookings & Pitstop Queue
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: isDarkMode ? tokens.textMuted : '#64748B',
-                        marginTop: 2,
-                      }}
-                    >
-                      Appointments, pit bay allocation, technician assignments & walk-in queue.
-                    </Text>
-                  </View>
-
                   <TouchableOpacity
                     style={{
                       flexDirection: 'row',
@@ -8735,327 +8806,51 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       />
                     </View>
 
-                    {/* Toolbar (Search, Filter Tabs, Add Walk-in) */}
-                    <View style={[styles.toolbarRow, { marginBottom: 12 }]}>
-                      <View style={styles.searchInputBox}>
-                        <BootstrapIcon name="search" size={14} color={isDarkMode ? tokens.textMuted : "#64748B"} style={{ marginRight: 8 }} />
-                        <TextInput
-                          style={styles.searchInput}
-                          placeholder="Search by Ref ID, Customer, Phone, Bike, Plate, or Service..."
-                          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                          value={bookingSearchQuery}
-                          onChangeText={(t) => {
-                            setBookingSearchQuery(t);
-                            setBookingPage(1);
-                          }}
-                        />
-                        {bookingSearchQuery ? (
-                          <TouchableOpacity onPress={() => setBookingSearchQuery('')}>
-                            <BootstrapIcon name="x-circle" size={14} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
-
-                      <TextInput
-                        style={[styles.searchInputBox, { maxWidth: 160, marginLeft: 8 }]}
-                        placeholder="Date YYYY-MM-DD"
-                        placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                        value={bookingDateFilter}
-                        onChangeText={(t) => {
-                          setBookingDateFilter(t);
-                          setBookingPage(1);
-                        }}
-                      />
-
-                      <View style={[styles.searchInputBox, { maxWidth: 180, marginLeft: 8 }]}>
-                        <BootstrapIcon name="person" size={14} color={isDarkMode ? tokens.textMuted : "#64748B"} style={{ marginRight: 6 }} />
-                        <TextInput
-                          style={styles.searchInput}
-                          placeholder="Filter by customer"
-                          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                          value={bookingCustomerFilter}
-                          onChangeText={(t) => {
-                            setBookingCustomerFilter(t);
-                            setBookingPage(1);
-                          }}
-                        />
-                        {bookingCustomerFilter ? (
-                          <TouchableOpacity
-                            onPress={() => {
-                              setBookingCustomerFilter('');
+                    {/* ── Clean Operational Toolbar & Quick Status Tabs ── */}
+                    <View style={{ gap: 12, marginBottom: 16 }}>
+                      {/* Row 1: Unified Search, Quick Date, Category Filter, and Walk-in Action */}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                        {/* Unified Search Input */}
+                        <View style={[styles.searchInputBox, { flex: 1, minWidth: 260 }]}>
+                          <BootstrapIcon name="search" size={14} color={isDarkMode ? tokens.textMuted : "#64748B"} style={{ marginRight: 8 }} />
+                          <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search by Ref ID, Customer, Phone, Bike, Plate, or Package..."
+                            placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                            value={bookingSearchQuery}
+                            onChangeText={(t) => {
+                              setBookingSearchQuery(t);
                               setBookingPage(1);
                             }}
-                          >
-                            <BootstrapIcon name="x-circle" size={14} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                          </TouchableOpacity>
-                        ) : null}
-                      </View>
+                          />
+                          {bookingSearchQuery ? (
+                            <TouchableOpacity onPress={() => setBookingSearchQuery('')}>
+                              <BootstrapIcon name="x-circle" size={14} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
 
-                      <TouchableOpacity
-                        style={[styles.addBtnPrimary, { backgroundColor: isDarkMode ? '#EA580C' : '#EA580C' }]}
-                        onPress={() => {
-                          setNewBkCustomerName('');
-                          setNewBkCustomerPhone('');
-                          setNewBkCustomerEmail('');
-                          setNewBkPlate('');
-                          setNewBkOdo('');
-                          setNewBkNotes('');
-                          setIsNewBookingModalOpen(true);
-                        }}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="calendar-plus-fill" size={13} color="#FFFFFF" />
-                        <Text style={styles.addBtnPrimaryText}>+ Book Walk-in / Phone</Text>
-                      </TouchableOpacity>
-                    </View>
+                        {/* Quick Date Filter */}
+                        <View style={[styles.searchInputBox, { width: 170 }]}>
+                          <BootstrapIcon name="calendar-date" size={14} color={isDarkMode ? tokens.textMuted : "#64748B"} style={{ marginRight: 8 }} />
+                          <TextInput
+                            style={styles.searchInput}
+                            placeholder="Date YYYY-MM-DD"
+                            placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                            value={bookingDateFilter}
+                            onChangeText={(t) => {
+                              setBookingDateFilter(t);
+                              setBookingPage(1);
+                            }}
+                          />
+                          {bookingDateFilter ? (
+                            <TouchableOpacity onPress={() => setBookingDateFilter('')}>
+                              <BootstrapIcon name="x-circle" size={13} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
 
-                    {/* Filter Dropdown & Category Bar */}
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: 12,
-                        marginBottom: 14,
-                        flexWrap: 'wrap',
-                        position: 'relative',
-                        zIndex: isBookingStatusDropdownOpen ? 99999 : 10,
-                      }}
-                    >
-                      {/* Booking Status Filter Dropdown */}
-                      <View
-                        style={{
-                          position: 'relative',
-                          zIndex: isBookingStatusDropdownOpen ? 99999 : 10,
-                        }}
-                      >
-                        {(() => {
-                          const bookingStatusOptions = [
-                            { key: 'All', label: 'All Bookings', count: bookingStats.total, icon: 'grid-fill', color: isDarkMode ? tokens.accentBrand : '#EA580C' },
-                            { key: 'Pending', label: 'Pending Review', count: bookingStats.pending, icon: 'hourglass-split', color: isDarkMode ? tokens.statusWarningText : '#D97706', highlight: bookingStats.pending > 0 },
-                            { key: 'Confirmed', label: 'Confirmed', count: bookingStats.confirmed, icon: 'clock-fill', color: isDarkMode ? tokens.statusInfoText : '#0284C7' },
-                            { key: 'Inspection', label: 'Inspection', count: bookingStats.inspection, icon: 'search', color: isDarkMode ? tokens.statusPurpleText : '#8B5CF6' },
-                            { key: 'In Progress', label: 'In Bay', count: bookingStats.inProgress, icon: 'gear-wide-connected', color: isDarkMode ? tokens.statusWarningText : '#F59E0B', highlight: bookingStats.inProgress > 0 },
-                            { key: 'Service Done', label: 'Done / Bill', count: bookingStats.serviceDone, icon: 'receipt', color: isDarkMode ? tokens.statusSuccessText : '#10B981' },
-                            { key: 'Completed', label: 'Completed', count: bookingStats.completed, icon: 'check-circle-fill', color: isDarkMode ? tokens.statusSuccessText : '#16A34A' },
-                            { key: 'Cancelled', label: 'Cancelled', count: bookingStats.cancelled, icon: 'x-circle-fill', color: isDarkMode ? tokens.statusDangerText : '#DC2626' },
-                          ];
-                          const activeOpt = bookingStatusOptions.find((o) => o.key === bookingStatusFilter) || bookingStatusOptions[0];
-
-                          return (
-                            <>
-                              <TouchableOpacity
-                                style={{
-                                  flexDirection: 'row',
-                                  alignItems: 'center',
-                                  justifyContent: 'space-between',
-                                  gap: 8,
-                                  backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                                  borderWidth: 1.5,
-                                  borderColor: isBookingStatusDropdownOpen
-                                    ? '#EA580C'
-                                    : activeOpt.highlight
-                                      ? '#F59E0B'
-                                      : bookingStatusFilter !== 'All'
-                                        ? '#EA580C'
-                                        : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                                  borderRadius: 12,
-                                  paddingHorizontal: 14,
-                                  paddingVertical: 9,
-                                  minWidth: 180,
-                                  cursor: 'pointer',
-                                  boxShadow: isBookingStatusDropdownOpen
-                                    ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
-                                    : '0 1px 3px rgba(0, 0, 0, 0.04)',
-                                }}
-                                onPress={() => setIsBookingStatusDropdownOpen((prev) => !prev)}
-                                activeOpacity={0.85}
-                              >
-                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
-                                  <BootstrapIcon
-                                    name={activeOpt.icon}
-                                    size={13}
-                                    color={
-                                      activeOpt.highlight
-                                        ? '#D97706'
-                                        : bookingStatusFilter !== 'All'
-                                          ? activeOpt.color
-                                          : '#64748B'
-                                    }
-                                  />
-                                  <Text
-                                    style={{
-                                      fontSize: 13,
-                                      fontWeight: '700',
-                                      color:
-                                        activeOpt.highlight
-                                          ? '#B45309'
-                                          : bookingStatusFilter !== 'All'
-                                            ? '#EA580C'
-                                            : isDarkMode ? tokens.textPrimary : '#0F172A',
-                                    }}
-                                  >
-                                    {activeOpt.label}
-                                  </Text>
-                                  <View
-                                    style={{
-                                      backgroundColor:
-                                        activeOpt.highlight
-                                          ? '#FEF3C7'
-                                          : bookingStatusFilter !== 'All'
-                                            ? '#EA580C'
-                                            : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                                      paddingHorizontal: 6,
-                                      paddingVertical: 1,
-                                      borderRadius: 8,
-                                      marginLeft: 2,
-                                    }}
-                                  >
-                                    <Text
-                                      style={{
-                                        fontSize: 11,
-                                        fontWeight: '600',
-                                        color:
-                                          activeOpt.highlight
-                                            ? '#B45309'
-                                            : bookingStatusFilter !== 'All'
-                                              ? '#FFFFFF'
-                                              : isDarkMode ? '#CBD5E1' : '#475569',
-                                      }}
-                                    >
-                                      {activeOpt.count}
-                                    </Text>
-                                  </View>
-                                </View>
-                                <BootstrapIcon
-                                  name={isBookingStatusDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                                  size={12}
-                                  color={isBookingStatusDropdownOpen ? '#EA580C' : '#64748B'}
-                                />
-                              </TouchableOpacity>
-
-                              {/* Transparent backdrop for outside click */}
-                              {isBookingStatusDropdownOpen && (
-                                <TouchableOpacity
-                                  style={{
-                                    position: 'fixed',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    zIndex: 99998,
-                                    backgroundColor: 'transparent',
-                                    cursor: 'default',
-                                  }}
-                                  onPress={() => setIsBookingStatusDropdownOpen(false)}
-                                  activeOpacity={1}
-                                />
-                              )}
-
-                              {/* Floating Dropdown Menu */}
-                              {isBookingStatusDropdownOpen && (
-                                <View
-                                  style={{
-                                    position: 'absolute',
-                                    top: '100%',
-                                    left: 0,
-                                    marginTop: 6,
-                                    minWidth: 230,
-                                    backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                                    borderRadius: 14,
-                                    borderWidth: 1.5,
-                                    borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                                    boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
-                                    zIndex: 99999,
-                                    padding: 6,
-                                    gap: 3,
-                                    maxHeight: 320,
-                                    overflowY: 'auto',
-                                  }}
-                                >
-                                  {bookingStatusOptions.map((option) => {
-                                    const isSelected = bookingStatusFilter === option.key;
-                                    return (
-                                      <TouchableOpacity
-                                        key={option.key}
-                                        style={{
-                                          flexDirection: 'row',
-                                          alignItems: 'center',
-                                          justifyContent: 'space-between',
-                                          paddingHorizontal: 12,
-                                          paddingVertical: 9,
-                                          borderRadius: 9,
-                                          backgroundColor: isSelected
-                                            ? isDarkMode ? '#132A26' : '#E8F0EC'
-                                            : 'transparent',
-                                          cursor: 'pointer',
-                                        }}
-                                        onPress={() => {
-                                          setBookingStatusFilter(option.key);
-                                          setBookingPage(1);
-                                          setIsBookingStatusDropdownOpen(false);
-                                        }}
-                                        activeOpacity={0.8}
-                                      >
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                          <BootstrapIcon
-                                            name={option.icon}
-                                            size={14}
-                                            color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : option.color || (isDarkMode ? tokens.textMuted : '#64748B')}
-                                          />
-                                          <Text
-                                            style={{
-                                              fontSize: 13,
-                                              fontWeight: isSelected ? '600' : '500',
-                                              color: isSelected
-                                                ? '#EA580C'
-                                                : isDarkMode ? '#E2E8F0' : '#334155',
-                                            }}
-                                          >
-                                            {option.label}
-                                          </Text>
-                                        </View>
-                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                          <View
-                                            style={{
-                                              backgroundColor: option.highlight
-                                                ? '#FEF3C7'
-                                                : isSelected
-                                                  ? '#EA580C'
-                                                  : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                                              paddingHorizontal: 6,
-                                              paddingVertical: 1,
-                                              borderRadius: 6,
-                                            }}
-                                          >
-                                            <Text
-                                              style={{
-                                                fontSize: 10.5,
-                                                fontWeight: '600',
-                                                color: option.highlight
-                                                  ? '#B45309'
-                                                  : isSelected
-                                                    ? '#FFFFFF'
-                                                    : isDarkMode ? '#CBD5E1' : '#475569',
-                                              }}
-                                            >
-                                              {option.count}
-                                            </Text>
-                                          </View>
-                                          {isSelected && <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />}
-                                        </View>
-                                      </TouchableOpacity>
-                                    );
-                                  })}
-                                </View>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </View>
-
-                      <View style={{ flexDirection: 'row', gap: 6, marginLeft: 'auto', alignItems: 'center' }}>
-                        {/* Segmented Category Filter: All Types | Repair | PMS | Installation */}
+                        {/* Category Segmented Filter */}
                         <View
                           style={{
                             flexDirection: 'row',
@@ -9067,21 +8862,18 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                             borderColor: isDarkMode ? '#334155' : '#E2E8F0',
                           }}
                         >
-                          {['All', 'Repair', 'PMS', 'Installation'].map((cat) => {
+                          {['All', 'PMS', 'Repair'].map((cat) => {
                             const isSelected = bookingCategoryFilter === cat;
                             return (
                               <TouchableOpacity
                                 key={cat}
                                 style={{
                                   paddingVertical: 5,
-                                  paddingHorizontal: 12,
+                                  paddingHorizontal: 11,
                                   borderRadius: 6,
                                   backgroundColor: isSelected ? '#EA580C' : 'transparent',
                                   boxShadow: isSelected ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
                                   cursor: 'pointer',
-                                  transition: 'all 0.15s ease',
                                 }}
                                 onPress={() => {
                                   setBookingCategoryFilter(cat);
@@ -9094,7 +8886,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     fontSize: 12,
                                     fontWeight: isSelected ? '700' : '600',
                                     color: isSelected ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
-                                    transition: 'color 0.15s ease',
                                   }}
                                 >
                                   {cat === 'All' ? 'All Types' : cat}
@@ -9104,90 +8895,540 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           })}
                         </View>
 
-                        {/* View Mode Toggle: Table / Calendar */}
-                        <View
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            marginLeft: 8,
-                            backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
-                            padding: 3,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: isDarkMode ? '#334155' : '#E2E8F0',
+                        {/* + Walk-in Booking Button */}
+                        <TouchableOpacity
+                          style={[styles.addBtnPrimary, { backgroundColor: '#EA580C', marginLeft: 'auto' }]}
+                          onPress={() => {
+                            setNewBkCustomerName('');
+                            setNewBkCustomerPhone('');
+                            setNewBkCustomerEmail('');
+                            setNewBkPlate('');
+                            setNewBkOdo('');
+                            setNewBkNotes('');
+                            setIsNewBookingModalOpen(true);
                           }}
+                          activeOpacity={0.85}
                         >
+                          <BootstrapIcon name="calendar-plus-fill" size={13} color="#FFFFFF" />
+                          <Text style={styles.addBtnPrimaryText}>+ Book Walk-in / Phone</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Row 2: Clean 1-Click Operational Status Tabs & View Toggles */}
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          flexWrap: 'wrap',
+                        }}
+                      >
+                        {/* Status Filter Tabs */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                          {[
+                            { key: 'All', label: 'All Bookings', count: bookingStats.total, icon: 'grid-fill' },
+                            { key: 'Needs Approval', label: 'Needs Approval', count: needsApprovalCount, icon: 'check2-circle', highlight: needsApprovalCount > 0 },
+                            { key: 'Confirmed', label: 'Confirmed', count: bookingStats.confirmed, icon: 'clock-fill' },
+                            { key: 'In Progress', label: 'In Bay', count: bookingStats.inProgress, icon: 'gear-wide-connected' },
+                            { key: 'Completed', label: 'Completed', count: bookingStats.completed, icon: 'check-circle-fill' },
+                            { key: 'Cancelled', label: 'Cancelled', count: bookingStats.cancelled, icon: 'x-circle' },
+                          ].map((tab) => {
+                            const isSel = bookingStatusFilter === tab.key;
+                            return (
+                              <TouchableOpacity
+                                key={tab.key}
+                                onPress={() => {
+                                  setBookingStatusFilter(tab.key);
+                                  setBookingPage(1);
+                                  if (bookingViewMode === 'reschedules') setBookingViewMode('table');
+                                }}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  paddingHorizontal: 12,
+                                  paddingVertical: 7,
+                                  borderRadius: 8,
+                                  borderWidth: 1,
+                                  borderColor: isSel
+                                    ? '#EA580C'
+                                    : tab.highlight
+                                      ? 'rgba(16, 185, 129, 0.45)'
+                                      : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                                  backgroundColor: isSel
+                                    ? '#EA580C'
+                                    : tab.highlight
+                                      ? (isDarkMode ? 'rgba(16, 185, 129, 0.12)' : '#ECFDF5')
+                                      : (isDarkMode ? tokens.bgElevated : '#FFFFFF'),
+                                  cursor: 'pointer',
+                                  transition: 'all 0.15s ease',
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <BootstrapIcon
+                                  name={tab.icon}
+                                  size={12}
+                                  color={isSel ? '#FFFFFF' : tab.highlight ? '#10B981' : (isDarkMode ? tokens.textMuted : '#64748B')}
+                                />
+                                <Text
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: isSel ? '700' : '600',
+                                    color: isSel ? '#FFFFFF' : tab.highlight ? (isDarkMode ? '#34D399' : '#047857') : (isDarkMode ? tokens.textPrimary : '#334155'),
+                                  }}
+                                >
+                                  {tab.label}
+                                </Text>
+                                <View
+                                  style={{
+                                    backgroundColor: isSel
+                                      ? 'rgba(255, 255, 255, 0.25)'
+                                      : tab.highlight
+                                        ? '#10B981'
+                                        : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                                    paddingHorizontal: 6,
+                                    paddingVertical: 1,
+                                    borderRadius: 999,
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 10.5,
+                                      fontWeight: '700',
+                                      color: isSel || tab.highlight ? '#FFFFFF' : (isDarkMode ? '#CBD5E1' : '#475569'),
+                                    }}
+                                  >
+                                    {tab.count}
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+
+                        {/* Right: Reschedules & Table/Calendar Toggles */}
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
+                          {/* Reschedule Requests Pill */}
                           <TouchableOpacity
                             style={{
                               flexDirection: 'row',
                               alignItems: 'center',
-                              gap: 5,
-                              paddingVertical: 5,
-                              paddingHorizontal: 10,
-                              borderRadius: 6,
-                              backgroundColor: bookingViewMode === 'table' ? '#EA580C' : 'transparent',
-                              boxShadow: bookingViewMode === 'table' ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
+                              gap: 6,
+                              paddingHorizontal: 11,
+                              paddingVertical: 7,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: bookingViewMode === 'reschedules' ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                              backgroundColor: bookingViewMode === 'reschedules' ? '#EA580C' : isDarkMode ? tokens.bgElevated : '#FFFFFF',
                               cursor: 'pointer',
-                              transition: 'all 0.15s ease',
                             }}
-                            onPress={() => setBookingViewMode('table')}
+                            onPress={() => setBookingViewMode(bookingViewMode === 'reschedules' ? 'table' : 'reschedules')}
                             activeOpacity={0.85}
                           >
                             <BootstrapIcon
-                              name="table"
+                              name="arrow-repeat"
                               size={12}
-                              color={bookingViewMode === 'table' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B'}
+                              color={bookingViewMode === 'reschedules' ? '#FFFFFF' : isDarkMode ? tokens.textMuted : '#64748B'}
                             />
                             <Text
                               style={{
                                 fontSize: 12,
-                                fontWeight: bookingViewMode === 'table' ? '700' : '600',
-                                color: bookingViewMode === 'table' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
-                                transition: 'color 0.15s ease',
+                                fontWeight: bookingViewMode === 'reschedules' ? '700' : '600',
+                                color: bookingViewMode === 'reschedules' ? '#FFFFFF' : isDarkMode ? tokens.textPrimary : '#334155',
                               }}
                             >
-                              Table
+                              Reschedules
                             </Text>
+                            {pendingReschedulesCount > 0 && (
+                              <View
+                                style={{
+                                  backgroundColor: bookingViewMode === 'reschedules' ? '#FFFFFF' : '#EA580C',
+                                  borderRadius: 999,
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 1,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: '700',
+                                    color: bookingViewMode === 'reschedules' ? '#EA580C' : '#FFFFFF',
+                                  }}
+                                >
+                                  {pendingReschedulesCount}
+                                </Text>
+                              </View>
+                            )}
                           </TouchableOpacity>
 
-                          <TouchableOpacity
+                          {/* Table / Calendar Toggle */}
+                          <View
                             style={{
                               flexDirection: 'row',
                               alignItems: 'center',
-                              gap: 5,
-                              paddingVertical: 5,
-                              paddingHorizontal: 10,
-                              borderRadius: 6,
-                              backgroundColor: bookingViewMode === 'calendar' ? '#EA580C' : 'transparent',
-                              boxShadow: bookingViewMode === 'calendar' ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
-                              cursor: 'pointer',
-                              transition: 'all 0.15s ease',
+                              backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
+                              padding: 3,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? '#334155' : '#E2E8F0',
                             }}
-                            onPress={() => setBookingViewMode('calendar')}
-                            activeOpacity={0.85}
                           >
-                            <BootstrapIcon
-                              name="calendar-week"
-                              size={12}
-                              color={bookingViewMode === 'calendar' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B'}
-                            />
-                            <Text
+                            <TouchableOpacity
                               style={{
-                                fontSize: 12,
-                                fontWeight: bookingViewMode === 'calendar' ? '700' : '600',
-                                color: bookingViewMode === 'calendar' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B',
-                                transition: 'color 0.15s ease',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 5,
+                                paddingVertical: 5,
+                                paddingHorizontal: 10,
+                                borderRadius: 6,
+                                backgroundColor: bookingViewMode === 'table' ? '#EA580C' : 'transparent',
+                                boxShadow: bookingViewMode === 'table' ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
+                                cursor: 'pointer',
                               }}
+                              onPress={() => setBookingViewMode('table')}
+                              activeOpacity={0.85}
                             >
-                              Calendar
-                            </Text>
-                          </TouchableOpacity>
+                              <BootstrapIcon name="table" size={12} color={bookingViewMode === 'table' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B'} />
+                              <Text style={{ fontSize: 12, fontWeight: bookingViewMode === 'table' ? '700' : '600', color: bookingViewMode === 'table' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B' }}>
+                                Table
+                              </Text>
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 5,
+                                paddingVertical: 5,
+                                paddingHorizontal: 10,
+                                borderRadius: 6,
+                                backgroundColor: bookingViewMode === 'calendar' ? '#EA580C' : 'transparent',
+                                boxShadow: bookingViewMode === 'calendar' ? '0 1px 4px rgba(234, 88, 12, 0.35)' : 'none',
+                                cursor: 'pointer',
+                              }}
+                              onPress={() => setBookingViewMode('calendar')}
+                              activeOpacity={0.85}
+                            >
+                              <BootstrapIcon name="calendar-week" size={12} color={bookingViewMode === 'calendar' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B'} />
+                              <Text style={{ fontSize: 12, fontWeight: bookingViewMode === 'calendar' ? '700' : '600', color: bookingViewMode === 'calendar' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#64748B' }}>
+                                Calendar
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
                         </View>
                       </View>
                     </View>
 
-                    {/* Bookings View: Calendar / Table */}
-                    {bookingViewMode === 'calendar' ? (
+                    {/* Bookings View: Calendar / Table / Reschedules */}
+                    {bookingViewMode === 'reschedules' ? (
+                      <View style={{ gap: 16, marginBottom: 20 }}>
+                        {/* Reschedule Toolbar & Filters */}
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            flexWrap: 'wrap',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: 12,
+                            backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                            borderRadius: 14,
+                            padding: 14,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                          }}
+                        >
+                          {/* Status Filter Pills */}
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                            {[
+                              { key: 'All', label: 'All Requests', count: rescheduleRequests.length },
+                              { key: 'Pending Review', label: 'Pending Review', count: pendingReschedulesCount, highlight: pendingReschedulesCount > 0 },
+                              { key: 'Approved', label: 'Approved', count: rescheduleRequests.filter(r => r.status === 'Approved').length },
+                              { key: 'Rejected', label: 'Rejected', count: rescheduleRequests.filter(r => r.status === 'Rejected').length },
+                              { key: 'Cancelled', label: 'Cancelled', count: rescheduleRequests.filter(r => r.status === 'Cancelled').length },
+                            ].map((f) => {
+                              const isSel = rescheduleFilter === f.key;
+                              return (
+                                <TouchableOpacity
+                                  key={f.key}
+                                  onPress={() => setRescheduleFilter(f.key)}
+                                  style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 6,
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: isSel ? '#EA580C' : isDarkMode ? tokens.borderInput : '#CBD5E1',
+                                    backgroundColor: isSel
+                                      ? '#EA580C'
+                                      : isDarkMode ? tokens.bgSub : '#F8FAFC',
+                                    cursor: 'pointer',
+                                  }}
+                                  activeOpacity={0.8}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: isSel ? '700' : '500',
+                                      color: isSel ? '#FFFFFF' : isDarkMode ? tokens.textPrimary : '#334155',
+                                    }}
+                                  >
+                                    {f.label}
+                                  </Text>
+                                  <View
+                                    style={{
+                                      paddingHorizontal: 6,
+                                      paddingVertical: 1,
+                                      borderRadius: 999,
+                                      backgroundColor: isSel
+                                        ? 'rgba(255, 255, 255, 0.25)'
+                                        : f.highlight
+                                          ? 'rgba(234, 88, 12, 0.15)'
+                                          : isDarkMode ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+                                    }}
+                                  >
+                                    <Text
+                                      style={{
+                                        fontSize: 10.5,
+                                        fontWeight: '700',
+                                        color: isSel ? '#FFFFFF' : f.highlight ? '#EA580C' : isDarkMode ? '#94A3B8' : '#64748B',
+                                      }}
+                                    >
+                                      {f.count}
+                                    </Text>
+                                  </View>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+
+                          {/* Search Input */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                              borderRadius: 8,
+                              paddingHorizontal: 10,
+                              paddingVertical: 6,
+                              minWidth: 220,
+                            }}
+                          >
+                            <BootstrapIcon name="search" size={13} color="#94A3B8" style={{ marginRight: 6 }} />
+                            <TextInput
+                              placeholder="Search reference, customer, plate..."
+                              placeholderTextColor="#94A3B8"
+                              value={rescheduleSearchQuery}
+                              onChangeText={setRescheduleSearchQuery}
+                              style={{
+                                flex: 1,
+                                fontSize: 12,
+                                color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                                outlineStyle: 'none',
+                              }}
+                            />
+                          </View>
+                        </View>
+
+                        {/* Reschedule Requests Table */}
+                        <View
+                          style={{
+                            backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                            borderRadius: 14,
+                            borderWidth: 1.5,
+                            borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          {/* Table Header */}
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              paddingHorizontal: 16,
+                              paddingVertical: 12,
+                              backgroundColor: isDarkMode ? '#15191E' : '#F8FAFC',
+                              borderBottomWidth: 1,
+                              borderBottomColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                            }}
+                          >
+                            <Text style={{ flex: 1.2, minWidth: 100, fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase' }}>Request Ref</Text>
+                            <Text style={{ flex: 1.2, minWidth: 100, fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase' }}>Booking Ref</Text>
+                            <Text style={{ flex: 1.6, minWidth: 130, fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase' }}>Customer</Text>
+                            <Text style={{ flex: 1.6, minWidth: 130, fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase' }}>Motorcycle</Text>
+                            <Text style={{ flex: 1.6, minWidth: 140, fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase' }}>Current Schedule</Text>
+                            <Text style={{ flex: 1.8, minWidth: 150, fontSize: 11, fontWeight: '700', color: '#EA580C', textTransform: 'uppercase' }}>Requested Schedule</Text>
+                            <Text style={{ flex: 1.8, minWidth: 140, fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase' }}>Reason</Text>
+                            <Text style={{ flex: 1.3, minWidth: 110, fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', textAlign: 'center' }}>Status</Text>
+                            <Text style={{ flex: 1, minWidth: 80, fontSize: 11, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', textAlign: 'center' }}>Action</Text>
+                          </View>
+
+                          {/* Table Body Rows */}
+                          {filteredReschedules.length === 0 ? (
+                            <View style={{ padding: 36, alignItems: 'center', justifyContent: 'center' }}>
+                              <BootstrapIcon name="check-circle" size={28} color={isDarkMode ? tokens.textMuted : '#94A3B8'} style={{ marginBottom: 8 }} />
+                              <Text style={{ fontSize: 14, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
+                                No reschedule requests found
+                              </Text>
+                              <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 4 }}>
+                                There are no requests matching this status filter.
+                              </Text>
+                            </View>
+                          ) : (
+                            filteredReschedules.map((r, idx) => {
+                              const isPend = r.status === 'Pending Review' || r.status === 'Alternative Suggested';
+                              const isAppr = r.status === 'Approved';
+                              const isRej = r.status === 'Rejected';
+
+                              return (
+                                <View
+                                  key={r.id || idx}
+                                  style={{
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    paddingHorizontal: 16,
+                                    paddingVertical: 14,
+                                    borderBottomWidth: idx < filteredReschedules.length - 1 ? 1 : 0,
+                                    borderBottomColor: isDarkMode ? tokens.tableRowBorder : '#E8EEF2',
+                                    backgroundColor: isPend
+                                      ? (isDarkMode ? 'rgba(234, 88, 12, 0.04)' : '#FFFDFB')
+                                      : 'transparent',
+                                  }}
+                                >
+                                  {/* Request Ref */}
+                                  <View style={{ flex: 1.2, minWidth: 100 }}>
+                                    <Text style={{ fontSize: 12, fontWeight: '700', color: '#EA580C', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>
+                                      {r.id}
+                                    </Text>
+                                    <Text style={{ fontSize: 10.5, color: tokens.textMuted }}>
+                                      {r.created_at ? new Date(r.created_at).toLocaleDateString() : 'Today'}
+                                    </Text>
+                                  </View>
+
+                                  {/* Booking Ref */}
+                                  <View style={{ flex: 1.2, minWidth: 100 }}>
+                                    <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>
+                                      {r.booking_id}
+                                    </Text>
+                                    <Text style={{ fontSize: 10.5, color: tokens.textMuted }} numberOfLines={1}>
+                                      {r.service_title || 'Service'}
+                                    </Text>
+                                  </View>
+
+                                  {/* Customer */}
+                                  <View style={{ flex: 1.6, minWidth: 130 }}>
+                                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} numberOfLines={1}>
+                                      {r.customer_name || 'Customer'}
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: tokens.textMuted }} numberOfLines={1}>
+                                      {r.customer_phone || r.customer_email || '—'}
+                                    </Text>
+                                  </View>
+
+                                  {/* Motorcycle */}
+                                  <View style={{ flex: 1.6, minWidth: 130 }}>
+                                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }} numberOfLines={1}>
+                                      {r.motorcycle_model || 'Motorcycle'}
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: tokens.textMuted }} numberOfLines={1}>
+                                      {r.plate_number || 'TEMP'}
+                                    </Text>
+                                  </View>
+
+                                  {/* Current Schedule */}
+                                  <View style={{ flex: 1.6, minWidth: 140 }}>
+                                    <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? tokens.textSecondary : '#475569' }}>
+                                      {r.original_date}
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: tokens.textMuted }} numberOfLines={1}>
+                                      {r.original_time_slot}
+                                    </Text>
+                                  </View>
+
+                                  {/* Requested Schedule */}
+                                  <View style={{ flex: 1.8, minWidth: 150 }}>
+                                    <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#EA580C' }}>
+                                      {r.requested_date}
+                                    </Text>
+                                    <Text style={{ fontSize: 11, color: '#EA580C', fontWeight: '600' }} numberOfLines={1}>
+                                      {r.requested_time_slot}
+                                    </Text>
+                                  </View>
+
+                                  {/* Reason */}
+                                  <View style={{ flex: 1.8, minWidth: 140, paddingRight: 6 }}>
+                                    <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textPrimary : '#1E293B', fontWeight: '500' }} numberOfLines={2}>
+                                      {r.reason}
+                                    </Text>
+                                  </View>
+
+                                  {/* Status */}
+                                  <View style={{ flex: 1.3, minWidth: 110, alignItems: 'center' }}>
+                                    <View
+                                      style={{
+                                        paddingHorizontal: 8,
+                                        paddingVertical: 3,
+                                        borderRadius: 999,
+                                        backgroundColor: isPend
+                                          ? (isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7')
+                                          : isAppr
+                                            ? (isDarkMode ? 'rgba(16, 185, 129, 0.16)' : '#D1FAE5')
+                                            : (isDarkMode ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2'),
+                                      }}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: 11,
+                                          fontWeight: '700',
+                                          color: isPend
+                                            ? '#D97706'
+                                            : isAppr
+                                              ? '#065F46'
+                                              : '#DC2626',
+                                        }}
+                                      >
+                                        {r.status}
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  {/* Action: Manage */}
+                                  <View style={{ flex: 1, minWidth: 80, alignItems: 'center' }}>
+                                    <TouchableOpacity
+                                      onPress={() => setSelectedRescheduleForModal(r)}
+                                      style={{
+                                        backgroundColor: isPend ? '#EA580C' : (isDarkMode ? tokens.bgSub : '#FFFFFF'),
+                                        borderWidth: 1,
+                                        borderColor: isPend ? '#EA580C' : (isDarkMode ? tokens.borderInput : '#CBD5E1'),
+                                        paddingHorizontal: 12,
+                                        paddingVertical: 5,
+                                        borderRadius: 8,
+                                        cursor: 'pointer',
+                                      }}
+                                      activeOpacity={0.8}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: 11.5,
+                                          fontWeight: '700',
+                                          color: isPend ? '#FFFFFF' : (isDarkMode ? tokens.textPrimary : '#334155'),
+                                        }}
+                                      >
+                                        Manage
+                                      </Text>
+                                    </TouchableOpacity>
+                                  </View>
+                                </View>
+                              );
+                            })
+                          )}
+                        </View>
+                      </View>
+                    ) : bookingViewMode === 'calendar' ? (
                       <View style={{ gap: 16, marginBottom: 20 }}>
                         <BookingCalendar
                           headerBg="#24272B"
@@ -9342,24 +9583,60 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                             ({bk.bike_model || bk.motorcycle || 'Motorcycle'})
                                           </Text>
                                         </View>
-                                        <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
-                                          {bk.service_name || bk.package_name || bk.category || 'Service'} • Slot: {bk.time_slot || 'Morning'} • Tech: {bk.mechanic || 'Unassigned'}
-                                        </Text>
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                                          <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
+                                            {bk.service_name || bk.package_name || bk.category || 'Service'} • Slot: {bk.time_slot || 'Morning'} • Tech: {bk.mechanic || 'Unassigned'}{bk.pit_bay || bk.bay_assigned || bk.bay_number ? ` • Bay: ${bk.pit_bay || bk.bay_assigned || bk.bay_number}` : ''}
+                                          </Text>
+                                          {Boolean(bk.has_pending_reschedule) && (
+                                            <View style={{ backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
+                                              <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? '#FBBF24' : '#B45309' }}>
+                                                Reschedule Pending
+                                              </Text>
+                                            </View>
+                                          )}
+                                          {Boolean(bk.rescheduled || (bk.schedule_history && bk.schedule_history.length > 0)) && !bk.has_pending_reschedule && (
+                                            <View style={{ backgroundColor: isDarkMode ? 'rgba(59, 130, 246, 0.2)' : '#DBEAFE', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
+                                              <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? '#60A5FA' : '#1D4ED8' }}>
+                                                Rescheduled
+                                              </Text>
+                                            </View>
+                                          )}
+                                        </View>
                                       </View>
 
                                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                        <View
-                                          style={{
-                                            backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
-                                            paddingHorizontal: 7,
-                                            paddingVertical: 2,
-                                            borderRadius: 5,
-                                          }}
-                                        >
-                                          <Text style={{ fontSize: 10.5, fontWeight: '600', color: isDarkMode ? tokens.statusWarningText : '#B45309' }}>
-                                            {bk.status || 'Pending'}
-                                          </Text>
-                                        </View>
+                                        {(() => {
+                                          const isBkReserved =
+                                            (bk.status || '').toLowerCase() === 'reserved' ||
+                                            normalizeBookingStatus(bk.status) === FLEX_BOOKING_STATUS.RESERVED ||
+                                            bk.downpayment_status === 'Paid' ||
+                                            bk.downpayment_paid ||
+                                            bk.deposit_paid;
+                                          return (
+                                            <View
+                                              style={{
+                                                backgroundColor: isBkReserved
+                                                  ? (isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5')
+                                                  : (isDarkMode ? tokens.statusWarningBg : '#FEF3C7'),
+                                                paddingHorizontal: 7,
+                                                paddingVertical: 2,
+                                                borderRadius: 5,
+                                              }}
+                                            >
+                                              <Text
+                                                style={{
+                                                  fontSize: 10.5,
+                                                  fontWeight: '600',
+                                                  color: isBkReserved
+                                                    ? (isDarkMode ? '#34D399' : '#065F46')
+                                                    : (isDarkMode ? tokens.statusWarningText : '#B45309'),
+                                                }}
+                                              >
+                                                {isBkReserved ? 'Reserved' : (bk.status || 'Pending')}
+                                              </Text>
+                                            </View>
+                                          );
+                                        })()}
                                         <TouchableOpacity
                                           style={[styles.actionIconBtn, { backgroundColor: isDarkMode ? tokens.borderInput : '#E2E8F0' }]}
                                           onPress={() => handleOpenBookingDetail(bk)}
@@ -9454,9 +9731,20 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                 </View>
                               ) : (
                                 paginatedBookings.map((b) => {
+                                  const isReserved =
+                                    (b.status || '').toLowerCase() === 'reserved' ||
+                                    normalizeBookingStatus(b.status) === FLEX_BOOKING_STATUS.RESERVED ||
+                                    ((b.downpayment_status === 'Paid' || b.downpayment_paid || b.deposit_paid) &&
+                                      (b.status || '').toLowerCase() !== 'completed' &&
+                                      (b.status || '').toLowerCase() !== 'cancelled' &&
+                                      (b.status || '').toLowerCase() !== 'rejected' &&
+                                      (b.status || '').toLowerCase() !== 'in progress' &&
+                                      normalizeBookingStatus(b.status) !== FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS &&
+                                      normalizeBookingStatus(b.status) !== FLEX_BOOKING_STATUS.COMPLETED);
                                   const isPending =
-                                    (b.status || '').toLowerCase() === 'pending' ||
-                                    normalizeBookingStatus(b.status) === FLEX_BOOKING_STATUS.PENDING_REVIEW;
+                                    !isReserved &&
+                                    ((b.status || '').toLowerCase() === 'pending' ||
+                                    normalizeBookingStatus(b.status) === FLEX_BOOKING_STATUS.PENDING_REVIEW);
                                   const isConfirmed =
                                     (b.status || '').toLowerCase() === 'confirmed' ||
                                     normalizeBookingStatus(b.status) === FLEX_BOOKING_STATUS.CONFIRMED ||
@@ -9522,7 +9810,10 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   let statusBg = isDarkMode ? tokens.badgeNeutralBg : '#F1F5F9';
                                   let statusFg = isDarkMode ? tokens.badgeNeutralText : '#334155';
                                   let statusSolid = false;
-                                  if (isPending) {
+                                  if (isReserved) {
+                                    statusBg = isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5';
+                                    statusFg = isDarkMode ? '#34D399' : '#065F46';
+                                  } else if (isPending) {
                                     statusBg = isDarkMode ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7';
                                     statusFg = isDarkMode ? '#FBBF24' : '#B45309';
                                   } else if (isConfirmed) {
@@ -9546,9 +9837,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                     statusFg = isDarkMode ? '#FCA5A5' : '#B91C1C';
                                   }
 
-                                  const payLabel = String(payStat || 'Unpaid')
-                                    .replace(/_/g, ' ')
-                                    .replace(/\b\w/g, (c) => c.toUpperCase());
+                                  const dpAmount = Number(b.downpayment_amount || b.amount_paid || 0);
+                                  const payLabel = isReserved && dpAmount > 0
+                                    ? `DP Paid ₱${dpAmount.toLocaleString()}`
+                                    : String(payStat || 'Unpaid')
+                                      .replace(/_/g, ' ')
+                                      .replace(/\b\w/g, (c) => c.toUpperCase());
 
                                   return (
                                     <View
@@ -9659,57 +9953,152 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                             }}
                                             numberOfLines={1}
                                           >
-                                            {statusLabel(b.status || 'Pending')}
+                                            {isReserved ? 'Reserved' : statusLabel(b.status || 'Pending')}
                                           </Text>
                                         </View>
-                                        <Text
-                                          style={{
-                                            fontSize: 11,
-                                            fontWeight: '500',
-                                            color: isDarkMode ? tokens.textMuted : '#64748B',
-                                            textAlign: 'center',
-                                          }}
-                                          numberOfLines={1}
-                                        >
-                                          {payLabel}
-                                        </Text>
+                                        {(() => {
+                                          const totalCost = Number(
+                                            b.final_service_total ||
+                                            b.estimated_service_total ||
+                                            b.labor_subtotal ||
+                                            b.pricePhp ||
+                                            quoteAmt ||
+                                            2500
+                                          );
+                                          const rawBookingPercent = Number(
+                                            b.downpayment_percent ??
+                                            b.downpaymentPercent ??
+                                            b.downpayment_percentage
+                                          );
+                                          const rawDp = Number(b.downpayment_amount ?? b.amount_paid);
+                                          const dpPercent = Number.isFinite(rawBookingPercent) && rawBookingPercent > 0
+                                            ? rawBookingPercent
+                                            : (totalCost > 0 && rawDp > 0 ? Math.round((rawDp / totalCost) * 100) : 20);
+                                          const dpAmt = Number(
+                                            b.downpayment_amount !== undefined && b.downpayment_amount !== null
+                                              ? b.downpayment_amount
+                                              : rawDp > 0
+                                                ? rawDp
+                                                : Math.round(totalCost * (dpPercent / 100))
+                                          );
+                                          const balance = Number(
+                                            b.remaining_balance !== undefined && b.remaining_balance !== null
+                                              ? b.remaining_balance
+                                              : Math.max(0, totalCost - dpAmt)
+                                          );
+
+                                          if (isDone || isPaid || String(b.payment_status || '').toUpperCase() === 'FULLY_PAID' || balance <= 0) {
+                                            return (
+                                              <View
+                                                style={{
+                                                  backgroundColor: isDarkMode ? 'rgba(16, 185, 129, 0.2)' : '#D1FAE5',
+                                                  borderWidth: 1,
+                                                  borderColor: isDarkMode ? 'rgba(16, 185, 129, 0.4)' : '#A7F3D0',
+                                                  paddingHorizontal: 8,
+                                                  paddingVertical: 2.5,
+                                                  borderRadius: 6,
+                                                  flexDirection: 'row',
+                                                  alignItems: 'center',
+                                                  gap: 4,
+                                                }}
+                                              >
+                                                <BootstrapIcon name="check-circle-fill" size={10} color={isDarkMode ? '#34D399' : '#047857'} />
+                                                <Text style={{ fontSize: 10.5, fontWeight: '700', color: isDarkMode ? '#34D399' : '#047857' }}>
+                                                  Fully Paid
+                                                </Text>
+                                              </View>
+                                            );
+                                          }
+
+                                          if (isCancel) {
+                                            return (
+                                              <Text
+                                                style={{
+                                                  fontSize: 11,
+                                                  fontWeight: '500',
+                                                  color: isDarkMode ? tokens.textMuted : '#64748B',
+                                                  textAlign: 'center',
+                                                }}
+                                                numberOfLines={1}
+                                              >
+                                                Cancelled
+                                              </Text>
+                                            );
+                                          }
+
+                                          return (
+                                            <View
+                                              style={{
+                                                backgroundColor: isDarkMode ? 'rgba(59, 130, 246, 0.16)' : '#EFF6FF',
+                                                borderWidth: 1,
+                                                borderColor: isDarkMode ? 'rgba(59, 130, 246, 0.35)' : '#BFDBFE',
+                                                paddingHorizontal: 8,
+                                                paddingVertical: 2.5,
+                                                borderRadius: 6,
+                                                flexDirection: 'row',
+                                                alignItems: 'center',
+                                                gap: 4,
+                                              }}
+                                            >
+                                              <BootstrapIcon name="wallet2" size={10} color={isDarkMode ? '#60A5FA' : '#2563EB'} />
+                                              <Text style={{ fontSize: 10.5, fontWeight: '700', color: isDarkMode ? '#60A5FA' : '#1D4ED8', fontVariant: ['tabular-nums'] }}>
+                                                Balance: ₱{balance.toLocaleString()}
+                                              </Text>
+                                            </View>
+                                          );
+                                        })()}
+                                        {Boolean(b.has_pending_reschedule) && (
+                                          <View style={{ backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#FEF3C7', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2 }}>
+                                            <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? '#FBBF24' : '#B45309' }}>
+                                              Reschedule Pending
+                                            </Text>
+                                          </View>
+                                        )}
+                                        {Boolean(b.rescheduled || (b.schedule_history && b.schedule_history.length > 0)) && !b.has_pending_reschedule && (
+                                          <View style={{ backgroundColor: isDarkMode ? 'rgba(59, 130, 246, 0.2)' : '#DBEAFE', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginTop: 2 }}>
+                                            <Text style={{ fontSize: 9.5, fontWeight: '700', color: isDarkMode ? '#60A5FA' : '#1D4ED8' }}>
+                                              Rescheduled
+                                            </Text>
+                                          </View>
+                                        )}
                                       </View>
 
                                       {/* Actions */}
-                                      <View
-                                        style={{
-                                          flex: 1.2,
-                                          minWidth: 120,
-                                          flexDirection: 'row',
-                                          alignItems: 'center',
-                                          justifyContent: 'center',
-                                          gap: 8,
-                                          flexShrink: 0,
-                                        }}
-                                      >
-                                        <TouchableOpacity
-                                          style={{
-                                            backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF',
-                                            borderWidth: 1,
-                                            borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                                            paddingHorizontal: 12,
-                                            paddingVertical: 7,
-                                            borderRadius: 8,
-                                          }}
-                                          onPress={() => handleOpenBookingModal(b)}
-                                          activeOpacity={0.8}
-                                          title="Manage booking"
-                                        >
-                                          <Text
-                                            style={{
-                                              fontSize: 12,
-                                              fontWeight: '600',
-                                              color: isDarkMode ? tokens.textPrimary : '#334155',
-                                            }}
-                                          >
-                                            Manage
-                                          </Text>
-                                        </TouchableOpacity>
+                                       <View
+                                         style={{
+                                           flex: 1.2,
+                                           minWidth: 120,
+                                           flexDirection: 'row',
+                                           alignItems: 'center',
+                                           justifyContent: 'center',
+                                           gap: 8,
+                                           flexShrink: 0,
+                                         }}
+                                       >
+                                         <TouchableOpacity
+                                           style={{
+                                             backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF',
+                                             borderWidth: 1,
+                                             borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                                             paddingHorizontal: 14,
+                                             paddingVertical: 7,
+                                             borderRadius: 8,
+                                             cursor: 'pointer',
+                                           }}
+                                           onPress={() => handleOpenBookingModal(b)}
+                                           activeOpacity={0.8}
+                                           title="Review booking"
+                                         >
+                                           <Text
+                                             style={{
+                                               fontSize: 12,
+                                               fontWeight: '600',
+                                               color: isDarkMode ? tokens.textPrimary : '#334155',
+                                             }}
+                                           >
+                                             Review
+                                           </Text>
+                                         </TouchableOpacity>
 
                                         <TouchableOpacity
                                           style={[styles.actionIconBtn, styles.actionIconBtnDanger]}
@@ -12985,130 +13374,6 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
           />
         )}
 
-        {/* ─── TAB 9: SUPABASE SETTINGS ─── */}
-        {activeNav === 'supabase' && (
-          <View>
-            <View style={[styles.tableCard, { padding: 24 }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-                <View
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 18,
-                    backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <BootstrapIcon name="database-fill-check" size={20} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                </View>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                  Cloud Database Connection (Supabase)
-                </Text>
-              </View>
-              <Text style={{ color: isDarkMode ? tokens.textMuted : '#64748B', fontSize: 13, marginBottom: 18, lineHeight: 20 }}>
-                Configure the live PostgreSQL database URL and public anon key for real-time order and
-                product synchronization. Note: Supabase project URLs always end with{' '}
-                <Text style={{ fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>.supabase.co</Text>.
-              </Text>
-
-              <Text style={styles.formLabel}>Supabase Project URL</Text>
-              <TextInput
-                style={styles.formInput}
-                value={supabaseUrl}
-                onChangeText={setSupabaseUrl}
-                placeholder="https://vtbdmurblidtdghaotne.supabase.co"
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                autoCapitalize="none"
-              />
-              <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 3, marginBottom: 14 }}>
-                Correct format:{' '}
-                <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '600' }}>
-                  https://vtbdmurblidtdghaotne.supabase.co
-                </Text>
-              </Text>
-
-              <Text style={styles.formLabel}>Supabase Public Anon Key</Text>
-              <TextInput
-                style={styles.formInput}
-                value={supabaseKey}
-                onChangeText={setSupabaseKey}
-                placeholder="eyJhbGciOi..."
-                placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                autoCapitalize="none"
-              />
-              <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 3, marginBottom: 18 }}>
-                Use the client <Text style={{ fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>anon/public</Text>{' '}
-                JWT key (starts with eyJhbGci...).
-              </Text>
-
-              <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
-                <TouchableOpacity
-                  style={styles.addBtnPrimary}
-                  onPress={async () => {
-                    const saved = supabaseManager.saveCredentials(supabaseUrl, supabaseKey);
-                    setSupabaseUrl(saved.url);
-                    setSupabaseKey(saved.key);
-                    const res = await supabaseManager.testConnection();
-                    setConnectionStatus({ tested: true, connected: res.connected, message: res.message });
-                    showToast(res.connected ? 'Supabase Connected Live!' : res.message);
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <BootstrapIcon name="plug-fill" size={14} color="#FFFFFF" />
-                  <Text style={styles.addBtnPrimaryText}>Save & Test Live Connection</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.addBtnPrimary,
-                    { backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7', borderWidth: 1, borderColor: isDarkMode ? tokens.accentBorder : '#EA580C' },
-                  ]}
-                  onPress={async () => {
-                    const defs = supabaseManager.resetToDefaults();
-                    setSupabaseUrl(defs.url);
-                    setSupabaseKey(defs.key);
-                    const res = await supabaseManager.testConnection();
-                    setConnectionStatus({ tested: true, connected: res.connected, message: res.message });
-                    showToast(res.connected ? 'Restored Project Defaults!' : res.message);
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <BootstrapIcon name="arrow-counterclockwise" size={14} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                  <Text style={[styles.addBtnPrimaryText, { color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}>
-                    Restore Default Project Credentials
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {connectionStatus.tested && (
-                <View
-                  style={{
-                    marginTop: 18,
-                    padding: 14,
-                    borderRadius: 12,
-                    backgroundColor: connectionStatus.connected ? '#ECFDF5' : '#FEF2F2',
-                    borderWidth: 1,
-                    borderColor: connectionStatus.connected ? '#A7F3D0' : '#FECACA',
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: connectionStatus.connected ? '#065F46' : '#991B1B',
-                      fontWeight: '700',
-                      fontSize: 13.5,
-                      lineHeight: 20,
-                    }}
-                  >
-                    {connectionStatus.connected ? 'Connection Active: ' : 'Error: '}{' '}
-                    {connectionStatus.message}
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
         {/* ─── TAB 10: NOTIFICATIONS & ALERTS CENTER ─── */}
         {activeNav === 'notifications' && (
           <NotificationsPage
@@ -13171,110 +13436,36 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
               />
             )}
 
-            {/* ─── 1. Page Header Card ─── */}
+            {/* Top Action Bar */}
             <View
-              style={[
-                styles.tableCard,
-                {
-                  padding: 20,
-                  marginBottom: 16,
-                  borderRadius: 14,
-                  borderWidth: 1,
-                  borderColor: isDarkMode ? 'rgba(255, 255, 255, 0.08)' : '#E2E8F0',
-                  backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
-                },
-              ]}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                marginBottom: 16,
+              }}
             >
-              <View
+              <TouchableOpacity
                 style={{
-                  flexDirection: isDesktop ? 'row' : 'column',
-                  alignItems: isDesktop ? 'center' : 'flex-start',
-                  justifyContent: 'space-between',
-                  gap: 14,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingHorizontal: 14,
+                  paddingVertical: 8,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
+                  backgroundColor: isDarkMode ? '#132A26' : '#FFFFFF',
+                  cursor: 'pointer',
                 }}
+                onPress={handleExportAuditLogs}
+                activeOpacity={0.8}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <View
-                    style={{
-                      width: 42,
-                      height: 42,
-                      borderRadius: 10,
-                      backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                  >
-                    <BootstrapIcon name="journal-text" size={20} color={isDarkMode ? tokens.accentBrand : '#059669'} />
-                  </View>
-                  <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text
-                        style={{
-                          fontSize: 19,
-                          fontWeight: '600',
-                          color: isDarkMode ? tokens.textPrimary : '#0F172A',
-                          letterSpacing: -0.3,
-                        }}
-                      >
-                        Activity Logs
-                      </Text>
-                      <View
-                        style={{
-                          backgroundColor: isDarkMode ? '#132A26' : '#ECFDF5',
-                          paddingHorizontal: 7,
-                          paddingVertical: 2,
-                          borderRadius: 6,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 10,
-                            fontWeight: '700',
-                            color: isDarkMode ? tokens.accentBrand : '#059669',
-                            letterSpacing: 0.3,
-                          }}
-                        >
-                          IMMUTABLE
-                        </Text>
-                      </View>
-                    </View>
-                    <Text
-                      style={{
-                        fontSize: 12.5,
-                        color: isDarkMode ? tokens.textMuted : '#64748B',
-                        marginTop: 3,
-                      }}
-                    >
-                      Track administrative actions, inventory changes, approvals, and security events.
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <TouchableOpacity
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 8,
-                      borderWidth: 1,
-                      borderColor: isDarkMode ? tokens.accentBorder : '#EA580C',
-                      backgroundColor: isDarkMode ? '#132A26' : '#FFFFFF',
-                      cursor: 'pointer',
-                    }}
-                    onPress={handleExportAuditLogs}
-                    activeOpacity={0.8}
-                  >
-                    <BootstrapIcon name="download" size={13} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
-                    <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '700', fontSize: 12.5 }}>
-                      Export CSV
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
+                <BootstrapIcon name="download" size={13} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+                <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '700', fontSize: 12.5 }}>
+                  Export CSV
+                </Text>
+              </TouchableOpacity>
             </View>
 
             {/* ─── 2. Four KPI Summary Cards ─── */}
@@ -16413,8 +16604,10 @@ onRequestClose = {() => setIsAddProductOpen(false)}
           style={[
             styles.modalSheet,
             {
-              maxWidth: 860,
-              maxHeight: '92%',
+              width: '95%',
+              maxWidth: 1160,
+              minHeight: 650,
+              maxHeight: '94%',
               borderRadius: 24,
               overflow: 'hidden',
               display: 'flex',
@@ -16422,21 +16615,22 @@ onRequestClose = {() => setIsAddProductOpen(false)}
               backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
               borderWidth: 1,
               borderColor: isDarkMode ? tokens.border : '#E2E8F0',
+              padding: 0,
               shadowColor: '#000000',
-              shadowOffset: { width: 0, height: 12 },
-              shadowOpacity: 0.2,
-              shadowRadius: 28,
-              elevation: 12,
+              shadowOffset: { width: 0, height: 16 },
+              shadowOpacity: 0.25,
+              shadowRadius: 36,
+              elevation: 16,
             },
           ]}
         >
-          {/* Fixed Modal Header */}
+          {/* Modal Header (Restored Original Clean Styling) */}
           <View
             style={{
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              paddingHorizontal: 20,
+              paddingHorizontal: 16,
               paddingVertical: 10,
               borderBottomWidth: 1,
               borderBottomColor: isDarkMode ? tokens.border : '#E2E8F0',
@@ -16446,50 +16640,52 @@ onRequestClose = {() => setIsAddProductOpen(false)}
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
               <View
                 style={{
-                  width: 32,
-                  height: 32,
+                  width: 34,
+                  height: 34,
                   borderRadius: 8,
-                  backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
+                  backgroundColor: isDarkMode ? tokens.bgSub : '#FEF3C7',
                   borderWidth: 1,
-                  borderColor: isDarkMode ? tokens.chipBorder : '#FDE68A',
+                  borderColor: isDarkMode ? tokens.border : '#FDE68A',
                   justifyContent: 'center',
                   alignItems: 'center',
                 }}
               >
-                <BootstrapIcon name="tools" size={15} color="#B45309" />
+                <BootstrapIcon name="tools" size={15} color={isDarkMode ? '#F59E0B' : '#D97706'} />
               </View>
               <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A', letterSpacing: -0.3 }}>
-                    Work Order #{selectedBookingForModal.booking_id || selectedBookingForModal.id}
-                  </Text>
-                  <View
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text
                     style={{
-                      backgroundColor: selectedBookingForModal.status === 'Cancelled' ? '#FEF2F2' : '#ECFDF5',
-                      paddingHorizontal: 7,
-                      paddingVertical: 2,
-                      borderRadius: 5,
-                      borderWidth: 1,
-                      borderColor: selectedBookingForModal.status === 'Cancelled' ? '#FECACA' : '#A7F3D0',
+                      fontSize: 10.5,
+                      fontWeight: '700',
+                      color: '#059669',
+                      letterSpacing: 0.6,
+                      textTransform: 'uppercase',
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: 10.5,
-                        fontWeight: '600',
-                        color: selectedBookingForModal.status === 'Cancelled' ? '#DC2626' : '#047857',
-                      }}
-                    >
-                      {selectedBookingForModal.status === 'Cancelled'
-                        ? 'DP Forfeited'
-                        : `20% DP ₱${(selectedBookingForModal.downpayment_amount !== undefined ? selectedBookingForModal.downpayment_amount : Math.round((selectedBookingForModal.pricePhp || 2500) * 0.20)).toLocaleString()} Paid (${selectedBookingForModal.downpayment_method || 'GCash'})`}
-                    </Text>
-                  </View>
+                    WORK ORDER
+                  </Text>
+                  <Text
+                    style={{
+                      fontSize: 16.5,
+                      fontWeight: '700',
+                      color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                      letterSpacing: -0.3,
+                    }}
+                  >
+                    {selectedBookingForModal.booking_id || selectedBookingForModal.id}
+                  </Text>
                 </View>
-
-                <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#64748B', fontWeight: '500', marginTop: 1 }}>
-                  {selectedBookingForModal.category || 'PMS'} Service Appointment •{' '}
-                  {selectedBookingForModal.branch?.replace('MotoTrack ', '') || 'D\'Blockchain Motorparts and Accessories'}
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: isDarkMode ? tokens.textMuted : '#64748B',
+                    fontWeight: '500',
+                    marginTop: 1,
+                  }}
+                >
+                  {selectedBookingForModal.category || 'PMS'} service appointment ·{' '}
+                  {selectedBookingForModal.branch?.replace('MotoTrack ', '') || "D'Blockchain Motorparts and Accessories"}
                 </Text>
               </View>
             </View>
@@ -16509,10 +16705,9 @@ onRequestClose = {() => setIsAddProductOpen(false)}
               }}
               activeOpacity={0.7}
             >
-              <BootstrapIcon name="x-lg" size={12} color={isDarkMode ? tokens.textMuted : "#64748B"} />
+              <BootstrapIcon name="x-lg" size={12} color={isDarkMode ? tokens.textMuted : '#64748B'} />
             </TouchableOpacity>
           </View>
-
           {/* Organized Booking Details & Operational Workflow Modal */}
           <AdminBookingDetailsPanel
             booking={selectedBookingForModal}
@@ -16550,6 +16745,24 @@ onRequestClose = {() => setIsAddProductOpen(false)}
     </Modal>
   )
 }
+
+{/* ─── MODAL: RESCHEDULE REQUEST REVIEW & MANAGEMENT ─── */}
+<AdminRescheduleModal
+  visible={Boolean(selectedRescheduleForModal)}
+  request={selectedRescheduleForModal}
+  onClose={() => setSelectedRescheduleForModal(null)}
+  onRequestUpdated={() => {
+    setRescheduleRequests(rescheduleService.getAllRequests());
+    garageService.fetchBookings().then((fresh) => {
+      if (Array.isArray(fresh)) setGarageBookings(fresh);
+    }).catch(() => {
+      setGarageBookings(garageService.getLocalBookings());
+    });
+  }}
+  showToast={showToast}
+  isDarkMode={isDarkMode}
+  adminName={currentUser?.name || currentUser?.full_name || currentUser?.email || 'Workshop Admin'}
+/>
 
 {/* ─── MODAL: CREATE WALK-IN / NEW BOOKING ─── */ }
 <Modal
@@ -18706,25 +18919,6 @@ onRequestClose = {() => setIsAddProductOpen(false)}
             <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
               {newReportsCount > 0 ? `${newReportsCount} new reports` : 'Customer feedback'}
             </Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* Supabase DB */}
-        <TouchableOpacity
-          style={[styles.mobileMoreCard, activeNav === 'supabase' && styles.mobileMoreCardActive]}
-          onPress={() => {
-            setActiveNav('supabase');
-            setIsMobileMoreOpen(false);
-          }}
-        >
-          <BootstrapIcon
-            name="database-fill-gear"
-            size={20}
-            color={activeNav === 'supabase' ? '#EA580C' : '#475569'}
-          />
-          <View>
-            <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>Supabase DB</Text>
-            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#64748B' }}>Cloud Database</Text>
           </View>
         </TouchableOpacity>
 

@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { serviceQuotationService } from '../../services/bookings/serviceQuotationService.js';
 import { garageService } from '../../services/bookings/garageService.js';
+import { rescheduleService, RESCHEDULE_STATUS } from '../../services/bookings/rescheduleService.js';
 import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../../services/products/motorcycleService.js';
 import BootstrapIcon from './BootstrapIcon.jsx';
 import BookingWorkflowTracker from './BookingWorkflowTracker.jsx';
@@ -233,6 +234,7 @@ export default function CustomerServiceBookingCard({
   defaultExpanded = false,
   canCancel = false,
   onCancel,
+  onReschedule,
   onViewDetails,
   viewMode = 'grid',
   isModalView = false,
@@ -248,6 +250,15 @@ export default function CustomerServiceBookingCard({
   const [charges, setCharges] = useState([]);
   const [payments, setPayments] = useState([]);
   const [timeline, setTimeline] = useState([]);
+
+  const canReschedInfo = useMemo(() => {
+    return rescheduleService.canBookingBeRescheduled(booking);
+  }, [booking]);
+  const canReschedule = canReschedInfo.canReschedule;
+  const pendingResched = useMemo(() => {
+    return booking?.active_reschedule_request || rescheduleService.getPendingRequestForBooking(bookingId);
+  }, [booking, bookingId]);
+  const isAltProposed = pendingResched?.status === RESCHEDULE_STATUS.ALTERNATIVE_SUGGESTED;
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [declineReason, setDeclineReason] = useState('');
@@ -1249,7 +1260,7 @@ export default function CustomerServiceBookingCard({
               </View>
             ) : (
               <Text style={styles.receiptNotice}>
-                ✓ Your service is complete. Open the full receipt anytime, or present your pickup QR at the shop.
+                ✓ Your service is complete. Open the full receipt anytime, and claim your motorcycle at the shop counter.
               </Text>
             )}
 
@@ -1298,21 +1309,41 @@ export default function CustomerServiceBookingCard({
         </Section>
       ) : null}
 
-      {/* Pickup QR */}
+      {/* Vehicle Pickup Status */}
       {showPickup ? (
-        <Section title="Pickup QR" icon="qr-code">
-          <View style={styles.pickupBox}>
-            <Image
-              source={{ uri: qrImageUrl(qrToken) }}
-              style={styles.qr}
-              accessibilityLabel="Pickup QR code"
-            />
-            <Text style={styles.muted}>Show this QR at the counter to release your motorcycle.</Text>
+        <Section title="Vehicle Pickup Status" icon="check-circle" defaultOpen={true}>
+          <View
+            style={[
+              styles.noteBox,
+              {
+                marginTop: 4,
+                marginBottom: 12,
+                backgroundColor: status === FLEX_BOOKING_STATUS.COMPLETED ? '#F0FDF4' : '#FFF7ED',
+                borderColor: status === FLEX_BOOKING_STATUS.COMPLETED ? '#BBF7D0' : '#FFEDD5',
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.noteText,
+                {
+                  color: status === FLEX_BOOKING_STATUS.COMPLETED ? '#166534' : '#9A3412',
+                  fontWeight: '600',
+                },
+              ]}
+            >
+              {status === FLEX_BOOKING_STATUS.COMPLETED
+                ? '✓ Your motorcycle has been released. Thank you for choosing MotoTrack!'
+                : '✓ Service complete! Your motorcycle is ready for pickup at the shop counter.'}
+            </Text>
           </View>
           <KV label="Booking ID" value={bookingId} />
           <KV label="Motorcycle" value={`${bikeLabel}${plate ? ` · ${plate}` : ''}`} />
           <KV label="Customer" value={booking?.customer_name || booking?.userName} />
-          <KV label="Payment status" value="Fully Paid" />
+          <KV
+            label="Payment status"
+            value={Number(booking?.remaining_balance || 0) <= 0 ? 'Fully Paid' : 'Balance Pending'}
+          />
           <KV
             label="Pickup status"
             value={status === FLEX_BOOKING_STATUS.COMPLETED ? 'Released' : 'Ready for pickup'}
@@ -1445,8 +1476,57 @@ export default function CustomerServiceBookingCard({
               </View>
             )}
 
-            {canCancel && onCancel ? (
-              <View style={styles.listActionsRow}>
+            <View style={styles.listActionsRow}>
+              {pendingResched ? (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 9,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    backgroundColor: isAltProposed ? '#FEF3C7' : 'rgba(234, 88, 12, 0.12)',
+                    borderWidth: 1,
+                    borderColor: isAltProposed ? '#F59E0B' : 'rgba(234, 88, 12, 0.3)',
+                    cursor: onReschedule ? 'pointer' : 'default',
+                  }}
+                  onPress={(e) => {
+                    e?.stopPropagation?.();
+                    onReschedule?.(booking);
+                  }}
+                >
+                  <BootstrapIcon name={isAltProposed ? "exclamation-triangle-fill" : "clock-history"} size={11} color={isAltProposed ? "#D97706" : "#EA580C"} />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: isAltProposed ? "#92400E" : "#EA580C" }}>
+                    {isAltProposed ? 'Review Proposal' : 'Reschedule Pending'}
+                  </Text>
+                </TouchableOpacity>
+              ) : canReschedule && onReschedule ? (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    paddingHorizontal: 9,
+                    paddingVertical: 5,
+                    borderRadius: 8,
+                    backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.12)' : '#FFF7ED',
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.3)' : '#FED7AA',
+                    cursor: 'pointer',
+                  }}
+                  onPress={(e) => {
+                    e?.stopPropagation?.();
+                    onReschedule(booking);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <BootstrapIcon name="calendar2-range" size={11} color="#EA580C" />
+                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#EA580C' }}>Reschedule</Text>
+                </TouchableOpacity>
+              ) : null}
+
+              {canCancel && onCancel ? (
                 <TouchableOpacity
                   style={styles.listCancelBtn}
                   onPress={(e) => {
@@ -1458,8 +1538,8 @@ export default function CustomerServiceBookingCard({
                   <BootstrapIcon name="x-circle" size={13} color="#DC2626" />
                   <Text style={styles.listCancelBtnText}>Cancel</Text>
                 </TouchableOpacity>
-              </View>
-            ) : null}
+              ) : null}
+            </View>
           </View>
         </View>
 
@@ -1679,19 +1759,70 @@ export default function CustomerServiceBookingCard({
             </TouchableOpacity>
           </View>
 
-          {/* Subtle & Unobtrusive Cancel Option */}
-          {canCancel && onCancel ? (
-            <TouchableOpacity
-              style={styles.gridCancelLink}
-              onPress={(e) => {
-                e?.stopPropagation?.();
-                onCancel();
-              }}
-              activeOpacity={0.65}
-            >
-              <Text style={styles.gridCancelText}>Cancel</Text>
-            </TouchableOpacity>
-          ) : null}
+          {/* Action Row: Reschedule + Cancel */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {pendingResched ? (
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  backgroundColor: isAltProposed ? '#FEF3C7' : 'rgba(234, 88, 12, 0.12)',
+                  borderWidth: 1,
+                  borderColor: isAltProposed ? '#F59E0B' : 'rgba(234, 88, 12, 0.3)',
+                  cursor: onReschedule ? 'pointer' : 'default',
+                }}
+                onPress={(e) => {
+                  e?.stopPropagation?.();
+                  onReschedule?.(booking);
+                }}
+              >
+                <BootstrapIcon name={isAltProposed ? "exclamation-triangle-fill" : "clock-history"} size={11} color={isAltProposed ? "#D97706" : "#EA580C"} />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: isAltProposed ? "#92400E" : "#EA580C" }}>
+                  {isAltProposed ? 'Review Proposal' : 'Reschedule Pending'}
+                </Text>
+              </TouchableOpacity>
+            ) : canReschedule && onReschedule ? (
+              <TouchableOpacity
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 4,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.12)' : '#FFF7ED',
+                  borderWidth: 1,
+                  borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.3)' : '#FED7AA',
+                  cursor: 'pointer',
+                }}
+                onPress={(e) => {
+                  e?.stopPropagation?.();
+                  onReschedule(booking);
+                }}
+                activeOpacity={0.75}
+              >
+                <BootstrapIcon name="calendar2-range" size={11} color="#EA580C" />
+                <Text style={{ fontSize: 11, fontWeight: '700', color: '#EA580C' }}>Reschedule</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {canCancel && onCancel ? (
+              <TouchableOpacity
+                style={styles.gridCancelLink}
+                onPress={(e) => {
+                  e?.stopPropagation?.();
+                  onCancel();
+                }}
+                activeOpacity={0.65}
+              >
+                <Text style={styles.gridCancelText}>Cancel</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
 
         {/* Fallback inline expansion when onViewDetails is not used */}

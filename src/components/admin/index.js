@@ -22,3 +22,4 @@ export { default as ModernOverviewDashboard } from './ModernOverviewDashboard.js
 export { default as AdminMarketingBannerSettings } from './AdminMarketingBannerSettings.jsx';
 export { default as AdminCustomerRatingsReportsPanel } from './AdminCustomerRatingsReportsPanel.jsx';
 export { default as ViewReportDetailsModal } from './ViewReportDetailsModal.jsx';
+export { default as AdminRescheduleModal } from './AdminRescheduleModal.jsx';

@@ -132,7 +132,7 @@ export const staffAccountApi = {
   },
 
   /**
-   * Email temporary password to a newly created Rider/Mechanic.
+   * Email temporary password to a newly created Rider.
    * Password is sent only in the request body to the server — never logged/returned.
    */
   sendTempCredentials({ name, email, role, temporaryPassword }) {

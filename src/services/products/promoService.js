@@ -32,7 +32,7 @@ const DEFAULT_PROMOS = [
     usageLimit: null,
     usageCount: 0,
     minimumOrderAmount: null,
-    isActive: true,
+    isActive: false,
   },
   {
     promo_id: 'prm-freeship',
@@ -48,7 +48,7 @@ const DEFAULT_PROMOS = [
     usageLimit: 100,
     usageCount: 0,
     minimumOrderAmount: null,
-    isActive: true,
+    isActive: false,
   },
 ];
 

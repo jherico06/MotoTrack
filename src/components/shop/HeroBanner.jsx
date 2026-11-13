@@ -190,86 +190,6 @@ export default function HeroBanner({
           zIndex: 2,
         }}
       >
-        {/* ─── TOP RIGHT GEOMETRIC ACCENT & SUBTITLE (matching reference UI) ─── */}
-        {isDesktop && (
-          <View
-            style={{
-              position: 'absolute',
-              top: 24,
-              right: 24,
-              zIndex: 3,
-              alignItems: 'flex-end',
-              pointerEvents: 'none',
-            }}
-          >
-          {/* Angular Orange Chevron Accent Ribbon */}
-          {Platform.OS === 'web' && (
-            <svg
-              style={{
-                position: 'absolute',
-                top: -14,
-                right: -10,
-                width: 140,
-                height: 140,
-                pointerEvents: 'none',
-                opacity: 0.9,
-              }}
-              viewBox="0 0 140 140"
-              fill="none"
-            >
-              <polygon points="140,0 90,0 140,50" fill="#FF5A0A" />
-              <polygon points="140,30 60,0 80,0 140,60" fill="#FF5A0A" opacity="0.6" />
-              <polygon points="140,70 100,30 115,30 140,85" fill="#FF5A0A" opacity="0.3" />
-            </svg>
-          )}
-
-          {banner?.subtitle ? (
-            <View style={{ alignItems: 'flex-end', marginTop: 12, marginRight: 8 }}>
-              {banner.subtitle.split(/\s+/).slice(0, 4).map((w, idx) => (
-                <Text
-                  key={idx}
-                  style={{
-                    color: idx % 2 === 0 ? '#FF5A0A' : '#FFFFFF',
-                    fontSize: 13,
-                    fontWeight: '600',
-                    letterSpacing: 2.5,
-                    lineHeight: 16,
-                    fontFamily: fontFamily.sans,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {w}
-                </Text>
-              ))}
-            </View>
-          ) : null}
-
-          {/* Dot Grid Pattern Accent at Bottom Right */}
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              width: 50,
-              gap: 5,
-              marginTop: 240,
-              opacity: 0.5,
-            }}
-          >
-            {Array.from({ length: 12 }).map((_, i) => (
-              <View
-                key={i}
-                style={{
-                  width: 4,
-                  height: 4,
-                  borderRadius: 2,
-                  backgroundColor: '#FF5A0A',
-                }}
-              />
-            ))}
-          </View>
-        </View>
-      )}
-
         {/* ─── LEFT HERO CONTENT (Eyebrow, Headline, Subtitle, CTAs, Trust Indicators) ─── */}
         <View
           style={{
@@ -357,13 +277,13 @@ export default function HeroBanner({
                 backgroundColor: '#FF5A0A',
                 paddingHorizontal: isDesktop ? 24 : isTablet ? 16 : 18,
                 paddingVertical: isDesktop ? 13 : isTablet ? 9.5 : 11,
-                borderRadius: 12,
+                borderRadius: 6,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
                 cursor: 'pointer',
-                boxShadow: '0 6px 20px rgba(255, 90, 10, 0.45)',
+                boxShadow: '0 4px 14px rgba(255, 90, 10, 0.35)',
                 flex: isSmallMobile ? 1 : undefined,
                 minWidth: isSmallMobile ? '100%' : undefined,
               }}
@@ -392,7 +312,7 @@ export default function HeroBanner({
                 borderColor: 'rgba(255, 255, 255, 0.22)',
                 paddingHorizontal: isDesktop ? 22 : isTablet ? 14 : 16,
                 paddingVertical: isDesktop ? 13 : isTablet ? 9.5 : 11,
-                borderRadius: 12,
+                borderRadius: 6,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -437,7 +357,7 @@ export default function HeroBanner({
               style={{
                 width: isTablet ? 28 : 32,
                 height: isTablet ? 28 : 32,
-                borderRadius: 8,
+                borderRadius: 6,
                 backgroundColor: 'rgba(255, 90, 10, 0.15)',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -475,7 +395,7 @@ export default function HeroBanner({
               style={{
                 width: isTablet ? 28 : 32,
                 height: isTablet ? 28 : 32,
-                borderRadius: 8,
+                borderRadius: 6,
                 backgroundColor: 'rgba(255, 90, 10, 0.15)',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -513,7 +433,7 @@ export default function HeroBanner({
               style={{
                 width: isTablet ? 28 : 32,
                 height: isTablet ? 28 : 32,
-                borderRadius: 8,
+                borderRadius: 6,
                 backgroundColor: 'rgba(255, 90, 10, 0.15)',
                 alignItems: 'center',
                 justifyContent: 'center',

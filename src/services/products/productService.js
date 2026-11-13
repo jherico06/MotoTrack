@@ -1192,6 +1192,7 @@ export const productService = {
               customerName: r.customer_name || 'Rider',
               rating: Number(r.rating) || 5,
               comment: r.comment || '',
+              photos: Array.isArray(r.photos) ? r.photos : [],
               createdAt: r.created_at,
             }));
         }
@@ -1227,7 +1228,7 @@ export const productService = {
   /**
    * Submit a customer rating & review for a product from a delivered order
    */
-  async submitProductReview({ productId, rating, comment, customerName, orderId }) {
+  async submitProductReview({ productId, rating, comment, customerName, orderId, photos = [] }) {
     if (!productId) return { success: false, error: 'Product ID is required' };
     const reviewId = `rev-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
     const reviewRow = {
@@ -1240,6 +1241,7 @@ export const productService = {
       customer_name: customerName || 'Rider',
       rating: Number(rating) || 5,
       comment: String(comment || '').trim(),
+      photos: Array.isArray(photos) ? photos : [],
       createdAt: new Date().toISOString(),
       created_at: new Date().toISOString(),
     };
@@ -1247,17 +1249,23 @@ export const productService = {
     try {
       const client = supabaseManager.getClient();
       if (client) {
-        await client.from('product_reviews').insert([
-          {
-            review_id: reviewId,
-            product_id: productId,
-            order_id: orderId || null,
-            customer_name: reviewRow.customerName,
-            rating: reviewRow.rating,
-            comment: reviewRow.comment || null,
-            created_at: reviewRow.createdAt,
-          },
-        ]);
+        const payload = {
+          review_id: reviewId,
+          product_id: productId,
+          order_id: orderId || null,
+          customer_name: reviewRow.customerName,
+          rating: reviewRow.rating,
+          comment: reviewRow.comment || null,
+          created_at: reviewRow.createdAt,
+        };
+        if (Array.isArray(photos) && photos.length > 0) {
+          payload.photos = photos;
+        }
+        const { error: insErr } = await client.from('product_reviews').insert([payload]);
+        if (insErr && insErr.message && insErr.message.includes('photos')) {
+          delete payload.photos;
+          await client.from('product_reviews').insert([payload]);
+        }
       }
     } catch (e) {
       console.warn('product_reviews insert note:', e);

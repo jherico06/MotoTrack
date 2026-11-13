@@ -1,6 +1,6 @@
 // =========================================================================
 // MotoTrack Minimalist Horizontal Booking Progress Indicator
-// Steps: 1. Choose Service | 2. Motorcycle | 3. Schedule | 4. Confirm
+// Steps: 1. Choose Service | 2. Motorcycle | 3. Schedule | 4. Review
 // =========================================================================
 
 import React from 'react';
@@ -11,7 +11,8 @@ export const BOOKING_STEPS = [
   { id: 1, label: 'Choose Service', icon: 'wrench-adjustable' },
   { id: 2, label: 'Rider Info', icon: 'person-lines-fill' },
   { id: 3, label: 'Schedule', icon: 'calendar3' },
-  { id: 4, label: 'Confirm', icon: 'check2-circle' },
+  { id: 4, label: 'Review', icon: 'check2-circle' },
+  { id: 5, label: 'Payment', icon: 'credit-card-2-front' },
 ];
 
 export default function BookingProgressIndicator({

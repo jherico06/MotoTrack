@@ -339,6 +339,7 @@ export default function ProductSpecsModal({
                     width: 48,
                     minWidth: 48,
                     paddingHorizontal: 0,
+                    borderRadius: 8,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -359,6 +360,7 @@ export default function ProductSpecsModal({
                   styles.checkoutBtn,
                   {
                     flex: 1,
+                    borderRadius: 8,
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',

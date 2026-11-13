@@ -3,6 +3,7 @@ import { garageService } from '../bookings/garageService.js';
 import { geminiService } from './geminiService.js';
 import { usdToPhp } from '../../utils/currency.js';
 import { promoService } from '../products/promoService.js';
+import { systemSettingsService } from '../system/systemSettingsService.js';
 
 /** Standard AI install labor fee (USD). Waived when product has FREE_INSTALLATION promo. */
 export const AI_INSTALLATION_FEE_USD = 65.0;
@@ -440,6 +441,10 @@ export const aiCustomizerService = {
     plateNumber,
     notes,
     currentUser,
+    downpaymentPercent,
+    downpaymentAmount,
+    remainingBalance,
+    paymentMethod,
   }) {
     const selectedParts = customizationData?.selectedParts || [];
     const partsNames = selectedParts.map((p) => p.name || p.product_name).filter(Boolean).join(' + ');
@@ -448,25 +453,23 @@ export const aiCustomizerService = {
       .filter(Boolean)
       .map(String);
 
-    const partsCostUsd = Number(
+    const partsCostPhp = Number(
       customizationData?.partsTotalUsd ??
         selectedParts.reduce((sum, p) => sum + Number(p.price || 0), 0)
     );
-    let installationFeeUsd = AI_INSTALLATION_FEE_USD;
+    let installFeePhp = systemSettingsService.getCustomizationLaborFee?.() ?? 3250;
     let freeInstallPromo = null;
 
     try {
       freeInstallPromo = await promoService.findApplicableFreeInstallation(productIds);
       if (freeInstallPromo?.isFreeInstallation) {
-        installationFeeUsd = 0;
+        installFeePhp = 0;
       }
     } catch (e) {
       console.warn('[bookCustomization] free install lookup:', e?.message || e);
     }
 
-    const totalEstUsd = Math.max(0, partsCostUsd) + installationFeeUsd;
-    const totalEstPhp = usdToPhp(totalEstUsd);
-    const installFeePhp = usdToPhp(installationFeeUsd);
+    const totalEstPhp = Math.max(0, partsCostPhp) + installFeePhp;
     const customizationId =
       customizationData?.customizationId ||
       customizationData?.customization_id ||
@@ -476,12 +479,31 @@ export const aiCustomizerService = {
       ? `Installation fee: FREE (promo ${freeInstallPromo.code})`
       : `Installation fee: ₱${installFeePhp.toLocaleString()}`;
 
+    // Downpayment calculation matching MotoTrack Pitstop Garage Rules
+    const adminSettings = systemSettingsService.getSettings?.() || {};
+    const effectiveDpPercent = downpaymentPercent ?? (
+      adminSettings?.requireDownpayment === false ? 0 : (Number(adminSettings?.downpaymentPercent) || 20)
+    );
+    const calculatedDp = downpaymentAmount ?? Math.round(totalEstPhp * (effectiveDpPercent / 100));
+    const calculatedBal = remainingBalance ?? Math.max(0, totalEstPhp - calculatedDp);
+
     const bookingPayload = {
       category: 'Customization',
       service_id: 'cust-ai-bespoke',
       service_title: `AI Install: ${customizationData?.bikeName || 'Motorcycle'}`,
-      service_price: totalEstUsd,
+      service_price: totalEstPhp / 50,
       pricePhp: totalEstPhp,
+      labor_subtotal: installFeePhp,
+      parts_subtotal: partsCostPhp,
+      estimated_service_total: totalEstPhp,
+      downpayment_percent: effectiveDpPercent,
+      downpayment_amount: calculatedDp,
+      downpayment_status: calculatedDp > 0 ? 'Awaiting Downpayment' : 'Not Required',
+      remaining_balance: calculatedBal,
+      payment_method: paymentMethod || 'GCash',
+      downpayment_method: paymentMethod || 'GCash',
+      deposit_amount: calculatedDp,
+      deposit_paid: false,
       bike_brand: customizationData?.bikeBrand || 'Motorcycle',
       bike_model: customizationData?.bikeName || customizationData?.bikeModel || 'Custom Model',
       plate_number: plateNumber || 'Pending Plate',
@@ -502,6 +524,9 @@ export const aiCustomizerService = {
         `[AI Install Studio${customizationId ? ` #${customizationId}` : ''}]`,
         partsNames ? `Parts: ${partsNames}` : null,
         feeNote,
+        calculatedDp > 0
+          ? `Downpayment Required (${effectiveDpPercent}%): ₱${calculatedDp.toLocaleString()} · Remaining: ₱${calculatedBal.toLocaleString()}`
+          : null,
         notes || null,
       ]
         .filter(Boolean)

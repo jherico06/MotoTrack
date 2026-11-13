@@ -56,6 +56,7 @@ export const TIMELINE_EVENTS = Object.freeze({
  */
 export const STATUS_TRANSITIONS = Object.freeze({
   [FLEX_BOOKING_STATUS.PENDING_REVIEW]: [
+    FLEX_BOOKING_STATUS.RESERVED,
     FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT,
     FLEX_BOOKING_STATUS.APPROVED,
     FLEX_BOOKING_STATUS.REJECTED,
@@ -71,8 +72,15 @@ export const STATUS_TRANSITIONS = Object.freeze({
     FLEX_BOOKING_STATUS.CANCELLED,
   ],
   [FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT]: [
+    FLEX_BOOKING_STATUS.RESERVED,
     FLEX_BOOKING_STATUS.CONFIRMED,
     FLEX_BOOKING_STATUS.BOOKING_EXPIRED,
+    FLEX_BOOKING_STATUS.CANCELLED,
+  ],
+  [FLEX_BOOKING_STATUS.RESERVED]: [
+    FLEX_BOOKING_STATUS.CONFIRMED,
+    FLEX_BOOKING_STATUS.SCHEDULED,
+    FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS,
     FLEX_BOOKING_STATUS.CANCELLED,
   ],
   [FLEX_BOOKING_STATUS.CONFIRMED]: [
@@ -142,6 +150,7 @@ export const STATUS_TRANSITIONS = Object.freeze({
 export const ROLE_ALLOWED_TARGETS = Object.freeze({
   [BOOKING_ROLES.CUSTOMER]: new Set([
     FLEX_BOOKING_STATUS.PENDING_REVIEW,
+    FLEX_BOOKING_STATUS.RESERVED,
     FLEX_BOOKING_STATUS.SERVICE_IN_PROGRESS,
     FLEX_BOOKING_STATUS.CUSTOMER_DECLINED,
     FLEX_BOOKING_STATUS.CANCELLED,
@@ -154,6 +163,7 @@ export const ROLE_ALLOWED_TARGETS = Object.freeze({
 });
 
 export const STATUS_LABELS = Object.freeze({
+  [FLEX_BOOKING_STATUS.RESERVED]: 'Reserved',
   [FLEX_BOOKING_STATUS.PENDING_REVIEW]: 'Pending Review',
   [FLEX_BOOKING_STATUS.NEEDS_INFORMATION]: 'Needs Information',
   [FLEX_BOOKING_STATUS.APPROVED]: 'Approved — Payment Required',
@@ -176,6 +186,7 @@ export const STATUS_LABELS = Object.freeze({
   [FLEX_BOOKING_STATUS.CUSTOMER_DECLINED]: 'Declined',
   [FLEX_BOOKING_STATUS.ADDITIONAL_APPROVAL_REQUIRED]: 'Additional Work Pending',
   [FLEX_BOOKING_STATUS.BOOKING_EXPIRED]: 'Booking Expired',
+  Reserved: 'Reserved',
   Pending: 'Pending Review',
   Confirmed: 'Confirmed',
   Inspection: 'Inspection',
@@ -187,6 +198,8 @@ export const STATUS_LABELS = Object.freeze({
 });
 
 export const STATUS_COLORS = Object.freeze({
+  [FLEX_BOOKING_STATUS.RESERVED]: { bg: '#D1FAE5', fg: '#065F46' },
+  Reserved: { bg: '#D1FAE5', fg: '#065F46' },
   [FLEX_BOOKING_STATUS.PENDING_REVIEW]: { bg: '#FEF3C7', fg: '#92400E' },
   [FLEX_BOOKING_STATUS.NEEDS_INFORMATION]: { bg: '#FEF3C7', fg: '#92400E' },
   [FLEX_BOOKING_STATUS.APPROVED]: { bg: '#DCFCE7', fg: '#166534' },
@@ -291,6 +304,7 @@ export function computeBookingDashboardStats(bookings = []) {
   const n = (b) => normalizeBookingStatus(b.status);
   return {
     total: bookings.length,
+    reserved: bucket((b) => n(b) === FLEX_BOOKING_STATUS.RESERVED || String(b.status).toLowerCase() === 'reserved' || b.downpayment_status === 'Paid' || b.downpayment_paid === true || b.deposit_paid === true),
     pending: bucket((b) => n(b) === FLEX_BOOKING_STATUS.PENDING_REVIEW || n(b) === FLEX_BOOKING_STATUS.NEEDS_INFORMATION),
     approved: bucket((b) => n(b) === FLEX_BOOKING_STATUS.APPROVED),
     scheduled: bucket((b) => n(b) === FLEX_BOOKING_STATUS.SCHEDULED),
@@ -319,6 +333,7 @@ export function computeBookingDashboardStats(bookings = []) {
 
 export const ADMIN_STATUS_FILTER_OPTIONS = [
   { key: 'All', label: 'All Bookings' },
+  { key: FLEX_BOOKING_STATUS.RESERVED, label: 'Reserved' },
   { key: FLEX_BOOKING_STATUS.PENDING_REVIEW, label: 'Pending Review' },
   { key: FLEX_BOOKING_STATUS.NEEDS_INFORMATION, label: 'Needs Information' },
   { key: FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT, label: 'Payment Required' },

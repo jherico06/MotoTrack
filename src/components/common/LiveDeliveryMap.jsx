@@ -50,18 +50,53 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
       display: flex; align-items: center; justify-content: center; font-size: 14px;
       border: 2px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,.35);
     }
-    .status-chip {
-      position: absolute; z-index: 1000; top: 10px; left: 10px; right: 10px;
-      background: rgba(15,23,42,.88); color: #fff; font: 600 12px/1.3 system-ui,sans-serif;
-      padding: 8px 12px; border-radius: 10px; pointer-events: none;
+    .leaflet-control-zoom {
+      border: 1px solid #CBD5E1 !important;
+      border-radius: 8px !important;
+      overflow: hidden !important;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12) !important;
+      margin-top: 10px !important;
+      margin-left: 10px !important;
+    }
+    .leaflet-control-zoom a {
+      background-color: #FFFFFF !important;
+      color: #0F172A !important;
+      width: 32px !important;
+      height: 32px !important;
+      line-height: 32px !important;
+      font-size: 16px !important;
+      font-weight: 700 !important;
+      border-bottom: 1px solid #E2E8F0 !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      text-decoration: none !important;
+      cursor: pointer !important;
+      transition: background-color 0.15s ease, color 0.15s ease;
+    }
+    .leaflet-control-zoom a:hover {
+      background-color: #FFF7ED !important;
+      color: #EA580C !important;
+    }
+    .leaflet-control-zoom a:last-child {
+      border-bottom: none !important;
     }
   </style>
 </head>
 <body>
-  <div id="statusChip" class="status-chip">${status}</div>
   <div id="map"></div>
   <script>
-    var map = L.map('map', { zoomControl: true, attributionControl: true });
+    var map = L.map('map', {
+      zoomControl: true,
+      attributionControl: true,
+      scrollWheelZoom: true,
+      doubleClickZoom: true,
+      touchZoom: true,
+      boxZoom: true,
+      dragging: true
+    });
+    map.on('zoomstart', function () { hasFitted = true; });
+    map.on('dragstart', function () { hasFitted = true; });
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap'
@@ -175,8 +210,7 @@ function buildMapHtml({ store, customer, statusLabel, orderId }) {
     }
 
     function setStatus(text) {
-      var el = document.getElementById('statusChip');
-      if (el) el.textContent = text || '';
+      // Unobstructed map view - status is displayed in outer cards
     }
 
     function setFollow(v) { followRider = !!v; }
@@ -230,6 +264,7 @@ export default function LiveDeliveryMap({
   lastUpdatedAt,
   height = 280,
   followRider = false,
+  hideFooter = false,
   style,
 }) {
   const webRef = useRef(null);
@@ -431,25 +466,27 @@ export default function LiveDeliveryMap({
         />
       )}
 
-      {lastUpdatedAt ? (
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            Last GPS update:{' '}
-            {(() => {
-              try {
-                return new Date(lastUpdatedAt).toLocaleString();
-              } catch (_e) {
-                return String(lastUpdatedAt);
-              }
-            })()}
-          </Text>
-        </View>
-      ) : (
-        <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            {routePath?.length ? 'Route: store → delivery address' : 'Waiting for rider GPS…'}
-          </Text>
-        </View>
+      {!hideFooter && (
+        lastUpdatedAt ? (
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              Last GPS update:{' '}
+              {(() => {
+                try {
+                  return new Date(lastUpdatedAt).toLocaleString();
+                } catch (_e) {
+                  return String(lastUpdatedAt);
+                }
+              })()}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>
+              {routePath?.length ? 'Route: store → delivery address' : 'Waiting for rider GPS…'}
+            </Text>
+          </View>
+        )
       )}
     </View>
   );

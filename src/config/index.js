@@ -34,6 +34,9 @@ export const APP_CONFIG = {
     merchantId: env.EXPO_PUBLIC_GCASH_MERCHANT_ID || 'MOTOTRACK-GRABPAY-DEMO',
     clientKey: env.EXPO_PUBLIC_GCASH_CLIENT_KEY || 'gcash-sandbox-key',
   },
+  xendit: {
+    secretKey: env.EXPO_PUBLIC_XENDIT_SECRET_KEY || env.XENDIT_SECRET_KEY || '',
+  },
   demo: {
     // Set EXPO_PUBLIC_ENABLE_DEMO_LOGINS=false to disable the one-click demo /
     // admin backdoor logins on the Sign In screen.
@@ -52,3 +55,5 @@ export const GEMINI_IMAGE_MODEL = APP_CONFIG.gemini.imageModel;
 export const USD_TO_PHP_RATE = APP_CONFIG.currency.usdToPhpRate;
 
 export default APP_CONFIG;
+
+export const XENDIT_SECRET_KEY = APP_CONFIG.xendit.secretKey;

@@ -1840,15 +1840,19 @@ class NotificationService {
   }
 
   // 6. The admin receives a notification when a new repair or customization booking is submitted.
-  async notifyAdminNewBooking({ bookingId, customerName, serviceType, vehicleModel, date, timeSlot }) {
+  async notifyAdminNewBooking({ bookingId, customerName, serviceType, vehicleModel, date, timeSlot, downpaymentAmount, downpaymentPaid }) {
+    const hasDp = downpaymentPaid !== false && (downpaymentPaid || Number(downpaymentAmount || 0) > 0);
+    const dpText = hasDp
+      ? ` (Downpayment of ₱${Number(downpaymentAmount || 390).toLocaleString()} Verified)`
+      : '';
     return this.addNotification({
       target: 'admin',
       category: 'booking_new',
       type: 'booking',
       priority: 'high',
-      title: 'New Pitstop Booking Received',
-      message: `New booking submitted by ${customerName || 'Customer'} for ${serviceType || 'Service'} (${vehicleModel || 'Motorcycle'}) on ${date || 'Upcoming'} at ${timeSlot || 'Scheduled Slot'}.`,
-      meta: { bookingId, customerName, serviceType, vehicleModel, date, timeSlot },
+      title: 'New Booking Awaiting Confirmation',
+      message: `New booking #${bookingId || ''} submitted by ${customerName || 'Customer'} for ${serviceType || 'Service'} (${vehicleModel || 'Motorcycle'}) on ${date || 'Upcoming'} at ${timeSlot || 'Scheduled Slot'}${dpText}. Awaiting admin confirmation.`,
+      meta: { bookingId, customerName, serviceType, vehicleModel, date, timeSlot, downpaymentAmount, downpaymentPaid },
       link: 'garage',
       icon: 'calendar-plus-fill',
     });

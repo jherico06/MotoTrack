@@ -15,13 +15,16 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { getProfileWebTokens, createProfileWebStyles } from '../../../styles/web/profilePage.web.styles.js';
+import { createShopWebStyles } from '../../../styles/web/shopPage.web.styles.js';
 import { appStorage } from '../../../services/system/storageAdapter.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useCart } from '../../../context/CartContext.jsx';
 import { useWishlist } from '../../../context/WishlistContext.jsx';
 import { useTheme } from '../../../context/ThemeContext.jsx';
+import { useWebSavedWishlistCount } from '../../../components/web/useWebSavedWishlistCount.js';
 import { garageService } from '../../../services/bookings/garageService.js';
 import { orderService } from '../../../services/orders/orderService.js';
+import { productService } from '../../../services/products/productService.js';
 import {
   notificationService,
   stripEmojis,
@@ -46,10 +49,17 @@ import {
   ConfirmModal,
   RegisterMotorcycleModal,
   EditCustomerSettingsModal,
-  CartModal,
   RateDeliveredOrderModal,
   CustomerSubmitReportModal,
+  CheckoutModal,
+  GCashPaymentModal,
+  ProductSpecsModal,
 } from '../../../components/modals';
+import CartPage from './CartPage.jsx';
+import CompatibilityIndicator from '../../../components/shop/CompatibilityIndicator.jsx';
+import { compatibilityService, COMPAT_STATUS } from '../../../services/products/compatibilityService.js';
+import { productNeedsSizes, withSelectedSize, isProductSoldOut } from '../../../utils/productSizes.js';
+import { resolveReorderLevel } from '../../../utils/inventoryHelpers.js';
 import { motorcycleService } from '../../../services/products/motorcycleService.js';
 import { customizationService } from '../../../services/bookings/customizationService.js';
 import { pickImageFromFile } from '../../../utils/imagePickerHelper.js';
@@ -61,6 +71,61 @@ const ADDRESS_PRESETS = [
   { label: 'Naga Boardwalk', address: 'Naga City Boardwalk, South Road, City of Naga, Cebu' },
   { label: 'Minglanilla Border', address: 'Poblacion Ward 2, Minglanilla, Cebu' },
   { label: 'BGC Central, Taguig', address: '7th Ave & 28th St, Bonifacio Global City, Taguig' },
+];
+
+const FALLBACK_SHOP_ITEMS = [
+  {
+    id: 'prod-seat-01',
+    name: 'Seat',
+    brand: 'SUZUKI',
+    category: 'Accessories',
+    price: 200,
+    oldPrice: null,
+    stock: 15,
+    rating: 0,
+    reviews: 0,
+    image: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=600&q=80',
+    compatStatus: 'incompatible',
+  },
+  {
+    id: 'prod-mirror-02',
+    name: 'Side Mirror',
+    brand: 'J&T SIDE MIRROR',
+    category: 'Accessories',
+    price: 250,
+    oldPrice: null,
+    stock: 18,
+    rating: 0,
+    reviews: 0,
+    image: 'https://images.unsplash.com/photo-1568772585407-9361f9bf3a87?auto=format&fit=crop&w=600&q=80',
+    compatStatus: 'compatible',
+  },
+  {
+    id: 'prod-rim-03',
+    name: 'RIM',
+    brand: 'AKRAPOVIČ',
+    category: 'Tires & Wheels',
+    price: 800,
+    oldPrice: null,
+    stock: 205,
+    rating: 0,
+    reviews: 0,
+    image: 'https://images.unsplash.com/photo-1558981420-87aa9dad1c89?auto=format&fit=crop&w=600&q=80',
+    compatStatus: 'compatible',
+  },
+  {
+    id: 'prod-oil-04',
+    name: 'Engine oil',
+    brand: 'SHELL',
+    category: 'Maintenance',
+    price: 500,
+    oldPrice: null,
+    stock: 12,
+    rating: 5.0,
+    reviews: 1,
+    image: 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=600&q=80',
+    compatStatus: 'compatible',
+  },
 ];
 
 const getOrderGrandTotal = (order) => {
@@ -151,7 +216,7 @@ const MOTORCYCLE_BRANDS = ['Yamaha', 'Honda', 'Kawasaki', 'Suzuki', 'Ducati', 'B
 const MAIN_NAV_ITEMS = [
   { id: 'shop', label: 'Shop' },
   { id: 'booking', label: 'Book a Service' },
-  { id: 'appointments', label: 'Appointments' },
+
   { id: 'customize', label: 'Customize' },
   { id: 'garage', label: 'Garage' },
   { id: 'orders', label: 'Orders' },
@@ -271,6 +336,7 @@ export default function ProfilePage({
   onNavigateToLogin,
   onLogout,
   onNavigateToAppointments,
+  onNavigateToProductDetails,
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 1024;
@@ -279,8 +345,19 @@ export default function ProfilePage({
   const isSmallMobile = windowWidth < 480;
 
   const { currentUser, updateProfile, changePassword, changeEmail, getAccountLogs, logout } = useAuth();
-  const { cartItemCount = 0, showToast: cartShowToast, addToCart } = useCart();
-  const { wishlistCount = 0 } = useWishlist();
+  const {
+    cart = [],
+    cartItemCount = 0,
+    cartTotal = 0,
+    selectedCartItems = [],
+    shippingRate = 150,
+    isFreeShipping = false,
+    removeSelectedFromCart,
+    showToast: cartShowToast,
+    addToCart,
+  } = useCart();
+  const { wishlist, isWishlisted, toggleWishlist } = useWishlist();
+  const savedWishlistCount = useWebSavedWishlistCount(wishlist);
 
   // ─── TOP NAVBAR & MODALS STATE ───
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -298,6 +375,7 @@ export default function ProfilePage({
 
   const tokens = useMemo(() => getProfileWebTokens(isDarkMode), [isDarkMode]);
   const styles = useMemo(() => createProfileWebStyles(isDarkMode), [isDarkMode]);
+  const shopWebStyles = useMemo(() => createShopWebStyles(isDarkMode), [isDarkMode]);
   const customerHeaderBg = isDarkMode ? '#1E2226' : '#24272B';
   const customerHeaderBorder = isDarkMode ? '#374151' : '#24272B';
 
@@ -412,6 +490,37 @@ export default function ProfilePage({
   const [expandedNotifIds, setExpandedNotifIds] = useState(new Set());
   const [orderSearchQuery, setOrderSearchQuery] = useState('');
 
+  // Recommended Catalog Products (shown in empty states and inspiration cards)
+  const [recommendedProducts, setRecommendedProducts] = useState([]);
+  const [isLoadingRecommended, setIsLoadingRecommended] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const fetchCatalog = async () => {
+      try {
+        setIsLoadingRecommended(true);
+        const list = await productService.getProducts();
+        if (active && Array.isArray(list) && list.length > 0) {
+          setRecommendedProducts(list.slice(0, 8));
+        }
+      } catch (err) {
+        console.warn('[ProfilePage] Error loading recommended products:', err);
+      } finally {
+        if (active) setIsLoadingRecommended(false);
+      }
+    };
+    fetchCatalog();
+    const unsub = productService.subscribe?.((fresh) => {
+      if (active && Array.isArray(fresh) && fresh.length > 0) {
+        setRecommendedProducts(fresh.slice(0, 8));
+      }
+    });
+    return () => {
+      active = false;
+      unsub?.();
+    };
+  }, []);
+
   // Real-time notification subscription
   useEffect(() => {
     const updateList = () => {
@@ -431,6 +540,29 @@ export default function ProfilePage({
   const [isRateOrderModalOpen, setIsRateOrderModalOpen] = useState(false);
   const [isSubmitReportModalOpen, setIsSubmitReportModalOpen] = useState(false);
   const [reportContextOrder, setReportContextOrder] = useState(null);
+
+  // Quick Order & Product Specs Modal State
+  const [selectedProductForSpecs, setSelectedProductForSpecs] = useState(null);
+  const [isSpecsOpen, setIsSpecsOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [buyNowItems, setBuyNowItems] = useState(null);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [isGcashModalOpen, setIsGcashModalOpen] = useState(false);
+  const [pendingGcashOrderData, setPendingGcashOrderData] = useState(null);
+  const [compatMap, setCompatMap] = useState(null);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const map = await compatibilityService.getCompatibilityMap?.();
+        if (alive && map) setCompatMap(map);
+      } catch (_e) {}
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Saved Customizations & AI Previews State
   const [customizations, setCustomizations] = useState([]);
@@ -615,6 +747,170 @@ export default function ProfilePage({
       setOrders([]);
     }
   }, [currentUser]);
+
+  // ─── BUY NOW & QUICK ORDER ACTIONS FROM CATALOG ───
+  const handleQuickOrder = (product, qty = 1, options = {}) => {
+    const rawProd = product?.rawProduct || product;
+    if (!currentUser) {
+      if (typeof onRequireLogin === 'function') {
+        onRequireLogin({
+          title: 'Sign In to Order',
+          message: 'Please sign in or create an account to purchase this item.',
+          actionLabel: 'Sign In to Buy',
+          feature: 'order',
+        });
+      } else {
+        onNavigateToLogin?.();
+      }
+      return;
+    }
+    const size = options.size || rawProd?.selectedSize || '';
+    if (productNeedsSizes(rawProd) && !size) {
+      setSelectedProductForSpecs(rawProd);
+      setIsSpecsOpen(true);
+      showToast('Select a size for this product');
+      return;
+    }
+    const stock = Number(rawProd?.stock);
+    if (Number.isFinite(stock) && stock <= 0) {
+      showToast(`"${rawProd.name?.slice(0, 20) || 'Item'}" is out of stock`);
+      return;
+    }
+    const quantity = Math.min(Math.max(1, qty), Number.isFinite(stock) ? stock : qty);
+    const sizedProduct = size ? withSelectedSize(rawProd, size) : rawProd;
+    setBuyNowItems([{ product: sizedProduct, quantity, size }]);
+    setIsSpecsOpen(false);
+    setIsCartOpen(false);
+    setIsCheckoutOpen(true);
+  };
+
+  const handleAddToCartFromGrid = (product, qty = 1, options = {}) => {
+    const rawProd = product?.rawProduct || product;
+    const size = options.size || rawProd?.selectedSize || '';
+    if (productNeedsSizes(rawProd) && !size) {
+      setSelectedProductForSpecs(rawProd);
+      setIsSpecsOpen(true);
+      showToast('Select a size for this product');
+      return;
+    }
+    const sizedProduct = size ? withSelectedSize(rawProd, size) : rawProd;
+    addToCart(sizedProduct, qty, { size });
+    showToast(`Added ${rawProd.name} to shopping bag!`);
+  };
+
+  const handleCompleteOrder = async (orderFormData) => {
+    const { paymentMethod } = orderFormData;
+    if (paymentMethod === 'GCash') {
+      setPendingGcashOrderData(orderFormData);
+      setIsCheckoutOpen(false);
+      setIsGcashModalOpen(true);
+      return;
+    }
+    const prepaid =
+      paymentMethod === 'Credit / Debit Card' ||
+      paymentMethod === 'PayPal' ||
+      (paymentMethod || '').toLowerCase().includes('card') ||
+      (paymentMethod || '').toLowerCase().includes('paypal');
+    if (prepaid) {
+      await executeCreateOrder(orderFormData, 'Processing');
+      return;
+    }
+    await executeCreateOrder(orderFormData);
+  };
+
+  const handleGcashPaymentSuccess = async (paymentReceipt) => {
+    const orderData = {
+      ...pendingGcashOrderData,
+      gcashReference: paymentReceipt.referenceNumber,
+      paymentMethod: 'GCash',
+    };
+    await executeCreateOrder(orderData, 'Processing');
+  };
+
+  const executeCreateOrder = async (orderFormData, overrideStatus = null) => {
+    if (isPlacingOrder) return { success: false };
+    const {
+      customerName,
+      customerPhone,
+      customerAddress,
+      deliveryNotes,
+      paymentMethod,
+      gcashNumber,
+      gcashReference,
+      codChangeFor,
+    } = orderFormData;
+
+    const isCOD =
+      (paymentMethod || '').toLowerCase().includes('cash') || (paymentMethod || '').includes('COD');
+
+    setIsPlacingOrder(true);
+    try {
+      const itemsToOrder =
+        buyNowItems && buyNowItems.length > 0
+          ? buyNowItems
+          : selectedCartItems && selectedCartItems.length > 0
+          ? selectedCartItems
+          : cart;
+      const subtotal = itemsToOrder.reduce(
+        (acc, it) => acc + Number(it.product?.price || 0) * (it.quantity || 1),
+        0
+      );
+      const shipping = isFreeShipping ? 0 : shippingRate;
+      const grandTotal = subtotal + shipping;
+
+      const res = await orderService.createOrder({
+        userId: currentUser?.user_id || currentUser?.id || null,
+        customerId: currentUser?.customer_id || currentUser?.user_id || currentUser?.id || null,
+        customerName,
+        customerPhone,
+        customerEmail: currentUser?.email || null,
+        customerAddress,
+        deliveryNotes,
+        paymentMethod,
+        gcashNumber,
+        gcashReference,
+        codChangeFor,
+        total: subtotal.toFixed(2),
+        discountAmount: '0.00',
+        shippingFee: Number(shipping || 0),
+        grandTotal: grandTotal.toFixed(2),
+        items: itemsToOrder,
+        channel: 'Online Store',
+        overrideStatus,
+      });
+
+      if (!res?.success) {
+        showToast(res?.error || 'Could not place order. Please try again.');
+        return res;
+      }
+
+      const placedOrder = res.order;
+      if (buyNowItems) {
+        setBuyNowItems(null);
+      } else {
+        removeSelectedFromCart?.();
+      }
+      setIsCheckoutOpen(false);
+      setIsGcashModalOpen(false);
+
+      // Re-fetch orders so the newly placed order shows up immediately!
+      refreshOrders();
+
+      setSelectedOrderForTracking(placedOrder);
+      setIsLiveTrackingOpen(true);
+      showToast(
+        isCOD
+          ? '🎉 COD Order placed! Awaiting Store Admin verification.'
+          : '🎉 Payment confirmed! Your order is being processed.'
+      );
+      return res;
+    } catch (e) {
+      console.warn('[ProfilePage] place order failed:', e);
+      showToast('Could not complete order. Please try again.');
+    } finally {
+      setIsPlacingOrder(false);
+    }
+  };
 
   // Subscriptions & Data Loading
   useEffect(() => {
@@ -1280,7 +1576,13 @@ export default function ProfilePage({
   const userInitials = (userDisplayName.charAt(0) || 'R').toUpperCase();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: tokens.bgMain }}>
+    <SafeAreaView
+      style={{
+        flex: 1,
+        backgroundColor: tokens.bgMain,
+        ...(Platform.OS === 'web' ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' } : {}),
+      }}
+    >
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
 
       {/* Floating Toast Notification */}
@@ -1311,7 +1613,9 @@ export default function ProfilePage({
         style={{
           flex: 1,
           width: '100%',
-          ...(Platform.OS === 'web' ? { overscrollBehavior: 'none', overscrollBehaviorY: 'none' } : {}),
+          ...(Platform.OS === 'web'
+            ? { overflowY: 'scroll', overscrollBehavior: 'none', overscrollBehaviorY: 'none' }
+            : {}),
         }}
         contentContainerStyle={{ flexGrow: 1, width: '100%' }}
         stickyHeaderIndices={[0]}
@@ -1328,13 +1632,20 @@ export default function ProfilePage({
         <View
           style={[
             styles.headerInner,
+            isTablet && { paddingHorizontal: 18, paddingVertical: 10, minHeight: 60, gap: 12 },
             windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8, minHeight: 56 },
             windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
           ]}
         >
           {/* LEFT: MotoTrack Logo + Mobile Menu Toggle */}
-          <View style={styles.headerLeft}>
-            {windowWidth < 1024 && (
+          <View
+            style={[
+              styles.headerLeft,
+              windowWidth < 768 && { gap: 8 },
+              windowWidth < 400 && { gap: 4 },
+            ]}
+          >
+            {windowWidth < 768 && (
               <TouchableOpacity
                 style={styles.mobileNavToggleBtn}
                 onPress={() => setIsMobileNavOpen((prev) => !prev)}
@@ -1348,26 +1659,30 @@ export default function ProfilePage({
 
             {windowWidth >= 768 && (
               <TouchableOpacity
-                style={styles.logoWrap}
+                style={[styles.logoWrap, isTablet && { marginRight: 4 }]}
                 onPress={onNavigateToStore}
                 activeOpacity={0.8}
               >
-                <BrandLogo size={windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
+                <BrandLogo size={windowWidth < 768 ? 28 : isTablet ? 30 : windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
               </TouchableOpacity>
             )}
           </View>
 
           {/* MAIN NAVIGATION (CENTERED): Shop | Book a Service | Customize | Garage | Orders */}
           {windowWidth >= 768 && (
-            <View style={styles.headerCenterNav}>
-              <View style={styles.mainNavList}>
+            <View style={[styles.headerCenterNav, isTablet && { gap: 8 }]}>
+              <View style={[styles.mainNavList, isTablet && { gap: 8 }]}>
                 {MAIN_NAV_ITEMS.map((item) => {
                   const isActive = activeTab === item.id;
                   return (
                     <TouchableOpacity
                       key={item.id}
                       className="main-nav-tab"
-                      style={[styles.mainNavItem, isActive && styles.mainNavItemActive]}
+                      style={[
+                        styles.mainNavItem,
+                        isActive && styles.mainNavItemActive,
+                        isTablet && { height: 34, paddingHorizontal: 9 },
+                      ]}
                       onPress={() => {
                         if (item.id === 'shop') {
                           onNavigateToStore?.();
@@ -1389,9 +1704,10 @@ export default function ProfilePage({
                         style={[
                           styles.mainNavItemText,
                           isActive && styles.mainNavItemTextActive,
+                          isTablet && { fontSize: 13 },
                         ]}
                       >
-                        {item.label}
+                        {isTablet && item.id === 'booking' ? 'Book Service' : item.label}
                       </Text>
                     </TouchableOpacity>
                   );
@@ -1414,17 +1730,17 @@ export default function ProfilePage({
               isDark={isDarkMode}
             />
 
-            {/* Wishlist / Heart Icon [Heart] */}
+            {/* Wishlist / Bookmark Icon */}
             {windowWidth >= 768 && (<TouchableOpacity
               style={styles.navActionIconBtn}
               onPress={onNavigateToWishlist}
               activeOpacity={0.8}
-              title="Favorites"
+              title="Saved Wishlist"
             >
-              <BootstrapIcon name="heart" size={16} color="#FFFFFF" />
-              {wishlistCount > 0 && (
+              <BootstrapIcon name="bookmark" size={16} color="#FFFFFF" />
+              {savedWishlistCount > 0 && (
                 <View style={styles.navBadgeCircle}>
-                  <Text style={styles.navBadgeText}>{wishlistCount}</Text>
+                  <Text style={styles.navBadgeText}>{savedWishlistCount}</Text>
                 </View>
               )}
             </TouchableOpacity>)}
@@ -2158,49 +2474,33 @@ export default function ProfilePage({
             {/* ───────────────────────────────────────────────────────── */}
             {activeTab === 'orders' && (
               <View>
-                {/* 4 Orders KPI Metrics Row (Customer Order Telemetry) */}
-                <View style={[styles.statsGrid, { marginBottom: 20 }]}>
-                  {/* Metric 1: Total Orders Placed */}
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <Text style={styles.statLabel}>Total Orders Placed</Text>
-                    <Text style={styles.statValue}>{orders.length}</Text>
-                    <Text style={styles.statSub}>Full order telemetry history</Text>
-                  </View>
-
-                  {/* Metric 2: Awaiting COD Approval */}
-                  <View style={[styles.statCard, styles.statCardWarningAccent]}>
-                    <Text style={styles.statLabel}>Awaiting COD Approval</Text>
-                    <Text style={[styles.statValue, { color: '#D97706' }]}>
-                      {orders.filter((o) => (o.status || '').toLowerCase().includes('pending') || (o.status || '').toLowerCase().includes('approval')).length}
-                    </Text>
-                    <Text style={styles.statSub}>Pending backoffice verification</Text>
-                  </View>
-
-                  {/* Metric 3: Active Dispatches */}
-                  <View style={[styles.statCard, styles.statCardTealAccent]}>
-                    <Text style={styles.statLabel}>Active Dispatches</Text>
-                    <Text style={[styles.statValue, { color: '#2563EB' }]}>
-                      {orders.filter((o) => ['processing', 'shipped', 'in transit'].includes((o.status || '').toLowerCase())).length}
-                    </Text>
-                    <Text style={styles.statSub}>Out for packing or courier transit</Text>
-                  </View>
-
-                  {/* Metric 4: Total Order Value */}
-                  <View style={[styles.statCard, styles.statCardSuccessAccent]}>
-                    <Text style={styles.statLabel}>Total Order Value</Text>
-                    <Text style={[styles.statValue, { color: '#16A34A' }]}>
-                      ₱{orders.reduce((acc, o) => acc + getOrderGrandTotal(o), 0).toLocaleString()}
-                    </Text>
-                    <Text style={styles.statSub}>Combined checkout expenditure</Text>
-                  </View>
-                </View>
-
-                {/* Orders Header & Filter Controls */}
+                {/* Orders Header & Filter Controls (Clean, Refined UI without KPI Cards) */}
                 <View style={{ zIndex: isOrderFilterDropdownOpen ? 1000 : 10, marginBottom: 20 }}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.textPrimary }}>
-                      Order History ({orders.length})
-                    </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+                    <View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <Text style={{ fontSize: 20, fontWeight: '700', color: tokens.textPrimary, letterSpacing: -0.3 }}>
+                          Order History
+                        </Text>
+                        <View
+                          style={{
+                            backgroundColor: isDarkMode ? '#27272A' : '#F1F5F9',
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                            borderRadius: 12,
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? '#3F3F46' : '#E2E8F0',
+                          }}
+                        >
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: isDarkMode ? '#D4D4D8' : '#475569' }}>
+                            {orders.length}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 13, color: tokens.textMuted, marginTop: 4 }}>
+                        Track package deliveries, view receipts, and re-order motorcycle parts.
+                      </Text>
+                    </View>
 
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       {/* Submit Feedback / Report Button */}
@@ -2209,10 +2509,10 @@ export default function ProfilePage({
                           flexDirection: 'row',
                           alignItems: 'center',
                           gap: 6,
-                          backgroundColor: tokens.bgSub,
+                          backgroundColor: isDarkMode ? '#202024' : '#FFFFFF',
                           borderWidth: 1,
                           borderColor: tokens.border,
-                          borderRadius: 10,
+                          borderRadius: 8,
                           paddingHorizontal: 12,
                           height: 38,
                           cursor: 'pointer',
@@ -2236,10 +2536,10 @@ export default function ProfilePage({
                             flexDirection: 'row',
                             alignItems: 'center',
                             gap: 8,
-                            backgroundColor: orderFilter !== 'All' ? (isDarkMode ? 'rgba(77, 184, 150, 0.2)' : '#C8DDD3') : (isDarkMode ? '#1C2422' : '#FFFFFF'),
-                            borderWidth: 1.5,
-                            borderColor: orderFilter !== 'All' ? tokens.brandPrimary : tokens.border,
-                            borderRadius: 10,
+                            backgroundColor: orderFilter !== 'All' ? (isDarkMode ? '#27272A' : '#FFF7ED') : (isDarkMode ? '#202024' : '#FFFFFF'),
+                            borderWidth: 1,
+                            borderColor: orderFilter !== 'All' ? '#EA580C' : tokens.border,
+                            borderRadius: 8,
                             paddingHorizontal: 12,
                             height: 38,
                             cursor: 'pointer',
@@ -2248,23 +2548,23 @@ export default function ProfilePage({
                           activeOpacity={0.85}
                         >
                           <BootstrapIcon
-                            name="grid-fill"
+                            name="funnel"
                             size={12}
-                            color={orderFilter !== 'All' ? tokens.brandPrimary : tokens.textMuted}
+                            color={orderFilter !== 'All' ? '#EA580C' : tokens.textMuted}
                           />
                           <Text
                             style={{
                               fontSize: 12.5,
                               fontWeight: '600',
-                              color: orderFilter !== 'All' ? tokens.brandPrimary : tokens.textPrimary,
+                              color: orderFilter !== 'All' ? '#EA580C' : tokens.textPrimary,
                             }}
                           >
-                            {orderFilter === 'All' ? 'Category: All' : `Category: ${orderFilter}`}
+                            {orderFilter === 'All' ? 'Filter: All Orders' : `Filter: ${orderFilter}`}
                           </Text>
                           <BootstrapIcon
                             name={isOrderFilterDropdownOpen ? 'chevron-up' : 'chevron-down'}
                             size={11}
-                            color={orderFilter !== 'All' ? tokens.brandPrimary : tokens.textMuted}
+                            color={orderFilter !== 'All' ? '#EA580C' : tokens.textMuted}
                           />
                         </TouchableOpacity>
 
@@ -2291,8 +2591,8 @@ export default function ProfilePage({
                                 right: 0,
                                 marginTop: 6,
                                 minWidth: 190,
-                                backgroundColor: isDarkMode ? '#141A18' : '#FFFFFF',
-                                borderRadius: 12,
+                                backgroundColor: isDarkMode ? '#1E2024' : '#FFFFFF',
+                                borderRadius: 10,
                                 borderWidth: 1,
                                 borderColor: tokens.border,
                                 boxShadow: '0 12px 30px -4px rgba(0, 0, 0, 0.16)',
@@ -2326,7 +2626,7 @@ export default function ProfilePage({
                                       paddingHorizontal: 14,
                                       paddingVertical: 9,
                                       backgroundColor: isActive
-                                        ? (isDarkMode ? 'rgba(77, 184, 150, 0.2)' : '#F0FDF4')
+                                        ? (isDarkMode ? 'rgba(234, 88, 12, 0.15)' : '#FFF7ED')
                                         : 'transparent',
                                       cursor: 'pointer',
                                     }}
@@ -2343,7 +2643,7 @@ export default function ProfilePage({
                                           height: 7,
                                           borderRadius: 4,
                                           backgroundColor: isActive
-                                            ? tokens.brandPrimary
+                                            ? '#EA580C'
                                             : item.key === 'Processing'
                                             ? '#F59E0B'
                                             : item.key === 'Shipped'
@@ -2359,7 +2659,7 @@ export default function ProfilePage({
                                         style={{
                                           fontSize: 13,
                                           fontWeight: '600',
-                                          color: isActive ? tokens.brandPrimary : tokens.textPrimary,
+                                          color: isActive ? '#EA580C' : tokens.textPrimary,
                                         }}
                                       >
                                         {item.label}
@@ -2368,7 +2668,7 @@ export default function ProfilePage({
                                     <View
                                       style={{
                                         backgroundColor: isActive
-                                          ? (isDarkMode ? 'rgba(77, 184, 150, 0.25)' : '#C8DDD3')
+                                          ? (isDarkMode ? 'rgba(234, 88, 12, 0.25)' : '#FFEDD5')
                                           : isDarkMode
                                           ? '#334155'
                                           : '#F1F5F9',
@@ -2381,7 +2681,7 @@ export default function ProfilePage({
                                         style={{
                                           fontSize: 11,
                                           fontWeight: '600',
-                                          color: isActive ? (isDarkMode ? tokens.brandPrimary : '#EA580C') : tokens.textMuted,
+                                          color: isActive ? '#EA580C' : tokens.textMuted,
                                         }}
                                       >
                                         {count}
@@ -2400,11 +2700,11 @@ export default function ProfilePage({
                         style={{
                           flexDirection: 'row',
                           alignItems: 'center',
-                          backgroundColor: tokens.bgSub,
-                          borderRadius: 10,
+                          backgroundColor: isDarkMode ? '#202024' : '#FFFFFF',
+                          borderRadius: 8,
                           borderWidth: 1,
                           borderColor: tokens.border,
-                          paddingHorizontal: 10,
+                          paddingHorizontal: 12,
                           height: 38,
                           minWidth: 220,
                           gap: 8,
@@ -2419,8 +2719,8 @@ export default function ProfilePage({
                           onChangeText={setOrderSearchQuery}
                         />
                         {orderSearchQuery ? (
-                          <TouchableOpacity onPress={() => setOrderSearchQuery('')}>
-                            <BootstrapIcon name="x" size={15} color={tokens.textMuted} />
+                          <TouchableOpacity onPress={() => setOrderSearchQuery('')} style={{ cursor: 'pointer' }}>
+                            <BootstrapIcon name="x-circle-fill" size={13} color={tokens.textMuted} />
                           </TouchableOpacity>
                         ) : null}
                       </View>
@@ -2430,225 +2730,594 @@ export default function ProfilePage({
 
                 {/* Orders List */}
                 {filteredOrders.length === 0 ? (
-                  <View style={[styles.sectionCard, { alignItems: 'center', paddingVertical: 40 }]}>
-                    <BootstrapIcon name="inbox" size={40} color={tokens.textMuted} />
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.textPrimary, marginTop: 12 }}>
-                      No matching orders found
-                    </Text>
-                    <Text style={{ fontSize: 13, color: tokens.textMuted, marginTop: 4 }}>
-                      Browse genuine high-performance motorcycle accessories in the store.
-                    </Text>
+                  <View style={{ width: '100%' }}>
+                    {/* Empty State Banner Matching Reference Image */}
+                    <View style={[styles.sectionCard, { alignItems: 'center', paddingVertical: 36, paddingHorizontal: 20, borderRadius: 12, marginBottom: 24, textAlign: 'center' }]}>
+                      <View
+                        style={{
+                          width: 52,
+                          height: 52,
+                          borderRadius: 16,
+                          backgroundColor: isDarkMode ? '#27272A' : '#F1F5F9',
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? '#3F3F46' : '#E2E8F0',
+                          justifyContent: 'center',
+                          alignItems: 'center',
+                          marginBottom: 12,
+                        }}
+                      >
+                        <BootstrapIcon name="inbox" size={24} color={tokens.textMuted} />
+                      </View>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: tokens.textPrimary, marginBottom: 4 }}>
+                        No matching orders found
+                      </Text>
+                      <Text style={{ fontSize: 13, color: tokens.textMuted, maxWidth: 380, textAlign: 'center', lineHeight: 18 }}>
+                        Browse genuine high-performance motorcycle accessories in the store or try resetting your filter.
+                      </Text>
+
+                      {(orderFilter !== 'All' || orderSearchQuery) && (
+                        <TouchableOpacity
+                          onPress={() => {
+                            setOrderFilter('All');
+                            setOrderSearchQuery('');
+                          }}
+                          style={{
+                            marginTop: 16,
+                            paddingVertical: 7,
+                            paddingHorizontal: 16,
+                            borderRadius: 8,
+                            backgroundColor: isDarkMode ? '#27272A' : '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: tokens.border,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 6,
+                            cursor: 'pointer',
+                          }}
+                          activeOpacity={0.8}
+                        >
+                          <BootstrapIcon name="arrow-counterclockwise" size={12} color="#EA580C" />
+                          <Text style={{ fontSize: 12.5, fontWeight: '600', color: tokens.textPrimary }}>
+                            Reset Filter ({orders.length} total orders)
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    {/* "You might also like" Product Recommendations (Matching Mobile App Experience) */}
+                    <View style={{ width: '100%', marginTop: 8 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <View
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 8,
+                              backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.15)' : '#FFF7ED',
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.3)' : '#FFEDD5',
+                              justifyContent: 'center',
+                              alignItems: 'center',
+                            }}
+                          >
+                            <BootstrapIcon name="stars" size={13} color="#EA580C" />
+                          </View>
+                          <View>
+                            <Text style={{ fontSize: 17, fontWeight: '700', color: tokens.textPrimary, letterSpacing: -0.2 }}>
+                              You might also like
+                            </Text>
+                            <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>
+                              Top-rated genuine performance parts & accessories
+                            </Text>
+                          </View>
+                        </View>
+
+                        <TouchableOpacity
+                          onPress={() => onNavigateToStore?.()}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#EA580C' }}>
+                            Explore shop
+                          </Text>
+                          <BootstrapIcon name="chevron-right" size={11} color="#EA580C" />
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Product Grid (Exact Shop Design & Instant Ordering) */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 w-full">
+                        {(recommendedProducts.length > 0 ? recommendedProducts : FALLBACK_SHOP_ITEMS).map((prod) => {
+                          const rawProd = prod.rawProduct || prod;
+                          const prodId = rawProd.id || rawProd.product_id || prod.id;
+                          const isFav = typeof isWishlisted === 'function' ? isWishlisted(prodId) : false;
+                          const priceNum = Number(rawProd.price ?? prod.price ?? 0);
+                          const oldPriceNum = Number(rawProd.oldPrice ?? rawProd.compareAtPrice ?? rawProd.compare_at_price ?? prod.oldPrice ?? 0);
+                          const hasDiscount = oldPriceNum > priceNum;
+                          const discountPercent = hasDiscount
+                            ? Math.round(((oldPriceNum - priceNum) / oldPriceNum) * 100)
+                            : null;
+                          const soldOut = isProductSoldOut(rawProd);
+                          const stockNum = Number(rawProd.stock ?? 20);
+                          const lowStock = !soldOut && stockNum > 0 && stockNum <= resolveReorderLevel(rawProd, 5);
+
+                          // Parts compatibility calculation matching Shop
+                          const compatStatus = compatibilityService?.checkCompatibility
+                            ? compatibilityService.checkCompatibility(rawProd, primaryMotorcycle, compatMap)
+                            : COMPAT_STATUS.UNAVAILABLE;
+                          const isCompatible = compatStatus === COMPAT_STATUS.COMPATIBLE || compatStatus === 'compatible';
+                          const isIncompatible = compatStatus === COMPAT_STATUS.INCOMPATIBLE || compatStatus === 'incompatible';
+
+                          return (
+                            <TouchableOpacity
+                              key={prodId}
+                              style={[
+                                shopWebStyles.productCard,
+                                { width: '100%', marginBottom: 0 },
+                                isDarkMode && {
+                                  backgroundColor: '#1C1F23',
+                                  borderColor: '#2B3035',
+                                },
+                              ]}
+                              className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:-translate-y-1"
+                              onPress={() => {
+                                setSelectedProductForSpecs(rawProd);
+                                setIsSpecsOpen(true);
+                              }}
+                              activeOpacity={0.92}
+                            >
+                              {/* 1:1 Square Product Image */}
+                              <View
+                                style={[
+                                  shopWebStyles.productImgContainer,
+                                  isDarkMode && { backgroundColor: '#14171A' },
+                                ]}
+                              >
+                                {rawProd.image ? (
+                                  <Image
+                                    source={{ uri: rawProd.image }}
+                                    style={shopWebStyles.productImg}
+                                    resizeMode="cover"
+                                  />
+                                ) : (
+                                  <View style={[shopWebStyles.productImg, { alignItems: 'center', justifyContent: 'center' }]}>
+                                    <BootstrapIcon name="box-seam" size={36} color={isDarkMode ? '#475569' : '#CBD5E1'} />
+                                  </View>
+                                )}
+
+                                {/* Compatibility Indicator (Top-Left) */}
+                                {(isCompatible || isIncompatible) && (
+                                  <CompatibilityIndicator
+                                    status={compatStatus}
+                                    bike={primaryMotorcycle}
+                                    message={rawProd.compatMessage || (primaryMotorcycle ? compatibilityService?.formatCompatMessage?.(compatStatus, primaryMotorcycle) : '')}
+                                  />
+                                )}
+
+                                {/* Sold Out or Discount Badge (NO "NEW" BADGE) */}
+                                {soldOut ? (
+                                  <View
+                                    style={{
+                                      position: 'absolute',
+                                      left: (isCompatible || isIncompatible) ? 38 : 8,
+                                      top: 8,
+                                      backgroundColor: '#DC2626',
+                                      paddingHorizontal: 7,
+                                      paddingVertical: 2.5,
+                                      borderRadius: 6,
+                                      zIndex: 4,
+                                    }}
+                                  >
+                                    <Text style={{ color: '#FFFFFF', fontSize: 10, fontWeight: '700' }}>SOLD OUT</Text>
+                                  </View>
+                                ) : hasDiscount ? (
+                                  <View
+                                    style={[
+                                      shopWebStyles.productCardDiscountBadge,
+                                      (isCompatible || isIncompatible) && { left: 38 },
+                                    ]}
+                                  >
+                                    <Text style={shopWebStyles.productCardDiscountBadgeText}>-{discountPercent}%</Text>
+                                  </View>
+                                ) : null}
+
+                                {/* Wishlist Button (Top-Right) */}
+                                <TouchableOpacity
+                                  style={[
+                                    shopWebStyles.wishlistBtn,
+                                    isDarkMode && { backgroundColor: 'rgba(30, 34, 38, 0.9)', borderColor: '#2B3035' },
+                                  ]}
+                                  onPress={(e) => {
+                                    e?.stopPropagation?.();
+                                    toggleWishlist(prodId);
+                                  }}
+                                  activeOpacity={0.8}
+                                >
+                                  <BootstrapIcon
+                                    name={isFav ? 'bookmark-fill' : 'bookmark'}
+                                    size={13}
+                                    color={isFav ? '#EA580C' : isDarkMode ? '#94A3B8' : '#64748B'}
+                                  />
+                                </TouchableOpacity>
+                              </View>
+
+                              {/* Details */}
+                              <View
+                                style={[
+                                  shopWebStyles.productDetails,
+                                  isDarkMode && { backgroundColor: '#1C1F23' },
+                                ]}
+                              >
+                                {/* Brand Name (Top of details, uppercase) */}
+                                {(rawProd.brand || rawProd.category) ? (
+                                  <Text
+                                    style={[
+                                      shopWebStyles.productBrandText,
+                                      isDarkMode && { color: '#94A3B8' },
+                                    ]}
+                                    numberOfLines={1}
+                                  >
+                                    {(rawProd.brand || rawProd.category || 'Accessories').toUpperCase()}
+                                  </Text>
+                                ) : null}
+
+                                {/* Product Name */}
+                                <Text
+                                  style={[
+                                    shopWebStyles.productName,
+                                    isDarkMode && { color: '#F9FAFB' },
+                                  ]}
+                                  numberOfLines={2}
+                                >
+                                  {rawProd.name}
+                                </Text>
+
+                                {/* Price Row: Currency and 2 decimal format */}
+                                <View style={shopWebStyles.priceRow}>
+                                  <Text style={shopWebStyles.priceMainText}>
+                                    ₱{priceNum.toFixed(2)}
+                                  </Text>
+                                  {hasDiscount && (
+                                    <Text style={shopWebStyles.priceOldText}>
+                                      ₱{oldPriceNum.toFixed(2)}
+                                    </Text>
+                                  )}
+                                </View>
+
+                                {/* Star Rating & In-Stock Line */}
+                                <View style={shopWebStyles.metaMinimalRow}>
+                                  {Number(rawProd.reviews || 0) > 0 ? (
+                                    <View style={shopWebStyles.ratingMinimal}>
+                                      <BootstrapIcon name="star-fill" size={9.5} color="#F59E0B" />
+                                      <Text style={[shopWebStyles.ratingValText, isDarkMode && { color: '#CBD5E1' }]}>
+                                        {Number(rawProd.rating || 5).toFixed(1)}
+                                      </Text>
+                                      <Text style={[shopWebStyles.reviewCountText, isDarkMode && { color: '#94A3B8' }]}>
+                                        ({rawProd.reviews})
+                                      </Text>
+                                    </View>
+                                  ) : (
+                                    <View style={shopWebStyles.ratingMinimal}>
+                                      <BootstrapIcon name="star" size={9.5} color={isDarkMode ? '#64748B' : '#94A3B8'} />
+                                      <Text style={[shopWebStyles.unratedMinimalText, isDarkMode && { color: '#94A3B8' }]}>
+                                        No ratings yet
+                                      </Text>
+                                    </View>
+                                  )}
+                                  <Text style={[shopWebStyles.metaDotDivider, isDarkMode && { color: '#475569' }]}>•</Text>
+                                  <Text
+                                    style={[
+                                      shopWebStyles.stockMinimalText,
+                                      soldOut && { color: '#DC2626' },
+                                      isDarkMode && !soldOut && { color: '#34D399' },
+                                    ]}
+                                  >
+                                    {soldOut
+                                      ? 'Sold out'
+                                      : lowStock
+                                        ? `Only ${stockNum} left`
+                                        : `${stockNum} in stock`}
+                                  </Text>
+                                </View>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </div>
+                    </View>
                   </View>
                 ) : (
                   <View style={{ gap: 14 }}>
-                    {filteredOrders.map((o) => (
-                      <View key={o.id} style={styles.sectionCard}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-                          <View>
-                            <Text style={{ fontSize: 15, fontWeight: '600', color: tokens.textPrimary }}>
-                              Order #{o.id}
-                            </Text>
-                            <Text style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 2 }}>
-                              Placed on {o.orderDate || o.createdAt || 'Recent'}
-                            </Text>
-                          </View>
+                    {filteredOrders.map((o) => {
+                      const isDelivered = (o.status || '').toLowerCase() === 'delivered';
+                      const isCancelled = (o.status || '').toLowerCase() === 'cancelled';
+                      const isPendingApproval = isOrderPendingApproval(o.status);
+                      const isDone = isOrderDeliveredOrDone(o.status);
 
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                            <View
-                              style={{
-                                backgroundColor: o.status === 'Delivered' ? '#D1FAE5' : o.status === 'Cancelled' ? '#FEE2E2' : '#FEF3C7',
-                                paddingHorizontal: 10,
-                                paddingVertical: 4,
-                                borderRadius: 8,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 11.5,
-                                  fontWeight: '600',
-                                  color: o.status === 'Delivered' ? '#065F46' : o.status === 'Cancelled' ? '#991B1B' : '#92400E',
-                                }}
-                              >
-                                {o.status || 'Processing'}
+                      return (
+                        <View key={o.id} style={[styles.sectionCard, { borderRadius: 12, padding: 20, marginBottom: 4 }]}>
+                          {/* Card Header */}
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                            <View>
+                              <Text style={{ fontSize: 15, fontWeight: '700', color: tokens.textPrimary }}>
+                                Order #{o.id}
+                              </Text>
+                              <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 2 }}>
+                                Placed on {formatOrderDate(o.orderDate || o.createdAt)}
                               </Text>
                             </View>
 
-                            {!isOrderDeliveredOrDone(o.status) && (
-                              isOrderPendingApproval(o.status) ? (
-                                <TouchableOpacity
-                                  style={[
-                                    styles.addBtnPrimary,
-                                    {
-                                      paddingVertical: 7,
-                                      paddingHorizontal: 12,
-                                      backgroundColor: '#FEF3C7',
-                                      borderColor: '#FDE68A',
-                                      borderWidth: 1,
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      gap: 6,
-                                    },
-                                  ]}
-                                  onPress={() => showToast('⏳ Order is pending admin approval. Live tracking will unlock once approved.')}
-                                  activeOpacity={0.8}
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                              {/* Status Badge */}
+                              <View
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  backgroundColor: isDelivered
+                                    ? (isDarkMode ? 'rgba(16, 185, 129, 0.14)' : '#ECFDF5')
+                                    : isCancelled
+                                    ? (isDarkMode ? 'rgba(244, 63, 94, 0.14)' : '#FFF1F2')
+                                    : (isDarkMode ? 'rgba(245, 158, 11, 0.14)' : '#FFFBEB'),
+                                  borderWidth: 1,
+                                  borderColor: isDelivered
+                                    ? (isDarkMode ? 'rgba(16, 185, 129, 0.35)' : '#A7F3D0')
+                                    : isCancelled
+                                    ? (isDarkMode ? 'rgba(244, 63, 94, 0.35)' : '#FECDD3')
+                                    : (isDarkMode ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A'),
+                                  paddingHorizontal: 9,
+                                  paddingVertical: 4,
+                                  borderRadius: 8,
+                                  gap: 6,
+                                }}
+                              >
+                                <View
+                                  style={{
+                                    width: 6,
+                                    height: 6,
+                                    borderRadius: 3,
+                                    backgroundColor: isDelivered
+                                      ? '#10B981'
+                                      : isCancelled
+                                      ? '#F43F5E'
+                                      : '#F59E0B',
+                                  }}
+                                />
+                                <Text
+                                  style={{
+                                    fontSize: 12,
+                                    fontWeight: '600',
+                                    color: isDelivered
+                                      ? (isDarkMode ? '#34D399' : '#047857')
+                                      : isCancelled
+                                      ? (isDarkMode ? '#FB7185' : '#BE123C')
+                                      : (isDarkMode ? '#FBBF24' : '#D97706'),
+                                  }}
                                 >
-                                  <BootstrapIcon name="hourglass-split" size={12} color="#92400E" />
-                                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#92400E' }}>
-                                    Awaiting Approval
-                                  </Text>
-                                </TouchableOpacity>
-                              ) : (
+                                  {o.status || 'Processing'}
+                                </Text>
+                              </View>
+
+                              {/* Action: Track Live / Awaiting Approval */}
+                              {!isDone && (
                                 <TouchableOpacity
-                                  style={[styles.addBtnPrimary, { paddingVertical: 7, paddingHorizontal: 12 }]}
+                                  style={{
+                                    paddingVertical: 6,
+                                    paddingHorizontal: 13,
+                                    backgroundColor: isPendingApproval
+                                      ? (isDarkMode ? '#27272A' : '#FEF3C7')
+                                      : '#1E2227',
+                                    borderRadius: 8,
+                                    borderWidth: 1,
+                                    borderColor: isPendingApproval
+                                      ? (isDarkMode ? '#3F3F46' : '#FDE68A')
+                                      : '#373C42',
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    gap: 6,
+                                    cursor: 'pointer',
+                                  }}
                                   onPress={() => {
                                     setSelectedOrderForTracking(o);
                                     setIsLiveTrackingOpen(true);
                                   }}
                                   activeOpacity={0.8}
                                 >
-                                  <BootstrapIcon name="geo-alt-fill" size={12} color="#FFFFFF" />
-                                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#FFFFFF' }}>
-                                    Track Live
-                                  </Text>
-                                </TouchableOpacity>
-                              )
-                            )}
-
-                            {o.status === 'Delivered' && (
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                                <TouchableOpacity
-                                  style={[
-                                    styles.addBtnPrimary,
-                                    {
-                                      paddingVertical: 7,
-                                      paddingHorizontal: 12,
-                                      backgroundColor: o.is_rated ? '#FEF3C7' : '#EA580C',
-                                      borderColor: o.is_rated ? '#FDE68A' : '#EA580C',
-                                      borderWidth: 1,
-                                      flexDirection: 'row',
-                                      alignItems: 'center',
-                                      gap: 6,
-                                    },
-                                  ]}
-                                  onPress={() => {
-                                    setSelectedOrderForRating(o);
-                                    setIsRateOrderModalOpen(true);
-                                  }}
-                                  activeOpacity={0.8}
-                                >
                                   <BootstrapIcon
-                                    name={o.is_rated ? 'star-fill' : 'star'}
+                                    name={isPendingApproval ? 'hourglass-split' : 'geo-alt-fill'}
                                     size={12}
-                                    color={o.is_rated ? '#D97706' : '#FFFFFF'}
+                                    color={isPendingApproval ? (isDarkMode ? '#FBBF24' : '#D97706') : '#FFFFFF'}
                                   />
                                   <Text
                                     style={{
                                       fontSize: 12,
                                       fontWeight: '600',
-                                      color: o.is_rated ? '#92400E' : '#FFFFFF',
+                                      color: isPendingApproval
+                                        ? (isDarkMode ? '#FBBF24' : '#92400E')
+                                        : '#FFFFFF',
                                     }}
                                   >
-                                    {o.is_rated ? 'Rated ★' : 'Rate Order'}
+                                    {isPendingApproval ? 'Track Order' : 'Track Live'}
                                   </Text>
                                 </TouchableOpacity>
+                              )}
 
-                                <TouchableOpacity
-                                  style={{
-                                    paddingVertical: 7,
-                                    paddingHorizontal: 10,
-                                    backgroundColor: tokens.bgSub,
-                                    borderWidth: 1,
-                                    borderColor: tokens.border,
-                                    borderRadius: 8,
-                                    flexDirection: 'row',
-                                    alignItems: 'center',
-                                    gap: 5,
-                                  }}
-                                  onPress={() => {
-                                    setReportContextOrder(o);
-                                    setIsSubmitReportModalOpen(true);
-                                  }}
-                                  activeOpacity={0.8}
-                                  title="Report an issue with this order"
-                                >
-                                  <BootstrapIcon name="flag" size={12} color={tokens.textMuted} />
-                                  <Text style={{ fontSize: 11.5, fontWeight: '500', color: tokens.textMuted }}>
-                                    Report
-                                  </Text>
-                                </TouchableOpacity>
+                              {/* Action: Rate Order / Report */}
+                              {isDelivered && (
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                  <TouchableOpacity
+                                    style={{
+                                      paddingVertical: 6,
+                                      paddingHorizontal: 13,
+                                      backgroundColor: o.is_rated
+                                        ? (isDarkMode ? '#27272A' : '#FEF3C7')
+                                        : '#EA580C',
+                                      borderColor: o.is_rated
+                                        ? (isDarkMode ? '#3F3F46' : '#FDE68A')
+                                        : '#EA580C',
+                                      borderWidth: 1,
+                                      borderRadius: 8,
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 6,
+                                      cursor: 'pointer',
+                                    }}
+                                    onPress={() => {
+                                      setSelectedOrderForRating(o);
+                                      setIsRateOrderModalOpen(true);
+                                    }}
+                                    activeOpacity={0.85}
+                                  >
+                                    <BootstrapIcon
+                                      name={o.is_rated ? 'star-fill' : 'star'}
+                                      size={12}
+                                      color={o.is_rated ? '#D97706' : '#FFFFFF'}
+                                    />
+                                    <Text
+                                      style={{
+                                        fontSize: 12,
+                                        fontWeight: '600',
+                                        color: o.is_rated ? (isDarkMode ? '#FBBF24' : '#92400E') : '#FFFFFF',
+                                      }}
+                                    >
+                                      {o.is_rated ? 'Rated ★' : 'Rate Order'}
+                                    </Text>
+                                  </TouchableOpacity>
+
+                                  <TouchableOpacity
+                                    style={{
+                                      paddingVertical: 6,
+                                      paddingHorizontal: 11,
+                                      backgroundColor: isDarkMode ? '#202024' : '#FFFFFF',
+                                      borderWidth: 1,
+                                      borderColor: tokens.border,
+                                      borderRadius: 8,
+                                      flexDirection: 'row',
+                                      alignItems: 'center',
+                                      gap: 5,
+                                      cursor: 'pointer',
+                                    }}
+                                    onPress={() => {
+                                      setReportContextOrder(o);
+                                      setIsSubmitReportModalOpen(true);
+                                    }}
+                                    activeOpacity={0.8}
+                                    title="Report an issue with this order"
+                                  >
+                                    <BootstrapIcon name="flag" size={11} color={tokens.textMuted} />
+                                    <Text style={{ fontSize: 11.5, fontWeight: '500', color: tokens.textMuted }}>
+                                      Report
+                                    </Text>
+                                  </TouchableOpacity>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+
+                          {/* Order Items Breakdown */}
+                          <View
+                            style={{
+                              backgroundColor: isDarkMode ? '#1E2024' : '#F8FAFC',
+                              borderRadius: 10,
+                              padding: 12,
+                              marginBottom: 12,
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? '#2A2D33' : '#F1F5F9',
+                            }}
+                          >
+                            {(o.items || []).map((item, idx) => (
+                              <View
+                                key={idx}
+                                style={{
+                                  flexDirection: 'row',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  paddingVertical: 7,
+                                  borderBottomWidth: idx === (o.items.length - 1) ? 0 : 1,
+                                  borderBottomColor: isDarkMode ? '#2A2D33' : '#E2E8F0',
+                                }}
+                              >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, flex: 1 }}>
+                                  {item.image ? (
+                                    <Image
+                                      source={{ uri: item.image }}
+                                      style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 8,
+                                        backgroundColor: '#FFFFFF',
+                                        borderWidth: 1,
+                                        borderColor: isDarkMode ? '#33373E' : '#E2E8F0',
+                                      }}
+                                    />
+                                  ) : (
+                                    <View
+                                      style={{
+                                        width: 40,
+                                        height: 40,
+                                        borderRadius: 8,
+                                        backgroundColor: isDarkMode ? '#27272A' : '#E2E8F0',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        borderWidth: 1,
+                                        borderColor: isDarkMode ? '#3F3F46' : '#CBD5E1',
+                                      }}
+                                    >
+                                      <BootstrapIcon name="box-seam" size={16} color="#64748B" />
+                                    </View>
+                                  )}
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={{ fontSize: 13.5, fontWeight: '600', color: tokens.textPrimary }} numberOfLines={1}>
+                                      {item.name}
+                                    </Text>
+                                    <Text style={{ fontSize: 11.5, color: tokens.textMuted, marginTop: 2 }}>
+                                      Qty: {item.quantity || 1} • ₱{Number(item.price || 0).toLocaleString()} each
+                                    </Text>
+                                  </View>
+                                </View>
+                                <Text style={{ fontSize: 13.5, fontWeight: '600', color: tokens.textPrimary }}>
+                                  ₱{(Number(item.price || 0) * (item.quantity || 1)).toLocaleString()}
+                                </Text>
                               </View>
+                            ))}
+                          </View>
+
+                          {/* Order Footer: Payment Method, Total, Re-Order */}
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                            <Text style={{ fontSize: 12.5, color: tokens.textMuted }}>
+                              Payment: <Text style={{ fontWeight: '600', color: tokens.textPrimary }}>{o.paymentMethod || 'COD'}</Text>
+                              {'  •  '}
+                              Total: <Text style={{ fontWeight: '700', color: '#EA580C', fontSize: 14.5 }}>₱{getOrderGrandTotal(o).toLocaleString()}</Text>
+                            </Text>
+
+                            {typeof addToCart === 'function' && o.items && o.items.length > 0 && (
+                              <TouchableOpacity
+                                style={{
+                                  backgroundColor: isDarkMode ? '#202024' : '#FFFFFF',
+                                  borderWidth: 1,
+                                  borderColor: tokens.border,
+                                  paddingVertical: 6,
+                                  paddingHorizontal: 12,
+                                  borderRadius: 8,
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  cursor: 'pointer',
+                                }}
+                                onPress={() => {
+                                  o.items.forEach((it) => addToCart(it, it.quantity || 1));
+                                  showToast('Added items back to shopping bag!');
+                                }}
+                                activeOpacity={0.8}
+                              >
+                                <BootstrapIcon name="arrow-repeat" size={12} color="#EA580C" />
+                                <Text style={{ fontSize: 12, fontWeight: '600', color: tokens.textPrimary }}>
+                                  Buy Again
+                                </Text>
+                              </TouchableOpacity>
                             )}
                           </View>
                         </View>
-
-                        {/* Order Items Breakdown */}
-                        <View style={{ backgroundColor: tokens.bgSub, borderRadius: 12, padding: 12, marginBottom: 12 }}>
-                          {(o.items || []).map((item, idx) => (
-                            <View
-                              key={idx}
-                              style={{
-                                flexDirection: 'row',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                paddingVertical: 6,
-                                borderBottomWidth: idx === (o.items.length - 1) ? 0 : 1,
-                                borderBottomColor: tokens.border,
-                              }}
-                            >
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-                                {item.image ? (
-                                  <Image source={{ uri: item.image }} style={{ width: 36, height: 36, borderRadius: 6, backgroundColor: '#FFFFFF' }} />
-                                ) : (
-                                  <View style={{ width: 36, height: 36, borderRadius: 6, backgroundColor: '#E2E8F0', justifyContent: 'center', alignItems: 'center' }}>
-                                    <BootstrapIcon name="box-seam" size={16} color="#64748B" />
-                                  </View>
-                                )}
-                                <View style={{ flex: 1 }}>
-                                  <Text style={{ fontSize: 13, fontWeight: '700', color: tokens.textPrimary }} numberOfLines={1}>
-                                    {item.name}
-                                  </Text>
-                                  <Text style={{ fontSize: 11, color: tokens.textMuted }}>
-                                    Qty: {item.quantity || 1} • ₱{Number(item.price || 0).toLocaleString()} each
-                                  </Text>
-                                </View>
-                              </View>
-                              <Text style={{ fontSize: 13, fontWeight: '600', color: tokens.textPrimary }}>
-                                ₱{(Number(item.price || 0) * (item.quantity || 1)).toLocaleString()}
-                              </Text>
-                            </View>
-                          ))}
-                        </View>
-
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                          <Text style={{ fontSize: 12, color: tokens.textMuted }}>
-                            Payment: <Text style={{ fontWeight: '700', color: tokens.textPrimary }}>{o.paymentMethod || 'COD'}</Text> • Total: <Text style={{ fontWeight: '600', color: tokens.brandPrimary, fontSize: 14 }}>₱{getOrderGrandTotal(o).toLocaleString()}</Text>
-                          </Text>
-
-                          {typeof addToCart === 'function' && o.items && o.items.length > 0 && (
-                            <TouchableOpacity
-                              style={{
-                                backgroundColor: isDarkMode ? '#1C2422' : '#FFFFFF',
-                                borderWidth: 1,
-                                borderColor: tokens.border,
-                                paddingVertical: 6,
-                                paddingHorizontal: 12,
-                                borderRadius: 8,
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                gap: 6,
-                              }}
-                              onPress={() => {
-                                o.items.forEach((it) => addToCart(it, it.quantity || 1));
-                                showToast('Added items back to shopping bag!');
-                              }}
-                            >
-                              <BootstrapIcon name="arrow-repeat" size={12} color={tokens.brandPrimary} />
-                              <Text style={{ fontSize: 11.5, fontWeight: '700', color: tokens.brandPrimary }}>Buy Again</Text>
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      </View>
-                    ))}
+                      );
+                    })}
                   </View>
                 )}
               </View>
@@ -5250,13 +5919,69 @@ export default function ProfilePage({
         onCancel={() => setIsLogoutModalOpen(false)}
       />
       {/* Shopping Cart Modal */}
-      <CartModal
+      <CartPage
         visible={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         onProceedToCheckout={() => {
           setIsCartOpen(false);
-          onNavigateToStore?.();
+          setBuyNowItems(null);
+          setIsCheckoutOpen(true);
         }}
+        onNavigateToStore={onNavigateToStore}
+        onNavigateToGarage={onNavigateToGarage}
+        onNavigateToCustomizer={onNavigateToCustomizer}
+        onNavigateToWishlist={onNavigateToWishlist}
+        onNavigateToOrders={onNavigateToOrders}
+        onNavigateToLogin={onNavigateToLogin}
+        onNavigateToAdmin={onNavigateToAdmin}
+        onLogout={onLogout}
+      />
+
+      {/* Product Quick-Order & Variant Inspection Modal */}
+      <ProductSpecsModal
+        visible={isSpecsOpen}
+        product={selectedProductForSpecs}
+        onClose={() => {
+          setIsSpecsOpen(false);
+          setSelectedProductForSpecs(null);
+        }}
+        onAddToCart={(prod, qty, opts) => handleAddToCartFromGrid(prod, qty, opts)}
+        onBuyNow={(prod, qty, opts) => handleQuickOrder(prod, qty, opts)}
+      />
+
+      {/* Checkout Modal (Direct Ordering from Profile Page) */}
+      <CheckoutModal
+        visible={isCheckoutOpen}
+        onClose={() => {
+          setIsCheckoutOpen(false);
+          setBuyNowItems(null);
+        }}
+        onCompleteOrder={handleCompleteOrder}
+        isPlacingOrder={isPlacingOrder}
+        overrideItemCount={buyNowItems ? buyNowItems.reduce((acc, it) => acc + (it.quantity || 1), 0) : null}
+        overrideTotal={
+          buyNowItems
+            ? buyNowItems.reduce((acc, it) => acc + Number(it.product?.price || 0) * (it.quantity || 1), 0) +
+              (isFreeShipping ? 0 : shippingRate)
+            : null
+        }
+        overrideItems={buyNowItems}
+        onOpenProfile={() => setIsCheckoutOpen(false)}
+      />
+
+      {/* GCash Payment Gateway Simulation Modal */}
+      <GCashPaymentModal
+        visible={isGcashModalOpen}
+        onClose={() => setIsGcashModalOpen(false)}
+        orderData={pendingGcashOrderData}
+        amount={
+          buyNowItems
+            ? buyNowItems.reduce((acc, it) => acc + Number(it.product?.price || 0) * (it.quantity || 1), 0) +
+              (isFreeShipping ? 0 : shippingRate)
+            : cartTotal
+        }
+        onPaymentSuccess={handleGcashPaymentSuccess}
+        showToast={showToast}
       />
 
       {/* Customer Delivered Order Rating & Review Modal */}

@@ -335,7 +335,7 @@ export default function AdminSidebar({
         },
         {
           id: 'profile',
-          label: 'Profile & Logs',
+          label: 'Profile',
           icon: 'person-gear',
         },
       ],
@@ -344,11 +344,6 @@ export default function AdminSidebar({
       id: 'system',
       heading: 'SYSTEM & SETTINGS',
       items: [
-        {
-          id: 'supabase',
-          label: 'Database',
-          icon: 'database',
-        },
         {
           id: 'audit',
           label: 'Activity Logs',

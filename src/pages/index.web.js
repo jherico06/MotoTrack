@@ -1,4 +1,5 @@
 export { default as ShopPage } from '../screens/web/customer/ShopPage.jsx';
+export { default as CartPage } from '../screens/web/customer/CartPage.jsx';
 export { default as LoginPage } from '../screens/web/auth/LoginPage.jsx';
 export { default as SignUpPage } from '../screens/web/auth/SignUpPage.jsx';
 export { default as OrderPage } from '../screens/web/customer/OrderPage.jsx';

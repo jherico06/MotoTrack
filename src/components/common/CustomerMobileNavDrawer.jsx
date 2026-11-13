@@ -232,13 +232,7 @@ export default function CustomerMobileNavDrawer({
       activeIcon: 'tools',
       screen: 'garage',
     },
-    {
-      id: 'appointments',
-      label: 'Appointments',
-      icon: 'calendar-check',
-      activeIcon: 'calendar-check-fill',
-      screen: 'appointments',
-    },
+
     {
       id: 'customizer',
       label: 'Customize',

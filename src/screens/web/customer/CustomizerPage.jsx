@@ -18,6 +18,7 @@ import { aiCustomizerService, BIKE_PRESETS, CUSTOM_THEMES } from '../../../servi
 import { productService } from '../../../services/products/productService.js';
 import { geminiService } from '../../../services/ai/geminiService.js';
 import { GARAGE_BRANCHES, TIME_SLOTS } from '../../../services/bookings/garageService.js';
+import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../../../services/products/motorcycleService.js';
 import { notificationService } from '../../../services/notifications/notificationService.js';
 import {
@@ -34,9 +35,9 @@ import {
   LiveOrderTrackingMapModal,
   RegisterMotorcycleModal,
   CheckoutModal,
-  CartModal,
   BookInstallationModal,
 } from '../../../components/modals';
+import CartPage from './CartPage.jsx';
 import CustomizationWorkspace from '../../../components/customizer/CustomizationWorkspace.jsx';
 import AiMotorcycleInstallStudio from '../../../components/customizer/AiMotorcycleInstallStudio.jsx';
 import { useCustomizationBuilder } from '../../../hooks/useCustomizationBuilder.js';
@@ -45,6 +46,7 @@ import { useAuth } from '../../../context/AuthContext.jsx';
 import { useCart } from '../../../context/CartContext.jsx';
 import { useWishlist } from '../../../context/WishlistContext.jsx';
 import { useTheme } from '../../../context/ThemeContext.jsx';
+import { useWebSavedWishlistCount } from '../../../components/web/useWebSavedWishlistCount.js';
 
 export default function CustomizerPageWeb({
   onNavigateToStore,
@@ -66,7 +68,8 @@ export default function CustomizerPageWeb({
 
   const { currentUser, logout, setRedirectReason } = useAuth();
   const { addToCart, showToast, toastMessage, cartItemCount } = useCart();
-  const { wishlistCount, addToWishlist } = useWishlist();
+  const { wishlist, addToWishlist } = useWishlist();
+  const savedWishlistCount = useWebSavedWishlistCount(wishlist);
 
   const [studioMode, setStudioMode] = useState('install');
   const customizationBuilder = useCustomizationBuilder({
@@ -244,8 +247,8 @@ export default function CustomizerPageWeb({
     return selectedParts.reduce((sum, p) => sum + Number(p.price || 0), 0);
   }, [selectedParts]);
   const partsTotalPhp = usdToPhp(partsTotalUsd);
-  const laborFeePhp = 1500;
-  const laborFeeUsd = 26.8;
+  const laborFeePhp = systemSettingsService.getCustomizationLaborFee?.() ?? 3250;
+  const laborFeeUsd = laborFeePhp / 50;
   const grandTotalPhp = partsTotalPhp + (selectedParts.length > 0 ? laborFeePhp : 0);
   const grandTotalUsd = partsTotalUsd + (selectedParts.length > 0 ? laborFeeUsd : 0);
 
@@ -286,7 +289,12 @@ export default function CustomizerPageWeb({
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isBookingSubmitting, setIsBookingSubmitting] = useState(false);
   const [bookingBranch, setBookingBranch] = useState(GARAGE_BRANCHES[0].name);
-  const [bookingDate, setBookingDate] = useState('Tomorrow, 10:30 AM');
+  const [bookingDate, setBookingDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    if (d.getDay() === 0) d.setDate(d.getDate() + 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [bookingTimeSlot, setBookingTimeSlot] = useState(TIME_SLOTS[1]);
   const [riderName, setRiderName] = useState(currentUser?.name || currentUser?.fullName || '');
   const [riderPhone, setRiderPhone] = useState(currentUser?.phone || '+63 917 882 9102');
@@ -472,8 +480,9 @@ export default function CustomizerPageWeb({
     setIsBookingModalOpen(true);
   };
 
-  const handleConfirmCustomBooking = async () => {
-    if (!riderPhone.trim()) {
+  const handleConfirmCustomBooking = async (bookingData = {}) => {
+    const effectivePhone = (bookingData?.phone || riderPhone || '').trim();
+    if (!effectivePhone) {
       showToast('Please enter your contact phone number');
       return;
     }
@@ -493,18 +502,23 @@ export default function CustomizerPageWeb({
 
       const booking = await aiCustomizerService.bookCustomizationService({
         customizationData: customizationPayload,
-        branchName: bookingBranch,
-        appointmentDate: bookingDate,
-        timeSlot: bookingTimeSlot,
+        branchName: bookingData?.branch || bookingBranch,
+        appointmentDate: bookingData?.date || bookingDate,
+        timeSlot: bookingData?.timeSlot || bookingTimeSlot,
         customerName: riderName || currentUser?.name || 'Rider',
-        customerPhone: riderPhone,
+        customerPhone: effectivePhone,
         plateNumber: bikePlate || activeMotorcycle?.plate_number || 'Custom Project',
-        notes: bookingNotes,
+        notes: bookingData?.notes !== undefined ? bookingData.notes : bookingNotes,
+        downpaymentPercent: bookingData?.downpaymentPercent,
+        downpaymentAmount: bookingData?.downpaymentAmount,
+        remainingBalance: bookingData?.remainingBalance,
+        paymentMethod: bookingData?.paymentMethod,
         currentUser,
       });
 
       setIsBookingModalOpen(false);
-      showToast(`🏁 Pitstop installation booked! Ticket #${booking.id}`);
+      const dpMsg = booking?.downpayment_amount > 0 ? ` (₱${Number(booking.downpayment_amount).toLocaleString()} deposit)` : '';
+      showToast(`🏁 Pitstop installation booked! Ticket #${booking?.id || booking?.booking_id || ''}.${dpMsg}`);
       onNavigateToGarage?.();
     } catch (err) {
       console.error('[CustomizerPageWeb] Booking error:', err);
@@ -538,16 +552,24 @@ export default function CustomizerPageWeb({
     generationResult && activeViewMode === 'generated' ? generationResult.generatedImage : currentBasePhoto;
 
   return (
-    <View style={[styles.container, isDarkMode && { backgroundColor: '#0F1412' }]}>
+    <View
+      style={[
+        styles.container,
+        isDarkMode && { backgroundColor: '#0F1412' },
+        Platform.OS === 'web' ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' } : {},
+      ]}
+    >
       <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ToastNotification message={toastMessage} />
 
       {/* ─── FULL-HEIGHT CUSTOMIZER SCROLLVIEW (Scrollbar extends to top: 0 through header, matching Image 1) ─── */}
       <ScrollView
         style={[
-          styles.container,
+          { flex: 1, width: '100%' },
           isDarkMode && { backgroundColor: '#0F1412' },
-          Platform.OS === 'web' ? { overscrollBehavior: 'none', overscrollBehaviorY: 'none' } : {},
+          Platform.OS === 'web'
+            ? { overflowY: 'scroll', overscrollBehavior: 'none', overscrollBehaviorY: 'none' }
+            : {},
         ]}
         contentContainerStyle={styles.scrollContent}
         stickyHeaderIndices={[0]}
@@ -563,6 +585,7 @@ export default function CustomizerPageWeb({
         <View
           style={[
             styles.headerInner,
+            isTablet && { paddingHorizontal: 18, paddingVertical: 10, minHeight: 60, gap: 12 },
             windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8, minHeight: 56 },
             windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
           ]}
@@ -586,59 +609,53 @@ export default function CustomizerPageWeb({
               </TouchableOpacity>
             )}
             {windowWidth >= 768 && (
-              <TouchableOpacity style={styles.logoWrap} onPress={() => onNavigateToStore?.()} activeOpacity={0.8}>
-                <BrandLogo size={windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
+              <TouchableOpacity
+                style={[styles.logoWrap, isTablet && { marginRight: 4 }]}
+                onPress={() => onNavigateToStore?.()}
+                activeOpacity={0.8}
+              >
+                <BrandLogo size={windowWidth < 768 ? 28 : isTablet ? 30 : windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
               </TouchableOpacity>
             )}
           </View>
 
           {/* Center Navigation: Shop, Book a Service, Customize (Desktop / Tablet only) */}
           {windowWidth >= 768 && (
-            <View style={styles.headerCenterNav}>
+            <View style={[styles.headerCenterNav, isTablet && { gap: 8 }]}>
               {/* Shop Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={styles.headerCenterBtn}
+                style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => onNavigateToStore?.()}
                 activeOpacity={0.8}
                 title="Shop"
               >
-                <Text style={styles.headerCenterBtnText}>Shop</Text>
+                <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Shop</Text>
               </TouchableOpacity>
 
               {/* Book a Service Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={styles.headerCenterBtn}
+                style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => onNavigateToGarage?.()}
                 activeOpacity={0.8}
                 title="Book a Service"
               >
-                <Text style={styles.headerCenterBtnText}>Book a Service</Text>
+                <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>
+                  {isTablet ? 'Book Service' : 'Book a Service'}
+                </Text>
               </TouchableOpacity>
 
-              {/* Appointments Button */}
-              <TouchableOpacity
-                className="main-nav-tab"
-                style={styles.headerCenterBtn}
-                onPress={() => {
-                  if (onNavigateToAppointments) onNavigateToAppointments();
-                  else onNavigateToGarage?.({ tab: 'appointments' });
-                }}
-                activeOpacity={0.8}
-                title="Appointments"
-              >
-                <Text style={styles.headerCenterBtnText}>Appointments</Text>
-              </TouchableOpacity>
+
 
               {/* Customize Button (Active) */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={styles.headerCenterBtnActive}
+                style={[styles.headerCenterBtnActive, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 activeOpacity={0.9}
                 title="Customize"
               >
-                <Text style={styles.headerCenterBtnTextActive}>
+                <Text style={[styles.headerCenterBtnTextActive, isTablet && { fontSize: 13 }]}>
                   Customize
                 </Text>
               </TouchableOpacity>
@@ -646,23 +663,23 @@ export default function CustomizerPageWeb({
               {/* Garage Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={styles.headerCenterBtn}
+                style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => onNavigateToProfile?.('garage')}
                 activeOpacity={0.8}
                 title="Garage"
               >
-                <Text style={styles.headerCenterBtnText}>Garage</Text>
+                <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Garage</Text>
               </TouchableOpacity>
 
               {/* Orders Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={styles.headerCenterBtn}
+                style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => onNavigateToOrders?.()}
                 activeOpacity={0.8}
                 title="Orders"
               >
-                <Text style={styles.headerCenterBtnText}>Orders</Text>
+                <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Orders</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -678,12 +695,12 @@ export default function CustomizerPageWeb({
               style={styles.navActionIconBtn}
               onPress={() => onNavigateToWishlist?.()}
               activeOpacity={0.8}
-              title="Favorites"
+              title="Saved Wishlist"
             >
-              <BootstrapIcon name="heart" size={16} color="#FFFFFF" />
-              {wishlistCount > 0 && (
+              <BootstrapIcon name="bookmark" size={16} color="#FFFFFF" />
+              {savedWishlistCount > 0 && (
                 <View style={styles.navBadgeCircle}>
-                  <Text style={styles.navBadgeText}>{wishlistCount}</Text>
+                  <Text style={styles.navBadgeText}>{savedWishlistCount}</Text>
                 </View>
               )}
             </TouchableOpacity>)}
@@ -901,14 +918,22 @@ export default function CustomizerPageWeb({
         }}
       />
 
-      {/* ─── 4. CART MODAL ─── */}
-      <CartModal
+      {/* ─── 4. CART PAGE ─── */}
+      <CartPage
         visible={isCartModalOpen}
         onClose={() => setIsCartModalOpen(false)}
         onProceedToCheckout={() => {
           setIsCartModalOpen(false);
           setIsCheckoutModalOpen(true);
         }}
+        onNavigateToStore={onNavigateToStore}
+        onNavigateToGarage={onNavigateToGarage}
+        onNavigateToWishlist={onNavigateToWishlist}
+        onNavigateToOrders={onNavigateToOrders}
+        onNavigateToProfile={onNavigateToProfile}
+        onNavigateToLogin={onNavigateToLogin}
+        onNavigateToAdmin={onNavigateToAdmin}
+        onLogout={onLogout}
       />
 
       {/* ─── 5. BOOKING MODAL (PITSTOP SERVICE) ─── */}
@@ -923,10 +948,13 @@ export default function CustomizerPageWeb({
             ? `${selectedParts.length} Custom Parts Installation`
             : 'Custom Parts Installation'
         }
-        laborFeePhp={3250}
+        laborFeePhp={laborFeePhp}
+        partsCostPhp={partsTotalPhp}
         branches={GARAGE_BRANCHES}
         selectedBranch={bookingBranch}
         onSelectBranch={setBookingBranch}
+        selectedDate={bookingDate}
+        onSelectDate={setBookingDate}
         timeSlots={TIME_SLOTS}
         selectedTimeSlot={bookingTimeSlot}
         onSelectTimeSlot={setBookingTimeSlot}

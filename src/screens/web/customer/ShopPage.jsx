@@ -34,7 +34,6 @@ import {
   BootstrapIcon,
   ToastNotification,
   ProductSpecsModal,
-  CartModal,
   CheckoutModal,
   ProfileModal,
   AccessDeniedModal,
@@ -42,6 +41,7 @@ import {
   GCashPaymentModal,
   CompanyInfoModal,
 } from '../../../components';
+import CartPage from './CartPage.jsx';
 import {
   UserProfileDropdown,
   UserProfileButton,
@@ -52,6 +52,8 @@ import {
   CustomerMobileNavDrawer,
 } from '../../../components/common';
 import HeroBanner from '../../../components/shop/HeroBanner.jsx';
+import CategoryIcon from '../../../components/shop/CategoryIcon.jsx';
+import { useWebSavedWishlistCount } from '../../../components/web/useWebSavedWishlistCount.js';
 import CompatibilityIndicator from '../../../components/shop/CompatibilityIndicator.jsx';
 import {
   compatibilityService,
@@ -68,16 +70,6 @@ const DEFAULT_SELECTED_BIKE = {
   model: 'Smash 125',
   motorcycle_id: 'default-smash-125',
 };
-
-// Popular Philippines motorcycles for rapid fitment preview
-const POPULAR_MOTORCYCLES = [
-  { brand: 'Suzuki', model: 'Smash 125', motorcycle_id: 'pop-smash-125' },
-  { brand: 'Yamaha', model: 'NMAX 155', motorcycle_id: 'pop-nmax-155' },
-  { brand: 'Honda', model: 'Click 160', motorcycle_id: 'pop-click-160' },
-  { brand: 'Honda', model: 'TMX 125', motorcycle_id: 'pop-tmx-125' },
-  { brand: 'Yamaha', model: 'Sniper 150', motorcycle_id: 'pop-sniper-150' },
-  { brand: 'Kawasaki', model: 'Ninja 400', motorcycle_id: 'pop-ninja-400' },
-];
 
 // Dynamic category cards are loaded via categoryService
 
@@ -114,13 +106,14 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
     toastMessage,
     showToast,
   } = useCart();
-  const { isWishlisted, toggleWishlist, wishlistCount } = useWishlist();
+  const { isWishlisted, toggleWishlist, wishlist } = useWishlist();
 
   // Active Admin Promos
   const [activePromos, setActivePromos] = useState([]);
 
   // Products & Filter state
   const [productsList, setProductsList] = useState([]);
+  const savedWishlistCount = useWebSavedWishlistCount(wishlist, productsList);
   const [categoriesList, setCategoriesList] = useState(
     () => categoryService.getCachedCategories?.() || []
   );
@@ -142,12 +135,19 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
   const [compatOnly, setCompatOnly] = useState(false);
   const [isSortDropdownOpen, setIsSortDropdownOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  const [newsletterEmail, setNewsletterEmail] = useState('');
+  const [hoveredCatId, setHoveredCatId] = useState(null);
 
   // Modal states
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isSpecsOpen, setIsSpecsOpen] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.location) {
+      try {
+        return new URLSearchParams(window.location.search).get('screen') === 'cart';
+      } catch (_e) {}
+    }
+    return false;
+  });
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -492,12 +492,33 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
   // Format dynamic category cards for the horizontal scroll bar
   const displayCategories = useMemo(() => {
     const list = Array.isArray(categoriesList) && categoriesList.length > 0 ? categoriesList : [];
-    const cards = list.map((cat) => ({
-      id: cat.category_id || cat.id || cat.name,
-      name: cat.name,
-      icon: cat.icon || resolveCategoryIcon(cat.name),
-      isMore: false,
-    }));
+    const ORDER = [
+      'accessories',
+      'brakes',
+      'drivetrain',
+      'engine',
+      'exhaust',
+      'maintenance',
+      'suspension',
+      'tires',
+    ];
+
+    const cards = [...list]
+      .sort((a, b) => {
+        const idxA = ORDER.indexOf((a.name || '').toLowerCase());
+        const idxB = ORDER.indexOf((b.name || '').toLowerCase());
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      })
+      .map((cat) => ({
+        id: cat.category_id || cat.id || cat.name,
+        name: cat.name,
+        icon: cat.icon || resolveCategoryIcon(cat.name),
+        isMore: false,
+      }));
+
     return [
       ...cards,
       {
@@ -808,7 +829,9 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         style={{
           flex: 1,
           width: '100%',
-          ...(Platform.OS === 'web' ? { overscrollBehavior: 'none', overscrollBehaviorY: 'none' } : {}),
+          ...(Platform.OS === 'web'
+            ? { overflowY: 'scroll', overscrollBehavior: 'none', overscrollBehaviorY: 'none' }
+            : {}),
         }}
         contentContainerStyle={webStyles.scrollContent}
         stickyHeaderIndices={[0]}
@@ -867,7 +890,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               {/* Shop Button (Active) */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={[webStyles.headerShopBtn, isTablet && { height: 34, paddingHorizontal: 10 }]}
+                style={[webStyles.headerShopBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => {
                   setSelectedCategory('All');
                   setSearchQuery('');
@@ -890,19 +913,6 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               >
                 <Text style={[webStyles.headerRepairBtnText, isTablet && { fontSize: 13 }]}>
                   {isTablet ? 'Book Service' : 'Book a Service'}
-                </Text>
-              </TouchableOpacity>
-
-              {/* Appointments Button */}
-              <TouchableOpacity
-                className="main-nav-tab"
-                style={[webStyles.headerRepairBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
-                onPress={() => onNavigateToScreen?.('appointments')}
-                activeOpacity={0.8}
-                title="Appointments"
-              >
-                <Text style={[webStyles.headerRepairBtnText, isTablet && { fontSize: 13 }]}>
-                  Appointments
                 </Text>
               </TouchableOpacity>
 
@@ -956,17 +966,17 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               isDark={isDarkMode}
             />
 
-            {/* Favorites Button (Icon Only with Badge) */}
+            {/* Saved Wishlist Button (Icon Only with Badge) */}
             {windowWidth >= 768 && (<TouchableOpacity
               style={webStyles.navActionIconBtn}
               onPress={handleNavigateToWishlist}
               activeOpacity={0.8}
-              title="Favorites"
+              title="Saved Wishlist"
             >
-              <BootstrapIcon name="heart" size={16} color="#FFFFFF" />
-              {wishlistCount > 0 && (
+              <BootstrapIcon name="bookmark" size={16} color="#FFFFFF" />
+              {savedWishlistCount > 0 && (
                 <View style={webStyles.navBadgeCircle}>
-                  <Text style={webStyles.navBadgeText}>{wishlistCount}</Text>
+                  <Text style={webStyles.navBadgeText}>{savedWishlistCount}</Text>
                 </View>
               )}
             </TouchableOpacity>)}
@@ -1417,76 +1427,6 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                             })}
                           </>
                         )}
-
-                        {/* Popular Models */}
-                        <View
-                          style={{
-                            paddingHorizontal: 14,
-                            paddingVertical: 5,
-                            backgroundColor: isDarkMode ? '#171C22' : '#F8FAFC',
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 10,
-                              fontWeight: '800',
-                              color: '#94A3B8',
-                              textTransform: 'uppercase',
-                            }}
-                          >
-                            Popular Models
-                          </Text>
-                        </View>
-                        {POPULAR_MOTORCYCLES.map((b) => {
-                          const isSelected =
-                            activeBike?.brand === b.brand && activeBike?.model === b.model;
-                          return (
-                            <TouchableOpacity
-                              key={b.motorcycle_id}
-                              style={[
-                                webStyles.categoryDropdownItem,
-                                isSelected && webStyles.categoryDropdownItemActive,
-                              ]}
-                              onPress={() => handleSelectBike(b)}
-                              activeOpacity={0.8}
-                            >
-                              <View style={webStyles.categoryDropdownItemLeft}>
-                                {isSelected ? (
-                                  <BootstrapIcon
-                                    name="check-circle-fill"
-                                    size={13}
-                                    color="#FF5A0A"
-                                  />
-                                ) : (
-                                  <BootstrapIcon name="circle" size={9} color="#CBD5E1" />
-                                )}
-                                <Text
-                                  style={[
-                                    webStyles.categoryDropdownItemText,
-                                    isSelected && webStyles.categoryDropdownItemTextActive,
-                                  ]}
-                                >
-                                  {b.brand} {b.model}
-                                </Text>
-                              </View>
-                              {b.model === 'Smash 125' && (
-                                <Text
-                                  style={{
-                                    fontSize: 9.5,
-                                    fontWeight: '800',
-                                    color: '#FF5A0A',
-                                    backgroundColor: isDarkMode ? '#2B1E17' : '#FFF7ED',
-                                    paddingHorizontal: 6,
-                                    paddingVertical: 1,
-                                    borderRadius: 4,
-                                  }}
-                                >
-                                  Selected
-                                </Text>
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })}
                       </ScrollView>
                     </View>
                   </>
@@ -1694,17 +1634,17 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
             );
           })()}
 
-          {/* ─── 4. MOTORCYCLE CATEGORIES ROW (8 attractive cards matching reference UI) ─── */}
+          {/* ─── 4. MOTORCYCLE CATEGORIES ROW (Clean Frameless Strip matching reference UI) ─── */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{
-              paddingBottom: 4,
+              paddingBottom: 0,
               paddingRight: isDesktop ? 0 : 16,
               minWidth: '100%',
               width: isDesktop ? '100%' : 'auto',
             }}
-            style={{ width: '100%', marginBottom: isTablet ? 20 : 28 }}
+            style={{ width: '100%', marginBottom: isTablet ? 18 : 26 }}
           >
             <View
               style={[
@@ -1713,11 +1653,24 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   width: 'auto',
                   minWidth: '100%',
                   justifyContent: 'flex-start',
+                  gap: 20,
                 },
               ]}
             >
               {displayCategories.map((cat) => {
                 const isActive = selectedCategory.toLowerCase() === cat.name.toLowerCase();
+                const isHovered = hoveredCatId === cat.id;
+
+                const itemColor = isActive
+                  ? '#FF5A0A'
+                  : isHovered
+                  ? isDarkMode
+                    ? '#FFFFFF'
+                    : '#0F172A'
+                  : isDarkMode
+                  ? '#94A3B8'
+                  : '#475569';
+
                 return (
                   <TouchableOpacity
                     key={cat.id}
@@ -1728,8 +1681,8 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                         ? { flex: 1, minWidth: 0 }
                         : {
                             flexShrink: 0,
-                            minWidth: 104,
-                            paddingHorizontal: 8,
+                            minWidth: 76,
+                            paddingHorizontal: 6,
                           },
                     ]}
                     onPress={() => {
@@ -1741,25 +1694,43 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                         setSelectedCategory(cat.name);
                       }
                     }}
-                    activeOpacity={0.85}
+                    onMouseEnter={() => setHoveredCatId(cat.id)}
+                    onMouseLeave={() => setHoveredCatId(null)}
+                    activeOpacity={0.75}
                   >
-                    <View style={webStyles.categoryCardImgWrap}>
-                      <BootstrapIcon
-                        name={cat.icon || resolveCategoryIcon(cat.name)}
-                        size={24}
-                        color={isActive ? '#FF5A0A' : '#64748B'}
+                    <View
+                      style={[
+                        webStyles.categoryCardImgWrap,
+                        (isActive || isHovered) && { transform: [{ translateY: -2 }] },
+                      ]}
+                    >
+                      <CategoryIcon
+                        name={cat.name}
+                        color={itemColor}
+                        size={26}
                       />
                     </View>
                     <Text
                       style={[
                         webStyles.categoryCardLabel,
                         isActive && webStyles.categoryCardLabelActive,
+                        isHovered && !isActive && { color: itemColor },
                         windowWidth < 1150 && { fontSize: 12, lineHeight: 15 },
                       ]}
                       numberOfLines={1}
                     >
                       {cat.name}
                     </Text>
+                    {/* Active Underline Indicator Bar */}
+                    <View
+                      style={[
+                        webStyles.categoryCardIndicator,
+                        {
+                          backgroundColor: isActive ? '#FF5A0A' : 'transparent',
+                          opacity: isActive ? 1 : 0,
+                        },
+                      ]}
+                    />
                   </TouchableOpacity>
                 );
               })}
@@ -1866,17 +1837,44 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                 const soldOut = isProductSoldOut(product);
                 const lowStock =
                   !soldOut && Number(product.stock) > 0 && Number(product.stock) <= resolveReorderLevel(product, 5);
-                const displayPrice = Number(product.price) || 0;
+                const basePrice = Number(product.price) || 0;
+                const pidStr = String(product.id || product.product_id || '');
+                const matchingPromo = (activePromos || [])
+                  .filter(
+                    (p) =>
+                      p &&
+                      p.isActive &&
+                      p.promoType === PROMO_TYPES.PERCENT_OFF &&
+                      Number(p.discountPercent) > 0 &&
+                      (p.appliesTo === 'ALL_PRODUCTS' ||
+                        (p.productIds || []).map(String).includes(pidStr))
+                  )
+                  .reduce(
+                    (best, cur) =>
+                      Number(cur.discountPercent || 0) > Number(best?.discountPercent || 0)
+                        ? cur
+                        : best,
+                    null
+                  );
+                const promoPct = Number(matchingPromo?.discountPercent || 0);
+                const hasCompareDiscount =
+                  product.compare_at_price && Number(product.compare_at_price) > basePrice;
+                const hasDiscount = hasCompareDiscount || promoPct > 0;
+                const displayPrice =
+                  promoPct > 0 ? basePrice * (1 - promoPct / 100) : basePrice;
+                const comparePrice =
+                  promoPct > 0 ? basePrice : Number(product.compare_at_price || 0);
+                const discountPercent =
+                  promoPct > 0
+                    ? Math.round(promoPct)
+                    : hasCompareDiscount
+                      ? Math.round(
+                          ((Number(product.compare_at_price) - basePrice) /
+                            Number(product.compare_at_price)) *
+                            100
+                        )
+                      : 0;
                 const hasRatings = productHasCustomerRatings(product);
-                const hasDiscount =
-                  product.compare_at_price && Number(product.compare_at_price) > Number(product.price);
-                const discountPercent = hasDiscount
-                  ? Math.round(
-                      ((Number(product.compare_at_price) - Number(product.price)) /
-                        Number(product.compare_at_price)) *
-                        100
-                    )
-                  : 0;
 
                 return (
                   <TouchableOpacity
@@ -1954,11 +1952,12 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                           toggleWishlist(product.id);
                         }}
                         activeOpacity={0.8}
+                        title={isFav ? "Saved to Wishlist" : "Save to Wishlist"}
                       >
                         <BootstrapIcon
-                          name={isFav ? 'heart-fill' : 'heart'}
+                          name={isFav ? 'bookmark-fill' : 'bookmark'}
                           size={13}
-                          color={isFav ? '#EF4444' : isDarkMode ? '#94A3B8' : '#64748B'}
+                          color={isFav ? '#EA580C' : isDarkMode ? '#94A3B8' : '#64748B'}
                         />
                       </TouchableOpacity>
                     </View>
@@ -1999,9 +1998,9 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                         <Text style={webStyles.priceMainText}>
                           ₱{displayPrice.toFixed(2)}
                         </Text>
-                        {hasDiscount && (
+                        {hasDiscount && comparePrice > displayPrice && (
                           <Text style={webStyles.priceOldText}>
-                            ₱{Number(product.compare_at_price).toFixed(2)}
+                            ₱{Number(comparePrice).toFixed(2)}
                           </Text>
                         )}
                       </View>
@@ -2152,230 +2151,36 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
           </View>
         </View>
 
-        {/* ─── 7. PROMOTIONAL CARDS (DYNAMICALLY LOADED FROM ACTIVE ADMIN PROMOS) ─── */}
-        <View style={[webStyles.promoCardsRow, windowWidth < 768 && { flexDirection: 'column', gap: 14 }]}>
-          {activePromos && activePromos.length > 0 ? (
-            <>
-              {activePromos.slice(0, 3).map((promo) => (
-                <View key={promo.promo_id || promo.code} style={webStyles.promoCard}>
-                  <View
-                    style={{
-                      position: 'absolute',
-                      right: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: '50%',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <Image
-                      source={{
-                        uri:
-                          promo.imageUrl ||
-                          promo.image_url ||
-                          (promo.promoType === PROMO_TYPES.FREE_SHIPPING
-                            ? 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80'
-                            : promo.promoType === PROMO_TYPES.FREE_INSTALLATION
-                              ? 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=400&q=80'
-                              : 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=400&q=80'),
-                      }}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        opacity: 0.32,
-                      }}
-                      resizeMode="cover"
-                    />
-                    <View
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        backgroundColor: 'rgba(24, 24, 27, 0.45)',
-                      }}
-                    />
-                  </View>
-                  <View style={{ zIndex: 2 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      {promo.promoType === PROMO_TYPES.FREE_SHIPPING ? (
-                        <BootstrapIcon name="truck" size={12} color="#FF5A0A" />
-                      ) : promo.promoType === PROMO_TYPES.FREE_INSTALLATION ? (
-                        <BootstrapIcon name="tools" size={12} color="#FF5A0A" />
-                      ) : (
-                        <BootstrapIcon name="tag-fill" size={12} color="#FF5A0A" />
-                      )}
-                      <Text style={webStyles.promoCardTag}>
-                        {promo.promoType === PROMO_TYPES.FREE_SHIPPING
-                          ? 'FREE SHIPPING'
-                          : promo.promoType === PROMO_TYPES.FREE_INSTALLATION
-                            ? 'FREE INSTALLATION'
-                            : promo.discountPercent
-                              ? `SPECIAL OFFER • ${promo.discountPercent}% OFF`
-                              : 'SPECIAL OFFER'}
-                      </Text>
-                    </View>
-                    <Text style={webStyles.promoCardTitle}>
-                      {promo.description ||
+        {/* ─── 7. PROMOTIONAL CARDS (DYNAMICALLY LOADED ONLY WHEN ADMIN ACTIVATES PROMOS) ─── */}
+        {activePromos && activePromos.length > 0 && (
+          <View style={[webStyles.promoCardsRow, windowWidth < 768 && { flexDirection: 'column', gap: 14 }]}>
+            {activePromos.slice(0, 3).map((promo) => (
+              <View key={promo.promo_id || promo.code} style={webStyles.promoCard}>
+                <View
+                  style={{
+                    position: 'absolute',
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: '50%',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <Image
+                    source={{
+                      uri:
+                        promo.imageUrl ||
+                        promo.image_url ||
                         (promo.promoType === PROMO_TYPES.FREE_SHIPPING
-                          ? 'Free Shipping Nationwide'
+                          ? 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80'
                           : promo.promoType === PROMO_TYPES.FREE_INSTALLATION
-                            ? 'Free Pitstop Installation'
-                            : `${promo.discountPercent}% Off On Products`)}
-                    </Text>
-                    <Text style={webStyles.promoCardSub}>
-                      {promo.minimumOrderAmount
-                        ? `For orders over ₱${Number(promo.minimumOrderAmount).toLocaleString()} • Use code ${promo.code}`
-                        : `Use promo code ${promo.code} at checkout`}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={webStyles.promoCardLink}
-                    onPress={() => handlePromoCardAction(promo)}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={webStyles.promoCardLinkText}>
-                      Apply Code ({promo.code})
-                    </Text>
-                    <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-
-              {/* Supplementary Card when 1 active promo: show Genuine Parts and Expert Service */}
-              {activePromos.length === 1 && (
-                <>
-                  <View style={webStyles.promoCard}>
-                    <Image
-                      source={{
-                        uri: 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=400&q=80',
-                      }}
-                      style={{
-                        position: 'absolute',
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: '45%',
-                        opacity: 0.3,
-                      }}
-                      resizeMode="cover"
-                    />
-                    <View style={{ zIndex: 2 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <BootstrapIcon name="tools" size={12} color="#FF5A0A" />
-                        <Text style={webStyles.promoCardTag}>CERTIFIED PITSTOP</Text>
-                      </View>
-                      <Text style={webStyles.promoCardTitle}>Expert Service & Tuning</Text>
-                      <Text style={webStyles.promoCardSub}>Book certified mechanics for your machine.</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={webStyles.promoCardLink}
-                      onPress={() => onNavigateToScreen?.('garage')}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={webStyles.promoCardLinkText}>Book Service</Text>
-                      <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={webStyles.promoCard}>
-                    <Image
-                      source={{
-                        uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=80',
-                      }}
-                      style={{
-                        position: 'absolute',
-                        right: 0,
-                        top: 0,
-                        bottom: 0,
-                        width: '45%',
-                        opacity: 0.28,
-                      }}
-                      resizeMode="cover"
-                    />
-                    <View style={{ zIndex: 2 }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                        <BootstrapIcon name="gear-fill" size={12} color="#FF5A0A" />
-                        <Text style={webStyles.promoCardTag}>GENUINE PARTS ONLY</Text>
-                      </View>
-                      <Text style={webStyles.promoCardTitle}>Genuine Parts Only</Text>
-                      <Text style={webStyles.promoCardSub}>
-                        100% original and trusted brands for your peace of mind.
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={webStyles.promoCardLink}
-                      onPress={() => handleOpenCompanyInfo('about')}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={webStyles.promoCardLinkText}>Learn More</Text>
-                      <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
-
-              {/* Supplementary Card when 2 active promos: show Genuine Parts */}
-              {activePromos.length === 2 && (
-                <View style={webStyles.promoCard}>
-                  <Image
-                    source={{
-                      uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=80',
-                    }}
-                    style={{
-                      position: 'absolute',
-                      right: 0,
-                      top: 0,
-                      bottom: 0,
-                      width: '45%',
-                      opacity: 0.28,
-                    }}
-                    resizeMode="cover"
-                  />
-                  <View style={{ zIndex: 2 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      <BootstrapIcon name="gear-fill" size={12} color="#FF5A0A" />
-                      <Text style={webStyles.promoCardTag}>GENUINE PARTS ONLY</Text>
-                    </View>
-                    <Text style={webStyles.promoCardTitle}>Genuine Parts Only</Text>
-                    <Text style={webStyles.promoCardSub}>
-                      100% original and trusted brands for your peace of mind.
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={webStyles.promoCardLink}
-                    onPress={() => handleOpenCompanyInfo('about')}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={webStyles.promoCardLinkText}>Learn More</Text>
-                    <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
-                  </TouchableOpacity>
-                </View>
-              )}
-            </>
-          ) : (
-            <>
-              {/* Default fallback cards when no promo is activated by admin yet */}
-              <View style={webStyles.promoCard}>
-                <View
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: '50%',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Image
-                    source={{
-                      uri: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=400&q=80',
+                            ? 'https://images.unsplash.com/photo-1558980664-769d59546b3d?auto=format&fit=crop&w=400&q=80'
+                            : 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=400&q=80'),
                     }}
                     style={{
                       width: '100%',
                       height: '100%',
-                      opacity: 0.35,
+                      opacity: 0.32,
                     }}
                     resizeMode="cover"
                   />
@@ -2391,129 +2196,52 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   />
                 </View>
                 <View style={{ zIndex: 2 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-                    <BootstrapIcon name="tag-fill" size={12} color="#FF5A0A" />
-                    <Text style={webStyles.promoCardTag}>SPECIAL OFFERS</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    {promo.promoType === PROMO_TYPES.FREE_SHIPPING ? (
+                      <BootstrapIcon name="truck" size={12} color="#FF5A0A" />
+                    ) : promo.promoType === PROMO_TYPES.FREE_INSTALLATION ? (
+                      <BootstrapIcon name="tools" size={12} color="#FF5A0A" />
+                    ) : (
+                      <BootstrapIcon name="tag-fill" size={12} color="#FF5A0A" />
+                    )}
+                    <Text style={webStyles.promoCardTag}>
+                      {promo.promoType === PROMO_TYPES.FREE_SHIPPING
+                        ? 'FREE SHIPPING'
+                        : promo.promoType === PROMO_TYPES.FREE_INSTALLATION
+                          ? 'FREE INSTALLATION'
+                          : promo.discountPercent
+                            ? `SPECIAL OFFER • ${promo.discountPercent}% OFF`
+                            : 'SPECIAL OFFER'}
+                    </Text>
                   </View>
-                  <Text style={webStyles.promoCardTitle}>Rider Deals & Discounts</Text>
-                  <Text style={webStyles.promoCardSub}>Quality motorcycle parts, ride in style.</Text>
-                </View>
-                <TouchableOpacity
-                  style={webStyles.promoCardLink}
-                  onPress={() => setSelectedCategory('All')}
-                  activeOpacity={0.85}
-                >
-                  <Text style={webStyles.promoCardLinkText}>Shop Now</Text>
-                  <BootstrapIcon name="arrow-right" size={12} color="#FF5A0A" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={webStyles.promoCard}>
-                <View
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: '50%',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Image
-                    source={{
-                      uri: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=400&q=80',
-                    }}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      opacity: 0.3,
-                    }}
-                    resizeMode="cover"
-                  />
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: 'rgba(24, 24, 27, 0.45)',
-                    }}
-                  />
-                </View>
-                <View style={{ zIndex: 2 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-                    <BootstrapIcon name="truck" size={12} color="#FF5A0A" />
-                    <Text style={webStyles.promoCardTag}>FREE SHIPPING</Text>
-                  </View>
-                  <Text style={webStyles.promoCardTitle}>Free Shipping Nationwide</Text>
-                  <Text style={webStyles.promoCardSub}>Available on eligible orders</Text>
-                </View>
-                <TouchableOpacity
-                  style={webStyles.promoCardLink}
-                  onPress={() => setSelectedCategory('All')}
-                  activeOpacity={0.85}
-                >
-                  <Text style={webStyles.promoCardLinkText}>Shop Now</Text>
-                  <BootstrapIcon name="arrow-right" size={12} color="#FF5A0A" />
-                </TouchableOpacity>
-              </View>
-
-              <View style={webStyles.promoCard}>
-                <View
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: '50%',
-                    overflow: 'hidden',
-                  }}
-                >
-                  <Image
-                    source={{
-                      uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=400&q=80',
-                    }}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      opacity: 0.35,
-                    }}
-                    resizeMode="cover"
-                  />
-                  <View
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      backgroundColor: 'rgba(24, 24, 27, 0.45)',
-                    }}
-                  />
-                </View>
-                <View style={{ zIndex: 2 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-                    <BootstrapIcon name="shield-check" size={12} color="#FF5A0A" />
-                    <Text style={webStyles.promoCardTag}>AUTHENTIC GUARANTEE</Text>
-                  </View>
-                  <Text style={webStyles.promoCardTitle}>Genuine Parts Only</Text>
+                  <Text style={webStyles.promoCardTitle}>
+                    {promo.description ||
+                      (promo.promoType === PROMO_TYPES.FREE_SHIPPING
+                        ? 'Free Shipping Nationwide'
+                        : promo.promoType === PROMO_TYPES.FREE_INSTALLATION
+                          ? 'Free Pitstop Installation'
+                          : `${promo.discountPercent}% Off On Products`)}
+                  </Text>
                   <Text style={webStyles.promoCardSub}>
-                    100% original and trusted brands for your peace of mind.
+                    {promo.minimumOrderAmount
+                      ? `For orders over ₱${Number(promo.minimumOrderAmount).toLocaleString()} • Use code ${promo.code}`
+                      : `Use promo code ${promo.code} at checkout`}
                   </Text>
                 </View>
                 <TouchableOpacity
                   style={webStyles.promoCardLink}
-                  onPress={() => handleOpenCompanyInfo('about')}
+                  onPress={() => handlePromoCardAction(promo)}
                   activeOpacity={0.85}
                 >
-                  <Text style={webStyles.promoCardLinkText}>Learn More</Text>
-                  <BootstrapIcon name="arrow-right" size={12} color="#FF5A0A" />
+                  <Text style={webStyles.promoCardLinkText}>
+                    Apply Code ({promo.code})
+                  </Text>
+                  <BootstrapIcon name="arrow-right" size={13} color="#FF5A0A" />
                 </TouchableOpacity>
               </View>
-            </>
-          )}
-        </View>
+            ))}
+          </View>
+        )}
         </View>
 
         {/* ─── 8. FULL-WIDTH DARK CHARCOAL FOOTER (Flush with viewport & Admin-Editable) ─── */}
@@ -2646,68 +2374,16 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                 )}
               </View>
 
-              {/* Column 4: Stay Connected (Newsletter + Social Icons) */}
+              {/* Column 4: Stay Connected (Social Icons) */}
               <View style={[webStyles.footerCol, { minWidth: 260 }]}>
                 <View style={webStyles.footerColTitleRow}>
                   <Text style={webStyles.footerColTitle}>
                     {brandSettings?.footerStayConnectedTitle || 'Stay Connected'}
                   </Text>
                 </View>
-                <Text style={{ fontSize: 12, color: '#94A3B8', marginBottom: 12 }}>
-                  {brandSettings?.footerNewsletterSubtitle || 'Get the latest updates, promos and more.'}
+                <Text style={{ fontSize: 12, color: '#94A3B8', marginBottom: 16 }}>
+                  Follow us on our social platforms for official updates and announcements.
                 </Text>
-                {brandSettings?.footerNewsletterEnabled !== false && (
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                      borderRadius: 10,
-                      borderWidth: 1,
-                      borderColor: 'rgba(255, 255, 255, 0.15)',
-                      paddingLeft: 12,
-                      paddingRight: 4,
-                      height: 40,
-                      marginBottom: 16,
-                    }}
-                  >
-                    <TextInput
-                      placeholder={brandSettings?.footerNewsletterPlaceholder || 'Enter your email address'}
-                      placeholderTextColor="#94A3B8"
-                      value={newsletterEmail}
-                      onChangeText={setNewsletterEmail}
-                      style={{
-                        flex: 1,
-                        color: '#FFFFFF',
-                        fontSize: 12.5,
-                        outlineStyle: 'none',
-                        paddingVertical: 0,
-                      }}
-                    />
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (!newsletterEmail || !newsletterEmail.includes('@')) {
-                          showToast?.('Please enter a valid email address');
-                          return;
-                        }
-                        showToast?.('Thank you for subscribing to ' + (brandSettings?.storeName || 'MotoTrack') + '!');
-                        setNewsletterEmail('');
-                      }}
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        backgroundColor: '#FF5A0A',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        cursor: 'pointer',
-                      }}
-                      activeOpacity={0.85}
-                    >
-                      <BootstrapIcon name="arrow-right" size={13} color="#FFFFFF" />
-                    </TouchableOpacity>
-                  </View>
-                )}
 
                 {/* Social media icons */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -2801,10 +2477,16 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         onBuyNow={handleBuyNowAttempt}
       />
 
-      <CartModal
+      <CartPage
         visible={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         onProceedToCheckout={handleProceedToCheckout}
+        onNavigateToScreen={onNavigateToScreen}
+        onNavigateToWishlist={handleNavigateToWishlist}
+        onLogout={() => {
+          logout?.();
+          showToast?.('Logged out successfully');
+        }}
       />
 
       <CheckoutModal

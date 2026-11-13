@@ -192,6 +192,18 @@ function primaryAction(booking) {
     return { id: 'approve', label: 'Review Booking', icon: 'check2-circle' };
   }
   if (s === FLEX_BOOKING_STATUS.APPROVED || s === FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT) {
+    const isPaid =
+      booking?.downpayment_status === 'Paid' ||
+      booking?.downpayment_status === 'Settled' ||
+      booking?.downpayment_paid === true ||
+      booking?.deposit_paid === true ||
+      Number(booking?.amount_paid || 0) > 0 ||
+      booking?.payment_status === 'DOWNPAYMENT_PAID' ||
+      booking?.payment_status === 'FULLY_PAID' ||
+      !booking?.is_walk_in;
+    if (isPaid) {
+      return { id: 'approve', label: 'Approve & Confirm', icon: 'check2-circle' };
+    }
     return { id: 'finalize', label: 'Record Downpayment', icon: 'cash-coin' };
   }
   if (s === FLEX_BOOKING_STATUS.CONFIRMED) {
@@ -333,19 +345,21 @@ export default function AdminBookingManager({
         // No mechanic required. PMS fixed bookings use their already-quoted rate.
         const pmsRate = isPmsFixedBooking(booking)
           ? Number(
-              booking.labor_subtotal ??
-                booking.quoted_service_rate ??
-                booking.estimated_service_total ??
-                booking.package_price ??
-                0
-            )
+            booking.labor_subtotal ??
+            booking.quoted_service_rate ??
+            booking.estimated_service_total ??
+            booking.package_price ??
+            0
+          )
           : Number(booking.labor_subtotal ?? booking.quoted_service_rate ?? 0) || 0;
         await garageService.approveBooking(id, null, {
           flexible: true,
           approvedBy: 'admin',
+          customerEmail: booking.customer_email || booking.userEmail || booking.email,
+          customerName: booking.customer_name,
           ...(pmsRate > 0 ? { estimatedServiceCost: pmsRate, estimated_service_total: pmsRate } : {}),
         });
-        toast(`Approved #${id} â€” awaiting downpayment`);
+        toast(`Approved #${id} — customer notified by email to bring bike`);
         setSelectedId(id);
       } else if (actionId === 'reject') {
         setRejectOpen(true);
@@ -567,13 +581,13 @@ export default function AdminBookingManager({
                     </TouchableOpacity>
                     {(normalizeBookingStatus(b.status) === FLEX_BOOKING_STATUS.PENDING_REVIEW ||
                       b.status === 'Pending') && (
-                      <TouchableOpacity
-                        style={s.rejectBtn}
-                        onPress={() => runAction(b, 'reject')}
-                      >
-                        <Text style={s.rejectBtnText}>Reject</Text>
-                      </TouchableOpacity>
-                    )}
+                        <TouchableOpacity
+                          style={s.rejectBtn}
+                          onPress={() => runAction(b, 'reject')}
+                        >
+                          <Text style={s.rejectBtnText}>Reject</Text>
+                        </TouchableOpacity>
+                      )}
                   </View>
                 </TouchableOpacity>
               );
@@ -680,29 +694,29 @@ export default function AdminBookingManager({
               {/* Approve block for pending */}
               {(normalizeBookingStatus(selected.status) === FLEX_BOOKING_STATUS.PENDING_REVIEW ||
                 selected.status === 'Pending') && (
-                <View style={s.actionBlock}>
-                  <Text style={s.blockTitle}>1. Review & approve</Text>
-                  <Text style={s.meta}>
-                    No mechanic assignment needed - the admin handles scheduling, service, and billing.
-                  </Text>
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-                    <TouchableOpacity
-                      style={[s.primaryBtn, { flex: 1, backgroundColor: isDarkMode ? '#EA580C' : '#EA580C' }]}
-                      onPress={() => runAction(selected, 'approve')}
-                    >
-                      <Text style={s.primaryBtnText}>Approve Booking</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={s.rejectBtn}
-                      onPress={() => {
-                        setRejectOpen(true);
-                      }}
-                    >
-                      <Text style={s.rejectBtnText}>Reject</Text>
-                    </TouchableOpacity>
+                  <View style={s.actionBlock}>
+                    <Text style={s.blockTitle}>1. Review & approve</Text>
+                    <Text style={s.meta}>
+                      No mechanic assignment needed - the admin handles scheduling, service, and billing.
+                    </Text>
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+                      <TouchableOpacity
+                        style={[s.primaryBtn, { flex: 1, backgroundColor: isDarkMode ? '#EA580C' : '#EA580C' }]}
+                        onPress={() => runAction(selected, 'approve')}
+                      >
+                        <Text style={s.primaryBtnText}>Approve Booking</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={s.rejectBtn}
+                        onPress={() => {
+                          setRejectOpen(true);
+                        }}
+                      >
+                        <Text style={s.rejectBtnText}>Reject</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-              )}
+                )}
 
               {rejectOpen && (
                 <View style={s.actionBlock}>

@@ -225,6 +225,184 @@ function buildCodOrderApprovedEmailHtml({
 </html>`;
 }
 
+function buildBookingApprovedEmailHtml({
+  customerName,
+  bookingId,
+  serviceTitle,
+  appointmentDate,
+  timeSlot,
+  branchName,
+  branchAddress,
+  mechanicName,
+  serviceBay,
+  bikeBrand,
+  bikeModel,
+  plateNumber,
+  estimatedTotal,
+  downpaymentAmount,
+  downpaymentStatus,
+  downpaymentMethod,
+  remainingBalance,
+  isConfirmed = true,
+  supportEmail = 'support@mototrack.com',
+  supportPhone = '+63 (2) 8123-4567',
+}) {
+  const brand = String(bikeBrand || '').trim();
+  const model = String(bikeModel || '').trim();
+  const plate = String(plateNumber || '').trim();
+  const bikeSummary = [brand, model].filter(Boolean).join(' ') + (plate ? ` (Plate: ${plate})` : '');
+  const bikeDisplay = bikeSummary || 'Your Registered Motorcycle';
+
+  const dateLabel = appointmentDate || 'Scheduled Date';
+  const timeLabel = timeSlot || '09:00 AM';
+  const branch = branchName || "D'Blockchain Motorparts & Accessories";
+  const address = branchAddress || 'Central Naga Highway, Naga City, Cebu';
+  const tech = mechanicName || 'Lead Master Pit Technician';
+  const bay = serviceBay || 'Pit Bay 02 (Express Bay)';
+
+  const est = Number(estimatedTotal) || 0;
+  const dp = Number(downpaymentAmount) || 0;
+  const bal = Number(remainingBalance) || (est > dp ? est - dp : 0);
+  const payMethod = downpaymentMethod || 'GCash';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Service Booking Reservation Approved — MotoTrack</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #F1F5F9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <div style="max-width: 600px; margin: 24px auto; background-color: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);">
+    
+    <!-- Header -->
+    <div style="background-color: #24272B; padding: 24px 28px; border-bottom: 3px solid #EA580C;">
+      <h1 style="margin: 0; color: #FFFFFF; font-size: 22px; font-weight: 900; letter-spacing: 0.5px;">
+        <span style="color: #EA580C;">MOTO</span>TRACK
+      </h1>
+      <p style="margin: 6px 0 0; color: #CBD5E1; font-size: 13px; font-weight: 500;">Workshop Reservation & Pit Schedule Notice</p>
+    </div>
+
+    <!-- Body Content -->
+    <div style="padding: 28px; color: #334155; font-size: 15px; line-height: 1.6;">
+      <p style="margin: 0 0 16px; font-size: 16px; color: #0F172A;">Hello <strong>${escapeHtml(customerName)}</strong>,</p>
+
+      <p style="margin: 0 0 18px; font-size: 15px; color: #1E293B;">
+        Great news! Your service booking reservation <strong>#${escapeHtml(bookingId)}</strong> for <strong>${escapeHtml(serviceTitle)}</strong> has been <strong>approved</strong> by the MotoTrack workshop administration.
+      </p>
+
+      <!-- REQUIRED ACTION CALLOUT CARD -->
+      <div style="background-color: #FFFBEB; border: 1px solid #FDE68A; border-left: 5px solid #EA580C; border-radius: 8px; padding: 18px 20px; margin: 22px 0;">
+        <div style="margin-bottom: 8px;">
+          <strong style="font-size: 14px; color: #9A3412; text-transform: uppercase; letter-spacing: 0.6px;">
+            ⚠️ ACTION REQUIRED: BRING YOUR MOTORCYCLE TO THE SHOP
+          </strong>
+        </div>
+        <p style="margin: 0 0 12px; font-size: 14px; color: #7C2D12; line-height: 1.55;">
+          You are <strong>required to go to the shop with your motorcycle</strong> on your scheduled appointment date and time:
+        </p>
+        <div style="background: #FFFFFF; border: 1px solid #FDE68A; border-radius: 8px; padding: 14px 16px; margin-bottom: 12px;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+            <tr>
+              <td style="padding: 5px 0; color: #78350F; width: 135px; font-weight: 600;">📅 Scheduled Date:</td>
+              <td style="padding: 5px 0; color: #0F172A; font-weight: 800;">${escapeHtml(dateLabel)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0; color: #78350F; font-weight: 600;">⏰ Arrival Time:</td>
+              <td style="padding: 5px 0; color: #EA580C; font-weight: 800;">${escapeHtml(timeLabel)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0; color: #78350F; font-weight: 600;">🏍️ Motorcycle:</td>
+              <td style="padding: 5px 0; color: #0F172A; font-weight: 700;">${escapeHtml(bikeDisplay)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0; color: #78350F; font-weight: 600;">📍 Shop Location:</td>
+              <td style="padding: 5px 0; color: #0F172A; font-weight: 600;">${escapeHtml(branch)}<br/><span style="color: #64748B; font-size: 12px;">${escapeHtml(address)}</span></td>
+            </tr>
+            ${tech ? `
+            <tr>
+              <td style="padding: 5px 0; color: #78350F; font-weight: 600;">🔧 Assigned Tech:</td>
+              <td style="padding: 5px 0; color: #0F172A; font-weight: 700;">${escapeHtml(tech)}</td>
+            </tr>` : ''}
+            ${bay ? `
+            <tr>
+              <td style="padding: 5px 0; color: #78350F; font-weight: 600;">🛠️ Service Bay:</td>
+              <td style="padding: 5px 0; color: #0F172A; font-weight: 600;">${escapeHtml(bay)}</td>
+            </tr>` : ''}
+          </table>
+        </div>
+        <p style="margin: 0; font-size: 13px; color: #9A3412; line-height: 1.5;">
+          • Please arrive <strong>10–15 minutes before</strong> your scheduled time (${escapeHtml(timeLabel)}).<br/>
+          • Bring your motorcycle (<strong>${escapeHtml(bikeDisplay)}</strong>) and present your Booking Reference <strong>#${escapeHtml(bookingId)}</strong> at the pit bay gate.
+        </p>
+      </div>
+
+      <!-- Booking Summary Details Card -->
+      <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 18px 20px; margin: 22px 0;">
+        <h3 style="margin: 0 0 12px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.8px; color: #64748B; font-weight: 800;">Reservation Summary</h3>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13.5px;">
+          <tr>
+            <td style="padding: 6px 0; color: #64748B; width: 140px;">Booking Ref:</td>
+            <td style="padding: 6px 0; color: #0F172A; font-weight: 800;">#${escapeHtml(bookingId)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748B;">Service Package:</td>
+            <td style="padding: 6px 0; color: #0F172A; font-weight: 700;">${escapeHtml(serviceTitle)}</td>
+          </tr>
+          <tr>
+            <td style="padding: 6px 0; color: #64748B;">Reservation Status:</td>
+            <td style="padding: 6px 0;">
+              <span style="background-color: #DCFCE7; color: #15803D; font-weight: 800; padding: 3px 10px; border-radius: 12px; font-size: 12px; display: inline-block;">Approved & Confirmed</span>
+            </td>
+          </tr>
+          ${est > 0 ? `
+          <tr>
+            <td style="padding: 6px 0; color: #64748B;">Service Estimate:</td>
+            <td style="padding: 6px 0; color: #0F172A; font-weight: 700;">₱${est.toLocaleString('en-PH')}</td>
+          </tr>` : ''}
+          ${dp > 0 ? `
+          <tr>
+            <td style="padding: 6px 0; color: #64748B;">Deposit Status:</td>
+            <td style="padding: 6px 0; color: #047857; font-weight: 700;">₱${dp.toLocaleString('en-PH')} Verified (${escapeHtml(payMethod)})</td>
+          </tr>` : ''}
+          ${bal > 0 ? `
+          <tr>
+            <td style="padding: 8px 0 0; color: #64748B; border-top: 1px dashed #CBD5E1;">Remaining Balance:</td>
+            <td style="padding: 8px 0 0; color: #EA580C; font-size: 16px; font-weight: 800; border-top: 1px dashed #CBD5E1;">₱${bal.toLocaleString('en-PH')} <span style="font-size: 12px; font-weight: 400; color: #64748B;">(payable at counter upon completion)</span></td>
+          </tr>` : ''}
+        </table>
+      </div>
+
+      <!-- Live Tracking Note -->
+      <div style="background-color: #EFF6FF; border-left: 4px solid #3B82F6; padding: 12px 16px; border-radius: 6px; margin: 18px 0;">
+        <p style="margin: 0; color: #1E40AF; font-size: 13px; line-height: 1.5;">
+          📡 <strong>Live Bay Telemetry:</strong> You can track your motorcycle's live service stages (Gate Check-In, Service Underway, Ready for Pick Up) directly in your <strong>MotoTrack Garage / My Appointments</strong> dashboard.
+        </p>
+      </div>
+
+      <!-- Support / Contact Info -->
+      <p style="margin: 20px 0 8px; color: #64748B; font-size: 13px; line-height: 1.5;">
+        Need to reschedule or have questions? Contact the workshop at <a href="mailto:${escapeHtml(supportEmail)}" style="color: #EA580C; text-decoration: none; font-weight: 600;">${escapeHtml(supportEmail)}</a> or call <strong>${escapeHtml(supportPhone)}</strong>.
+      </p>
+
+      <!-- Closing -->
+      <p style="margin: 22px 0 4px; color: #1E293B; font-size: 14.5px;">We look forward to servicing your bike!</p>
+      <p style="margin: 0; color: #64748B; font-size: 14px;">
+        Best regards,<br>
+        <strong style="color: #0F172A;">MotoTrack Workshop Team</strong><br>
+        <span style="font-size: 12px; color: #94A3B8;">${escapeHtml(branch)}</span>
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="background-color: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 16px 28px; color: #94A3B8; font-size: 12px; text-align: center;">
+      MotoTrack Atelier OS · Pit Bay Service Telemetry · Automated Notification
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
 class EmailService {
   /**
    * Resolve a customer email from order/booking fields or the customers/users table.
@@ -236,6 +414,7 @@ class EmailService {
     phone,
     userId,
     customerId,
+    bookingId,
   } = {}) {
     const direct = isValidEmail(email || customerEmail || userEmail);
     if (direct) return direct;
@@ -243,27 +422,47 @@ class EmailService {
     const maybePhone = isValidEmail(phone);
     if (maybePhone) return maybePhone;
 
+    // Check window.localStorage for current session user email if on web
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const storedUser = JSON.parse(window.localStorage.getItem('mototrack_user') || '{}');
+        const storedEmail = isValidEmail(storedUser?.email);
+        if (storedEmail && (storedUser?.id === userId || storedUser?.customer_id === customerId || !userId)) {
+          return storedEmail;
+        }
+      } catch (_e) {}
+    }
+
     const ids = [...new Set([userId, customerId].map((v) => String(v || '').trim()).filter(Boolean))];
-    if (!ids.length || !supabase) return null;
+    if (ids.length && supabase) {
+      try {
+        for (const id of ids) {
+          // 1. Check customers table by customer_id
+          const byCustomer = await supabase.from('customers').select('email').eq('customer_id', id).maybeSingle();
+          const foundCustomer = isValidEmail(byCustomer.data?.email);
+          if (foundCustomer) return foundCustomer;
 
-    try {
-      for (const id of ids) {
-        // 1. Check customers table by customer_id
-        const byCustomer = await supabase.from('customers').select('email').eq('customer_id', id).maybeSingle();
-        const foundCustomer = isValidEmail(byCustomer.data?.email);
-        if (foundCustomer) return foundCustomer;
+          // 2. Check users table by user_id
+          const byUserId = await supabase.from('users').select('email').eq('user_id', id).maybeSingle();
+          const foundUserId = isValidEmail(byUserId.data?.email);
+          if (foundUserId) return foundUserId;
 
-        // 2. Check users table by user_id
-        const byUserId = await supabase.from('users').select('email').eq('user_id', id).maybeSingle();
-        const foundUserId = isValidEmail(byUserId.data?.email);
-        if (foundUserId) return foundUserId;
+          // 3. Check users table by id
+          const byId = await supabase.from('users').select('email').eq('id', id).maybeSingle();
+          const foundId = isValidEmail(byId.data?.email);
+          if (foundId) return foundId;
+        }
+      } catch (_e) {}
+    }
 
-        // 3. Check users table by id
-        const byId = await supabase.from('users').select('email').eq('id', id).maybeSingle();
-        const foundId = isValidEmail(byId.data?.email);
-        if (foundId) return foundId;
-      }
-    } catch (_e) {}
+    // Check bookings table in Supabase by bookingId if provided
+    if (bookingId && supabase) {
+      try {
+        const fromBooking = await supabase.from('bookings').select('customer_email').eq('booking_id', bookingId).maybeSingle();
+        const foundBookingEmail = isValidEmail(fromBooking.data?.customer_email);
+        if (foundBookingEmail) return foundBookingEmail;
+      } catch (_e) {}
+    }
 
     return null;
   }
@@ -735,7 +934,9 @@ class EmailService {
   }
 
   /**
-   * Email customer when admin approves a service booking.
+   * Email customer when admin approves a service booking reservation.
+   * Prominently informs the customer that their reservation is approved
+   * and that they are required to go to the shop with their motorcycle at the scheduled time.
    */
   async sendBookingApprovalEmail({
     booking,
@@ -749,70 +950,146 @@ class EmailService {
     appointmentDate,
     timeSlot,
     branchName,
+    branchAddress,
+    mechanicName,
+    serviceBay,
+    bikeBrand,
+    bikeModel,
+    plateNumber,
+    estimatedServiceTotal,
+    remainingBalance,
   } = {}) {
-    const id = bookingId || booking?.booking_id || booking?.id || 'N/A';
+    // Safely unwrap booking object if passed as an array or single object
+    const b = Array.isArray(booking)
+      ? booking.find((item) => item?.id === bookingId || item?.booking_id === bookingId) || booking[0] || {}
+      : (booking || {});
+
+    const id = bookingId || b?.booking_id || b?.id || 'N/A';
     const cleanEmail = await this.resolveCustomerEmail({
-      customerEmail: customerEmail || booking?.customer_email || booking?.userEmail,
-      phone: booking?.customer_phone,
-      userId: booking?.user_id || booking?.customer_id,
-      customerId: booking?.customer_id || booking?.user_id,
+      email: customerEmail,
+      customerEmail: customerEmail || b?.customer_email || b?.userEmail || b?.email,
+      userEmail: b?.userEmail || b?.email,
+      phone: b?.customer_phone || b?.phone,
+      userId: b?.user_id || b?.customer_id,
+      customerId: b?.customer_id || b?.user_id,
+      bookingId: id,
     });
 
-    const name = customerName || booking?.customer_name || 'Rider';
-    const title = serviceTitle || booking?.service_title || booking?.package_name || 'Service booking';
+    const name = customerName || b?.customer_name || 'Rider';
+    const title = serviceTitle || b?.service_title || b?.package_name || 'Service booking';
     const dateLabel =
       appointmentDate ||
-      booking?.appointment_date ||
-      booking?.preferred_date ||
-      'To be confirmed';
-    const timeLabel = timeSlot || booking?.time_slot || booking?.preferred_time || '';
-    const branch = branchName || booking?.branch_name || booking?.branch || 'MotoTrack Garage';
-    const needsDownpayment =
-      String(status || booking?.status || '')
-        .toLowerCase()
-        .includes('downpayment') || Number(downpaymentAmount || booking?.downpayment_amount || 0) > 0;
+      b?.appointment_date ||
+      b?.preferred_date ||
+      b?.date ||
+      'Scheduled Date';
+    const timeLabel = timeSlot || b?.time_slot || b?.preferred_time || b?.time || '09:00 AM';
+    const branch = branchName || b?.branch_name || b?.branch || "D'Blockchain Motorparts & Accessories";
+    const address = branchAddress || b?.branch_address || 'Central Naga Highway, Naga City, Cebu';
+    const assignedTech = mechanicName || b?.mechanic || '';
+    const bay = serviceBay || b?.service_bay || b?.bay_name || 'Pit Bay 02 (Express Bay)';
 
-    const dp = Number(downpaymentAmount ?? booking?.downpayment_amount ?? 0);
-    const deadline = paymentDeadline || booking?.payment_deadline;
+    const brand = bikeBrand || b?.bike_brand || '';
+    const model = bikeModel || b?.bike_model || b?.motorcycle_model || b?.motorcycle || '';
+    const plate = plateNumber || b?.plate_number || b?.bike_plate || b?.plate || '';
+    const bikeSummary = [brand, model].filter(Boolean).join(' ') + (plate ? ` (Plate: ${plate})` : '');
+    const bikeDisplay = bikeSummary || 'Your Registered Motorcycle';
 
-    let bodyDetail = `<p>Your service booking <strong>#${escapeHtml(id)}</strong> has been <strong>approved</strong> by our team.</p>`;
-    if (needsDownpayment && dp > 0) {
-      bodyDetail += `
-        <p>Please pay the downpayment of <strong>₱${escapeHtml(dp.toLocaleString('en-PH'))}</strong>
-        ${deadline ? ` by <strong>${escapeHtml(new Date(deadline).toLocaleString())}</strong>` : ''}
-        to keep your appointment. Unpaid bookings may be cancelled automatically.</p>
-      `;
-    } else {
-      bodyDetail += `<p>Your appointment is confirmed. Please bring your motorcycle on the scheduled date.</p>`;
-    }
+    const isPaid =
+      b?.downpayment_status === 'Paid' ||
+      b?.downpayment_status === 'Settled' ||
+      b?.downpayment_paid === true ||
+      b?.deposit_paid === true ||
+      Number(b?.amount_paid || 0) > 0 ||
+      b?.payment_status === 'DOWNPAYMENT_PAID' ||
+      b?.payment_status === 'FULLY_PAID' ||
+      !b?.is_walk_in;
 
-    const html = brandEmailHtml({
-      title: 'Booking approved',
-      greetingName: name,
-      bodyHtml: `
-        ${bodyDetail}
-        <div style="background:#F8FAFC;border-radius:8px;padding:16px;margin:20px 0;">
-          <p style="margin:0 0 8px;font-weight:700;color:#0F172A;">${escapeHtml(title)}</p>
-          <p style="margin:0 0 4px;color:#64748B;font-size:14px;"><strong>Branch:</strong> ${escapeHtml(branch)}</p>
-          <p style="margin:0 0 4px;color:#64748B;font-size:14px;"><strong>Date:</strong> ${escapeHtml(dateLabel)}${timeLabel ? ` · ${escapeHtml(timeLabel)}` : ''}</p>
-          <p style="margin:0;color:#64748B;font-size:14px;"><strong>Status:</strong> ${escapeHtml(status || booking?.status || 'Approved')}</p>
-        </div>
-        <p style="color:#64748B;font-size:13px;">You can review this booking anytime in the MotoTrack Garage / Bookings section.</p>
-      `,
+    const isConfirmed =
+      String(status || b?.status || '').toLowerCase() === 'confirmed' ||
+      String(status || b?.status || '').toLowerCase() === 'scheduled' ||
+      isPaid;
+
+    const dp = Number(downpaymentAmount ?? b?.downpayment_amount ?? b?.amount_paid ?? 0);
+    const est = Number(estimatedServiceTotal ?? b?.estimated_service_total ?? b?.quoted_service_rate ?? b?.package_price ?? 0);
+    const bal = Number(remainingBalance ?? b?.remaining_balance ?? (est > dp ? est - dp : 0));
+    const payMethod = b?.downpayment_method || b?.payment_method || 'GCash / Online';
+
+    const subject = `Booking #${id} Approved: Please Bring Your Motorcycle on ${dateLabel} at ${timeLabel}`;
+
+    const html = buildBookingApprovedEmailHtml({
+      customerName: name,
+      bookingId: id,
+      serviceTitle: title,
+      appointmentDate: dateLabel,
+      timeSlot: timeLabel,
+      branchName: branch,
+      branchAddress: address,
+      mechanicName: assignedTech,
+      serviceBay: bay,
+      bikeBrand: brand,
+      bikeModel: model,
+      plateNumber: plate,
+      estimatedTotal: est,
+      downpaymentAmount: dp,
+      downpaymentStatus: isPaid ? 'Verified' : 'Pending',
+      downpaymentMethod: payMethod,
+      remainingBalance: bal,
+      isConfirmed,
     });
 
-    console.log(`[EmailService] 📧 Booking #${id} approval email → ${cleanEmail || '(no email)'}`);
+    const textMessage = `Hello ${name},
 
+Great news! Your service booking reservation #${id} for ${title} has been APPROVED by MotoTrack.
+
+=======================================================
+REQUIRED ACTION: BRING YOUR MOTORCYCLE TO THE SHOP
+=======================================================
+You are required to go to the workshop with your motorcycle
+at your scheduled appointment date and time:
+
+• Scheduled Date: ${dateLabel}
+• Arrival Time: ${timeLabel}
+• Motorcycle: ${bikeDisplay}
+• Workshop Location: ${branch} (${address})
+${assignedTech ? `• Assigned Technician: ${assignedTech}\n` : ''}${bay ? `• Service Bay: ${bay}\n` : ''}
+IMPORTANT INSTRUCTIONS:
+1. Please arrive 10 to 15 minutes before your scheduled time (${timeLabel}).
+2. Bring your motorcycle (${bikeDisplay}) and present your Booking Reference #${id} at the pit bay gate.
+3. Our workshop team will mount your bike in the service bay for check-in and scheduled service.
+
+RESERVATION SUMMARY:
+• Booking Reference: #${id}
+• Service: ${title}
+• Status: Approved & Confirmed
+${est > 0 ? `• Estimated Total: ₱${est.toLocaleString('en-PH')}\n` : ''}${dp > 0 ? `• Downpayment Verified: ₱${dp.toLocaleString('en-PH')} (${payMethod})\n` : ''}${bal > 0 ? `• Remaining Balance: ₱${bal.toLocaleString('en-PH')} (payable at counter upon completion)\n` : ''}
+You can monitor your live pit bay status anytime in the MotoTrack Garage under My Appointments.
+
+Thank you for choosing MotoTrack!
+
+Best regards,
+MotoTrack Workshop Team
+${branch}`;
+
+    console.log(`[EmailService] 📧 Booking #${id} approval email → ${cleanEmail || '(no email found)'}`);
+
+    let dispatchResult = { success: false, emailed: false };
     if (cleanEmail) {
-      await this.dispatchHtmlEmail({
+      dispatchResult = await this.dispatchHtmlEmail({
         to: cleanEmail,
-        subject: `Booking #${id} Approved — MotoTrack`,
+        subject,
         html,
-        textMessage: `Your booking #${id} (${title}) has been approved.${needsDownpayment && dp > 0 ? ` Downpayment ₱${dp.toLocaleString('en-PH')} required.` : ''}`,
+        textMessage,
       });
     }
 
-    return { success: true, emailed: !!cleanEmail };
+    return {
+      success: true,
+      emailed: !!cleanEmail && dispatchResult.success,
+      recipient: cleanEmail,
+      dispatched: dispatchResult.dispatched,
+      provider: dispatchResult.provider,
+    };
   }
 }
 

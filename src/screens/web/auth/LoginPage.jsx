@@ -17,10 +17,13 @@ import { BootstrapIcon, BrandLogo, GoogleIcon } from '../../../components';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import { appStorage } from '../../../services/system/storageAdapter.js';
+import { isRider } from '../../../utils/permissions.js';
 import { fontFamily } from '../../../styles/typography.js';
 import { botanicalStyles, authWebStyles as authStyles } from '../../../styles/web/loginPage.web.styles.js';
 
 const REMEMBER_EMAIL_KEY = 'mototrack_remember_login_email';
+const RIDER_MOBILE_ONLY_MESSAGE =
+  'Rider accounts can only be accessed through the MotoTrack mobile app.';
 
 export default function LoginPageWeb({
   onLoginSuccess,
@@ -32,6 +35,7 @@ export default function LoginPageWeb({
 }) {
   const {
     login,
+    logout,
     loginWithGoogle,
     loginWithGoogleSimulated,
     validatePasswordStrength,
@@ -283,6 +287,13 @@ export default function LoginPageWeb({
     setActiveMode((prev) => (prev === 'signup' ? 'signin' : 'signup'));
   };
 
+  const rejectRiderOnWeb = (user) => {
+    if (!isRider(user)) return false;
+    logout();
+    setSignInError(RIDER_MOBILE_ONLY_MESSAGE);
+    return true;
+  };
+
   // ─── 1. SIGN IN HANDLER (CONNECTED TO SUPABASE) ───
   const handleSignInSubmit = async () => {
     if (isSignInLoading) return;
@@ -302,6 +313,10 @@ export default function LoginPageWeb({
 
     if (!res.success) {
       setSignInError(res.error || 'Invalid email or password.');
+      return;
+    }
+
+    if (rejectRiderOnWeb(res.user)) {
       return;
     }
 
@@ -329,6 +344,9 @@ export default function LoginPageWeb({
     try {
       const res = await loginWithGoogle();
       if (res?.success && res.user) {
+        if (rejectRiderOnWeb(res.user)) {
+          return;
+        }
         if (onLoginSuccess) {
           onLoginSuccess(res.user);
         } else {
@@ -356,6 +374,9 @@ export default function LoginPageWeb({
     try {
       const res = await loginWithGoogleSimulated();
       if (res?.success && res.user) {
+        if (rejectRiderOnWeb(res.user)) {
+          return;
+        }
         if (onLoginSuccess) {
           onLoginSuccess(res.user);
         } else {

@@ -140,6 +140,7 @@ export default function AdminSystemSettingsPanel({
         'downpaymentPercent',
         'downpaymentDueHours',
         'laborRatePerHour',
+        'customizationLaborFee',
         'allowCancellationHours',
         'reminderHoursBefore',
         'minimumOrderAmount',
@@ -562,9 +563,6 @@ export default function AdminSystemSettingsPanel({
                   </Text>
                 </View>
               </View>
-              <Text style={{ color: isDarkMode ? tokens.textMuted : '#64748B', fontSize: 12.5, marginTop: 3 }}>
-                Configure store identity, customer checkout rules, pitstop parameters, and system maintenance.
-              </Text>
             </View>
           </View>
 
@@ -1146,9 +1144,6 @@ export default function AdminSystemSettingsPanel({
                   </Text>
                 </View>
               </View>
-              <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                Control all customer-facing footer content on the Shop page: brand tagline, 4-column navigation, newsletter subscription, social media links, and copyright text.
-              </Text>
             </View>
 
             <TouchableOpacity
@@ -1958,6 +1953,15 @@ export default function AdminSystemSettingsPanel({
 
               <View style={{ flex: 1 }}>
                 <ReadOnlyField
+                  title="Customization Installation Labor Fee"
+                  value={`₱${Number(settings.customizationLaborFee ?? 3250).toLocaleString()}`}
+                  icon="tools"
+                  description="Base labor charge for installing AI customization builds & aftermarket parts."
+                />
+              </View>
+
+              <View style={{ flex: 1 }}>
+                <ReadOnlyField
                   title="Standard Garage Hourly Labor Rate"
                   value={`₱${Number(settings.laborRatePerHour || 350).toLocaleString()} / hour`}
                   icon="cash-coin"
@@ -2470,9 +2474,6 @@ export default function AdminSystemSettingsPanel({
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 16, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
                   Data Backup & Storage Utilities
-                </Text>
-                <Text style={{ fontSize: 12.5, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 2 }}>
-                  Generate downloadable system configuration snapshots or clear non-critical local caches safely.
                 </Text>
               </View>
             </View>
@@ -3547,8 +3548,8 @@ export default function AdminSystemSettingsPanel({
               {/* 7. GARAGE PRICING & POLICIES MODAL */}
               {activeModalSection === 'garage_pricing' && (
                 <>
-                  <View style={{ flexDirection: 'row', gap: 14 }}>
-                    <View style={{ flex: 1, gap: 6 }}>
+                  <View style={{ flexDirection: 'row', gap: 14, flexWrap: 'wrap' }}>
+                    <View style={{ flex: 1, minWidth: 160, gap: 6 }}>
                       <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Required Downpayment (%)
                       </Text>
@@ -3572,7 +3573,31 @@ export default function AdminSystemSettingsPanel({
                       />
                     </View>
 
-                    <View style={{ flex: 1, gap: 6 }}>
+                    <View style={{ flex: 1, minWidth: 160, gap: 6 }}>
+                      <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                        Customization Labor Fee (₱)
+                      </Text>
+                      <TextInput
+                        style={{
+                          backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                          borderRadius: 10,
+                          borderWidth: 1.5,
+                          borderColor: isDarkMode ? tokens.borderInput : '#CBD5E1',
+                          paddingHorizontal: 14,
+                          paddingVertical: 10,
+                          fontSize: 14,
+                          fontWeight: '700',
+                          color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                        }}
+                        keyboardType="numeric"
+                        value={modalForm.customizationLaborFee !== undefined ? String(modalForm.customizationLaborFee) : ''}
+                        onChangeText={(val) => handleUpdateFormField('customizationLaborFee', val)}
+                        placeholder="3250"
+                        placeholderTextColor="#94A3B8"
+                      />
+                    </View>
+
+                    <View style={{ flex: 1, minWidth: 160, gap: 6 }}>
                       <Text style={{ fontSize: 12, fontWeight: '500', color: isDarkMode ? tokens.textMuted : '#475569', textTransform: 'uppercase', letterSpacing: 0.5 }}>
                         Hourly Labor Rate (₱/hr)
                       </Text>

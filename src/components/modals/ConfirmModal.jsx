@@ -3,25 +3,27 @@ import { View, Text, TouchableOpacity, Modal, StyleSheet, Platform, ActivityIndi
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 
 /**
- * MotoTrack Custom Confirmation & Alert Dialog Modal
- * Pops in the center of the screen with the MotoTrack brand design system.
+ * MotoTrack Confirmation & Alert Dialog Modal
+ * Matches the MotoTrack Atelier & Admin Design System:
+ * - Signature Charcoal (#1E2227) / Brand Orange (#EA580C) / Danger (#DC2626)
+ * - Refined typography (Inter), clean pill badges, and minimalist borders
  */
 export default function ConfirmModal({
   visible = false,
-  title = 'Confirm Removal',
+  title = 'Confirm Action',
   message = 'Are you sure you want to proceed?',
   itemName,
-  confirmText = 'Delete',
+  confirmText = 'Confirm',
   cancelText = 'Cancel',
   confirmLabel,
   cancelLabel,
   danger,
-  type = 'danger', // 'danger' | 'warning' | 'info' | 'success'
+  type = 'info', // 'danger' | 'warning' | 'info' | 'success'
   confirmIcon,
   onConfirm,
   onCancel,
   isLoading = false,
-  hideCancel = false, // When used as an alert dialog with single OK button
+  hideCancel = false,
   isDark: isDarkProp,
 }) {
   if (!visible) return null;
@@ -31,48 +33,55 @@ export default function ConfirmModal({
   const actualType = danger ? 'danger' : type;
   const isDanger = actualType === 'danger';
   const isWarning = actualType === 'warning';
-  const isInfo = actualType === 'info';
   const isSuccess = actualType === 'success';
 
   const resolvedConfirmText = confirmLabel || confirmText;
   const resolvedCancelText = cancelLabel || cancelText;
 
-  // Badge icon styling based on type
+  // Icon badge colors and icons matching MotoTrack Brand System
   const iconName =
     confirmIcon ||
     (isDanger
       ? 'trash3-fill'
       : isWarning
         ? 'exclamation-triangle-fill'
-        : isSuccess
-          ? 'check-circle-fill'
-          : 'info-circle-fill');
+        : 'check-circle-fill');
 
   const badgeBg = isDanger
-    ? (isDark ? 'rgba(239, 68, 68, 0.18)' : '#FEF2F2')
+    ? (isDark ? 'rgba(239, 68, 68, 0.15)' : '#FEF2F2')
     : isWarning
-      ? (isDark ? 'rgba(245, 158, 11, 0.18)' : '#FFFBEB')
-      : isSuccess
-        ? (isDark ? 'rgba(16, 185, 129, 0.18)' : '#F0FDF4')
-        : (isDark ? 'rgba(234, 88, 12, 0.25)' : '#FFF7ED');
+      ? (isDark ? 'rgba(245, 158, 11, 0.15)' : '#FFFBEB')
+      : (isDark ? 'rgba(234, 88, 12, 0.15)' : '#FFF7ED');
 
   const badgeBorder = isDanger
-    ? (isDark ? 'rgba(239, 68, 68, 0.4)' : '#FEE2E2')
+    ? (isDark ? 'rgba(239, 68, 68, 0.35)' : '#FEE2E2')
     : isWarning
-      ? (isDark ? 'rgba(245, 158, 11, 0.4)' : '#FEF3C7')
-      : isSuccess
-        ? (isDark ? 'rgba(16, 185, 129, 0.4)' : '#DCFCE7')
-        : (isDark ? 'rgba(234, 88, 12, 0.45)' : '#FED7AA');
+      ? (isDark ? 'rgba(245, 158, 11, 0.35)' : '#FEF3C7')
+      : (isDark ? 'rgba(234, 88, 12, 0.35)' : '#FED7AA');
 
   const iconColor = isDanger
-    ? (isDark ? '#F87171' : '#EF4444')
+    ? (isDark ? '#F87171' : '#DC2626')
     : isWarning
-      ? (isDark ? '#FBBF24' : '#F59E0B')
-      : isSuccess
-        ? (isDark ? '#34D399' : '#10B981')
-        : (isDark ? '#34D399' : '#EA580C');
+      ? (isDark ? '#FBBF24' : '#D97706')
+      : (isDark ? '#FB923C' : '#EA580C');
 
-  const confirmBg = isDanger ? '#DC2626' : isWarning ? '#D97706' : isSuccess ? '#059669' : '#EA580C';
+  // Primary action button background
+  // Danger -> Red (#DC2626)
+  // Warning -> Brand Orange (#EA580C)
+  // Success / Standard -> MotoTrack Signature Atelier Charcoal (#1E2227)
+  const confirmBg = isDanger
+    ? '#DC2626'
+    : isWarning
+      ? '#EA580C'
+      : (isDark ? '#27272A' : '#1E2227');
+
+  const confirmBorder = isDanger
+    ? '#DC2626'
+    : isWarning
+      ? '#EA580C'
+      : (isDark ? '#3F3F46' : '#1E2227');
+
+  const cleanItemName = itemName ? String(itemName).replace(/^"+|"+$/g, '').trim() : null;
 
   return (
     <Modal
@@ -82,38 +91,43 @@ export default function ConfirmModal({
       onRequestClose={onCancel}
     >
       <View style={styles.overlay}>
-        {/* Backdrop Touchable */}
+        {/* Backdrop Click Area */}
         <TouchableOpacity
           style={styles.backdropClickArea}
           activeOpacity={1}
           onPress={hideCancel ? onConfirm : onCancel}
         />
 
-        <View style={[styles.cardContainer, isDark && { backgroundColor: '#141A18', borderColor: 'rgba(255,255,255,0.1)' }]}>
-          {/* Top Brand Accent Stripe */}
-          <View style={[styles.topAccentStripe, { backgroundColor: isDanger ? '#EF4444' : '#EA580C' }]} />
-
+        <View style={[styles.cardContainer, isDark && styles.cardContainerDark]}>
           <View style={styles.cardContent}>
-            {/* Centered Glowing Icon Badge */}
+            {/* Centered Brand Icon Badge */}
             <View style={[styles.iconBadge, { backgroundColor: badgeBg, borderColor: badgeBorder }]}>
-              <BootstrapIcon name={iconName} size={28} color={iconColor} />
+              <BootstrapIcon name={iconName} size={22} color={iconColor} />
             </View>
 
             {/* Title */}
-            <Text style={[styles.titleText, isDark && { color: '#F8FAFC' }]}>{title}</Text>
+            <Text style={[styles.titleText, isDark && styles.textLight]}>{title}</Text>
 
             {/* Message Body */}
-            <Text style={[styles.messageText, isDark && { color: '#94A3B8' }]}>{message}</Text>
+            <Text style={[styles.messageText, isDark && styles.textMuted]}>{message}</Text>
 
-            {/* Highlighted Item Badge (if provided) */}
-            {itemName ? (
-              <View style={[styles.itemHighlightBox, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}>
-                <BootstrapIcon name="box-seam" size={14} color={isDanger ? (isDark ? '#F87171' : '#DC2626') : (isDark ? '#34D399' : '#EA580C')} />
+            {/* Highlighted Item Badge (Clean Monospace Reference Pill) */}
+            {cleanItemName ? (
+              <View style={[styles.itemHighlightBox, isDark && styles.itemHighlightBoxDark]}>
+                <BootstrapIcon
+                  name={isDanger ? 'trash3' : 'receipt'}
+                  size={13}
+                  color={isDanger ? (isDark ? '#F87171' : '#DC2626') : (isDark ? '#FB923C' : '#EA580C')}
+                />
                 <Text
-                  style={[styles.itemHighlightText, { color: isDanger ? (isDark ? '#FCA5A5' : '#991B1B') : (isDark ? '#A7F3D0' : '#064E3B') }]}
+                  style={[
+                    styles.itemHighlightText,
+                    isDark && styles.itemHighlightTextDark,
+                    isDanger && { color: isDark ? '#FCA5A5' : '#991B1B' },
+                  ]}
                   numberOfLines={2}
                 >
-                  "{itemName}"
+                  {cleanItemName}
                 </Text>
               </View>
             ) : null}
@@ -122,17 +136,23 @@ export default function ConfirmModal({
             <View style={styles.buttonsRow}>
               {!hideCancel && (
                 <TouchableOpacity
-                  style={[styles.cancelButton, isDark && { backgroundColor: '#1C2422', borderColor: 'rgba(255,255,255,0.1)' }]}
+                  style={[styles.cancelButton, isDark && styles.cancelButtonDark]}
                   onPress={onCancel}
                   activeOpacity={0.8}
                   disabled={isLoading}
                 >
-                  <Text style={[styles.cancelButtonText, isDark && { color: '#CBD5E1' }]}>{resolvedCancelText}</Text>
+                  <Text style={[styles.cancelButtonText, isDark && styles.cancelButtonTextDark]}>
+                    {resolvedCancelText}
+                  </Text>
                 </TouchableOpacity>
               )}
 
               <TouchableOpacity
-                style={[styles.confirmButton, { backgroundColor: confirmBg }, hideCancel && { flex: 1 }]}
+                style={[
+                  styles.confirmButton,
+                  { backgroundColor: confirmBg, borderColor: confirmBorder },
+                  hideCancel && { flex: 1 },
+                ]}
                 onPress={onConfirm}
                 activeOpacity={0.85}
                 disabled={isLoading}
@@ -143,7 +163,7 @@ export default function ConfirmModal({
                   <View style={styles.confirmBtnInner}>
                     <BootstrapIcon
                       name={confirmIcon || (isDanger ? 'trash3-fill' : 'check-lg')}
-                      size={14}
+                      size={13}
                       color="#FFFFFF"
                     />
                     <Text style={styles.confirmButtonText}>{resolvedConfirmText}</Text>
@@ -161,67 +181,72 @@ export default function ConfirmModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.68)',
-    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
-    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
-    padding: Platform.OS === 'web' ? 18 : 0,
-    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(6px)' } : {}),
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(5px)' } : {}),
   },
   backdropClickArea: {
     ...StyleSheet.absoluteFillObject,
   },
   cardContainer: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderBottomLeftRadius: Platform.OS === 'web' ? 22 : 0,
-    borderBottomRightRadius: Platform.OS === 'web' ? 22 : 0,
+    borderRadius: 18,
     width: '100%',
-    maxWidth: Platform.OS === 'web' ? 440 : '100%',
+    maxWidth: Platform.OS === 'web' ? 410 : 360,
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
-    elevation: 25,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.12,
+    shadowRadius: 28,
+    elevation: 20,
   },
-  topAccentStripe: {
-    height: 4,
-    width: '100%',
+  cardContainerDark: {
+    backgroundColor: '#18181B',
+    borderColor: '#27272A',
+    shadowColor: '#000000',
+    shadowOpacity: 0.4,
   },
   cardContent: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 22,
     paddingTop: 24,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 22,
+    paddingBottom: 20,
     alignItems: 'center',
     textAlign: 'center',
   },
   iconBadge: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 1.5,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   titleText: {
-    fontSize: 18.5,
-    fontWeight: '600',
+    fontSize: 16.5,
+    fontWeight: '700',
     color: '#0F172A',
     textAlign: 'center',
-    letterSpacing: -0.3,
-    marginBottom: 8,
+    letterSpacing: -0.25,
+    marginBottom: 6,
+  },
+  textLight: {
+    color: '#F8FAFC',
   },
   messageText: {
-    fontSize: 13.5,
+    fontSize: 13,
     color: '#64748B',
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 14,
+    lineHeight: 19,
+    marginBottom: 16,
     paddingHorizontal: 6,
+  },
+  textMuted: {
+    color: '#94A3B8',
   },
   itemHighlightBox: {
     flexDirection: 'row',
@@ -230,51 +255,69 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    marginBottom: 20,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 18,
     width: '100%',
     justifyContent: 'center',
   },
+  itemHighlightBoxDark: {
+    backgroundColor: '#202024',
+    borderColor: '#2A2A2E',
+  },
   itemHighlightText: {
-    fontSize: 13.5,
+    fontSize: 12.5,
     fontWeight: '600',
+    color: '#0F172A',
     textAlign: 'center',
+    fontFamily: Platform.OS === 'web' ? 'monospace, sans-serif' : undefined,
+  },
+  itemHighlightTextDark: {
+    color: '#F1F5F9',
   },
   buttonsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
     width: '100%',
-    marginTop: 4,
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 14,
-    paddingVertical: 13,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    cursor: 'pointer',
+  },
+  cancelButtonDark: {
+    backgroundColor: '#202024',
+    borderColor: '#2E2E32',
   },
   cancelButtonText: {
-    color: '#475569',
+    color: '#334155',
     fontWeight: '600',
-    fontSize: 13.5,
+    fontSize: 13,
+  },
+  cancelButtonTextDark: {
+    color: '#CBD5E1',
   },
   confirmButton: {
     flex: 1,
-    borderRadius: 14,
-    paddingVertical: 13,
+    borderRadius: 10,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    cursor: 'pointer',
+    borderWidth: 1,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   confirmBtnInner: {
     flexDirection: 'row',
@@ -285,7 +328,7 @@ const styles = StyleSheet.create({
   confirmButtonText: {
     color: '#FFFFFF',
     fontWeight: '600',
-    fontSize: 13.5,
-    letterSpacing: 0.2,
+    fontSize: 13,
+    letterSpacing: 0.1,
   },
 });

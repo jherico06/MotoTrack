@@ -10,6 +10,12 @@ import { BootstrapIcon } from '../../common';
 import { getPackageStartingPrice } from './bookingPackagesData.js';
 import { formatPhp } from '../../../utils/serviceQuotation.js';
 
+const CC_TIERS = [
+  { id: 'cc-125-below', label: '125cc and below' },
+  { id: 'cc-150-160', label: '150cc–160cc' },
+  { id: 'cc-big-bikes', label: 'Big Bikes (200cc+)' },
+];
+
 export default function PackageCard({
   pkg,
   isSelected,
@@ -30,15 +36,33 @@ export default function PackageCard({
   const displayPrice = matchedPrice != null ? matchedPrice : startingPrice;
   const isExactPrice = matchedPrice != null;
 
-  // Extract the top 3 inclusion highlights
-  const inclusions = (pkg.inclusions || []).slice(0, 3);
+  // CC tier matching the selected motorcycle (highlighted in the rate list)
+  const activeTierId = engineCc
+    ? engineCc <= 125
+      ? 'cc-125-below'
+      : engineCc < 200
+        ? 'cc-150-160'
+        : 'cc-big-bikes'
+    : null;
   const [imgLoadError, setImgLoadError] = React.useState(false);
   const isRepair = pkg?.category === 'Repair' || pkg?.category === 'General Repair';
   const fallbackImg = isRepair
     ? 'https://images.unsplash.com/photo-1558980394-4c7c9299fe96?auto=format&fit=crop&w=800&q=80'
     : 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?auto=format&fit=crop&w=800&q=80';
-  const hasCustomImg = pkg?.image && String(pkg.image).trim().length > 5;
-  const imageUri = (!imgLoadError && hasCustomImg) ? String(pkg.image).trim() : fallbackImg;
+
+  // Prefer the customer's selected motorcycle photo; fall back to the package image
+  const bikePhoto = String(
+    selectedMotorcycle?.photo_url || selectedMotorcycle?.photoUrl || selectedMotorcycle?.image || ''
+  ).trim();
+  const hasBikePhoto = bikePhoto.length > 5;
+  const hasCustomImg = hasBikePhoto || (pkg?.image && String(pkg.image).trim().length > 5);
+  const primaryImg = hasBikePhoto ? bikePhoto : String(pkg?.image || '').trim();
+  const imageUri = (!imgLoadError && hasCustomImg) ? primaryImg : fallbackImg;
+
+  // Retry loading whenever the selected bike (or its photo) changes
+  React.useEffect(() => {
+    setImgLoadError(false);
+  }, [bikePhoto]);
 
   return (
     <View style={[cardStyles.cardWrapper, isSelected && cardStyles.cardWrapperSelected]}>
@@ -89,21 +113,43 @@ export default function PackageCard({
           {pkg.shortDescription}
         </Text>
 
-        {/* ─── THREE INCLUDED SERVICE ITEMS WITH CHECK ICONS ─── */}
-        {inclusions.length > 0 && (
-          <View style={cardStyles.inclusionsBox}>
-            {inclusions.map((item, idx) => (
-              <View key={idx} style={cardStyles.inclusionLine}>
-                <View style={cardStyles.checkIconWrap}>
-                  <BootstrapIcon name="check2" size={13} color="#EA580C" />
+        {/* ─── RATES BY ENGINE DISPLACEMENT (CC TIER) ─── */}
+        <View style={cardStyles.inclusionsBox}>
+          {CC_TIERS.map((tier) => {
+            const raw = pkg?.prices?.[tier.id];
+            const isAvailable = raw !== null && raw !== undefined && Number.isFinite(Number(raw));
+            const isMatch = activeTierId === tier.id;
+            return (
+              <View
+                key={tier.id}
+                style={[cardStyles.inclusionLine, isMatch && cardStyles.tierLineActive]}
+              >
+                <View style={[cardStyles.checkIconWrap, !isMatch && cardStyles.tierDotIdle]}>
+                  <BootstrapIcon
+                    name={isMatch ? 'check2' : 'dot'}
+                    size={13}
+                    color={isMatch ? '#EA580C' : '#A1A1AA'}
+                  />
                 </View>
-                <Text style={cardStyles.inclusionText} numberOfLines={1}>
-                  {item}
+                <Text
+                  style={[cardStyles.inclusionText, isMatch && cardStyles.tierTextActive]}
+                  numberOfLines={1}
+                >
+                  {tier.label}
+                </Text>
+                <Text
+                  style={[
+                    cardStyles.tierPrice,
+                    isMatch && cardStyles.tierPriceActive,
+                    !isAvailable && cardStyles.tierPriceNa,
+                  ]}
+                >
+                  {isAvailable ? formatPhp(Number(raw)) : 'N/A'}
                 </Text>
               </View>
-            ))}
-          </View>
-        )}
+            );
+          })}
+        </View>
       </View>
 
       {/* ─── CARD FOOTER (PRICING & ACTIONS) ─── */}
@@ -298,6 +344,34 @@ const cardStyles = StyleSheet.create({
     fontWeight: '500',
     color: '#27272A',
     flex: 1,
+  },
+  tierLineActive: {
+    backgroundColor: '#FFF7ED',
+    marginHorizontal: -8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  tierDotIdle: {
+    backgroundColor: '#F4F4F5',
+  },
+  tierTextActive: {
+    fontWeight: '600',
+    color: '#18181B',
+  },
+  tierPrice: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#52525B',
+    fontVariant: ['tabular-nums'],
+  },
+  tierPriceActive: {
+    fontWeight: '700',
+    color: '#EA580C',
+  },
+  tierPriceNa: {
+    color: '#A1A1AA',
+    fontWeight: '500',
   },
   cardFooter: {
     paddingHorizontal: 18,

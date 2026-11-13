@@ -5,7 +5,7 @@ This app is a motorcycle parts store with garage service and delivery. The login
 - [Customer](#customer)
 - [Admin](#admin)
 - [Rider](#rider)
-- [Mechanic](#mechanic)
+- [Workshop Mechanics (Admin-Managed Roster)](#workshop-mechanics-admin-managed-roster)
 
 For numbered use cases, see [USE_CASES.md](./USE_CASES.md).  
 For Input–Process–Output diagrams, see [USE_CASE_PROCESSES.md](./USE_CASE_PROCESSES.md).
@@ -30,7 +30,7 @@ For Input–Process–Output diagrams, see [USE_CASE_PROCESSES.md](./USE_CASE_PR
 - Register motorcycles (brand, model, year, photos)
 - Book PMS / repair (flexible quote-after-inspection workflow)
 - Accept or decline service quotations and additional work
-- Show pickup QR when the bike is ready
+- Receive ready-for-pickup notification when motorcycle service is complete
 - AI Customizer / Install Studio to preview parts and save setups
 
 ### Account
@@ -57,8 +57,8 @@ For Input–Process–Output diagrams, see [USE_CASE_PROCESSES.md](./USE_CASE_PR
 - **Suppliers** — partner CRUD and restock linking
 
 ### Garage & people
-- **Bookings** — approve/reject, assign mechanic/bay, quotations, payments, pickup QR release
-- **Mechanics** — roster, specializations, linked login accounts
+- **Bookings** — approve/reject, assign mechanic/bay, diagnostic inspection logs, itemized quotations, payments, and vehicle pickup release
+- **Mechanics Roster** — staff profiles, skill specializations, availability, and bay allocation (admin-managed roster; no login accounts)
 - **Riders** — status, login access, delivery assignment
 
 ### Platform
@@ -87,13 +87,7 @@ For Input–Process–Output diagrams, see [USE_CASE_PROCESSES.md](./USE_CASE_PR
 
 ---
 
-## Mechanic
+## Workshop Mechanics (Admin-Managed Roster)
 
-### Assigned jobs
-- View jobs filtered by today, upcoming, inspection, estimate, in service, completed
-
-### Workflow
-- Start / save inspection (checklist, odometer, findings)
-- Submit labor/parts estimate for admin quotation
-- Update service progress and request additional work
-- Complete service notes (payment and bike release remain admin-only)
+> [!NOTE]
+> Mechanics in MotoTrack are rostered pit-bay technicians managed entirely by the Store Administrator. The system does not support user accounts or login dashboards for mechanics. All bay allocations, multi-point inspection notes, labor & parts quotations, service progress milestones, and vehicle pickup releases are managed directly by the Admin in the **Admin Dashboard**.

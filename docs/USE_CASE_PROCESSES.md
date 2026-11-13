@@ -1,7 +1,26 @@
-# MotoTrack — Use Case Processes (IPO)
+# MotoTrack — Use Case Processes (IPO) & Flowcharts
 
-Input–Process–Output diagrams for major system processes.  
-Companion catalog: [USE_CASES.md](./USE_CASES.md)
+Input–Process–Output tables and process flowcharts for major system processes.  
+Companion catalogs: [USE_CASES.md](./USE_CASES.md) | [FUNCTIONAL_REQUIREMENTS.md](./FUNCTIONAL_REQUIREMENTS.md)
+
+---
+
+## Visual Flowchart Rulebook & Diagram Index
+
+All flowcharts follow continuous letter labeling and database connector conventions:
+- **Master Rulebook**: [Master System Flowchart (PNG)](./diagrams/flowchart_main.png)
+- **Role Use Case Diagrams**: [Admin](./diagrams/usecase_admin.png) | [Customer](./diagrams/usecase_customer.png) | [Rider](./diagrams/usecase_rider.png) | [All Actors](./diagrams/usecase_all_actors.png)
+- **Process D Flowchart**: [Manage Products & Compatibility (PNG)](./diagrams/flowchart_process_D_product.png)
+- **Process N Flowchart**: [Cart & Wishlist Operations (PNG)](./diagrams/flowchart_process_N_cart.png)
+- **Process P Flowchart**: [Customer Profile & Address Book (PNG)](./diagrams/flowchart_process_P_profile.png)
+- **Process T Flowchart**: [Service Bookings & Quotations (PNG)](./diagrams/flowchart_process_T_service.png)
+- **Process U Flowchart**: [My Garage & Fitment Registration (PNG)](./diagrams/flowchart_process_U_garage.png)
+- **Process A Flowchart**: [Manage Orders & COD Fulfillment (PNG)](./diagrams/flowchart_process_A_orders.png)
+- **Process B Flowchart**: [Inventory Stock & Low-Stock Alerts (PNG)](./diagrams/flowchart_process_B_inventory.png)
+- **Process O Flowchart**: [Checkout & Payment (PNG)](./diagrams/flowchart_process_O_checkout.png)
+- **Process Q Flowchart**: [Order Tracking, Delivery QR & Returns (PNG)](./diagrams/flowchart_process_Q_tracking.png)
+- **Processes RD1/RD2/RD3 Flowchart**: [Rider Fleet Delivery Operations (PNG)](./diagrams/flowchart_process_rider_delivery.png)
+- **Master Editable Source**: [MotoTrack_Flowcharts.drawio](./diagrams/MotoTrack_Flowcharts.drawio)
 
 ---
 
@@ -29,7 +48,7 @@ Companion catalog: [USE_CASES.md](./USE_CASES.md)
 
 | INPUT | PROCESS | OUTPUT |
 | :---: | :---: | :---: |
-| Email/username and password (or Google OAuth) | Verify credentials and resolve role | Homepage, Admin Dashboard, Rider Dashboard, or Mechanic Dashboard |
+| Email/username and password (or Google OAuth) | Verify credentials and resolve role | Homepage, Admin Dashboard, or Rider Dashboard |
 
 ```
 [ Username and Password ] → [ Verify login credentials ] → [ Role homepage / dashboard ]
@@ -241,26 +260,26 @@ Companion catalog: [USE_CASES.md](./USE_CASES.md)
 
 ---
 
-## 20. Mechanic Job Workflow Process
+## 20. Workshop Service Execution Process
 
 | INPUT | PROCESS | OUTPUT |
 | :---: | :---: | :---: |
-| Assigned job actions (inspect, estimate, progress, complete) | Update booking workflow for admin/customer visibility | Updated job status |
+| Workshop service actions (inspect, estimate, progress milestones, complete) | Admin updates booking workflow and technician milestones for customer visibility | Updated service job status |
 
 ```
-[ Job action ] → [ Update service progress ] → [ Updated Job Status ]
+[ Service action & milestones ] → [ Admin updates workflow progress ] → [ Updated Job Status ]
 ```
 
 ---
 
-## 21. Pickup QR Release Process
+## 21. Motorcycle Pickup & Vehicle Release Process
 
 | INPUT | PROCESS | OUTPUT |
 | :---: | :---: | :---: |
-| Customer pickup QR token | Validate token and release motorcycle | Bike released / booking completed |
+| Booking ID & payment settlement | Admin verifies final payment settlement and authorizes motorcycle release | Vehicle released / booking marked completed |
 
 ```
-[ Pickup QR token ] → [ Validate & release motorcycle ] → [ Pickup Completed ]
+[ Booking ID & payment status ] → [ Admin verifies settlement & releases bike ] → [ Pickup Completed ]
 ```
 
 ---
@@ -373,14 +392,14 @@ Companion catalog: [USE_CASES.md](./USE_CASES.md)
 
 ---
 
-## 31. Mechanic Vehicle Inspection & Estimate Process
+## 31. Workshop Vehicle Inspection & Estimate Process
 
 | INPUT | PROCESS | OUTPUT |
 | :---: | :---: | :---: |
-| Booking ID, odometer reading, checklist items, condition photos, parts & labor draft | Save inspection findings, transition booking status, compile quotation estimate for admin approval | Inspection report completed / quotation pending customer review |
+| Booking ID, odometer reading, checklist items, condition photos, parts & labor draft | Admin records inspection findings, transitions booking status, and compiles itemized quotation for customer review | Inspection report recorded / quotation ready for customer approval |
 
 ```
-[ Odometer, checklist & parts estimate ] → [ Record diagnostics & draft quotation ] → [ Quotation Ready for Review ]
+[ Odometer, checklist & parts estimate ] → [ Admin records diagnostics & builds quote ] → [ Quotation Ready for Review ]
 ```
 
 ---
@@ -426,10 +445,10 @@ flowchart TD
 
   subgraph Garage PMS & Repair Workflow
     G1[Customer Books Service] --> G2[Admin Assigns Mechanic & Bay]
-    G2 --> G3[Mechanic Diagnostic Inspection]
+    G2 --> G3[Admin Records Diagnostic Inspection]
     G3 --> G4[Itemized Labor & Parts Quotation]
     G4 --> G5[Customer Approves Quotation]
-    G5 --> G6[Mechanic Performs Repair & Updates Milestones]
+    G5 --> G6[Admin Tracks Repair Progress Milestones]
     G6 --> G7[Admin Scans Pickup QR & Releases Vehicle]
   end
 

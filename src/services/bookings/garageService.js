@@ -27,6 +27,7 @@ import { pmsPricingService } from './pmsPricingService.js';
 import { serviceQuotationService } from './serviceQuotationService.js';
 import { bookingTimelineService } from './bookingTimelineService.js';
 import { systemSettingsService } from '../system/systemSettingsService.js';
+import { xenditPaymentService } from '../payments/xenditPaymentService.js';
 
 let hasMechanicUserIdColumn = null;
 export function getMechanicUserIdColumnSupport() {
@@ -1802,9 +1803,12 @@ export const garageService = {
               actual_labor_cost: b.actual_labor_cost,
               estimated_service_total: b.estimated_service_total,
               final_service_total: b.final_service_total,
-              amount_paid: b.amount_paid,
-              payment_status: b.payment_status,
+              amount_paid: b.amount_paid != null ? Number(b.amount_paid) : (b.downpayment_status === 'Paid' ? Number(b.downpayment_amount || 0) : null),
+              payment_status: b.payment_status || (b.downpayment_status === 'Paid' ? 'DOWNPAYMENT_PAID' : null),
               downpayment_status: b.downpayment_status,
+              downpayment_paid: b.downpayment_paid ?? (b.downpayment_status === 'Paid' || b.payment_status === 'DOWNPAYMENT_PAID'),
+              downpayment_method: b.downpayment_method || null,
+              downpayment_ref: b.downpayment_ref || null,
               downpayment_percent: b.downpayment_percent,
               downpayment_required: b.downpayment_required,
               payment_deadline: b.payment_deadline || null,
@@ -2060,15 +2064,24 @@ export const garageService = {
         ? settingsDpPercent
         : Number(estimateDefaults.downpaymentPercent || 20);
 
-    // PMS fixed + package: downpayment can apply. Repair flexible: quote later (no DP at create).
-    const shouldRequireDpNow = requireDownpayment && !isFlexible;
+    const isDepositAlreadyPaid =
+      newBookingData.deposit_paid === true ||
+      newBookingData.downpayment_paid === true ||
+      String(newBookingData.downpayment_status || '').toLowerCase() === 'paid' ||
+      String(newBookingData.payment_status || '').toLowerCase() === 'paid' ||
+      String(newBookingData.payment_status || '').toUpperCase() === 'DOWNPAYMENT_PAID';
 
-    let downpaymentPercent = isFlexible ? 0 : 20;
+    // PMS fixed + package: downpayment can apply. Repair flexible: quote later (no DP at create).
+    const shouldRequireDpNow = requireDownpayment && !isFlexible && !isDepositAlreadyPaid;
+
+    let downpaymentPercent = newBookingData.downpayment_percent !== undefined
+      ? Number(newBookingData.downpayment_percent)
+      : isFlexible ? 0 : 20;
     let downpaymentAmount = isFlexible
       ? 0
       : newBookingData.downpayment_amount !== undefined
         ? Number(newBookingData.downpayment_amount)
-        : Math.round(pricePhp * 0.2);
+        : Math.round(pricePhp * (downpaymentPercent / 100));
     let remainingBalance = isFlexible
       ? 0
       : newBookingData.remaining_balance !== undefined
@@ -2078,23 +2091,30 @@ export const garageService = {
     let estimatedServiceTotal = isPmsFixed
       ? Number(laborSubtotal || pmsQuote.laborSubtotal || 0)
       : Number(newBookingData.estimated_service_total || 0);
-    let initialStatus = isPmsFixed || isFlexible
-      ? newBookingData.status || FLEX_BOOKING_STATUS.PENDING_REVIEW
-      : newBookingData.status || 'Pending';
-    let downpaymentRequired = !isFlexible;
-    let downpaymentStatus = isFlexible ? 'Not Required' : newBookingData.downpayment_status || 'Paid';
-    let downpaymentPaid = isFlexible
-      ? false
-      : newBookingData.downpayment_paid !== undefined
-        ? newBookingData.downpayment_paid
-        : true;
-    let paymentStatus = isFlexible ? 'Unpaid' : 'DOWNPAYMENT_PAID';
-    let amountPaid = isFlexible ? 0 : downpaymentAmount;
-    let currentStage = isPmsFixed
-      ? `Labor estimate ${formatPhp(pricePhp)} (${serviceLineItems.length} service${serviceLineItems.length === 1 ? '' : 's'}) • Pending admin review`
+
+    let initialStatus = isDepositAlreadyPaid
+      ? (newBookingData.status || FLEX_BOOKING_STATUS.RESERVED)
+      : isPmsFixed || isFlexible
+        ? newBookingData.status || FLEX_BOOKING_STATUS.PENDING_REVIEW
+        : newBookingData.status || 'Pending';
+    let downpaymentRequired = isDepositAlreadyPaid ? true : !isFlexible;
+    let downpaymentStatus = isDepositAlreadyPaid ? 'Paid' : isFlexible ? 'Not Required' : newBookingData.downpayment_status || 'Required';
+    let downpaymentPaid = isDepositAlreadyPaid
+      ? true
       : isFlexible
-        ? 'Pending advisor review • No price required until inspection quotation'
-        : `20% Downpayment Verified (₱${downpaymentAmount.toLocaleString()}) • Pending Advisor Review`;
+        ? false
+        : newBookingData.downpayment_paid !== undefined
+          ? newBookingData.downpayment_paid
+          : false;
+    let paymentStatus = isDepositAlreadyPaid ? 'DOWNPAYMENT_PAID' : isFlexible ? 'Unpaid' : 'Unpaid';
+    let amountPaid = isDepositAlreadyPaid ? downpaymentAmount : 0;
+    let currentStage = isDepositAlreadyPaid
+      ? `Downpayment Verified (${formatPhp(downpaymentAmount)} via ${newBookingData.downpayment_method || newBookingData.payment_method || 'GCash'}) • Reserved (Pending Admin Allocation)`
+      : isPmsFixed
+        ? `Labor estimate ${formatPhp(pricePhp)} (${serviceLineItems.length} service${serviceLineItems.length === 1 ? '' : 's'}) • Pending admin review`
+        : isFlexible
+          ? 'Pending advisor review • No price required until inspection quotation'
+          : `20% Downpayment Verified (₱${downpaymentAmount.toLocaleString()}) • Pending Advisor Review`;
 
     if (shouldRequireDpNow) {
       const estimateBase = isPmsFixed
@@ -2298,6 +2318,30 @@ export const garageService = {
       });
     }
 
+    // Persist downpayment transaction into Supabase payments table
+    if (
+      booking.downpayment_paid ||
+      booking.deposit_paid ||
+      String(booking.downpayment_status || '').toLowerCase() === 'paid' ||
+      booking.payment_status === 'DOWNPAYMENT_PAID' ||
+      Number(booking.amount_paid || 0) > 0
+    ) {
+      try {
+        await xenditPaymentService.recordPaymentTransaction({
+          bookingId: bookingId,
+          customerId: booking.customer_id || booking.user_id,
+          amount: booking.downpayment_amount || booking.amount_paid || downpaymentAmount,
+          paymentMethod: booking.downpayment_method || booking.payment_method || 'Online (GCash / Card)',
+          referenceNumber: booking.downpayment_ref || booking.transaction_ref || `DP-${bookingId}`,
+          transactionRef: booking.transaction_ref || `TXN-${bookingId}`,
+          status: 'Completed',
+          notes: `Downpayment for booking #${bookingId} (${booking.service_title})`,
+        });
+      } catch (payErr) {
+        console.warn('[GarageService] Downpayment payment log notice:', payErr);
+      }
+    }
+
     // 3. Push Notification to Customer
     try {
       if (notificationService?.addNotification) {
@@ -2484,18 +2528,36 @@ export const garageService = {
         local?.payment_deadline ||
         calcPaymentDeadline(new Date(), deadlineHours);
 
+      const isAlreadyPaid =
+        opts.isAlreadyPaid === true ||
+        local?.downpayment_status === 'Paid' ||
+        local?.downpayment_status === 'Settled' ||
+        local?.downpayment_paid === true ||
+        local?.deposit_paid === true ||
+        Number(local?.amount_paid || 0) > 0 ||
+        local?.payment_status === 'DOWNPAYMENT_PAID' ||
+        local?.payment_status === 'FULLY_PAID' ||
+        Boolean(local?.downpayment_paid_at) ||
+        !local?.is_walk_in;
+
       patch = {
         ...patch,
-        status: FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT,
+        status: isAlreadyPaid ? FLEX_BOOKING_STATUS.CONFIRMED : FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT,
         estimated_service_total: estimatedCost,
         downpayment_required: true,
         downpayment_percent: dpPercent,
         downpayment_amount: downpaymentAmount,
         remaining_balance: remainingBalance,
-        downpayment_status: local?.downpayment_status === 'Paid' ? 'Paid' : 'Required',
+        downpayment_status: isAlreadyPaid ? 'Paid' : 'Required',
+        downpayment_paid: isAlreadyPaid,
+        deposit_paid: isAlreadyPaid,
+        payment_status: isAlreadyPaid ? 'DOWNPAYMENT_PAID' : (local?.payment_status || 'Unpaid'),
+        amount_paid: isAlreadyPaid ? (Number(local?.amount_paid) > 0 ? Number(local.amount_paid) : downpaymentAmount) : 0,
         payment_deadline: deadline,
         skip_downpayment: false,
-        current_stage: `Approved — downpayment ${formatPhp(downpaymentAmount)} due by ${new Date(deadline).toLocaleString()}`,
+        current_stage: isAlreadyPaid
+          ? (assignedMech ? `Appointment Confirmed • Assigned to ${assignedMech}` : 'Appointment Approved & Confirmed')
+          : `Approved — downpayment ${formatPhp(downpaymentAmount)} due by ${new Date(deadline).toLocaleString()}`,
       };
     } else {
       patch = {
@@ -2509,32 +2571,92 @@ export const garageService = {
 
     const updated = await this.updateBooking(bookingId, patch);
 
+    // Ensure payment transaction record is persisted in Supabase payments table
+    if (patch.downpayment_paid) {
+      try {
+        await xenditPaymentService.recordPaymentTransaction({
+          bookingId: bookingId,
+          customerId: local?.customer_id || local?.user_id,
+          amount: patch.downpayment_amount || patch.amount_paid || 0,
+          paymentMethod: local?.downpayment_method || local?.payment_method || 'Online (GCash / Card)',
+          referenceNumber: local?.downpayment_ref || `DP-${bookingId}`,
+          status: 'Completed',
+          notes: `Downpayment verified for booking #${bookingId} (${local?.service_title || 'Service'})`,
+        });
+      } catch (_payErr) {}
+    }
+
     try {
+      const isConfirmed = patch.status === FLEX_BOOKING_STATUS.CONFIRMED || patch.status === 'Confirmed';
+      const allBookings = Array.isArray(updated) ? updated : this.getLocalBookings();
+      const updatedBooking =
+        allBookings.find((b) => b && (b.id === bookingId || b.booking_id === bookingId)) ||
+        { ...local, ...patch, booking_id: bookingId, id: bookingId };
+
+      const schedDate =
+        updatedBooking.appointment_date ||
+        updatedBooking.preferred_date ||
+        local?.appointment_date ||
+        local?.preferred_date ||
+        'the scheduled date';
+      const schedTime =
+        updatedBooking.time_slot ||
+        updatedBooking.preferred_time ||
+        local?.time_slot ||
+        local?.preferred_time ||
+        '09:00 AM';
+      const bikeSummary =
+        [updatedBooking.bike_brand || local?.bike_brand, updatedBooking.bike_model || local?.bike_model].filter(Boolean).join(' ') ||
+        'your motorcycle';
+
       notificationService?.addNotification?.({
         user_id: local?.customer_id || local?.user_id || 'guest',
-        title: flexible ? 'Booking Approved' : 'Service Booking Confirmed!',
-        message: flexible
-          ? `Your booking #${bookingId} was approved. Pay the ${formatPhp(patch.downpayment_amount)} downpayment by ${new Date(patch.payment_deadline).toLocaleString()} or the booking will be cancelled automatically.`
-          : `Your appointment #${bookingId} has been confirmed. Please bring your bike on the scheduled time.`,
+        title: 'Booking Reservation Approved!',
+        message: isConfirmed
+          ? `Your booking #${bookingId} for ${local?.service_title || 'Service'} has been approved & confirmed. You are required to go to the shop with your motorcycle (${bikeSummary}) on ${schedDate} at ${schedTime}.`
+          : (flexible
+            ? `Your booking #${bookingId} was approved! You are required to go to the shop with your motorcycle on ${schedDate} at ${schedTime}. Downpayment: ${formatPhp(patch.downpayment_amount)} due by ${new Date(patch.payment_deadline).toLocaleString()}.`
+            : `Your booking #${bookingId} has been approved. You are required to go to the shop with your motorcycle on ${schedDate} at ${schedTime}.`),
         type: 'booking',
         link: 'bookings',
       });
     } catch (_e) {}
 
     try {
-      const bookingForEmail = updated || { ...local, ...patch, booking_id: bookingId, id: bookingId };
+      const allBookings = Array.isArray(updated) ? updated : this.getLocalBookings();
+      const updatedBooking =
+        allBookings.find((b) => b && (b.id === bookingId || b.booking_id === bookingId)) ||
+        { ...local, ...patch, booking_id: bookingId, id: bookingId };
+
+      const resolvedEmail =
+        updatedBooking.customer_email ||
+        updatedBooking.userEmail ||
+        updatedBooking.email ||
+        local?.customer_email ||
+        local?.userEmail ||
+        local?.email ||
+        opts.customerEmail ||
+        opts.customer_email;
+
       await emailService.sendBookingApprovalEmail({
-        booking: bookingForEmail,
+        booking: updatedBooking,
         bookingId,
-        customerEmail: bookingForEmail.customer_email || bookingForEmail.userEmail,
-        customerName: bookingForEmail.customer_name,
-        status: patch.status,
-        downpaymentAmount: patch.downpayment_amount,
-        paymentDeadline: patch.payment_deadline,
-        serviceTitle: bookingForEmail.service_title || bookingForEmail.package_name,
-        appointmentDate: bookingForEmail.appointment_date || bookingForEmail.preferred_date,
-        timeSlot: bookingForEmail.time_slot || bookingForEmail.preferred_time,
-        branchName: bookingForEmail.branch_name || bookingForEmail.branch,
+        customerEmail: resolvedEmail,
+        customerName: updatedBooking.customer_name || local?.customer_name,
+        status: patch.status || updatedBooking.status || 'Confirmed',
+        downpaymentAmount: patch.downpayment_amount ?? updatedBooking.downpayment_amount,
+        paymentDeadline: patch.payment_deadline ?? updatedBooking.payment_deadline,
+        serviceTitle: updatedBooking.service_title || updatedBooking.package_name || local?.service_title,
+        appointmentDate: updatedBooking.appointment_date || updatedBooking.preferred_date || local?.appointment_date || local?.preferred_date,
+        timeSlot: updatedBooking.time_slot || updatedBooking.preferred_time || local?.time_slot || local?.preferred_time,
+        branchName: updatedBooking.branch_name || updatedBooking.branch || local?.branch_name || local?.branch,
+        mechanicName: patch.mechanic || updatedBooking.mechanic || local?.mechanic,
+        bikeBrand: updatedBooking.bike_brand || local?.bike_brand,
+        bikeModel: updatedBooking.bike_model || local?.bike_model,
+        plateNumber: updatedBooking.plate_number || updatedBooking.bike_plate || local?.plate_number || local?.bike_plate,
+        serviceBay: patch.service_bay || updatedBooking.service_bay || local?.service_bay,
+        estimatedServiceTotal: patch.estimated_service_total ?? updatedBooking.estimated_service_total ?? local?.estimated_service_total,
+        remainingBalance: patch.remaining_balance ?? updatedBooking.remaining_balance ?? local?.remaining_balance,
       });
     } catch (emailErr) {
       console.warn('[GarageService] Booking approval email failed:', emailErr);
@@ -2544,13 +2666,13 @@ export const garageService = {
       await bookingTimelineService.append({
         bookingId,
         eventType: TIMELINE_EVENTS.BOOKING_APPROVED,
-        description: flexible
-          ? `Booking approved — downpayment ${formatPhp(patch.downpayment_amount)} required`
-          : 'Booking Approved',
+        description: patch.status === FLEX_BOOKING_STATUS.CONFIRMED
+          ? `Booking approved & confirmed${assignedMech ? ` • Assigned to ${assignedMech}` : ''}`
+          : `Booking approved — downpayment ${formatPhp(patch.downpayment_amount)} required`,
         actorId: opts.approvedBy || 'admin',
         actorRole: BOOKING_ROLES.ADMIN,
         fromStatus: local?.status,
-        toStatus: flexible ? FLEX_BOOKING_STATUS.AWAITING_DOWNPAYMENT : 'Confirmed',
+        toStatus: patch.status,
         metadata: flexible
           ? {
               estimated_service_total: patch.estimated_service_total,
@@ -2798,12 +2920,37 @@ export const garageService = {
       });
     } catch (_e) {}
     try {
+      const allBookings = Array.isArray(updated) ? updated : this.getLocalBookings();
+      const updatedBooking =
+        allBookings.find((b) => b && (b.id === bookingId || b.booking_id === bookingId)) ||
+        { ...local, ...patch, booking_id: bookingId, id: bookingId };
+      const schedDate = date || updatedBooking.appointment_date || updatedBooking.preferred_date || 'the scheduled date';
+      const schedTime = time || updatedBooking.time_slot || updatedBooking.preferred_time || '09:00 AM';
+      const bikeSummary = [updatedBooking.bike_brand || local?.bike_brand, updatedBooking.bike_model || local?.bike_model].filter(Boolean).join(' ') || 'your motorcycle';
+
       notificationService?.addNotification?.({
         user_id: local?.customer_id || local?.user_id || 'guest',
-        title: 'Appointment Scheduled',
-        message: `Your appointment #${bookingId} is scheduled${date ? ` for ${String(date).slice(0, 10)}` : ''}${time ? ` (${time})` : ''}.`,
+        title: 'Appointment Scheduled & Confirmed',
+        message: `Your appointment #${bookingId} is scheduled for ${schedDate} at ${schedTime}. You are required to go to the shop with your motorcycle (${bikeSummary}) at the scheduled time.`,
         type: 'booking',
         link: 'bookings',
+      });
+
+      await emailService.sendBookingApprovalEmail({
+        booking: updatedBooking,
+        bookingId,
+        customerEmail: updatedBooking.customer_email || updatedBooking.userEmail || local?.customer_email,
+        customerName: updatedBooking.customer_name || local?.customer_name,
+        status: patch.status,
+        serviceTitle: updatedBooking.service_title || updatedBooking.package_name,
+        appointmentDate: schedDate,
+        timeSlot: schedTime,
+        branchName: updatedBooking.branch_name || updatedBooking.branch,
+        serviceBay: bay || updatedBooking.service_bay,
+        bikeBrand: updatedBooking.bike_brand || local?.bike_brand,
+        bikeModel: updatedBooking.bike_model || local?.bike_model,
+        plateNumber: updatedBooking.plate_number || updatedBooking.bike_plate || local?.plate_number,
+        mechanicName: updatedBooking.mechanic || local?.mechanic,
       });
     } catch (_e) {}
     return updated;

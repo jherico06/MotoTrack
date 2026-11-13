@@ -1245,19 +1245,10 @@ export default function SalesAnalyticsPanel({
                 fontWeight: '600',
                 color: theme.textPrimary,
                 letterSpacing: -0.2,
-              }}
-            >
-              Sales Channel Distribution
-            </Text>
-            <Text
-              style={{
-                fontSize: 11.5,
-                color: theme.textMuted,
-                marginTop: 2,
                 marginBottom: 16,
               }}
             >
-              Online storefront vs Walk-in POS transactions
+              Sales Channel Distribution
             </Text>
 
             {/* Online Store Bar */}
@@ -1521,9 +1512,6 @@ export default function SalesAnalyticsPanel({
               >
                 Top Products
               </Text>
-              <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
-                Best-performing products by sales revenue
-              </Text>
             </View>
             <TouchableOpacity
               onPress={() => setActiveNav('products')}
@@ -1714,9 +1702,6 @@ export default function SalesAnalyticsPanel({
                 }}
               >
                 Category Revenue
-              </Text>
-              <Text style={{ fontSize: 11.5, color: theme.textMuted, marginTop: 2 }}>
-                Observed sales totals by category
               </Text>
             </View>
 

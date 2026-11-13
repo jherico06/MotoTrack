@@ -107,7 +107,7 @@ export default function LoginPage({
         setGoogleAdvisory({
           title: 'Supabase Redirect URL Required',
           message:
-            'Google sign-in completed, but Supabase blocked the redirect back into Expo Go. To fix: add "exp://**" to your Supabase Redirect URLs.',
+            'Google sign-in completed, but Supabase blocked the redirect back into Expo Go. To fix: add "exp://**" and "exps://**" to your Supabase Redirect URLs in Authentication → URL Configuration.',
           showInstantTest: true,
         });
         if (res?.error) {

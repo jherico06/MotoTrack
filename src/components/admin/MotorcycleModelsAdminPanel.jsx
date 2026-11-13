@@ -75,13 +75,7 @@ export default function MotorcycleModelsAdminPanel({ onToast, style, isDarkMode 
 
   return (
     <View style={[styles.wrap, style]}>
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Motorcycle Models</Text>
-          <Text style={styles.sub}>
-            Brand + model only. Used for product compatibility checkboxes and customer selection.
-          </Text>
-        </View>
+      <View style={[styles.header, { justifyContent: 'flex-end', marginBottom: 14 }]}>
         <TouchableOpacity style={styles.refresh} onPress={refresh}>
           <BootstrapIcon name="arrow-clockwise" size={14} color={t.accentBrand} />
         </TouchableOpacity>

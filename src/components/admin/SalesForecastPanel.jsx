@@ -1128,9 +1128,6 @@ export default function SalesForecastPanel({
                     <Text style={{ fontSize: 16, fontWeight: '700', color: tokens.foreground }}>
                       Select Product for Forecasting
                     </Text>
-                    <Text style={{ fontSize: 11.5, color: tokens.mutedForeground, marginTop: 1 }}>
-                      Choose a motorcycle part to run Simple Linear Regression demand forecasting
-                    </Text>
                   </View>
                 </View>
 

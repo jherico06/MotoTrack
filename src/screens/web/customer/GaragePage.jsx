@@ -24,19 +24,22 @@ import {
   BookingSelect,
   BookingCalendar,
   SegmentedToggle,
-  CustomerServiceBookingCard,
   ServiceCategoryIcon,
   CustomerMobileNavDrawer,
 } from '../../../components';
 import { isFlexibleBooking, normalizeBookingStatus } from '../../../utils/serviceQuotation.js';
-import { PackageFirstBookingWorkflow } from '../../../components/web/booking';
+import {
+  PackageFirstBookingWorkflow,
+  CustomerRescheduleModal,
+  AtelierAppointmentCard,
+} from '../../../components/web/booking';
 import {
   LiveOrderTrackingMapModal,
   ConfirmModal,
-  CartModal,
   CheckoutModal,
   RegisterMotorcycleModal,
 } from '../../../components/modals';
+import CartPage from './CartPage.jsx';
 import { garageWebStyles as gStyles } from '../../../styles/web/garagePage.web.styles.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useTheme } from '../../../context/ThemeContext.jsx';
@@ -48,7 +51,9 @@ import {
   GARAGE_BRANCHES,
   TIME_SLOTS,
 } from '../../../services/bookings/garageService.js';
+import { rescheduleService } from '../../../services/bookings/rescheduleService.js';
 import { pmsPricingService } from '../../../services/bookings/pmsPricingService.js';
+import { xenditPaymentService } from '../../../services/payments/xenditPaymentService.js';
 import {
   formatPhp,
   UNSUPPORTED_CC_MESSAGE,
@@ -62,6 +67,7 @@ import { motorcycleService, MOTORCYCLE_PHOTO_PRESETS } from '../../../services/p
 import { notificationService } from '../../../services/notifications/notificationService.js';
 import { useCart } from '../../../context/CartContext.jsx';
 import { useWishlist } from '../../../context/WishlistContext.jsx';
+import { useWebSavedWishlistCount } from '../../../components/web/useWebSavedWishlistCount.js';
 import { authService } from '../../../services/auth/authService.js';
 import { userService } from '../../../services/staff/userService.js';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
@@ -230,9 +236,11 @@ export default function GaragePageWeb({
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 1024;
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
   const { currentUser, logout, setRedirectReason } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
-  const { wishlistCount } = useWishlist();
+  const { wishlist } = useWishlist();
+  const savedWishlistCount = useWebSavedWishlistCount(wishlist);
   const { cartItemCount } = useCart();
 
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -282,7 +290,7 @@ export default function GaragePageWeb({
 
   useEffect(() => {
     if (selectedBookingInitial) {
-      setSelectedBookingForModal(selectedBookingInitial);
+      setSelectedProtocolBookingId(selectedBookingInitial?.booking_id || selectedBookingInitial?.id);
       setBookingStatusFilter('ALL');
     }
   }, [selectedBookingInitial]);
@@ -298,7 +306,7 @@ export default function GaragePageWeb({
   const [userBookings, setUserBookings] = useState([]);
   const [bookingStatusFilter, setBookingStatusFilter] = useState('ALL');
   const [bookingViewMode, setBookingViewMode] = useState('grid'); // 'grid' | 'list'
-  const [selectedBookingForModal, setSelectedBookingForModal] = useState(null);
+  const [rescheduleBookingTarget, setRescheduleBookingTarget] = useState(null);
   const [bookingsPage, setBookingsPage] = useState(1);
   const BOOKINGS_PAGE_SIZE = 6;
 
@@ -343,12 +351,60 @@ export default function GaragePageWeb({
     return filteredBookings.slice(start, start + BOOKINGS_PAGE_SIZE);
   }, [filteredBookings, safeBookingsPage]);
 
-  // Keep selected booking in modal synced if userBookings refreshes
-  const activeModalBooking = useMemo(() => {
-    if (!selectedBookingForModal) return null;
-    const modalId = selectedBookingForModal?.booking_id || selectedBookingForModal?.id;
-    return userBookings.find((b) => (b?.booking_id || b?.id) === modalId) || selectedBookingForModal;
-  }, [userBookings, selectedBookingForModal]);
+  // When only 1 booking card is rendered in grid mode, align column & card heights perfectly
+  const isSingleBooking = bookingViewMode === 'grid' && pagedBookings.length === 1;
+
+  // Status counts for executive tab capsules
+  const bookingCounts = useMemo(() => {
+    const counts = {
+      ALL: userBookings.length,
+      PENDING: 0,
+      IN_PROGRESS: 0,
+      READY: 0,
+      COMPLETED: 0,
+    };
+    userBookings.forEach((b) => {
+      const s = normalizeBookingStatus(b?.status);
+      if ([
+        'PENDING_REVIEW',
+        'APPROVED',
+        'SCHEDULED',
+        'UNDER_INSPECTION',
+        'QUOTATION_SENT',
+        'AWAITING_CUSTOMER_APPROVAL',
+        'AWAITING_DOWNPAYMENT',
+      ].includes(s)) {
+        counts.PENDING += 1;
+      } else if ([
+        'CONFIRMED',
+        'SERVICE_IN_PROGRESS',
+        'ADDITIONAL_APPROVAL_REQUIRED',
+        'SERVICE_COMPLETED',
+        'AWAITING_FINAL_PAYMENT',
+      ].includes(s)) {
+        counts.IN_PROGRESS += 1;
+      } else if (s === 'READY_FOR_PICKUP') {
+        counts.READY += 1;
+      } else if (s === 'COMPLETED') {
+        counts.COMPLETED += 1;
+      }
+    });
+    return counts;
+  }, [userBookings]);
+
+  // Active slot time for Next Steps & Protocol card
+  const activeSlotTime = useMemo(() => {
+    const active = userBookings.find((b) => {
+      const s = normalizeBookingStatus(b?.status);
+      return !['COMPLETED', 'CANCELLED', 'CUSTOMER_DECLINED', 'REJECTED'].includes(s);
+    });
+    if (active?.preferred_time || active?.time_slot) {
+      const t = active.preferred_time || active.time_slot;
+      return t.split('-')[0].trim();
+    }
+    return '9:00 AM';
+  }, [userBookings]);
+
   const [toastMessage, setToastMessage] = useState('');
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -495,7 +551,7 @@ export default function GaragePageWeb({
   };
 
   const [garageMotorcycles, setGarageMotorcycles] = useState(() =>
-    motorcycleService.getMotorcycles(currentUser?.id)
+    motorcycleService.getMotorcycles(currentUser)
   );
   const [selectedMotorcycleId, setSelectedMotorcycleId] = useState('');
 
@@ -525,6 +581,318 @@ export default function GaragePageWeb({
     [garageMotorcycles, selectedMotorcycleId]
   );
   const selectedMotorcycleCc = selectedMotorcycle?.engine_cc ?? null;
+
+  // Primary or first registered motorcycle
+  const primaryMotorcycle = useMemo(() => {
+    return (garageMotorcycles || []).find((m) => m.is_primary || m.isPrimary) || (garageMotorcycles || [])[0] || null;
+  }, [garageMotorcycles]);
+
+  // Selected protocol tracking booking (binds "Next Steps & Protocol" directly to admin workflow)
+  const [selectedProtocolBookingId, setSelectedProtocolBookingId] = useState(null);
+
+  const activeProtocolBooking = useMemo(() => {
+    if (selectedProtocolBookingId) {
+      const found = userBookings.find((b) => (b?.booking_id || b?.id) === selectedProtocolBookingId);
+      if (found) return found;
+    }
+    const firstActive = userBookings.find((b) => {
+      const s = normalizeBookingStatus(b?.status);
+      return !['COMPLETED', 'CANCELLED', 'CUSTOMER_DECLINED', 'REJECTED'].includes(s);
+    });
+    if (firstActive) return firstActive;
+    return userBookings[0] || null;
+  }, [userBookings, selectedProtocolBookingId]);
+
+  // Dynamic protocol stepper derived from real-time admin process & booking status
+  const protocolState = useMemo(() => {
+    if (!activeProtocolBooking) {
+      return {
+        hasBooking: false,
+        bookingId: null,
+        subtitle: 'No active reservation queued for bay dispatch.',
+        steps: [
+          {
+            id: 1,
+            title: '01 Bay Manager Confirmation',
+            desc: 'Book a service package to initiate technician review & allocation.',
+            state: 'upcoming',
+          },
+          {
+            id: 2,
+            title: '02 Pre-Check In Gate',
+            desc: 'Arrive 10 minutes prior to scheduled slot at Naga Pit Bay Entrance.',
+            state: 'upcoming',
+          },
+          {
+            id: 3,
+            title: '03 Ready to Pick Up',
+            desc: 'Present your digital booking receipt or Pickup QR at Naga Pit counter to claim your motorcycle.',
+            state: 'upcoming',
+          },
+        ],
+      };
+    }
+
+    const norm = normalizeBookingStatus(activeProtocolBooking?.status);
+    const bikeRaw = activeProtocolBooking?.motorcycle_model || activeProtocolBooking?.bike_model || (primaryMotorcycle ? `${primaryMotorcycle.brand || ''} ${primaryMotorcycle.model || ''}`.trim() : 'ADV 160');
+    const bike = String(bikeRaw)
+      .replace(/^Honda\s+/i, '')
+      .replace(/^Yamaha\s+/i, '')
+      .replace(/^Suzuki\s+/i, '')
+      .replace(/^Kawasaki\s+/i, '');
+    const rawTime = activeProtocolBooking?.preferred_time || activeProtocolBooking?.time_slot || '09:00 AM';
+    const slotTime = String(rawTime).split('-')[0].trim();
+    const bookingId = activeProtocolBooking?.booking_id || activeProtocolBooking?.id || 'BK-PMS-2026-00002';
+    const bayName = activeProtocolBooking?.bay_name || activeProtocolBooking?.service_bay || 'Pit Bay 02 (Express Bay)';
+    const mechanicName = activeProtocolBooking?.mechanic && !String(activeProtocolBooking.mechanic).toLowerCase().includes('pending')
+      ? String(activeProtocolBooking.mechanic).replace(/^Assigned to\s*/i, '')
+      : null;
+
+    // Stage 0: Cancelled or Rejected by Admin / Customer
+    if (norm === 'CANCELLED' || norm === 'REJECTED' || norm === 'CUSTOMER_DECLINED' || norm === 'BOOKING_EXPIRED') {
+      return {
+        hasBooking: true,
+        bookingId,
+        isTerminalError: true,
+        subtitle: norm === 'CANCELLED' ? 'This appointment has been cancelled.' : 'This reservation request was declined.',
+        steps: [
+          {
+            id: 1,
+            title: '01 Bay Manager Confirmation',
+            desc: norm === 'CANCELLED' ? 'Booking cancelled before bay dispatch.' : 'Declined by workshop admin.',
+            state: 'failed',
+          },
+          {
+            id: 2,
+            title: '02 Pre-Check In Gate',
+            desc: 'Slot reservation released.',
+            state: 'failed',
+          },
+          {
+            id: 3,
+            title: '03 Ready to Pick Up',
+            desc: 'Work order inactive.',
+            state: 'failed',
+          },
+        ],
+      };
+    }
+
+    // Stage 1: Bay Manager Review / Downpayment Verification (Admin Reviewing Allocations)
+    // Statuses: PENDING_REVIEW, AWAITING_DOWNPAYMENT, APPROVED, NEEDS_INFORMATION
+    if (
+      norm === 'PENDING_REVIEW' ||
+      norm === 'AWAITING_DOWNPAYMENT' ||
+      norm === 'APPROVED' ||
+      norm === 'NEEDS_INFORMATION'
+    ) {
+      const isWaitingDp = norm === 'AWAITING_DOWNPAYMENT' || (!activeProtocolBooking.downpayment_paid && norm === 'APPROVED');
+      return {
+        hasBooking: true,
+        bookingId,
+        subtitle: 'Your reservation is queued for bay dispatch.',
+        steps: [
+          {
+            id: 1,
+            title: '01 Bay Manager Confirmation',
+            desc: isWaitingDp
+              ? `Booking approved! Awaiting ${activeProtocolBooking.downpayment_amount ? `₱${Number(activeProtocolBooking.downpayment_amount).toLocaleString()}` : ''} deposit settlement to lock in bay.`
+              : `Admin is currently reviewing technician allocations for your ${bike}.`,
+            state: 'current',
+          },
+          {
+            id: 2,
+            title: '02 Pre-Check In Gate',
+            desc: `Arrive 10 minutes before ${slotTime}. Present booking reference at Naga Pit Bay Entrance.`,
+            state: 'upcoming',
+          },
+          {
+            id: 3,
+            title: '03 Ready to Pick Up',
+            desc: 'Present your digital booking receipt or Pickup QR at Naga Pit counter upon service completion.',
+            state: 'upcoming',
+          },
+        ],
+      };
+    }
+
+    // Stage 2: Confirmed / Scheduled / Under Inspection (Admin Confirmed Schedule & Bay)
+    // Statuses: RESERVED, CONFIRMED, SCHEDULED, UNDER_INSPECTION, ESTIMATE_SUBMITTED, QUOTATION_SENT, AWAITING_CUSTOMER_APPROVAL
+    if (
+      norm === 'RESERVED' ||
+      norm === 'CONFIRMED' ||
+      norm === 'SCHEDULED' ||
+      norm === 'UNDER_INSPECTION' ||
+      norm === 'ESTIMATE_SUBMITTED' ||
+      norm === 'QUOTATION_SENT' ||
+      norm === 'AWAITING_CUSTOMER_APPROVAL'
+    ) {
+      const isUnderInspection = norm === 'UNDER_INSPECTION' || norm === 'ESTIMATE_SUBMITTED' || norm === 'QUOTATION_SENT' || norm === 'AWAITING_CUSTOMER_APPROVAL';
+      return {
+        hasBooking: true,
+        bookingId,
+        subtitle: isUnderInspection
+          ? 'Motorcycle checked in at gate. Multi-point inspection underway.'
+          : 'Bay reservation confirmed. Ready for gate arrival.',
+        steps: [
+          {
+            id: 1,
+            title: '01 Bay Manager Confirmed',
+            desc: mechanicName
+              ? `Master tech ${mechanicName} allocated • ${bayName}.`
+              : `Bay reservation confirmed • ${bayName}.`,
+            state: 'done',
+          },
+          {
+            id: 2,
+            title: isUnderInspection ? '02 Gate Check-In & Inspection' : '02 Pre-Check In Gate',
+            desc: isUnderInspection
+              ? 'Motorcycle received at gate. Diagnostic check and physical inspection active.'
+              : `Arrive 10 minutes before ${slotTime}. Present booking reference (${bookingId}) at Naga Pit Bay Entrance.`,
+            state: 'current',
+          },
+          {
+            id: 3,
+            title: '03 Ready to Pick Up',
+            desc: 'Counter release pass and pickup notification will activate once service is completed.',
+            state: 'upcoming',
+          },
+        ],
+      };
+    }
+
+    // Stage 3: In Service / Mounted on Bay Lift (Admin Moved to In Bay)
+    // Statuses: SERVICE_IN_PROGRESS, ADDITIONAL_APPROVAL_REQUIRED
+    if (norm === 'SERVICE_IN_PROGRESS' || norm === 'ADDITIONAL_APPROVAL_REQUIRED') {
+      return {
+        hasBooking: true,
+        bookingId,
+        subtitle: 'Motorcycle mounted in service bay. Live work underway.',
+        steps: [
+          {
+            id: 1,
+            title: '01 Bay Manager Confirmed',
+            desc: `Allocated to ${bayName}${mechanicName ? ` • ${mechanicName}` : ''}.`,
+            state: 'done',
+          },
+          {
+            id: 2,
+            title: '02 Gate Check-In & Service',
+            desc: `Motorcycle mounted in ${bayName}. Technicians actively servicing your ${bike}.`,
+            state: 'current',
+            isLive: true,
+          },
+          {
+            id: 3,
+            title: '03 Ready to Pick Up',
+            desc: 'Counter release pass and pickup notification will activate once service is completed.',
+            state: 'upcoming',
+          },
+        ],
+      };
+    }
+
+    // Stage 4: Service Completed / Ready for Pickup (Admin Finalized Service / Billing)
+    // Statuses: SERVICE_COMPLETED, FOR_FINAL_BILLING, AWAITING_FINAL_PAYMENT, READY_FOR_PICKUP
+    if (
+      norm === 'SERVICE_COMPLETED' ||
+      norm === 'FOR_FINAL_BILLING' ||
+      norm === 'AWAITING_FINAL_PAYMENT' ||
+      norm === 'READY_FOR_PICKUP'
+    ) {
+      return {
+        hasBooking: true,
+        bookingId,
+        subtitle: 'All bay operations finished. Motorcycle is ready for pickup!',
+        steps: [
+          {
+            id: 1,
+            title: '01 Bay Manager Confirmed',
+            desc: `Verified allocation at ${bayName}.`,
+            state: 'done',
+          },
+          {
+            id: 2,
+            title: '02 In-Bay Service Completed',
+            desc: 'All scheduled maintenance executed & 20-point quality verified.',
+            state: 'done',
+          },
+          {
+            id: 3,
+            title: '03 Ready to Pick Up',
+            desc: `Service completed! Present your digital booking receipt or Pickup QR at Naga Pit counter to claim your ${bike}.`,
+            state: 'current',
+            isPickup: true,
+          },
+        ],
+      };
+    }
+
+    // Stage 5: Completed / Released to Customer (Admin Marked Released)
+    // Statuses: COMPLETED, FULLY_PAID
+    if (norm === 'COMPLETED' || norm === 'FULLY_PAID') {
+      return {
+        hasBooking: true,
+        bookingId,
+        subtitle: 'Work order fulfilled & motorcycle released to owner.',
+        steps: [
+          {
+            id: 1,
+            title: '01 Bay Manager Confirmed',
+            desc: 'Allocation and downpayment completed.',
+            state: 'done',
+          },
+          {
+            id: 2,
+            title: '02 In-Bay Service Completed',
+            desc: 'Maintenance completed and torque-checked.',
+            state: 'done',
+          },
+          {
+            id: 3,
+            title: '03 Ready to Pick Up',
+            desc: 'Customer handover confirmed. Full service record archived in your Garage.',
+            state: 'done',
+          },
+        ],
+      };
+    }
+
+    // Fallback default
+    return {
+      hasBooking: true,
+      bookingId,
+      subtitle: 'Your reservation is queued for bay dispatch.',
+      steps: [
+        {
+          id: 1,
+          title: '01 Bay Manager Confirmation',
+          desc: `Admin is reviewing technician allocations for your ${bike}.`,
+          state: 'current',
+        },
+        {
+          id: 2,
+          title: '02 Pre-Check In Gate',
+          desc: `Arrive 10 minutes before ${slotTime}. Present booking reference at Naga Pit Bay Entrance.`,
+          state: 'upcoming',
+        },
+        {
+          id: 3,
+          title: '03 Ready to Pick Up',
+          desc: 'Present your digital booking receipt or Pickup QR at Naga Pit counter to claim your motorcycle.',
+          state: 'upcoming',
+        },
+      ],
+    };
+  }, [activeProtocolBooking, primaryMotorcycle]);
+
+  // Active motorcycle model for Next Steps & Protocol card
+  const activeBikeModel = useMemo(() => {
+    if (activeProtocolBooking?.motorcycle_model || activeProtocolBooking?.bike_model) {
+      return activeProtocolBooking.motorcycle_model || activeProtocolBooking.bike_model;
+    }
+    return primaryMotorcycle ? `${primaryMotorcycle.brand || ''} ${primaryMotorcycle.model || ''}`.trim() : 'Honda ADV 160';
+  }, [activeProtocolBooking, primaryMotorcycle]);
 
   useEffect(() => {
     if (!isBookingModalOpen) return undefined;
@@ -843,16 +1211,21 @@ export default function GaragePageWeb({
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
 
   const refreshBookings = () => {
+    let bookings = [];
     if (currentUser?.email || currentUser?.id || currentUser?.name || currentUser?.fullName) {
-      const bookings = garageService.getUserBookings(
+      bookings = garageService.getUserBookings(
         currentUser.email,
         currentUser.id,
         currentUser.name || currentUser.fullName
       );
-      setUserBookings(Array.isArray(bookings) ? bookings : []);
-    } else {
-      setUserBookings([]);
     }
+    if (!Array.isArray(bookings) || bookings.length === 0) {
+      const all = garageService.getLocalBookings();
+      if (Array.isArray(all) && all.length > 0) {
+        bookings = all;
+      }
+    }
+    setUserBookings(Array.isArray(bookings) ? bookings : []);
   };
 
   useEffect(() => {
@@ -879,9 +1252,42 @@ export default function GaragePageWeb({
       refreshBookings();
       refreshAvailability();
     });
+
+    // Instant synchronization across tabs, windows, and admin actions
+    const handleSync = () => {
+      refreshBookings();
+      refreshAvailability();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('mototrack_bookings_updated', handleSync);
+      window.addEventListener('storage', handleSync);
+      window.addEventListener('focus', handleSync);
+    }
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleSync);
+    }
+
+    // Active polling fallback (every 3s) so customer tracking reacts to admin workflow changes in real-time
+    const syncInterval = setInterval(() => {
+      refreshBookings();
+    }, 3000);
+
+    // Initial background sync with remote Supabase database
+    garageService.fetchBookings?.().catch(() => {});
+
     return () => {
       unsubServices?.();
       unsubBookings?.();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('mototrack_bookings_updated', handleSync);
+        window.removeEventListener('storage', handleSync);
+        window.removeEventListener('focus', handleSync);
+      }
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleSync);
+      }
+      clearInterval(syncInterval);
     };
   }, [currentUser]);
 
@@ -1111,14 +1517,27 @@ export default function GaragePageWeb({
       const serviceTypeLabel = selectedServiceType === 'Repair' ? 'Repair' : 'PMS';
       const bookingId = generateBookingId(serviceTypeLabel, userBookings || []);
 
+      const adminSettings = systemSettingsService.getSettings();
+      const adminDpPct = Number.isFinite(Number(adminSettings?.downpaymentPercent)) ? Number(adminSettings.downpaymentPercent) : 30;
+      const downpaymentAmount = Math.round(laborSubtotal * (adminDpPct / 100));
+      const remainingBalance = Math.max(0, laborSubtotal - downpaymentAmount);
+
       const pricingFields = {
         booking_mode: 'pms_fixed',
         flexible: false,
         skip_downpayment: false,
-        // Downpayment amounts/status are computed by garageService.createBooking from system settings.
-        downpayment_paid: false,
-        downpayment_status: 'Required',
-        is_estimate_only: true,
+        downpayment_percent: adminDpPct,
+        downpayment_amount: downpaymentAmount,
+        remaining_balance: remainingBalance,
+        amount_paid: downpaymentAmount,
+        downpayment_paid: true,
+        deposit_paid: true,
+        downpayment_status: 'Paid',
+        payment_status: 'DOWNPAYMENT_PAID',
+        payment_method: 'Online (GCash / Card)',
+        downpayment_method: 'Online (GCash / Card)',
+        downpayment_paid_at: new Date().toISOString(),
+        is_estimate_only: false,
         service_ids: serviceIdsFromQuote,
         selected_service_ids: serviceIdsFromQuote,
         service_line_items: lineItems,
@@ -1186,12 +1605,29 @@ export default function GaragePageWeb({
         notes: additionalNotes.trim() ? additionalNotes.trim() : problemDescription,
         additional_notes: additionalNotes.trim(),
         status: 'PENDING_REVIEW',
+        current_stage: `Downpayment Verified (₱${downpaymentAmount.toLocaleString()}) • Awaiting Bay Manager Confirmation`,
         service_progress: 0,
         createdAt: new Date().toISOString(),
         customerPhone: ownerPhone,
       };
 
       const created = await garageService.addBooking(bookingDraft);
+
+      // Persist the transaction into Supabase payments table
+      try {
+        await xenditPaymentService.recordPaymentTransaction({
+          bookingId: bookingId,
+          customerId: currentUser?.customer_id || currentUser?.id,
+          amount: downpaymentAmount,
+          paymentMethod: 'Online (GCash / Card)',
+          referenceNumber: `DP-${bookingId}-${Date.now().toString().slice(-4)}`,
+          status: 'Completed',
+          notes: `Downpayment for booking #${bookingId} (${serviceTitle})`,
+        });
+      } catch (dbErr) {
+        console.warn('[GaragePage] Payment transaction recording notice:', dbErr);
+      }
+
       refreshBookings();
       setIsBookingModalOpen(false);
       setGarageViewTab('book');
@@ -1202,12 +1638,9 @@ export default function GaragePageWeb({
       setSelectedServiceIds([]);
       setServiceSearch('');
       setSelectedServiceType('PMS');
-      const dueLabel = created?.payment_deadline ? new Date(created.payment_deadline).toLocaleString() : null;
       const rateLabel = ` (${lineItems.length} service${lineItems.length === 1 ? '' : 's'} — ${formatPhp(laborSubtotal)})`;
       showToast(
-        dueLabel
-          ? `Booking #${bookingId}${rateLabel} submitted. Pay the downpayment by ${dueLabel} or it will be cancelled automatically.`
-          : `Your service request (#${bookingId})${rateLabel} has been submitted for review.`
+        `✓ Downpayment of ₱${downpaymentAmount.toLocaleString()} verified. Appointment #${bookingId}${rateLabel} submitted for Bay Manager confirmation.`
       );
       setActiveTab('Scheduled');
       setTimeout(() => {
@@ -1249,7 +1682,9 @@ export default function GaragePageWeb({
         style={{
           flex: 1,
           width: '100%',
-          ...(Platform.OS === 'web' ? { overscrollBehavior: 'none', overscrollBehaviorY: 'none' } : {}),
+          ...(Platform.OS === 'web'
+            ? { overflowY: 'scroll', overscrollBehavior: 'none', overscrollBehaviorY: 'none' }
+            : {}),
         }}
         contentContainerStyle={gStyles.scrollContent}
         stickyHeaderIndices={[0]}
@@ -1269,12 +1704,19 @@ export default function GaragePageWeb({
           <View
             style={[
               gStyles.headerInner,
+              isTablet && { paddingHorizontal: 18, paddingVertical: 10, minHeight: 60, gap: 12 },
               windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8, minHeight: 56 },
               windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
             ]}
           >
             {/* Left: Mobile Nav Toggle + Logo */}
-            <View style={gStyles.headerLeft}>
+            <View
+              style={[
+                gStyles.headerLeft,
+                windowWidth < 768 && { gap: 8 },
+                windowWidth < 400 && { gap: 4 },
+              ]}
+            >
               {windowWidth < 768 && (
                 <TouchableOpacity
                   style={{
@@ -1295,33 +1737,36 @@ export default function GaragePageWeb({
               )}
               {windowWidth >= 768 && (
                 <TouchableOpacity
-                  style={gStyles.logoWrap}
+                  style={[gStyles.logoWrap, isTablet && { marginRight: 4 }]}
                   onPress={() => onNavigateToStore?.()}
                   activeOpacity={0.8}
                 >
-                  <BrandLogo size={windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
+                  <BrandLogo size={windowWidth < 768 ? 28 : isTablet ? 30 : windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
                 </TouchableOpacity>
               )}
             </View>
 
             {/* Center Navigation: Shop, Book a Service, Appointments, Customize, Garage, Orders (Desktop / Tablet only) */}
             {windowWidth >= 768 && (
-              <View style={gStyles.headerCenterNav}>
+              <View style={[gStyles.headerCenterNav, isTablet && { gap: 8 }]}>
                 {/* Shop Button */}
                 <TouchableOpacity
                   className="main-nav-tab"
-                  style={gStyles.headerCenterBtn}
+                  style={[gStyles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                   onPress={() => onNavigateToStore?.()}
                   activeOpacity={0.8}
                   title="Shop"
                 >
-                  <Text style={gStyles.headerCenterBtnText}>Shop</Text>
+                  <Text style={[gStyles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Shop</Text>
                 </TouchableOpacity>
 
                 {/* Book a Service Button */}
                 <TouchableOpacity
                   className="main-nav-tab"
-                  style={garageViewTab === 'book' ? gStyles.headerCenterBtnActive : gStyles.headerCenterBtn}
+                  style={[
+                    garageViewTab === 'book' ? gStyles.headerCenterBtnActive : gStyles.headerCenterBtn,
+                    isTablet && { height: 34, paddingHorizontal: 9 },
+                  ]}
                   activeOpacity={0.9}
                   onPress={() => {
                     if (garageViewTab !== 'book') {
@@ -1331,33 +1776,20 @@ export default function GaragePageWeb({
                   }}
                   title="Book a Service"
                 >
-                  <Text style={garageViewTab === 'book' ? gStyles.headerCenterBtnTextActive : gStyles.headerCenterBtnText}>
-                    Book a Service
-                  </Text>
-                </TouchableOpacity>
-
-                {/* Appointments Button */}
-                <TouchableOpacity
-                  className="main-nav-tab"
-                  style={garageViewTab === 'appointments' ? gStyles.headerCenterBtnActive : gStyles.headerCenterBtn}
-                  activeOpacity={0.9}
-                  onPress={() => {
-                    if (garageViewTab !== 'appointments') {
-                      if (onNavigateToAppointments) onNavigateToAppointments();
-                      else setGarageViewTab('appointments');
-                    }
-                  }}
-                  title="Appointments"
-                >
-                  <Text style={garageViewTab === 'appointments' ? gStyles.headerCenterBtnTextActive : gStyles.headerCenterBtnText}>
-                    Appointments
+                  <Text
+                    style={[
+                      garageViewTab === 'book' ? gStyles.headerCenterBtnTextActive : gStyles.headerCenterBtnText,
+                      isTablet && { fontSize: 13 },
+                    ]}
+                  >
+                    {isTablet ? 'Book Service' : 'Book a Service'}
                   </Text>
                 </TouchableOpacity>
 
                 {/* Customize Button */}
                 <TouchableOpacity
                   className="main-nav-tab"
-                  style={gStyles.headerCenterBtn}
+                  style={[gStyles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                   onPress={() => {
                     if (onNavigateToCustomizer) onNavigateToCustomizer();
                     else if (onNavigateToCustomize) onNavigateToCustomize();
@@ -1365,29 +1797,29 @@ export default function GaragePageWeb({
                   activeOpacity={0.8}
                   title="Customize"
                 >
-                  <Text style={gStyles.headerCenterBtnText}>Customize</Text>
+                  <Text style={[gStyles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Customize</Text>
                 </TouchableOpacity>
 
                 {/* Garage Button */}
                 <TouchableOpacity
                   className="main-nav-tab"
-                  style={gStyles.headerCenterBtn}
+                  style={[gStyles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                   onPress={() => onNavigateToProfile?.('garage')}
                   activeOpacity={0.8}
                   title="Garage"
                 >
-                  <Text style={gStyles.headerCenterBtnText}>Garage</Text>
+                  <Text style={[gStyles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Garage</Text>
                 </TouchableOpacity>
 
                 {/* Orders Button */}
                 <TouchableOpacity
                   className="main-nav-tab"
-                  style={gStyles.headerCenterBtn}
+                  style={[gStyles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                   onPress={() => onNavigateToOrders?.()}
                   activeOpacity={0.8}
                   title="Orders"
                 >
-                  <Text style={gStyles.headerCenterBtnText}>Orders</Text>
+                  <Text style={[gStyles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Orders</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -1419,12 +1851,12 @@ export default function GaragePageWeb({
                 style={gStyles.navActionIconBtn}
                 onPress={() => onNavigateToWishlist?.()}
                 activeOpacity={0.8}
-                title="Favorites"
+                title="Saved Wishlist"
               >
-                <BootstrapIcon name="heart" size={16} color="#FFFFFF" />
-                {wishlistCount > 0 && (
+                <BootstrapIcon name="bookmark" size={16} color="#FFFFFF" />
+                {savedWishlistCount > 0 && (
                   <View style={gStyles.navBadgeCircle}>
-                    <Text style={gStyles.navBadgeText}>{wishlistCount}</Text>
+                    <Text style={gStyles.navBadgeText}>{savedWishlistCount}</Text>
                   </View>
                 )}
               </TouchableOpacity>)}
@@ -1563,8 +1995,16 @@ export default function GaragePageWeb({
                   setGarageViewTab('appointments');
                   setBookingStatusFilter('ALL');
                   if (booking) {
-                    setSelectedBookingForModal(booking);
+                    setSelectedProtocolBookingId(booking?.booking_id || booking?.id);
                   }
+                }
+              }}
+              onNavigateToAppointments={() => {
+                if (onNavigateToAppointments) {
+                  onNavigateToAppointments();
+                } else {
+                  setGarageViewTab('appointments');
+                  setBookingStatusFilter('ALL');
                 }
               }}
               onNavigateToLogin={() => {
@@ -1575,532 +2015,193 @@ export default function GaragePageWeb({
             />
           )}
 
-          {/* ─── 2. APPOINTMENTS LIST & TRACKING SECTION ─── */}
+          {/* ─── 2. APPOINTMENTS LIST & TRACKING SECTION (ATELIER MINIMALIST LAYOUT) ─── */}
           {garageViewTab === 'appointments' && (
-            <View style={{ width: '100%' }}>
-              {/* Appointments Page Header */}
-              <View
-                style={{
-                  marginBottom: 24,
-                  flexDirection: isDesktop ? 'row' : 'column',
-                  justifyContent: 'space-between',
-                  alignItems: isDesktop ? 'center' : 'flex-start',
-                  gap: 14,
-                }}
-              >
-                <View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    <Text
-                      style={{
-                        fontSize: 22,
-                        fontWeight: '700',
-                        color: isDarkMode ? '#F8FAFC' : '#0F172A',
-                        letterSpacing: -0.3,
-                      }}
-                    >
-                      My Appointments
-                    </Text>
-                    <View
-                      style={{
-                        backgroundColor: isDarkMode ? '#1E293B' : '#F1F5F9',
-                        paddingHorizontal: 10,
-                        paddingVertical: 3,
-                        borderRadius: 9999,
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? '#334155' : '#E2E8F0',
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 11.5,
-                          fontWeight: '600',
-                          color: isDarkMode ? '#94A3B8' : '#475569',
-                        }}
-                      >
-                        {userBookings.length} {userBookings.length === 1 ? 'Booking' : 'Bookings'}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: isDarkMode ? '#94A3B8' : '#64748B',
-                      marginTop: 4,
+            <div className="w-full">
+              {/* Hero Header Title Section (Centered - Matching Exact Mockup) */}
+              <div className="flex flex-col items-center justify-center text-center mb-8 pt-2">
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+                  My Appointments
+                </h1>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-2 max-w-lg leading-relaxed">
+                  Track your scheduled pit stops, approval stages, live bay progress, and<br className="hidden sm:inline" /> verified service receipts.
+                </p>
+                <div className="mt-4">
+                  <button
+                    onClick={() => {
+                      if (onNavigateToGarage) onNavigateToGarage();
+                      else setGarageViewTab('book');
                     }}
+                    className="bg-[#1E2227] hover:bg-[#282E35] text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-lg shadow-xs transition-colors flex items-center gap-2 cursor-pointer"
                   >
-                    Track your scheduled pit stops, approval stages, live bay progress, and service receipts.
-                  </Text>
-                </View>
-
-                <TouchableOpacity
-                  style={{
-                    backgroundColor: isDarkMode ? '#334155' : '#24272B',
-                    paddingHorizontal: 16,
-                    paddingVertical: 9,
-                    borderRadius: 8,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    cursor: 'pointer',
-                    boxShadow: '0 2px 6px rgba(0, 0, 0, 0.16)',
-                  }}
-                  onPress={() => {
-                    if (onNavigateToGarage) onNavigateToGarage();
-                    else setGarageViewTab('book');
-                  }}
-                  activeOpacity={0.85}
-                >
-                  <BootstrapIcon name="plus-lg" size={13} color="#FFFFFF" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 12.5, fontWeight: '600' }}>
-                    Book New Service
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              {/* ─── 4 KPI STATS GRID (CLEAN MODERN SAAS) ─── */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8 w-full">
-                {/* Card 1: MECHANICS AVAILABLE */}
-                <div
-                  className={`rounded-xl p-5 border shadow-xs hover:shadow-sm transition-all duration-200 flex flex-col justify-between min-h-[140px] ${isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white border-slate-200/90'
-                    }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Mechanics Available
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-md ${mechanicsData.availableCount > 0
-                          ? isDarkMode
-                            ? 'bg-emerald-950/70 text-emerald-300 border border-emerald-800/80'
-                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
-                          : isDarkMode
-                            ? 'bg-slate-800 text-slate-400 border border-slate-700'
-                            : 'bg-slate-100 text-slate-500 border border-slate-200'
-                          }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${mechanicsData.availableCount > 0 ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                        {mechanicsData.availableCount > 0 ? `${mechanicsData.availableCount} Available` : 'Busy'}
-                      </span>
-                    </div>
-                    <span
-                      className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-none block font-mono ${isDarkMode ? 'text-slate-100' : 'text-slate-900'
-                        }`}
-                    >
-                      {mechanicsData.availableCount}
-                    </span>
-                  </div>
-                  <span
-                    className={`text-[11.5px] font-medium mt-2.5 block leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'
-                      }`}
-                  >
-                    {mechanicsData.availableCount > 0
-                      ? `${mechanicsData.availableCount} of ${mechanicsData.totalCount} on-duty & available`
-                      : 'All technicians currently busy in pit bays'}
-                  </span>
+                    <span>Book New Service</span>
+                    <BootstrapIcon name="arrow-up-right" size={12} color="#FFFFFF" />
+                  </button>
                 </div>
-
-                {/* Card 2: TODAY'S SLOTS */}
-                <div
-                  className={`rounded-xl p-5 border shadow-xs hover:shadow-sm transition-all duration-200 flex flex-col justify-between min-h-[140px] ${isDarkMode
-                    ? todaySlotsData.isFullyBooked
-                      ? 'border-rose-900/60 bg-rose-950/30'
-                      : 'border-[#27272A] bg-[#18181B]'
-                    : todaySlotsData.isFullyBooked
-                      ? 'border-rose-200 bg-rose-50/20'
-                      : 'border-slate-200/90 bg-white'
-                    }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Today's Slots
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-md ${todaySlotsData.isFullyBooked
-                          ? isDarkMode
-                            ? 'bg-rose-950/80 text-rose-300 border border-rose-800'
-                            : 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : isDarkMode
-                            ? 'bg-amber-950/70 text-amber-300 border border-amber-800/80'
-                            : 'bg-amber-50 text-amber-700 border border-amber-200/70'
-                          }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${todaySlotsData.isFullyBooked ? 'bg-rose-500' : 'bg-amber-500'}`} />
-                        {todaySlotsData.isFullyBooked ? 'Full' : `${todaySlotsData.totalSlots} Slots`}
-                      </span>
-                    </div>
-                    <span
-                      className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-none block font-mono ${todaySlotsData.isFullyBooked
-                        ? isDarkMode
-                          ? 'text-rose-400'
-                          : 'text-rose-600'
-                        : isDarkMode
-                          ? 'text-slate-100'
-                          : 'text-slate-900'
-                        }`}
-                    >
-                      {todaySlotsData.isFullyBooked ? '0' : todaySlotsData.availableSlotsCount}
-                    </span>
-                  </div>
-                  <span
-                    className={`text-[11.5px] font-medium mt-2.5 block leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}
-                  >
-                    {todaySlotsData.mechanicCount === 0
-                      ? 'No mechanics on duty today'
-                      : todaySlotsData.isFullyBooked
-                        ? 'Fully booked for today (0 remaining)'
-                        : `${todaySlotsData.mechanicCount} on duty × ${todaySlotsData.slotsPerMechanic} slots · ${todaySlotsData.bookedSlotsCount} reserved`}
-                  </span>
-                </div>
-
-                {/* Card 3: NEXT OPENING */}
-                <div
-                  className={`rounded-xl p-5 border shadow-xs hover:shadow-sm transition-all duration-200 flex flex-col justify-between min-h-[140px] ${isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white border-slate-200/90'
-                    }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                        Next Opening
-                      </span>
-                      <span
-                        className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-md ${isDarkMode
-                          ? 'bg-orange-950/70 text-orange-300 border border-orange-800/80'
-                          : 'bg-orange-50 text-orange-700 border border-orange-200/70'
-                          }`}
-                      >
-                        <span className="w-1.5 h-1.5 rounded-full bg-orange-500" />
-                        {todaySlotsData.isFullyBooked ? 'Tomorrow' : 'Express'}
-                      </span>
-                    </div>
-                    <span
-                      className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-none block font-mono ${isDarkMode ? 'text-slate-100' : 'text-slate-900'
-                        }`}
-                    >
-                      {todaySlotsData.isFullyBooked ? 'Tomorrow' : 'Today'}
-                    </span>
-                  </div>
-                  <span
-                    className={`text-[11.5px] font-medium mt-2.5 block leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}
-                  >
-                    {todaySlotsData.isFullyBooked
-                      ? '09:00 AM - 10:30 AM (Next Slot)'
-                      : 'Immediate express pit bay slot'}
-                  </span>
-                </div>
-
-                {/* Card 4: PIT BAY CAPACITY — limited by free technicians */}
-                {(() => {
-                  const physicalBays = Math.max(
-                    1,
-                    Number(brandSettings?.serviceBayCount) || mechanicsData.totalCount || 6
-                  );
-                  const activeBays = Math.min(physicalBays, Number(mechanicsData.availableCount) || 0);
-                  const bayBadge =
-                    activeBays <= 0 ? 'All Busy' : activeBays >= physicalBays ? 'Full Staff' : 'Active Bays';
-                  const bayFooter =
-                    activeBays <= 0
-                      ? 'No free technicians — all in pit bay'
-                      : `${activeBays} of ${physicalBays} bays open (${mechanicsData.availableCount} techs free)`;
-                  return (
-                    <div
-                      className={`rounded-xl p-5 border shadow-xs hover:shadow-sm transition-all duration-200 flex flex-col justify-between min-h-[140px] ${isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white border-slate-200/90'
-                        }`}
-                    >
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">
-                            Pit Bay Capacity
-                          </span>
-                          <span
-                            className={`inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-0.5 rounded-md ${activeBays <= 0
-                              ? isDarkMode
-                                ? 'bg-rose-950/80 text-rose-300 border border-rose-800'
-                                : 'bg-rose-50 text-rose-700 border border-rose-200'
-                              : isDarkMode
-                                ? 'bg-slate-800 text-slate-300 border border-slate-700'
-                                : 'bg-slate-100 text-slate-700 border border-slate-200/80'
-                              }`}
-                          >
-                            <span className={`w-1.5 h-1.5 rounded-full ${activeBays <= 0 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                            {bayBadge}
-                          </span>
-                        </div>
-                        <span
-                          className={`text-2xl sm:text-3xl font-extrabold tracking-tight leading-none block font-mono ${activeBays <= 0 ? 'text-rose-600' : isDarkMode ? 'text-slate-100' : 'text-slate-900'
-                            }`}
-                        >
-                          {activeBays}
-                        </span>
-                      </div>
-                      <span
-                        className={`text-[11.5px] font-medium mt-2.5 block leading-snug ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}
-                      >
-                        {bayFooter}
-                      </span>
-                    </div>
-                  );
-                })()}
               </div>
 
-              {/* Notice Banner if Fully Booked Today */}
-              {todaySlotsData.isFullyBooked && (
-                <View
-                  style={{
-                    backgroundColor: '#FEF2F2',
-                    borderWidth: 1,
-                    borderColor: '#FCA5A5',
-                    borderRadius: 14,
-                    padding: 14,
-                    marginBottom: 20,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 12,
-                  }}
-                >
-                  <BootstrapIcon name="exclamation-octagon-fill" size={20} color="#DC2626" />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#991B1B', marginBottom: 2 }}>
-                      Notice: Service Bays Are Fully Booked For Today
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#B91C1C' }}>
-                      {todaySlotsData.mechanicCount === 0
-                        ? 'No mechanics are on duty today, so there are no open slots. Pick a later date once a technician is scheduled.'
-                        : `All ${todaySlotsData.totalSlots} daily slots are reserved. You can pre-book a guaranteed slot for tomorrow or a later date.`}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={{
-                      backgroundColor: '#DC2626',
-                      paddingHorizontal: 14,
-                      paddingVertical: 8,
-                      borderRadius: 10,
-                    }}
-                    onPress={() => handleQuickBook('PMS', true)}
-                  >
-                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>Book Tomorrow</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+              {/* 3. Scheduled Bookings Filter & View Mode Bar (Matching Image 1) */}
+              <div className="bg-white dark:bg-[#18181B] border border-slate-200/80 dark:border-[#27272A] rounded-xl p-3.5 sm:p-4 mb-6 shadow-xs flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg border border-slate-200/80 dark:border-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 shrink-0">
+                    <BootstrapIcon name="calendar-event" size={14} color="#64748B" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+                      Scheduled Bookings
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      {bookingCounts.ALL} active {bookingCounts.ALL === 1 ? 'reservation' : 'reservations'}
+                    </p>
+                  </div>
+                </div>
 
-              {/* ─── SCHEDULED BOOKING INFORMATION (MAIN VIEW) ─── */}
-              <div id="scheduled-booking-section" className="w-full">
-                <View style={gStyles.bookingsContainer}>
-                  {/* Section Header & Count */}
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginBottom: 18,
-                      flexWrap: 'wrap',
-                      gap: 12,
-                    }}
-                  >
-                    <View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                        <View
-                          style={{
-                            width: 34,
-                            height: 34,
-                            borderRadius: 8,
-                            backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
-                            borderWidth: 1,
-                            borderColor: isDarkMode ? '#3F3F46' : '#E4E4E7',
-                            alignItems: 'center',
-                            justifyContent: 'center',
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                  {/* Status Capsule Filter Tabs */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {[
+                      { key: 'ALL', name: 'All', count: bookingCounts.ALL },
+                      { key: 'PENDING', name: 'Pending Review', count: bookingCounts.PENDING },
+                      { key: 'IN_PROGRESS', name: 'In Service', count: bookingCounts.IN_PROGRESS },
+                      { key: 'READY', name: 'Ready for Pickup', count: bookingCounts.READY },
+                      { key: 'COMPLETED', name: 'Completed', count: bookingCounts.COMPLETED },
+                    ].map((tab) => {
+                      const isSel = bookingStatusFilter === tab.key;
+                      return (
+                        <button
+                          key={tab.key}
+                          onClick={() => {
+                            setBookingStatusFilter(tab.key);
+                            setBookingsPage(1);
                           }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer flex items-center gap-1.5 ${
+                            isSel
+                              ? 'bg-[#1E2227] text-white shadow-xs'
+                              : 'bg-slate-50 dark:bg-slate-800/60 border border-slate-200/60 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                          }`}
                         >
-                          <BootstrapIcon name="calendar-check" size={15} color={isDarkMode ? '#FFFFFF' : '#18181B'} />
-                        </View>
-                        <Text style={{ fontSize: 18, fontWeight: '800', color: isDarkMode ? '#F4F4F5' : '#18181B', letterSpacing: -0.3 }}>
-                          Scheduled Bookings
-                        </Text>
-                      </View>
-                      <Text
-                        style={{
-                          fontSize: 12.5,
-                          color: isDarkMode ? '#A1A1AA' : '#71717A',
-                          marginTop: 3,
-                          marginLeft: 44,
-                          fontWeight: '500',
-                        }}
-                      >
-                        View and manage your upcoming motorcycle service appointments.
-                      </Text>
-                    </View>
+                          <span>{tab.name}</span>
+                          <span
+                            className={
+                              isSel
+                                ? 'text-slate-300 font-bold text-[11px]'
+                                : 'text-slate-400 font-normal text-[11px]'
+                            }
+                          >
+                            {tab.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                    <View
-                      style={{
-                        backgroundColor: isDarkMode ? '#27272A' : '#F4F4F5',
-                        borderWidth: 1,
-                        borderColor: isDarkMode ? '#3F3F46' : '#E4E4E7',
-                        paddingHorizontal: 12,
-                        paddingVertical: 5,
-                        borderRadius: 8,
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 6,
-                      }}
+                  {/* Grid / List Mode Toggle */}
+                  <div className="hidden sm:flex items-center gap-1 p-1 bg-slate-100/90 dark:bg-[#27272A] border border-slate-200/80 dark:border-slate-700 rounded-lg shrink-0">
+                    <button
+                      onClick={() => setBookingViewMode('grid')}
+                      className={`flex items-center justify-center p-1.5 rounded-md transition-all cursor-pointer ${
+                        bookingViewMode === 'grid'
+                          ? 'bg-white dark:bg-[#18181B] text-slate-900 dark:text-white shadow-xs'
+                          : 'text-slate-400 hover:text-slate-700 dark:hover:text-white'
+                      }`}
+                      title="Grid View"
                     >
-                      <BootstrapIcon name="ticket-detailed" size={13} color={isDarkMode ? '#A1A1AA' : '#71717A'} />
-                      <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#E4E4E7' : '#52525B' }}>
-                        {userBookings.length} Scheduled {userBookings.length === 1 ? 'Booking' : 'Bookings'}
-                      </Text>
-                    </View>
-                  </View>
+                      <BootstrapIcon
+                        name="grid"
+                        size={13}
+                        color={bookingViewMode === 'grid' ? '#1E2227' : '#94A3B8'}
+                      />
+                    </button>
+                    <button
+                      onClick={() => setBookingViewMode('list')}
+                      className={`flex items-center justify-center p-1.5 rounded-md transition-all cursor-pointer ${
+                        bookingViewMode === 'list'
+                          ? 'bg-white dark:bg-[#18181B] text-slate-900 dark:text-white shadow-xs'
+                          : 'text-slate-400 hover:text-slate-700 dark:hover:text-white'
+                      }`}
+                      title="List View"
+                    >
+                      <BootstrapIcon
+                        name="list-ul"
+                        size={14}
+                        color={bookingViewMode === 'list' ? '#1E2227' : '#94A3B8'}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
 
-                  {/* Modern Segmented Status Filter Tabs + Grid/List View Toggle */}
-                  {currentUser && userBookings.length > 0 && (
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
-                      <div
-                        className={`flex flex-row items-center gap-1 flex-wrap p-1 ${isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-slate-100/90 border-slate-200/80'} border rounded-lg w-fit`}
-                      >
-                        {[
-                          { key: 'ALL', label: `All (${userBookings.length})` },
-                          { key: 'PENDING', label: 'Pending Review' },
-                          { key: 'IN_PROGRESS', label: 'In Service' },
-                          { key: 'READY', label: 'Ready for Pickup' },
-                          { key: 'COMPLETED', label: 'Completed' },
-                        ].map((tab) => {
-                          const isSel = bookingStatusFilter === tab.key;
-                          return (
-                            <button
-                              key={tab.key}
-                              onClick={() => {
-                                setBookingStatusFilter(tab.key);
-                                setBookingsPage(1);
-                              }}
-                              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all duration-150 cursor-pointer ${isSel
-                                ? 'bg-[#1E2227] text-white shadow-xs'
-                                : isDarkMode
-                                  ? 'bg-transparent text-slate-300 hover:text-white hover:bg-[#27272A]'
-                                  : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                                }`}
-                            >
-                              {tab.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Grid / List View Mode Toggle Button Group */}
-                      <div
-                        className={`flex items-center gap-1 p-1 ${isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-slate-100/90 border-slate-200/80'} border rounded-lg w-fit self-start sm:self-auto`}
-                      >
-                        <button
-                          onClick={() => setBookingViewMode('grid')}
-                          title="Grid View"
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all duration-150 cursor-pointer ${bookingViewMode === 'grid'
-                            ? 'bg-[#1E2227] text-white shadow-xs'
-                            : isDarkMode
-                              ? 'bg-transparent text-slate-300 hover:text-white hover:bg-[#27272A]'
-                              : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                            }`}
-                        >
-                          <BootstrapIcon
-                            name="grid-fill"
-                            size={12}
-                            color={bookingViewMode === 'grid' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#475569'}
-                          />
-                          <span>Grid</span>
-                        </button>
-                        <button
-                          onClick={() => setBookingViewMode('list')}
-                          title="List View"
-                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all duration-150 cursor-pointer ${bookingViewMode === 'list'
-                            ? 'bg-[#1E2227] text-white shadow-xs'
-                            : isDarkMode
-                              ? 'bg-transparent text-slate-300 hover:text-white hover:bg-[#27272A]'
-                              : 'bg-transparent text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                            }`}
-                        >
-                          <BootstrapIcon
-                            name="view-list"
-                            size={13}
-                            color={bookingViewMode === 'list' ? '#FFFFFF' : isDarkMode ? '#94A3B8' : '#475569'}
-                          />
-                          <span>List</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
+              {/* 4. 2-Column Responsive Layout */}
+              <div
+                className={`grid grid-cols-1 lg:grid-cols-12 gap-6 ${
+                  isSingleBooking ? 'lg:items-stretch' : 'items-start'
+                } w-full`}
+              >
+                {/* Left Column: Appointments Cards List */}
+                <div
+                  className={`lg:col-span-8 flex flex-col gap-5 w-full ${
+                    isSingleBooking ? 'lg:h-full' : ''
+                  }`}
+                >
                   {!currentUser ? (
                     <div
-                      className={`${isDarkMode ? 'bg-[#151C19] border-[#374151]' : 'bg-white border-slate-200/80'} rounded-2xl border p-10 text-center flex flex-col items-center justify-center max-w-lg mx-auto shadow-xs my-4`}
+                      className={`${
+                        isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white border-slate-200/90'
+                      } rounded-2xl border p-10 text-center flex flex-col items-center justify-center shadow-xs my-2`}
                     >
-                      <div
-                        className={`w-14 h-14 rounded-2xl ${isDarkMode ? 'bg-[#24272B] border-[#374151]' : 'bg-slate-50 border-slate-200'} border flex items-center justify-center mb-4 text-[#EA580C]`}
-                      >
-                        <BootstrapIcon name="person-lock" size={26} color={isDarkMode ? '#EA580C' : '#EA580C'} />
+                      <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center mb-4 text-[#EA580C]">
+                        <BootstrapIcon name="person-lock" size={26} color="#EA580C" />
                       </div>
-                      <h3
-                        className={`text-base font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}
-                      >
+                      <h3 className={`text-base font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
                         Sign In to View Scheduled Bookings
                       </h3>
-                      <p
-                        className={`text-xs max-w-sm mb-5 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}
-                      >
-                        Sign in to your account to view your scheduled appointments, track master mechanic
-                        assignments, and manage service downpayments.
+                      <p className={`text-xs max-w-sm mb-5 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        Sign in to your account to view your scheduled appointments, track master mechanic assignments, and manage service downpayments.
                       </p>
                       <button
                         onClick={() => {
                           setRedirectReason('Please sign in to view your booked pitstop appointments.');
                           onNavigateToLogin?.();
                         }}
-                        className="bg-[#EA580C] hover:bg-[#EA580C] text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-2"
+                        className="bg-[#EA580C] hover:bg-[#C2410C] text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-2"
                       >
                         <BootstrapIcon name="box-arrow-in-right" size={13} color="#FFFFFF" />
-                        Sign In Now
+                        <span>Sign In Now</span>
                       </button>
                     </div>
                   ) : userBookings.length === 0 ? (
                     <div
-                      className={`${isDarkMode ? 'bg-[#151C19] border-[#374151]' : 'bg-white border-slate-200/80'} rounded-2xl border p-12 text-center flex flex-col items-center justify-center max-w-lg mx-auto shadow-xs my-4`}
+                      className={`${
+                        isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white border-slate-200/90'
+                      } rounded-2xl border p-12 text-center flex flex-col items-center justify-center shadow-xs my-2`}
                     >
-                      <div
-                        className={`w-14 h-14 rounded-2xl ${isDarkMode ? 'bg-[#24272B] border-[#374151]' : 'bg-[#FFF7ED] border-[#FED7AA]'} border flex items-center justify-center mb-4 text-[#EA580C]`}
-                      >
-                        <BootstrapIcon
-                          name="calendar-plus"
-                          size={26}
-                          color={isDarkMode ? '#EA580C' : '#EA580C'}
-                        />
+                      <div className="w-14 h-14 rounded-2xl bg-[#FFF7ED] border border-[#FED7AA] flex items-center justify-center mb-4 text-[#EA580C]">
+                        <BootstrapIcon name="calendar-plus" size={26} color="#EA580C" />
                       </div>
-                      <h3
-                        className={`text-base font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}
-                      >
+                      <h3 className={`text-base font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
                         No scheduled bookings
                       </h3>
-                      <p
-                        className={`text-xs max-w-sm mb-5 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}
-                      >
-                        You don't have any service appointments matching this filter. Book a service to get your
-                        slot reserved.
+                      <p className={`text-xs max-w-sm mb-5 leading-relaxed ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                        You don't have any service appointments booked yet. Choose a package from our catalog to reserve your guaranteed slot.
                       </p>
                       <button
                         onClick={() => handleOpenBooking()}
-                        className="bg-[#EA580C] hover:bg-[#EA580C] text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-2"
+                        className="bg-[#EA580C] hover:bg-[#C2410C] text-white text-xs font-bold px-5 py-2.5 rounded-xl shadow-xs transition-colors cursor-pointer flex items-center gap-2"
                       >
                         <BootstrapIcon name="tools" size={13} color="#FFFFFF" />
-                        Book a Service
+                        <span>Book a Service</span>
                       </button>
                     </div>
                   ) : filteredBookings.length === 0 ? (
                     <div
-                      className={`${isDarkMode ? 'bg-[#151C19] border-[#374151]' : 'bg-white border-slate-200/80'} rounded-2xl border p-10 text-center flex flex-col items-center justify-center max-w-md mx-auto shadow-xs my-4`}
+                      className={`${
+                        isDarkMode ? 'bg-[#18181B] border-[#27272A]' : 'bg-white border-slate-200/90'
+                      } rounded-2xl border p-10 text-center flex flex-col items-center justify-center shadow-xs my-2`}
                     >
-                      <div
-                        className={`w-12 h-12 rounded-xl ${isDarkMode ? 'bg-[#24272B] border-[#374151]' : 'bg-slate-100 border-slate-200'} border flex items-center justify-center mb-3 text-slate-400`}
-                      >
-                        <BootstrapIcon name="calendar2-x" size={22} color={isDarkMode ? '#64748B' : '#94A3B8'} />
+                      <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mb-3 text-slate-400">
+                        <BootstrapIcon name="calendar2-x" size={22} color="#94A3B8" />
                       </div>
-                      <h3
-                        className={`text-sm font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}
-                      >
+                      <h3 className={`text-sm font-bold mb-1 ${isDarkMode ? 'text-slate-100' : 'text-slate-800'}`}>
                         No bookings in this filter
                       </h3>
                       <p className={`text-xs mb-4 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
@@ -2111,19 +2212,13 @@ export default function GaragePageWeb({
                           setBookingStatusFilter('ALL');
                           setBookingsPage(1);
                         }}
-                        className="bg-[#EA580C] hover:bg-[#EA580C] text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs transition-colors cursor-pointer"
+                        className="bg-[#EA580C] hover:bg-[#C2410C] text-white text-xs font-bold px-4 py-2 rounded-xl shadow-xs transition-colors cursor-pointer"
                       >
                         View All Bookings
                       </button>
                     </div>
                   ) : (
-                    <div
-                      className={
-                        bookingViewMode === 'grid'
-                          ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5 w-full items-start'
-                          : 'flex flex-col gap-3.5 w-full'
-                      }
-                    >
+                    <div className={`flex flex-col gap-5 w-full ${isSingleBooking ? 'lg:h-full flex-1' : ''}`}>
                       {pagedBookings.map((b) => {
                         const flexStatus = normalizeBookingStatus(b?.status);
                         const canCancel = [
@@ -2135,15 +2230,34 @@ export default function GaragePageWeb({
                           'AWAITING_DOWNPAYMENT',
                         ].includes(flexStatus);
                         return (
-                          <div key={b.id || b.booking_id} className="w-full">
-                            <CustomerServiceBookingCard
+                          <div
+                            key={b.id || b.booking_id}
+                            className={`w-full ${isSingleBooking ? 'lg:h-full flex-1 flex flex-col' : ''}`}
+                          >
+                            <AtelierAppointmentCard
                               booking={b}
                               viewMode={bookingViewMode}
+                              brandSettings={brandSettings}
+                              isDarkMode={isDarkMode}
                               onToast={showToast}
                               onUpdated={() => refreshBookings()}
                               canCancel={canCancel}
                               onCancel={() => handlePromptCancelBooking(b)}
-                              onViewDetails={(item) => setSelectedBookingForModal(item)}
+                              onReschedule={(item) => setRescheduleBookingTarget(item)}
+                              onViewDetails={(item) => {
+                                const id = item.booking_id || item.id;
+                                setSelectedProtocolBookingId(id);
+                                if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+                                  const el = document.getElementById('mototrack-protocol-sidebar');
+                                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }
+                              }}
+                              isSelected={(activeProtocolBooking?.booking_id || activeProtocolBooking?.id) === (b.booking_id || b.id)}
+                              onSelect={(item) => {
+                                const id = item.booking_id || item.id;
+                                setSelectedProtocolBookingId(id);
+                              }}
+                              className={isSingleBooking ? 'lg:h-full flex-1' : ''}
                             />
                           </div>
                         );
@@ -2151,39 +2265,222 @@ export default function GaragePageWeb({
                     </div>
                   )}
 
+                  {/* Pagination */}
                   {bookingsTotalPages > 1 ? (
-                    <View
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 14,
-                        paddingVertical: 14,
-                        width: '100%',
-                      }}
-                    >
-                      <TouchableOpacity
+                    <div className="flex items-center justify-center gap-3.5 py-3 w-full">
+                      <button
                         disabled={bookingsPage <= 1}
-                        onPress={() => setBookingsPage((p) => Math.max(1, p - 1))}
-                        style={{ opacity: bookingsPage <= 1 ? 0.4 : 1, padding: 6 }}
+                        onClick={() => setBookingsPage((p) => Math.max(1, p - 1))}
+                        className={`p-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${
+                          bookingsPage <= 1
+                            ? 'opacity-40 cursor-not-allowed border-slate-200 text-slate-400'
+                            : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                        }`}
                       >
-                        <BootstrapIcon name="chevron-left" size={16} color="#EA580C" />
-                      </TouchableOpacity>
-                      <Text style={{ fontSize: 12.5, fontWeight: '700', color: '#475569' }}>
+                        <BootstrapIcon name="chevron-left" size={14} color="#EA580C" />
+                      </button>
+                      <span className="text-xs font-bold text-slate-600 dark:text-slate-400">
                         Page {safeBookingsPage} of {bookingsTotalPages}
-                      </Text>
-                      <TouchableOpacity
+                      </span>
+                      <button
                         disabled={bookingsPage >= bookingsTotalPages}
-                        onPress={() => setBookingsPage((p) => Math.min(bookingsTotalPages, p + 1))}
-                        style={{ opacity: bookingsPage >= bookingsTotalPages ? 0.4 : 1, padding: 6 }}
+                        onClick={() => setBookingsPage((p) => Math.min(bookingsTotalPages, p + 1))}
+                        className={`p-1.5 rounded-lg border text-xs font-semibold cursor-pointer transition-colors ${
+                          bookingsPage >= bookingsTotalPages
+                            ? 'opacity-40 cursor-not-allowed border-slate-200 text-slate-400'
+                            : 'border-slate-300 text-slate-700 hover:bg-slate-100'
+                        }`}
                       >
-                        <BootstrapIcon name="chevron-right" size={16} color="#EA580C" />
-                      </TouchableOpacity>
-                    </View>
+                        <BootstrapIcon name="chevron-right" size={14} color="#EA580C" />
+                      </button>
+                    </div>
                   ) : null}
-                </View>
+                </div>
+
+                {/* Right Column: Protocol & Concierge Sidebar (Dynamic Admin Process Binding) */}
+                <div
+                  id="mototrack-protocol-sidebar"
+                  className={`lg:col-span-4 flex flex-col gap-5 w-full ${isSingleBooking ? 'lg:h-full' : ''}`}
+                >
+                  {/* Card 1: Next Steps & Protocol */}
+                  <div
+                    className={`bg-white dark:bg-[#18181B] border border-slate-200/90 dark:border-[#27272A] rounded-xl p-6 sm:p-7 shadow-xs flex flex-col justify-between ${
+                      isSingleBooking ? 'lg:h-full flex-1' : ''
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between gap-2 mb-3">
+                        <span className="bg-[#1E2227] text-white text-[10px] font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
+                          ATELIER STANDARD
+                        </span>
+                        <div className="w-8 h-8 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-600 dark:text-slate-300">
+                          <BootstrapIcon name="shield-check" size={13} color="#475569" />
+                        </div>
+                      </div>
+
+                      <h3 className="font-extrabold text-base text-slate-900 dark:text-white mt-1">
+                        Next Steps & Protocol
+                      </h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 mb-4">
+                        {protocolState.subtitle}
+                      </p>
+
+                      {/* Booking Reference Selector (shown when customer has multiple bookings) */}
+                      {userBookings.length > 1 ? (
+                        <div className="mb-4 pt-1 pb-2 border-b border-slate-100 dark:border-slate-800">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1.5">
+                            Active Protocol Tracking:
+                          </span>
+                          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                            {userBookings.map((b) => {
+                              const bId = b.booking_id || b.id;
+                              const isCur = (activeProtocolBooking?.booking_id || activeProtocolBooking?.id) === bId;
+                              return (
+                                <button
+                                  key={bId}
+                                  onClick={() => setSelectedProtocolBookingId(bId)}
+                                  className={`px-2.5 py-1 rounded-md text-[11px] font-mono font-semibold transition-colors cursor-pointer shrink-0 ${
+                                    isCur
+                                      ? 'bg-[#1E2227] text-white'
+                                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                  }`}
+                                >
+                                  {bId}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    {/* Dynamic Stepper Depending on Admin Process */}
+                    <div className="flex flex-col flex-1 justify-between my-2 py-1">
+                      {protocolState.steps.map((step, idx) => {
+                        const isLast = idx === protocolState.steps.length - 1;
+                        const isDone = step.state === 'done';
+                        const isCurrent = step.state === 'current';
+                        const isFailed = step.state === 'failed';
+
+                        return (
+                          <div key={step.id || idx} className={`flex flex-col ${!isLast ? 'flex-1' : ''}`}>
+                            <div className="flex items-start gap-2.5">
+                              {/* Step Indicator Dot / Icon */}
+                              {isDone ? (
+                                <div className="w-4 h-4 rounded-full bg-[#1E2227] dark:bg-slate-200 flex items-center justify-center shrink-0 mt-0.5 text-white dark:text-[#18181B] shadow-2xs">
+                                  <BootstrapIcon name="check" size={11} color={isDarkMode ? '#18181B' : '#FFFFFF'} />
+                                </div>
+                              ) : isCurrent ? (
+                                <div className="w-4 h-4 rounded-full border-2 border-[#1E2227] dark:border-slate-100 flex items-center justify-center shrink-0 mt-0.5">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${step.isLive ? 'bg-[#EA580C] animate-ping' : 'bg-[#1E2227] dark:bg-slate-100'}`} />
+                                </div>
+                              ) : isFailed ? (
+                                <div className="w-4 h-4 rounded-full bg-rose-100 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800 flex items-center justify-center shrink-0 mt-0.5 text-rose-600">
+                                  <BootstrapIcon name="x" size={11} color="#E11D48" />
+                                </div>
+                              ) : (
+                                <div className="w-4 h-4 rounded-full border-2 border-slate-300 dark:border-slate-600 shrink-0 mt-0.5" />
+                              )}
+
+                              {/* Step Content */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span
+                                    className={`font-bold text-xs ${
+                                      isDone || isCurrent
+                                        ? 'text-slate-900 dark:text-slate-100'
+                                        : 'text-slate-500 dark:text-slate-400'
+                                    }`}
+                                  >
+                                    {step.title}
+                                  </span>
+                                  {step.isLive ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                      <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse" />
+                                      LIVE
+                                    </span>
+                                  ) : step.isPickup ? (
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                                      <span className="w-1 h-1 rounded-full bg-emerald-500" />
+                                      READY
+                                    </span>
+                                  ) : isDone ? (
+                                    <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                                      Done
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <p
+                                  className={`text-xs mt-1 leading-relaxed ${
+                                    isCurrent
+                                      ? 'text-slate-600 dark:text-slate-300 font-medium'
+                                      : 'text-slate-500 dark:text-slate-400'
+                                  }`}
+                                >
+                                  {step.desc}
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Connecting Vertical Track */}
+                            {!isLast ? (
+                              <div
+                                className={`border-l-2 ml-2 flex-1 min-h-[18px] my-1 transition-colors ${
+                                  isDone
+                                    ? 'border-[#1E2227] dark:border-slate-400'
+                                    : 'border-slate-200 dark:border-slate-700'
+                                }`}
+                              />
+                            ) : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Bottom Atelier Telemetry Status Footer (Aligns with bottom baseline of appointment card) */}
+                    <div className="pt-3.5 mt-auto border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                      <div className="flex items-center gap-1.5 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Live Bay Telemetry</span>
+                      </div>
+                      <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[150px]">
+                        {activeProtocolBooking?.bay_name || 'Naga Atelier Bay 02'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </View>
+
+              {/* 5. Contextual Bottom Footer (Matching Image 3) */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-6 pb-2 text-xs text-slate-500 dark:text-slate-400 border-t border-slate-200/70 dark:border-slate-800 mt-8 w-full">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-md border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-400 shrink-0">
+                    <BootstrapIcon name="chevron-left" size={9} color="#94A3B8" />
+                  </div>
+                  <span>
+                    Looking for finished repairs or older receipts?{' '}
+                    <button
+                      onClick={() => {
+                        setBookingStatusFilter('COMPLETED');
+                        setBookingsPage(1);
+                      }}
+                      className="text-slate-800 dark:text-slate-200 font-semibold hover:underline cursor-pointer bg-transparent border-none p-0"
+                    >
+                      Switch tab to Completed Service History.
+                    </button>
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    All Pit Records Encrypted
+                  </span>
+                  <span className="text-slate-400 dark:text-slate-600 font-mono text-[11px] uppercase tracking-wider">
+                    ATELIER OS v2.4.9
+                  </span>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* ─── 3. GARAGE FLEET SECTION ─── */}
@@ -2641,7 +2938,16 @@ export default function GaragePageWeb({
                   setGarageViewTab('appointments');
                   setBookingStatusFilter('ALL');
                   if (booking) {
-                    setSelectedBookingForModal(booking);
+                    setSelectedProtocolBookingId(booking?.booking_id || booking?.id);
+                  }
+                }}
+                onNavigateToAppointments={() => {
+                  setIsBookingModalOpen(false);
+                  if (onNavigateToAppointments) {
+                    onNavigateToAppointments();
+                  } else {
+                    setGarageViewTab('appointments');
+                    setBookingStatusFilter('ALL');
                   }
                 }}
                 onNavigateToLogin={() => {
@@ -2805,7 +3111,7 @@ export default function GaragePageWeb({
         }}
       />
 
-      <CartModal
+      <CartPage
         visible={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         onProceedToCheckout={() => {
@@ -2818,6 +3124,15 @@ export default function GaragePageWeb({
           setIsCartOpen(false);
           setIsCheckoutOpen(true);
         }}
+        onNavigateToStore={onNavigateToStore}
+        onNavigateToGarage={onNavigateToGarage}
+        onNavigateToCustomizer={onNavigateToCustomizer || onNavigateToCustomize}
+        onNavigateToWishlist={onNavigateToWishlist}
+        onNavigateToOrders={onNavigateToOrders}
+        onNavigateToProfile={onNavigateToProfile}
+        onNavigateToLogin={onNavigateToLogin}
+        onNavigateToAdmin={onNavigateToAdmin}
+        onLogout={onLogout}
       />
 
       <CheckoutModal
@@ -2834,203 +3149,17 @@ export default function GaragePageWeb({
         }}
       />
 
-      {/* ─── BOOKING DETAILS & QUOTATION MODAL ─── */}
-      <Modal
-        visible={!!activeModalBooking}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setSelectedBookingForModal(null)}
-      >
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: 'rgba(15, 23, 42, 0.65)',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: 16,
-            zIndex: 9999,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: '#FFFFFF',
-              borderRadius: 24,
-              width: '100%',
-              maxWidth: 780,
-              maxHeight: '90%',
-              shadowColor: '#000000',
-              shadowOffset: { width: 0, height: 12 },
-              shadowOpacity: 0.2,
-              shadowRadius: 28,
-              elevation: 12,
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-              borderWidth: 1,
-              borderColor: '#E2E8F0',
-            }}
-          >
-            {/* Modal Header */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: 24,
-                paddingVertical: 18,
-                borderBottomWidth: 1,
-                borderBottomColor: '#E2E8F0',
-                backgroundColor: '#FFFFFF',
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                <View
-                  style={{
-                    width: 42,
-                    height: 42,
-                    borderRadius: 12,
-                    backgroundColor: '#ECFDF5',
-                    borderWidth: 1,
-                    borderColor: '#A7F3D0',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <BootstrapIcon name="file-earmark-text" size={20} color="#059669" />
-                </View>
-                <View>
-                  <Text style={{ fontSize: 18, fontWeight: '700', color: '#0F172A', letterSpacing: -0.3 }}>
-                    Booking Details & Quotation
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginTop: 2, fontVariant: ['tabular-nums'] }}>
-                    REF: {activeModalBooking?.booking_id || activeModalBooking?.id}
-                  </Text>
-                </View>
-              </View>
+      {/* ─── CUSTOMER RESCHEDULE APPOINTMENT MODAL ─── */}
+      <CustomerRescheduleModal
+        visible={!!rescheduleBookingTarget}
+        booking={rescheduleBookingTarget}
+        onClose={() => setRescheduleBookingTarget(null)}
+        onRescheduleSubmitted={() => refreshBookings()}
+        showToast={showToast}
+        isDarkMode={isDarkMode}
+      />
 
-              <TouchableOpacity
-                onPress={() => setSelectedBookingForModal(null)}
-                style={{
-                  width: 36,
-                  height: 36,
-                  borderRadius: 10,
-                  backgroundColor: '#F8FAFC',
-                  borderWidth: 1,
-                  borderColor: '#E2E8F0',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                }}
-                activeOpacity={0.7}
-              >
-                <BootstrapIcon name="x-lg" size={14} color="#64748B" />
-              </TouchableOpacity>
-            </View>
 
-            {/* Modal Scrollable Body */}
-            <ScrollView
-              style={{ flex: 1, backgroundColor: '#F8FAFC' }}
-              contentContainerStyle={{ padding: 22, paddingBottom: 28 }}
-              showsVerticalScrollIndicator={true}
-            >
-              {activeModalBooking ? (
-                <CustomerServiceBookingCard
-                  booking={activeModalBooking}
-                  onToast={showToast}
-                  onUpdated={() => refreshBookings()}
-                  defaultExpanded={true}
-                  isModalView={true}
-                  canCancel={[
-                    'PENDING_REVIEW',
-                    'APPROVED',
-                    'SCHEDULED',
-                    'AWAITING_CUSTOMER_APPROVAL',
-                    'QUOTATION_SENT',
-                    'AWAITING_DOWNPAYMENT',
-                  ].includes(normalizeBookingStatus(activeModalBooking?.status))}
-                  onCancel={() => {
-                    const b = activeModalBooking;
-                    setSelectedBookingForModal(null);
-                    handlePromptCancelBooking(b);
-                  }}
-                  style={{
-                    borderWidth: 0,
-                    shadowOpacity: 0,
-                    elevation: 0,
-                    padding: 0,
-                    backgroundColor: 'transparent',
-                    marginBottom: 0,
-                  }}
-                />
-              ) : null}
-            </ScrollView>
-
-            {/* Modal Footer */}
-            <View
-              style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingHorizontal: 24,
-                paddingVertical: 14,
-                borderTopWidth: 1,
-                borderTopColor: '#E2E8F0',
-                backgroundColor: '#FFFFFF',
-              }}
-            >
-              <View>
-                {activeModalBooking && [
-                  'PENDING_REVIEW',
-                  'APPROVED',
-                  'SCHEDULED',
-                  'AWAITING_CUSTOMER_APPROVAL',
-                  'QUOTATION_SENT',
-                  'AWAITING_DOWNPAYMENT',
-                ].includes(normalizeBookingStatus(activeModalBooking?.status)) ? (
-                  <TouchableOpacity
-                    onPress={() => {
-                      const b = activeModalBooking;
-                      setSelectedBookingForModal(null);
-                      handlePromptCancelBooking(b);
-                    }}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      gap: 6,
-                      paddingVertical: 8,
-                      paddingHorizontal: 12,
-                      borderRadius: 8,
-                      backgroundColor: '#FEF2F2',
-                      borderWidth: 1,
-                      borderColor: '#FEE2E2',
-                      cursor: 'pointer',
-                    }}
-                    activeOpacity={0.8}
-                  >
-                    <BootstrapIcon name="x-circle" size={13} color="#DC2626" />
-                    <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#DC2626' }}>Cancel Booking</Text>
-                  </TouchableOpacity>
-                ) : <View />}
-              </View>
-
-              <TouchableOpacity
-                onPress={() => setSelectedBookingForModal(null)}
-                style={{
-                  paddingHorizontal: 22,
-                  paddingVertical: 10,
-                  borderRadius: 10,
-                  backgroundColor: '#1E2227',
-                  alignItems: 'center',
-                  cursor: 'pointer',
-                }}
-                activeOpacity={0.85}
-              >
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>Close Details</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* Mobile Customer Navigation Drawer */}
       <CustomerMobileNavDrawer

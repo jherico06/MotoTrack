@@ -10,8 +10,12 @@ export { default as CustomerInformationScreen } from './CustomerInformationScree
 export { default as PackagePricingScreen } from './PackagePricingScreen.jsx';
 export { default as BookingInformationScreen } from './BookingInformationScreen.jsx';
 export { default as PaymentMethodScreen } from './PaymentMethodScreen.jsx';
+export { default as BookingPaymentScreen } from './BookingPaymentScreen.jsx';
 export { default as BookingReviewScreen } from './BookingReviewScreen.jsx';
 export { default as BookingSuccessScreen } from './BookingSuccessScreen.jsx';
 export { default as AdminPackageEditorModal } from './AdminPackageEditorModal.jsx';
+export { default as CustomerRescheduleModal } from './CustomerRescheduleModal.jsx';
+export { default as CustomerMotorcyclesModal } from './CustomerMotorcyclesModal.jsx';
+export { default as AtelierAppointmentCard } from './AtelierAppointmentCard.jsx';
 export * from './BookingModals.jsx';
 export * from './bookingPackagesData.js';

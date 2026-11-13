@@ -691,15 +691,6 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
               </Text>
               <Text style={styles.headerSubtitleText}>{arrivalRangeText}</Text>
             </View>
-
-            <TouchableOpacity
-              style={styles.headerGpsBtn}
-              onPress={() => setShowLiveMapDrawer(!showLiveMapDrawer)}
-              activeOpacity={0.8}
-            >
-              <BootstrapIcon name={showLiveMapDrawer ? 'receipt' : 'compass'} size={14} color="#EA580C" />
-              <Text style={styles.headerGpsBtnText}>{showLiveMapDrawer ? 'Details' : 'Google Map'}</Text>
-            </TouchableOpacity>
           </View>
 
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, windowWidth < 400 && { paddingHorizontal: 12 }]}>
@@ -815,9 +806,12 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                       status: activeOrder?.status,
                     }}
                     statusOverride={activeOrder?.status}
-                    height={300}
+                    height={260}
                     title="Live delivery map"
                     showWhenInactive
+                    hideHeader={true}
+                    hideLegend={true}
+                    hideFooter={true}
                   />
                 </View>
 

@@ -225,7 +225,7 @@ export default function ServiceReceiptModal({
               <Text style={styles.notice}>
                 {remaining > 0
                   ? 'Please settle the remaining balance at the shop. Present this receipt when paying.'
-                  : 'Thank you. Present this receipt (or pickup QR) when claiming your motorcycle.'}
+                  : 'Thank you. Present your Booking ID or receipt when claiming your motorcycle at the shop counter.'}
               </Text>
             </View>
           </ScrollView>

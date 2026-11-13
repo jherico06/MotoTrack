@@ -5,7 +5,9 @@ export const customizerWebStyles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F3F4F6',
-    minHeight: Platform.OS === 'web' ? '100vh' : '100%',
+    ...(Platform.OS === 'web'
+      ? { height: '100vh', maxHeight: '100vh', overflow: 'hidden' }
+      : { minHeight: '100%' }),
   },
   scrollContent: {
     paddingTop: 0,
@@ -31,6 +33,8 @@ export const customizerWebStyles = StyleSheet.create({
     left: 0,
     right: 0,
     width: '100%',
+    maxWidth: '100vw',
+    boxSizing: 'border-box',
     alignSelf: 'stretch',
     zIndex: 1000,
     boxShadow: 'none',
@@ -45,6 +49,7 @@ export const customizerWebStyles = StyleSheet.create({
     maxWidth: 1360,
     marginHorizontal: 'auto',
     width: '100%',
+    boxSizing: 'border-box',
     paddingHorizontal: 24,
     paddingVertical: 12,
     minHeight: 66,
@@ -120,12 +125,14 @@ export const customizerWebStyles = StyleSheet.create({
     borderRadius: 6,
     cursor: 'pointer',
     backgroundColor: 'transparent',
+    flexShrink: 0,
   },
   headerCenterBtnText: {
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 20,
-    color: 'rgba(255, 255, 255, 0.75)',
+    color: 'rgba(255, 255, 255, 0.85)',
+    whiteSpace: 'nowrap',
   },
   headerCenterBtnActive: {
     flexDirection: 'row',
@@ -137,12 +144,14 @@ export const customizerWebStyles = StyleSheet.create({
     borderRadius: 6,
     cursor: 'pointer',
     backgroundColor: 'transparent',
+    flexShrink: 0,
   },
   headerCenterBtnTextActive: {
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 20,
-    color: '#FF5A0A',
+    color: '#FF7A2F',
+    whiteSpace: 'nowrap',
   },
   headerActions: {
     flexDirection: 'row',
@@ -165,17 +174,17 @@ export const customizerWebStyles = StyleSheet.create({
   },
   navBadgeCircle: {
     position: 'absolute',
-    top: -3,
-    right: -3,
+    top: -4,
+    right: -4,
     backgroundColor: '#EF4444',
     borderRadius: 9999,
-    minWidth: 16,
-    height: 16,
+    minWidth: 18,
+    height: 18,
     paddingHorizontal: 4,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#1E293B',
+    borderColor: '#1E2227',
     zIndex: 10,
   },
   navBadgeText: {
@@ -1668,7 +1677,7 @@ export const customizerWebStyles = StyleSheet.create({
   },
   partModalAddBtn: {
     flex: 2,
-    backgroundColor: '#EA580C',
+    backgroundColor: '#1E2227',
     paddingVertical: 13,
     paddingHorizontal: 18,
     borderRadius: 14,

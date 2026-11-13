@@ -5,12 +5,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  StyleSheet,
   useWindowDimensions,
   Platform,
-  Modal,
-  TextInput,
-  ActivityIndicator,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -23,8 +19,9 @@ import {
   NotificationDropdown,
   CustomerMobileNavDrawer,
 } from '../../../components/common';
-import { LiveOrderTrackingMapModal, ProductSpecsModal, CartModal, CheckoutModal, BookInstallationModal } from '../../../components/modals';
-import { createWishlistWebStyles, wishlistWebStyles } from '../../../styles/web/wishlistPage.web.styles.js';
+import { LiveOrderTrackingMapModal, ProductSpecsModal, CheckoutModal } from '../../../components/modals';
+import CartPage from './CartPage.jsx';
+import { createWishlistWebStyles } from '../../../styles/web/wishlistPage.web.styles.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useCart } from '../../../context/CartContext.jsx';
 import { useWishlist } from '../../../context/WishlistContext.jsx';
@@ -32,11 +29,7 @@ import { useTheme } from '../../../context/ThemeContext.jsx';
 import { resolveReorderLevel } from '../../../utils/inventoryHelpers.js';
 import { notificationService } from '../../../services/notifications/notificationService.js';
 import { productService } from '../../../services/products/productService.js';
-import { orderService } from '../../../services/orders/orderService.js';
 import { productHasCustomerRatings } from '../../../utils/productCatalog.js';
-import { aiCustomizerService } from '../../../services/ai/aiCustomizerService.js';
-import { GARAGE_BRANCHES, TIME_SLOTS } from '../../../services/bookings/garageService.js';
-import { promoService } from '../../../services/products/promoService.js';
 
 export default function WishlistPageWeb({
   onNavigateToStore,
@@ -53,6 +46,7 @@ export default function WishlistPageWeb({
   onNavigateToAppointments,
 }) {
   const { width: windowWidth } = useWindowDimensions();
+  const isTablet = windowWidth >= 768 && windowWidth < 1024;
   const { currentUser, logout, setRedirectReason } = useAuth();
   const { isDarkMode, toggleDarkMode } = useTheme();
   const wStyles = useMemo(() => createWishlistWebStyles(isDarkMode), [isDarkMode]);
@@ -60,23 +54,10 @@ export default function WishlistPageWeb({
   const {
     wishlist,
     toggleWishlist,
-    clearWishlist,
-    wishlistCount,
-    customizations,
-    removeCustomizationFromWishlist,
   } = useWishlist();
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [bookingTarget, setBookingTarget] = useState(null);
-  const [bookingBranch, setBookingBranch] = useState(
-    () => GARAGE_BRANCHES?.[0]?.name || "D'Blockchain Motorparts"
-  );
-  const [bookingTimeSlot, setBookingTimeSlot] = useState(() => TIME_SLOTS?.[1] || '10:30 AM - 12:00 PM');
-  const [bookingPhone, setBookingPhone] = useState('');
-  const [bookingNotes, setBookingNotes] = useState('');
-  const [bookingBusy, setBookingBusy] = useState(false);
-  const [bookingFreeInstall, setBookingFreeInstall] = useState(null);
 
   const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
     currentUser ? notificationService.getUnreadCount(currentUser) : 0
@@ -112,81 +93,9 @@ export default function WishlistPageWeb({
 
   const prods = Array.isArray(catalogProducts) ? catalogProducts : [];
   const wishlistedProducts = prods.filter((p) => Boolean(wishlist?.[p.id]));
-  const aiInstalls = Array.isArray(customizations) ? customizations : [];
+  const productWishlistCount = wishlistedProducts.length;
   const totalWishlistValue = wishlistedProducts.reduce((sum, p) => sum + Number(p.price || 0), 0);
-  const isWishlistEmpty = wishlistedProducts.length === 0 && aiInstalls.length === 0;
-
-  const openInstallBooking = async (entry) => {
-    if (!currentUser) {
-      setRedirectReason?.('Please sign in to book installation.');
-      onNavigateToLogin?.();
-      return;
-    }
-    setBookingTarget(entry);
-    setBookingPhone(currentUser?.phone || '');
-    setBookingNotes('');
-    const pids = (entry.productIds || []).map(String);
-    try {
-      const match = await promoService.findApplicableFreeInstallation(pids);
-      setBookingFreeInstall(match);
-    } catch {
-      setBookingFreeInstall(null);
-    }
-  };
-
-  const confirmInstallBooking = async () => {
-    if (!bookingTarget) return;
-    if (!bookingPhone.trim()) {
-      showToast('Please enter your contact phone number');
-      return;
-    }
-    setBookingBusy(true);
-    try {
-      const moto = bookingTarget.motorcycle || {};
-      const selectedParts = (bookingTarget.items || [])
-        .map((it) => ({
-          id: it.productId || it.product_id || it.id,
-          product_id: it.productId || it.product_id || it.id,
-          name: it.name || it.product_name,
-          price: Number(it.price) || 0,
-          brand: it.brand || '',
-        }))
-        .filter((p) => p.id);
-
-      const booking = await aiCustomizerService.bookCustomizationService({
-        customizationData: {
-          customizationId: bookingTarget.customizationId || bookingTarget.id,
-          bikeName:
-            bookingTarget.name ||
-            [moto.brand, moto.model].filter(Boolean).join(' ') ||
-            'Motorcycle',
-          bikeBrand: moto.brand || 'Motorcycle',
-          bikeModel: moto.model || '',
-          motorcycleId: moto.motorcycle_id || moto.motorcycleId || null,
-          selectedParts,
-          partsTotalUsd: selectedParts.reduce((s, p) => s + Number(p.price || 0), 0),
-          generatedImage: bookingTarget.previewImageUrl,
-        },
-        branchName: bookingBranch,
-        appointmentDate: 'Tomorrow',
-        timeSlot: bookingTimeSlot,
-        customerName: currentUser?.name || 'Rider',
-        customerPhone: bookingPhone.trim(),
-        plateNumber: moto.plate_number || 'Pending Plate',
-        notes: bookingNotes,
-        currentUser,
-      });
-
-      setBookingTarget(null);
-      const feeMsg = booking?.installationFeeWaived ? ' Free installation applied!' : '';
-      showToast(`🏁 Installation booked! Ticket #${booking?.id || booking?.booking_id}.${feeMsg}`);
-      onNavigateToGarage?.();
-    } catch (err) {
-      showToast(err?.message || 'Could not book installation.');
-    } finally {
-      setBookingBusy(false);
-    }
-  };
+  const isWishlistEmpty = productWishlistCount === 0;
 
   const handleMoveAllToCart = () => {
     if (wishlistedProducts.length === 0) return;
@@ -208,22 +117,45 @@ export default function WishlistPageWeb({
     }
   };
 
+  const handleClearWishlist = () => {
+    if (wishlistedProducts.length === 0) return;
+    wishlistedProducts.forEach((product) => {
+      toggleWishlist(product.id);
+    });
+    showToast('Saved catalog parts cleared.');
+  };
+
+  const pageSubtitle = useMemo(
+    () =>
+      `${productWishlistCount} saved catalog product${productWishlistCount === 1 ? '' : 's'} • Parts value: ₱${Number(totalWishlistValue || 0).toFixed(2)}`,
+    [productWishlistCount, totalWishlistValue]
+  );
+
   // Balanced grid columns: 1 column on <360px, 2 on mobile, 3 on tablet, 4 on desktop, 5 on wide
   const numColumns = windowWidth >= 1250 ? 5 : windowWidth >= 980 ? 4 : windowWidth >= 680 ? 3 : windowWidth < 360 ? 1 : 2;
   const gapSize = windowWidth < 480 ? 8 : windowWidth < 768 ? 10 : 14;
   const cardWidth = `calc(${100 / numColumns}% - ${((numColumns - 1) * gapSize) / numColumns}px)`;
 
   return (
-    <View style={[wStyles.container, isDarkMode && { backgroundColor: '#0F1412' }]} className={isDarkMode ? "bg-[#0F1412] min-h-screen" : "bg-[#F3F4F6] min-h-screen"}>
-      <StatusBar style={isDarkMode ? "light" : "dark"} />
+    <View
+      style={[
+        wStyles.container,
+        isDarkMode && { backgroundColor: '#121518' },
+        Platform.OS === 'web' && { height: '100vh', maxHeight: '100vh', overflow: 'hidden' },
+      ]}
+      className={isDarkMode ? 'dark bg-[#11151A] min-h-screen' : 'bg-[#F3F4F6] min-h-screen'}
+    >
+      <StatusBar style={isDarkMode ? 'light' : 'dark'} />
       <ToastNotification message={toastMessage} />
 
-      {/* ─── FULL-HEIGHT WISHLIST SCROLLVIEW (Scrollbar extends to top: 0 through header, matching Image 1) ─── */}
+      {/* ─── FULL-HEIGHT WISHLIST SCROLLVIEW (Scrollbar extends to top: 0 through header, matching ShopPage) ─── */}
       <ScrollView
         style={{
           flex: 1,
           width: '100%',
-          ...(Platform.OS === 'web' ? { overscrollBehavior: 'none', overscrollBehaviorY: 'none' } : {}),
+          ...(Platform.OS === 'web'
+            ? { overflowY: 'scroll', overscrollBehavior: 'none', overscrollBehaviorY: 'none' }
+            : {}),
         }}
         contentContainerStyle={wStyles.scrollContent}
         stickyHeaderIndices={[0]}
@@ -239,6 +171,7 @@ export default function WishlistPageWeb({
         <View
           style={[
             wStyles.headerInner,
+            isTablet && { paddingHorizontal: 18, paddingVertical: 10, minHeight: 60, gap: 12 },
             windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8, minHeight: 56 },
             windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
           ]}
@@ -263,58 +196,48 @@ export default function WishlistPageWeb({
             )}
             {windowWidth >= 768 && (
               <TouchableOpacity
-                style={wStyles.logoWrap}
+                style={[wStyles.logoWrap, isTablet && { marginRight: 4 }]}
                 onPress={() => onNavigateToStore?.()}
                 activeOpacity={0.8}
               >
-                <BrandLogo size={windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
+                <BrandLogo size={windowWidth < 768 ? 28 : isTablet ? 30 : windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
               </TouchableOpacity>
             )}
           </View>
 
           {/* Center Navigation: Store & Repair (Desktop / Tablet only) */}
           {windowWidth >= 768 && (
-            <View style={wStyles.headerCenterNav}>
+            <View style={[wStyles.headerCenterNav, isTablet && { gap: 8 }]}>
               {/* Shop Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={wStyles.headerCenterBtn}
+                style={[wStyles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 10 }]}
                 onPress={() => onNavigateToStore?.()}
                 activeOpacity={0.8}
                 title="Shop"
               >
-                <Text style={wStyles.headerCenterBtnText}>Shop</Text>
+                <Text style={[wStyles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Shop</Text>
               </TouchableOpacity>
 
               {/* Repair Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={wStyles.headerCenterBtn}
+                style={[wStyles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => onNavigateToGarage?.()}
                 activeOpacity={0.8}
                 title="Book a Service"
               >
-                <Text style={wStyles.headerCenterBtnText}>Book a Service</Text>
+                <Text style={[wStyles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>
+                  {isTablet ? 'Book Service' : 'Book a Service'}
+                </Text>
               </TouchableOpacity>
 
-              {/* Appointments Button */}
-              <TouchableOpacity
-                className="main-nav-tab"
-                style={wStyles.headerCenterBtn}
-                onPress={() => {
-                  if (onNavigateToAppointments) onNavigateToAppointments();
-                  else onNavigateToGarage?.({ tab: 'appointments' });
-                }}
-                activeOpacity={0.8}
-                title="Appointments"
-              >
-                <Text style={wStyles.headerCenterBtnText}>Appointments</Text>
-              </TouchableOpacity>
+
 
               {/* Customize Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={wStyles.headerCenterBtn}
+                style={[wStyles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => {
                   if (onNavigateToCustomizer) onNavigateToCustomizer();
                   else if (onNavigateToCustomize) onNavigateToCustomize();
@@ -322,29 +245,29 @@ export default function WishlistPageWeb({
                 activeOpacity={0.8}
                 title="Customize"
               >
-                <Text style={wStyles.headerCenterBtnText}>Customize</Text>
+                <Text style={[wStyles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Customize</Text>
               </TouchableOpacity>
 
               {/* Garage Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={wStyles.headerCenterBtn}
+                style={[wStyles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => onNavigateToProfile?.('garage')}
                 activeOpacity={0.8}
                 title="Garage"
               >
-                <Text style={wStyles.headerCenterBtnText}>Garage</Text>
+                <Text style={[wStyles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Garage</Text>
               </TouchableOpacity>
 
               {/* Orders Button */}
               <TouchableOpacity
                 className="main-nav-tab"
-                style={wStyles.headerCenterBtn}
+                style={[wStyles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
                 onPress={() => onNavigateToOrders?.()}
                 activeOpacity={0.8}
                 title="Orders"
               >
-                <Text style={wStyles.headerCenterBtnText}>Orders</Text>
+                <Text style={[wStyles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Orders</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -363,17 +286,17 @@ export default function WishlistPageWeb({
               isDark={isDarkMode}
             />
 
-            {/* Favorites Button */}
+            {/* Saved Wishlist Button */}
             {windowWidth >= 768 && (<TouchableOpacity
               style={wStyles.navActionIconBtn}
               onPress={() => onNavigateToWishlist?.()}
               activeOpacity={0.8}
-              title="Favorites"
+              title="Saved Wishlist"
             >
-              <BootstrapIcon name="heart" size={16} color="#FFFFFF" />
-              {wishlistCount > 0 && (
+              <BootstrapIcon name="bookmark" size={16} color="#FFFFFF" />
+              {productWishlistCount > 0 && (
                 <View style={wStyles.navBadgeCircle}>
-                  <Text style={wStyles.navBadgeText}>{wishlistCount}</Text>
+                  <Text style={wStyles.navBadgeText}>{productWishlistCount}</Text>
                 </View>
               )}
             </TouchableOpacity>)}
@@ -494,363 +417,199 @@ export default function WishlistPageWeb({
           <View style={wStyles.actionBar}>
             <View>
               <Text style={wStyles.pageTitle}>Saved Performance Wishlist</Text>
-              <Text style={wStyles.pageSub}>
-                {wishlistCount} saved • {aiInstalls.length} AI installs • Parts value: ₱
-                {Number(totalWishlistValue || 0).toFixed(2)}
-              </Text>
+              <Text style={wStyles.pageSub}>{pageSubtitle}</Text>
             </View>
 
             {!isWishlistEmpty && (
               <View style={wStyles.actionBtnsGroup}>
                 <TouchableOpacity
                   style={wStyles.clearWishlistBtn}
-                  onPress={() => {
-                    clearWishlist();
-                    showToast('Wishlist cleared.');
-                  }}
+                  onPress={handleClearWishlist}
                   activeOpacity={0.8}
                 >
                   <BootstrapIcon name="trash" size={13} color="#DC2626" />
                   <Text style={wStyles.clearWishlistBtnText}>Clear List</Text>
                 </TouchableOpacity>
 
-                {wishlistedProducts.length > 0 ? (
-                  <TouchableOpacity
-                    style={wStyles.moveAllBtn}
-                    onPress={handleMoveAllToCart}
-                    activeOpacity={0.85}
-                  >
-                    <BootstrapIcon name="cart-check-fill" size={14} color="#FFFFFF" />
-                    <Text style={wStyles.moveAllBtnText}>Move All to Cart</Text>
-                  </TouchableOpacity>
-                ) : null}
+                <TouchableOpacity
+                  style={wStyles.moveAllBtn}
+                  onPress={handleMoveAllToCart}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="cart-check-fill" size={14} color="#FFFFFF" />
+                  <Text style={wStyles.moveAllBtnText}>Move All to Cart</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
 
-          {/* AI Installation Previews */}
-          {aiInstalls.length > 0 ? (
+          {/* Empty State */}
+          {isWishlistEmpty && (
+            <View style={wStyles.emptyBox}>
+              <View style={wStyles.emptyIconCircle}>
+                <BootstrapIcon name="box-seam" size={32} color="#EA580C" />
+              </View>
+              <Text style={wStyles.emptyTitle}>No Saved Products Yet</Text>
+              <Text style={wStyles.emptySub}>
+                Browse our catalog of motorcycle parts and accessories and click the save bookmark icon to add items here.
+              </Text>
+              <TouchableOpacity
+                style={wStyles.exploreStoreBtn}
+                onPress={() => onNavigateToStore?.()}
+                activeOpacity={0.85}
+              >
+                <BootstrapIcon name="cart-plus-fill" size={14} color="#FFFFFF" />
+                <Text style={wStyles.exploreStoreBtnText}>Explore Shop Catalog</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Saved Products */}
+          {wishlistedProducts.length > 0 ? (
             <View style={{ marginBottom: 28 }}>
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: '600',
-                  color: isDarkMode ? '#E2E8F0' : '#0F172A',
-                  marginBottom: 6,
-                }}
-              >
-                AI Installation Previews
-              </Text>
-              <Text
-                style={{
-                  fontSize: 12.5,
-                  color: isDarkMode ? '#94A3B8' : '#64748B',
-                  marginBottom: 14,
-                }}
-              >
-                Saved from Install Studio — book shop installation for these builds.
-              </Text>
               <View style={[wStyles.productGrid, { gap: gapSize }]}>
-                {aiInstalls.map((entry) => (
-                  <View
-                    key={entry.id || entry.customizationId}
+                {wishlistedProducts.map((product) => (
+                  <TouchableOpacity
+                    key={product.id}
                     style={[wStyles.productCard, { width: cardWidth }]}
+                    className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden mb-2 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
+                    onPress={() => {
+                      setSelectedProductForSpecs(product);
+                      setIsSpecsOpen(true);
+                    }}
+                    activeOpacity={0.92}
                   >
-                    <View style={wStyles.productImgWrap}>
-                      {entry.previewImageUrl ? (
-                        <Image
-                          source={{ uri: entry.previewImageUrl }}
-                          style={wStyles.productImg}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View
-                          style={{
-                            flex: 1,
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: '#F1F5F9',
-                          }}
-                        >
-                          <BootstrapIcon name="image" size={28} color="#94A3B8" />
-                        </View>
-                      )}
+                    {/* 1:1 Square Product Image */}
+                    <View
+                      style={wStyles.productImgWrap}
+                      className="w-full aspect-square bg-slate-100 relative overflow-hidden"
+                    >
+                      <Image
+                        source={{ uri: product.image }}
+                        style={wStyles.productImg}
+                        resizeMode="cover"
+                        className="w-full h-full object-cover"
+                      />
+
+                      {/* Wishlist Remove Button */}
                       <TouchableOpacity
                         style={wStyles.removeFavBtn}
-                        onPress={() => {
-                          removeCustomizationFromWishlist(entry.id || entry.customizationId);
-                          showToast('Removed AI preview from wishlist.');
+                        className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/95 items-center justify-center shadow-sm z-10 hover:scale-105 transition-transform"
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          toggleWishlist(product.id);
+                        }}
+                        activeOpacity={0.8}
+                        title="Remove from saved"
+                      >
+                        <BootstrapIcon name="bookmark-fill" size={13} color="#EA580C" />
+                      </TouchableOpacity>
+                    </View>
+
+                    {/* Details - Compact Square Layout */}
+                    <View
+                      style={wStyles.productDetails}
+                      className="p-2.5 bg-white flex flex-col justify-between"
+                    >
+                      {/* Product Name (2 Lines Max) */}
+                      <Text
+                        style={wStyles.productName}
+                        numberOfLines={2}
+                        className="text-[12.5px] font-semibold text-slate-800 leading-[17px] mb-1 h-[34px]"
+                      >
+                        {product.name}
+                      </Text>
+
+                      {/* Price Row */}
+                      <View style={wStyles.priceRow} className="flex flex-row items-baseline gap-1.5 mb-1.5">
+                        <Text
+                          style={wStyles.priceMainText}
+                          className="text-[15px] font-semibold text-[#EA580C]"
+                        >
+                          ₱{Number(product.price || 0).toFixed(2)}
+                        </Text>
+                      </View>
+
+                      {/* Tags Row: COD, Actual Stock & Rating */}
+                      <View
+                        style={wStyles.tagsRow}
+                        className="flex flex-row items-center gap-1.5 mb-1.5 flex-wrap"
+                      >
+                        <View style={wStyles.codTag} className="bg-amber-100 px-1.5 py-0.5 rounded">
+                          <Text
+                            style={wStyles.codTagText}
+                            className="text-[10px] font-semibold text-amber-700"
+                          >
+                            COD
+                          </Text>
+                        </View>
+                        <View style={wStyles.stockTag} className="bg-emerald-50 px-1.5 py-0.5 rounded">
+                          <Text style={wStyles.stockTagText} className="text-[10px] font-bold text-emerald-700">
+                            {product.stock <= 0
+                              ? 'Sold out'
+                              : product.stock <= resolveReorderLevel(product, 5)
+                                ? `Only ${product.stock} left`
+                                : `${product.stock} in stock`}
+                          </Text>
+                        </View>
+                        {productHasCustomerRatings(product) ? (
+                          <View
+                            style={[wStyles.ratingLeft, { marginLeft: 'auto' }]}
+                            className="flex flex-row items-center gap-1 ml-auto"
+                          >
+                            <BootstrapIcon name="star-fill" size={10} color="#F59E0B" />
+                            <Text
+                              style={wStyles.ratingValText}
+                              className="text-[11.5px] font-bold text-amber-500"
+                            >
+                              {Number(product.rating).toFixed(1)}
+                            </Text>
+                            <Text
+                              style={wStyles.reviewCountText}
+                              className="text-[10.5px] text-slate-500 font-medium"
+                            >
+                              ({product.reviews})
+                            </Text>
+                          </View>
+                        ) : (
+                          <View
+                            style={[wStyles.ratingLeft, { marginLeft: 'auto' }]}
+                            className="flex flex-row items-center gap-1 ml-auto"
+                          >
+                            <BootstrapIcon name="star" size={10} color="#94A3B8" />
+                            <Text
+                              style={wStyles.reviewCountText}
+                              className="text-[10.5px] text-slate-500 font-medium"
+                            >
+                              No ratings yet
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Add to Cart Button */}
+                      <TouchableOpacity
+                        style={wStyles.addToCartBtn}
+                        className="bg-[#EA580C] hover:bg-[#094e46] rounded-lg py-2 flex flex-row items-center justify-center gap-1.5 mt-1.5 transition-colors cursor-pointer"
+                        onPress={(e) => {
+                          e?.stopPropagation?.();
+                          handleAddToCartSingle(product);
                         }}
                         activeOpacity={0.8}
                       >
-                        <BootstrapIcon name="heart-fill" size={13} color="#EF4444" />
-                      </TouchableOpacity>
-                      <View
-                        style={{
-                          position: 'absolute',
-                          left: 8,
-                          bottom: 8,
-                          backgroundColor: 'rgba(29,69,51,0.92)',
-                          borderRadius: 6,
-                          paddingHorizontal: 8,
-                          paddingVertical: 3,
-                        }}
-                      >
-                        <Text style={{ color: '#FFF', fontSize: 10, fontWeight: '600' }}>
-                          AI INSTALL
-                        </Text>
-                      </View>
-                    </View>
-                    <View style={wStyles.productDetails}>
-                      <Text style={wStyles.productName} numberOfLines={2}>
-                        {entry.name || entry.title || 'AI Installation Preview'}
-                      </Text>
-                      <Text
-                        style={{ fontSize: 11, color: '#64748B', marginBottom: 8 }}
-                        numberOfLines={1}
-                      >
-                        {(entry.items || []).map((i) => i.name).filter(Boolean).join(', ') ||
-                          'Custom part install'}
-                      </Text>
-                      <TouchableOpacity
-                        style={wStyles.addToCartBtn}
-                        onPress={() => openInstallBooking(entry)}
-                        activeOpacity={0.85}
-                      >
-                        <BootstrapIcon name="calendar-check" size={13} color="#FFFFFF" />
-                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>
-                          Book Installation
+                        <BootstrapIcon name="cart3" size={13} color="#FFFFFF" />
+                        <Text style={wStyles.addToCartBtnText} className="text-xs font-bold text-white">
+                          Add to Cart
                         </Text>
                       </TouchableOpacity>
-                      {(entry.productIds || []).length > 0 ? (
-                        <TouchableOpacity
-                          style={{
-                            marginTop: 8,
-                            borderWidth: 1,
-                            borderColor: '#EA580C',
-                            borderRadius: 8,
-                            paddingVertical: 8,
-                            alignItems: 'center',
-                          }}
-                          onPress={() => {
-                            const first = prods.find((p) =>
-                              (entry.productIds || []).includes(String(p.id))
-                            );
-                            if (first) handleAddToCartSingle(first);
-                            else showToast('Part added via Install Studio wishlist.');
-                          }}
-                          activeOpacity={0.85}
-                        >
-                          <Text style={{ color: '#EA580C', fontSize: 12, fontWeight: '700' }}>
-                            Add Part to Cart
-                          </Text>
-                        </TouchableOpacity>
-                      ) : null}
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             </View>
           ) : null}
-
-          {/* Grid or Empty View */}
-          {isWishlistEmpty ? (
-            <View style={wStyles.emptyBox}>
-              <BootstrapIcon name="heart" size={42} color="#94A3B8" />
-              <Text style={wStyles.emptyTitle}>Your Wishlist is Empty</Text>
-              <Text style={wStyles.emptySub}>
-                Save catalog parts with the heart icon, or save AI installation previews from Install
-                Studio.
-              </Text>
-              <View style={{ flexDirection: 'row', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-                <TouchableOpacity
-                  style={wStyles.exploreStoreBtn}
-                  onPress={() => onNavigateToStore?.()}
-                  activeOpacity={0.85}
-                >
-                  <BootstrapIcon name="cart-plus-fill" size={14} color="#FFFFFF" />
-                  <Text style={wStyles.exploreStoreBtnText}>Explore Parts</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[wStyles.exploreStoreBtn, { backgroundColor: '#0F172A' }]}
-                  onPress={() => onNavigateToCustomizer?.() || onNavigateToCustomize?.()}
-                  activeOpacity={0.85}
-                >
-                  <BootstrapIcon name="stars" size={14} color="#FFFFFF" />
-                  <Text style={wStyles.exploreStoreBtnText}>Open Install Studio</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ) : wishlistedProducts.length > 0 ? (
-            <View style={[wStyles.productGrid, { gap: gapSize }]}>
-              {wishlistedProducts.map((product) => (
-                <TouchableOpacity
-                  key={product.id}
-                  style={[wStyles.productCard, { width: cardWidth }]}
-                  className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden mb-2 cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5"
-                  onPress={() => {
-                    setSelectedProductForSpecs(product);
-                    setIsSpecsOpen(true);
-                  }}
-                  activeOpacity={0.92}
-                >
-                  {/* 1:1 Square Product Image */}
-                  <View
-                    style={wStyles.productImgWrap}
-                    className="w-full aspect-square bg-slate-100 relative overflow-hidden"
-                  >
-                    <Image
-                      source={{ uri: product.image }}
-                      style={wStyles.productImg}
-                      resizeMode="cover"
-                      className="w-full h-full object-cover"
-                    />
-
-                    {/* Wishlist Remove Button */}
-                    <TouchableOpacity
-                      style={wStyles.removeFavBtn}
-                      className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/95 items-center justify-center shadow-sm z-10 hover:scale-105 transition-transform"
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        toggleWishlist(product.id);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <BootstrapIcon name="heart-fill" size={13} color="#EF4444" />
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Details - Compact Square Layout */}
-                  <View
-                    style={wStyles.productDetails}
-                    className="p-2.5 bg-white flex flex-col justify-between"
-                  >
-                    {/* Product Name (2 Lines Max) */}
-                    <Text
-                      style={wStyles.productName}
-                      numberOfLines={2}
-                      className="text-[12.5px] font-semibold text-slate-800 leading-[17px] mb-1 h-[34px]"
-                    >
-                      {product.name}
-                    </Text>
-
-                    {/* Price Row: Bold Teal Brand Color (matching app) */}
-                    <View style={wStyles.priceRow} className="flex flex-row items-baseline gap-1.5 mb-1.5">
-                      <Text
-                        style={wStyles.priceMainText}
-                        className="text-[15px] font-semibold text-[#EA580C]"
-                      >
-                        ₱{Number(product.price || 0).toFixed(2)}
-                      </Text>
-                    </View>
-
-                    {/* Tags Row: COD, Actual Stock & Rating */}
-                    <View
-                      style={wStyles.tagsRow}
-                      className="flex flex-row items-center gap-1.5 mb-1.5 flex-wrap"
-                    >
-                      <View style={wStyles.codTag} className="bg-amber-100 px-1.5 py-0.5 rounded">
-                        <Text
-                          style={wStyles.codTagText}
-                          className="text-[10px] font-semibold text-amber-700"
-                        >
-                          COD
-                        </Text>
-                      </View>
-                      <View style={wStyles.stockTag} className="bg-emerald-50 px-1.5 py-0.5 rounded">
-                        <Text style={wStyles.stockTagText} className="text-[10px] font-bold text-emerald-700">
-                          {product.stock <= 0
-                            ? 'Sold out'
-                            : product.stock <= resolveReorderLevel(product, 5)
-                              ? `Only ${product.stock} left`
-                              : `${product.stock} in stock`}
-                        </Text>
-                      </View>
-                      {productHasCustomerRatings(product) ? (
-                        <View
-                          style={[wStyles.ratingLeft, { marginLeft: 'auto' }]}
-                          className="flex flex-row items-center gap-1 ml-auto"
-                        >
-                          <BootstrapIcon name="star-fill" size={10} color="#F59E0B" />
-                          <Text
-                            style={wStyles.ratingValText}
-                            className="text-[11.5px] font-bold text-amber-500"
-                          >
-                            {Number(product.rating).toFixed(1)}
-                          </Text>
-                          <Text
-                            style={wStyles.reviewCountText}
-                            className="text-[10.5px] text-slate-500 font-medium"
-                          >
-                            ({product.reviews})
-                          </Text>
-                        </View>
-                      ) : (
-                        <View
-                          style={[wStyles.ratingLeft, { marginLeft: 'auto' }]}
-                          className="flex flex-row items-center gap-1 ml-auto"
-                        >
-                          <BootstrapIcon name="star" size={10} color="#94A3B8" />
-                          <Text
-                            style={wStyles.reviewCountText}
-                            className="text-[10.5px] text-slate-500 font-medium"
-                          >
-                            No ratings yet
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Add to Cart Button with matching App Solid Teal style */}
-                    <TouchableOpacity
-                      style={wStyles.addToCartBtn}
-                      className="bg-[#EA580C] hover:bg-[#094e46] rounded-lg py-2 flex flex-row items-center justify-center gap-1.5 mt-1.5 transition-colors cursor-pointer"
-                      onPress={(e) => {
-                        e?.stopPropagation?.();
-                        handleAddToCartSingle(product);
-                      }}
-                      activeOpacity={0.8}
-                    >
-                      <BootstrapIcon name="cart3" size={13} color="#FFFFFF" />
-                      <Text style={wStyles.addToCartBtnText} className="text-xs font-bold text-white">
-                        Add to Cart
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          ) : null}
         </View>
       </ScrollView>
-
-      {/* Book Installation from AI wishlist preview */}
-      <BookInstallationModal
-        visible={Boolean(bookingTarget)}
-        onClose={() => !bookingBusy && setBookingTarget(null)}
-        previewImageUri={bookingTarget?.previewImageUrl || bookingTarget?.preview_image_url}
-        motorcycle={bookingTarget?.motorcycle}
-        bikeTitle={
-          bookingTarget?.motorcycle
-            ? `${bookingTarget.motorcycle.brand || ''} ${bookingTarget.motorcycle.model || ''}`.trim()
-            : ''
-        }
-        serviceName={bookingTarget?.name || bookingTarget?.title || 'AI Custom Installation'}
-        laborFeePhp={3250}
-        freeInstallPromo={bookingFreeInstall}
-        branches={GARAGE_BRANCHES}
-        selectedBranch={bookingBranch}
-        onSelectBranch={setBookingBranch}
-        timeSlots={TIME_SLOTS}
-        selectedTimeSlot={bookingTimeSlot}
-        onSelectTimeSlot={setBookingTimeSlot}
-        phone={bookingPhone}
-        onChangePhone={setBookingPhone}
-        notes={bookingNotes}
-        onChangeNotes={setBookingNotes}
-        onConfirm={confirmInstallBooking}
-        busy={bookingBusy}
-      />
 
       {/* Specs Modal */}
       <ProductSpecsModal
@@ -860,7 +619,7 @@ export default function WishlistPageWeb({
         onAddToCart={(prod) => handleAddToCartSingle(prod)}
       />
 
-      <CartModal
+      <CartPage
         visible={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         onProceedToCheckout={() => {
@@ -873,6 +632,15 @@ export default function WishlistPageWeb({
           setIsCartOpen(false);
           setIsCheckoutOpen(true);
         }}
+        onNavigateToStore={onNavigateToStore}
+        onNavigateToGarage={onNavigateToGarage}
+        onNavigateToCustomizer={onNavigateToCustomizer || onNavigateToCustomize}
+        onNavigateToWishlist={onNavigateToWishlist}
+        onNavigateToOrders={onNavigateToOrders}
+        onNavigateToProfile={onNavigateToProfile}
+        onNavigateToLogin={onNavigateToLogin}
+        onNavigateToAdmin={onNavigateToAdmin}
+        onLogout={onLogout}
       />
 
       <CheckoutModal
