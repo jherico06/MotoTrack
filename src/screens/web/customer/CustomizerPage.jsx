@@ -752,7 +752,7 @@ export default function CustomizerPageWeb({
               )}
             </TouchableOpacity>)}
 
-            {currentUser && windowWidth >= 768 ? (
+            {currentUser ? (
               <View style={[styles.loggedInContainer, { position: 'relative' }]}>
                 <UserProfileButton
                   currentUser={currentUser}
@@ -994,11 +994,13 @@ export default function CustomizerPageWeb({
             else onNavigateToGarage?.({ tab: 'appointments' });
           }
           else if (screen === 'customizer') { /* already here */ }
+          else if (screen === 'cart') setIsCartModalOpen(true);
           else if (screen === 'wishlist') onNavigateToWishlist?.();
           else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
           else if (screen === 'login') onNavigateToLogin?.();
           else if (screen === 'admin') onNavigateToAdmin?.();
         }}
+        onOpenCart={() => setIsCartModalOpen(true)}
         unreadNotifCount={unreadNotifCount}
       />
     </View>

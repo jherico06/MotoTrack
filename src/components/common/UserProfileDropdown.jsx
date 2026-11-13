@@ -32,7 +32,6 @@ export default function UserProfileDropdown({
   onLogout,
   onNavigateToDashboard,
   onNavigateToOrders,
-  onNavigateToAppointments,
   onNavigateToWishlist,
   onNavigateToScreen,
   isMobile = false,
@@ -211,7 +210,6 @@ export default function UserProfileDropdown({
   }, [avatarUri]);
 
   if (!currentUser) return null;
-  if (isMobileScreen) return null;
   if (
     !isOpen &&
     !isLogoutConfirmOpen &&
@@ -462,39 +460,6 @@ export default function UserProfileDropdown({
             <BootstrapIcon name="chevron-right" size={16} color={theme.chevronColor} />
           </TouchableOpacity>
         )}
-
-        {/* My Appointments Choice */}
-        <TouchableOpacity
-          style={[
-            styles.menuItem,
-            hoveredItem === 'appointments' && { backgroundColor: theme.bgHover },
-          ]}
-          onPress={() => {
-            onClose?.();
-            if (onNavigateToAppointments) {
-              onNavigateToAppointments();
-            } else if (onNavigateToScreen) {
-              onNavigateToScreen('appointments');
-            } else if (onNavigateToDashboard) {
-              onNavigateToDashboard('appointments');
-            } else if (onNavigateToProfile) {
-              onNavigateToProfile('appointments');
-            }
-          }}
-          activeOpacity={0.7}
-          {...(Platform.OS === 'web'
-            ? {
-              onMouseEnter: () => setHoveredItem('appointments'),
-              onMouseLeave: () => setHoveredItem(null),
-            }
-            : {})}
-        >
-          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="calendar-check-fill" size={16} color={theme.iconColor} />
-          </View>
-          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>My Appointments</Text>
-          <BootstrapIcon name="chevron-right" size={16} color={theme.chevronColor} />
-        </TouchableOpacity>
 
         {/* 2. Settings & privacy */}
         <TouchableOpacity

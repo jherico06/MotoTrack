@@ -700,7 +700,7 @@ export default function BookingPaymentScreen({
                   gap: 16,
                 }}
               >
-                <View style={{ flex: 1, minWidth: 260 }}>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     <View
                       style={{
@@ -714,8 +714,8 @@ export default function BookingPaymentScreen({
                     >
                       <BootstrapIcon name="bank" size={18} color="#FFFFFF" />
                     </View>
-                    <View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                         <Text style={{ fontSize: 15, fontWeight: '700', color: '#18181B' }}>
                           Pay with Bank Transfer
                         </Text>

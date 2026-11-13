@@ -352,7 +352,7 @@ export default function WishlistPageWeb({
             </TouchableOpacity>)}
 
             {/* Auth: Sign In & Sign Up OR Logged In Profile */}
-            {currentUser && windowWidth >= 768 ? (
+            {currentUser ? (
               <View style={[wStyles.loggedInContainer, { position: 'relative' }]}>
                 <UserProfileButton
                   currentUser={currentUser}
@@ -681,10 +681,12 @@ export default function WishlistPageWeb({
             else onNavigateToCustomize?.();
           }
           else if (screen === 'wishlist') { /* already here */ }
+          else if (screen === 'cart') setIsCartOpen(true);
           else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
           else if (screen === 'login') onNavigateToLogin?.();
           else if (screen === 'admin') onNavigateToAdmin?.();
         }}
+        onOpenCart={() => setIsCartOpen(true)}
         unreadNotifCount={unreadNotifCount}
       />
     </View>

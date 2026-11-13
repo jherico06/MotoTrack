@@ -165,7 +165,7 @@ export default function CustomerRescheduleModal({
               backgroundColor: isDarkMode ? '#15191E' : '#FAFAFA',
             }}
           >
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
               <View
                 style={{
                   width: 38,
@@ -180,7 +180,7 @@ export default function CustomerRescheduleModal({
               >
                 <BootstrapIcon name="calendar2-range-fill" size={18} color="#EA580C" />
               </View>
-              <View>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={{ fontSize: 16, fontWeight: '700', color: textPrimary }}>
                   Reschedule Appointment
                 </Text>

@@ -785,9 +785,9 @@ export default function PackageFirstBookingWorkflow({
                   gap: 10,
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8, flex: 1, minWidth: 200, maxWidth: '100%' }}>
                   <BootstrapIcon name="speedometer" size={15} color="#EA580C" />
-                  <Text style={{ fontSize: 13, color: '#18181B' }}>
+                  <Text style={{ fontSize: 13, lineHeight: 19, color: '#18181B', flex: 1, flexShrink: 1 }}>
                     Showing package rates for <Text style={{ fontWeight: '700' }}>{selectedMotorcycle.brand} {selectedMotorcycle.model}</Text>{' '}
                     (<Text style={{ fontWeight: '700', color: '#EA580C' }}>{pricingData.engineCc} CC • {pricingData.matchedCategory}</Text>)
                   </Text>
@@ -830,9 +830,9 @@ export default function PackageFirstBookingWorkflow({
                   gap: 10,
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 200 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 200, maxWidth: '100%' }}>
                   <BootstrapIcon name="search" size={13} color="#FF5A0A" />
-                  <Text style={{ fontSize: 13, color: '#334155' }}>
+                  <Text style={{ fontSize: 13, lineHeight: 19, color: '#334155', flex: 1, flexShrink: 1 }}>
                     Showing results for <Text style={{ fontWeight: '700', color: '#0F172A' }}>"{searchQuery}"</Text>{' '}
                     • <Text style={{ fontWeight: '600', color: '#FF5A0A' }}>{displayPackages.length} package{displayPackages.length === 1 ? '' : 's'}</Text> found
                   </Text>

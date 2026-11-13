@@ -239,9 +239,9 @@ export default function MotorcycleSelectionScreen({
             gap: 16,
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
             <BootstrapIcon name="person-circle" size={24} color="#EA580C" />
-            <View>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#9A3412' }}>
                 Sign in to view your registered garage fleet
               </Text>

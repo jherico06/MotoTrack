@@ -1801,7 +1801,7 @@ export default function ProfilePage({
 
 
             {/* User Profile Avatar [Profile] or Sign In */}
-            {currentUser && windowWidth >= 768 ? (
+            {currentUser ? (
               <View style={[styles.loggedInContainer, { position: 'relative' }]}>
                 <UserProfileButton
                   currentUser={currentUser}
@@ -1952,7 +1952,7 @@ export default function ProfilePage({
                       }}
                     >
                       {/* Left: Icon, Title, Count, Description */}
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, width: isSmallMobile ? '100%' : undefined, flex: isSmallMobile ? undefined : 1, minWidth: 0 }}>
                         <View
                           style={{
                             width: 38,
@@ -1967,8 +1967,8 @@ export default function ProfilePage({
                         >
                           <BootstrapIcon name="bicycle" size={18} color={isDarkMode ? '#F8FAFC' : '#24272B'} />
                         </View>
-                        <View>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                             <Text
                               style={{
                                 fontSize: 16,
@@ -2787,7 +2787,7 @@ export default function ProfilePage({
                     {/* "You might also like" Product Recommendations (Matching Mobile App Experience) */}
                     <View style={{ width: '100%', marginTop: 8 }}>
                       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
                           <View
                             style={{
                               width: 28,
@@ -2802,7 +2802,7 @@ export default function ProfilePage({
                           >
                             <BootstrapIcon name="stars" size={13} color="#EA580C" />
                           </View>
-                          <View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
                             <Text style={{ fontSize: 17, fontWeight: '700', color: tokens.textPrimary, letterSpacing: -0.2 }}>
                               You might also like
                             </Text>
@@ -3609,7 +3609,7 @@ export default function ProfilePage({
                       marginBottom: 16,
                     }}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }}>
                       <View
                         style={{
                           width: 28,
@@ -3624,7 +3624,7 @@ export default function ProfilePage({
                       >
                         <BootstrapIcon name="person-vcard" size={13.5} color={tokens.brandPrimary} />
                       </View>
-                      <View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
                         <Text
                           style={{
                             fontSize: 15.5,
@@ -3886,7 +3886,7 @@ export default function ProfilePage({
                       marginBottom: 16,
                     }}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }}>
                       <View
                         style={{
                           width: 28,
@@ -3901,7 +3901,7 @@ export default function ProfilePage({
                       >
                         <BootstrapIcon name="wrench-adjustable" size={13.5} color={tokens.brandPrimary} />
                       </View>
-                      <View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
                         <Text
                           style={{
                             fontSize: 15.5,
@@ -4401,7 +4401,7 @@ export default function ProfilePage({
                       marginBottom: 16,
                     }}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 }}>
                       <View
                         style={{
                           width: 28,
@@ -4416,7 +4416,7 @@ export default function ProfilePage({
                       >
                         <BootstrapIcon name="shield-lock-fill" size={13.5} color={tokens.brandPrimary} />
                       </View>
-                      <View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
                         <Text
                           style={{
                             fontSize: 15.5,
@@ -4695,7 +4695,7 @@ export default function ProfilePage({
                         marginBottom: 14,
                       }}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, width: isSmallMobile ? '100%' : undefined, flex: isSmallMobile ? undefined : 1, minWidth: 0 }}>
                         <View
                           style={{
                             width: 40,
@@ -4710,8 +4710,8 @@ export default function ProfilePage({
                         >
                           <BootstrapIcon name="bell-fill" size={18} color={tokens.brandPrimary} />
                         </View>
-                        <View>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                             <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.textPrimary, letterSpacing: -0.3 }}>
                               Notifications & Alerts
                             </Text>
@@ -5105,222 +5105,401 @@ export default function ProfilePage({
             {/* TAB 6: SECURITY & SETTINGS                                */}
             {/* ───────────────────────────────────────────────────────── */}
             {activeTab === 'settings' && (
-              <View>
-                {/* 1. Customer Information & Settings Card */}
-                <View style={[styles.sectionCard, { marginBottom: 20 }]}>
+              <View style={{ gap: 16 }}>
+                {/* 1. Customer Information & Settings Card (Booking ReviewCard Style) */}
+                <View
+                  style={{
+                    backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? tokens.border : '#E4E4E7',
+                    padding: isSmallMobile ? 16 : 22,
+                    shadowColor: '#000000',
+                    shadowOpacity: 0.03,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 2 },
+                  }}
+                >
                   <View
                     style={{
                       flexDirection: isSmallMobile ? 'column' : 'row',
                       alignItems: isSmallMobile ? 'flex-start' : 'center',
                       justifyContent: 'space-between',
+                      flexWrap: 'wrap',
                       gap: 12,
-                      marginBottom: 16,
-                      paddingBottom: 14,
-                      borderBottomWidth: 1,
-                      borderBottomColor: tokens.border,
+                      marginBottom: 18,
                     }}
                   >
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 220 }}>
                       <View
                         style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 10,
-                          backgroundColor: tokens.brandLight,
+                          width: 40,
+                          height: 40,
+                          borderRadius: 20,
+                          backgroundColor: isDarkMode ? tokens.brandLight : '#FFF7ED',
                           alignItems: 'center',
                           justifyContent: 'center',
                           borderWidth: 1,
-                          borderColor: tokens.brandBorder,
+                          borderColor: isDarkMode ? tokens.brandBorder : '#FED7AA',
+                          flexShrink: 0,
                         }}
                       >
-                        <BootstrapIcon name="person-vcard-fill" size={17} color={tokens.brandPrimary} />
+                        <BootstrapIcon name="person-vcard" size={16} color="#EA580C" />
                       </View>
-                      <View>
-                        <Text style={{ fontSize: 16.5, fontWeight: '600', color: tokens.textPrimary, letterSpacing: -0.2 }}>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textMuted : '#71717A',
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.8,
+                          }}
+                        >
+                          Rider & Account Profile
+                        </Text>
+                        <Text
+                          style={{
+                            fontSize: 16.5,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textPrimary : '#18181B',
+                            marginTop: 2,
+                            letterSpacing: -0.2,
+                          }}
+                        >
                           Customer Information & Settings
                         </Text>
-                        <Text style={{ fontSize: 12, color: tokens.textMuted, marginTop: 1 }}>
+                        <Text
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: '400',
+                            color: isDarkMode ? tokens.textMuted : '#71717A',
+                            marginTop: 1,
+                          }}
+                        >
                           Review your registered rider information, contact details, and destination
                         </Text>
                       </View>
                     </View>
 
                     <TouchableOpacity
-                      style={styles.btnPrimary}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        paddingVertical: 6,
+                        paddingHorizontal: 14,
+                        borderRadius: 20,
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? tokens.border : '#D4D4D8',
+                        cursor: 'pointer',
+                      }}
                       onPress={() => setIsEditSettingsModalOpen(true)}
-                      activeOpacity={0.85}
+                      activeOpacity={0.75}
                     >
-                      <BootstrapIcon name="pencil-square" size={13} color="#FFFFFF" />
-                      <Text style={styles.btnPrimaryText}>Edit Information</Text>
+                      <BootstrapIcon
+                        name="pencil"
+                        size={11}
+                        color={isDarkMode ? tokens.textSecondary : '#52525B'}
+                      />
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textPrimary : '#3F3F46',
+                        }}
+                      >
+                        Edit Information
+                      </Text>
                     </TouchableOpacity>
                   </View>
 
-                  {/* 2-Column Responsive Information Grid */}
-                  <View style={{ gap: 12 }}>
-                    {/* Row 1: Name and Email */}
-                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
-                      <View
-                        style={{
-                          flex: 1,
-                          backgroundColor: tokens.bgSub,
-                          padding: 13,
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: tokens.border,
-                        }}
-                      >
-                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                          Full Customer Name
-                        </Text>
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: tokens.textPrimary, marginTop: 3 }}>
-                          {userDisplayName}
-                        </Text>
-                      </View>
+                  {/* Section 1: Personal & Contact Details */}
+                  <Text
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: '600',
+                      color: isDarkMode ? tokens.textMuted : '#71717A',
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.8,
+                      marginBottom: 12,
+                    }}
+                  >
+                    Personal & Contact Details
+                  </Text>
 
-                      <View
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                    <View style={{ flex: 1, minWidth: 160 }}>
+                      <Text
                         style={{
-                          flex: 1,
-                          backgroundColor: tokens.bgSub,
-                          padding: 13,
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: tokens.border,
+                          fontSize: 10.5,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textMuted : '#71717A',
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.6,
                         }}
                       >
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                            Account Email Address
+                        Full Customer Name
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textPrimary : '#18181B',
+                          marginTop: 3,
+                          letterSpacing: -0.1,
+                        }}
+                      >
+                        {userDisplayName}
+                      </Text>
+                    </View>
+
+                    <View style={{ flex: 1.2, minWidth: 200 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <Text
+                          style={{
+                            fontSize: 10.5,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textMuted : '#71717A',
+                            textTransform: 'uppercase',
+                            letterSpacing: 0.6,
+                          }}
+                        >
+                          Account Email Address
+                        </Text>
+                        <View
+                          style={{
+                            backgroundColor: tokens.statusSuccessBg,
+                            paddingHorizontal: 7,
+                            paddingVertical: 1.5,
+                            borderRadius: 9999,
+                            borderWidth: 1,
+                            borderColor: tokens.statusSuccessBorder,
+                          }}
+                        >
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: tokens.statusSuccessText }}>
+                            Verified
                           </Text>
-                          <View
-                            style={{
-                              backgroundColor: tokens.statusSuccessBg,
-                              paddingHorizontal: 7,
-                              paddingVertical: 1.5,
-                              borderRadius: 5,
-                              borderWidth: 1,
-                              borderColor: tokens.statusSuccessBorder,
-                            }}
-                          >
-                            <Text style={{ fontSize: 10, fontWeight: '600', color: tokens.statusSuccessText }}>Verified</Text>
-                          </View>
                         </View>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary, marginTop: 3 }}>
-                          {currentUser?.email || 'N/A'}
-                        </Text>
                       </View>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textPrimary : '#18181B',
+                          marginTop: 3,
+                          letterSpacing: -0.1,
+                        }}
+                      >
+                        {currentUser?.email || 'N/A'}
+                      </Text>
                     </View>
 
-                    {/* Row 2: Phone and Delivery Destination */}
-                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
-                      <View
+                    <View style={{ flex: 1, minWidth: 140 }}>
+                      <Text
                         style={{
-                          flex: 1,
-                          backgroundColor: tokens.bgSub,
-                          padding: 13,
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: tokens.border,
+                          fontSize: 10.5,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textMuted : '#71717A',
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.6,
                         }}
                       >
-                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                          Contact Phone Number
-                        </Text>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary, marginTop: 3 }}>
-                          {currentUser?.phone || phone || 'Not provided'}
-                        </Text>
-                      </View>
+                        Contact Phone Number
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textPrimary : '#18181B',
+                          marginTop: 3,
+                          letterSpacing: -0.1,
+                          fontVariant: ['tabular-nums'],
+                        }}
+                      >
+                        {currentUser?.phone || phone || 'Not provided'}
+                      </Text>
+                    </View>
+                  </View>
 
-                      <View
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: isDarkMode ? tokens.border : '#F4F4F5',
+                      marginVertical: 16,
+                    }}
+                  />
+
+                  {/* Section 2: Delivery & Rider Preferences */}
+                  <Text
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: '600',
+                      color: isDarkMode ? tokens.textMuted : '#71717A',
+                      textTransform: 'uppercase',
+                      letterSpacing: 0.8,
+                      marginBottom: 12,
+                    }}
+                  >
+                    Delivery & Rider Preferences
+                  </Text>
+
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+                    <View style={{ flex: 1.2, minWidth: 200 }}>
+                      <Text
                         style={{
-                          flex: 1,
-                          backgroundColor: tokens.bgSub,
-                          padding: 13,
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: tokens.border,
+                          fontSize: 10.5,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textMuted : '#71717A',
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.6,
                         }}
                       >
-                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                          Primary Delivery Destination
-                        </Text>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: tokens.textPrimary, marginTop: 3 }} numberOfLines={1}>
-                          {currentUser?.address || address ? `${currentUser?.address || address}, ${currentUser?.city || city || 'City of Naga'}, ${currentUser?.country || country || 'Philippines'}` : 'No street address saved'}
-                        </Text>
-                      </View>
+                        Primary Delivery Destination
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 14,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textPrimary : '#18181B',
+                          marginTop: 3,
+                          lineHeight: 20,
+                          letterSpacing: -0.1,
+                        }}
+                      >
+                        {currentUser?.address || address
+                          ? `${currentUser?.address || address}, ${currentUser?.city || city || 'City of Naga'}, ${currentUser?.country || country || 'Philippines'}`
+                          : 'No street address saved'}
+                      </Text>
                     </View>
 
-                    {/* Row 3: Bio and Delivery Notes */}
-                    <View style={{ flexDirection: isDesktop ? 'row' : 'column', gap: 12 }}>
-                      <View
+                    <View style={{ flex: 1, minWidth: 170 }}>
+                      <Text
                         style={{
-                          flex: 1,
-                          backgroundColor: tokens.bgSub,
-                          padding: 13,
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: tokens.border,
+                          fontSize: 10.5,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textMuted : '#71717A',
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.6,
                         }}
                       >
-                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                          Rider Bio / Headline
-                        </Text>
-                        <Text style={{ fontSize: 13.5, fontWeight: '600', color: tokens.textSecondary, marginTop: 3 }}>
-                          {currentUser?.bio || bio || 'Motorcycle Enthusiast & Customer'}
-                        </Text>
-                      </View>
-
-                      <View
+                        Courier Delivery Instructions
+                      </Text>
+                      <Text
                         style={{
-                          flex: 1,
-                          backgroundColor: tokens.bgSub,
-                          padding: 13,
-                          borderRadius: 12,
-                          borderWidth: 1,
-                          borderColor: tokens.border,
+                          fontSize: 13.5,
+                          fontWeight: '500',
+                          color: isDarkMode ? tokens.textSecondary : '#3F3F46',
+                          marginTop: 3,
+                          lineHeight: 19,
                         }}
                       >
-                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-                          Courier Delivery Instructions
-                        </Text>
-                        <Text style={{ fontSize: 13.5, fontWeight: '600', color: tokens.textSecondary, marginTop: 3 }}>
-                          {currentUser?.deliveryNotes || deliveryNotes || 'Leave at front gate / contact on delivery'}
-                        </Text>
-                      </View>
+                        {currentUser?.deliveryNotes || deliveryNotes || 'Leave at front gate / contact on delivery'}
+                      </Text>
                     </View>
 
-                    {/* Row 4: Account Badges & Status */}
+                    <View style={{ flex: 1, minWidth: 170 }}>
+                      <Text
+                        style={{
+                          fontSize: 10.5,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textMuted : '#71717A',
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.6,
+                        }}
+                      >
+                        Rider Bio / Headline
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 13.5,
+                          fontWeight: '500',
+                          color: isDarkMode ? tokens.textSecondary : '#3F3F46',
+                          marginTop: 3,
+                          lineHeight: 19,
+                        }}
+                      >
+                        {currentUser?.bio || bio || 'Motorcycle Enthusiast & Customer'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: isDarkMode ? tokens.border : '#F4F4F5',
+                      marginVertical: 14,
+                    }}
+                  />
+
+                  {/* Bottom Status Row */}
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      flexWrap: 'wrap',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
                     <View
                       style={{
                         flexDirection: 'row',
-                        flexWrap: 'wrap',
                         alignItems: 'center',
-                        gap: 8,
-                        paddingTop: 4,
+                        gap: 6,
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        paddingHorizontal: 11,
+                        paddingVertical: 4,
+                        borderRadius: 9999,
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? tokens.border : '#E2E8F0',
                       }}
                     >
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: tokens.bgSub, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: tokens.border }}>
-                        <BootstrapIcon name="shield-check" size={12} color="#059669" />
-                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: tokens.textPrimary }}>
-                          Active Customer
-                        </Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: tokens.bgSub, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: tokens.border }}>
-                        <BootstrapIcon name="geo-alt-fill" size={12} color={tokens.brandPrimary} />
-                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: tokens.textPrimary }}>
-                          Hub: {currentUser?.city || city || 'City of Naga'}
-                        </Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: tokens.bgSub, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 6, borderWidth: 1, borderColor: tokens.border }}>
-                        <BootstrapIcon name="patch-check-fill" size={12} color="#2563EB" />
-                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: tokens.textPrimary }}>
-                          Verified Account
-                        </Text>
-                      </View>
+                      <BootstrapIcon name="shield-check" size={12} color="#059669" />
+                      <Text style={{ fontSize: 11.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#18181B' }}>
+                        Active Customer
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        paddingHorizontal: 11,
+                        paddingVertical: 4,
+                        borderRadius: 9999,
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? tokens.border : '#E2E8F0',
+                      }}
+                    >
+                      <BootstrapIcon name="geo-alt-fill" size={12} color="#EA580C" />
+                      <Text style={{ fontSize: 11.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#18181B' }}>
+                        Hub: {currentUser?.city || city || 'City of Naga'}
+                      </Text>
+                    </View>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 6,
+                        backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                        paddingHorizontal: 11,
+                        paddingVertical: 4,
+                        borderRadius: 9999,
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? tokens.border : '#E2E8F0',
+                      }}
+                    >
+                      <BootstrapIcon name="patch-check-fill" size={12} color="#2563EB" />
+                      <Text style={{ fontSize: 11.5, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#18181B' }}>
+                        Verified Account
+                      </Text>
                     </View>
                   </View>
                 </View>
 
-                {/* 2. Compact Change Password Card */}
+                {/* 2. Change Password Card (Booking Form Style) */}
                 {(() => {
                   const hasLength = newPwd.length >= 8;
                   const hasUpper = /[A-Z]/.test(newPwd);
@@ -5345,102 +5524,163 @@ export default function ProfilePage({
                     strengthPercent = '100%';
                   }
 
+                  const cleanInputStyle = {
+                    backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF',
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? tokens.border : '#CBD5E1',
+                    borderRadius: 8,
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    fontSize: 13.5,
+                    fontWeight: '400',
+                    color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                  };
+
+                  const cleanFieldLabelStyle = {
+                    fontSize: 12.5,
+                    fontWeight: '600',
+                    color: isDarkMode ? tokens.textSecondary : '#334155',
+                    marginBottom: 6,
+                  };
+
                   return (
-                    <View style={styles.sectionCard}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                    <View
+                      style={{
+                        backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+                        borderRadius: 16,
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? tokens.border : '#E4E4E7',
+                        padding: isSmallMobile ? 16 : 22,
+                        shadowColor: '#000000',
+                        shadowOpacity: 0.03,
+                        shadowRadius: 8,
+                        shadowOffset: { width: 0, height: 2 },
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                         <View
                           style={{
-                            width: 32,
-                            height: 32,
-                            borderRadius: 8,
-                            backgroundColor: tokens.brandLight,
+                            width: 40,
+                            height: 40,
+                            borderRadius: 20,
+                            backgroundColor: isDarkMode ? tokens.brandLight : '#FFF7ED',
                             alignItems: 'center',
                             justifyContent: 'center',
                             borderWidth: 1,
-                            borderColor: tokens.brandBorder,
+                            borderColor: isDarkMode ? tokens.brandBorder : '#FED7AA',
+                            flexShrink: 0,
                           }}
                         >
-                          <BootstrapIcon name="key-fill" size={15} color={tokens.brandPrimary} />
+                          <BootstrapIcon name="key-fill" size={16} color="#EA580C" />
                         </View>
-                        <View>
-                          <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.textPrimary }}>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              fontWeight: '600',
+                              color: isDarkMode ? tokens.textMuted : '#71717A',
+                              textTransform: 'uppercase',
+                              letterSpacing: 0.8,
+                            }}
+                          >
+                            Account Security
+                          </Text>
+                          <Text
+                            style={{
+                              fontSize: 16.5,
+                              fontWeight: '600',
+                              color: isDarkMode ? tokens.textPrimary : '#18181B',
+                              marginTop: 2,
+                              letterSpacing: -0.2,
+                            }}
+                          >
                             Change Password
                           </Text>
-                          <Text style={{ fontSize: 12, color: tokens.textMuted }}>
+                          <Text
+                            style={{
+                              fontSize: 12.5,
+                              fontWeight: '400',
+                              color: isDarkMode ? tokens.textMuted : '#71717A',
+                              marginTop: 1,
+                            }}
+                          >
                             Keep your rider account secured with strong authentication
                           </Text>
                         </View>
                       </View>
 
-                      <View style={{ gap: 14 }}>
+                      <View
+                        style={{
+                          height: 1,
+                          backgroundColor: isDarkMode ? tokens.border : '#F4F4F5',
+                          marginVertical: 16,
+                        }}
+                      />
+
+                      <View style={{ gap: 16 }}>
                         {/* Current Password */}
                         <View>
-                          <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                            Current Password
-                          </Text>
+                          <Text style={cleanFieldLabelStyle}>Current Password</Text>
                           <View style={{ position: 'relative', justifyContent: 'center' }}>
                             <TextInput
-                              style={[styles.inputBox, { paddingRight: 42 }]}
+                              style={[cleanInputStyle, { paddingRight: 42 }]}
                               value={currentPwd}
                               onChangeText={setCurrentPwd}
                               secureTextEntry={!showCurrentPwd}
                               placeholder="••••••••"
-                              placeholderTextColor={tokens.textMuted}
+                              placeholderTextColor={isDarkMode ? tokens.textMuted : '#94A3B8'}
                             />
                             <TouchableOpacity
-                              style={{ position: 'absolute', right: 12, padding: 6 }}
+                              style={{ position: 'absolute', right: 12, padding: 6, cursor: 'pointer' }}
                               onPress={() => setShowCurrentPwd(!showCurrentPwd)}
                               accessibilityLabel={showCurrentPwd ? 'Hide current password' : 'Show current password'}
                             >
-                              <BootstrapIcon name={showCurrentPwd ? 'eye-slash' : 'eye'} size={15} color={tokens.textMuted} />
+                              <BootstrapIcon name={showCurrentPwd ? 'eye-slash' : 'eye'} size={15} color={isDarkMode ? tokens.textMuted : '#64748B'} />
                             </TouchableOpacity>
                           </View>
                         </View>
 
                         {/* New Password & Confirm New Password in 2 Columns */}
-                        <View style={{ flexDirection: windowWidth >= 640 ? 'row' : 'column', gap: 14 }}>
+                        <View style={{ flexDirection: windowWidth >= 640 ? 'row' : 'column', gap: 16 }}>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                              New Password
-                            </Text>
+                            <Text style={cleanFieldLabelStyle}>New Password</Text>
                             <View style={{ position: 'relative', justifyContent: 'center' }}>
                               <TextInput
-                                style={[styles.inputBox, { paddingRight: 42 }]}
+                                style={[cleanInputStyle, { paddingRight: 42 }]}
                                 value={newPwd}
                                 onChangeText={setNewPwd}
                                 secureTextEntry={!showNewPwd}
                                 placeholder="Min 8 characters"
-                                placeholderTextColor={tokens.textMuted}
+                                placeholderTextColor={isDarkMode ? tokens.textMuted : '#94A3B8'}
                               />
                               <TouchableOpacity
-                                style={{ position: 'absolute', right: 12, padding: 6 }}
+                                style={{ position: 'absolute', right: 12, padding: 6, cursor: 'pointer' }}
                                 onPress={() => setShowNewPwd(!showNewPwd)}
                                 accessibilityLabel={showNewPwd ? 'Hide new password' : 'Show new password'}
                               >
-                                <BootstrapIcon name={showNewPwd ? 'eye-slash' : 'eye'} size={15} color={tokens.textMuted} />
+                                <BootstrapIcon name={showNewPwd ? 'eye-slash' : 'eye'} size={15} color={isDarkMode ? tokens.textMuted : '#64748B'} />
                               </TouchableOpacity>
                             </View>
                           </View>
 
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
-                              Confirm New Password
-                            </Text>
+                            <Text style={cleanFieldLabelStyle}>Confirm New Password</Text>
                             <View style={{ position: 'relative', justifyContent: 'center' }}>
                               <TextInput
-                                style={[styles.inputBox, { paddingRight: 42 }]}
+                                style={[cleanInputStyle, { paddingRight: 42 }]}
                                 value={confirmPwd}
                                 onChangeText={setConfirmPwd}
                                 secureTextEntry={!showConfirmPwd}
                                 placeholder="Re-enter password"
-                                placeholderTextColor={tokens.textMuted}
+                                placeholderTextColor={isDarkMode ? tokens.textMuted : '#94A3B8'}
                               />
                               <TouchableOpacity
-                                style={{ position: 'absolute', right: 12, padding: 6 }}
+                                style={{ position: 'absolute', right: 12, padding: 6, cursor: 'pointer' }}
                                 onPress={() => setShowConfirmPwd(!showConfirmPwd)}
                                 accessibilityLabel={showConfirmPwd ? 'Hide confirm password' : 'Show confirm password'}
                               >
-                                <BootstrapIcon name={showConfirmPwd ? 'eye-slash' : 'eye'} size={15} color={tokens.textMuted} />
+                                <BootstrapIcon name={showConfirmPwd ? 'eye-slash' : 'eye'} size={15} color={isDarkMode ? tokens.textMuted : '#64748B'} />
                               </TouchableOpacity>
                             </View>
                           </View>
@@ -5448,17 +5688,43 @@ export default function ProfilePage({
 
                         {/* Real-time Password Strength & Requirements Checklist */}
                         {newPwd.length > 0 && (
-                          <View style={{ backgroundColor: tokens.bgSub, borderRadius: 10, padding: 12, borderWidth: 1, borderColor: tokens.border, gap: 10 }}>
+                          <View
+                            style={{
+                              backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                              borderRadius: 10,
+                              padding: 12,
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? tokens.border : '#E2E8F0',
+                              gap: 10,
+                            }}
+                          >
                             <View>
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-                                <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                <Text
+                                  style={{
+                                    fontSize: 10.5,
+                                    fontWeight: '600',
+                                    color: isDarkMode ? tokens.textMuted : '#64748B',
+                                    textTransform: 'uppercase',
+                                    letterSpacing: 0.5,
+                                  }}
+                                >
                                   Password Strength
                                 </Text>
                                 <Text style={{ fontSize: 11.5, fontWeight: '600', color: strengthColor }}>
                                   {strengthLabel}
                                 </Text>
                               </View>
-                              <View style={{ height: 5, borderRadius: 3, backgroundColor: tokens.bgCard, borderWidth: 1, borderColor: tokens.border, overflow: 'hidden' }}>
+                              <View
+                                style={{
+                                  height: 5,
+                                  borderRadius: 3,
+                                  backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+                                  borderWidth: 1,
+                                  borderColor: isDarkMode ? tokens.border : '#E2E8F0',
+                                  overflow: 'hidden',
+                                }}
+                              >
                                 <View style={{ width: strengthPercent, height: '100%', backgroundColor: strengthColor, borderRadius: 2 }} />
                               </View>
                             </View>
@@ -5468,9 +5734,15 @@ export default function ProfilePage({
                                 <BootstrapIcon
                                   name={hasLength ? 'check-circle-fill' : 'circle'}
                                   size={12}
-                                  color={hasLength ? '#10B981' : tokens.textMuted}
+                                  color={hasLength ? '#10B981' : (isDarkMode ? tokens.textMuted : '#64748B')}
                                 />
-                                <Text style={{ fontSize: 11.5, color: hasLength ? tokens.textPrimary : tokens.textMuted, fontWeight: hasLength ? '600' : '400' }}>
+                                <Text
+                                  style={{
+                                    fontSize: 11.5,
+                                    color: hasLength ? (isDarkMode ? tokens.textPrimary : '#0F172A') : (isDarkMode ? tokens.textMuted : '#64748B'),
+                                    fontWeight: hasLength ? '600' : '400',
+                                  }}
+                                >
                                   At least 8 characters
                                 </Text>
                               </View>
@@ -5479,9 +5751,15 @@ export default function ProfilePage({
                                 <BootstrapIcon
                                   name={hasUpper ? 'check-circle-fill' : 'circle'}
                                   size={12}
-                                  color={hasUpper ? '#10B981' : tokens.textMuted}
+                                  color={hasUpper ? '#10B981' : (isDarkMode ? tokens.textMuted : '#64748B')}
                                 />
-                                <Text style={{ fontSize: 11.5, color: hasUpper ? tokens.textPrimary : tokens.textMuted, fontWeight: hasUpper ? '600' : '400' }}>
+                                <Text
+                                  style={{
+                                    fontSize: 11.5,
+                                    color: hasUpper ? (isDarkMode ? tokens.textPrimary : '#0F172A') : (isDarkMode ? tokens.textMuted : '#64748B'),
+                                    fontWeight: hasUpper ? '600' : '400',
+                                  }}
+                                >
                                   Contains uppercase letter
                                 </Text>
                               </View>
@@ -5490,9 +5768,15 @@ export default function ProfilePage({
                                 <BootstrapIcon
                                   name={hasNumber ? 'check-circle-fill' : 'circle'}
                                   size={12}
-                                  color={hasNumber ? '#10B981' : tokens.textMuted}
+                                  color={hasNumber ? '#10B981' : (isDarkMode ? tokens.textMuted : '#64748B')}
                                 />
-                                <Text style={{ fontSize: 11.5, color: hasNumber ? tokens.textPrimary : tokens.textMuted, fontWeight: hasNumber ? '600' : '400' }}>
+                                <Text
+                                  style={{
+                                    fontSize: 11.5,
+                                    color: hasNumber ? (isDarkMode ? tokens.textPrimary : '#0F172A') : (isDarkMode ? tokens.textMuted : '#64748B'),
+                                    fontWeight: hasNumber ? '600' : '400',
+                                  }}
+                                >
                                   Contains number
                                 </Text>
                               </View>
@@ -5501,9 +5785,15 @@ export default function ProfilePage({
                                 <BootstrapIcon
                                   name={hasSpecial ? 'check-circle-fill' : 'circle'}
                                   size={12}
-                                  color={hasSpecial ? '#10B981' : tokens.textMuted}
+                                  color={hasSpecial ? '#10B981' : (isDarkMode ? tokens.textMuted : '#64748B')}
                                 />
-                                <Text style={{ fontSize: 11.5, color: hasSpecial ? tokens.textPrimary : tokens.textMuted, fontWeight: hasSpecial ? '600' : '400' }}>
+                                <Text
+                                  style={{
+                                    fontSize: 11.5,
+                                    color: hasSpecial ? (isDarkMode ? tokens.textPrimary : '#0F172A') : (isDarkMode ? tokens.textMuted : '#64748B'),
+                                    fontWeight: hasSpecial ? '600' : '400',
+                                  }}
+                                >
                                   Contains special character
                                 </Text>
                               </View>
@@ -5512,13 +5802,19 @@ export default function ProfilePage({
                         )}
 
                         <TouchableOpacity
-                          style={[
-                            styles.btnPrimary,
-                            {
-                              marginTop: 4,
-                              alignSelf: isSmallMobile ? 'stretch' : 'flex-start',
-                            },
-                          ]}
+                          style={{
+                            backgroundColor: '#EA580C',
+                            paddingHorizontal: 16,
+                            paddingVertical: 10,
+                            borderRadius: 8,
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            cursor: 'pointer',
+                            marginTop: 2,
+                            alignSelf: isSmallMobile ? 'stretch' : 'flex-start',
+                          }}
                           onPress={handleChangePassword}
                           disabled={isSavingPwd}
                           activeOpacity={0.85}
@@ -5528,7 +5824,9 @@ export default function ProfilePage({
                           ) : (
                             <>
                               <BootstrapIcon name="shield-lock-fill" size={13} color="#FFFFFF" />
-                              <Text style={styles.btnPrimaryText}>Update Password</Text>
+                              <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>
+                                Update Password
+                              </Text>
                             </>
                           )}
                         </TouchableOpacity>
@@ -5537,73 +5835,162 @@ export default function ProfilePage({
                   );
                 })()}
 
-                {/* 3. Change Email Card */}
-                <View style={styles.sectionCard}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                {/* 3. Account Email Address Card (Booking Form Style) */}
+                <View
+                  style={{
+                    backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? tokens.border : '#E4E4E7',
+                    padding: isSmallMobile ? 16 : 22,
+                    shadowColor: '#000000',
+                    shadowOpacity: 0.03,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 2 },
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                     <View
                       style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 8,
-                        backgroundColor: tokens.brandLight,
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: isDarkMode ? tokens.brandLight : '#FFF7ED',
                         alignItems: 'center',
                         justifyContent: 'center',
                         borderWidth: 1,
-                        borderColor: tokens.brandBorder,
+                        borderColor: isDarkMode ? tokens.brandBorder : '#FED7AA',
+                        flexShrink: 0,
                       }}
                     >
-                      <BootstrapIcon name="envelope-check-fill" size={15} color={tokens.brandPrimary} />
+                      <BootstrapIcon name="envelope-check-fill" size={16} color="#EA580C" />
                     </View>
-                    <View>
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.textPrimary }}>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textMuted : '#71717A',
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.8,
+                        }}
+                      >
+                        Email Credentials
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 16.5,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textPrimary : '#18181B',
+                          marginTop: 2,
+                          letterSpacing: -0.2,
+                        }}
+                      >
                         Account Email Address
                       </Text>
-                      <Text style={{ fontSize: 12, color: tokens.textMuted }}>
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: '400',
+                          color: isDarkMode ? tokens.textMuted : '#71717A',
+                          marginTop: 1,
+                        }}
+                      >
                         Currently signed in as: {currentUser?.email || 'N/A'}
                       </Text>
                     </View>
                   </View>
 
-                  <View style={{ gap: 14 }}>
-                    <View style={{ flexDirection: windowWidth >= 640 ? 'row' : 'column', gap: 14 }}>
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: isDarkMode ? tokens.border : '#F4F4F5',
+                      marginVertical: 16,
+                    }}
+                  />
+
+                  <View style={{ gap: 16 }}>
+                    <View style={{ flexDirection: windowWidth >= 640 ? 'row' : 'column', gap: 16 }}>
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                        <Text
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textSecondary : '#334155',
+                            marginBottom: 6,
+                          }}
+                        >
                           New Email Address
                         </Text>
                         <TextInput
-                          style={styles.inputBox}
+                          style={{
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF',
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? tokens.border : '#CBD5E1',
+                            borderRadius: 8,
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            fontSize: 13.5,
+                            fontWeight: '400',
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                            ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                          }}
                           value={newEmail}
                           onChangeText={setNewEmail}
                           placeholder="rider@newemail.com"
-                          placeholderTextColor={tokens.textMuted}
+                          placeholderTextColor={isDarkMode ? tokens.textMuted : '#94A3B8'}
                           keyboardType="email-address"
                           autoCapitalize="none"
                         />
                       </View>
 
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 10.5, fontWeight: '700', color: tokens.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+                        <Text
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: '600',
+                            color: isDarkMode ? tokens.textSecondary : '#334155',
+                            marginBottom: 6,
+                          }}
+                        >
                           Confirm with Current Password
                         </Text>
                         <TextInput
-                          style={styles.inputBox}
+                          style={{
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#FFFFFF',
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? tokens.border : '#CBD5E1',
+                            borderRadius: 8,
+                            paddingHorizontal: 14,
+                            paddingVertical: 10,
+                            fontSize: 13.5,
+                            fontWeight: '400',
+                            color: isDarkMode ? tokens.textPrimary : '#0F172A',
+                            ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+                          }}
                           value={emailPwd}
                           onChangeText={setEmailPwd}
                           secureTextEntry
                           placeholder="Current password"
-                          placeholderTextColor={tokens.textMuted}
+                          placeholderTextColor={isDarkMode ? tokens.textMuted : '#94A3B8'}
                         />
                       </View>
                     </View>
 
                     <TouchableOpacity
-                      style={[
-                        styles.btnPrimary,
-                        {
-                          marginTop: 4,
-                          alignSelf: isSmallMobile ? 'stretch' : 'flex-start',
-                        },
-                      ]}
+                      style={{
+                        backgroundColor: '#EA580C',
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        borderRadius: 8,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 6,
+                        cursor: 'pointer',
+                        marginTop: 2,
+                        alignSelf: isSmallMobile ? 'stretch' : 'flex-start',
+                      }}
                       onPress={handleChangeEmail}
                       disabled={isSavingEmail}
                       activeOpacity={0.85}
@@ -5613,24 +6000,97 @@ export default function ProfilePage({
                       ) : (
                         <>
                           <BootstrapIcon name="check2" size={14} color="#FFFFFF" />
-                          <Text style={styles.btnPrimaryText}>Save Email Address</Text>
+                          <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '600' }}>
+                            Save Email Address
+                          </Text>
                         </>
                       )}
                     </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* Account Activity Logs */}
-                <View style={styles.sectionCard}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-                    <BootstrapIcon name="shield-lock" size={18} color={tokens.brandPrimary} />
-                    <Text style={{ fontSize: 16, fontWeight: '600', color: tokens.textPrimary }}>
-                      Security Activity History
-                    </Text>
+                {/* 4. Security Activity History Card (Booking ReviewCard Style) */}
+                <View
+                  style={{
+                    backgroundColor: isDarkMode ? tokens.bgCard : '#FFFFFF',
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: isDarkMode ? tokens.border : '#E4E4E7',
+                    padding: isSmallMobile ? 16 : 22,
+                    shadowColor: '#000000',
+                    shadowOpacity: 0.03,
+                    shadowRadius: 8,
+                    shadowOffset: { width: 0, height: 2 },
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                    <View
+                      style={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 20,
+                        backgroundColor: isDarkMode ? tokens.brandLight : '#FFF7ED',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderColor: isDarkMode ? tokens.brandBorder : '#FED7AA',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <BootstrapIcon name="shield-lock" size={16} color="#EA580C" />
+                    </View>
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text
+                        style={{
+                          fontSize: 10,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textMuted : '#71717A',
+                          textTransform: 'uppercase',
+                          letterSpacing: 0.8,
+                        }}
+                      >
+                        Security Telemetry
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 16.5,
+                          fontWeight: '600',
+                          color: isDarkMode ? tokens.textPrimary : '#18181B',
+                          marginTop: 2,
+                          letterSpacing: -0.2,
+                        }}
+                      >
+                        Security Activity History
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 12.5,
+                          fontWeight: '400',
+                          color: isDarkMode ? tokens.textMuted : '#71717A',
+                          marginTop: 1,
+                        }}
+                      >
+                        Recent authentication and account security events
+                      </Text>
+                    </View>
                   </View>
 
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: isDarkMode ? tokens.border : '#F4F4F5',
+                      marginVertical: 16,
+                    }}
+                  />
+
                   {accountLogs.length === 0 ? (
-                    <Text style={{ fontSize: 12.5, color: tokens.textMuted }}>
+                    <Text
+                      style={{
+                        fontSize: 12.5,
+                        fontWeight: '400',
+                        color: isDarkMode ? tokens.textMuted : '#71717A',
+                      }}
+                    >
                       No security alerts recorded. Your account status is clean and healthy.
                     </Text>
                   ) : (
@@ -5639,17 +6099,35 @@ export default function ProfilePage({
                         <View
                           key={idx}
                           style={{
-                            padding: 10,
-                            borderRadius: 8,
-                            backgroundColor: tokens.bgSub,
+                            paddingVertical: 10,
+                            paddingHorizontal: 12,
+                            borderRadius: 10,
+                            backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? tokens.border : '#F1F5F9',
                             flexDirection: 'row',
                             justifyContent: 'space-between',
+                            alignItems: 'center',
+                            gap: 12,
                           }}
                         >
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: tokens.textPrimary }}>
+                          <Text
+                            style={{
+                              fontSize: 12.5,
+                              fontWeight: '600',
+                              color: isDarkMode ? tokens.textPrimary : '#18181B',
+                            }}
+                          >
                             {log.action}
                           </Text>
-                          <Text style={{ fontSize: 11, color: tokens.textMuted }}>
+                          <Text
+                            style={{
+                              fontSize: 11.5,
+                              fontWeight: '400',
+                              color: isDarkMode ? tokens.textMuted : '#71717A',
+                              fontVariant: ['tabular-nums'],
+                            }}
+                          >
                             {log.timestamp || 'Recent'}
                           </Text>
                         </View>
@@ -5715,7 +6193,7 @@ export default function ProfilePage({
                 backgroundColor: tokens.bgCard,
               }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
                 <View
                   style={{
                     width: 42,
@@ -5730,7 +6208,7 @@ export default function ProfilePage({
                 >
                   <BootstrapIcon name="file-earmark-text" size={20} color={tokens.brandPrimary} />
                 </View>
-                <View>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={{ fontSize: 18, fontWeight: '700', color: tokens.textPrimary, letterSpacing: -0.3 }}>
                     Booking Details & Quotation
                   </Text>

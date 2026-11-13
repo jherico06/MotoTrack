@@ -138,7 +138,7 @@ export default function CustomerInformationScreen({
             gap: 14,
           }}
         >
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14, flex: 1, minWidth: 0 }}>
             <View
               style={{
                 width: 46,
@@ -153,7 +153,7 @@ export default function CustomerInformationScreen({
             >
               <BootstrapIcon name="bicycle" size={22} color="#EA580C" />
             </View>
-            <View>
+            <View style={{ flex: 1, minWidth: 0 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <Text style={{ fontSize: 16.5, fontWeight: '700', color: '#0F172A', letterSpacing: -0.2 }}>
                   {motoBrand} {motoModel}

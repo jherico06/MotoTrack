@@ -599,7 +599,7 @@ export default function ProductDetailsPageWeb({
             </TouchableOpacity>)}
 
             {/* Auth */}
-            {currentUser && !isMobile ? (
+            {currentUser ? (
               <UserProfileButton
                 currentUser={currentUser}
                 onPress={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
@@ -1420,10 +1420,12 @@ export default function ProductDetailsPageWeb({
           else if (screen === 'garage') onNavigateToScreen?.('garage');
           else if (screen === 'customizer') onNavigateToScreen?.('customizer');
           else if (screen === 'wishlist') onNavigateToWishlist?.();
+          else if (screen === 'cart') setIsCartOpen(true);
           else if (screen === 'profile' || screen === 'orders' || screen === 'notifications') {
             onNavigateToOrders?.();
           } else if (screen === 'login') onNavigateToLogin?.();
         }}
+        onOpenCart={() => setIsCartOpen(true)}
       />
     </View>
   );

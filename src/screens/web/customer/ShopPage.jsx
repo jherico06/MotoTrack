@@ -1028,8 +1028,8 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
               )}
             </TouchableOpacity>)}
 
-            {/* Auth: Sign In & Sign Up OR Logged In Profile (Dropdown only on desktop/tablet; sidebar on mobile) */}
-            {currentUser && windowWidth >= 768 ? (
+            {/* Auth: Sign In & Sign Up OR Logged In Profile */}
+            {currentUser ? (
               <View style={[webStyles.loggedInContainer, { position: 'relative' }]}>
                 <UserProfileButton
                   currentUser={currentUser}
@@ -1037,7 +1037,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                     setIsNotifDropdownOpen(false);
                     setIsProfileDropdownOpen(!isProfileDropdownOpen);
                   }}
-                  size={40}
+                  size={windowWidth < 400 ? 34 : 40}
                 />
 
                 <UserProfileDropdown
@@ -2555,6 +2555,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
         onClose={() => setIsMobileNavOpen(false)}
         currentScreen="shop"
         onNavigateToScreen={onNavigateToScreen}
+        onOpenCart={() => setIsCartOpen(true)}
         unreadNotifCount={unreadNotifCount}
       />
     </View>

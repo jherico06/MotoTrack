@@ -500,7 +500,7 @@ export default function CartPageWeb({
               )}
 
               {/* User Profile / Sign In */}
-              {currentUser && !isMobile ? (
+              {currentUser ? (
                 <View style={[cStyles.loggedInContainer, { position: 'relative' }]}>
                   <UserProfileButton
                     currentUser={currentUser}
@@ -508,7 +508,7 @@ export default function CartPageWeb({
                       setIsNotifDropdownOpen(false);
                       setIsUserDropdownOpen((prev) => !prev);
                     }}
-                    size={40}
+                    size={windowWidth < 400 ? 34 : 40}
                   />
                   <UserProfileDropdown
                     currentUser={currentUser}
@@ -533,7 +533,7 @@ export default function CartPageWeb({
                     onToggleDarkMode={toggleDarkMode}
                   />
                 </View>
-              ) : !currentUser ? (
+              ) : (
                 <TouchableOpacity
                   style={cStyles.signInHeaderBtn}
                   onPress={() => navigateFromCart('login')}
@@ -542,7 +542,7 @@ export default function CartPageWeb({
                   <BootstrapIcon name="person" size={16} color="#FFFFFF" />
                   <Text style={cStyles.signInHeaderBtnText}>Sign In</Text>
                 </TouchableOpacity>
-              ) : null}
+              )}
             </View>
           </View>
         </View>
@@ -1210,6 +1210,7 @@ export default function CartPageWeb({
           setIsMobileNavOpen(false);
           navigateFromCart(screen, params);
         }}
+        onOpenCart={() => setIsMobileNavOpen(false)}
         unreadNotifCount={unreadNotifCount}
       />
     </View>

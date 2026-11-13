@@ -2,7 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, Image, StyleSheet, Platform, useWindowDimensions } from 'react-native';
 import BootstrapIcon from './BootstrapIcon.jsx';
 
-export default function UserProfileButton({ currentUser, onPress, size = 40, hideOnMobile = true }) {
+export default function UserProfileButton({ currentUser, onPress, size = 40, hideOnMobile = false }) {
   const { width: windowWidth } = useWindowDimensions();
   const [imageError, setImageError] = React.useState(false);
 

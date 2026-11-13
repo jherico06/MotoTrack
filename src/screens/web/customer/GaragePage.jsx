@@ -1910,8 +1910,8 @@ export default function GaragePageWeb({
                 )}
               </TouchableOpacity>)}
 
-              {/* Auth: Sign In & Sign Up OR Logged In Profile (Dropdown only on desktop/tablet; sidebar on mobile) */}
-              {currentUser && windowWidth >= 768 ? (
+              {/* Auth: Sign In & Sign Up OR Logged In Profile */}
+              {currentUser ? (
                 <View style={[gStyles.loggedInContainer, { position: 'relative' }]}>
                   <UserProfileButton
                     currentUser={currentUser}
@@ -1919,7 +1919,7 @@ export default function GaragePageWeb({
                       setIsNotifDropdownOpen(false);
                       setIsUserDropdownOpen(!isUserDropdownOpen);
                     }}
-                    size={40}
+                    size={windowWidth < 400 ? 34 : 40}
                   />
 
                   <UserProfileDropdown
@@ -2875,7 +2875,7 @@ export default function GaragePageWeb({
                 borderBottomColor: 'rgba(255, 255, 255, 0.08)',
               }}
             >
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
                 <View
                   style={{
                     width: 34,
@@ -2888,7 +2888,7 @@ export default function GaragePageWeb({
                 >
                   <BootstrapIcon name="tools" size={17} color="#FFFFFF" />
                 </View>
-                <View>
+                <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={{ fontSize: 14.5, fontWeight: '700', color: '#FFFFFF' }}>
                     Service Booking & Package Marketplace
                   </Text>
@@ -3169,12 +3169,14 @@ export default function GaragePageWeb({
         onNavigateToScreen={(screen, params) => {
           if (screen === 'shop') onNavigateToStore?.();
           else if (screen === 'garage') setActiveTab('All');
+          else if (screen === 'cart') setIsCartOpen(true);
           else if (screen === 'customizer') onNavigateToCustomizer ? onNavigateToCustomizer() : onNavigateToCustomize?.();
           else if (screen === 'wishlist') onNavigateToWishlist?.();
           else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
           else if (screen === 'login') onNavigateToLogin?.();
           else if (screen === 'admin') onNavigateToAdmin?.();
         }}
+        onOpenCart={() => setIsCartOpen(true)}
         unreadNotifCount={unreadNotifCount}
       />
     </View>
