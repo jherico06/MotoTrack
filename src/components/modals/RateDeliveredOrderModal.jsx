@@ -13,10 +13,11 @@ import {
   TouchableWithoutFeedback,
   useWindowDimensions,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { BootstrapIcon } from '../common/BootstrapIcon.jsx';
 import { orderService } from '../../services/orders/orderService.js';
 import { productService } from '../../services/products/productService.js';
 import { useCart } from '../../context/CartContext.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import { pickImageFromFile } from '../../utils/imagePickerHelper.js';
 import { uploadProductImage } from '../../utils/productImageUpload.js';
 
@@ -43,10 +44,14 @@ export default function RateDeliveredOrderModal({
   currentUser = null,
   onClose = () => {},
   onSubmitSuccess = () => {},
+  isDarkMode: isDarkProp,
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
   const { showToast } = useCart();
+  const { isDarkMode: themeDark } = useTheme();
+  const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
+  const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
   const [itemsRatings, setItemsRatings] = useState({});
   const [courierRating, setCourierRating] = useState(5);
   const [overallFeedback, setOverallFeedback] = useState('');
@@ -295,7 +300,7 @@ export default function RateDeliveredOrderModal({
               <View style={styles.header}>
                 <View style={styles.headerLeft}>
                   <View style={styles.headerIconWrap}>
-                    <BootstrapIcon name="star-fill" size={18} color="#D97706" />
+                    <BootstrapIcon name="star-fill" size={18} color={isDarkMode ? '#FBBF24' : '#D97706'} />
                   </View>
                   <View>
                     <Text style={styles.headerTitle}>
@@ -305,7 +310,7 @@ export default function RateDeliveredOrderModal({
                   </View>
                 </View>
                 <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.75}>
-                  <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+                  <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#94A3B8' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
@@ -313,7 +318,11 @@ export default function RateDeliveredOrderModal({
                 {/* ─── VERIFIED DELIVERY BANNER ─── */}
                 <View style={styles.deliveryBadgeBanner}>
                   <View style={styles.checkCircle}>
-                    <BootstrapIcon name="check-circle-fill" size={16} color="#15803D" />
+                    <BootstrapIcon
+                      name="check-circle-fill"
+                      size={16}
+                      color={isDarkMode ? '#4ADE80' : '#15803D'}
+                    />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.deliveryBannerTitle}>Verified Delivery Complete</Text>
@@ -540,419 +549,426 @@ export default function RateDeliveredOrderModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: 'flex-end',
-    ...(Platform.OS === 'web' ? { backdropFilter: 'blur(4px)' } : {}),
-  },
-  backdropDesktop: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: '92%',
-    paddingTop: 16,
-    paddingBottom: Platform.OS === 'ios' ? 30 : 16,
-    paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 20,
-    width: '100%',
-  },
-  modalCardDesktop: {
-    maxWidth: 580,
-    borderRadius: 24,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    maxHeight: '85%',
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 24,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.22,
-    shadowRadius: 30,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flex: 1,
-  },
-  headerIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  headerSub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 1,
-    fontWeight: '600',
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollArea: {
-    marginVertical: 12,
-  },
-  deliveryBadgeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#F0FDF4',
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 16,
-  },
-  checkCircle: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#DCFCE7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  deliveryBannerTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#15803D',
-  },
-  deliveryBannerSub: {
-    fontSize: 11.5,
-    color: '#166534',
-    marginTop: 2,
-    lineHeight: 16,
-  },
-  sectionHeading: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginBottom: 10,
-  },
-  itemReviewCard: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 12,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  productRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
-    paddingBottom: 10,
-  },
-  productThumb: {
-    width: 50,
-    height: 50,
-    borderRadius: 10,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  productInfo: {
-    flex: 1,
-  },
-  productBrand: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: '#EA580C',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  productName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
-    marginTop: 1,
-  },
-  productPrice: {
-    fontSize: 11.5,
-    color: '#64748B',
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  starRatingSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  rateQuestionLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#475569',
-    marginBottom: 6,
-  },
-  starRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  starBtn: {
-    padding: 4,
-  },
-  starSentimentText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#D97706',
-    marginTop: 4,
-  },
-  quickTagsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginVertical: 8,
-  },
-  tagPill: {
-    paddingHorizontal: 9,
-    paddingVertical: 4.5,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  tagPillActive: {
-    backgroundColor: '#F0FDF4',
-    borderColor: '#86EFAC',
-  },
-  tagPillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  tagPillTextActive: {
-    color: '#15803D',
-    fontWeight: '600',
-  },
-  commentInputWrap: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginTop: 4,
-  },
-  commentInput: {
-    fontSize: 12.5,
-    color: '#0F172A',
-    minHeight: 44,
-    textAlignVertical: 'top',
-    ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
-  },
-  photosSection: {
-    marginTop: 10,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
-    padding: 10,
-  },
-  photosHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  photosLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#334155',
-  },
-  photosCount: {
-    fontSize: 11,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  photosGrid: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 6,
-  },
-  photoThumbWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
-    position: 'relative',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    backgroundColor: '#FFFFFF',
-  },
-  photoThumb: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 9,
-  },
-  removePhotoBtn: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  addPhotoTile: {
-    width: 64,
-    height: 64,
-    borderRadius: 10,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderStyle: 'dashed',
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    cursor: 'pointer',
-  },
-  addPhotoIconCircle: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#FFF7ED',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addPhotoText: {
-    fontSize: 9.5,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  photosHint: {
-    fontSize: 10.5,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
-  courierSectionCard: {
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
-  },
-  courierHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  courierIconWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: '#FFF7ED',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  courierTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  courierSub: {
-    fontSize: 11,
-    color: '#64748B',
-  },
-  courierStarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 10,
-  },
-  courierStarBtn: {
-    padding: 2,
-  },
-  courierRatingLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#D97706',
-    marginLeft: 6,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  cancelBtn: {
-    flex: 0.8,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  submitBtn: {
-    flex: 1.5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: '#EA580C',
-    shadowColor: '#EA580C',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  submitBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-});
+const createStyles = (isDarkMode) =>
+  StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: isDarkMode ? 'rgba(2, 6, 23, 0.72)' : 'rgba(15, 23, 42, 0.65)',
+      justifyContent: 'flex-end',
+      ...(Platform.OS === 'web' ? { backdropFilter: 'blur(4px)' } : {}),
+    },
+    backdropDesktop: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    modalCard: {
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      maxHeight: '92%',
+      paddingTop: 16,
+      paddingBottom: Platform.OS === 'ios' ? 30 : 16,
+      paddingHorizontal: 16,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: isDarkMode ? 0.45 : 0.15,
+      shadowRadius: 16,
+      elevation: 20,
+      width: '100%',
+    },
+    modalCardDesktop: {
+      maxWidth: 580,
+      borderRadius: 24,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+      maxHeight: '85%',
+      paddingHorizontal: 24,
+      paddingTop: 20,
+      paddingBottom: 24,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: isDarkMode ? 0.5 : 0.22,
+      shadowRadius: 30,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: isDarkMode ? '#282D34' : '#F1F5F9',
+    },
+    headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      flex: 1,
+    },
+    headerIconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(251, 191, 36, 0.35)' : '#FDE68A',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    headerSub: {
+      fontSize: 12,
+      color: '#94A3B8',
+      marginTop: 1,
+      fontWeight: '600',
+    },
+    closeBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scrollArea: {
+      marginVertical: 12,
+    },
+    deliveryBadgeBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.14)' : '#F0FDF4',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(74, 222, 128, 0.3)' : '#BBF7D0',
+      borderRadius: 14,
+      padding: 12,
+      marginBottom: 16,
+    },
+    checkCircle: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.22)' : '#DCFCE7',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    deliveryBannerTitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDarkMode ? '#4ADE80' : '#15803D',
+    },
+    deliveryBannerSub: {
+      fontSize: 11.5,
+      color: isDarkMode ? '#86EFAC' : '#166534',
+      marginTop: 2,
+      lineHeight: 16,
+    },
+    sectionHeading: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      marginBottom: 10,
+    },
+    itemReviewCard: {
+      backgroundColor: isDarkMode ? '#181B1F' : '#FFFFFF',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderRadius: 16,
+      padding: 12,
+      marginBottom: 12,
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: isDarkMode ? 0.2 : 0.03,
+      shadowRadius: 3,
+      elevation: 1,
+    },
+    productRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: isDarkMode ? '#282D34' : '#F8FAFC',
+      paddingBottom: 10,
+    },
+    productThumb: {
+      width: 50,
+      height: 50,
+      borderRadius: 10,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    },
+    productInfo: {
+      flex: 1,
+    },
+    productBrand: {
+      fontSize: 10.5,
+      fontWeight: '700',
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+      textTransform: 'uppercase',
+      letterSpacing: 0.4,
+    },
+    productName: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: isDarkMode ? '#F8FAFC' : '#1E293B',
+      marginTop: 1,
+    },
+    productPrice: {
+      fontSize: 11.5,
+      color: '#94A3B8',
+      fontWeight: '600',
+      marginTop: 2,
+    },
+    starRatingSection: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+    },
+    rateQuestionLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDarkMode ? '#CBD5E1' : '#475569',
+      marginBottom: 6,
+    },
+    starRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    starBtn: {
+      padding: 4,
+    },
+    starSentimentText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDarkMode ? '#FBBF24' : '#D97706',
+      marginTop: 4,
+    },
+    quickTagsContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 6,
+      marginVertical: 8,
+    },
+    tagPill: {
+      paddingHorizontal: 9,
+      paddingVertical: 4.5,
+      borderRadius: 14,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    },
+    tagPillActive: {
+      backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.16)' : '#F0FDF4',
+      borderColor: isDarkMode ? 'rgba(74, 222, 128, 0.4)' : '#86EFAC',
+    },
+    tagPillText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: isDarkMode ? '#94A3B8' : '#64748B',
+    },
+    tagPillTextActive: {
+      color: isDarkMode ? '#4ADE80' : '#15803D',
+      fontWeight: '600',
+    },
+    commentInputWrap: {
+      backgroundColor: isDarkMode ? '#14181D' : '#F8FAFC',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#333A42' : '#E2E8F0',
+      borderRadius: 12,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      marginTop: 4,
+    },
+    commentInput: {
+      fontSize: 12.5,
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      minHeight: 44,
+      textAlignVertical: 'top',
+      ...(Platform.OS === 'web' ? { outlineStyle: 'none' } : {}),
+    },
+    photosSection: {
+      marginTop: 10,
+      backgroundColor: isDarkMode ? '#14181D' : '#F8FAFC',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderRadius: 12,
+      padding: 10,
+    },
+    photosHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 8,
+    },
+    photosLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDarkMode ? '#E2E8F0' : '#334155',
+    },
+    photosCount: {
+      fontSize: 11,
+      color: '#94A3B8',
+      fontWeight: '600',
+    },
+    photosGrid: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginBottom: 6,
+    },
+    photoThumbWrap: {
+      width: 64,
+      height: 64,
+      borderRadius: 10,
+      position: 'relative',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+    },
+    photoThumb: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 9,
+    },
+    removePhotoBtn: {
+      position: 'absolute',
+      top: -6,
+      right: -6,
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      borderRadius: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.2,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    addPhotoTile: {
+      width: 64,
+      height: 64,
+      borderRadius: 10,
+      borderWidth: 1.5,
+      borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
+      borderStyle: 'dashed',
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      cursor: 'pointer',
+    },
+    addPhotoIconCircle: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.16)' : '#FFF7ED',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addPhotoText: {
+      fontSize: 9.5,
+      fontWeight: '600',
+      color: '#94A3B8',
+    },
+    photosHint: {
+      fontSize: 10.5,
+      color: '#94A3B8',
+      marginTop: 2,
+    },
+    courierSectionCard: {
+      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderRadius: 16,
+      padding: 12,
+      marginBottom: 10,
+    },
+    courierHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    courierIconWrap: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.16)' : '#FFF7ED',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    courierTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    courierSub: {
+      fontSize: 11,
+      color: '#94A3B8',
+    },
+    courierStarRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginTop: 10,
+    },
+    courierStarBtn: {
+      padding: 2,
+    },
+    courierRatingLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDarkMode ? '#FBBF24' : '#D97706',
+      marginLeft: 6,
+    },
+    footer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: isDarkMode ? '#282D34' : '#F1F5F9',
+    },
+    cancelBtn: {
+      flex: 0.8,
+      paddingVertical: 12,
+      borderRadius: 14,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cancelBtnText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: isDarkMode ? '#CBD5E1' : '#475569',
+    },
+    submitBtn: {
+      flex: 1.5,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      borderRadius: 14,
+      backgroundColor: '#EA580C',
+      shadowColor: '#EA580C',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    submitBtnText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+  });

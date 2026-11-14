@@ -212,14 +212,21 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
         background: #C2410C;
       }
       /* Utility to hide scrollbar if specifically requested */
-      .no-scrollbar::-webkit-scrollbar {
+      .no-scrollbar::-webkit-scrollbar,
+      .no-scrollbar *::-webkit-scrollbar,
+      [data-no-scrollbar="true"]::-webkit-scrollbar,
+      [data-no-scrollbar="true"] *::-webkit-scrollbar {
         display: none !important;
         width: 0 !important;
         height: 0 !important;
       }
-      .no-scrollbar {
+      .no-scrollbar,
+      .no-scrollbar *,
+      [data-no-scrollbar="true"],
+      [data-no-scrollbar="true"] * {
         scrollbar-width: none !important;
         -ms-overflow-style: none !important;
+        scrollbar-color: transparent transparent !important;
       }
       /* Hide native browser password reveal eye (Edge / IE / Chromium) & clear buttons */
       input::-ms-reveal,

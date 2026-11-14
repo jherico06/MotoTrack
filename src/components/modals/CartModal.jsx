@@ -3,9 +3,12 @@ import { View, Text, TouchableOpacity, ScrollView, Image, TextInput, Modal, useW
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { shopStyles as styles } from '../../styles/shop.styles.js';
 import { useCart } from '../../context/CartContext.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import { promoService } from '../../services/products/promoService.js';
 
-export default function CartModal({ visible, onClose, onProceedToCheckout }) {
+export default function CartModal({ visible, onClose, onProceedToCheckout, isDarkMode: isDarkProp }) {
+  const { isDarkMode: themeDark } = useTheme();
+  const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
   const { width: windowWidth } = useWindowDimensions();
   const {
     cart,
@@ -61,6 +64,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
       <View
         style={[
           styles.modalOverlay,
+          isDarkMode && { backgroundColor: 'rgba(2, 6, 23, 0.72)' },
           isDesktop && {
             justifyContent: 'center',
             alignItems: 'center',
@@ -76,6 +80,11 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
         <View
           style={[
             styles.modalSheet,
+            isDarkMode && {
+              backgroundColor: '#181B1F',
+              borderWidth: 1,
+              borderColor: '#282D34',
+            },
             isDesktop && {
               borderRadius: 24,
               borderTopLeftRadius: 24,
@@ -83,7 +92,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
               maxHeight: '90%',
               maxWidth: 580,
               alignSelf: 'center',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
+              boxShadow: isDarkMode ? '0 24px 60px rgba(0, 0, 0, 0.55)' : '0 20px 60px rgba(0, 0, 0, 0.25)',
             },
             windowWidth < 400 && { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 24 },
           ]}
@@ -95,32 +104,39 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                   width: 38,
                   height: 38,
                   borderRadius: 12,
-                  backgroundColor: '#FFF7ED',
+                  backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.16)' : '#FFF7ED',
                   borderWidth: 1,
-                  borderColor: '#FED7AA',
+                  borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.35)' : '#FED7AA',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <BootstrapIcon name="cart-fill" size={16} color="#EA580C" />
+                <BootstrapIcon name="cart-fill" size={16} color={isDarkMode ? '#FB923C' : '#EA580C'} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.modalTitle}>Your Cart</Text>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                <Text style={[styles.modalTitle, { fontWeight: '700' }, isDarkMode && { color: '#F8FAFC' }]}>
+                  Your Cart
+                </Text>
+                <Text style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 1 }}>
                   {cartItemCount} {cartItemCount === 1 ? 'item' : 'items'} in your bag
                 </Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
-              <BootstrapIcon name="x-lg" size={14} color="#64748b" />
+            <TouchableOpacity
+              style={[styles.modalCloseBtn, isDarkMode && { backgroundColor: '#252A30' }]}
+              onPress={onClose}
+            >
+              <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#94A3B8' : '#64748B'} />
             </TouchableOpacity>
           </View>
 
           {cart.length === 0 ? (
             <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-              <BootstrapIcon name="cart-x" size={42} color="#94A3B8" style={{ marginBottom: 12 }} />
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#0F172A' }}>Your cart is empty</Text>
-              <Text style={{ fontSize: 13, color: '#64748B', marginTop: 4 }}>
+              <BootstrapIcon name="cart-x" size={42} color={isDarkMode ? '#64748B' : '#94A3B8'} style={{ marginBottom: 12 }} />
+              <Text style={{ fontSize: 16, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                Your cart is empty
+              </Text>
+              <Text style={{ fontSize: 13, color: isDarkMode ? '#94A3B8' : '#64748B', marginTop: 4 }}>
                 Browse our catalog and add motorcycle pro gear to your cart!
               </Text>
             </View>
@@ -135,7 +151,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                   paddingVertical: 10,
                   paddingHorizontal: 4,
                   borderBottomWidth: 1,
-                  borderBottomColor: '#F1F5F9',
+                  borderBottomColor: isDarkMode ? '#282D34' : '#F1F5F9',
                   marginBottom: 6,
                 }}
               >
@@ -150,15 +166,15 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                       height: 22,
                       borderRadius: 6,
                       borderWidth: 1.8,
-                      borderColor: isAllSelected ? '#EA580C' : '#CBD5E1',
-                      backgroundColor: isAllSelected ? '#EA580C' : '#FFFFFF',
+                      borderColor: isAllSelected ? '#EA580C' : isDarkMode ? '#333A42' : '#CBD5E1',
+                      backgroundColor: isAllSelected ? '#EA580C' : isDarkMode ? '#14181D' : '#FFFFFF',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
                     {isAllSelected && <BootstrapIcon name="check" size={15} color="#FFFFFF" />}
                   </View>
-                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#0F172A' }}>
+                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
                     Select All ({cart.length})
                   </Text>
                 </TouchableOpacity>
@@ -166,18 +182,18 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                 {hasSelectedItems ? (
                   <View
                     style={{
-                      backgroundColor: '#FFF7ED',
+                      backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.16)' : '#FFF7ED',
                       paddingHorizontal: 8,
                       paddingVertical: 3,
                       borderRadius: 12,
                     }}
                   >
-                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#EA580C' }}>
+                    <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? '#FB923C' : '#EA580C' }}>
                       {selectedCartItems.length} selected ({selectedCartItemCount} {selectedCartItemCount === 1 ? 'unit' : 'units'})
                     </Text>
                   </View>
                 ) : (
-                  <Text style={{ fontSize: 12, color: '#94A3B8', fontWeight: '500' }}>
+                  <Text style={{ fontSize: 12, color: isDarkMode ? '#64748B' : '#94A3B8', fontWeight: '500' }}>
                     0 selected
                   </Text>
                 )}
@@ -192,6 +208,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                       key={product.id ? `cart-${product.id}-${lineSize || cIdx}` : `cart-item-${cIdx}`}
                       style={[
                         styles.cartItemRow,
+                        isDarkMode && { borderBottomColor: '#282D34' },
                         windowWidth < 380 && { gap: 8 },
                         !isChecked && { opacity: 0.72 },
                       ]}
@@ -213,8 +230,8 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                             height: 22,
                             borderRadius: 6,
                             borderWidth: 1.8,
-                            borderColor: isChecked ? '#EA580C' : '#CBD5E1',
-                            backgroundColor: isChecked ? '#EA580C' : '#FFFFFF',
+                            borderColor: isChecked ? '#EA580C' : isDarkMode ? '#333A42' : '#CBD5E1',
+                            backgroundColor: isChecked ? '#EA580C' : isDarkMode ? '#14181D' : '#FFFFFF',
                             alignItems: 'center',
                             justifyContent: 'center',
                           }}
@@ -223,31 +240,73 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                         </View>
                       </TouchableOpacity>
 
-                      <Image source={{ uri: product.image }} style={[styles.cartItemThumb, windowWidth < 380 && { width: 48, height: 48 }]} />
+                      <Image
+                        source={{ uri: product.image }}
+                        style={[
+                          styles.cartItemThumb,
+                          isDarkMode && { backgroundColor: '#252A30' },
+                          windowWidth < 380 && { width: 48, height: 48 },
+                        ]}
+                      />
                       <View style={styles.cartItemInfo}>
-                        <Text style={styles.cartItemTitle} numberOfLines={1}>
+                        <Text
+                          style={[styles.cartItemTitle, isDarkMode && { color: '#F8FAFC' }]}
+                          numberOfLines={1}
+                        >
                           {product.name}
                         </Text>
-                        <Text style={styles.cartItemBrand}>
+                        <Text style={[styles.cartItemBrand, isDarkMode && { color: '#94A3B8' }]}>
                           {product.brand}
                           {lineSize ? ` · Size ${lineSize}` : ''}
                         </Text>
-                        <Text style={styles.cartItemPrice}>₱{(product.price * quantity).toFixed(2)}</Text>
+                        <Text
+                          style={[
+                            styles.cartItemPrice,
+                            { fontWeight: '700' },
+                            isDarkMode && { color: '#FB923C' },
+                          ]}
+                        >
+                          ₱{(product.price * quantity).toFixed(2)}
+                        </Text>
                       </View>
 
                       <View style={styles.cartQtyControls}>
                         <TouchableOpacity
-                          style={styles.cartQtyBtn}
+                          style={[styles.cartQtyBtn, isDarkMode && { backgroundColor: '#252A30' }]}
                           onPress={() => updateCartQuantity(product.id, -1, lineSize)}
                         >
-                          <Text style={styles.cartQtyBtnText}>-</Text>
+                          <Text
+                            style={[
+                              styles.cartQtyBtnText,
+                              { fontWeight: '700' },
+                              isDarkMode && { color: '#F8FAFC' },
+                            ]}
+                          >
+                            -
+                          </Text>
                         </TouchableOpacity>
-                        <Text style={styles.cartQtyNumber}>{quantity}</Text>
+                        <Text
+                          style={[
+                            styles.cartQtyNumber,
+                            { fontWeight: '700' },
+                            isDarkMode && { color: '#F8FAFC' },
+                          ]}
+                        >
+                          {quantity}
+                        </Text>
                         <TouchableOpacity
-                          style={styles.cartQtyBtn}
+                          style={[styles.cartQtyBtn, isDarkMode && { backgroundColor: '#252A30' }]}
                           onPress={() => updateCartQuantity(product.id, 1, lineSize)}
                         >
-                          <Text style={styles.cartQtyBtnText}>+</Text>
+                          <Text
+                            style={[
+                              styles.cartQtyBtnText,
+                              { fontWeight: '700' },
+                              isDarkMode && { color: '#F8FAFC' },
+                            ]}
+                          >
+                            +
+                          </Text>
                         </TouchableOpacity>
                       </View>
 
@@ -255,7 +314,7 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                         onPress={() => removeFromCart(product.id, lineSize)}
                         style={{ padding: 6 }}
                       >
-                        <BootstrapIcon name="trash3-fill" size={14} color="#EF4444" />
+                        <BootstrapIcon name="trash3-fill" size={14} color={isDarkMode ? '#F87171' : '#EF4444'} />
                       </TouchableOpacity>
                     </View>
                   );
@@ -265,11 +324,19 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
           )}
 
           {cart.length > 0 && (
-            <View style={styles.cartFooter}>
+            <View style={[styles.cartFooter, isDarkMode && { borderTopColor: '#282D34' }]}>
               {/* Available Active Promos */}
               {availablePromos.length > 0 && (
                 <View style={{ marginBottom: 10 }}>
-                  <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 6, letterSpacing: 0.3 }}>
+                  <Text
+                    style={{
+                      fontSize: 11,
+                      fontWeight: '700',
+                      color: isDarkMode ? '#94A3B8' : '#64748B',
+                      marginBottom: 6,
+                      letterSpacing: 0.3,
+                    }}
+                  >
                     ACTIVE PROMOS (TAP TO APPLY):
                   </Text>
                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
@@ -290,8 +357,8 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                             flexDirection: 'row',
                             alignItems: 'center',
                             gap: 5,
-                            backgroundColor: isSelected ? '#EA580C' : '#F1F5F9',
-                            borderColor: isSelected ? '#EA580C' : '#CBD5E1',
+                            backgroundColor: isSelected ? '#EA580C' : isDarkMode ? '#252A30' : '#F1F5F9',
+                            borderColor: isSelected ? '#EA580C' : isDarkMode ? '#333A42' : '#CBD5E1',
                             borderWidth: 1,
                             borderRadius: 12,
                             paddingHorizontal: 9,
@@ -302,13 +369,13 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                           <BootstrapIcon
                             name={isSelected ? 'check-circle-fill' : 'ticket-perforated-fill'}
                             size={11}
-                            color={isSelected ? '#FFFFFF' : '#EA580C'}
+                            color={isSelected ? '#FFFFFF' : isDarkMode ? '#FB923C' : '#EA580C'}
                           />
                           <Text
                             style={{
                               fontSize: 11,
                               fontWeight: '500',
-                              color: isSelected ? '#FFFFFF' : '#0F172A',
+                              color: isSelected ? '#FFFFFF' : isDarkMode ? '#CBD5E1' : '#0F172A',
                             }}
                           >
                             {label}
@@ -322,12 +389,27 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
 
               {/* Promo Code Input */}
               <View style={{ marginBottom: 4 }}>
-                <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 6 }}>
+                <Text
+                  style={{
+                    fontSize: 11,
+                    fontWeight: '700',
+                    color: isDarkMode ? '#94A3B8' : '#64748B',
+                    marginBottom: 6,
+                  }}
+                >
                   Promo Code
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
                   <TextInput
-                    style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
+                    style={[
+                      styles.formInput,
+                      { flex: 1, marginBottom: 0 },
+                      isDarkMode && {
+                        backgroundColor: '#14181D',
+                        borderColor: '#333A42',
+                        color: '#F8FAFC',
+                      },
+                    ]}
                     placeholder="Enter promo code..."
                     placeholderTextColor="#94A3B8"
                     value={promoCode}
@@ -348,7 +430,13 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
                   style={{
                     fontSize: 12,
                     fontWeight: '700',
-                    color: promoFeedback.isError ? '#DC2626' : '#16A34A',
+                    color: promoFeedback.isError
+                      ? isDarkMode
+                        ? '#F87171'
+                        : '#DC2626'
+                      : isDarkMode
+                        ? '#4ADE80'
+                        : '#16A34A',
                     marginBottom: 8,
                   }}
                 >
@@ -357,25 +445,27 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
               ) : null}
 
               <View style={styles.cartSummaryRow}>
-                <Text style={styles.cartSummaryLabel}>Subtotal</Text>
-                <Text style={styles.cartSummaryValue}>₱{selectedCartSubtotal.toFixed(2)}</Text>
+                <Text style={[styles.cartSummaryLabel, isDarkMode && { color: '#94A3B8' }]}>Subtotal</Text>
+                <Text style={[styles.cartSummaryValue, isDarkMode && { color: '#F8FAFC' }]}>
+                  ₱{selectedCartSubtotal.toFixed(2)}
+                </Text>
               </View>
 
               {selectedDiscountAmount > 0 && (
                 <View style={styles.cartSummaryRow}>
-                  <Text style={[styles.cartSummaryLabel, { color: '#16A34A' }]}>
+                  <Text style={[styles.cartSummaryLabel, { color: isDarkMode ? '#4ADE80' : '#16A34A' }]}>
                     {appliedPromoMeta?.code || promoCode || 'Promo'}
                     {discountPercent > 0 ? ` −${discountPercent}%` : ''}
                   </Text>
-                  <Text style={[styles.cartSummaryValue, { color: '#16A34A' }]}>
+                  <Text style={[styles.cartSummaryValue, { color: isDarkMode ? '#4ADE80' : '#16A34A' }]}>
                     −₱{selectedDiscountAmount.toFixed(2)}
                   </Text>
                 </View>
               )}
 
               <View style={styles.cartSummaryRow}>
-                <Text style={styles.cartSummaryLabel}>Shipping</Text>
-                <Text style={styles.cartSummaryValue}>
+                <Text style={[styles.cartSummaryLabel, isDarkMode && { color: '#94A3B8' }]}>Shipping</Text>
+                <Text style={[styles.cartSummaryValue, isDarkMode && { color: '#F8FAFC' }]}>
                   {selectedCartItems.length === 0
                     ? '₱0.00'
                     : `₱${(isFreeShipping ? shippingRate : selectedShippingFee).toFixed(2)}`}
@@ -384,23 +474,31 @@ export default function CartModal({ visible, onClose, onProceedToCheckout }) {
 
               {isFreeShipping && selectedCartItems.length > 0 && (
                 <View style={styles.cartSummaryRow}>
-                  <Text style={[styles.cartSummaryLabel, { color: '#16A34A' }]}>Free Shipping</Text>
-                  <Text style={[styles.cartSummaryValue, { color: '#16A34A' }]}>
+                  <Text style={[styles.cartSummaryLabel, { color: isDarkMode ? '#4ADE80' : '#16A34A' }]}>
+                    Free Shipping
+                  </Text>
+                  <Text style={[styles.cartSummaryValue, { color: isDarkMode ? '#4ADE80' : '#16A34A' }]}>
                     −₱{Number(shippingRate || 0).toFixed(2)}
                   </Text>
                 </View>
               )}
 
               <View style={styles.cartSummaryRow}>
-                <Text style={styles.cartTotalLabel}>Total</Text>
-                <Text style={styles.cartTotalValue}>₱{selectedCartTotal.toFixed(2)}</Text>
+                <Text style={[styles.cartTotalLabel, { fontWeight: '700' }, isDarkMode && { color: '#F8FAFC' }]}>
+                  Total
+                </Text>
+                <Text
+                  style={[styles.cartTotalValue, { fontWeight: '700' }, isDarkMode && { color: '#FB923C' }]}
+                >
+                  ₱{selectedCartTotal.toFixed(2)}
+                </Text>
               </View>
 
               <TouchableOpacity
                 style={[
                   styles.checkoutBtn,
                   { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-                  !hasSelectedItems && { opacity: 0.5, backgroundColor: '#94A3B8' },
+                  !hasSelectedItems && { opacity: 0.5, backgroundColor: isDarkMode ? '#333A42' : '#94A3B8' },
                 ]}
                 onPress={handleCheckoutPress}
                 activeOpacity={0.9}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -64,6 +64,8 @@ export default function WishlistPageWeb({
   );
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const handleCloseNotifDropdown = useCallback(() => setIsNotifDropdownOpen(false), []);
+  const handleCloseMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
@@ -78,6 +80,7 @@ export default function WishlistPageWeb({
   const [selectedProductForSpecs, setSelectedProductForSpecs] = useState(null);
   const [isSpecsOpen, setIsSpecsOpen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const handleCloseUserDropdown = useCallback(() => setIsUserDropdownOpen(false), []);
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
 
@@ -324,7 +327,7 @@ export default function WishlistPageWeb({
 
               <NotificationDropdown
                 isOpen={isNotifDropdownOpen}
-                onClose={() => setIsNotifDropdownOpen(false)}
+                onClose={handleCloseNotifDropdown}
                 onNavigateToScreen={(screen, params) => {
                   if (screen === 'store' || screen === 'shop') onNavigateToStore?.();
                   else if (screen === 'orders') onNavigateToOrders?.();
@@ -368,7 +371,7 @@ export default function WishlistPageWeb({
                   isOpen={isUserDropdownOpen}
                   currentScreen="wishlist"
                   showDashboard={false}
-                  onClose={() => setIsUserDropdownOpen(false)}
+                  onClose={handleCloseUserDropdown}
                   onNavigateToDashboard={() => onNavigateToProfile?.('garage')}
                   onNavigateToOrders={() => onNavigateToOrders?.()}
                   onNavigateToProfile={(tab = 'profile') => onNavigateToProfile?.(typeof tab === 'string' ? tab : 'profile')}
@@ -667,7 +670,7 @@ export default function WishlistPageWeb({
       {/* Mobile Customer Navigation Drawer */}
       <CustomerMobileNavDrawer
         isOpen={isMobileNavOpen}
-        onClose={() => setIsMobileNavOpen(false)}
+        onClose={handleCloseMobileNav}
         currentScreen="wishlist"
         onNavigateToScreen={(screen, params) => {
           if (screen === 'shop') onNavigateToStore?.();

@@ -220,6 +220,29 @@ export default function AiMotorcycleInstallStudio({
     currentUserRef.current = currentUser;
   }, [currentUser]);
 
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const styleId = 'mototrack-install-studio-no-scrollbar';
+    if (document.getElementById(styleId)) return;
+    const styleEl = document.createElement('style');
+    styleEl.id = styleId;
+    styleEl.textContent = `
+      [data-no-scrollbar="true"]::-webkit-scrollbar,
+      [data-no-scrollbar="true"] *::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
+      }
+      [data-no-scrollbar="true"],
+      [data-no-scrollbar="true"] * {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
+        scrollbar-color: transparent transparent !important;
+      }
+    `;
+    document.head.appendChild(styleEl);
+  }, []);
+
   // Selection state - initialized from user's registered motorcycles (no synthetic mock bikes)
   const [bikes, setBikes] = useState(() => {
     return motorcycleService.getMotorcycles(currentUser) || [];
@@ -1191,12 +1214,16 @@ export default function AiMotorcycleInstallStudio({
             id: p.product_id || p.id,
             product_id: p.product_id || p.id,
             name: p.product_name || p.name || 'Accessory',
+            productName: p.product_name || p.name || 'Accessory',
             brand: p.brand || '',
             category: p.category || '',
             price: Number(p.price ?? p.raw?.price) || 0,
             image: p.product_image || p.image || '',
-            position: p.position || '',
-            type: p.type || '',
+            position: p.installation_position || p.position || '',
+            type: p.installation_type || p.type || '',
+            installation_position: p.installation_position || p.position || '',
+            installation_type: p.installation_type || p.type || '',
+            installation_description: p.installation_description || '',
           })),
         },
       });
@@ -2361,7 +2388,9 @@ export default function AiMotorcycleInstallStudio({
             <ScrollView
               style={styles.catalogScroll}
               contentContainerStyle={styles.catalogGrid}
-              showsVerticalScrollIndicator={true}
+              showsVerticalScrollIndicator={false}
+              showsHorizontalScrollIndicator={false}
+              dataSet={{ noScrollbar: 'true' }}
               nestedScrollEnabled
             >
               {filteredParts.length === 0 ? (
@@ -3499,7 +3528,12 @@ export default function AiMotorcycleInstallStudio({
                   </Text>
                 </View>
               ) : (
-                <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, gap: 12 }}>
+                <ScrollView
+                  style={{ flex: 1, scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                  contentContainerStyle={{ padding: 16, gap: 12 }}
+                  showsVerticalScrollIndicator={false}
+                  dataSet={{ noScrollbar: 'true' }}
+                >
                   {savedBuilds.map((build) => {
                     const buildId = build.id || build.customization_id;
                     const img = build.previewImageUrl || build.preview_image_url;
@@ -3698,7 +3732,12 @@ function FilterSelect({ label, value, options, open, onToggle, onChange, disable
       </TouchableOpacity>
       {open ? (
         <View style={styles.filterMenu}>
-          <ScrollView style={styles.filterMenuScroll} nestedScrollEnabled>
+          <ScrollView
+            style={styles.filterMenuScroll}
+            showsVerticalScrollIndicator={false}
+            dataSet={{ noScrollbar: 'true' }}
+            nestedScrollEnabled
+          >
             {options.map((opt) => {
               const selected = opt === value;
               return (
@@ -4748,6 +4787,12 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     },
     filterMenuScroll: {
       maxHeight: 180,
+      ...Platform.select({
+        web: {
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        },
+      }),
     },
     filterOption: {
       paddingHorizontal: 10,
@@ -4768,6 +4813,12 @@ function createInstallStudioStyles(isDark = false, isWeb = false) {
     catalogScroll: {
       maxHeight: isWeb ? 380 : 340,
       borderRadius: isWeb ? 8 : 10,
+      ...Platform.select({
+        web: {
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        },
+      }),
     },
     catalogGrid: {
       flexDirection: 'row',

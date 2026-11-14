@@ -34,7 +34,7 @@ import {
   determineTrend,
   trendLabel,
   trendExplanation,
-} from '../../../src/utils/linearRegression.js';
+} from '../utils/linearRegression.js';
 
 const EXCLUDED_ORDER_STATUSES = new Set([
   'cancelled',

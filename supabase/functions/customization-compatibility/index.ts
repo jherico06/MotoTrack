@@ -1,3 +1,4 @@
+/// <reference path="../deno.d.ts" />
 // Supabase Edge Function: customization-compatibility
 // Proxies validated requests to the n8n compatibility webhook.
 // Secrets (N8N_COMPAT_WEBHOOK_URL, N8N_WEBHOOK_SECRET) live only here.
@@ -43,7 +44,7 @@ function yearMatches(row: Record<string, unknown>, year: number | null) {
   return true;
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {

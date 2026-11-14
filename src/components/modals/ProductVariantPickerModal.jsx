@@ -10,8 +10,9 @@ import {
   Alert,
   useWindowDimensions,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { BootstrapIcon } from '../common/BootstrapIcon.jsx';
 import { variantModalStyles as styles } from '../../styles/productVariantPickerModal.styles.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import {
   getProductColorEntries,
   getColorImage,
@@ -41,9 +42,21 @@ export default function ProductVariantPickerModal({
   onConfirm,
   isFreeShippingActive = false,
   activePromo = null,
+  isDarkMode: isDarkProp,
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
+  const { isDarkMode: themeDark } = useTheme();
+  const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
+
+  const sheetBg = isDarkMode ? '#1C2025' : '#FFFFFF';
+  const subBg = isDarkMode ? '#181B1F' : '#F8FAFC';
+  const elevatedBg = isDarkMode ? '#252A30' : '#F1F5F9';
+  const borderCol = isDarkMode ? '#282D34' : '#E2E8F0';
+  const dividerCol = isDarkMode ? '#282D34' : '#F1F5F9';
+  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
+  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
+  const brandAccent = isDarkMode ? '#FB923C' : '#EA580C';
   const colorEntries = useMemo(() => getProductColorEntries(product), [product]);
   const sizeEntries = useMemo(() => getProductSizeEntries(product), [product]);
   const needsColor = productHasColors(product);
@@ -163,6 +176,7 @@ export default function ProductVariantPickerModal({
       <View
         style={[
           styles.modalOverlay,
+          isDarkMode && { backgroundColor: 'rgba(2, 6, 23, 0.72)' },
           isDesktop && {
             justifyContent: 'center',
             alignItems: 'center',
@@ -179,6 +193,8 @@ export default function ProductVariantPickerModal({
         <View
           style={[
             styles.modalSheet,
+            { backgroundColor: sheetBg, borderColor: borderCol },
+            isDarkMode && { borderWidth: 1 },
             isDesktop && {
               borderRadius: 24,
               borderTopLeftRadius: 24,
@@ -188,18 +204,30 @@ export default function ProductVariantPickerModal({
               alignSelf: 'center',
               minHeight: 'auto',
               maxHeight: '90%',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
+              boxShadow: isDarkMode
+                ? '0 20px 60px rgba(0, 0, 0, 0.55)'
+                : '0 20px 60px rgba(0, 0, 0, 0.25)',
             },
             windowWidth < 400 && { paddingHorizontal: 4 },
           ]}
         >
           {/* Subtle drag handle */}
-          <View style={styles.dragHandleBar} />
+          <View
+            style={[
+              styles.dragHandleBar,
+              isDarkMode && { backgroundColor: '#333A42' },
+            ]}
+          />
 
           {/* ─── MODAL HEADER ─── */}
-          <View style={styles.sheetHeader}>
+          <View style={[styles.sheetHeader, { borderBottomColor: dividerCol }]}>
             {/* Product Thumbnail (swaps dynamically with selected color) */}
-            <View style={styles.productThumbnailContainer}>
+            <View
+              style={[
+                styles.productThumbnailContainer,
+                { backgroundColor: subBg, borderColor: borderCol },
+              ]}
+            >
               <Image
                 source={{ uri: activeImage }}
                 style={styles.productThumbnail}
@@ -211,13 +239,28 @@ export default function ProductVariantPickerModal({
             <View style={styles.headerInfo}>
               <View style={styles.priceRow}>
                 {hasValidOldPrice && discountPercent && discountPercent > 0 && (
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountBadgeText}>-{discountPercent}%</Text>
+                  <View
+                    style={[
+                      styles.discountBadge,
+                      isDarkMode && {
+                        backgroundColor: 'rgba(239, 68, 68, 0.16)',
+                        borderColor: 'rgba(248, 113, 113, 0.35)',
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.discountBadgeText,
+                        isDarkMode && { color: '#FCA5A5' },
+                      ]}
+                    >
+                      -{discountPercent}%
+                    </Text>
                   </View>
                 )}
-                <Text style={styles.priceCurrency}>₱</Text>
-                <Text style={styles.priceInteger}>{priceIntStr}</Text>
-                <Text style={styles.priceDecimal}>{priceDecStr}</Text>
+                <Text style={[styles.priceCurrency, { color: brandAccent }]}>₱</Text>
+                <Text style={[styles.priceInteger, { color: brandAccent }]}>{priceIntStr}</Text>
+                <Text style={[styles.priceDecimal, { color: brandAccent }]}>{priceDecStr}</Text>
                 {hasValidOldPrice && originalPrice && (
                   <Text style={styles.priceOriginal}>₱{originalPrice.toFixed(2)}</Text>
                 )}
@@ -227,14 +270,38 @@ export default function ProductVariantPickerModal({
               {(isFreeShippingActive || activePromo) && (
                 <View style={styles.perksRow}>
                   {isFreeShippingActive && (
-                    <View style={styles.freeShippingBadge}>
-                      <BootstrapIcon name="truck" size={10} color="#EA580C" />
-                      <Text style={styles.freeShippingBadgeText}>Free shipping</Text>
+                    <View
+                      style={[
+                        styles.freeShippingBadge,
+                        isDarkMode && {
+                          backgroundColor: 'rgba(234, 88, 12, 0.16)',
+                          borderWidth: 1,
+                          borderColor: 'rgba(251, 146, 60, 0.35)',
+                        },
+                      ]}
+                    >
+                      <BootstrapIcon name="truck" size={10} color={brandAccent} />
+                      <Text style={[styles.freeShippingBadgeText, { color: brandAccent }]}>
+                        Free shipping
+                      </Text>
                     </View>
                   )}
                   {activePromo && (
-                    <View style={styles.bonusBadge}>
-                      <Text style={styles.bonusBadgeText}>
+                    <View
+                      style={[
+                        styles.bonusBadge,
+                        isDarkMode && {
+                          backgroundColor: 'rgba(245, 158, 11, 0.14)',
+                          borderColor: 'rgba(251, 191, 36, 0.35)',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.bonusBadgeText,
+                          isDarkMode && { color: '#FBBF24' },
+                        ]}
+                      >
                         Code {activePromo.code} ({activePromo.discountPercent}% OFF)
                       </Text>
                     </View>
@@ -243,7 +310,7 @@ export default function ProductVariantPickerModal({
               )}
 
               {/* Selected summary */}
-              <Text style={styles.selectedVariantSummary} numberOfLines={1}>
+              <Text style={[styles.selectedVariantSummary, { color: textMuted }]} numberOfLines={1}>
                 {activeColor && activeSize
                   ? `Selected: ${activeColor} • ${activeSize}`
                   : activeColor
@@ -255,8 +322,16 @@ export default function ProductVariantPickerModal({
             </View>
 
             {/* Close Button */}
-            <TouchableOpacity style={styles.closeButton} onPress={onClose} activeOpacity={0.8}>
-              <BootstrapIcon name="x-lg" size={13} color="#0F172A" />
+            <TouchableOpacity
+              style={[
+                styles.closeButton,
+                { backgroundColor: elevatedBg },
+                isDarkMode && { borderWidth: 1, borderColor: borderCol },
+              ]}
+              onPress={onClose}
+              activeOpacity={0.8}
+            >
+              <BootstrapIcon name="x-lg" size={13} color={textPrimary} />
             </TouchableOpacity>
           </View>
 
@@ -270,9 +345,9 @@ export default function ProductVariantPickerModal({
             {validationError ? (
               <View
                 style={{
-                  backgroundColor: '#FEF2F2',
+                  backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.14)' : '#FEF2F2',
                   borderWidth: 1,
-                  borderColor: '#FECACA',
+                  borderColor: isDarkMode ? 'rgba(248, 113, 113, 0.35)' : '#FECACA',
                   borderRadius: 8,
                   paddingHorizontal: 12,
                   paddingVertical: 8,
@@ -282,8 +357,12 @@ export default function ProductVariantPickerModal({
                   gap: 8,
                 }}
               >
-                <BootstrapIcon name="exclamation-circle-fill" size={14} color="#EF4444" />
-                <Text style={{ color: '#DC2626', fontSize: 12, fontWeight: '700' }}>
+                <BootstrapIcon
+                  name="exclamation-circle-fill"
+                  size={14}
+                  color={isDarkMode ? '#F87171' : '#EF4444'}
+                />
+                <Text style={{ color: isDarkMode ? '#FCA5A5' : '#DC2626', fontSize: 12, fontWeight: '700' }}>
                   {validationError}
                 </Text>
               </View>
@@ -293,11 +372,19 @@ export default function ProductVariantPickerModal({
             {colorEntries.length > 0 && (
               <View style={styles.sectionContainer}>
                 <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionTitle}>Color</Text>
+                  <Text style={[styles.sectionTitle, { color: textPrimary }]}>Color</Text>
                   {activeColor ? (
-                    <Text style={styles.sectionSub}>{activeColor}</Text>
+                    <Text style={[styles.sectionSub, { color: brandAccent }]}>{activeColor}</Text>
                   ) : (
-                    <Text style={{ fontSize: 12, color: '#DC2626', fontWeight: '700' }}>Required</Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        color: isDarkMode ? '#F87171' : '#DC2626',
+                        fontWeight: '700',
+                      }}
+                    >
+                      Required
+                    </Text>
                   )}
                 </View>
 
@@ -312,15 +399,30 @@ export default function ProductVariantPickerModal({
                         <TouchableOpacity
                           style={[
                             styles.colorCard,
-                            isSelected && styles.colorCardSelected,
-                            soldOut && styles.colorCardSoldOut,
+                            { borderColor: borderCol, backgroundColor: subBg },
+                            isSelected && [
+                              styles.colorCardSelected,
+                              isDarkMode && {
+                                borderColor: '#EA580C',
+                                backgroundColor: 'rgba(234, 88, 12, 0.14)',
+                              },
+                            ],
+                            soldOut && [
+                              styles.colorCardSoldOut,
+                              isDarkMode && { borderColor: borderCol },
+                            ],
                           ]}
                           disabled={soldOut}
                           onPress={() => handleSelectColor(col.label)}
                           activeOpacity={0.85}
                         >
                           {/* Image preview with expand icon */}
-                          <View style={styles.colorCardImageContainer}>
+                          <View
+                            style={[
+                              styles.colorCardImageContainer,
+                              { backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF' },
+                            ]}
+                          >
                             <Image
                               source={{ uri: colImg }}
                               style={styles.colorCardImage}
@@ -337,6 +439,7 @@ export default function ProductVariantPickerModal({
                           <View
                             style={[
                               styles.colorCardFooter,
+                              isDarkMode && { backgroundColor: elevatedBg },
                               isSelected && styles.colorCardFooterSelected,
                             ]}
                           >
@@ -361,14 +464,14 @@ export default function ProductVariantPickerModal({
             {sizeEntries.length > 0 && (
               <View style={styles.sectionContainer}>
                 <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionTitle}>Size</Text>
+                  <Text style={[styles.sectionTitle, { color: textPrimary }]}>Size</Text>
                   <TouchableOpacity
                     style={styles.sizeGuideLink}
                     onPress={handleShowSizeGuide}
                     activeOpacity={0.8}
                   >
-                    <BootstrapIcon name="rulers" size={12} color="#EA580C" />
-                    <Text style={styles.sizeGuideText}>Size guide</Text>
+                    <BootstrapIcon name="rulers" size={12} color={brandAccent} />
+                    <Text style={[styles.sizeGuideText, { color: brandAccent }]}>Size guide</Text>
                   </TouchableOpacity>
                 </View>
 
@@ -386,14 +489,19 @@ export default function ProductVariantPickerModal({
                         onPress={() => handleSelectSize(sz.label)}
                         style={[
                           styles.sizeChip,
+                          { borderColor: borderCol, backgroundColor: subBg },
                           isSelected && styles.sizeChipSelected,
-                          soldOut && styles.sizeChipSoldOut,
+                          soldOut && [
+                            styles.sizeChipSoldOut,
+                            { borderColor: borderCol, backgroundColor: subBg },
+                          ],
                         ]}
                         activeOpacity={0.85}
                       >
                         <Text
                           style={[
                             styles.sizeChipText,
+                            { color: textPrimary },
                             isSelected && styles.sizeChipTextSelected,
                             soldOut && { textDecorationLine: 'line-through', color: '#94A3B8' },
                           ]}
@@ -401,11 +509,19 @@ export default function ProductVariantPickerModal({
                           {sz.label}
                         </Text>
                         {soldOut ? (
-                          <Text style={[styles.sizeChipPrice, { color: '#EF4444' }]}>Sold out</Text>
+                          <Text
+                            style={[
+                              styles.sizeChipPrice,
+                              { color: isDarkMode ? '#F87171' : '#EF4444' },
+                            ]}
+                          >
+                            Sold out
+                          </Text>
                         ) : priceDiff !== 0 ? (
                           <Text
                             style={[
                               styles.sizeChipPrice,
+                              { color: textMuted },
                               isSelected && styles.sizeChipPriceSelected,
                             ]}
                           >
@@ -420,47 +536,69 @@ export default function ProductVariantPickerModal({
             )}
 
             {/* ─── QUANTITY ROW ─── */}
-            <View style={styles.quantityRow}>
+            <View style={[styles.quantityRow, { borderTopColor: dividerCol }]}>
               <View style={styles.quantityLeft}>
-                <Text style={styles.quantityLabel}>Quantity</Text>
-                <Text style={styles.stockAvailableText}>
+                <Text style={[styles.quantityLabel, { color: textPrimary }]}>Quantity</Text>
+                <Text style={[styles.stockAvailableText, { color: textMuted }]}>
                   {isVariantSoldOut ? 'Out of stock' : `${currentStock} in stock`}
                 </Text>
               </View>
 
-              <View style={styles.stepperContainer}>
+              <View
+                style={[
+                  styles.stepperContainer,
+                  {
+                    borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
+                    backgroundColor: sheetBg,
+                  },
+                ]}
+              >
                 <TouchableOpacity
-                  style={[styles.stepperBtn, (internalQty <= 1 || isVariantSoldOut) && styles.stepperBtnDisabled]}
+                  style={[
+                    styles.stepperBtn,
+                    { backgroundColor: subBg },
+                    (internalQty <= 1 || isVariantSoldOut) && styles.stepperBtnDisabled,
+                  ]}
                   onPress={handleDecQty}
                   disabled={internalQty <= 1 || isVariantSoldOut}
                   activeOpacity={0.8}
                 >
-                  <BootstrapIcon name="dash" size={14} color="#0F172A" />
+                  <BootstrapIcon name="dash" size={14} color={textPrimary} />
                 </TouchableOpacity>
 
-                <Text style={styles.stepperValue}>{internalQty}</Text>
+                <Text style={[styles.stepperValue, { color: textPrimary }]}>{internalQty}</Text>
 
                 <TouchableOpacity
                   style={[
                     styles.stepperBtn,
+                    { backgroundColor: subBg },
                     (internalQty >= currentStock || isVariantSoldOut) && styles.stepperBtnDisabled,
                   ]}
                   onPress={handleIncQty}
                   disabled={internalQty >= currentStock || isVariantSoldOut}
                   activeOpacity={0.8}
                 >
-                  <BootstrapIcon name="plus" size={14} color="#0F172A" />
+                  <BootstrapIcon name="plus" size={14} color={textPrimary} />
                 </TouchableOpacity>
               </View>
             </View>
           </ScrollView>
 
           {/* ─── STICKY BOTTOM CONFIRM BUTTON ─── */}
-          <SafeAreaView edges={['bottom']} style={styles.stickyFooter}>
+          <SafeAreaView
+            edges={['bottom']}
+            style={[
+              styles.stickyFooter,
+              { backgroundColor: sheetBg, borderTopColor: dividerCol },
+            ]}
+          >
             <TouchableOpacity
               style={[
                 styles.confirmBtn,
-                isVariantSoldOut && styles.confirmBtnDisabled,
+                isVariantSoldOut && [
+                  styles.confirmBtnDisabled,
+                  isDarkMode && { backgroundColor: '#334155' },
+                ],
               ]}
               disabled={isVariantSoldOut}
               onPress={handleConfirmPress}

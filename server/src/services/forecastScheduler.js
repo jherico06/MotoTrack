@@ -180,8 +180,12 @@ export async function runScheduledForecastJob(period = 'daily', options = {}) {
   }
 }
 
+const MAX_SAFE_TIMEOUT_MS = 2147483647; // Max 32-bit signed integer (~24.85 days)
+
 /**
  * Start background interval schedulers for daily, weekly, and monthly forecast updates.
+ * Uses safe interval chunking so 30-day monthly intervals never trigger Node's
+ * 32-bit TimeoutOverflowWarning (which otherwise resets delay to 1ms and causes DB burn).
  */
 export function startForecastScheduler(options = {}) {
   if (schedulerTimers.size > 0) {
@@ -189,11 +193,15 @@ export function startForecastScheduler(options = {}) {
   }
 
   for (const [period, intervalMs] of Object.entries(SCHEDULE_INTERVALS_MS)) {
+    let nextDueAt = Date.now() + intervalMs;
+    const tickMs = Math.min(intervalMs, MAX_SAFE_TIMEOUT_MS, DAY_MS);
     const timer = setInterval(() => {
+      if (Date.now() < nextDueAt) return;
+      nextDueAt = Date.now() + intervalMs;
       runScheduledForecastJob(period, options).catch((err) => {
         console.error(`[forecastScheduler] Scheduled ${period} forecast job failed:`, err?.message || err);
       });
-    }, intervalMs);
+    }, tickMs);
 
     if (typeof timer.unref === 'function') {
       timer.unref();

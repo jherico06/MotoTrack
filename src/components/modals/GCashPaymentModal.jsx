@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,8 @@ import {
   useWindowDimensions,
   Platform,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
+import { BootstrapIcon } from '../common/BootstrapIcon.jsx';
 import { gcashPaymentService, GCASH_CONFIG } from '../../services/orders/gcashPaymentService.js';
 
 export default function GCashPaymentModal({
@@ -24,6 +25,8 @@ export default function GCashPaymentModal({
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
+  const { isDarkMode } = useTheme();
+  const gStyles = useMemo(() => createGStyles(isDarkMode), [isDarkMode]);
 
   // Multi-step GCash flow: 'phone' -> 'otp' -> 'mpin' -> 'review' -> 'receipt'
   const [step, setStep] = useState('phone');
@@ -286,7 +289,9 @@ export default function GCashPaymentModal({
                 <Text style={gStyles.stepHeading}>Enter Authentication Code</Text>
                 <Text style={gStyles.stepSub}>
                   Sent via SMS to{' '}
-                  <Text style={{ fontWeight: '600', color: '#0F172A' }}>+63 {mobileNumber}</Text>
+                  <Text style={{ fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                    +63 {mobileNumber}
+                  </Text>
                 </Text>
 
                 <TextInput
@@ -418,16 +423,22 @@ export default function GCashPaymentModal({
                   <View
                     style={[
                       gStyles.breakdownLine,
-                      { borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 8, marginTop: 4 },
+                      { borderTopWidth: 1, borderTopColor: isDarkMode ? '#282D34' : '#E2E8F0', paddingTop: 8, marginTop: 4 },
                     ]}
                   >
                     <Text
-                      style={[gStyles.breakdownLabel, { fontWeight: '600', color: '#0F172A', fontSize: 13 }]}
+                      style={[
+                        gStyles.breakdownLabel,
+                        { fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A', fontSize: 13 },
+                      ]}
                     >
                       Total Amount
                     </Text>
                     <Text
-                      style={[gStyles.breakdownVal, { fontWeight: '600', color: '#007DFE', fontSize: 16 }]}
+                      style={[
+                        gStyles.breakdownVal,
+                        { fontWeight: '600', color: isDarkMode ? '#38BDF8' : '#007DFE', fontSize: 16 },
+                      ]}
                     >
                       ₱{totalAmountFormatted}
                     </Text>
@@ -462,8 +473,10 @@ export default function GCashPaymentModal({
                 <Text style={gStyles.receiptPaidTitle}>Payment Successful!</Text>
                 <Text style={gStyles.receiptPaidSub}>
                   You have successfully paid{' '}
-                  <Text style={{ fontWeight: '600', color: '#0F172A' }}>₱{totalAmountFormatted}</Text> to{' '}
-                  {GCASH_CONFIG.MERCHANT_NAME}.
+                  <Text style={{ fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
+                    ₱{totalAmountFormatted}
+                  </Text>{' '}
+                  to {GCASH_CONFIG.MERCHANT_NAME}.
                 </Text>
 
                 {/* Receipt Details Box */}
@@ -513,440 +526,436 @@ export default function GCashPaymentModal({
   );
 }
 
-const gStyles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    ...Platform.select({
-      web: { backdropFilter: 'blur(4px)' },
-    }),
-  },
-  overlayDesktop: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  overlayMobile: {
-    justifyContent: 'flex-end',
-    alignItems: 'stretch',
-    padding: 0,
+const createGStyles = (isDarkMode) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: isDarkMode ? 'rgba(2, 6, 23, 0.78)' : 'rgba(15, 23, 42, 0.75)',
+      ...Platform.select({
+        web: { backdropFilter: 'blur(4px)' },
+      }),
+    },
+    overlayDesktop: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    overlayMobile: {
+      justifyContent: 'flex-end',
+      alignItems: 'stretch',
+      padding: 0,
+    },
+    container: {
+      width: '100%',
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      overflow: 'hidden',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: isDarkMode ? 0.5 : 0.25,
+      shadowRadius: 20,
+      elevation: 20,
+      paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+    },
+    containerDesktop: {
+      maxWidth: 440,
+      borderRadius: 24,
+      borderBottomLeftRadius: 24,
+      borderBottomRightRadius: 24,
+    },
+    containerMobile: {
+      maxWidth: '100%',
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+    },
 
+    // 1. Header
+    gcashHeader: {
+      backgroundColor: '#007DFE',
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 14,
+    },
+    gcashHeaderTop: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    gcashBrandRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    gcashLogoCircle: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    gcashLogoG: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#007DFE',
+    },
+    gcashBrandTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: '#FFFFFF',
+      letterSpacing: -0.5,
+    },
+    sandboxBadge: {
+      backgroundColor: '#FFD700',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    sandboxBadgeText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: '#000000',
+    },
+    testKeyStrip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 8,
+      marginTop: 10,
+    },
+    testKeyText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: isDarkMode ? '#38BDF8' : '#007DFE',
+    },
 
-  },
-  container: {
-    width: '100%',
+    // 2. Merchant Banner
+    merchantBanner: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: isDarkMode ? '#181B1F' : '#F0F7FF',
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    },
+    merchantLabel: {
+      fontSize: 10.5,
+      color: '#94A3B8',
+      fontWeight: '600',
+    },
+    merchantName: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      marginTop: 1,
+    },
+    merchantAmount: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: isDarkMode ? '#38BDF8' : '#007DFE',
+      marginTop: 1,
+    },
 
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
+    bodyScroll: {
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+      maxHeight: 460,
+    },
 
+    // Error Card
+    errorCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.14)' : '#FEF2F2',
+      padding: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(248, 113, 113, 0.35)' : '#FECACA',
+      marginBottom: 12,
+    },
+    errorCardText: {
+      fontSize: 12,
+      color: isDarkMode ? '#FCA5A5' : '#DC2626',
+      fontWeight: '700',
+      flex: 1,
+    },
 
-    overflow: 'hidden',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 20,
-    elevation: 20,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 12,
-  },
-  containerDesktop: {
-    maxWidth: 440,
+    // Steps
+    stepWrap: {
+      gap: 12,
+    },
+    stepHeading: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    stepSub: {
+      fontSize: 12.5,
+      color: '#94A3B8',
+      lineHeight: 18,
+    },
 
-    borderRadius: 24,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-  },
-  containerMobile: {
-    maxWidth: '100%',
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
+    // Inputs
+    phoneInputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginTop: 4,
+    },
+    countryCodeWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
+    },
+    countryFlag: {
+      fontSize: 16,
+    },
+    countryCodeText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    phoneTextInput: {
+      flex: 1,
+      backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
+      borderWidth: 1.5,
+      borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      fontSize: 16,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      letterSpacing: 1,
+    },
 
-  },
+    otpInputBox: {
+      backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
+      borderWidth: 2,
+      borderColor: '#007DFE',
+      borderRadius: 14,
+      paddingVertical: 12,
+      fontSize: 24,
+      fontWeight: '600',
+      color: isDarkMode ? '#38BDF8' : '#007DFE',
+      letterSpacing: 8,
+      marginTop: 8,
+    },
 
-  // 1. Header
-  gcashHeader: {
-    backgroundColor: '#007DFE',
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-  },
-  gcashHeaderTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  gcashBrandRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  gcashLogoCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  gcashLogoG: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#007DFE',
-  },
-  gcashBrandTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-  },
-  sandboxBadge: {
-    backgroundColor: '#FFD700',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  sandboxBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  testKeyStrip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  testKeyText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#007DFE',
-  },
+    mpinInputBox: {
+      backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
+      borderWidth: 2,
+      borderColor: '#007DFE',
+      borderRadius: 14,
+      paddingVertical: 12,
+      fontSize: 28,
+      fontWeight: '600',
+      color: isDarkMode ? '#38BDF8' : '#007DFE',
+      letterSpacing: 12,
+      marginTop: 8,
+    },
 
-  // 2. Merchant Banner
-  merchantBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#F0F7FF',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  merchantLabel: {
-    fontSize: 10.5,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  merchantName: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#0F172A',
-    marginTop: 1,
-  },
-  merchantAmount: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#007DFE',
-    marginTop: 1,
-  },
+    autofillChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      backgroundColor: isDarkMode ? 'rgba(0, 125, 254, 0.14)' : '#F0F7FF',
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#BAE6FD',
+    },
+    autofillChipText: {
+      fontSize: 11.5,
+      color: isDarkMode ? '#7DD3FC' : '#0369A1',
+      fontWeight: '600',
+    },
 
-  bodyScroll: {
-    paddingHorizontal: 20,
-    paddingVertical: 18,
-    maxHeight: 460,
-  },
+    sandboxTipCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 8,
+      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      padding: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    },
+    sandboxTipText: {
+      fontSize: 11,
+      color: isDarkMode ? '#CBD5E1' : '#475569',
+      flex: 1,
+      lineHeight: 16,
+    },
 
-  // Error Card
-  errorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#FEF2F2',
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    marginBottom: 12,
-  },
-  errorCardText: {
-    fontSize: 12,
-    color: '#DC2626',
-    fontWeight: '700',
-    flex: 1,
-  },
+    walletBalanceCard: {
+      backgroundColor: isDarkMode ? 'rgba(0, 125, 254, 0.14)' : '#F0F7FF',
+      borderRadius: 14,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(56, 189, 248, 0.35)' : '#BAE6FD',
+      gap: 6,
+    },
+    walletCardLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDarkMode ? '#7DD3FC' : '#0369A1',
+    },
+    walletCardBalance: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: isDarkMode ? '#38BDF8' : '#007DFE',
+    },
+    walletAccountRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: isDarkMode ? 'rgba(56, 189, 248, 0.25)' : '#E0F2FE',
+      paddingTop: 6,
+      marginTop: 2,
+    },
+    walletAccountText: {
+      fontSize: 11.5,
+      color: '#94A3B8',
+    },
+    verifiedBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.2)' : '#DCFCE7',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+    },
+    verifiedBadgeText: {
+      fontSize: 9.5,
+      fontWeight: '600',
+      color: isDarkMode ? '#4ADE80' : '#166534',
+    },
 
-  // Steps
-  stepWrap: {
-    gap: 12,
-  },
-  stepHeading: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  stepSub: {
-    fontSize: 12.5,
-    color: '#64748B',
-    lineHeight: 18,
-  },
+    breakdownCard: {
+      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      borderRadius: 14,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      gap: 6,
+    },
+    breakdownLine: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    breakdownLabel: {
+      fontSize: 12,
+      color: '#94A3B8',
+    },
+    breakdownVal: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
 
-  // Inputs
-  phoneInputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 4,
-  },
-  countryCodeWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  countryFlag: {
-    fontSize: 16,
-  },
-  countryCodeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  phoneTextInput: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0F172A',
-    letterSpacing: 1,
-  },
+    // Buttons
+    primaryGcashBtn: {
+      backgroundColor: '#007DFE',
+      paddingVertical: 14,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 6,
+      shadowColor: '#007DFE',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    primaryGcashBtnText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: '#FFFFFF',
+      letterSpacing: 0.3,
+    },
+    cancelBtn: {
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    cancelBtnText: {
+      fontSize: 12.5,
+      color: '#94A3B8',
+      fontWeight: '700',
+    },
 
-  otpInputBox: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#007DFE',
-    borderRadius: 14,
-    paddingVertical: 12,
-    fontSize: 24,
-    fontWeight: '600',
-    color: '#007DFE',
-    letterSpacing: 8,
-    marginTop: 8,
-  },
-
-  mpinInputBox: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 2,
-    borderColor: '#007DFE',
-    borderRadius: 14,
-    paddingVertical: 12,
-    fontSize: 28,
-    fontWeight: '600',
-    color: '#007DFE',
-    letterSpacing: 12,
-    marginTop: 8,
-  },
-
-  autofillChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#F0F7FF',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-  },
-  autofillChipText: {
-    fontSize: 11.5,
-    color: '#0369A1',
-    fontWeight: '600',
-  },
-
-  sandboxTipCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: '#F8FAFC',
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  sandboxTipText: {
-    fontSize: 11,
-    color: '#475569',
-    flex: 1,
-    lineHeight: 16,
-  },
-
-  walletBalanceCard: {
-    backgroundColor: '#F0F7FF',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#BAE6FD',
-    gap: 6,
-  },
-  walletCardLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0369A1',
-  },
-  walletCardBalance: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#007DFE',
-  },
-  walletAccountRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#E0F2FE',
-    paddingTop: 6,
-    marginTop: 2,
-  },
-  walletAccountText: {
-    fontSize: 11.5,
-    color: '#64748B',
-  },
-  verifiedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  verifiedBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '600',
-    color: '#166534',
-  },
-
-  breakdownCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 6,
-  },
-  breakdownLine: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  breakdownLabel: {
-    fontSize: 12,
-    color: '#64748B',
-  },
-  breakdownVal: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-
-  // Buttons
-  primaryGcashBtn: {
-    backgroundColor: '#007DFE',
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 6,
-    shadowColor: '#007DFE',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  primaryGcashBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    letterSpacing: 0.3,
-  },
-  cancelBtn: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  cancelBtnText: {
-    fontSize: 12.5,
-    color: '#64748B',
-    fontWeight: '700',
-  },
-
-  // Receipt
-  receiptWrap: {
-    alignItems: 'center',
-    gap: 8,
-    paddingVertical: 6,
-  },
-  successIconWrap: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#16A34A',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  receiptPaidTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  receiptPaidSub: {
-    fontSize: 12.5,
-    color: '#64748B',
-    textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 10,
-  },
-  receiptBox: {
-    width: '100%',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginTop: 10,
-    gap: 8,
-  },
-  receiptLine: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  receiptLabel: {
-    fontSize: 11.5,
-    color: '#64748B',
-  },
-  receiptVal: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  receiptValBold: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#007DFE',
-  },
-});
+    // Receipt
+    receiptWrap: {
+      alignItems: 'center',
+      gap: 8,
+      paddingVertical: 6,
+    },
+    successIconWrap: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: '#16A34A',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 4,
+    },
+    receiptPaidTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    receiptPaidSub: {
+      fontSize: 12.5,
+      color: '#94A3B8',
+      textAlign: 'center',
+      lineHeight: 18,
+      paddingHorizontal: 10,
+    },
+    receiptBox: {
+      width: '100%',
+      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      marginTop: 10,
+      gap: 8,
+    },
+    receiptLine: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    receiptLabel: {
+      fontSize: 11.5,
+      color: '#94A3B8',
+    },
+    receiptVal: {
+      fontSize: 11.5,
+      fontWeight: '700',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    receiptValBold: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDarkMode ? '#38BDF8' : '#007DFE',
+    },
+  });

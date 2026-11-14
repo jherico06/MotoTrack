@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -39,8 +39,8 @@ import {
   AccessDeniedModal,
   LiveOrderTrackingMapModal,
   GCashPaymentModal,
-  CompanyInfoModal,
 } from '../../../components';
+import { CompanyInfoModal } from '../../../components/web';
 import CartPage from './CartPage.jsx';
 import {
   UserProfileDropdown,
@@ -153,6 +153,9 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
+  const handleCloseMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
+  const handleCloseProfileDropdown = useCallback(() => setIsProfileDropdownOpen(false), []);
+  const handleCloseNotifDropdown = useCallback(() => setIsNotifDropdownOpen(false), []);
   const [isAccessDeniedModalOpen, setIsAccessDeniedModalOpen] = useState(false);
   const [selectedOrderForTracking, setSelectedOrderForTracking] = useState(null);
   const [isLiveTrackingOpen, setIsLiveTrackingOpen] = useState(false);
@@ -1006,7 +1009,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
 
               <NotificationDropdown
                 isOpen={isNotifDropdownOpen}
-                onClose={() => setIsNotifDropdownOpen(false)}
+                onClose={handleCloseNotifDropdown}
                 onNavigateToScreen={onNavigateToScreen}
                 currentUser={currentUser}
                 topOffset={windowWidth < 1024 ? 104 : undefined}
@@ -1047,7 +1050,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
                   showDashboard={false}
                   isDark={isDarkMode}
                   onToggleDarkMode={toggleDarkMode}
-                  onClose={() => setIsProfileDropdownOpen(false)}
+                  onClose={handleCloseProfileDropdown}
                   onNavigateToDashboard={(tab = 'garage') => onNavigateToScreen?.('profile', { tab })}
                   onNavigateToOrders={() => onNavigateToScreen?.('orders')}
                   onNavigateToProfile={(tab = 'profile') => onNavigateToScreen?.('profile', { tab: typeof tab === 'string' ? tab : 'profile' })}
@@ -2552,7 +2555,7 @@ export default function ShopPageWeb({ onNavigateToScreen, onNavigateToWishlist: 
       {/* Mobile Customer Navigation Drawer */}
       <CustomerMobileNavDrawer
         isOpen={isMobileNavOpen}
-        onClose={() => setIsMobileNavOpen(false)}
+        onClose={handleCloseMobileNav}
         currentScreen="shop"
         onNavigateToScreen={onNavigateToScreen}
         onOpenCart={() => setIsCartOpen(true)}

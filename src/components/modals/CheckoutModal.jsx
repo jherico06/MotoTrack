@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -11,10 +11,11 @@ import {
   Image,
   useWindowDimensions,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { BootstrapIcon } from '../common/BootstrapIcon.jsx';
 import { shopStyles as styles } from '../../styles/shop.styles.js';
 import { useAuth } from '../../context/AuthContext.jsx';
 import { useCart } from '../../context/CartContext.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import { formatPHPhone } from './LiveOrderTrackingMapModal.jsx';
 
 export default function CheckoutModal({
@@ -26,8 +27,22 @@ export default function CheckoutModal({
   overrideItemCount = null,
   overrideTotal = null,
   overrideItems = null,
+  isDarkMode: isDarkProp,
 }) {
   const { width: windowWidth } = useWindowDimensions();
+  const { isDarkMode: themeDark } = useTheme();
+  const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
+  const checkoutStyles = useMemo(() => createCheckoutStyles(isDarkMode), [isDarkMode]);
+
+  const sheetBg = isDarkMode ? '#1C2025' : '#FFFFFF';
+  const subBg = isDarkMode ? '#181B1F' : '#F8FAFC';
+  const elevatedBg = isDarkMode ? '#252A30' : '#F1F5F9';
+  const borderCol = isDarkMode ? '#282D34' : '#E2E8F0';
+  const inputBorderCol = isDarkMode ? '#333A42' : '#CBD5E1';
+  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
+  const textSecondary = isDarkMode ? '#CBD5E1' : '#475569';
+  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
+  const brandAccent = isDarkMode ? '#FB923C' : '#EA580C';
   const { currentUser, updateProfile } = useAuth();
   const {
     cart,
@@ -175,6 +190,7 @@ export default function CheckoutModal({
       <View
         style={[
           styles.modalOverlay,
+          isDarkMode && { backgroundColor: 'rgba(2, 6, 23, 0.72)' },
           isDesktop && {
             justifyContent: 'center',
             alignItems: 'center',
@@ -190,44 +206,53 @@ export default function CheckoutModal({
         <View
           style={[
             styles.modalSheet,
-            { maxHeight: '92%' },
+            { maxHeight: '92%', backgroundColor: sheetBg, borderColor: borderCol },
+            isDarkMode && { borderWidth: 1 },
             isDesktop && {
               borderRadius: 24,
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
               maxWidth: 640,
               alignSelf: 'center',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
+              boxShadow: isDarkMode
+                ? '0 20px 60px rgba(0, 0, 0, 0.55)'
+                : '0 20px 60px rgba(0, 0, 0, 0.25)',
             },
             windowWidth < 400 && { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 24 },
           ]}
         >
           {/* ─── HEADER ─── */}
-          <View style={styles.modalHeaderRow}>
+          <View style={[styles.modalHeaderRow, isDarkMode && { borderBottomColor: borderCol }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
               <View
                 style={{
                   width: 38,
                   height: 38,
                   borderRadius: 12,
-                  backgroundColor: '#FFF7ED',
+                  backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.16)' : '#FFF7ED',
                   borderWidth: 1,
-                  borderColor: '#FED7AA',
+                  borderColor: isDarkMode ? 'rgba(251, 146, 60, 0.35)' : '#FED7AA',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <BootstrapIcon name="bag-check-fill" size={16} color="#EA580C" />
+                <BootstrapIcon name="bag-check-fill" size={16} color={brandAccent} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.modalTitle}>Express Checkout</Text>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                <Text style={[styles.modalTitle, { color: textPrimary }]}>Express Checkout</Text>
+                <Text style={{ fontSize: 12, color: textMuted, marginTop: 1 }}>
                   Review items, shipping, and payment
                 </Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
-              <BootstrapIcon name="x-lg" size={14} color="#64748b" />
+            <TouchableOpacity
+              style={[
+                styles.modalCloseBtn,
+                isDarkMode && { backgroundColor: elevatedBg, borderWidth: 1, borderColor: borderCol },
+              ]}
+              onPress={onClose}
+            >
+              <BootstrapIcon name="x-lg" size={14} color={textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -236,7 +261,7 @@ export default function CheckoutModal({
             <View style={checkoutStyles.addressCardContainer}>
               <View style={checkoutStyles.addressCardHeader}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <BootstrapIcon name="geo-alt-fill" size={15} color="#EA580C" />
+                  <BootstrapIcon name="geo-alt-fill" size={15} color={brandAccent} />
                   <Text style={checkoutStyles.addressCardTitle}>Delivery Destination</Text>
                 </View>
                 <TouchableOpacity
@@ -263,7 +288,7 @@ export default function CheckoutModal({
                   <Text style={checkoutStyles.addressFullText}>{customerAddress}</Text>
 
                   <View style={checkoutStyles.profileSyncBadge}>
-                    <BootstrapIcon name="shield-check" size={12} color="#EA580C" />
+                    <BootstrapIcon name="shield-check" size={12} color={brandAccent} />
                     <Text style={checkoutStyles.profileSyncBadgeText}>
                       Linked directly to your user profile & live GPS map
                     </Text>
@@ -311,12 +336,12 @@ export default function CheckoutModal({
               <View style={{ marginBottom: 14 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <BootstrapIcon name="box-seam-fill" size={14} color="#EA580C" />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>
+                    <BootstrapIcon name="box-seam-fill" size={14} color={brandAccent} />
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: textPrimary }}>
                       Items in this Order ({displayItemCount})
                     </Text>
                   </View>
-                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>
+                  <Text style={{ fontSize: 12, fontWeight: '600', color: brandAccent }}>
                     ₱{displayTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </Text>
                 </View>
@@ -337,11 +362,11 @@ export default function CheckoutModal({
                         style={{
                           flexDirection: 'row',
                           gap: 10,
-                          backgroundColor: '#F8FAFC',
+                          backgroundColor: subBg,
                           borderRadius: 12,
                           padding: 10,
                           borderWidth: 1,
-                          borderColor: '#E2E8F0',
+                          borderColor: borderCol,
                         }}
                       >
                         {image ? (
@@ -351,9 +376,9 @@ export default function CheckoutModal({
                               width: 52,
                               height: 52,
                               borderRadius: 8,
-                              backgroundColor: '#FFFFFF',
+                              backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
                               borderWidth: 1,
-                              borderColor: '#E2E8F0',
+                              borderColor: borderCol,
                             }}
                             resizeMode="cover"
                           />
@@ -363,27 +388,27 @@ export default function CheckoutModal({
                               width: 52,
                               height: 52,
                               borderRadius: 8,
-                              backgroundColor: '#FFF7ED',
+                              backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.16)' : '#FFF7ED',
                               alignItems: 'center',
                               justifyContent: 'center',
                             }}
                           >
-                            <BootstrapIcon name="box-seam" size={18} color="#EA580C" />
+                            <BootstrapIcon name="box-seam" size={18} color={brandAccent} />
                           </View>
                         )}
 
                         <View style={{ flex: 1, justifyContent: 'center' }}>
                           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                            <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#0F172A', flex: 1 }} numberOfLines={1}>
+                            <Text style={{ fontSize: 12.5, fontWeight: '600', color: textPrimary, flex: 1 }} numberOfLines={1}>
                               {name}
                             </Text>
-                            <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>
+                            <Text style={{ fontSize: 12, fontWeight: '600', color: brandAccent }}>
                               ₱{(itemPrice * qty).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                             </Text>
                           </View>
 
                           {brand ? (
-                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: '#64748B', marginTop: 1 }}>
+                            <Text style={{ fontSize: 10.5, fontWeight: '700', color: textMuted, marginTop: 1 }}>
                               {brand}{prod.category ? ` • ${prod.category}` : ''}
                             </Text>
                           ) : null}
@@ -392,7 +417,7 @@ export default function CheckoutModal({
                             <Text
                               style={{
                                 fontSize: 11,
-                                color: '#475569',
+                                color: textSecondary,
                                 marginTop: 3,
                                 lineHeight: 15,
                               }}
@@ -403,12 +428,12 @@ export default function CheckoutModal({
                           ) : null}
 
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 }}>
-                            <View style={{ backgroundColor: '#E2E8F0', paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
-                              <Text style={{ fontSize: 10, fontWeight: '700', color: '#334155' }}>
+                            <View style={{ backgroundColor: elevatedBg, paddingHorizontal: 6, paddingVertical: 1.5, borderRadius: 4 }}>
+                              <Text style={{ fontSize: 10, fontWeight: '700', color: isDarkMode ? '#E2E8F0' : '#334155' }}>
                                 Qty: {qty}
                               </Text>
                             </View>
-                            <Text style={{ fontSize: 10.5, color: '#94A3B8' }}>
+                            <Text style={{ fontSize: 10.5, color: textMuted }}>
                               ₱{itemPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })} each
                             </Text>
                           </View>
@@ -422,9 +447,16 @@ export default function CheckoutModal({
 
             {/* ─── 3. DELIVERY INSTRUCTIONS (OPTIONAL) ─── */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Delivery Instructions (Optional)</Text>
+              <Text style={[styles.formLabel, { color: textPrimary }]}>Delivery Instructions (Optional)</Text>
               <TextInput
-                style={styles.formInput}
+                style={[
+                  styles.formInput,
+                  isDarkMode && {
+                    backgroundColor: subBg,
+                    borderColor: inputBorderCol,
+                    color: textPrimary,
+                  },
+                ]}
                 value={deliveryNotes}
                 onChangeText={setDeliveryNotes}
                 placeholder="e.g. Leave at front porch, ring doorbell upon arrival..."
@@ -434,8 +466,8 @@ export default function CheckoutModal({
 
             {/* ─── 3. PAYMENT METHOD SELECTION ─── */}
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>Payment Method *</Text>
-              <Text style={{ fontSize: 11.5, color: '#64748B', marginBottom: 8 }}>
+              <Text style={[styles.formLabel, { color: textPrimary }]}>Payment Method *</Text>
+              <Text style={{ fontSize: 11.5, color: textMuted, marginBottom: 8 }}>
                 Choose your preferred payment method for this order:
               </Text>
 
@@ -443,7 +475,14 @@ export default function CheckoutModal({
               <TouchableOpacity
                 style={[
                   styles.paymentOptionCard,
-                  paymentMethod === 'Cash on Delivery (COD)' && styles.paymentOptionCardActive,
+                  isDarkMode && { backgroundColor: subBg, borderColor: borderCol },
+                  paymentMethod === 'Cash on Delivery (COD)' && [
+                    styles.paymentOptionCardActive,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(234, 88, 12, 0.12)',
+                      borderColor: '#EA580C',
+                    },
+                  ],
                 ]}
                 onPress={() => setPaymentMethod('Cash on Delivery (COD)')}
                 activeOpacity={0.85}
@@ -455,21 +494,26 @@ export default function CheckoutModal({
                         width: 34,
                         height: 34,
                         borderRadius: 10,
-                        backgroundColor: '#DCFCE7',
+                        backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.18)' : '#DCFCE7',
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
                     >
-                      <BootstrapIcon name="cash-stack" size={18} color="#16A34A" />
+                      <BootstrapIcon name="cash-stack" size={18} color={isDarkMode ? '#4ADE80' : '#16A34A'} />
                     </View>
                     <View>
-                      <Text style={styles.paymentOptionTitle}>Cash on Delivery (COD)</Text>
-                      <Text style={styles.paymentOptionSub}>Pay cash to courier upon doorstep delivery</Text>
+                      <Text style={[styles.paymentOptionTitle, { color: textPrimary }]}>
+                        Cash on Delivery (COD)
+                      </Text>
+                      <Text style={[styles.paymentOptionSub, { color: textMuted }]}>
+                        Pay cash to courier upon doorstep delivery
+                      </Text>
                     </View>
                   </View>
                   <View
                     style={[
                       styles.paymentRadioDot,
+                      isDarkMode && { borderColor: '#475569' },
                       paymentMethod === 'Cash on Delivery (COD)' && styles.paymentRadioDotActive,
                     ]}
                   >
@@ -478,22 +522,22 @@ export default function CheckoutModal({
                 </View>
 
                 {paymentMethod === 'Cash on Delivery (COD)' && (
-                  <View style={styles.paymentDetailsDrawer}>
+                  <View style={[styles.paymentDetailsDrawer, isDarkMode && { borderTopColor: borderCol }]}>
                     <View
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 6,
-                        backgroundColor: '#FFFFFF',
+                        backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.14)' : '#FFFFFF',
                         padding: 10,
                         borderRadius: 10,
                         borderWidth: 1,
-                        borderColor: '#BBF7D0',
+                        borderColor: isDarkMode ? 'rgba(74, 222, 128, 0.3)' : '#BBF7D0',
                         marginBottom: 8,
                       }}
                     >
-                      <BootstrapIcon name="cash-coin" size={14} color="#16A34A" />
-                      <Text style={{ fontSize: 11.5, color: '#166534', fontWeight: '700', flex: 1 }}>
+                      <BootstrapIcon name="cash-coin" size={14} color={isDarkMode ? '#4ADE80' : '#16A34A'} />
+                      <Text style={{ fontSize: 11.5, color: isDarkMode ? '#86EFAC' : '#166534', fontWeight: '700', flex: 1 }}>
                         Exact amount to prepare: ₱
                         {displayTotal.toLocaleString(undefined, {
                           minimumFractionDigits: 2,
@@ -503,24 +547,32 @@ export default function CheckoutModal({
                     </View>
                     <View
                       style={{
-                        backgroundColor: '#F3F7F6',
+                        backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.12)' : '#F3F7F6',
                         padding: 9,
                         borderRadius: 9,
                         borderWidth: 1,
-                        borderColor: '#C8DDD3',
+                        borderColor: isDarkMode ? 'rgba(251, 146, 60, 0.3)' : '#C8DDD3',
                         marginBottom: 8,
                         flexDirection: 'row',
                         alignItems: 'center',
                         gap: 6,
                       }}
                     >
-                      <BootstrapIcon name="shield-lock-fill" size={13} color="#EA580C" />
-                      <Text style={{ fontSize: 11, color: '#EA580C', fontWeight: '700', flex: 1 }}>
+                      <BootstrapIcon name="shield-lock-fill" size={13} color={brandAccent} />
+                      <Text style={{ fontSize: 11, color: brandAccent, fontWeight: '700', flex: 1 }}>
                         COD orders require Store Admin verification before dispatch.
                       </Text>
                     </View>
                     <TextInput
-                      style={[styles.formInput, { fontSize: 12.5, backgroundColor: '#FFFFFF' }]}
+                      style={[
+                        styles.formInput,
+                        {
+                          fontSize: 12.5,
+                          backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
+                          borderColor: inputBorderCol,
+                          color: textPrimary,
+                        },
+                      ]}
                       placeholder="Need change for? (e.g. ₱5,000 / ₱1,000 - optional)"
                       placeholderTextColor="#94A3B8"
                       value={codChangeFor}
@@ -534,7 +586,14 @@ export default function CheckoutModal({
               <TouchableOpacity
                 style={[
                   styles.paymentOptionCard,
-                  paymentMethod === 'GCash' && styles.paymentOptionCardActive,
+                  isDarkMode && { backgroundColor: subBg, borderColor: borderCol },
+                  paymentMethod === 'GCash' && [
+                    styles.paymentOptionCardActive,
+                    isDarkMode && {
+                      backgroundColor: 'rgba(234, 88, 12, 0.12)',
+                      borderColor: '#EA580C',
+                    },
+                  ],
                 ]}
                 onPress={() => setPaymentMethod('GCash')}
                 activeOpacity={0.85}
@@ -555,19 +614,19 @@ export default function CheckoutModal({
                     </View>
                     <View>
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <Text style={styles.paymentOptionTitle}>GCash Express Pay</Text>
+                        <Text style={[styles.paymentOptionTitle, { color: textPrimary }]}>GCash Express Pay</Text>
                         <View
                           style={{
-                            backgroundColor: '#FDE68A',
+                            backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.2)' : '#FDE68A',
                             paddingHorizontal: 6,
                             paddingVertical: 1.5,
                             borderRadius: 6,
                           }}
                         >
-                          <Text style={{ fontSize: 10, fontWeight: '600', color: '#EA580C' }}>INSTANT</Text>
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: brandAccent }}>INSTANT</Text>
                         </View>
                       </View>
-                      <Text style={styles.paymentOptionSub}>
+                      <Text style={[styles.paymentOptionSub, { color: textMuted }]}>
                         Instant e-wallet payment with reference code
                       </Text>
                     </View>
@@ -575,6 +634,7 @@ export default function CheckoutModal({
                   <View
                     style={[
                       styles.paymentRadioDot,
+                      isDarkMode && { borderColor: '#475569' },
                       paymentMethod === 'GCash' && styles.paymentRadioDotActive,
                     ]}
                   >
@@ -583,14 +643,14 @@ export default function CheckoutModal({
                 </View>
 
                 {paymentMethod === 'GCash' && (
-                  <View style={styles.paymentDetailsDrawer}>
+                  <View style={[styles.paymentDetailsDrawer, isDarkMode && { borderTopColor: borderCol }]}>
                     <View
                       style={{
-                        backgroundColor: '#FFFFFF',
+                        backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
                         padding: 12,
                         borderRadius: 12,
                         borderWidth: 1,
-                        borderColor: '#C8DDD3',
+                        borderColor: isDarkMode ? borderCol : '#C8DDD3',
                         marginBottom: 10,
                       }}
                     >
@@ -602,25 +662,31 @@ export default function CheckoutModal({
                           marginBottom: 4,
                         }}
                       >
-                        <Text style={{ fontSize: 11, fontWeight: '600', color: '#64748B' }}>
+                        <Text style={{ fontSize: 11, fontWeight: '600', color: textMuted }}>
                           OFFICIAL GCASH MERCHANT:
                         </Text>
-                        <Text style={{ fontSize: 12, fontWeight: '600', color: '#EA580C' }}>
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: brandAccent }}>
                           0917-582-9410
                         </Text>
                       </View>
-                      <Text style={{ fontSize: 11, color: '#475569' }}>
+                      <Text style={{ fontSize: 11, color: textSecondary }}>
                         Account Name: MotoTrack Motorparts and Accessories
                       </Text>
                     </View>
 
-                    <Text style={[styles.formLabel, { fontSize: 12, marginBottom: 4 }]}>
+                    <Text style={[styles.formLabel, { fontSize: 12, marginBottom: 4, color: textPrimary }]}>
                       Your GCash Mobile Number *
                     </Text>
                     <TextInput
                       style={[
                         styles.formInput,
-                        { fontSize: 13, backgroundColor: '#FFFFFF', marginBottom: 8 },
+                        {
+                          fontSize: 13,
+                          backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
+                          borderColor: inputBorderCol,
+                          color: textPrimary,
+                          marginBottom: 8,
+                        },
                       ]}
                       placeholder="09XX-XXX-XXXX"
                       placeholderTextColor="#94A3B8"
@@ -634,16 +700,16 @@ export default function CheckoutModal({
                         flexDirection: 'row',
                         justifyContent: 'space-between',
                         alignItems: 'center',
-                        backgroundColor: '#F0FDF4',
+                        backgroundColor: isDarkMode ? 'rgba(22, 163, 74, 0.14)' : '#F0FDF4',
                         padding: 8,
                         borderRadius: 8,
                         borderWidth: 1,
-                        borderColor: '#BBF7D0',
+                        borderColor: isDarkMode ? 'rgba(74, 222, 128, 0.3)' : '#BBF7D0',
                       }}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <BootstrapIcon name="check-circle-fill" size={13} color="#16A34A" />
-                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: '#166534' }}>
+                        <BootstrapIcon name="check-circle-fill" size={13} color={isDarkMode ? '#4ADE80' : '#16A34A'} />
+                        <Text style={{ fontSize: 11.5, fontWeight: '700', color: isDarkMode ? '#86EFAC' : '#166534' }}>
                           Reference: {gcashReference}
                         </Text>
                       </View>
@@ -653,7 +719,7 @@ export default function CheckoutModal({
                           showToast('Generated fresh GCash reference code');
                         }}
                       >
-                        <BootstrapIcon name="arrow-clockwise" size={13} color="#16A34A" />
+                        <BootstrapIcon name="arrow-clockwise" size={13} color={isDarkMode ? '#4ADE80' : '#16A34A'} />
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -664,50 +730,50 @@ export default function CheckoutModal({
             {/* ─── 4. ORDER SUMMARY & TOTAL ─── */}
             <View
               style={{
-                backgroundColor: '#F8FAFC',
+                backgroundColor: subBg,
                 padding: 14,
                 borderRadius: 14,
                 marginVertical: 10,
                 borderWidth: 1,
-                borderColor: '#E2E8F0',
+                borderColor: borderCol,
               }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#0F172A', marginBottom: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: textPrimary, marginBottom: 8 }}>
                 Order Summary ({displayItemCount} {displayItemCount === 1 ? 'item' : 'items'})
               </Text>
 
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={{ fontSize: 12.5, color: '#64748B', fontWeight: '600' }}>Subtotal</Text>
-                <Text style={{ fontSize: 12.5, color: '#0F172A', fontWeight: '700' }}>
+                <Text style={{ fontSize: 12.5, color: textMuted, fontWeight: '600' }}>Subtotal</Text>
+                <Text style={{ fontSize: 12.5, color: textPrimary, fontWeight: '700' }}>
                   ₱{Number(summarySubtotal || 0).toFixed(2)}
                 </Text>
               </View>
 
               {summaryDiscount > 0 ? (
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>
+                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#4ADE80' : '#16A34A', fontWeight: '700' }}>
                     {appliedPromoMeta?.code || 'Discount'}
                     {discountPercent > 0 ? ` −${discountPercent}%` : ''}
                   </Text>
-                  <Text style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>
+                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#4ADE80' : '#16A34A', fontWeight: '700' }}>
                     −₱{Number(summaryDiscount).toFixed(2)}
                   </Text>
                 </View>
               ) : null}
 
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                <Text style={{ fontSize: 12.5, color: '#64748B', fontWeight: '600' }}>Shipping</Text>
-                <Text style={{ fontSize: 12.5, color: '#0F172A', fontWeight: '700' }}>
+                <Text style={{ fontSize: 12.5, color: textMuted, fontWeight: '600' }}>Shipping</Text>
+                <Text style={{ fontSize: 12.5, color: textPrimary, fontWeight: '700' }}>
                   ₱{Number(summaryFreeShipping ? shippingRate || 150 : summaryShipping || 0).toFixed(2)}
                 </Text>
               </View>
 
               {summaryFreeShipping ? (
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                  <Text style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>
+                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#4ADE80' : '#16A34A', fontWeight: '700' }}>
                     ✓ Free Shipping
                   </Text>
-                  <Text style={{ fontSize: 12.5, color: '#16A34A', fontWeight: '700' }}>
+                  <Text style={{ fontSize: 12.5, color: isDarkMode ? '#4ADE80' : '#16A34A', fontWeight: '700' }}>
                     −₱{Number(shippingRate || 150).toFixed(2)}
                   </Text>
                 </View>
@@ -716,7 +782,7 @@ export default function CheckoutModal({
               <View
                 style={{
                   borderTopWidth: 1,
-                  borderTopColor: '#E2E8F0',
+                  borderTopColor: borderCol,
                   marginTop: 8,
                   paddingTop: 8,
                   flexDirection: 'row',
@@ -724,8 +790,8 @@ export default function CheckoutModal({
                   alignItems: 'center',
                 }}
               >
-                <Text style={{ fontSize: 14, fontWeight: '600', color: '#0F172A' }}>Total to Pay</Text>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: '#EA580C' }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: textPrimary }}>Total to Pay</Text>
+                <Text style={{ fontSize: 18, fontWeight: '700', color: brandAccent }}>
                   ₱
                   {Number(displayTotal).toLocaleString(undefined, {
                     minimumFractionDigits: 2,
@@ -765,106 +831,109 @@ export default function CheckoutModal({
   );
 }
 
-const checkoutStyles = StyleSheet.create({
-  addressCardContainer: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 16,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginBottom: 14,
-  },
-  addressCardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EDF2F7',
-  },
-  addressCardTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  editProfileAddressBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    backgroundColor: '#F3F7F6',
-    borderWidth: 1,
-    borderColor: '#C8DDD3',
-  },
-  editProfileAddressText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#EA580C',
-  },
-  addressDisplayWrap: {
-    paddingTop: 8,
-    gap: 4,
-  },
-  addressRecipientName: {
-    fontSize: 13.5,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  addressPhoneText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  addressFullText: {
-    fontSize: 12.5,
-    color: '#334155',
-    lineHeight: 18,
-    marginTop: 2,
-  },
-  profileSyncBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    marginTop: 6,
-    backgroundColor: '#F3F7F6',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  profileSyncBadgeText: {
-    fontSize: 10.5,
-    color: '#EA580C',
-    fontWeight: '700',
-  },
-  inlineAddressForm: {
-    paddingTop: 8,
-    gap: 6,
-  },
-  inlineFormLabel: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#475569',
-  },
-  inlineInput: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    fontSize: 12.5,
-    color: '#0F172A',
-    minHeight: 60,
-    textAlignVertical: 'top',
-  },
-  inlineSaveBtn: {
-    backgroundColor: '#EA580C',
-    paddingVertical: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  inlineSaveBtnText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-});
+const createCheckoutStyles = (isDarkMode) =>
+  StyleSheet.create({
+    addressCardContainer: {
+      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      borderRadius: 16,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      marginBottom: 14,
+    },
+    addressCardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingBottom: 8,
+      borderBottomWidth: 1,
+      borderBottomColor: isDarkMode ? '#282D34' : '#EDF2F7',
+    },
+    addressCardTitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    editProfileAddressBtn: {
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 8,
+      backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#F3F7F6',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(251, 146, 60, 0.35)' : '#C8DDD3',
+    },
+    editProfileAddressText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+    },
+    addressDisplayWrap: {
+      paddingTop: 8,
+      gap: 4,
+    },
+    addressRecipientName: {
+      fontSize: 13.5,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    addressPhoneText: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: '#94A3B8',
+    },
+    addressFullText: {
+      fontSize: 12.5,
+      color: isDarkMode ? '#CBD5E1' : '#334155',
+      lineHeight: 18,
+      marginTop: 2,
+    },
+    profileSyncBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 6,
+      backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.12)' : '#F3F7F6',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? 'rgba(251, 146, 60, 0.28)' : 'transparent',
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+    },
+    profileSyncBadgeText: {
+      fontSize: 10.5,
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+      fontWeight: '700',
+    },
+    inlineAddressForm: {
+      paddingTop: 8,
+      gap: 6,
+    },
+    inlineFormLabel: {
+      fontSize: 11.5,
+      fontWeight: '700',
+      color: isDarkMode ? '#CBD5E1' : '#475569',
+    },
+    inlineInput: {
+      backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
+      borderRadius: 10,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
+      fontSize: 12.5,
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      minHeight: 60,
+      textAlignVertical: 'top',
+    },
+    inlineSaveBtn: {
+      backgroundColor: '#EA580C',
+      paddingVertical: 10,
+      borderRadius: 10,
+      alignItems: 'center',
+      marginTop: 4,
+    },
+    inlineSaveBtnText: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+  });

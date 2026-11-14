@@ -12,6 +12,7 @@ import {
 import BootstrapIcon from './BootstrapIcon.jsx';
 import { notificationService, stripEmojis } from '../../services/notifications/notificationService.js';
 import { getThemeTokens } from '../../styles/theme.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 // Ensure custom orange pill scrollbar indicator styles are injected on web
 if (
@@ -126,11 +127,13 @@ export default function NotificationDropdown({
   onNavigateToScreen,
   currentUser,
   isAdmin: propIsAdmin = false,
-  isDark = false,
+  isDark: isDarkProp,
   topOffset,
   rightOffset,
   isMobile = false,
 }) {
+  const { isDarkMode: themeDark = false } = useTheme?.() || {};
+  const isDark = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
   const containerRef = useRef(null);
   const hoverTimersRef = useRef(new Map());
   const { width: windowWidth } = useWindowDimensions();

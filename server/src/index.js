@@ -120,12 +120,13 @@ function listLanIPv4() {
 }
 
 const isServerless =
-  process.env.VERCEL === '1' ||
+  Boolean(process.env.VERCEL) ||
+  Boolean(process.env.VERCEL_ENV) ||
   Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
   Boolean(process.env.LAMBDA_TASK_ROOT);
 
 if (!isServerless && process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, HOST, () => {
+  const server = app.listen(PORT, HOST, () => {
     const lan = listLanIPv4();
     console.log(`MotoTrack AI Customizer API listening on http://${HOST}:${PORT}`);
     console.log(`Local:   http://127.0.0.1:${PORT}`);
@@ -161,6 +162,16 @@ if (!isServerless && process.env.NODE_ENV !== 'test') {
         console.warn('WARNING: Set RESEND_API_KEY or SMTP_USER/SMTP_PASS for staff OTP/credential emails.');
       }
     }
+  });
+
+  server.on('error', (err) => {
+    if (err && err.code === 'EADDRINUSE') {
+      console.error(
+        `[server] Port ${PORT} is already in use by another process. Stop the other server instance on port ${PORT} or set a different PORT in .env.`
+      );
+      return;
+    }
+    console.error('[server] Fatal listen error:', err);
   });
 }
 

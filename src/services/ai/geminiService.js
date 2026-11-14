@@ -51,7 +51,7 @@ export const geminiService = {
   async hasApiKey() {
     try {
       const base = getCustomizeApiBaseUrl();
-      const res = await fetch(`${base}/health`);
+      const res = await fetch(`${base}/api/health`);
       const data = await res.json().catch(() => ({}));
       return Boolean(data?.hasGeminiKey);
     } catch {
@@ -201,7 +201,7 @@ export const geminiService = {
     const imageMime = imagePart?.inline_data?.mime_type || 'image/jpeg';
 
     const proxied = await callServerProxy(
-      '/gemini/image',
+      '/api/gemini/image',
       {
         promptText,
         model: this.getImageModel(),
@@ -243,7 +243,7 @@ export const geminiService = {
     }
 
     const proxied = await callServerProxy(
-      '/gemini/generate',
+      '/api/gemini/generate',
       {
         promptText,
         model: DEFAULT_GEMINI_MODEL,

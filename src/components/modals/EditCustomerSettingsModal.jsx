@@ -12,6 +12,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 const ADDRESS_PRESETS = [
   { label: 'Inoburan, Naga', address: 'Purok Avocado 4, Inoburan, City of Naga, Cebu', city: 'City of Naga' },
@@ -26,9 +27,11 @@ export default function EditCustomerSettingsModal({
   currentUser,
   onClose,
   onSave,
-  isDarkMode = false,
+  isDarkMode: isDarkProp,
   showToast = () => { },
 }) {
+  const { isDarkMode: themeDark = false } = useTheme?.() || {};
+  const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
   const { width: windowWidth } = useWindowDimensions();
   const isSmall = windowWidth < 600;
   const isDesktop = windowWidth >= 768;

@@ -14,9 +14,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { BootstrapIcon } from '../common/BootstrapIcon.jsx';
 import DeliveryTrackingPanel from '../common/DeliveryTrackingPanel.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import { orderService, canCustomerCancelStatus, canCustomerRequestReturnStatus, canCustomerEditAddressStatus } from '../../services/orders/orderService.js';
 import { geocodeAddress, STORE_LOCATION } from '../../utils/geo.js';
 
@@ -97,8 +98,17 @@ export function formatPHPhone(phone, masked = true) {
   }
 }
 
-export default function LiveOrderTrackingMapModal({ visible, order, onClose, showToast = () => {} }) {
+export default function LiveOrderTrackingMapModal({
+  visible,
+  order,
+  onClose,
+  showToast = () => {},
+  isDarkMode: isDarkProp,
+}) {
   const { currentUser } = useAuth();
+  const { isDarkMode: themeDark } = useTheme();
+  const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
+  const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
 
@@ -676,7 +686,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
           {/* ─── 1. TOP HEADER ─── */}
           <View style={[styles.headerRow, windowWidth < 400 && { paddingHorizontal: 12, paddingVertical: 12 }]}>
             <TouchableOpacity style={[styles.closeBtn, windowWidth < 400 && { marginRight: 8 }]} onPress={onClose} activeOpacity={0.8}>
-              <BootstrapIcon name="x-lg" size={15} color="#64748B" />
+              <BootstrapIcon name="x-lg" size={15} color={isDarkMode ? '#94A3B8' : '#64748B'} />
             </TouchableOpacity>
 
             <View style={styles.headerTextWrap}>
@@ -776,10 +786,10 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                 <View style={styles.mapToolbarRow}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                     <View style={styles.mapHudLiveDot} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>
+                    <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? '#F8FAFC' : '#0F172A' }}>
                       Live GPS Tracking
                     </Text>
-                    <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>
+                    <Text style={{ fontSize: 12, color: isDarkMode ? '#94A3B8' : '#64748B', fontWeight: '600' }}>
                       • City of Naga
                     </Text>
                   </View>
@@ -789,7 +799,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     onPress={handleOpenGoogleMapsApp}
                     activeOpacity={0.8}
                   >
-                    <BootstrapIcon name="box-arrow-up-right" size={11} color="#EA580C" />
+                    <BootstrapIcon name="box-arrow-up-right" size={11} color={isDarkMode ? '#FB923C' : '#EA580C'} />
                     <Text style={styles.openGoogleMapsBtnText}>Open in Google Maps</Text>
                   </TouchableOpacity>
                 </View>
@@ -818,13 +828,31 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                 {/* Rider Contact Card */}
                 <View style={styles.riderInfoBar}>
                   {riderInfo.unassigned ? (
-                    <View style={[styles.riderAvatarSmall, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0' }]}>
+                    <View
+                      style={[
+                        styles.riderAvatarSmall,
+                        {
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: isDarkMode ? '#252A30' : '#E2E8F0',
+                        },
+                      ]}
+                    >
                       <BootstrapIcon name="person" size={16} color="#94A3B8" />
                     </View>
                   ) : riderInfo.avatar ? (
                     <Image source={{ uri: riderInfo.avatar }} style={styles.riderAvatarSmall} />
                   ) : (
-                    <View style={[styles.riderAvatarSmall, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0' }]}>
+                    <View
+                      style={[
+                        styles.riderAvatarSmall,
+                        {
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: isDarkMode ? '#252A30' : '#E2E8F0',
+                        },
+                      ]}
+                    >
                       <BootstrapIcon name="person" size={16} color="#94A3B8" />
                     </View>
                   )}
@@ -915,7 +943,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                   activeOpacity={0.8}
                 >
                   <Text style={styles.browseShopText}>Browse shop</Text>
-                  <BootstrapIcon name="chevron-right" size={12} color="#64748B" />
+                  <BootstrapIcon name="chevron-right" size={12} color={isDarkMode ? '#94A3B8' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
@@ -991,7 +1019,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                   <Text style={styles.orderNumberValue}>
                     {activeOrder?.order_id || activeOrder?.id || '—'}
                   </Text>
-                  <BootstrapIcon name="copy" size={13} color="#64748B" />
+                  <BootstrapIcon name="copy" size={13} color={isDarkMode ? '#94A3B8' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
@@ -1016,7 +1044,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                   <BootstrapIcon
                     name={isSummaryExpanded ? 'chevron-up' : 'chevron-down'}
                     size={12}
-                    color="#64748B"
+                    color={isDarkMode ? '#94A3B8' : '#64748B'}
                     style={{ marginLeft: 4 }}
                   />
                 </TouchableOpacity>
@@ -1064,7 +1092,7 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                   convenience (30-day policy)
                 </Text>
               </View>
-              <BootstrapIcon name="chevron-right" size={13} color="#64748B" />
+              <BootstrapIcon name="chevron-right" size={13} color={isDarkMode ? '#94A3B8' : '#64748B'} />
             </TouchableOpacity>
             )}
           </ScrollView>
@@ -1175,10 +1203,10 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                 <View style={{ alignItems: 'center', marginBottom: 10 }}>
                   <BootstrapIcon name="exclamation-triangle-fill" size={32} color="#DC2626" />
                 </View>
-                <Text style={[styles.editAddressTitle, { textAlign: 'center', color: '#DC2626' }]}>
+                <Text style={[styles.editAddressTitle, { textAlign: 'center', color: isDarkMode ? '#F87171' : '#DC2626' }]}>
                   Cancel Order #{activeOrder?.order_id || activeOrder?.id}?
                 </Text>
-                <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 12 }}>
+                <Text style={{ fontSize: 13, color: isDarkMode ? '#94A3B8' : '#64748B', textAlign: 'center', marginBottom: 12 }}>
                   Please select a reason for cancellation. Once cancelled, this action cannot be undone.
                 </Text>
                 {[
@@ -1195,9 +1223,23 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                       padding: 10,
                       borderRadius: 8,
                       marginBottom: 6,
-                      backgroundColor: cancelReason === reason ? '#FEF2F2' : '#F8FAFC',
+                      backgroundColor:
+                        cancelReason === reason
+                          ? isDarkMode
+                            ? 'rgba(220, 38, 38, 0.18)'
+                            : '#FEF2F2'
+                          : isDarkMode
+                            ? '#14181D'
+                            : '#F8FAFC',
                       borderWidth: 1,
-                      borderColor: cancelReason === reason ? '#FCA5A5' : '#E2E8F0',
+                      borderColor:
+                        cancelReason === reason
+                          ? isDarkMode
+                            ? '#EF4444'
+                            : '#FCA5A5'
+                          : isDarkMode
+                            ? '#282D34'
+                            : '#E2E8F0',
                     }}
                     onPress={() => setCancelReason(reason)}
                     activeOpacity={0.8}
@@ -1205,14 +1247,21 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     <BootstrapIcon
                       name={cancelReason === reason ? 'check-circle-fill' : 'circle'}
                       size={15}
-                      color={cancelReason === reason ? '#DC2626' : '#94A3B8'}
+                      color={cancelReason === reason ? (isDarkMode ? '#F87171' : '#DC2626') : '#94A3B8'}
                     />
                     <Text
                       style={{
                         marginLeft: 8,
                         fontSize: 12.5,
                         fontWeight: cancelReason === reason ? '700' : '500',
-                        color: cancelReason === reason ? '#991B1B' : '#334155',
+                        color:
+                          cancelReason === reason
+                            ? isDarkMode
+                              ? '#FCA5A5'
+                              : '#991B1B'
+                            : isDarkMode
+                              ? '#CBD5E1'
+                              : '#334155',
                       }}
                     >
                       {reason}
@@ -1247,12 +1296,12 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
             <View style={styles.editAddressOverlay}>
               <View style={styles.editAddressCard}>
                 <View style={{ alignItems: 'center', marginBottom: 10 }}>
-                  <BootstrapIcon name="arrow-counterclockwise" size={32} color="#EA580C" />
+                  <BootstrapIcon name="arrow-counterclockwise" size={32} color={isDarkMode ? '#FB923C' : '#EA580C'} />
                 </View>
                 <Text style={[styles.editAddressTitle, { textAlign: 'center' }]}>
                   Request Return & Refund
                 </Text>
-                <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginBottom: 12 }}>
+                <Text style={{ fontSize: 13, color: isDarkMode ? '#94A3B8' : '#64748B', textAlign: 'center', marginBottom: 12 }}>
                   30-day hassle-free return policy. Select a reason and add optional details:
                 </Text>
                 {[
@@ -1269,9 +1318,23 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                       padding: 10,
                       borderRadius: 8,
                       marginBottom: 6,
-                      backgroundColor: returnReason === reason ? '#F0FDF4' : '#F8FAFC',
+                      backgroundColor:
+                        returnReason === reason
+                          ? isDarkMode
+                            ? 'rgba(22, 163, 74, 0.16)'
+                            : '#F0FDF4'
+                          : isDarkMode
+                            ? '#14181D'
+                            : '#F8FAFC',
                       borderWidth: 1,
-                      borderColor: returnReason === reason ? '#86EFAC' : '#E2E8F0',
+                      borderColor:
+                        returnReason === reason
+                          ? isDarkMode
+                            ? '#4ADE80'
+                            : '#86EFAC'
+                          : isDarkMode
+                            ? '#282D34'
+                            : '#E2E8F0',
                     }}
                     onPress={() => setReturnReason(reason)}
                     activeOpacity={0.8}
@@ -1279,14 +1342,21 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                     <BootstrapIcon
                       name={returnReason === reason ? 'check-circle-fill' : 'circle'}
                       size={15}
-                      color={returnReason === reason ? '#EA580C' : '#94A3B8'}
+                      color={returnReason === reason ? (isDarkMode ? '#FB923C' : '#EA580C') : '#94A3B8'}
                     />
                     <Text
                       style={{
                         marginLeft: 8,
                         fontSize: 12.5,
                         fontWeight: returnReason === reason ? '700' : '500',
-                        color: returnReason === reason ? '#065F46' : '#334155',
+                        color:
+                          returnReason === reason
+                            ? isDarkMode
+                              ? '#86EFAC'
+                              : '#065F46'
+                            : isDarkMode
+                              ? '#CBD5E1'
+                              : '#334155',
                       }}
                     >
                       {reason}
@@ -1332,7 +1402,16 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
                   {riderInfo.avatar ? (
                     <Image source={{ uri: riderInfo.avatar }} style={styles.callAvatarImg} />
                   ) : (
-                    <View style={[styles.callAvatarImg, { alignItems: 'center', justifyContent: 'center', backgroundColor: '#E2E8F0' }]}>
+                    <View
+                      style={[
+                        styles.callAvatarImg,
+                        {
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: isDarkMode ? '#252A30' : '#E2E8F0',
+                        },
+                      ]}
+                    >
                       <BootstrapIcon name="person" size={28} color="#94A3B8" />
                     </View>
                   )}
@@ -1362,1138 +1441,1148 @@ export default function LiveOrderTrackingMapModal({ visible, order, onClose, sho
   );
 }
 
-const styles = StyleSheet.create({
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: 'flex-end',
-  },
-  modalContainer: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    maxHeight: '94%',
-    overflow: 'hidden',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 20,
-  },
-  modalContainerDesktop: {
-    maxWidth: 560,
-    marginHorizontal: 'auto',
-    borderRadius: 28,
-    maxHeight: '90%',
-    marginBottom: 24,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
+const createStyles = (isDarkMode) =>
+  StyleSheet.create({
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: isDarkMode ? 'rgba(2, 6, 23, 0.75)' : 'rgba(15, 23, 42, 0.65)',
+      justifyContent: 'flex-end',
+    },
+    modalContainer: {
+      width: '100%',
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      maxHeight: '94%',
+      overflow: 'hidden',
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: -6 },
+      shadowOpacity: isDarkMode ? 0.5 : 0.15,
+      shadowRadius: 16,
+      elevation: 20,
+    },
+    modalContainerDesktop: {
+      maxWidth: 560,
+      marginHorizontal: 'auto',
+      borderRadius: 28,
+      maxHeight: '90%',
+      marginBottom: 24,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    },
 
-  // 1. Header
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 18,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    backgroundColor: '#FFFFFF',
-  },
-  closeBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 14,
-  },
-  headerTextWrap: {
-    flex: 1,
-  },
-  headerMainTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#0F172A',
-    letterSpacing: -0.3,
-  },
-  headerSubtitleText: {
-    fontSize: 13,
-    color: '#EA580C',
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  headerGpsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 11,
-    paddingVertical: 6,
-    borderRadius: 12,
-    backgroundColor: '#FEF3C7',
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  headerGpsBtnText: {
-    color: '#EA580C',
-    fontSize: 12,
-    fontWeight: '600',
-  },
+    // 1. Header
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: isDarkMode ? '#282D34' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+    },
+    closeBtn: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 14,
+    },
+    headerTextWrap: {
+      flex: 1,
+    },
+    headerMainTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      letterSpacing: -0.3,
+    },
+    headerSubtitleText: {
+      fontSize: 13,
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+      fontWeight: '700',
+      marginTop: 2,
+    },
+    headerGpsBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 11,
+      paddingVertical: 6,
+      borderRadius: 12,
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(251, 191, 36, 0.35)' : '#FDE68A',
+    },
+    headerGpsBtnText: {
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+      fontSize: 12,
+      fontWeight: '600',
+    },
 
-  scrollContent: {
-    paddingHorizontal: 18,
-    paddingTop: 16,
-    paddingBottom: 24,
-    gap: 12,
-    backgroundColor: '#FFFFFF',
-  },
+    scrollContent: {
+      paddingHorizontal: 18,
+      paddingTop: 16,
+      paddingBottom: 24,
+      gap: 12,
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+    },
 
-  // 2. Timeline Stepper
-  stepperCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  stepperTrackRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    position: 'relative',
-    height: 32,
-    marginHorizontal: 10,
-  },
-  stepperConnectingLineBackground: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    height: 2.5,
-    backgroundColor: '#E2E8F0',
-    top: 15,
-    zIndex: 1,
-  },
-  stepperConnectingLineActive: {
-    position: 'absolute',
-    left: 0,
-    height: 2.5,
-    backgroundColor: '#EA580C',
-    top: 15,
-    zIndex: 2,
-  },
-  stepNodeContainer: {
-    zIndex: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  activeStepCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#EA580C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#EA580C',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 5,
-  },
-  completedStepDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: '#EA580C',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pendingStepDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: '#E2E8F0',
-    borderWidth: 2,
-    borderColor: '#CBD5E1',
-  },
-  stepLabelsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 10,
-  },
-  stepLabelText: {
-    fontSize: 10.5,
-    color: '#64748B',
-    fontWeight: '600',
-    textAlign: 'center',
-    flex: 1,
-  },
-  stepLabelTextActive: {
-    color: '#EA580C',
-    fontWeight: '600',
-  },
-  stepLabelTextCompleted: {
-    color: '#0F172A',
-    fontWeight: '700',
-  },
+    // 2. Timeline Stepper
+    stepperCard: {
+      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      borderRadius: 20,
+      paddingHorizontal: 16,
+      paddingTop: 20,
+      paddingBottom: 16,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    },
+    stepperTrackRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      position: 'relative',
+      height: 32,
+      marginHorizontal: 10,
+    },
+    stepperConnectingLineBackground: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      height: 2.5,
+      backgroundColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      top: 15,
+      zIndex: 1,
+    },
+    stepperConnectingLineActive: {
+      position: 'absolute',
+      left: 0,
+      height: 2.5,
+      backgroundColor: '#EA580C',
+      top: 15,
+      zIndex: 2,
+    },
+    stepNodeContainer: {
+      zIndex: 3,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    activeStepCircle: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: '#EA580C',
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#EA580C',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: 0.35,
+      shadowRadius: 6,
+      elevation: 5,
+    },
+    completedStepDot: {
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: '#EA580C',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pendingStepDot: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: isDarkMode ? '#252A30' : '#E2E8F0',
+      borderWidth: 2,
+      borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
+    },
+    stepLabelsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 10,
+    },
+    stepLabelText: {
+      fontSize: 10.5,
+      color: '#94A3B8',
+      fontWeight: '600',
+      textAlign: 'center',
+      flex: 1,
+    },
+    stepLabelTextActive: {
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+      fontWeight: '600',
+    },
+    stepLabelTextCompleted: {
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      fontWeight: '700',
+    },
 
-  // 3. Guarantee Banner
-  guaranteeBanner: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 16,
-    padding: 13,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-    gap: 10,
-  },
-  guaranteeIconWrap: {
-    marginTop: 1,
-  },
-  guaranteeText: {
-    flex: 1,
-    fontSize: 12,
-    color: '#334155',
-    lineHeight: 18,
-  },
+    // 3. Guarantee Banner
+    guaranteeBanner: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7',
+      borderRadius: 16,
+      padding: 13,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(251, 191, 36, 0.3)' : '#FDE68A',
+      gap: 10,
+    },
+    guaranteeIconWrap: {
+      marginTop: 1,
+    },
+    guaranteeText: {
+      flex: 1,
+      fontSize: 12,
+      color: isDarkMode ? '#FDE68A' : '#334155',
+      lineHeight: 18,
+    },
 
-  // 4. Google Maps Section
-  googleMapSectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  mapToolbarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  mapModePills: {
-    flexDirection: 'row',
-    gap: 6,
-    backgroundColor: '#F1F5F9',
-    padding: 3,
-    borderRadius: 12,
-  },
-  mapModePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 9,
-  },
-  mapModePillActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  mapModePillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  mapModePillTextActive: {
-    color: '#EA580C',
-    fontWeight: '600',
-  },
-  openGoogleMapsBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  openGoogleMapsBtnText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#EA580C',
-  },
+    // 4. Google Maps Section
+    googleMapSectionCard: {
+      backgroundColor: isDarkMode ? '#181B1F' : '#FFFFFF',
+      borderRadius: 20,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      shadowColor: '#0F172A',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDarkMode ? 0.25 : 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    mapToolbarRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 10,
+    },
+    mapModePills: {
+      flexDirection: 'row',
+      gap: 6,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      padding: 3,
+      borderRadius: 12,
+    },
+    mapModePill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+      borderRadius: 9,
+    },
+    mapModePillActive: {
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: isDarkMode ? 0.35 : 0.1,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    mapModePillText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: '#94A3B8',
+    },
+    mapModePillTextActive: {
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+      fontWeight: '600',
+    },
+    openGoogleMapsBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.14)' : '#FEF3C7',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(251, 191, 36, 0.35)' : '#FDE68A',
+    },
+    openGoogleMapsBtnText: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+    },
 
-  mapCanvasWrapper: {
-    height: 260,
-    minHeight: 260,
-    backgroundColor: '#EDF1F5',
-    borderRadius: 16,
-    position: 'relative',
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-  },
-  iframeMapContainer: {
-    width: '100%',
-    height: 260,
-    minHeight: 260,
-    position: 'relative',
-  },
-  nativeWebView: {
-    width: '100%',
-    height: 260,
-    minHeight: 260,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  mapLoadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-    gap: 8,
-  },
-  mapLoadingText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  googleMapLiveBadge: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  googleMapLiveText: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
+    mapCanvasWrapper: {
+      height: 260,
+      minHeight: 260,
+      backgroundColor: isDarkMode ? '#14181D' : '#EDF1F5',
+      borderRadius: 16,
+      position: 'relative',
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#CBD5E1',
+    },
+    iframeMapContainer: {
+      width: '100%',
+      height: 260,
+      minHeight: 260,
+      position: 'relative',
+    },
+    nativeWebView: {
+      width: '100%',
+      height: 260,
+      minHeight: 260,
+      borderRadius: 16,
+      overflow: 'hidden',
+    },
+    mapLoadingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: isDarkMode ? '#14181D' : '#F8FAFC',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 10,
+      gap: 8,
+    },
+    mapLoadingText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: '#94A3B8',
+    },
+    googleMapLiveBadge: {
+      position: 'absolute',
+      top: 10,
+      left: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: isDarkMode ? 'rgba(24, 27, 31, 0.92)' : 'rgba(255, 255, 255, 0.92)',
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    },
+    googleMapLiveText: {
+      fontSize: 10.5,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
 
-  mapRealisticTerrain: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: '#EDF1F5',
-  },
-  mapCoastalWater: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: '22%',
-    backgroundColor: '#BAE6FD',
-    borderRightWidth: 2,
-    borderRightColor: '#7DD3FC',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mapWaterLabel: {
-    transform: [{ rotate: '-90deg' }],
-    fontSize: 7.5,
-    fontWeight: '600',
-    color: '#0369A1',
-    letterSpacing: 1.5,
-    opacity: 0.7,
-  },
-  mapParkArea: {
-    position: 'absolute',
-    backgroundColor: '#D1FAE5',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    padding: 4,
-    justifyContent: 'flex-start',
-  },
-  mapParkLabel: {
-    fontSize: 7.5,
-    fontWeight: '600',
-    color: '#047857',
-  },
-  mapCityBlock: {
-    position: 'absolute',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#94A3B8',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  mapStreetLocalH: {
-    position: 'absolute',
-    left: '22%',
-    right: 0,
-    height: 5,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 0.5,
-    borderBottomWidth: 0.5,
-    borderColor: '#E2E8F0',
-  },
-  mapStreetLocalV: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 5,
-    backgroundColor: '#FFFFFF',
-    borderLeftWidth: 0.5,
-    borderRightWidth: 0.5,
-    borderColor: '#E2E8F0',
-  },
-  mapHighwayH: {
-    position: 'absolute',
-    left: '22%',
-    right: 0,
-    height: 16,
-    backgroundColor: '#C8DDD3',
-    borderTopWidth: 1.5,
-    borderBottomWidth: 1.5,
-    borderColor: '#F59E0B',
-    justifyContent: 'center',
-    paddingLeft: 8,
-  },
-  mapHighwayLabel: {
-    fontSize: 6.5,
-    fontWeight: '600',
-    color: '#9A3412',
-    letterSpacing: 0.5,
-  },
-  mapAvenueV: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    width: 14,
-    backgroundColor: '#FFFFFF',
-    borderLeftWidth: 1.5,
-    borderRightWidth: 1.5,
-    borderColor: '#CBD5E1',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  mapAvenueLabel: {
-    transform: [{ rotate: '-90deg' }],
-    fontSize: 6.5,
-    fontWeight: '600',
-    color: '#64748B',
-    letterSpacing: 0.5,
-  },
-  mapStreetNameTag: {
-    position: 'absolute',
-    fontSize: 7.5,
-    fontWeight: '600',
-    color: '#475569',
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
-    paddingHorizontal: 3,
-    paddingVertical: 1,
-    borderRadius: 3,
-  },
+    mapRealisticTerrain: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: '#EDF1F5',
+    },
+    mapCoastalWater: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      left: 0,
+      width: '22%',
+      backgroundColor: '#BAE6FD',
+      borderRightWidth: 2,
+      borderRightColor: '#7DD3FC',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    mapWaterLabel: {
+      transform: [{ rotate: '-90deg' }],
+      fontSize: 7.5,
+      fontWeight: '600',
+      color: '#0369A1',
+      letterSpacing: 1.5,
+      opacity: 0.7,
+    },
+    mapParkArea: {
+      position: 'absolute',
+      backgroundColor: '#D1FAE5',
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: '#A7F3D0',
+      padding: 4,
+      justifyContent: 'flex-start',
+    },
+    mapParkLabel: {
+      fontSize: 7.5,
+      fontWeight: '600',
+      color: '#047857',
+    },
+    mapCityBlock: {
+      position: 'absolute',
+      backgroundColor: '#FFFFFF',
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: '#E2E8F0',
+      shadowColor: '#94A3B8',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    mapStreetLocalH: {
+      position: 'absolute',
+      left: '22%',
+      right: 0,
+      height: 5,
+      backgroundColor: '#FFFFFF',
+      borderTopWidth: 0.5,
+      borderBottomWidth: 0.5,
+      borderColor: '#E2E8F0',
+    },
+    mapStreetLocalV: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      width: 5,
+      backgroundColor: '#FFFFFF',
+      borderLeftWidth: 0.5,
+      borderRightWidth: 0.5,
+      borderColor: '#E2E8F0',
+    },
+    mapHighwayH: {
+      position: 'absolute',
+      left: '22%',
+      right: 0,
+      height: 16,
+      backgroundColor: '#C8DDD3',
+      borderTopWidth: 1.5,
+      borderBottomWidth: 1.5,
+      borderColor: '#F59E0B',
+      justifyContent: 'center',
+      paddingLeft: 8,
+    },
+    mapHighwayLabel: {
+      fontSize: 6.5,
+      fontWeight: '600',
+      color: '#9A3412',
+      letterSpacing: 0.5,
+    },
+    mapAvenueV: {
+      position: 'absolute',
+      top: 0,
+      bottom: 0,
+      width: 14,
+      backgroundColor: '#FFFFFF',
+      borderLeftWidth: 1.5,
+      borderRightWidth: 1.5,
+      borderColor: '#CBD5E1',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    mapAvenueLabel: {
+      transform: [{ rotate: '-90deg' }],
+      fontSize: 6.5,
+      fontWeight: '600',
+      color: '#64748B',
+      letterSpacing: 0.5,
+    },
+    mapStreetNameTag: {
+      position: 'absolute',
+      fontSize: 7.5,
+      fontWeight: '600',
+      color: '#475569',
+      backgroundColor: 'rgba(255, 255, 255, 0.85)',
+      paddingHorizontal: 3,
+      paddingVertical: 1,
+      borderRadius: 3,
+    },
 
-  mapOriginMarkerRealistic: {
-    position: 'absolute',
-    alignItems: 'center',
-    transform: [{ translateX: -14 }, { translateY: -14 }],
-    zIndex: 20,
-  },
-  originMarkerBubbleRealistic: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#EA580C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#EA580C',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  originMarkerBadgeRealistic: {
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 6,
-    marginTop: 2,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  originMarkerBadgeText: {
-    fontSize: 7.5,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+    mapOriginMarkerRealistic: {
+      position: 'absolute',
+      alignItems: 'center',
+      transform: [{ translateX: -14 }, { translateY: -14 }],
+      zIndex: 20,
+    },
+    originMarkerBubbleRealistic: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: '#EA580C',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
+      shadowColor: '#EA580C',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.35,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    originMarkerBadgeRealistic: {
+      backgroundColor: '#0F172A',
+      paddingHorizontal: 5,
+      paddingVertical: 1.5,
+      borderRadius: 6,
+      marginTop: 2,
+      borderWidth: 1,
+      borderColor: '#334155',
+    },
+    originMarkerBadgeText: {
+      fontSize: 7.5,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
 
-  mapDestMarkerRealistic: {
-    position: 'absolute',
-    alignItems: 'center',
-    transform: [{ translateX: -14 }, { translateY: -14 }],
-    zIndex: 20,
-  },
-  destRadarPulseRealistic: {
-    position: 'absolute',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    top: -8,
-    left: -8,
-  },
-  destMarkerBubbleRealistic: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#EF4444',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#EF4444',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  destMarkerBadgeRealistic: {
-    backgroundColor: '#991B1B',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 6,
-    marginTop: 2,
-  },
-  destMarkerBadgeText: {
-    fontSize: 7.5,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+    mapDestMarkerRealistic: {
+      position: 'absolute',
+      alignItems: 'center',
+      transform: [{ translateX: -14 }, { translateY: -14 }],
+      zIndex: 20,
+    },
+    destRadarPulseRealistic: {
+      position: 'absolute',
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: 'rgba(239, 68, 68, 0.2)',
+      top: -8,
+      left: -8,
+    },
+    destMarkerBubbleRealistic: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: '#EF4444',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: '#FFFFFF',
+      shadowColor: '#EF4444',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.35,
+      shadowRadius: 4,
+      elevation: 4,
+    },
+    destMarkerBadgeRealistic: {
+      backgroundColor: '#991B1B',
+      paddingHorizontal: 5,
+      paddingVertical: 1.5,
+      borderRadius: 6,
+      marginTop: 2,
+    },
+    destMarkerBadgeText: {
+      fontSize: 7.5,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
 
-  mapRiderMarkerRealistic: {
-    position: 'absolute',
-    alignItems: 'center',
-    transform: [{ translateX: -18 }, { translateY: -18 }],
-    zIndex: 30,
-  },
-  riderLivePulseRing: {
-    position: 'absolute',
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(36, 39, 43, 0.6)',
-    top: -7,
-    left: -7,
-  },
-  riderBikeAvatarWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2.5,
-    borderColor: '#EA580C',
-    backgroundColor: '#FFFFFF',
-    overflow: 'visible',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  riderPinAvatarRealistic: {
-    width: 31,
-    height: 31,
-    borderRadius: 15.5,
-  },
-  riderMotorcycleBadge: {
-    position: 'absolute',
-    bottom: -3,
-    right: -3,
-    backgroundColor: '#EA580C',
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
-  },
-  riderTooltipPillRealistic: {
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
-    marginTop: 3,
-    borderWidth: 1,
-    borderColor: '#EA580C',
-    alignItems: 'center',
-  },
-  riderTooltipNameRealistic: {
-    color: '#FFFFFF',
-    fontSize: 8.5,
-    fontWeight: '600',
-  },
-  riderTooltipSpeedRealistic: {
-    color: '#EAB308',
-    fontSize: 7.5,
-    fontWeight: '700',
-  },
+    mapRiderMarkerRealistic: {
+      position: 'absolute',
+      alignItems: 'center',
+      transform: [{ translateX: -18 }, { translateY: -18 }],
+      zIndex: 30,
+    },
+    riderLivePulseRing: {
+      position: 'absolute',
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      backgroundColor: 'rgba(36, 39, 43, 0.6)',
+      top: -7,
+      left: -7,
+    },
+    riderBikeAvatarWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      borderWidth: 2.5,
+      borderColor: '#EA580C',
+      backgroundColor: '#FFFFFF',
+      overflow: 'visible',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    riderPinAvatarRealistic: {
+      width: 31,
+      height: 31,
+      borderRadius: 15.5,
+    },
+    riderMotorcycleBadge: {
+      position: 'absolute',
+      bottom: -3,
+      right: -3,
+      backgroundColor: '#EA580C',
+      width: 14,
+      height: 14,
+      borderRadius: 7,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: '#FFFFFF',
+    },
+    riderTooltipPillRealistic: {
+      backgroundColor: '#0F172A',
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      borderRadius: 8,
+      marginTop: 3,
+      borderWidth: 1,
+      borderColor: '#EA580C',
+      alignItems: 'center',
+    },
+    riderTooltipNameRealistic: {
+      color: '#FFFFFF',
+      fontSize: 8.5,
+      fontWeight: '600',
+    },
+    riderTooltipSpeedRealistic: {
+      color: '#EAB308',
+      fontSize: 7.5,
+      fontWeight: '700',
+    },
 
-  googleWatermark: {
-    position: 'absolute',
-    bottom: 6,
-    left: 8,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    zIndex: 25,
-  },
-  googleWatermarkText: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: -0.5,
-  },
+    googleWatermark: {
+      position: 'absolute',
+      bottom: 6,
+      left: 8,
+      backgroundColor: 'rgba(255, 255, 255, 0.8)',
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 4,
+      zIndex: 25,
+    },
+    googleWatermarkText: {
+      fontSize: 11,
+      fontWeight: '600',
+      letterSpacing: -0.5,
+    },
 
-  mapHudTopLeft: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(15, 23, 42, 0.88)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-    zIndex: 25,
-  },
-  mapHudLiveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#10B981',
-  },
-  mapHudLiveText: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+    mapHudTopLeft: {
+      position: 'absolute',
+      top: 10,
+      left: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: 'rgba(15, 23, 42, 0.88)',
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: '#334155',
+      zIndex: 25,
+    },
+    mapHudLiveDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 3.5,
+      backgroundColor: '#10B981',
+    },
+    mapHudLiveText: {
+      fontSize: 10.5,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
 
-  // 5. Rider Contact Card
-  riderInfoBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    marginTop: 10,
-  },
-  riderAvatarSmall: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-  },
-  riderNameSmall: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  riderPlateText: {
-    fontSize: 10.5,
-    color: '#64748B',
-    marginTop: 1,
-  },
-  riderCallSmallBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#EA580C',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 10,
-  },
-  riderCallSmallText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '600',
-  },
+    // 5. Rider Contact Card
+    riderInfoBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: isDarkMode ? '#14181D' : '#F8FAFC',
+      borderRadius: 14,
+      padding: 10,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      marginTop: 10,
+    },
+    riderAvatarSmall: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+    },
+    riderNameSmall: {
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    riderPlateText: {
+      fontSize: 10.5,
+      color: '#94A3B8',
+      marginTop: 1,
+    },
+    riderCallSmallBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: '#EA580C',
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 10,
+    },
+    riderCallSmallText: {
+      color: '#FFFFFF',
+      fontSize: 11,
+      fontWeight: '600',
+    },
 
-  // 6. Address Card
-  addressCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 8,
-  },
-  addressHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
-  },
-  addressPinWrap: {
-    marginTop: 2,
-  },
-  addressRecipientName: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  addressPhone: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  addressDetailText: {
-    fontSize: 12,
-    color: '#475569',
-    marginTop: 3,
-    lineHeight: 17,
-  },
-  changeAddressLink: {
-    alignSelf: 'flex-end',
-    paddingVertical: 2,
-    paddingHorizontal: 6,
-  },
-  changeAddressLinkText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#EA580C',
-  },
+    // 6. Address Card
+    addressCard: {
+      backgroundColor: isDarkMode ? '#181B1F' : '#FFFFFF',
+      borderRadius: 18,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      gap: 8,
+    },
+    addressHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 10,
+    },
+    addressPinWrap: {
+      marginTop: 2,
+    },
+    addressRecipientName: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    addressPhone: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#94A3B8',
+    },
+    addressDetailText: {
+      fontSize: 12,
+      color: isDarkMode ? '#CBD5E1' : '#475569',
+      marginTop: 3,
+      lineHeight: 17,
+    },
+    changeAddressLink: {
+      alignSelf: 'flex-end',
+      paddingVertical: 2,
+      paddingHorizontal: 6,
+    },
+    changeAddressLinkText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+    },
 
-  // 7. Order Items Card
-  orderItemsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 12,
-  },
-  storeHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  storeHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  storeAvatarCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: '#FEF3C7',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  storeNameText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  browseShopBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  browseShopText: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '700',
-  },
+    // 7. Order Items Card
+    orderItemsCard: {
+      backgroundColor: isDarkMode ? '#181B1F' : '#FFFFFF',
+      borderRadius: 18,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      gap: 12,
+    },
+    storeHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingBottom: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: isDarkMode ? '#282D34' : '#F1F5F9',
+    },
+    storeHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    storeAvatarCircle: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    storeNameText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    browseShopBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+    },
+    browseShopText: {
+      fontSize: 12,
+      color: '#94A3B8',
+      fontWeight: '700',
+    },
 
-  itemProductRow: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'center',
-  },
-  itemThumbImg: {
-    width: 58,
-    height: 58,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-  },
-  itemInfoCol: {
-    flex: 1,
-    gap: 3,
-  },
-  itemTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    gap: 6,
-  },
-  itemNameText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: '#0F172A',
-    flex: 1,
-    lineHeight: 16,
-  },
-  itemPriceText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  itemMetaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  itemCategorySpecText: {
-    fontSize: 11,
-    color: '#64748B',
-  },
-  itemQtyText: {
-    fontSize: 11,
-    color: '#64748B',
-    fontWeight: '700',
-  },
-  itemBadgesRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 2,
-  },
-  freeReturnsPill: {
-    backgroundColor: '#FEF3C7',
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  freeReturnsPillText: {
-    fontSize: 9.5,
-    color: '#EA580C',
-    fontWeight: '600',
-  },
-  genuinePill: {
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 6,
-    paddingVertical: 1.5,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  genuinePillText: {
-    fontSize: 9.5,
-    color: '#64748B',
-    fontWeight: '700',
-  },
+    itemProductRow: {
+      flexDirection: 'row',
+      gap: 12,
+      alignItems: 'center',
+    },
+    itemThumbImg: {
+      width: 58,
+      height: 58,
+      borderRadius: 12,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+    },
+    itemInfoCol: {
+      flex: 1,
+      gap: 3,
+    },
+    itemTitleRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      gap: 6,
+    },
+    itemNameText: {
+      fontSize: 12.5,
+      fontWeight: '700',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      flex: 1,
+      lineHeight: 16,
+    },
+    itemPriceText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    itemMetaRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    itemCategorySpecText: {
+      fontSize: 11,
+      color: '#94A3B8',
+    },
+    itemQtyText: {
+      fontSize: 11,
+      color: '#94A3B8',
+      fontWeight: '700',
+    },
+    itemBadgesRow: {
+      flexDirection: 'row',
+      gap: 6,
+      marginTop: 2,
+    },
+    freeReturnsPill: {
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.14)' : '#FEF3C7',
+      paddingHorizontal: 6,
+      paddingVertical: 1.5,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(251, 191, 36, 0.32)' : '#FDE68A',
+    },
+    freeReturnsPillText: {
+      fontSize: 9.5,
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+      fontWeight: '600',
+    },
+    genuinePill: {
+      backgroundColor: isDarkMode ? '#252A30' : '#F8FAFC',
+      paddingHorizontal: 6,
+      paddingVertical: 1.5,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    },
+    genuinePillText: {
+      fontSize: 9.5,
+      color: '#94A3B8',
+      fontWeight: '700',
+    },
 
-  orderNumberRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  orderNumberLabel: {
-    fontSize: 12,
-    color: '#64748B',
-  },
-  orderNumberValueWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  orderNumberValue: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
+    orderNumberRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: isDarkMode ? '#282D34' : '#F1F5F9',
+    },
+    orderNumberLabel: {
+      fontSize: 12,
+      color: '#94A3B8',
+    },
+    orderNumberValueWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    orderNumberValue: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
 
-  paymentMethodRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  paymentBadgeWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  codIndicatorBadge: {
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 5,
-    paddingVertical: 1.5,
-    borderRadius: 4,
-  },
-  codIndicatorText: {
-    fontSize: 9.5,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  paymentMethodLabel: {
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '600',
-  },
-  totalExpandWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  totalLabelSmall: {
-    fontSize: 12,
-    color: '#64748B',
-  },
-  totalPriceBig: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#EA580C',
-  },
+    paymentMethodRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingTop: 8,
+      borderTopWidth: 1,
+      borderTopColor: isDarkMode ? '#282D34' : '#F1F5F9',
+    },
+    paymentBadgeWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    codIndicatorBadge: {
+      backgroundColor: '#F59E0B',
+      paddingHorizontal: 5,
+      paddingVertical: 1.5,
+      borderRadius: 4,
+    },
+    codIndicatorText: {
+      fontSize: 9.5,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+    paymentMethodLabel: {
+      fontSize: 12,
+      color: isDarkMode ? '#CBD5E1' : '#475569',
+      fontWeight: '600',
+    },
+    totalExpandWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    totalLabelSmall: {
+      fontSize: 12,
+      color: '#94A3B8',
+    },
+    totalPriceBig: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+    },
 
-  expandedPriceSummary: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 10,
-    gap: 6,
-  },
-  priceBreakdownLine: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  priceBreakdownLabel: {
-    fontSize: 11.5,
-    color: '#64748B',
-  },
-  priceBreakdownVal: {
-    fontSize: 11.5,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
+    expandedPriceSummary: {
+      backgroundColor: isDarkMode ? '#14181D' : '#F8FAFC',
+      borderRadius: 12,
+      padding: 10,
+      gap: 6,
+    },
+    priceBreakdownLine: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+    },
+    priceBreakdownLabel: {
+      fontSize: 11.5,
+      color: '#94A3B8',
+    },
+    priceBreakdownVal: {
+      fontSize: 11.5,
+      fontWeight: '700',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
 
-  // 8. Free Returns Bar
-  freeReturnsBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#FEF3C7',
-    borderRadius: 16,
-    padding: 13,
-    borderWidth: 1,
-    borderColor: '#FDE68A',
-  },
-  freeReturnsLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  freeReturnsText: {
-    fontSize: 12,
-    color: '#334155',
-  },
+    // 8. Free Returns Bar
+    freeReturnsBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7',
+      borderRadius: 16,
+      padding: 13,
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(251, 191, 36, 0.3)' : '#FDE68A',
+    },
+    freeReturnsLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    freeReturnsText: {
+      fontSize: 12,
+      color: isDarkMode ? '#FDE68A' : '#334155',
+    },
 
-  // 9. Bottom Action Buttons
-  bottomButtonsContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 18,
-    paddingTop: 12,
-    paddingBottom: 16,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  secondaryBottomBtn: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    paddingVertical: 13,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  secondaryBottomBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  primaryCancelBtn: {
-    flex: 1,
-    backgroundColor: '#FEF2F2',
-    paddingVertical: 13,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-  },
-  primaryCancelBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#DC2626',
-  },
+    // 9. Bottom Action Buttons
+    bottomButtonsContainer: {
+      flexDirection: 'row',
+      gap: 10,
+      paddingHorizontal: 18,
+      paddingTop: 12,
+      paddingBottom: 16,
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      borderTopWidth: 1,
+      borderTopColor: isDarkMode ? '#282D34' : '#F1F5F9',
+    },
+    secondaryBottomBtn: {
+      flex: 1,
+      backgroundColor: isDarkMode ? '#252A30' : '#F8FAFC',
+      paddingVertical: 13,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    },
+    secondaryBottomBtnText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    primaryCancelBtn: {
+      flex: 1,
+      backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.14)' : '#FEF2F2',
+      paddingVertical: 13,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(248, 113, 113, 0.35)' : '#FECACA',
+    },
+    primaryCancelBtnText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: isDarkMode ? '#FCA5A5' : '#DC2626',
+    },
 
-  // Edit Address Dialog
-  editAddressOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 100,
-    padding: 16,
-  },
-  editAddressCard: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 20,
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 10,
-  },
-  editAddressTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  editAddressInput: {
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 12,
-    padding: 12,
-    fontSize: 13,
-    color: '#0F172A',
-    minHeight: 70,
-    textAlignVertical: 'top',
-  },
-  editAddressBtnRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginTop: 4,
-  },
-  editAddressCancelBtn: {
-    flex: 1,
-    backgroundColor: '#F1F5F9',
-    paddingVertical: 11,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  editAddressCancelText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  editAddressSaveBtn: {
-    flex: 1,
-    backgroundColor: '#EA580C',
-    paddingVertical: 11,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  editAddressSaveText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+    // Edit Address Dialog
+    editAddressOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: isDarkMode ? 'rgba(2, 6, 23, 0.78)' : 'rgba(15, 23, 42, 0.65)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 100,
+      padding: 16,
+    },
+    editAddressCard: {
+      width: '100%',
+      maxWidth: 420,
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderRadius: 20,
+      padding: 20,
+      gap: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: isDarkMode ? 0.45 : 0.15,
+      shadowRadius: 12,
+      elevation: 10,
+    },
+    editAddressTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    editAddressInput: {
+      backgroundColor: isDarkMode ? '#14181D' : '#FFFFFF',
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
+      borderRadius: 12,
+      padding: 12,
+      fontSize: 13,
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      minHeight: 70,
+      textAlignVertical: 'top',
+    },
+    editAddressBtnRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 4,
+    },
+    editAddressCancelBtn: {
+      flex: 1,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      paddingVertical: 11,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    editAddressCancelText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#94A3B8',
+    },
+    editAddressSaveBtn: {
+      flex: 1,
+      backgroundColor: '#EA580C',
+      paddingVertical: 11,
+      borderRadius: 10,
+      alignItems: 'center',
+    },
+    editAddressSaveText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
 
-  // Calling Dialog
-  callDialogOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(15, 23, 42, 0.75)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 100,
-    padding: 16,
-  },
-  callDialogCard: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 24,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 15,
-  },
-  callAvatarPulse: {
-    width: 84,
-    height: 84,
-    borderRadius: 42,
-    backgroundColor: '#FEF3C7',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: '#FDE68A',
-  },
-  callAvatarImg: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-  },
-  callRiderName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  callRiderPhone: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  callStatusText: {
-    fontSize: 12,
-    color: '#EA580C',
-    marginTop: 8,
-    fontWeight: '700',
-  },
-  callBtnRow: {
-    marginTop: 20,
-    width: '100%',
-  },
-  callHangupBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#EF4444',
-    paddingVertical: 12,
-    borderRadius: 14,
-    width: '100%',
-  },
-  callHangupText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-});
+    // Calling Dialog
+    callDialogOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: isDarkMode ? 'rgba(2, 6, 23, 0.82)' : 'rgba(15, 23, 42, 0.75)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 100,
+      padding: 16,
+    },
+    callDialogCard: {
+      width: '100%',
+      maxWidth: 340,
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      borderRadius: 24,
+      padding: 24,
+      alignItems: 'center',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: isDarkMode ? 0.5 : 0.2,
+      shadowRadius: 16,
+      elevation: 15,
+    },
+    callAvatarPulse: {
+      width: 84,
+      height: 84,
+      borderRadius: 42,
+      backgroundColor: isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+      borderWidth: 2,
+      borderColor: isDarkMode ? 'rgba(251, 191, 36, 0.35)' : '#FDE68A',
+    },
+    callAvatarImg: {
+      width: 72,
+      height: 72,
+      borderRadius: 36,
+    },
+    callRiderName: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    callRiderPhone: {
+      fontSize: 13,
+      color: '#94A3B8',
+      marginTop: 2,
+    },
+    callStatusText: {
+      fontSize: 12,
+      color: isDarkMode ? '#FB923C' : '#EA580C',
+      marginTop: 8,
+      fontWeight: '700',
+    },
+    callBtnRow: {
+      marginTop: 20,
+      width: '100%',
+    },
+    callHangupBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: '#EF4444',
+      paddingVertical: 12,
+      borderRadius: 14,
+      width: '100%',
+    },
+    callHangupText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+  });

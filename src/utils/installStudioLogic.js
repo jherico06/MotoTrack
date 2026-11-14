@@ -30,108 +30,121 @@ export const UPLOAD_PART_CATEGORIES = Object.freeze([
 
 const INSTALLATION_GUIDES = [
   {
-    keys: ['exhaust', 'muffler', 'silencer', 'slip-on', 'slip on'],
+    keys: ['exhaust', 'muffler', 'silencer', 'slip-on', 'slip on', 'pipe'],
+    partCategory: 'Exhaust',
     position: 'Rear / engine exhaust mounting area',
     type: 'Bolt-on exhaust system installation',
     description:
-      'Mount the exhaust at the stock exhaust outlet and secure it along the rear/side mounting points with the correct brackets and hardware.',
-    cameraView: '3/4 rear-side view highlighting the exhaust and muffler area',
+      'Completely remove the stock OEM exhaust muffler/canister and mount the exact aftermarket exhaust from the product reference image at the exhaust header outlet and rear passenger peg hanger bracket. Keep the swingarm, rear shock, rear wheel, and brake assembly untouched.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
     keys: ['mirror', 'side mirror', 'rearview'],
+    partCategory: 'Side Mirror',
     position: 'Handlebar / mirror mounting point',
     type: 'Handlebar mount replacement',
     description:
-      'Install the mirror on the handlebar mirror mount so the stem and glass face outward in a realistic riding position.',
-    cameraView: 'Front 3/4 view showing the handlebars and mirrors clearly',
+      'Completely REMOVE both original OEM side mirrors AND their tall stock wire stems from the left and right handlebars. Install a matching left-and-right pair of the exact aftermarket side mirrors (using their own short low-profile black CNC/folding stems shown in the product image) directly onto the left and right handlebar mounts. CRITICAL 3D ORIENTATION (NO BLUE GLASS FACING FORWARD): Product photos of side mirrors often show two mirrors (one showing the rider-facing blue glass side, and one showing the forward-facing matte black ribbed pentagon back housing shell). When the motorcycle in REFERENCE IMAGE 1 is viewed from the front or front-3/4 angle (camera in front of the headlight), BOTH installed left and right mirrors MUST show ONLY their solid MATTE BLACK RIBBED BACK HOUSING SHELL facing toward the camera — ZERO blue mirror glass may be visible from the front of the motorcycle! Ignore any duplicate display mirror or unmounted clamp adapter lying beside the mirror in the product photo.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
     keys: ['brake disc', 'brake disk', 'rotor', 'disc brake'],
+    partCategory: 'Brake Disc',
     position: 'Wheel hub / brake assembly',
     type: 'Hub-mounted brake disc installation',
     description:
-      'Mount the brake disc onto the wheel hub/brake assembly with correct orientation, bolt pattern, and caliper clearance.',
-    cameraView: 'Close 3/4 front-wheel view showing the brake disc and hub',
+      'Mount the exact brake disc rotor onto the wheel hub/brake assembly with correct carrier color, outer rotor ring pattern, bolt alignment, and caliper clearance.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
-    keys: ['brake', 'caliper', 'master cylinder'],
-    position: 'Wheel hub / brake assembly',
+    keys: ['brake', 'caliper', 'master cylinder', 'lever'],
+    partCategory: 'Brake Component',
+    position: 'Wheel hub / brake assembly or handlebar lever perch',
     type: 'Brake component installation',
     description:
-      'Install the brake component at the correct brake assembly location with realistic caliper, disc, and mounting hardware alignment.',
-    cameraView: '3/4 view highlighting the brake assembly',
+      'Install the brake component at the exact lower fork caliper mount (or handlebar lever perch for levers/master cylinders) with realistic alignment and hardware.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
     keys: ['top box', 'topcase', 'top case', 'luggage', 'trunk'],
+    partCategory: 'Top Box',
     position: 'Rear luggage rack',
     type: 'Rear rack mount installation',
     description:
-      'Secure the top box onto the rear luggage rack using the proper mounting plate, latches, and hardware.',
-    cameraView: 'Rear 3/4 view highlighting the luggage rack and top box',
+      'Secure the top box onto the rear luggage rack behind the passenger seat using the proper baseplate, latches, and hardware, oriented correctly facing forward.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
-    keys: ['crash guard', 'crash bar', 'engine guard', 'cage'],
+    keys: ['crash guard', 'crash bar', 'engine guard', 'cage', 'slider'],
+    partCategory: 'Crash Guard',
     position: 'Frame / engine mounting area',
     type: 'Frame-mounted crash protection',
     description:
-      'Attach the crash guard to the motorcycle frame/engine mounting points with bolts and brackets so it wraps protectively around the engine area.',
-    cameraView: 'Side 3/4 view showing the engine and frame guards',
+      'Attach the crash guard to the motorcycle frame/engine mounting points with bolts and brackets so it wraps protectively around the engine/fairing area.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
     keys: ['headlight', 'led headlight', 'head lamp'],
+    partCategory: 'Headlight',
     position: 'Front headlight housing',
     type: 'Headlight housing replacement',
     description:
-      'Install the headlight into the front headlight housing with correct orientation, bezel alignment, and wiring realism.',
-    cameraView: 'Front 3/4 view highlighting the headlight',
+      'Install the headlight assembly cleanly inside the front headlight housing with correct lens, bezel alignment, and reflectors while keeping surrounding fairing colors unchanged.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
     keys: ['tail light', 'taillight', 'signal', 'indicator', 'led'],
+    partCategory: 'Lighting',
     position: 'Lighting mount / housing',
     type: 'Lighting component installation',
     description:
-      'Install the lighting part in the correct housing or mount with realistic wiring and alignment for that motorcycle.',
-    cameraView: '3/4 view that clearly shows the installed lighting part',
+      'Install the lighting part in the correct housing or mount with realistic lens detail and alignment for that motorcycle.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
-    keys: ['rim', 'wheel', 'alloy'],
-    position: 'Wheel hub / axle assembly',
-    type: 'Wheel and rim replacement',
+    keys: ['rim', 'wheel', 'alloy', 'spoke', 'mag'],
+    partCategory: 'Wheel/Rim',
+    position: 'Front and rear wheel hub / axle assemblies',
+    type: 'Front and rear wheel rim replacement',
     description:
-      'Install the wheel/rim on the correct axle and hub with proper brake disc, sprocket, and tire alignment.',
-    cameraView: 'Side 3/4 view highlighting the installed wheel',
+      'Replace BOTH the front and rear wheel assemblies inside the motorcycle’s existing black rubber tires with the exact rim and hub from the product reference image. Match BOTH the outer rim lip color/anodized finish (plus white rim decal/sticker) AND the center wheel hub color (if the center hub in the product reference image is glossy anodized red, render the installed front and rear wheel center hubs in that exact glossy anodized red!), while keeping the wire spokes bright metallic silver/white with black spoke nipples (do NOT tint the silver wire spokes red!). CRITICAL: Preserve the exact front and rear brake mechanism from REFERENCE IMAGE 1 (if REFERENCE IMAGE 1 has a front drum brake with cable, keep the drum brake mechanism — do NOT invent or add a disc brake rotor or caliper!). Ignore any shop counter, glass display case, floor, or background behind the bare rim in the product photo.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
-    keys: ['handlebar', 'bar end', 'grip'],
+    keys: ['handlebar', 'bar end', 'grip', 'riser', 'throttle'],
+    partCategory: 'Handlebar',
     position: 'Handlebar / controls area',
     type: 'Handlebar component installation',
     description:
-      'Install the handlebar part at the controls area with realistic clamp, control, and cable alignment.',
-    cameraView: 'Front 3/4 cockpit view showing the handlebars',
+      'Install the handlebar part at the cockpit controls/grip ends with realistic left-right symmetry, clamp, control, and cable alignment.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
-    keys: ['suspension', 'fork', 'shock', 'absorber'],
+    keys: ['suspension', 'fork', 'shock', 'absorber', 'monoshock'],
+    partCategory: 'Suspension',
     position: 'Front fork or rear suspension mount',
     type: 'Suspension component installation',
     description:
-      'Install the suspension component at the correct fork or rear mount points with realistic geometry and hardware.',
-    cameraView: 'Side view highlighting the suspension components',
+      'Replace the suspension component at the exact front fork or rear shock mounting points with matching spring color, reservoir canister, and damper body.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
-    keys: ['fairing', 'body', 'cowling', 'cover', 'fender'],
+    keys: ['fairing', 'body', 'cowling', 'cover', 'fender', 'windshield', 'visor'],
+    partCategory: 'Body/Fairing',
     position: 'Body panel / fairing mounting points',
     type: 'Bodywork installation',
     description:
-      'Fit the body/fairing part onto the matching panel mounting points while preserving the motorcycle silhouette.',
-    cameraView: 'Side 3/4 view showing the bodywork clearly',
+      'Fit the body/fairing/windshield part onto the matching mounting points while preserving all other motorcycle panels and factory paint.',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
   {
     keys: ['seat', 'saddle'],
+    partCategory: 'Seat',
     position: 'Seat mount / subframe',
     type: 'Seat replacement',
     description:
-      'Install the seat onto the subframe mounts so it sits flush and aligned with the tank and rear body.',
-    cameraView: 'Side 3/4 view highlighting the seat',
+      'Replace ONLY the seat cushion/upholstery on the subframe with the exact seat cover material, surface texture (such as horizontal ribbed non-slip grip lines), and rear top brand emblem/logo from the product reference image, foreshortened naturally in 3D perspective to match REFERENCE IMAGE 1’s viewing angle. CRITICAL: Keep the original 3D seat profile/thickness and DO NOT remove, cover, or alter the rear passenger grab bar / pillion handle behind the seat!',
+    cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
   },
 ];
 
@@ -139,9 +152,51 @@ const DEFAULT_INSTALLATION = Object.freeze({
   position: 'Correct OEM mounting location for this part category',
   type: 'Mechanically realistic bolt-on installation',
   description:
-    'Install the selected part using the correct mounts, brackets, bolts, clamps, connectors, or wiring for this motorcycle and part type.',
-  cameraView: '3/4 studio product view showing the full motorcycle with the installed part clearly visible',
+    'Install the selected part using the correct mounts, brackets, bolts, clamps, connectors, or wiring for this motorcycle and part type without altering unrelated motorcycle components.',
+  cameraView: 'Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1',
 });
+
+const MARKETING_TAG_VALUES = new Set([
+  'newarrival',
+  'new arrival',
+  'bestseller',
+  'best seller',
+  'featured',
+  'hot',
+  'sale',
+  'promo',
+  'default',
+]);
+
+const GENERIC_BOILERPLATE_DESCRIPTIONS = new Set([
+  'precision engineered high performance motorcycle upgrade component.',
+  'precision engineered high performance motorcycle upgrade component',
+]);
+
+function cleanCategoryValue(rawCategory) {
+  const val = clean(rawCategory);
+  if (!val) return '';
+  if (MARKETING_TAG_VALUES.has(val.toLowerCase())) return '';
+  return val;
+}
+
+function sanitizePartBrand(brand, partCategory, partName) {
+  const b = clean(brand);
+  if (!b) return '';
+  const lowerBrand = b.toLowerCase();
+  const hay = `${lower(partCategory)} ${lower(partName)}`;
+  // Guard against default exhaust brand ('Akrapovič') left on non-exhaust items like RIM/Seat/Mirror
+  if (
+    (lowerBrand.includes('akrapov') || lowerBrand.includes('yoshimura') || lowerBrand.includes('sc project')) &&
+    !hay.includes('exhaust') &&
+    !hay.includes('muffler') &&
+    !hay.includes('pipe') &&
+    !hay.includes('slip')
+  ) {
+    return '';
+  }
+  return b;
+}
 
 function clean(value) {
   return String(value || '').trim();
@@ -253,10 +308,16 @@ function matchInstallationGuide(category = '', name = '', description = '') {
  * then category/name heuristics. Never hardcode one position for every product.
  */
 export function resolveInstallationMetadata(source = {}) {
-  const category = clean(source.category || source.product_type || source.type);
+  const rawCategory = cleanCategoryValue(source.category || source.product_type || source.type);
   const name = clean(source.name || source.product_name);
-  const description = clean(source.description || source.product_description);
-  const guide = matchInstallationGuide(category, name, description);
+  const rawDesc = clean(source.description || source.product_description);
+  const description = GENERIC_BOILERPLATE_DESCRIPTIONS.has(rawDesc.toLowerCase()) ? '' : rawDesc;
+  const guide = matchInstallationGuide(rawCategory, name, description);
+
+  const resolvedCategory =
+    guide?.partCategory && (!rawCategory || rawCategory.toLowerCase() === 'accessories')
+      ? guide.partCategory
+      : rawCategory || guide?.partCategory || 'Accessories';
 
   const position =
     clean(source.installation_position) ||
@@ -289,7 +350,7 @@ export function resolveInstallationMetadata(source = {}) {
     installation_type: type,
     installation_description: installDescription,
     camera_view: cameraView,
-    category: category || 'Accessories',
+    category: resolvedCategory,
     inferred: !clean(source.installation_position) && Boolean(guide),
   };
 }
@@ -369,6 +430,7 @@ export function normalizeProduct(product, options = {}) {
   const id = product.product_id || product.id || null;
   const image = productImageUri(product);
   const meta = resolveInstallationMetadata(product);
+  const cleanName = clean(product.name || product.product_name);
   const compatible =
     options.compatible_motorcycles ||
     product.compatible_motorcycles ||
@@ -378,10 +440,10 @@ export function normalizeProduct(product, options = {}) {
   return {
     id,
     product_id: id,
-    product_name: clean(product.name || product.product_name),
-    name: clean(product.name || product.product_name),
-    brand: clean(product.brand),
-    category: clean(product.category) || meta.category,
+    product_name: cleanName,
+    name: cleanName,
+    brand: sanitizePartBrand(product.brand, meta.category, cleanName) || clean(product.brand),
+    category: meta.category || cleanCategoryValue(product.category) || 'Accessories',
     product_image: image,
     image,
     description: clean(product.description),
@@ -600,38 +662,41 @@ export function buildInstallationPrompt({
     [clean(motorcycle?.brand), clean(motorcycle?.model)].filter(Boolean).join(' ') ||
     clean(motorcycle?.motorcycle_name) ||
     'motorcycle';
-  const colorLine = motorcycle?.color
-    ? `Preserve the motorcycle color (${motorcycle.color}).`
-    : '';
+  const colorLine =
+    'Preserve the exact factory paint colors, two-tone fairing finishes, front fender color, headlight cowl color, and factory decals visible in REFERENCE IMAGE 1 (do NOT repaint or recolor any body panels).';
   const notes = clean(customNotes);
   const compat = clean(compatibilityNote);
 
   if (list.length <= 1) {
     const single = list[0] || product || {};
-    const productCategory = clean(single?.category) || 'motorcycle part';
+    const resolvedMeta = resolveInstallationMetadata(single);
+    const productCategory =
+      cleanCategoryValue(single?.category) || resolvedMeta.category || 'motorcycle part';
     const productName = clean(single?.product_name || single?.name) || 'selected part';
-    const productBrand = clean(single?.brand) || 'the selected brand';
+    const safeBrand = sanitizePartBrand(single?.brand, productCategory, productName);
+    const brandClause = safeBrand ? ` from ${safeBrand}` : '';
     const installationPosition =
-      clean(single?.installation_position) || DEFAULT_INSTALLATION.position;
-    const installationType = clean(single?.installation_type) || DEFAULT_INSTALLATION.type;
+      clean(single?.installation_position) || resolvedMeta.installation_position;
+    const installationType = clean(single?.installation_type) || resolvedMeta.installation_type;
     const installationDescription =
-      clean(single?.installation_description) || DEFAULT_INSTALLATION.description;
-    const cameraView = clean(single?.camera_view) || DEFAULT_INSTALLATION.cameraView;
+      clean(single?.installation_description) || resolvedMeta.installation_description;
+    const cameraView = clean(single?.camera_view) || resolvedMeta.camera_view;
 
     return [
       `Use the uploaded image of the ${year} ${motorcycleModel} motorcycle as the PRIMARY motorcycle reference.`,
       '',
-      `Use the uploaded image of the selected ${productCategory} named '${productName}' from ${productBrand} as the PRIMARY product reference.`,
+      `Use the uploaded image of the selected ${productCategory} named '${productName}'${brandClause} as the PRIMARY product reference.`,
       '',
-      'Install the EXACT selected product shown in the product reference image onto the selected motorcycle.',
+      'TASK: PRECISION IN-PLACE PHOTO EDITING (SURGICAL COMPONENT REPLACEMENT ON REFERENCE IMAGE 1).',
+      'Install the EXACT selected product shown in the product reference image onto the selected motorcycle in REFERENCE IMAGE 1.',
       '',
-      'Keep the original motorcycle unchanged. Preserve its body shape, frame, fairings, wheels, tires, suspension, handlebars, seat, engine, lights, mirrors, color, decals, proportions, and overall design.',
+      'Keep the original motorcycle unchanged everywhere outside the replaced part. Preserve its exact camera angle, pose, framing, body shape, frame, fairings, front fender, headlight cowl, rear passenger grab bar (pillion rail), brake system type (drum vs disc), wheels, tires, suspension, handlebars, seat, engine, lights, mirrors, exact panel colors, decals, proportions, and overall design.',
       '',
       'Do not replace the motorcycle with another model.',
       '',
       'Do not substitute the selected product with another similar-looking product.',
       '',
-      "Preserve the selected product's recognizable shape, design, material, color, finish, dimensions, and important visual details.",
+      "Preserve the selected product's recognizable shape, design, material, color, finish, sub-component colors, logos, dimensions, and important visual details.",
       '',
       'Installation position:',
       installationPosition,
@@ -642,28 +707,24 @@ export function buildInstallationPrompt({
       'Installation description:',
       installationDescription,
       '',
-      'Install the product in the correct and mechanically realistic position for the selected motorcycle.',
+      'Install the product in the correct and mechanically realistic 3D position and orientation for the camera angle of REFERENCE IMAGE 1.',
       '',
-      'Make the product physically attached using appropriate brackets, bolts, clamps, connectors, mounts, wiring, or other realistic hardware when applicable.',
+      'Make the product physically attached using appropriate brackets, bolts, clamps, connectors, mounts, wiring, or other realistic hardware when applicable, and completely remove the original stock part it replaces (do not leave old OEM mirror stems or old parts stacked under the new part).',
       '',
-      'Ensure correct scale, orientation, perspective, and alignment.',
+      'Ensure correct scale, 3D orientation, perspective foreshortening, and alignment.',
+      '',
+      'Ignore any shop counter, table, floor, packaging, or duplicate display angle shown in the product reference photo — extract ONLY the physical motorcycle part itself.',
       '',
       'Do not allow the product to float, intersect incorrectly with the motorcycle, penetrate through body panels, or appear disconnected.',
       '',
-      'Do not add any additional aftermarket parts that were not selected by the customer.',
+      'Do not add any additional aftermarket parts that were not selected by the customer (for example, do NOT convert a drum brake into a disc brake unless a brake disc was selected, and do NOT delete the rear passenger grab bar behind the seat).',
       '',
-      'Do not remove motorcycle components unless they would realistically need to be removed or repositioned for the installation.',
+      'Do not remove motorcycle components unless they are the exact stock component being replaced by the selected part.',
       '',
-      `Generate a photorealistic commercial studio image of the customized ${year} ${motorcycleModel} with the selected ${productName} professionally installed.`,
+      `Return an authentic, surgically edited studio photograph of the ${year} ${motorcycleModel} from REFERENCE IMAGE 1 with the selected ${productName} professionally installed.`,
       '',
       'Camera view:',
       cameraView,
-      '',
-      'Keep the entire motorcycle recognizable while making the installed product clearly visible.',
-      '',
-      'Use realistic lighting, shadows, reflections, materials, proportions, and perspective.',
-      '',
-      "The result must look like an authentic photograph of the customer's motorcycle with the selected part installed, not a cartoon or redesigned motorcycle.",
       '',
       'BACKGROUND & ENVIRONMENT FIDELITY (CRITICAL):',
       '- Preserve the exact background and environment from REFERENCE IMAGE 1.',
@@ -683,18 +744,14 @@ export function buildInstallationPrompt({
       'Do not use the motorcycle image as the product reference.',
       '',
       'Install ONLY the selected product.',
-      '',
       'Do not substitute the motorcycle.',
-      '',
       'Do not substitute the product.',
-      '',
       'Preserve the original motorcycle body and silhouette.',
       'Preserve the original background environment from REFERENCE IMAGE 1.',
       'Do not alter the background into a repair shop or garage.',
-      '',
       'Prioritize physical and mechanical realism.',
       '',
-      colorLine || null,
+      colorLine,
       compat || null,
       notes ? `Customer installation notes: ${notes}` : null,
       '',
@@ -712,16 +769,18 @@ export function buildInstallationPrompt({
 
   const perPartBlocks = list.map((p, idx) => {
     const refIndex = idx + 2;
-    const pCat = clean(p?.category) || 'motorcycle part';
+    const resolvedMeta = resolveInstallationMetadata(p);
+    const pCat = cleanCategoryValue(p?.category) || resolvedMeta.category || 'motorcycle part';
     const pName = clean(p?.product_name || p?.name) || `selected part ${idx + 1}`;
-    const pBrand = clean(p?.brand) || 'the selected brand';
-    const pPos = clean(p?.installation_position) || DEFAULT_INSTALLATION.position;
-    const pType = clean(p?.installation_type) || DEFAULT_INSTALLATION.type;
-    const pDesc = clean(p?.installation_description) || DEFAULT_INSTALLATION.description;
+    const safeBrand = sanitizePartBrand(p?.brand, pCat, pName);
+    const brandSuffix = safeBrand ? ` by ${safeBrand}` : '';
+    const pPos = clean(p?.installation_position) || resolvedMeta.installation_position;
+    const pType = clean(p?.installation_type) || resolvedMeta.installation_type;
+    const pDesc = clean(p?.installation_description) || resolvedMeta.installation_description;
 
     return [
       `SELECTED PART ${idx + 1} OF ${totalParts} — REFERENCE IMAGE ${refIndex} (PRIMARY product reference #${idx + 1}):`,
-      `- Product: '${pName}' (${pCat}) by ${pBrand}`,
+      `- Product: '${pName}' (Category: ${pCat})${brandSuffix}`,
       `- Installation position: ${pPos}`,
       `- Installation type: ${pType}`,
       `- Installation description: ${pDesc}`,
@@ -729,11 +788,12 @@ export function buildInstallationPrompt({
   });
 
   const referenceLegend = [
-    'REFERENCE IMAGE 1 = primary motorcycle identity, body, frame, proportions, paint colors, and background environment.',
-    ...list.map(
-      (p, idx) =>
-        `REFERENCE IMAGE ${idx + 2} = exact product identity and visual appearance for Selected Part ${idx + 1} ('${clean(p?.product_name || p?.name) || `Part ${idx + 1}`}').`
-    ),
+    'REFERENCE IMAGE 1 = primary motorcycle identity, exact camera angle, body, frame, proportions, exact panel paint colors, decals, brake hardware, rear passenger grab rail, and background environment.',
+    ...list.map((p, idx) => {
+      const resolvedMeta = resolveInstallationMetadata(p);
+      const pCat = cleanCategoryValue(p?.category) || resolvedMeta.category || 'part';
+      return `REFERENCE IMAGE ${idx + 2} = exact product identity and visual appearance for Selected Part ${idx + 1} ('${clean(p?.product_name || p?.name) || `Part ${idx + 1}`}' — ${pCat}). Extract ONLY the physical part from this photo and ignore any shop counter, table, or duplicate display angle.`;
+    }),
   ].join('\n');
 
   return [
@@ -741,20 +801,23 @@ export function buildInstallationPrompt({
     '',
     `Use the ${totalParts} uploaded product images (REFERENCE IMAGE 2 through REFERENCE IMAGE ${totalParts + 1}) for ${summaryNames} as the PRIMARY product reference images.`,
     '',
-    `Install ALL ${totalParts} selected aftermarket parts SIMULTANEOUSLY onto the single ${year} ${motorcycleModel} motorcycle in ONE combined photorealistic installation preview.`,
+    'TASK: PRECISION IN-PLACE PHOTO EDITING (SURGICAL MULTI-PART REPLACEMENT ON REFERENCE IMAGE 1).',
+    `Install ALL ${totalParts} selected aftermarket parts SIMULTANEOUSLY onto the single ${year} ${motorcycleModel} motorcycle from REFERENCE IMAGE 1 in ONE combined photorealistic installation preview.`,
     '',
     ...perPartBlocks.flatMap((block) => [block, '']),
-    'COMBINED MULTI-PART INSTALLATION RULES:',
-    `- Generate ONE unified photograph of the single ${year} ${motorcycleModel} motorcycle with ALL ${totalParts} selected parts (${summaryNames}) installed together at the same time.`,
+    'COMBINED MULTI-PART INSTALLATION & FIDELITY RULES:',
+    `- Perform a surgical in-place edit of REFERENCE IMAGE 1 so the single ${year} ${motorcycleModel} motorcycle has ALL ${totalParts} selected parts (${summaryNames}) installed together at the same time.`,
     '- Do NOT generate separate images for individual products, and do NOT output split screens, collages, grids, or floating part insets.',
-    `- Ensure EVERY selected part (all ${totalParts} of ${totalParts}) is clearly visible, accurately scaled, and mounted in its mechanically realistic location using proper brackets, bolts, clamps, mounts, or hardware.`,
-    '- Preserve the original motorcycle body, frame, fairings, proportions, colors, decals, and all other unrelated stock components that are not being replaced by the selected parts.',
+    `- Ensure EVERY selected part (all ${totalParts} of ${totalParts}) is clearly visible, accurately scaled, properly oriented in 3D perspective for REFERENCE IMAGE 1’s viewing angle, and mounted in its mechanically realistic location.`,
+    '- Completely remove each replaced stock OEM part (for example, when replacing side mirrors, completely remove both stock mirror heads AND their tall stock wire stems so only the new aftermarket mirror stems and housings are mounted).',
+    '- For side mirrors: reflective mirror glass MUST face rearward toward the rider/seat — when the motorcycle in REFERENCE IMAGE 1 faces front or front-3/4, the viewer MUST see the back outer shell/housing of the mirrors facing forward and their short stems, NEVER both blue mirror glasses facing forward toward the headlight!',
+    '- For wheel rims: apply the exact rim lip color, rim decal, spoke color (keep bright silver/white wire spokes silver/white and black spoke nipples black — do NOT tint spokes red if only the outer rim ring and center hub are red!), and hub color to BOTH front and rear wheels inside the existing rubber tires, while keeping REFERENCE IMAGE 1’s exact brake type (keep a front drum brake as a drum brake — do NOT invent a disc brake rotor or caliper unless selected!).',
+    '- For seats/seat covers: map the top-down seat cover texture (e.g., horizontal ribbed grip lines) and rear top brand logo/emblem onto the existing 3D seat contour in natural foreshortened perspective, and strictly KEEP the rear passenger grab bar / pillion rail behind the seat intact!',
+    '- Preserve every other part of REFERENCE IMAGE 1 unchanged: exact camera angle, pose, and panel-by-panel paint colors (for example, if REFERENCE IMAGE 1 has a glossy black front fender and glossy black upper headlight cowl with a gray/silver middle nose fairing, keep the front fender and upper headlight cowl glossy black — never bleed the nose fairing color onto the front fender or headlight cowl!), factory decals, engine, exhaust (unless exhaust is selected), suspension (unless suspension is selected), and proportions.',
     '- Do not replace the motorcycle with another model, and do not substitute any selected product with a generic alternative.',
-    '- Preserve each selected product’s recognizable shape, design, material, color, finish, and visual details.',
-    '- Apply ONLY the selected aftermarket parts. Do not add any unselected modifications.',
     '',
     'Camera view:',
-    `Full 3/4 studio view matching REFERENCE IMAGE 1 framing so the entire ${year} ${motorcycleModel} and all ${totalParts} installed parts (${summaryNames}) are clearly visible.`,
+    `Exact same camera angle, framing, and perspective as REFERENCE IMAGE 1 showing the entire ${year} ${motorcycleModel} with all ${totalParts} installed parts (${summaryNames}).`,
     '',
     'BACKGROUND & ENVIRONMENT FIDELITY (CRITICAL):',
     '- Preserve the exact background and environment from REFERENCE IMAGE 1.',
@@ -765,11 +828,11 @@ export function buildInstallationPrompt({
     'IMPORTANT REFERENCE MAPPING:',
     referenceLegend,
     '',
-    colorLine || null,
+    colorLine,
     compat || null,
     notes ? `Customer installation notes: ${notes}` : null,
     '',
-    `Generate the ONE combined photorealistic installation preview showing all ${totalParts} selected parts installed on the motorcycle.`,
+    `Generate the ONE combined photorealistic installation preview showing all ${totalParts} selected parts surgically installed on the motorcycle from REFERENCE IMAGE 1.`,
   ]
     .filter((line) => line != null)
     .join('\n');

@@ -13,6 +13,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import {
   MOTORCYCLE_BRANDS,
 } from '../../services/products/motorcycleService.js';
@@ -21,10 +22,12 @@ import { pickImageFromFile } from '../../utils/imagePickerHelper.js';
 export default function RegisterMotorcycleModal({
   visible = false,
   motorcycle = null,
-  isDarkMode = false,
+  isDarkMode: isDarkProp,
   onClose,
   onSave,
 }) {
+  const { isDarkMode: themeDark = false } = useTheme?.() || {};
+  const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
   const isEditing = Boolean(motorcycle && motorcycle.motorcycle_id);

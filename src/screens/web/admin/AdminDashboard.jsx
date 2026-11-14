@@ -78,7 +78,8 @@ import { usdToPhp } from '../../../utils/currency.js';
 import { systemSettingsService } from '../../../services/system/systemSettingsService.js';
 import NotificationsPage from '../customer/NotificationsPage.jsx';
 import { auditLogService } from '../../../services/system/auditLogService.js';
-import { AdminSidebar, SalesForecastPanel, SalesAnalyticsPanel, RevenueTrendChart, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, ServiceQuotationPanel, PickupQrScannerPanel, AdminBookingDetailsPanel, MotorcycleModelsAdminPanel, ProductCompatibilityPicker, AdminSystemSettingsPanel, PromosAdminPanel, RiderProfileCard, DashboardInsightsPanel, AdminProfileLogsPanel, ModernOverviewDashboard, AdminCustomerRatingsReportsPanel, AdminRescheduleModal } from '../../../components/admin';
+import { AdminSidebar, SalesForecastPanel, SalesAnalyticsPanel, RevenueTrendChart, BookingCategoryPieChart, ProductSizesEditor, ProductColorsEditor, ServiceQuotationPanel, PickupQrScannerPanel, AdminBookingDetailsPanel, MotorcycleModelsAdminPanel, ProductCompatibilityPicker, AdminSystemSettingsPanel, PromosAdminPanel, RiderProfileCard, DashboardInsightsPanel, AdminProfileLogsPanel, AdminCustomerRatingsReportsPanel, AdminRescheduleModal } from '../../../components/admin';
+import WebOverviewDashboard from '../../../components/web/admin/WebOverviewDashboard.jsx';
 import { ratingsReportsService } from '../../../services/feedback/ratingsReportsService.js';
 import {
   buildDashboardInsights,
@@ -101,6 +102,11 @@ import {
 import { normalizeProductColors, serializeProductColors, validateColorDrafts } from '../../../utils/productColors.js';
 import { CATEGORY_NAMES, CATEGORY_PILLS } from '../../../data/motorParts.js';
 import { categoryService, resolveCategoryIcon } from '../../../services/products/categoryService.js';
+import {
+  isValidReceiptEmail,
+  sendPosDigitalReceiptEmail,
+  printPosReceipt,
+} from './posReceiptHelper.js';
 
 function AlertOrangeDot({ count, label, title }) {
   const [hovered, setHovered] = useState(false);
@@ -329,6 +335,68 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       `;
       document.head.appendChild(style);
     }
+
+    const posStyleId = 'mototrack-clean-pos-styles';
+    if (!document.getElementById(posStyleId)) {
+      const posStyle = document.createElement('style');
+      posStyle.id = posStyleId;
+      posStyle.innerHTML = `
+        [data-posgrid="true"],
+        [data-pos-grid="true"] {
+          display: grid !important;
+          grid-template-columns: repeat(auto-fill, minmax(185px, 1fr)) !important;
+          gap: 14px !important;
+          align-items: stretch !important;
+        }
+        [data-posgrid="true"] > [data-poscard="true"],
+        [data-pos-grid="true"] > [data-pos-card="true"] {
+          width: auto !important;
+          min-width: 0 !important;
+          max-width: none !important;
+          transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+        }
+        [data-posgrid="true"] > [data-poscard="true"]:hover,
+        [data-pos-grid="true"] > [data-pos-card="true"]:hover {
+          transform: translateY(-2px);
+          border-color: rgba(234, 88, 12, 0.35) !important;
+          box-shadow: 0 8px 20px -6px rgba(15, 23, 42, 0.12) !important;
+        }
+        [data-posscroll="true"],
+        [data-pos-scroll="true"],
+        [data-posscroll="true"] *,
+        [data-pos-scroll="true"] * {
+          scrollbar-width: thin !important;
+          scrollbar-color: rgba(148, 163, 184, 0.38) transparent !important;
+        }
+        [data-posscroll="true"]::-webkit-scrollbar,
+        [data-pos-scroll="true"]::-webkit-scrollbar,
+        [data-posscroll="true"] *::-webkit-scrollbar,
+        [data-pos-scroll="true"] *::-webkit-scrollbar {
+          width: 5px !important;
+          height: 5px !important;
+        }
+        [data-posscroll="true"]::-webkit-scrollbar-track,
+        [data-pos-scroll="true"]::-webkit-scrollbar-track,
+        [data-posscroll="true"] *::-webkit-scrollbar-track,
+        [data-pos-scroll="true"] *::-webkit-scrollbar-track {
+          background: transparent !important;
+        }
+        [data-posscroll="true"]::-webkit-scrollbar-thumb,
+        [data-pos-scroll="true"]::-webkit-scrollbar-thumb,
+        [data-posscroll="true"] *::-webkit-scrollbar-thumb,
+        [data-pos-scroll="true"] *::-webkit-scrollbar-thumb {
+          background: rgba(148, 163, 184, 0.38) !important;
+          border-radius: 9999px !important;
+        }
+        [data-posscroll="true"]::-webkit-scrollbar-thumb:hover,
+        [data-pos-scroll="true"]::-webkit-scrollbar-thumb:hover,
+        [data-posscroll="true"] *::-webkit-scrollbar-thumb:hover,
+        [data-pos-scroll="true"] *::-webkit-scrollbar-thumb:hover {
+          background: rgba(100, 116, 139, 0.58) !important;
+        }
+      `;
+      document.head.appendChild(posStyle);
+    }
   }, []);
 
   const themeTokens = useMemo(() => getAdminThemeTokens(isDarkMode), [isDarkMode]);
@@ -492,13 +560,19 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     id: 'walkin',
     name: 'Walk-in Customer',
     phone: 'N/A',
+    email: '',
   });
   const [posCustomerDropdownOpen, setPosCustomerDropdownOpen] = useState(false);
   const [posPaymentMethod, setPosPaymentMethod] = useState('Cash'); // 'Cash' | 'Card' | 'GCash' | 'Bank'
   const [posTendered, setPosTendered] = useState('');
   const [posDiscountCode, setPosDiscountCode] = useState('');
   const [posDiscountPercent, setPosDiscountPercent] = useState(0);
+  const [posReceiptDelivery, setPosReceiptDelivery] = useState('print'); // 'print' | 'digital'
+  const [posReceiptEmail, setPosReceiptEmail] = useState('');
+  const [posCheckoutSubmitting, setPosCheckoutSubmitting] = useState(false);
   const [posReceiptOrder, setPosReceiptOrder] = useState(null);
+  const [posResendEmailInput, setPosResendEmailInput] = useState('');
+  const [posResendingEmail, setPosResendingEmail] = useState(false);
   const [posSizePickerProduct, setPosSizePickerProduct] = useState(null);
   const [posSelectedSize, setPosSelectedSize] = useState('');
 
@@ -1341,6 +1415,9 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
     });
 
     const handleWindowBookings = (e) => {
+      if (e?.type === 'storage' && e?.key && e.key !== 'mototrack_bookings_db' && e.key !== 'mototrack_garage_bookings') {
+        return;
+      }
       if (e?.detail && Array.isArray(e.detail)) {
         setGarageBookings(e.detail);
       } else {
@@ -1378,6 +1455,37 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       }
     };
   }, [currentUser]);
+
+  // Force-refresh bookings whenever Admin opens the Garage / Booking Management tab or refocuses window
+  useEffect(() => {
+    if (!currentUser || currentUser.role !== 'admin') return;
+    if (activeNav !== 'garage') return;
+    let active = true;
+    const syncLatestBookings = () => {
+      garageService
+        .getAllBookings({ force: true })
+        .then((fresh) => {
+          if (active && Array.isArray(fresh)) {
+            setGarageBookings(fresh);
+          }
+        })
+        .catch(() => {});
+    };
+    syncLatestBookings();
+    const handleFocus = () => syncLatestBookings();
+    const handleVis = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        syncLatestBookings();
+      }
+    };
+    if (typeof window !== 'undefined') window.addEventListener('focus', handleFocus);
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', handleVis);
+    return () => {
+      active = false;
+      if (typeof window !== 'undefined') window.removeEventListener('focus', handleFocus);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', handleVis);
+    };
+  }, [activeNav, currentUser]);
 
   // ─── INVENTORY COMPUTATIONS & ACTIONS ───
   const invStats = useMemo(() => computeInventoryKpis(products), [products]);
@@ -1861,6 +1969,8 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
   const posChangeAmount = Math.max(0, posTenderedNum - posGrandTotal);
 
   const handlePOSCheckout = async () => {
+    if (posCheckoutSubmitting) return;
+
     if (posCart.length === 0) {
       showAlert('Empty Cart', 'Please add products to the POS register before checkout.');
       return;
@@ -1874,10 +1984,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       return;
     }
 
+    const cleanReceiptEmail =
+      posReceiptDelivery === 'digital' ? isValidReceiptEmail(posReceiptEmail) : null;
+    if (posReceiptDelivery === 'digital' && !cleanReceiptEmail) {
+      showAlert(
+        'Customer Gmail Required',
+        'Please enter a valid customer Gmail address to send the digital receipt.'
+      );
+      return;
+    }
+
     const orderData = {
       customer_id: posSelectedCustomer.id || 'walkin',
       customer_name: posSelectedCustomer.name || 'Walk-in Customer',
       customer_phone: posSelectedCustomer.phone || 'N/A',
+      customer_email: cleanReceiptEmail || posSelectedCustomer.email || '',
       payment_method: posPaymentMethod,
       amount_tendered: posPaymentMethod === 'Cash' ? posTenderedNum : posGrandTotal,
       change_amount: posPaymentMethod === 'Cash' ? posChangeAmount : 0,
@@ -1889,19 +2010,87 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
       items: posCart,
     };
 
-    const res = await orderService.createPOSOrder(orderData);
-    if (res.success) {
+    setPosCheckoutSubmitting(true);
+    try {
+      const res = await orderService.createPOSOrder(orderData);
+      if (!res.success) {
+        showToast(res.error || 'POS sale failed');
+        return;
+      }
+
       await loadData();
 
-      // Show receipt modal
-      setPosReceiptOrder(res.order);
+      let receiptOrder = {
+        ...res.order,
+        receipt_delivery: posReceiptDelivery,
+        receipt_email: cleanReceiptEmail || posSelectedCustomer.email || '',
+      };
+
+      if (posReceiptDelivery === 'digital' && cleanReceiptEmail) {
+        const emailRes = await sendPosDigitalReceiptEmail({
+          order: receiptOrder,
+          recipientEmail: cleanReceiptEmail,
+        });
+        receiptOrder = {
+          ...receiptOrder,
+          receipt_email_status: emailRes,
+        };
+        if (emailRes.success && emailRes.dispatched) {
+          showToast(`POS Sale Completed! Digital receipt sent to ${cleanReceiptEmail}.`);
+        } else if (emailRes.success) {
+          showToast('POS Sale Completed! Receipt generated (email server in dev-fallback mode).');
+        } else {
+          showToast(`POS Sale Completed, but Gmail sending failed: ${emailRes.error || 'Email error'}`);
+        }
+      } else {
+        showToast('POS Sale Completed! Ready to print receipt.');
+      }
+
+      setPosReceiptOrder(receiptOrder);
+      setPosResendEmailInput(receiptOrder.receipt_email || '');
       setPosCart([]);
       setPosTendered('');
       setPosDiscountCode('');
       setPosDiscountPercent(0);
-      showToast('POS Sale Completed! Receipt generated.');
-    } else {
-      showToast(res.error || 'POS sale failed');
+      setPosReceiptEmail(posSelectedCustomer.email || '');
+    } finally {
+      setPosCheckoutSubmitting(false);
+    }
+  };
+
+  const handlePOSResendDigitalReceipt = async () => {
+    if (!posReceiptOrder || posResendingEmail) return;
+    const cleanEmail = isValidReceiptEmail(posResendEmailInput);
+    if (!cleanEmail) {
+      showAlert('Invalid Gmail Address', 'Please enter a valid customer Gmail address.');
+      return;
+    }
+
+    setPosResendingEmail(true);
+    try {
+      const emailRes = await sendPosDigitalReceiptEmail({
+        order: posReceiptOrder,
+        recipientEmail: cleanEmail,
+      });
+      setPosReceiptOrder((prev) =>
+        prev
+          ? {
+              ...prev,
+              receipt_delivery: 'digital',
+              receipt_email: cleanEmail,
+              receipt_email_status: emailRes,
+            }
+          : prev
+      );
+      if (emailRes.success && emailRes.dispatched) {
+        showToast(`Digital receipt sent to ${cleanEmail}.`);
+      } else if (emailRes.success) {
+        showToast('Email server is in dev-fallback mode (no live SMTP/Resend configured).');
+      } else {
+        showToast(emailRes.error || 'Failed to send digital receipt to Gmail.');
+      }
+    } finally {
+      setPosResendingEmail(false);
     }
   };
 
@@ -5394,12 +5583,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
             {/* ─── TAB 1: OVERVIEW ─── */}
             {activeNav === 'overview' && (
-              <ModernOverviewDashboard
+              <WebOverviewDashboard
                 isLoading={shouldShowSkeleton}
                 orders={orders}
                 products={products}
                 garageBookings={garageBookings}
                 suppliers={suppliers}
+                supplierStats={supplierStats}
+                pendingReschedulesCount={pendingReschedulesCount}
                 analyticsData={analyticsData}
                 orderStats={orderStats}
                 invStats={invStats}
@@ -5411,6 +5602,12 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                 setOrderStatusFilter={setOrderStatusFilter}
                 setInvStockFilter={setInvStockFilter}
                 setBookingStatusFilter={setBookingStatusFilter}
+                setSupplierFilterStatus={setSupplierFilterStatus}
+                onOpenReschedules={() => {
+                  setBookingViewMode('reschedules');
+                  setRescheduleFilter('Pending Review');
+                  setActiveNav('garage');
+                }}
                 isDarkMode={isDarkMode}
                 isDesktop={isDesktop}
                 tokens={tokens}
@@ -7664,9 +7861,32 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
 
             {/* ─── TAB 3: POINT OF SALE (POS) CASHIER TERMINAL ─── */}
             {activeNav === 'pos' && (
-              <View style={[styles.posContainer, isDesktop && { height: 'calc(100vh - 120px)', overflow: 'hidden' }]}>
+              <View
+                style={[
+                  styles.posContainer,
+                  isDesktop && {
+                    flexWrap: 'nowrap',
+                    gap: 20,
+                    height: 'calc(100vh - 124px)',
+                    overflow: 'hidden',
+                    alignItems: 'stretch',
+                  },
+                ]}
+              >
                 {/* LEFT PANE: PRODUCT CATALOG GRID */}
-                <View style={[styles.posCatalogColumn, isDesktop && { height: '100%', display: 'flex', flexDirection: 'column' }]}>
+                <View
+                  style={[
+                    styles.posCatalogColumn,
+                    isDesktop && {
+                      flex: 3,
+                      minWidth: 0,
+                      width: 'auto',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    },
+                  ]}
+                >
                   <View
                     style={[
                       styles.toolbarRow,
@@ -7675,18 +7895,71 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         zIndex: isPosCategoryDropdownOpen ? 99999 : 10,
                         elevation: isPosCategoryDropdownOpen ? 99999 : 1,
                         marginBottom: 14,
+                        gap: 10,
+                        alignItems: 'center',
                       },
                     ]}
                   >
-                    <View style={styles.searchInputBox}>
-                      <BootstrapIcon name="search" size={14} color={isDarkMode ? tokens.textMuted : "#64748B"} style={{ marginRight: 8 }} />
+                    <View
+                      style={[
+                        styles.searchInputBox,
+                        {
+                          height: 42,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? tokens.borderInput : '#E5E7EB',
+                          backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
+                          paddingHorizontal: 13,
+                          boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)',
+                        },
+                      ]}
+                    >
+                      <BootstrapIcon
+                        name="search"
+                        size={14}
+                        color={isDarkMode ? tokens.textMuted : '#64748B'}
+                        style={{ marginRight: 9 }}
+                      />
                       <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search parts catalog / Scan barcode..."
-                        placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
+                        style={[styles.searchInput, { fontSize: 13 }]}
+                        placeholder="Search parts catalog or scan barcode..."
+                        placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
                         value={posSearchQuery}
                         onChangeText={setPosSearchQuery}
                       />
+                      {posSearchQuery ? (
+                        <TouchableOpacity
+                          onPress={() => setPosSearchQuery('')}
+                          style={{ padding: 2 }}
+                          activeOpacity={0.7}
+                        >
+                          <BootstrapIcon
+                            name="x-circle-fill"
+                            size={14}
+                            color={isDarkMode ? tokens.textMuted : '#94A3B8'}
+                          />
+                        </TouchableOpacity>
+                      ) : (
+                        <View
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 3,
+                            borderRadius: 6,
+                            backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              fontWeight: '500',
+                              color: isDarkMode ? tokens.textMuted : '#64748B',
+                              fontVariant: ['tabular-nums'],
+                            }}
+                          >
+                            {filteredPOSProducts.length} items
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
                     {/* POS Category Filter Dropdown */}
@@ -7698,25 +7971,23 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                     >
                       <TouchableOpacity
                         style={{
+                          height: 42,
                           flexDirection: 'row',
                           alignItems: 'center',
                           justifyContent: 'space-between',
                           gap: 8,
-                          backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
-                          borderWidth: 1.5,
-                          borderColor: isPosCategoryDropdownOpen
+                          backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
+                          borderWidth: 1,
+                          borderColor: isPosCategoryDropdownOpen || posCategoryFilter !== 'All'
                             ? '#EA580C'
-                            : posCategoryFilter !== 'All'
-                              ? '#EA580C'
-                              : isDarkMode ? tokens.borderInput : '#E2E8F0',
-                          borderRadius: 12,
+                            : isDarkMode ? tokens.borderInput : '#E5E7EB',
+                          borderRadius: 8,
                           paddingHorizontal: 14,
-                          paddingVertical: 9,
-                          minWidth: 160,
+                          minWidth: 168,
                           cursor: 'pointer',
                           boxShadow: isPosCategoryDropdownOpen
-                            ? '0 6px 20px -2px rgba(234, 88, 12, 0.2)'
-                            : '0 1px 3px rgba(0, 0, 0, 0.04)',
+                            ? '0 6px 20px -4px rgba(234, 88, 12, 0.18)'
+                            : '0 1px 2px rgba(15, 23, 42, 0.03)',
                         }}
                         onPress={() => setIsPosCategoryDropdownOpen((prev) => !prev)}
                         activeOpacity={0.85}
@@ -7725,13 +7996,13 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                           <BootstrapIcon
                             name={getCategoryIcon(posCategoryFilter)}
                             size={13}
-                            color={posCategoryFilter !== 'All' ? '#EA580C' : '#64748B'}
+                            color={posCategoryFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.textMuted : '#64748B'}
                           />
                           <Text
                             style={{
                               fontSize: 13,
-                              fontWeight: '700',
-                              color: posCategoryFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#0F172A',
+                              fontWeight: '600',
+                              color: posCategoryFilter !== 'All' ? '#EA580C' : isDarkMode ? tokens.textPrimary : '#111827',
                             }}
                           >
                             {posCategoryFilter === 'All' ? 'All Categories' : posCategoryFilter}
@@ -7740,7 +8011,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                         <BootstrapIcon
                           name={isPosCategoryDropdownOpen ? 'chevron-up' : 'chevron-down'}
                           size={12}
-                          color={isPosCategoryDropdownOpen ? '#EA580C' : '#64748B'}
+                          color={isPosCategoryDropdownOpen ? '#EA580C' : isDarkMode ? tokens.textMuted : '#64748B'}
                         />
                       </TouchableOpacity>
 
@@ -7765,20 +8036,21 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                       {/* Floating Dropdown Menu */}
                       {isPosCategoryDropdownOpen && (
                         <View
+                          dataSet={{ posScroll: 'true' }}
                           style={{
                             position: 'absolute',
                             top: '100%',
-                            left: 0,
+                            right: 0,
                             marginTop: 6,
                             minWidth: 220,
-                            backgroundColor: isDarkMode ? tokens.bgElevated : '#FFFFFF',
+                            backgroundColor: isDarkMode ? '#1F2225' : '#FFFFFF',
                             borderRadius: 14,
-                            borderWidth: 1.5,
-                            borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                            boxShadow: '0 16px 36px -4px rgba(0, 0, 0, 0.25), 0 4px 12px rgba(0,0,0,0.08)',
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? tokens.borderInput : '#E5E7EB',
+                            boxShadow: '0 16px 36px -6px rgba(15, 23, 42, 0.2), 0 4px 12px rgba(0,0,0,0.06)',
                             zIndex: 99999,
                             padding: 6,
-                            gap: 3,
+                            gap: 2,
                             maxHeight: 320,
                             overflowY: 'auto',
                           }}
@@ -7796,7 +8068,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   paddingVertical: 9,
                                   borderRadius: 9,
                                   backgroundColor: isSelected
-                                    ? isDarkMode ? '#132A26' : '#E8F0EC'
+                                    ? isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED'
                                     : 'transparent',
                                   cursor: 'pointer',
                                 }}
@@ -7810,16 +8082,14 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   <BootstrapIcon
                                     name={getCategoryIcon(cat)}
                                     size={14}
-                                    color={isSelected ? (isDarkMode ? tokens.accentBrand : '#EA580C') : (isDarkMode ? tokens.textMuted : '#64748B')}
+                                    color={isSelected ? '#EA580C' : isDarkMode ? tokens.textMuted : '#64748B'}
                                   />
                                   <Text
                                     style={{
                                       fontSize: 13,
                                       fontWeight: isSelected ? '600' : '500',
                                       color: isSelected
-                                        ? isDarkMode
-                                          ? tokens.accentBrand
-                                          : '#EA580C'
+                                        ? '#EA580C'
                                         : isDarkMode
                                           ? tokens.textSecondary
                                           : '#334155',
@@ -7829,7 +8099,7 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                                   </Text>
                                 </View>
                                 {isSelected && (
-                                  <BootstrapIcon name="check2" size={14} color={isDarkMode ? tokens.accentBrand : '#EA580C'} />
+                                  <BootstrapIcon name="check2" size={14} color="#EA580C" />
                                 )}
                               </TouchableOpacity>
                             );
@@ -7840,404 +8110,1182 @@ export default function AdminDashboard({ onNavigateToStore, onLogout }) {
                   </View>
 
                   {/* Product Cards Grid */}
-                  <ScrollView style={{ flex: 1, marginTop: 12 }} contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
-                    <View style={[styles.posGrid, { marginTop: 0 }]}>
-                      {filteredPOSProducts.map((p) => {
-                        const isOutOfStock = !p.stock || p.stock <= 0;
-                        return (
-                          <View
-                            key={p.id}
-                            style={[styles.posProductCard, isOutOfStock && styles.posProductCardDisabled]}
+                  <ScrollView
+                    dataSet={{ posScroll: 'true' }}
+                    style={{ flex: 1 }}
+                    contentContainerStyle={{ paddingBottom: 24, paddingRight: 4 }}
+                    showsVerticalScrollIndicator={false}
+                  >
+                    {filteredPOSProducts.length === 0 ? (
+                      <View
+                        style={{
+                          backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
+                          borderRadius: 16,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+                          paddingVertical: 44,
+                          paddingHorizontal: 20,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginTop: 8,
+                        }}
+                      >
+                        <View
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 12,
+                            backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginBottom: 10,
+                          }}
+                        >
+                          <BootstrapIcon name="search" size={18} color={isDarkMode ? tokens.textMuted : '#64748B'} />
+                        </View>
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#111827' }}>
+                          No matching parts found
+                        </Text>
+                        <Text style={{ fontSize: 12, color: isDarkMode ? tokens.textMuted : '#64748B', marginTop: 4, textAlign: 'center' }}>
+                          Try clearing your search query or switching back to All Categories.
+                        </Text>
+                        {(posSearchQuery || posCategoryFilter !== 'All') && (
+                          <TouchableOpacity
+                            style={{
+                              marginTop: 14,
+                              paddingHorizontal: 14,
+                              paddingVertical: 8,
+                              borderRadius: 9,
+                              backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.3)' : '#FED7AA',
+                            }}
+                            onPress={() => {
+                              setPosSearchQuery('');
+                              setPosCategoryFilter('All');
+                            }}
                           >
-                            <View style={styles.posProductImgContainer}>
-                              <Image
-                                source={{ uri: p.image }}
-                                style={styles.posProductImg}
-                                resizeMode="cover"
-                              />
-                            </View>
-                            <View style={styles.posProductBody}>
-                              <Text style={styles.posProductBrand}>{p.brand}</Text>
-                              <Text style={styles.posProductName} numberOfLines={2}>
-                                {p.name}
-                              </Text>
+                            <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#EA580C' }}>
+                              Reset Filters
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    ) : (
+                      <View dataSet={{ posGrid: 'true' }} style={[styles.posGrid, { marginTop: 0 }]}>
+                        {filteredPOSProducts.map((p) => {
+                          const isOutOfStock = !p.stock || p.stock <= 0;
+                          const isLowPosStock = !isOutOfStock && Number(p.stock) <= 5;
+                          const inCartQty = posCart
+                            .filter((item) => item.productId === p.id || item.id === p.id)
+                            .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+
+                          return (
+                            <View
+                              key={p.id}
+                              dataSet={{ posCard: 'true' }}
+                              style={[
+                                styles.posProductCard,
+                                {
+                                  borderRadius: 10,
+                                  backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
+                                  borderColor: inCartQty > 0
+                                    ? isDarkMode ? 'rgba(234, 88, 12, 0.45)' : '#FDBA74'
+                                    : isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+                                  boxShadow: '0 1px 2px rgba(15, 23, 42, 0.03)',
+                                },
+                                isOutOfStock && styles.posProductCardDisabled,
+                              ]}
+                            >
                               <View
-                                style={{
-                                  flexDirection: 'row',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                }}
+                                style={[
+                                  styles.posProductImgContainer,
+                                  {
+                                    height: 132,
+                                    padding: 10,
+                                    backgroundColor: isDarkMode ? '#202225' : '#F8FAFC',
+                                    borderBottomWidth: 1,
+                                    borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                                    borderTopLeftRadius: 9,
+                                    borderTopRightRadius: 9,
+                                    position: 'relative',
+                                  },
+                                ]}
                               >
-                                <Text style={styles.posProductPrice}>₱{p.price?.toLocaleString()}</Text>
-                                <Text
-                                  style={{
-                                    fontSize: 11,
-                                    fontWeight: '700',
-                                    color: isOutOfStock ? '#EF4444' : '#10B981',
-                                  }}
-                                >
-                                  {isOutOfStock ? '0 Left' : `${p.stock} In Stock`}
-                                </Text>
+                                {p.image ? (
+                                  <Image
+                                    source={{ uri: p.image }}
+                                    style={{ width: '100%', height: '100%' }}
+                                    resizeMode="contain"
+                                  />
+                                ) : (
+                                  <BootstrapIcon name="box-seam" size={28} color={isDarkMode ? tokens.textMuted : '#94A3B8'} />
+                                )}
+                                {inCartQty > 0 && (
+                                  <View
+                                    style={{
+                                      position: 'absolute',
+                                      top: 8,
+                                      right: 8,
+                                      backgroundColor: '#EA580C',
+                                      paddingHorizontal: 7,
+                                      paddingVertical: 3,
+                                      borderRadius: 999,
+                                    }}
+                                  >
+                                    <Text
+                                      style={{
+                                        color: '#FFFFFF',
+                                        fontSize: 10,
+                                        fontWeight: '600',
+                                        fontVariant: ['tabular-nums'],
+                                      }}
+                                    >
+                                      {inCartQty} in cart
+                                    </Text>
+                                  </View>
+                                )}
                               </View>
-                              <TouchableOpacity
-                                style={[styles.posAddBtn, isOutOfStock && { opacity: 0.5 }]}
-                                onPress={() => handlePOSAddToCart(p)}
-                                disabled={isOutOfStock}
-                              >
-                                <BootstrapIcon name="plus-lg" size={12} color="#FFFFFF" />
-                                <Text style={styles.posAddBtnText}>Add to Cart</Text>
-                              </TouchableOpacity>
+                              <View style={[styles.posProductBody, { padding: 12 }]}>
+                                <View>
+                                  <Text
+                                    style={[
+                                      styles.posProductBrand,
+                                      { fontSize: 10, fontWeight: '600', letterSpacing: 0.5 },
+                                    ]}
+                                    numberOfLines={1}
+                                  >
+                                    {p.brand}
+                                  </Text>
+                                  <Text
+                                    style={[
+                                      styles.posProductName,
+                                      {
+                                        fontSize: 13.5,
+                                        fontWeight: '600',
+                                        lineHeight: 18,
+                                        height: 36,
+                                        marginBottom: 8,
+                                      },
+                                    ]}
+                                    numberOfLines={2}
+                                  >
+                                    {p.name}
+                                  </Text>
+                                </View>
+
+                                <View>
+                                  <View
+                                    style={{
+                                      flexDirection: 'row',
+                                      justifyContent: 'space-between',
+                                      alignItems: 'center',
+                                      gap: 6,
+                                    }}
+                                  >
+                                    <Text
+                                      style={[
+                                        styles.posProductPrice,
+                                        {
+                                          fontSize: 15,
+                                          fontWeight: '700',
+                                          fontVariant: ['tabular-nums'],
+                                        },
+                                      ]}
+                                    >
+                                      ₱{p.price?.toLocaleString()}
+                                    </Text>
+                                    <View
+                                      style={{
+                                        paddingHorizontal: 7,
+                                        paddingVertical: 2.5,
+                                        borderRadius: 6,
+                                        backgroundColor: isOutOfStock
+                                          ? isDarkMode ? 'rgba(239, 68, 68, 0.15)' : '#FEE2E2'
+                                          : isLowPosStock
+                                            ? isDarkMode ? 'rgba(245, 158, 11, 0.16)' : '#FEF3C7'
+                                            : isDarkMode ? 'rgba(16, 185, 129, 0.14)' : '#ECFDF5',
+                                      }}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: 10.5,
+                                          fontWeight: '600',
+                                          fontVariant: ['tabular-nums'],
+                                          color: isOutOfStock
+                                            ? isDarkMode ? '#FCA5A5' : '#B91C1C'
+                                            : isLowPosStock
+                                              ? isDarkMode ? '#FCD34D' : '#B45309'
+                                              : isDarkMode ? '#6EE7B7' : '#047857',
+                                        }}
+                                      >
+                                        {isOutOfStock ? 'Out of stock' : `${p.stock} in stock`}
+                                      </Text>
+                                    </View>
+                                  </View>
+
+                                  <TouchableOpacity
+                                    style={[
+                                      styles.posAddBtn,
+                                      {
+                                        borderRadius: 8,
+                                        paddingVertical: 8,
+                                        marginTop: 10,
+                                      },
+                                      isOutOfStock && { opacity: 0.45 },
+                                    ]}
+                                    onPress={() => handlePOSAddToCart(p)}
+                                    disabled={isOutOfStock}
+                                    activeOpacity={0.85}
+                                  >
+                                    <BootstrapIcon name="plus-lg" size={12} color="#FFFFFF" />
+                                    <Text style={[styles.posAddBtnText, { fontSize: 12.5, fontWeight: '600' }]}>
+                                      Add to Cart
+                                    </Text>
+                                  </TouchableOpacity>
+                                </View>
+                              </View>
                             </View>
-                          </View>
-                        );
-                      })}
-                    </View>
+                          );
+                        })}
+                      </View>
+                    )}
                   </ScrollView>
                 </View>
 
                 {/* RIGHT PANE: POS REGISTER CART & CHECKOUT */}
-                <View style={[styles.posRegisterColumn, isDesktop && { height: '100%', display: 'flex', flexDirection: 'column' }]}>
-                  <View style={[styles.posRegisterCard, isDesktop && { height: '100%', display: 'flex', flexDirection: 'column', overflowY: 'auto' }]}>
-                    <View style={styles.posRegisterHeader}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <BootstrapIcon name="cart3" size={18} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                        <Text style={styles.posRegisterTitle}>POS Cashier Register</Text>
-                      </View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        {posCart.length > 0 && (
-                          <TouchableOpacity
-                            onPress={() => setPosCart([])}
+                <View
+                  style={[
+                    styles.posRegisterColumn,
+                    isDesktop && {
+                      flex: 2,
+                      minWidth: 340,
+                      width: 'auto',
+                      height: '100%',
+                      display: 'flex',
+                      flexDirection: 'column',
+                    },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.posRegisterCard,
+                      {
+                        borderRadius: 14,
+                        padding: 16,
+                        backgroundColor: isDarkMode ? '#18181B' : '#FFFFFF',
+                        borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+                        boxShadow: isDarkMode
+                          ? '0 8px 24px rgba(0, 0, 0, 0.35)'
+                          : '0 2px 10px rgba(15, 23, 42, 0.04)',
+                      },
+                      isDesktop && {
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                      },
+                    ]}
+                  >
+                    {/* Pinned Register Header & Customer Picker */}
+                    <View style={{ flexShrink: 0 }}>
+                      <View
+                        style={[
+                          styles.posRegisterHeader,
+                          {
+                            paddingBottom: 10,
+                            marginBottom: 10,
+                            borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F1F5F9',
+                          },
+                        ]}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                          <View
                             style={{
-                              flexDirection: 'row',
+                              width: 30,
+                              height: 30,
+                              borderRadius: 6,
+                              backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.28)' : '#FED7AA',
                               alignItems: 'center',
-                              gap: 4,
-                              paddingHorizontal: 8,
-                              paddingVertical: 4,
-                              borderRadius: 8,
-                              backgroundColor: isDarkMode ? tokens.borderInput : '#FEE2E2',
+                              justifyContent: 'center',
+                              flexShrink: 0,
                             }}
                           >
-                            <BootstrapIcon name="trash" size={11} color={isDarkMode ? tokens.statusDangerText : "#EF4444"} />
-                            <Text style={{ color: isDarkMode ? tokens.statusDangerText : '#EF4444', fontSize: 11, fontWeight: '700' }}>Clear</Text>
-                          </TouchableOpacity>
-                        )}
-                        <View
-                          style={{
-                            backgroundColor: '#E8F0EC',
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                            borderRadius: 8,
-                          }}
-                        >
-                          <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontSize: 11, fontWeight: '600' }}>
-                            {posCart.reduce((acc, item) => acc + item.quantity, 0)} Item(s)
+                            <BootstrapIcon name="cart3" size={15} color="#EA580C" />
+                          </View>
+                          <Text
+                            numberOfLines={1}
+                            style={[
+                              styles.posRegisterTitle,
+                              { fontSize: 15, fontWeight: '600', letterSpacing: -0.2, flexShrink: 1 },
+                            ]}
+                          >
+                            POS Cashier Register
                           </Text>
                         </View>
-                      </View>
-                    </View>
-
-                    {/* Customer Selector */}
-                    <View style={styles.posCustomerSelector}>
-                      <Text style={styles.posCustomerLabel}>Customer / Account</Text>
-                      <TouchableOpacity
-                        style={styles.posCustomerPickerRow}
-                        onPress={() => setPosCustomerDropdownOpen(!posCustomerDropdownOpen)}
-                      >
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <BootstrapIcon name="person-circle" size={16} color={isDarkMode ? tokens.accentBrand : "#EA580C"} />
-                          <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? tokens.textPrimary : '#0F172A' }}>
-                            {posSelectedCustomer.name}
-                          </Text>
-                        </View>
-                        <BootstrapIcon
-                          name={posCustomerDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                          size={12}
-                          color={isDarkMode ? tokens.textMuted : "#64748B"}
-                        />
-                      </TouchableOpacity>
-
-                      {/* Dropdown Customer Options */}
-                      {posCustomerDropdownOpen && (
-                        <View
-                          style={{
-                            marginTop: 8,
-                            paddingTop: 8,
-                            borderTopWidth: 1,
-                            borderTopColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
-                            maxHeight: 150,
-                          }}
-                        >
-                          <ScrollView>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                          {posCart.length > 0 && (
                             <TouchableOpacity
-                              style={{ paddingVertical: 6 }}
-                              onPress={() => {
-                                setPosSelectedCustomer({
-                                  id: 'walkin',
-                                  name: 'Walk-in Customer',
-                                  phone: 'N/A',
-                                });
-                                setPosCustomerDropdownOpen(false);
+                              onPress={() => setPosCart([])}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 4,
+                                paddingHorizontal: 8,
+                                paddingVertical: 4,
+                                borderRadius: 6,
+                                backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.14)' : '#FEF2F2',
+                                borderWidth: 1,
+                                borderColor: isDarkMode ? 'rgba(239, 68, 68, 0.25)' : '#FECACA',
                               }}
+                              activeOpacity={0.8}
                             >
-                              <Text style={{ fontSize: 12.5, fontWeight: '700', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
-                                Walk-in Customer
+                              <BootstrapIcon
+                                name="trash"
+                                size={11}
+                                color={isDarkMode ? tokens.statusDangerText : '#DC2626'}
+                              />
+                              <Text
+                                style={{
+                                  color: isDarkMode ? tokens.statusDangerText : '#DC2626',
+                                  fontSize: 11,
+                                  fontWeight: '600',
+                                }}
+                              >
+                                Clear
                               </Text>
                             </TouchableOpacity>
-                            {usersList.map((u) => (
+                          )}
+                          <View
+                            style={{
+                              backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.28)' : '#FED7AA',
+                              paddingHorizontal: 9,
+                              paddingVertical: 4,
+                              borderRadius: 6,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: '#EA580C',
+                                fontSize: 11,
+                                fontWeight: '600',
+                                fontVariant: ['tabular-nums'],
+                              }}
+                            >
+                              {posCart.reduce((acc, item) => acc + item.quantity, 0)} Item(s)
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+
+                      {/* Customer Selector */}
+                      <View
+                        style={[
+                          styles.posCustomerSelector,
+                          {
+                            borderRadius: 10,
+                            paddingHorizontal: 12,
+                            paddingVertical: 9,
+                            marginBottom: 10,
+                            backgroundColor: isDarkMode ? '#202225' : '#F8FAFC',
+                            borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+                          },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.posCustomerLabel,
+                            { fontSize: 10, fontWeight: '600', letterSpacing: 0.5, marginBottom: 4 },
+                          ]}
+                        >
+                          Customer / Account
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.posCustomerPickerRow}
+                          onPress={() => setPosCustomerDropdownOpen(!posCustomerDropdownOpen)}
+                          activeOpacity={0.8}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                            <BootstrapIcon name="person-circle" size={16} color="#EA580C" />
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                              <Text
+                                style={{
+                                  fontSize: 13,
+                                  fontWeight: '600',
+                                  color: isDarkMode ? tokens.textPrimary : '#111827',
+                                }}
+                                numberOfLines={1}
+                              >
+                                {posSelectedCustomer.name}
+                                {posSelectedCustomer.email ? (
+                                  <Text
+                                    style={{
+                                      fontSize: 11.5,
+                                      fontWeight: '400',
+                                      color: isDarkMode ? tokens.textMuted : '#64748B',
+                                    }}
+                                  >
+                                    {` · ${posSelectedCustomer.email}`}
+                                  </Text>
+                                ) : null}
+                              </Text>
+                            </View>
+                          </View>
+                          <BootstrapIcon
+                            name={posCustomerDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                            size={12}
+                            color={isDarkMode ? tokens.textMuted : '#64748B'}
+                          />
+                        </TouchableOpacity>
+
+                        {/* Dropdown Customer Options */}
+                        {posCustomerDropdownOpen && (
+                          <View
+                            dataSet={{ posScroll: 'true' }}
+                            style={{
+                              marginTop: 8,
+                              paddingTop: 6,
+                              borderTopWidth: 1,
+                              borderTopColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+                              maxHeight: 145,
+                            }}
+                          >
+                            <ScrollView showsVerticalScrollIndicator={false}>
                               <TouchableOpacity
-                                key={u.id}
-                                style={{ paddingVertical: 6 }}
+                                style={{
+                                  paddingVertical: 7,
+                                  paddingHorizontal: 6,
+                                  borderRadius: 7,
+                                  backgroundColor:
+                                    posSelectedCustomer.id === 'walkin'
+                                      ? isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED'
+                                      : 'transparent',
+                                }}
                                 onPress={() => {
                                   setPosSelectedCustomer({
-                                    id: u.id,
-                                    name: u.name,
-                                    phone: u.phone || u.email,
+                                    id: 'walkin',
+                                    name: 'Walk-in Customer',
+                                    phone: 'N/A',
+                                    email: '',
                                   });
+                                  setPosReceiptEmail('');
                                   setPosCustomerDropdownOpen(false);
                                 }}
                               >
-                                <Text style={{ fontSize: 12.5, color: isDarkMode ? '#CBD5E1' : '#334155', fontWeight: '600' }}>
-                                  {u.name} ({u.email})
+                                <Text style={{ fontSize: 12.5, fontWeight: '600', color: '#EA580C' }}>
+                                  Walk-in Customer
                                 </Text>
                               </TouchableOpacity>
-                            ))}
-                          </ScrollView>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Cart Items List */}
-                    {posCart.length === 0 ? (
-                      <View style={{ paddingVertical: 28, alignItems: 'center' }}>
-                        <View style={{ marginBottom: 8 }}>
-                          <BootstrapIcon name="cart3" size={32} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                        </View>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: isDarkMode ? tokens.textMuted : '#64748B' }}>
-                          Cart is currently empty
-                        </Text>
-                        <Text style={{ fontSize: 11.5, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 2 }}>
-                          Click any product part on the left to begin sale
-                        </Text>
-                      </View>
-                    ) : (
-                      <ScrollView
-                        style={[
-                          styles.posCartItemsList,
-                          { flexShrink: 0, minHeight: 140, maxHeight: 260 },
-                          Platform.OS === 'web' ? { scrollbarWidth: 'none', msOverflowStyle: 'none' } : {},
-                        ]}
-                        contentContainerStyle={{ paddingRight: 4 }}
-                        showsVerticalScrollIndicator={false}
-                        showsHorizontalScrollIndicator={false}
-                      >
-                        {posCart.map((item) => (
-                          <View key={item.id} style={styles.posCartItemRow}>
-                            {/* Product Thumbnail */}
-                            <View
-                              style={{
-                                width: 40,
-                                height: 40,
-                                borderRadius: 8,
-                                backgroundColor: isDarkMode ? '#0F172A' : '#F1F5F9',
-                                overflow: 'hidden',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                marginRight: 10,
-                                flexShrink: 0,
-                              }}
-                            >
-                              {item.image ? (
-                                <Image
-                                  source={{ uri: item.image }}
-                                  style={{ width: '100%', height: '100%' }}
-                                  resizeMode="contain"
-                                />
-                              ) : (
-                                <BootstrapIcon name="box-seam" size={16} color={isDarkMode ? tokens.textMuted : "#94A3B8"} />
-                              )}
-                            </View>
-
-                            <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
-                              <Text style={styles.posCartItemName} numberOfLines={1}>
-                                {item.name}
-                              </Text>
-                              <Text style={styles.posCartItemPrice}>
-                                ₱{item.price?.toLocaleString()} each
-                                {item.size ? ` · Size ${item.size}` : ''}
-                              </Text>
-                            </View>
-
-                            <View style={styles.posQtyBox}>
-                              <TouchableOpacity
-                                style={styles.posQtyBtn}
-                                onPress={() => handlePOSUpdateQty(item.id, -1)}
-                              >
-                                <Text style={{ fontWeight: '600', color: isDarkMode ? '#CBD5E1' : '#475569', fontSize: 13 }}>-</Text>
-                              </TouchableOpacity>
-                              <Text style={styles.posQtyText}>{item.quantity}</Text>
-                              <TouchableOpacity
-                                style={styles.posQtyBtn}
-                                onPress={() => handlePOSUpdateQty(item.id, 1)}
-                              >
-                                <Text style={{ fontWeight: '600', color: isDarkMode ? '#CBD5E1' : '#475569', fontSize: 13 }}>+</Text>
-                              </TouchableOpacity>
-                            </View>
-
-                            <View style={{ minWidth: 62, alignItems: 'flex-end', marginLeft: 8 }}>
-                              <Text style={{ fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C' }}>
-                                ₱{(item.price * item.quantity).toLocaleString()}
-                              </Text>
-                            </View>
-
-                            <TouchableOpacity
-                              style={{ padding: 6, marginLeft: 4 }}
-                              onPress={() => handlePOSUpdateQty(item.id, -item.quantity)}
-                            >
-                              <BootstrapIcon name="trash3" size={13} color={isDarkMode ? tokens.statusDangerText : "#EF4444"} />
-                            </TouchableOpacity>
-                          </View>
-                        ))}
-                      </ScrollView>
-                    )}
-
-                    {/* Promo Code Input */}
-                    <View style={{ flexDirection: 'row', gap: 6, marginVertical: 10 }}>
-                      <TextInput
-                        style={[styles.formInput, { flex: 1, marginBottom: 0 }]}
-                        placeholder="Promo Voucher (e.g. RACE20)"
-                        placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                        value={posDiscountCode}
-                        onChangeText={setPosDiscountCode}
-                        autoCapitalize="characters"
-                      />
-                      <TouchableOpacity
-                        style={{
-                          backgroundColor: isDarkMode ? tokens.statusWarningBg : '#FEF3C7',
-                          borderWidth: 1,
-                          borderColor: isDarkMode ? tokens.chipBorder : '#FDE68A',
-                          paddingHorizontal: 14,
-                          borderRadius: 12,
-                          justifyContent: 'center',
-                        }}
-                        onPress={handlePOSApplyDiscount}
-                      >
-                        <Text style={{ color: isDarkMode ? tokens.accentBrand : '#EA580C', fontWeight: '600', fontSize: 12.5 }}>Apply</Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {/* Summary Totals */}
-                    <View style={{ borderTopWidth: 1, borderTopColor: '#F1F5F9', paddingTop: 10 }}>
-                      <View style={styles.posSummaryRow}>
-                        <Text style={styles.posSummaryLabel}>Subtotal</Text>
-                        <Text style={styles.posSummaryVal}>₱{posSubtotal.toLocaleString()}</Text>
-                      </View>
-                      {posDiscountAmount > 0 && (
-                        <View style={styles.posSummaryRow}>
-                          <Text style={[styles.posSummaryLabel, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>
-                            Discount ({posDiscountPercent}% OFF)
-                          </Text>
-                          <Text style={[styles.posSummaryVal, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>
-                            -₱{posDiscountAmount.toLocaleString()}
-                          </Text>
-                        </View>
-                      )}
-                      <View style={styles.posGrandTotalRow}>
-                        <Text style={styles.posGrandTotalLabel}>Total Amount Due</Text>
-                        <Text style={styles.posGrandTotalVal}>₱{posGrandTotal.toLocaleString()}</Text>
-                      </View>
-                    </View>
-
-                    {/* Payment Method Selector */}
-                    <Text style={[styles.posCustomerLabel, { marginTop: 14 }]}>Payment Method</Text>
-                    <View style={styles.posPayMethodRow}>
-                      {['Cash', 'GCash'].map((method) => (
-                        <TouchableOpacity
-                          key={method}
-                          style={[
-                            styles.posPayMethodBtn,
-                            posPaymentMethod === method && styles.posPayMethodBtnActive,
-                          ]}
-                          onPress={() => setPosPaymentMethod(method)}
-                        >
-                          <Text
-                            style={[
-                              styles.posPayMethodText,
-                              posPaymentMethod === method && styles.posPayMethodTextActive,
-                            ]}
-                          >
-                            {method}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-
-                    {/* Cash Tender Calculator */}
-                    {posPaymentMethod === 'Cash' && (
-                      <View style={styles.posTenderBox}>
-                        <Text
-                          style={{
-                            fontSize: 11,
-                            fontWeight: '600',
-                            color: isDarkMode ? tokens.textMuted : '#475569',
-                            textTransform: 'uppercase',
-                          }}
-                        >
-                          Cash Tendered (₱)
-                        </Text>
-                        <TextInput
-                          style={[
-                            styles.formInput,
-                            { fontSize: 16, fontWeight: '600', color: isDarkMode ? tokens.accentBrand : '#EA580C', marginTop: 4 },
-                          ]}
-                          keyboardType="numeric"
-                          placeholder="Enter amount given by customer..."
-                          placeholderTextColor={isDarkMode ? tokens.placeholder : "#94A3B8"}
-                          value={posTendered}
-                          onChangeText={setPosTendered}
-                        />
-                        {/* Quick Cash Chips */}
-                        <View style={styles.posQuickCashRow}>
-                          <TouchableOpacity
-                            style={styles.posQuickCashChip}
-                            onPress={() => setPosTendered(String(posGrandTotal))}
-                          >
-                            <Text style={styles.posQuickCashChipText}>
-                              Exact (₱{posGrandTotal.toLocaleString()})
-                            </Text>
-                          </TouchableOpacity>
-                          {[1000, 2000, 5000, 10000, 50000].map((amt) => (
-                            <TouchableOpacity
-                              key={amt}
-                              style={styles.posQuickCashChip}
-                              onPress={() => setPosTendered(String(amt))}
-                            >
-                              <Text style={styles.posQuickCashChipText}>₱{amt.toLocaleString()}</Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-
-                        {/* Change Due Display */}
-                        {posTenderedNum > 0 && (
-                          <View style={styles.posChangeBanner}>
-                            <Text style={styles.posChangeBannerText}>Change Due to Customer:</Text>
-                            <Text style={styles.posChangeBannerAmount}>
-                              ₱{posChangeAmount.toLocaleString()}
-                            </Text>
+                              {usersList.map((u) => (
+                                <TouchableOpacity
+                                  key={u.id}
+                                  style={{
+                                    paddingVertical: 7,
+                                    paddingHorizontal: 6,
+                                    borderRadius: 7,
+                                    backgroundColor:
+                                      posSelectedCustomer.id === u.id
+                                        ? isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED'
+                                        : 'transparent',
+                                  }}
+                                  onPress={() => {
+                                    const accountEmail = String(u.email || '').trim();
+                                    setPosSelectedCustomer({
+                                      id: u.id,
+                                      name: u.name,
+                                      phone: u.phone || accountEmail || 'N/A',
+                                      email: accountEmail,
+                                    });
+                                    setPosReceiptEmail(accountEmail);
+                                    setPosCustomerDropdownOpen(false);
+                                  }}
+                                >
+                                  <Text
+                                    style={{
+                                      fontSize: 12.5,
+                                      color: posSelectedCustomer.id === u.id
+                                        ? '#EA580C'
+                                        : isDarkMode ? '#CBD5E1' : '#334155',
+                                      fontWeight: posSelectedCustomer.id === u.id ? '600' : '500',
+                                    }}
+                                    numberOfLines={1}
+                                  >
+                                    {u.name} ({u.email})
+                                  </Text>
+                                </TouchableOpacity>
+                              ))}
+                            </ScrollView>
                           </View>
                         )}
                       </View>
-                    )}
+                    </View>
 
-                    {/* Process Checkout CTA */}
-                    <TouchableOpacity
-                      style={[styles.posCheckoutBtn, posCart.length === 0 && styles.posCheckoutBtnDisabled]}
-                      onPress={handlePOSCheckout}
-                      disabled={posCart.length === 0}
-                      activeOpacity={0.85}
+                    {/* Scrollable Register Body (Clean subtle scrollbar only when content overflows) */}
+                    <ScrollView
+                      dataSet={{ posScroll: 'true' }}
+                      style={isDesktop ? { flex: 1, minHeight: 0 } : undefined}
+                      contentContainerStyle={{ paddingBottom: 8 }}
+                      showsVerticalScrollIndicator={true}
                     >
-                      <BootstrapIcon name="receipt-cutoff" size={16} color="#FFFFFF" />
-                      <Text style={styles.posCheckoutBtnText}>Complete POS Sale & Print Receipt</Text>
-                    </TouchableOpacity>
+                      {/* Cart Items List */}
+                      {posCart.length === 0 ? (
+                        <View
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            gap: 10,
+                            paddingVertical: 10,
+                            paddingHorizontal: 12,
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderStyle: 'dashed',
+                            borderColor: isDarkMode ? 'rgba(255,255,255,0.12)' : '#CBD5E1',
+                            backgroundColor: isDarkMode ? 'rgba(255,255,255,0.02)' : '#FAFAFA',
+                            marginBottom: 10,
+                          }}
+                        >
+                          <View
+                            style={{
+                              width: 32,
+                              height: 32,
+                              borderRadius: 8,
+                              backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <BootstrapIcon name="cart3" size={16} color={isDarkMode ? tokens.textMuted : '#94A3B8'} />
+                          </View>
+                          <View style={{ flex: 1, minWidth: 0 }}>
+                            <Text style={{ fontSize: 12.5, fontWeight: '600', color: isDarkMode ? tokens.textSecondary : '#475569' }}>
+                              Cart is currently empty
+                            </Text>
+                            <Text style={{ fontSize: 11, color: isDarkMode ? tokens.textMuted : '#94A3B8', marginTop: 1 }}>
+                              Select any part on the left to start checkout
+                            </Text>
+                          </View>
+                        </View>
+                      ) : (
+                        <View style={{ marginBottom: 8 }}>
+                          {posCart.map((item) => (
+                            <View
+                              key={item.id}
+                              style={[
+                                styles.posCartItemRow,
+                                {
+                                  paddingVertical: 8,
+                                  borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F1F5F9',
+                                },
+                              ]}
+                            >
+                              {/* Product Thumbnail */}
+                              <View
+                                style={{
+                                  width: 38,
+                                  height: 38,
+                                  borderRadius: 8,
+                                  backgroundColor: isDarkMode ? '#202225' : '#F8FAFC',
+                                  borderWidth: 1,
+                                  borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E5E7EB',
+                                  overflow: 'hidden',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  marginRight: 8,
+                                  flexShrink: 0,
+                                  padding: 3,
+                                }}
+                              >
+                                {item.image ? (
+                                  <Image
+                                    source={{ uri: item.image }}
+                                    style={{ width: '100%', height: '100%' }}
+                                    resizeMode="contain"
+                                  />
+                                ) : (
+                                  <BootstrapIcon name="box-seam" size={15} color={isDarkMode ? tokens.textMuted : '#94A3B8'} />
+                                )}
+                              </View>
+
+                              <View style={{ flex: 1, minWidth: 0, marginRight: 6 }}>
+                                <Text
+                                  style={[styles.posCartItemName, { fontSize: 12.5, fontWeight: '600' }]}
+                                  numberOfLines={1}
+                                >
+                                  {item.name}
+                                </Text>
+                                <Text
+                                  style={[
+                                    styles.posCartItemPrice,
+                                    { fontSize: 11, fontVariant: ['tabular-nums'] },
+                                  ]}
+                                >
+                                  ₱{item.price?.toLocaleString()} each
+                                  {item.size ? ` · Size ${item.size}` : ''}
+                                </Text>
+                              </View>
+
+                              <View style={[styles.posQtyBox, { borderRadius: 6 }]}>
+                                <TouchableOpacity
+                                  style={[styles.posQtyBtn, { borderRadius: 5 }]}
+                                  onPress={() => handlePOSUpdateQty(item.id, -1)}
+                                >
+                                  <Text style={{ fontWeight: '600', color: isDarkMode ? '#CBD5E1' : '#475569', fontSize: 13 }}>-</Text>
+                                </TouchableOpacity>
+                                <Text style={[styles.posQtyText, { fontVariant: ['tabular-nums'] }]}>
+                                  {item.quantity}
+                                </Text>
+                                <TouchableOpacity
+                                  style={[styles.posQtyBtn, { borderRadius: 5 }]}
+                                  onPress={() => handlePOSUpdateQty(item.id, 1)}
+                                >
+                                  <Text style={{ fontWeight: '600', color: isDarkMode ? '#CBD5E1' : '#475569', fontSize: 13 }}>+</Text>
+                                </TouchableOpacity>
+                              </View>
+
+                              <View style={{ minWidth: 56, alignItems: 'flex-end', marginLeft: 4 }}>
+                                <Text
+                                  style={{
+                                    fontSize: 12.5,
+                                    fontWeight: '600',
+                                    color: '#EA580C',
+                                    fontVariant: ['tabular-nums'],
+                                  }}
+                                >
+                                  ₱{(item.price * item.quantity).toLocaleString()}
+                                </Text>
+                              </View>
+
+                              <TouchableOpacity
+                                style={{ padding: 4, marginLeft: 2 }}
+                                onPress={() => handlePOSUpdateQty(item.id, -item.quantity)}
+                              >
+                                <BootstrapIcon name="trash3" size={12.5} color={isDarkMode ? tokens.statusDangerText : '#94A3B8'} />
+                              </TouchableOpacity>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+
+                      {/* Promo Code Input */}
+                      <View style={{ flexDirection: 'row', gap: 6, marginBottom: 10 }}>
+                        <TextInput
+                          style={[
+                            styles.formInput,
+                            {
+                              flex: 1,
+                              minWidth: 0,
+                              marginBottom: 0,
+                              height: 38,
+                              paddingVertical: 0,
+                              borderRadius: 8,
+                              fontSize: 12.5,
+                            },
+                          ]}
+                          placeholder="Promo Voucher (e.g. RACE20)"
+                          placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+                          value={posDiscountCode}
+                          onChangeText={setPosDiscountCode}
+                          autoCapitalize="characters"
+                        />
+                        <TouchableOpacity
+                          style={{
+                            height: 38,
+                            flexShrink: 0,
+                            backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
+                            borderWidth: 1,
+                            borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.32)' : '#FED7AA',
+                            paddingHorizontal: 14,
+                            borderRadius: 8,
+                            justifyContent: 'center',
+                            alignItems: 'center',
+                          }}
+                          onPress={handlePOSApplyDiscount}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={{ color: '#EA580C', fontWeight: '600', fontSize: 12.5 }}>Apply</Text>
+                        </TouchableOpacity>
+                      </View>
+
+                      {/* Summary Totals */}
+                      <View
+                        style={{
+                          backgroundColor: isDarkMode ? '#202225' : '#F8FAFC',
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+                          paddingHorizontal: 12,
+                          paddingVertical: 9,
+                          marginBottom: 10,
+                        }}
+                      >
+                        <View style={[styles.posSummaryRow, { paddingVertical: 2 }]}>
+                          <Text style={[styles.posSummaryLabel, { fontSize: 12 }]}>Subtotal</Text>
+                          <Text
+                            style={[
+                              styles.posSummaryVal,
+                              { fontSize: 12.5, fontWeight: '600', fontVariant: ['tabular-nums'] },
+                            ]}
+                          >
+                            ₱{posSubtotal.toLocaleString()}
+                          </Text>
+                        </View>
+                        {posDiscountAmount > 0 && (
+                          <View style={[styles.posSummaryRow, { paddingVertical: 2 }]}>
+                            <Text style={[styles.posSummaryLabel, { fontSize: 12, color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>
+                              Discount ({posDiscountPercent}% OFF)
+                            </Text>
+                            <Text
+                              style={[
+                                styles.posSummaryVal,
+                                {
+                                  fontSize: 12.5,
+                                  fontWeight: '600',
+                                  fontVariant: ['tabular-nums'],
+                                  color: isDarkMode ? tokens.statusSuccessText : '#059669',
+                                },
+                              ]}
+                            >
+                              -₱{posDiscountAmount.toLocaleString()}
+                            </Text>
+                          </View>
+                        )}
+                        <View
+                          style={[
+                            styles.posGrandTotalRow,
+                            {
+                              paddingTop: 7,
+                              marginTop: 5,
+                              borderTopWidth: 1,
+                              borderTopColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E2E8F0',
+                              alignItems: 'center',
+                            },
+                          ]}
+                        >
+                          <Text style={[styles.posGrandTotalLabel, { fontSize: 13.5, fontWeight: '600' }]}>
+                            Total Amount Due
+                          </Text>
+                          <Text
+                            style={[
+                              styles.posGrandTotalVal,
+                              { fontSize: 19, fontWeight: '700', fontVariant: ['tabular-nums'] },
+                            ]}
+                          >
+                            ₱{posGrandTotal.toLocaleString()}
+                          </Text>
+                        </View>
+                      </View>
+
+                      {/* Payment Method Segmented Selector */}
+                      <Text
+                        style={[
+                          styles.posCustomerLabel,
+                          { fontSize: 10, fontWeight: '600', letterSpacing: 0.5, marginBottom: 5 },
+                        ]}
+                      >
+                        Payment Method
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          gap: 4,
+                          padding: 3,
+                          borderRadius: 10,
+                          backgroundColor: isDarkMode ? '#111315' : '#F1F5F9',
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E2E8F0',
+                          marginBottom: 10,
+                        }}
+                      >
+                        {[
+                          { key: 'Cash', icon: 'cash-stack' },
+                          { key: 'GCash', icon: 'wallet2' },
+                        ].map((m) => {
+                          const isActive = posPaymentMethod === m.key;
+                          return (
+                            <TouchableOpacity
+                              key={m.key}
+                              style={{
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                paddingVertical: 7.5,
+                                borderRadius: 7,
+                                backgroundColor: isActive
+                                  ? isDarkMode ? '#272A2E' : '#FFFFFF'
+                                  : 'transparent',
+                                borderWidth: 1,
+                                borderColor: isActive
+                                  ? isDarkMode ? 'rgba(234, 88, 12, 0.5)' : '#FDBA74'
+                                  : 'transparent',
+                                boxShadow: isActive ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
+                              }}
+                              onPress={() => setPosPaymentMethod(m.key)}
+                              activeOpacity={0.85}
+                            >
+                              <BootstrapIcon
+                                name={m.icon}
+                                size={12.5}
+                                color={isActive ? '#EA580C' : isDarkMode ? tokens.textMuted : '#64748B'}
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: isActive ? '600' : '500',
+                                  color: isActive ? '#EA580C' : isDarkMode ? tokens.textMuted : '#64748B',
+                                }}
+                              >
+                                {m.key}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {/* Cash Tender Calculator */}
+                      {posPaymentMethod === 'Cash' && (
+                        <View
+                          style={[
+                            styles.posTenderBox,
+                            {
+                              borderRadius: 10,
+                              padding: 10,
+                              marginBottom: 10,
+                              backgroundColor: isDarkMode ? '#202225' : '#F8FAFC',
+                              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+                            },
+                          ]}
+                        >
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                fontWeight: '600',
+                                letterSpacing: 0.5,
+                                color: isDarkMode ? tokens.textMuted : '#64748B',
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              Cash Tendered (₱)
+                            </Text>
+                            {posTenderedNum > 0 && (
+                              <Text
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: '600',
+                                  fontVariant: ['tabular-nums'],
+                                  color: posTenderedNum >= posGrandTotal
+                                    ? isDarkMode ? '#6EE7B7' : '#047857'
+                                    : isDarkMode ? tokens.statusDangerText : '#DC2626',
+                                }}
+                              >
+                                {posTenderedNum >= posGrandTotal
+                                  ? `Change: ₱${posChangeAmount.toLocaleString()}`
+                                  : `Short: ₱${(posGrandTotal - posTenderedNum).toLocaleString()}`}
+                              </Text>
+                            )}
+                          </View>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              height: 38,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor: isDarkMode ? tokens.borderInput : '#E2E8F0',
+                              backgroundColor: isDarkMode ? '#14171A' : '#FFFFFF',
+                              paddingHorizontal: 11,
+                              gap: 6,
+                            }}
+                          >
+                            <Text style={{ fontSize: 13.5, fontWeight: '600', color: '#EA580C' }}>₱</Text>
+                            <TextInput
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                fontSize: 13.5,
+                                fontWeight: '600',
+                                color: isDarkMode ? tokens.textPrimary : '#111827',
+                                fontVariant: ['tabular-nums'],
+                                outlineStyle: 'none',
+                              }}
+                              keyboardType="numeric"
+                              placeholder="Enter amount given..."
+                              placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+                              value={posTendered}
+                              onChangeText={setPosTendered}
+                            />
+                            {posTendered ? (
+                              <TouchableOpacity onPress={() => setPosTendered('')}>
+                                <BootstrapIcon name="x-circle-fill" size={12.5} color={isDarkMode ? tokens.textMuted : '#94A3B8'} />
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+
+                          {/* Quick Cash Chips */}
+                          <View style={[styles.posQuickCashRow, { marginTop: 8, gap: 6 }]}>
+                            {[
+                              { label: `Exact (₱${posGrandTotal.toLocaleString()})`, val: String(posGrandTotal) },
+                              { label: '₱500', val: '500' },
+                              { label: '₱1,000', val: '1000' },
+                              { label: '₱2,000', val: '2000' },
+                              { label: '₱5,000', val: '5000' },
+                            ].map((chip) => {
+                              const activeChip = posTendered === chip.val && Number(chip.val) > 0;
+                              return (
+                                <TouchableOpacity
+                                  key={chip.label}
+                                  style={[
+                                    styles.posQuickCashChip,
+                                    {
+                                      paddingHorizontal: 10,
+                                      paddingVertical: 5,
+                                      borderRadius: 6,
+                                      backgroundColor: activeChip
+                                        ? isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED'
+                                        : isDarkMode ? '#18181B' : '#FFFFFF',
+                                      borderColor: activeChip
+                                        ? '#EA580C'
+                                        : isDarkMode ? 'rgba(255,255,255,0.1)' : '#E2E8F0',
+                                    },
+                                  ]}
+                                  onPress={() => setPosTendered(chip.val)}
+                                >
+                                  <Text
+                                    style={[
+                                      styles.posQuickCashChipText,
+                                      {
+                                        fontSize: 11,
+                                        fontWeight: '600',
+                                        fontVariant: ['tabular-nums'],
+                                        color: activeChip
+                                          ? '#EA580C'
+                                          : isDarkMode ? tokens.textSecondary : '#475569',
+                                      },
+                                    ]}
+                                  >
+                                    {chip.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      )}
+
+                      {/* Receipt Delivery Selector (Printed vs Digital via Gmail) */}
+                      <Text
+                        style={[
+                          styles.posCustomerLabel,
+                          { fontSize: 10, fontWeight: '600', letterSpacing: 0.5, marginBottom: 5 },
+                        ]}
+                      >
+                        Receipt Delivery
+                      </Text>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          gap: 4,
+                          padding: 3,
+                          borderRadius: 10,
+                          backgroundColor: isDarkMode ? '#111315' : '#F1F5F9',
+                          borderWidth: 1,
+                          borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#E2E8F0',
+                          marginBottom: posReceiptDelivery === 'digital' ? 8 : 2,
+                        }}
+                      >
+                        {[
+                          { key: 'print', label: 'Printed', icon: 'printer' },
+                          { key: 'digital', label: 'Digital (Gmail)', icon: 'envelope' },
+                        ].map((opt) => {
+                          const isActive = posReceiptDelivery === opt.key;
+                          return (
+                            <TouchableOpacity
+                              key={opt.key}
+                              style={{
+                                flex: 1,
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                gap: 6,
+                                paddingVertical: 7.5,
+                                borderRadius: 7,
+                                backgroundColor: isActive
+                                  ? isDarkMode ? '#272A2E' : '#FFFFFF'
+                                  : 'transparent',
+                                borderWidth: 1,
+                                borderColor: isActive
+                                  ? isDarkMode ? 'rgba(234, 88, 12, 0.5)' : '#FDBA74'
+                                  : 'transparent',
+                                boxShadow: isActive ? '0 1px 2px rgba(15, 23, 42, 0.06)' : 'none',
+                              }}
+                              onPress={() => {
+                                setPosReceiptDelivery(opt.key);
+                                if (opt.key === 'digital' && !posReceiptEmail && posSelectedCustomer.email) {
+                                  setPosReceiptEmail(posSelectedCustomer.email);
+                                }
+                              }}
+                              activeOpacity={0.85}
+                            >
+                              <BootstrapIcon
+                                name={opt.icon}
+                                size={12.5}
+                                color={isActive ? '#EA580C' : isDarkMode ? tokens.textMuted : '#64748B'}
+                              />
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontWeight: isActive ? '600' : '500',
+                                  color: isActive ? '#EA580C' : isDarkMode ? tokens.textMuted : '#64748B',
+                                }}
+                              >
+                                {opt.label}
+                              </Text>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+
+                      {/* Customer Gmail Input when Digital Receipt is Selected */}
+                      {posReceiptDelivery === 'digital' && (
+                        <View
+                          style={[
+                            styles.posTenderBox,
+                            {
+                              borderRadius: 10,
+                              padding: 10,
+                              marginBottom: 4,
+                              backgroundColor: isDarkMode ? '#202225' : '#F8FAFC',
+                              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#E5E7EB',
+                            },
+                          ]}
+                        >
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
+                            <Text
+                              style={{
+                                fontSize: 10,
+                                fontWeight: '600',
+                                letterSpacing: 0.5,
+                                color: isDarkMode ? tokens.textMuted : '#64748B',
+                                textTransform: 'uppercase',
+                              }}
+                            >
+                              Customer Gmail Address
+                            </Text>
+                            {posSelectedCustomer.email ? (
+                              <TouchableOpacity onPress={() => setPosReceiptEmail(posSelectedCustomer.email)}>
+                                <Text style={{ fontSize: 10.5, fontWeight: '600', color: '#EA580C' }}>
+                                  Use Account Email
+                                </Text>
+                              </TouchableOpacity>
+                            ) : null}
+                          </View>
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              height: 38,
+                              borderRadius: 8,
+                              borderWidth: 1,
+                              borderColor:
+                                posReceiptEmail.trim().length > 0 && !isValidReceiptEmail(posReceiptEmail)
+                                  ? isDarkMode ? 'rgba(239, 68, 68, 0.5)' : '#FCA5A5'
+                                  : isDarkMode ? tokens.borderInput : '#E2E8F0',
+                              backgroundColor: isDarkMode ? '#14171A' : '#FFFFFF',
+                              paddingHorizontal: 11,
+                              gap: 7,
+                              marginBottom: 4,
+                            }}
+                          >
+                            <BootstrapIcon name="envelope" size={12.5} color={isDarkMode ? tokens.textMuted : '#64748B'} />
+                            <TextInput
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                fontSize: 12.5,
+                                color: isDarkMode ? tokens.textPrimary : '#111827',
+                                outlineStyle: 'none',
+                              }}
+                              keyboardType="email-address"
+                              autoCapitalize="none"
+                              autoCorrect={false}
+                              placeholder="customer@gmail.com"
+                              placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+                              value={posReceiptEmail}
+                              onChangeText={setPosReceiptEmail}
+                            />
+                          </View>
+                          <Text
+                            style={{
+                              fontSize: 11,
+                              color:
+                                posReceiptEmail.trim().length > 0 && !isValidReceiptEmail(posReceiptEmail)
+                                  ? isDarkMode ? tokens.statusDangerText : '#DC2626'
+                                  : isDarkMode ? tokens.textMuted : '#64748B',
+                            }}
+                          >
+                            {posReceiptEmail.trim().length > 0 && !isValidReceiptEmail(posReceiptEmail)
+                              ? 'Enter a valid Gmail address (e.g. rider@gmail.com).'
+                              : 'Digital receipt will be emailed to this Gmail on checkout.'}
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+
+                    {/* Pinned Bottom Checkout CTA */}
+                    <View
+                      style={{
+                        flexShrink: 0,
+                        paddingTop: 10,
+                        marginTop: 6,
+                        borderTopWidth: 1,
+                        borderTopColor: isDarkMode ? 'rgba(255,255,255,0.08)' : '#F1F5F9',
+                      }}
+                    >
+                      <TouchableOpacity
+                        style={[
+                          styles.posCheckoutBtn,
+                          {
+                            borderRadius: 8,
+                            paddingVertical: 12,
+                            paddingHorizontal: 14,
+                            boxShadow:
+                              posCart.length > 0 && !posCheckoutSubmitting
+                                ? '0 3px 10px rgba(234, 88, 12, 0.22)'
+                                : 'none',
+                          },
+                          (posCart.length === 0 || posCheckoutSubmitting) && styles.posCheckoutBtnDisabled,
+                        ]}
+                        onPress={handlePOSCheckout}
+                        disabled={posCart.length === 0 || posCheckoutSubmitting}
+                        activeOpacity={0.85}
+                      >
+                        {posCheckoutSubmitting ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <BootstrapIcon
+                            name={posReceiptDelivery === 'digital' ? 'envelope-check' : 'printer-fill'}
+                            size={15}
+                            color="#FFFFFF"
+                          />
+                        )}
+                        <Text style={[styles.posCheckoutBtnText, { fontSize: 13, fontWeight: '600' }]}>
+                          {posCheckoutSubmitting
+                            ? posReceiptDelivery === 'digital'
+                              ? 'Completing Sale & Sending to Gmail...'
+                              : 'Completing POS Sale...'
+                            : posReceiptDelivery === 'digital'
+                              ? 'Complete POS Sale & Send Digital Receipt'
+                              : 'Complete POS Sale & Print Receipt'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               </View>
@@ -16477,114 +17525,285 @@ onRequestClose = {() => setIsAddProductOpen(false)}
       onRequestClose={() => setPosReceiptOrder(null)}
     >
       <View style={styles.modalOverlay}>
-        <View style={styles.receiptSheet}>
-          <Text style={styles.receiptLogo}>MotoTrack Motorparts & Accessories</Text>
-          <Text style={styles.receiptSub}>Official Counter POS Sales Invoice</Text>
-          <Text style={styles.receiptSub}>
-            Receipt No: {posReceiptOrder.order_id} • {posReceiptOrder.order_date}
-          </Text>
-
-          <View style={styles.receiptDivider} />
-
-          <View style={styles.receiptRow}>
-            <Text style={styles.receiptText}>Customer:</Text>
-            <Text style={styles.receiptTextBold}>{posReceiptOrder.customer_name}</Text>
-          </View>
-          <View style={styles.receiptRow}>
-            <Text style={styles.receiptText}>Cashier:</Text>
-            <Text style={styles.receiptTextBold}>{posReceiptOrder.cashier || 'Admin Cashier'}</Text>
-          </View>
-          <View style={styles.receiptRow}>
-            <Text style={styles.receiptText}>Channel:</Text>
-            <Text style={styles.receiptTextBold}>Direct In-Store Counter</Text>
-          </View>
-
-          <View style={styles.receiptDivider} />
-
-          {/* Items */}
-          {(posReceiptOrder.items || []).map((it, idx) => (
-            <View key={idx} style={{ marginVertical: 3 }}>
-              <Text style={[styles.receiptTextBold, { fontSize: 11.5 }]} numberOfLines={1}>
-                {it.name}
-              </Text>
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptText}>
-                  {' '}
-                  {it.quantity} x ₱{it.price?.toLocaleString()}
-                </Text>
-                <Text style={styles.receiptTextBold}>₱{(it.price * it.quantity).toLocaleString()}</Text>
-              </View>
-            </View>
-          ))}
-
-          <View style={styles.receiptDivider} />
-
-          <View style={styles.receiptRow}>
-            <Text style={styles.receiptText}>Subtotal:</Text>
-            <Text style={styles.receiptTextBold}>₱{posReceiptOrder.total_amount?.toLocaleString()}</Text>
-          </View>
-
-          {posReceiptOrder.discount_amount > 0 && (
-            <View style={styles.receiptRow}>
-              <Text style={[styles.receiptText, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>Voucher Discount:</Text>
-              <Text style={[styles.receiptTextBold, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>
-                -₱{posReceiptOrder.discount_amount?.toLocaleString()}
-              </Text>
-            </View>
-          )}
-
-          <View style={[styles.receiptRow, { marginTop: 4 }]}>
-            <Text style={[styles.receiptTextBold, { fontSize: 14 }]}>TOTAL PAID:</Text>
-            <Text style={[styles.receiptTextBold, { fontSize: 16, color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}>
-              ₱{posReceiptOrder.grand_total?.toLocaleString()}
+        <ScrollView
+          dataSet={{ posScroll: 'true' }}
+          style={{ maxHeight: '92%', width: '100%' }}
+          contentContainerStyle={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 16 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.receiptSheet}>
+            <Text style={styles.receiptLogo}>MotoTrack Motorparts & Accessories</Text>
+            <Text style={styles.receiptSub}>Official Counter POS Sales Invoice</Text>
+            <Text style={styles.receiptSub}>
+              Receipt No: {posReceiptOrder.order_id} • {posReceiptOrder.order_date}
             </Text>
-          </View>
 
-          <View style={styles.receiptRow}>
-            <Text style={styles.receiptText}>Payment Method:</Text>
-            <Text style={styles.receiptTextBold}>{posReceiptOrder.payment_method}</Text>
-          </View>
-
-          {posReceiptOrder.payment_method === 'Cash' && (
-            <>
-              <View style={styles.receiptRow}>
-                <Text style={styles.receiptText}>Tendered:</Text>
-                <Text style={styles.receiptTextBold}>
-                  ₱{posReceiptOrder.amount_tendered?.toLocaleString()}
+            {/* Delivery Status Banner */}
+            {posReceiptOrder.receipt_delivery === 'digital' ? (
+              <View
+                style={{
+                  marginTop: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 9,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  backgroundColor: posReceiptOrder.receipt_email_status?.dispatched
+                    ? isDarkMode ? tokens.statusSuccessBg : '#DCFCE7'
+                    : posReceiptOrder.receipt_email_status?.success
+                      ? isDarkMode ? tokens.statusWarningBg : '#FEF3C7'
+                      : isDarkMode ? tokens.statusDangerBg : '#FEE2E2',
+                  borderColor: posReceiptOrder.receipt_email_status?.dispatched
+                    ? isDarkMode ? 'rgba(34, 197, 94, 0.35)' : '#86EFAC'
+                    : posReceiptOrder.receipt_email_status?.success
+                      ? isDarkMode ? 'rgba(245, 158, 11, 0.35)' : '#FDE68A'
+                      : isDarkMode ? 'rgba(239, 68, 68, 0.35)' : '#FCA5A5',
+                }}
+              >
+                <BootstrapIcon
+                  name={posReceiptOrder.receipt_email_status?.dispatched ? 'check-circle-fill' : 'envelope'}
+                  size={15}
+                  color={
+                    posReceiptOrder.receipt_email_status?.dispatched
+                      ? isDarkMode ? tokens.statusSuccessText : '#166534'
+                      : posReceiptOrder.receipt_email_status?.success
+                        ? isDarkMode ? '#FBBF24' : '#92400E'
+                        : isDarkMode ? tokens.statusDangerText : '#991B1B'
+                  }
+                />
+                <Text
+                  style={{
+                    flex: 1,
+                    fontSize: 11.5,
+                    fontWeight: '600',
+                    color: posReceiptOrder.receipt_email_status?.dispatched
+                      ? isDarkMode ? tokens.statusSuccessText : '#166534'
+                      : posReceiptOrder.receipt_email_status?.success
+                        ? isDarkMode ? '#FDE68A' : '#92400E'
+                        : isDarkMode ? tokens.statusDangerText : '#991B1B',
+                  }}
+                >
+                  {posReceiptOrder.receipt_email_status?.dispatched
+                    ? `Digital receipt sent to ${posReceiptOrder.receipt_email}`
+                    : posReceiptOrder.receipt_email_status?.success
+                      ? `Digital receipt prepared for ${posReceiptOrder.receipt_email} (dev-fallback mode)`
+                      : `Gmail delivery failed: ${posReceiptOrder.receipt_email_status?.error || 'Check email server'}`}
                 </Text>
               </View>
+            ) : (
+              <View
+                style={{
+                  marginTop: 12,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 10,
+                  borderWidth: 1,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 8,
+                  backgroundColor: isDarkMode ? tokens.bgSub : '#FFF7ED',
+                  borderColor: isDarkMode ? tokens.border : '#FED7AA',
+                }}
+              >
+                <BootstrapIcon name="printer" size={14} color="#EA580C" />
+                <Text style={{ flex: 1, fontSize: 11.5, fontWeight: '600', color: isDarkMode ? tokens.textSecondary : '#9A3412' }}>
+                  Printed Receipt Mode · Ready to print
+                </Text>
+              </View>
+            )}
+
+            <View style={styles.receiptDivider} />
+
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptText}>Customer:</Text>
+              <Text style={styles.receiptTextBold}>{posReceiptOrder.customer_name}</Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptText}>Cashier:</Text>
+              <Text style={styles.receiptTextBold}>{posReceiptOrder.cashier || 'Admin Cashier'}</Text>
+            </View>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptText}>Channel:</Text>
+              <Text style={styles.receiptTextBold}>Direct In-Store Counter</Text>
+            </View>
+
+            <View style={styles.receiptDivider} />
+
+            {/* Items */}
+            {(posReceiptOrder.items || []).map((it, idx) => (
+              <View key={idx} style={{ marginVertical: 3 }}>
+                <Text style={[styles.receiptTextBold, { fontSize: 11.5 }]} numberOfLines={1}>
+                  {it.name}
+                  {it.size ? ` · Size ${it.size}` : ''}
+                </Text>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptText}>
+                    {' '}
+                    {it.quantity} x ₱{it.price?.toLocaleString()}
+                  </Text>
+                  <Text style={styles.receiptTextBold}>₱{(it.price * it.quantity).toLocaleString()}</Text>
+                </View>
+              </View>
+            ))}
+
+            <View style={styles.receiptDivider} />
+
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptText}>Subtotal:</Text>
+              <Text style={styles.receiptTextBold}>₱{posReceiptOrder.total_amount?.toLocaleString()}</Text>
+            </View>
+
+            {posReceiptOrder.discount_amount > 0 && (
               <View style={styles.receiptRow}>
-                <Text style={styles.receiptText}>Change Given:</Text>
+                <Text style={[styles.receiptText, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>Voucher Discount:</Text>
                 <Text style={[styles.receiptTextBold, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>
-                  ₱{posReceiptOrder.change_amount?.toLocaleString()}
+                  -₱{posReceiptOrder.discount_amount?.toLocaleString()}
                 </Text>
               </View>
-            </>
-          )}
+            )}
 
-          <View style={styles.receiptBarcode}>
-            <Text style={styles.receiptBarcodeText}>|||||||| | ||||| |||| | |||||||</Text>
-          </View>
+            <View style={[styles.receiptRow, { marginTop: 4 }]}>
+              <Text style={[styles.receiptTextBold, { fontSize: 14 }]}>TOTAL PAID:</Text>
+              <Text style={[styles.receiptTextBold, { fontSize: 16, color: isDarkMode ? tokens.accentBrand : '#EA580C' }]}>
+                ₱{posReceiptOrder.grand_total?.toLocaleString()}
+              </Text>
+            </View>
 
-          <Text style={[styles.receiptSub, { marginTop: 6 }]}>
-            Thank you for choosing MotoTrack! Drive safe.
-          </Text>
+            <View style={styles.receiptRow}>
+              <Text style={styles.receiptText}>Payment Method:</Text>
+              <Text style={styles.receiptTextBold}>{posReceiptOrder.payment_method}</Text>
+            </View>
 
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-            <TouchableOpacity
-              style={[styles.addBtnPrimary, { flex: 1, justifyContent: 'center' }]}
-              onPress={() => {
-                if (Platform.OS === 'web' && typeof window !== 'undefined') {
-                  window.print?.();
-                }
-                setPosReceiptOrder(null);
+            {posReceiptOrder.payment_method === 'Cash' && (
+              <>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptText}>Tendered:</Text>
+                  <Text style={styles.receiptTextBold}>
+                    ₱{posReceiptOrder.amount_tendered?.toLocaleString()}
+                  </Text>
+                </View>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptText}>Change Given:</Text>
+                  <Text style={[styles.receiptTextBold, { color: isDarkMode ? tokens.statusSuccessText : '#059669' }]}>
+                    ₱{posReceiptOrder.change_amount?.toLocaleString()}
+                  </Text>
+                </View>
+              </>
+            )}
+
+            <View style={styles.receiptBarcode}>
+              <Text style={styles.receiptBarcodeText}>|||||||| | ||||| |||| | |||||||</Text>
+            </View>
+
+            <Text style={[styles.receiptSub, { marginTop: 6 }]}>
+              Thank you for choosing MotoTrack! Drive safe.
+            </Text>
+
+            {/* Send / Resend to Gmail Controls */}
+            <View
+              style={{
+                marginTop: 14,
+                padding: 10,
+                borderRadius: 10,
+                backgroundColor: isDarkMode ? tokens.bgSub : '#F8FAFC',
+                borderWidth: 1,
+                borderColor: isDarkMode ? tokens.border : '#E2E8F0',
               }}
             >
-              <BootstrapIcon name="printer-fill" size={14} color="#FFFFFF" />
-              <Text style={styles.addBtnPrimaryText}>Print / Close</Text>
-            </TouchableOpacity>
+              <Text
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: '600',
+                  color: isDarkMode ? tokens.textMuted : '#64748B',
+                  textTransform: 'uppercase',
+                  marginBottom: 6,
+                }}
+              >
+                {posReceiptOrder.receipt_delivery === 'digital' ? 'Resend / Change Gmail' : 'Also Send Digital Copy to Gmail'}
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                <TextInput
+                  style={[styles.formInput, { flex: 1, minWidth: 0, marginBottom: 0, paddingVertical: 8, fontSize: 12.5, borderRadius: 8 }]}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="customer@gmail.com"
+                  placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
+                  value={posResendEmailInput}
+                  onChangeText={setPosResendEmailInput}
+                />
+                <TouchableOpacity
+                  style={{
+                    backgroundColor: '#EA580C',
+                    paddingHorizontal: 12,
+                    paddingVertical: 9,
+                    borderRadius: 8,
+                    flexShrink: 0,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 5,
+                    opacity: posResendingEmail ? 0.6 : 1,
+                  }}
+                  onPress={handlePOSResendDigitalReceipt}
+                  disabled={posResendingEmail}
+                >
+                  {posResendingEmail ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <BootstrapIcon name="send-fill" size={12} color="#FFFFFF" />
+                  )}
+                  <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>
+                    {posResendingEmail ? 'Sending' : 'Send'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
+              <TouchableOpacity
+                style={[
+                  posReceiptOrder.receipt_delivery === 'print' ? styles.addBtnPrimary : styles.cancelBtn,
+                  { flex: 1, justifyContent: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8 },
+                ]}
+                onPress={() => printPosReceipt(posReceiptOrder)}
+              >
+                <BootstrapIcon
+                  name="printer-fill"
+                  size={14}
+                  color={posReceiptOrder.receipt_delivery === 'print' ? '#FFFFFF' : isDarkMode ? tokens.textPrimary : '#334155'}
+                />
+                <Text
+                  style={
+                    posReceiptOrder.receipt_delivery === 'print'
+                      ? styles.addBtnPrimaryText
+                      : { fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }
+                  }
+                >
+                  {posReceiptOrder.receipt_delivery === 'digital' ? 'Print Copy' : 'Print Receipt'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  posReceiptOrder.receipt_delivery === 'digital' ? styles.addBtnPrimary : styles.cancelBtn,
+                  { flex: 1, justifyContent: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 8 },
+                ]}
+                onPress={() => setPosReceiptOrder(null)}
+              >
+                <Text
+                  style={
+                    posReceiptOrder.receipt_delivery === 'digital'
+                      ? styles.addBtnPrimaryText
+                      : { fontSize: 13, fontWeight: '600', color: isDarkMode ? tokens.textPrimary : '#334155' }
+                  }
+                >
+                  Done
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </ScrollView>
       </View>
     </Modal>
   )
@@ -19401,6 +20620,7 @@ onRequestClose = {() => setIsAddProductOpen(false)}
   type={confirmDialog.type}
   confirmIcon={confirmDialog.confirmIcon}
   hideCancel={confirmDialog.hideCancel}
+  isDark={isDarkMode}
   onConfirm={confirmDialog.onConfirm}
   onCancel={() => setConfirmDialog((prev) => ({ ...prev, visible: false }))}
 />

@@ -23,7 +23,7 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { BootstrapIcon } from '../common';
+import { BootstrapIcon, DateRangeCalendarPicker } from '../common';
 import ConfirmModal from '../modals/ConfirmModal.jsx';
 import {
   promoService,
@@ -34,6 +34,7 @@ import { productService } from '../../services/products/productService.js';
 import { getThemeTokens } from '../../styles/theme.js';
 import { pickImageFromFile } from '../../utils/imagePickerHelper.js';
 import { uploadProductImage } from '../../utils/productImageUpload.js';
+import { formatPromoDateDisplay, toLocalYmd } from '../../utils/promoDate.js';
 
 const BRAND = '#EA580C';
 const BRAND_SOFT = '#FFF7ED';
@@ -68,7 +69,7 @@ export const BANNER_PRESETS = [
 ];
 
 function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+  return toLocalYmd();
 }
 
 function buildPromoModalStyles(tokens, isDark) {
@@ -254,6 +255,44 @@ function buildPromoModalStyles(tokens, isDark) {
     },
     inputError: {
       borderColor: '#EF4444',
+    },
+    dateTrigger: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 8,
+      minHeight: 42,
+    },
+    dateTriggerLeft: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      minWidth: 0,
+    },
+    dateTriggerValue: {
+      fontSize: 13.5,
+      fontWeight: '600',
+      color: text,
+      fontVariant: ['tabular-nums'],
+    },
+    dateTriggerPlaceholder: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: muted,
+    },
+    dateTriggerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    dateClearBtn: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#F1F5F9',
     },
     inputSuffixRow: {
       flexDirection: 'row',
@@ -653,6 +692,7 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
   const [errors, setErrors] = useState({});
   const [productSearch, setProductSearch] = useState('');
   const [focusedField, setFocusedField] = useState(null);
+  const [activeDatePicker, setActiveDatePicker] = useState(null); // 'startDate' | 'endDate' | null
 
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
@@ -688,6 +728,7 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
     setForm(emptyForm());
     setErrors({});
     setProductSearch('');
+    setActiveDatePicker(null);
     setModalOpen(true);
   }, []);
 
@@ -698,6 +739,7 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
     setForm(formFromPromo(promo));
     setErrors({});
     setProductSearch('');
+    setActiveDatePicker(null);
     setModalOpen(true);
   };
 
@@ -707,13 +749,47 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
     setEditingPromo(null);
     setErrors({});
     setFocusedField(null);
+    setActiveDatePicker(null);
   };
 
   const inputStyle = (name) => [
     ms.input,
-    focusedField === name && ms.inputFocused,
+    (focusedField === name || activeDatePicker === name) && ms.inputFocused,
     errors[name] && ms.inputError,
   ];
+
+  const toggleDatePicker = (field) => {
+    setFocusedField(null);
+    setActiveDatePicker((prev) => (prev === field ? null : field));
+  };
+
+  const handlePickPromoDate = (field, dateStr) => {
+    if (field === 'startDate') {
+      const clearEnd = Boolean(form.endDate && dateStr > form.endDate);
+      setForm((prev) => ({
+        ...prev,
+        startDate: dateStr,
+        endDate: clearEnd ? '' : prev.endDate,
+      }));
+      setErrors((prev) => {
+        if (!prev.startDate && !prev.endDate) return prev;
+        const next = { ...prev };
+        delete next.startDate;
+        delete next.endDate;
+        return next;
+      });
+      // Prompt user right into selecting end date when none is set yet
+      if (!form.endDate || clearEnd) {
+        setActiveDatePicker('endDate');
+      } else {
+        setActiveDatePicker(null);
+      }
+      return;
+    }
+
+    setField('endDate', dateStr);
+    setActiveDatePicker(null);
+  };
 
   const setField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -1628,32 +1704,112 @@ const PromosAdminPanel = forwardRef(function PromosAdminPanel(
                   <View style={ms.fieldRow}>
                     <View style={ms.fieldCol}>
                       <Text style={ms.label}>Start Date</Text>
-                      <TextInput
-                        style={inputStyle('startDate')}
-                        value={form.startDate}
-                        onChangeText={(v) => setField('startDate', v)}
-                        onFocus={() => setFocusedField('startDate')}
-                        onBlur={() => setFocusedField(null)}
-                        placeholder="YYYY-MM-DD"
-                        placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
-                        accessibilityLabel="Start date"
-                      />
+                      <TouchableOpacity
+                        style={[...inputStyle('startDate'), ms.dateTrigger]}
+                        onPress={() => toggleDatePicker('startDate')}
+                        activeOpacity={0.8}
+                        accessibilityRole="button"
+                        accessibilityLabel="Pick start date"
+                      >
+                        <View style={ms.dateTriggerLeft}>
+                          <BootstrapIcon
+                            name="calendar-event"
+                            size={15}
+                            color={activeDatePicker === 'startDate' ? BRAND : tokens.textMuted}
+                          />
+                          <Text
+                            style={
+                              form.startDate ? ms.dateTriggerValue : ms.dateTriggerPlaceholder
+                            }
+                            numberOfLines={1}
+                          >
+                            {form.startDate
+                              ? `${formatPromoDateDisplay(form.startDate)} (${form.startDate})`
+                              : 'Select start date'}
+                          </Text>
+                        </View>
+                        <BootstrapIcon
+                          name={activeDatePicker === 'startDate' ? 'chevron-up' : 'chevron-down'}
+                          size={13}
+                          color={activeDatePicker === 'startDate' ? BRAND : tokens.textMuted}
+                        />
+                      </TouchableOpacity>
                     </View>
                     <View style={ms.fieldCol}>
                       <Text style={ms.label}>End Date</Text>
-                      <TextInput
-                        style={inputStyle('endDate')}
-                        value={form.endDate}
-                        onChangeText={(v) => setField('endDate', v)}
-                        onFocus={() => setFocusedField('endDate')}
-                        onBlur={() => setFocusedField(null)}
-                        placeholder="YYYY-MM-DD (optional)"
-                        placeholderTextColor={isDarkMode ? tokens.placeholder : '#94A3B8'}
-                        accessibilityLabel="End date"
-                      />
+                      <View style={[...inputStyle('endDate'), ms.dateTrigger]}>
+                        <TouchableOpacity
+                          style={ms.dateTriggerLeft}
+                          onPress={() => toggleDatePicker('endDate')}
+                          activeOpacity={0.8}
+                          accessibilityRole="button"
+                          accessibilityLabel="Pick end date"
+                        >
+                          <BootstrapIcon
+                            name="calendar-event"
+                            size={15}
+                            color={activeDatePicker === 'endDate' ? BRAND : tokens.textMuted}
+                          />
+                          <Text
+                            style={
+                              form.endDate ? ms.dateTriggerValue : ms.dateTriggerPlaceholder
+                            }
+                            numberOfLines={1}
+                          >
+                            {form.endDate
+                              ? `${formatPromoDateDisplay(form.endDate)} (${form.endDate})`
+                              : 'Optional (no expiry)'}
+                          </Text>
+                        </TouchableOpacity>
+                        <View style={ms.dateTriggerRight}>
+                          {form.endDate ? (
+                            <TouchableOpacity
+                              style={ms.dateClearBtn}
+                              onPress={() => setField('endDate', '')}
+                              activeOpacity={0.75}
+                              accessibilityRole="button"
+                              accessibilityLabel="Clear end date"
+                            >
+                              <BootstrapIcon
+                                name="x"
+                                size={12}
+                                color={isDarkMode ? tokens.textSecondary : '#475569'}
+                              />
+                            </TouchableOpacity>
+                          ) : null}
+                          <TouchableOpacity
+                            onPress={() => toggleDatePicker('endDate')}
+                            activeOpacity={0.75}
+                            accessibilityRole="button"
+                            accessibilityLabel="Toggle end date calendar"
+                          >
+                            <BootstrapIcon
+                              name={activeDatePicker === 'endDate' ? 'chevron-up' : 'chevron-down'}
+                              size={13}
+                              color={activeDatePicker === 'endDate' ? BRAND : tokens.textMuted}
+                            />
+                          </TouchableOpacity>
+                        </View>
+                      </View>
                       <FieldError name="endDate" />
                     </View>
                   </View>
+
+                  {activeDatePicker ? (
+                    <DateRangeCalendarPicker
+                      activeField={activeDatePicker}
+                      onActiveFieldChange={setActiveDatePicker}
+                      startDate={form.startDate}
+                      endDate={form.endDate}
+                      onSelectDate={handlePickPromoDate}
+                      onClearEndDate={() => {
+                        setField('endDate', '');
+                        setActiveDatePicker(null);
+                      }}
+                      onClose={() => setActiveDatePicker(null)}
+                      isDarkMode={isDarkMode}
+                    />
+                  ) : null}
 
                   <View style={ms.fieldRow}>
                     <View style={ms.fieldCol}>

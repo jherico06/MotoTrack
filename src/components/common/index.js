@@ -19,6 +19,7 @@ export { default as CustomerServiceBookingCard } from './CustomerServiceBookingC
 export { default as BookingWorkflowTracker } from './BookingWorkflowTracker.jsx';
 export { default as MyMotorcyclePanel } from './MyMotorcyclePanel.jsx';
 export { default as OrderDeliveryCalendar } from './OrderDeliveryCalendar.jsx';
+export { default as DateRangeCalendarPicker } from './DateRangeCalendarPicker.jsx';
 export { default as LiveDeliveryMap } from './LiveDeliveryMap.jsx';
 export { default as DeliveryTrackingPanel } from './DeliveryTrackingPanel.jsx';
 export { default as ServiceCategoryIcon } from './ServiceCategoryIcon.jsx';

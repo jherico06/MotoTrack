@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -112,6 +112,7 @@ export default function ProductDetailsPageWeb({
 
   // Navigation state
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const handleCloseMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -1413,7 +1414,7 @@ export default function ProductDetailsPageWeb({
 
       <CustomerMobileNavDrawer
         isOpen={isMobileNavOpen}
-        onClose={() => setIsMobileNavOpen(false)}
+        onClose={handleCloseMobileNav}
         currentScreen="shop"
         onNavigateToScreen={(screen, params) => {
           if (screen === 'shop') onNavigateToStore?.();

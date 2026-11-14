@@ -378,15 +378,19 @@ export async function recordSuccessfulGeneration({
     }
 
     if (supabase) {
-      // Record generation history for audit
+      // Record generation history for audit (never store multi-MB data: URIs in DB per prevent-usage-burn)
+      const safeHistoryImageUrl =
+        typeof imageUrl === 'string' && /^https?:\/\//i.test(imageUrl) && imageUrl.length <= 2048
+          ? imageUrl
+          : null;
       const historyPayload = {
         user_id: userId,
         generated_at: now.toISOString(),
         status: 'success',
         motorcycle_id: motorcycleId || null,
         product_id: productId || null,
-        image_url: imageUrl || null,
-        prompt: prompt || null,
+        image_url: safeHistoryImageUrl,
+        prompt: prompt ? String(prompt).slice(0, 4000) : null,
       };
 
       const { error: histErr } = await supabase

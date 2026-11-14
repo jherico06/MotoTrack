@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Image, Modal, useWindowDimensions } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { BootstrapIcon } from '../common/BootstrapIcon.jsx';
 import { shopStyles as styles } from '../../styles/shop.styles.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import {
   getProductSizeEntries,
   getSizePrice,
@@ -28,9 +29,21 @@ export default function PlaceOrderModal({
   mode = 'buy', // 'buy' | 'cart'
   onClose,
   onConfirm,
+  isDarkMode: isDarkProp,
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
+  const { isDarkMode: themeDark } = useTheme();
+  const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
+
+  const sheetBg = isDarkMode ? '#1C2025' : '#FFFFFF';
+  const subBg = isDarkMode ? '#181B1F' : '#F8FAFC';
+  const elevatedBg = isDarkMode ? '#252A30' : '#F1F5F9';
+  const borderCol = isDarkMode ? '#282D34' : '#E2E8F0';
+  const controlBorderCol = isDarkMode ? '#333A42' : '#CBD5E1';
+  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
+  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
+  const brandAccent = isDarkMode ? '#FB923C' : '#EA580C';
   const sizeEntries = useMemo(() => getProductSizeEntries(product), [product]);
   const colorEntries = useMemo(() => getProductColorEntries(product), [product]);
   const needsSize = productNeedsSizes(product);
@@ -115,6 +128,7 @@ export default function PlaceOrderModal({
       <View
         style={[
           styles.modalOverlay,
+          isDarkMode && { backgroundColor: 'rgba(2, 6, 23, 0.72)' },
           isDesktop && {
             justifyContent: 'center',
             alignItems: 'center',
@@ -130,28 +144,31 @@ export default function PlaceOrderModal({
         <View
           style={[
             styles.modalSheet,
-            { maxHeight: '90%' },
+            { maxHeight: '90%', backgroundColor: sheetBg, borderColor: borderCol },
+            isDarkMode && { borderWidth: 1 },
             isDesktop && {
               borderRadius: 24,
               borderTopLeftRadius: 24,
               borderTopRightRadius: 24,
               maxWidth: 580,
               alignSelf: 'center',
-              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
+              boxShadow: isDarkMode
+                ? '0 20px 60px rgba(0, 0, 0, 0.55)'
+                : '0 20px 60px rgba(0, 0, 0, 0.25)',
             },
             windowWidth < 400 && { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 24 },
           ]}
         >
-          <View style={styles.modalHeaderRow}>
+          <View style={[styles.modalHeaderRow, isDarkMode && { borderBottomColor: borderCol }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
               <View
                 style={{
                   width: 38,
                   height: 38,
                   borderRadius: 12,
-                  backgroundColor: '#FFF7ED',
+                  backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.16)' : '#FFF7ED',
                   borderWidth: 1,
-                  borderColor: '#FED7AA',
+                  borderColor: isDarkMode ? 'rgba(251, 146, 60, 0.35)' : '#FED7AA',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -159,18 +176,24 @@ export default function PlaceOrderModal({
                 <BootstrapIcon
                   name={mode === 'buy' ? 'lightning-fill' : 'cart-plus-fill'}
                   size={16}
-                  color="#EA580C"
+                  color={brandAccent}
                 />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.modalTitle}>{title}</Text>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                <Text style={[styles.modalTitle, { color: textPrimary }]}>{title}</Text>
+                <Text style={{ fontSize: 12, color: textMuted, marginTop: 1 }}>
                   Configure color, size, and quantity
                 </Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={onClose}>
-              <BootstrapIcon name="x-lg" size={14} color="#64748b" />
+            <TouchableOpacity
+              style={[
+                styles.modalCloseBtn,
+                isDarkMode && { backgroundColor: elevatedBg, borderColor: borderCol, borderWidth: 1 },
+              ]}
+              onPress={onClose}
+            >
+              <BootstrapIcon name="x-lg" size={14} color={textMuted} />
             </TouchableOpacity>
           </View>
 
@@ -178,37 +201,43 @@ export default function PlaceOrderModal({
             <Image
               key={previewImage}
               source={{ uri: previewImage }}
-              style={styles.specImageBanner}
+              style={[styles.specImageBanner, { backgroundColor: subBg }]}
             />
-            <Text style={styles.specTitle}>{product.name}</Text>
-            <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '600', marginBottom: 8 }}>
+            <Text style={[styles.specTitle, { color: textPrimary }]}>{product.name}</Text>
+            <Text style={{ fontSize: 13, color: textMuted, fontWeight: '600', marginBottom: 8 }}>
               {product.brand} • {product.category}
               {selectedColor ? ` • ${selectedColor}` : ''}
             </Text>
 
             <View style={styles.specPriceRow}>
-              <Text style={styles.specPriceMain}>₱{Number(displayPrice).toFixed(2)}</Text>
+              <Text style={[styles.specPriceMain, { color: brandAccent }]}>
+                ₱{Number(displayPrice).toFixed(2)}
+              </Text>
             </View>
 
             {productSoldOut || availableStock <= 0 ? (
               <View
                 style={{
                   alignSelf: 'flex-start',
-                  backgroundColor: '#FEE2E2',
+                  backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2',
+                  borderWidth: isDarkMode ? 1 : 0,
+                  borderColor: isDarkMode ? 'rgba(248, 113, 113, 0.35)' : 'transparent',
                   paddingHorizontal: 10,
                   paddingVertical: 5,
                   borderRadius: 8,
                   marginBottom: 10,
                 }}
               >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: '#DC2626' }}>SOLD OUT</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: isDarkMode ? '#FCA5A5' : '#DC2626' }}>
+                  SOLD OUT
+                </Text>
               </View>
             ) : null}
 
             {needsColor ? (
               <View style={{ marginTop: 8 }}>
-                <Text style={styles.formLabel}>Select Color *</Text>
-                <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 6 }}>
+                <Text style={[styles.formLabel, { color: textPrimary }]}>Select Color *</Text>
+                <Text style={{ fontSize: 11, color: textMuted, marginBottom: 6 }}>
                   Tap a color to preview the product in that finish.
                 </Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 4 }}>
@@ -232,9 +261,15 @@ export default function PlaceOrderModal({
                             width: 44,
                             height: 44,
                             borderRadius: 22,
-                            backgroundColor: entry.hex || '#CBD5E1',
+                            backgroundColor: entry.hex || (isDarkMode ? '#333A42' : '#CBD5E1'),
                             borderWidth: active ? 3 : 1.5,
-                            borderColor: soldOut ? '#FECACA' : active ? '#EA580C' : '#E2E8F0',
+                            borderColor: soldOut
+                              ? isDarkMode
+                                ? 'rgba(248, 113, 113, 0.45)'
+                                : '#FECACA'
+                              : active
+                                ? '#EA580C'
+                                : borderCol,
                             overflow: 'hidden',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -254,7 +289,13 @@ export default function PlaceOrderModal({
                             fontWeight: '600',
                             marginTop: 6,
                             textAlign: 'center',
-                            color: soldOut ? '#991B1B' : active ? '#EA580C' : '#0F172A',
+                            color: soldOut
+                              ? isDarkMode
+                                ? '#FCA5A5'
+                                : '#991B1B'
+                              : active
+                                ? brandAccent
+                                : textPrimary,
                             textDecorationLine: soldOut ? 'line-through' : 'none',
                           }}
                           numberOfLines={2}
@@ -262,7 +303,13 @@ export default function PlaceOrderModal({
                           {entry.label}
                         </Text>
                         {soldOut ? (
-                          <Text style={{ fontSize: 10, fontWeight: '700', color: '#DC2626' }}>
+                          <Text
+                            style={{
+                              fontSize: 10,
+                              fontWeight: '700',
+                              color: isDarkMode ? '#F87171' : '#DC2626',
+                            }}
+                          >
                             Sold Out
                           </Text>
                         ) : null}
@@ -271,7 +318,14 @@ export default function PlaceOrderModal({
                   })}
                 </View>
                 {needsColor && !selectedColor ? (
-                  <Text style={{ fontSize: 12, color: '#DC2626', marginTop: 6, fontWeight: '600' }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: isDarkMode ? '#F87171' : '#DC2626',
+                      marginTop: 6,
+                      fontWeight: '600',
+                    }}
+                  >
                     Choose a color to continue.
                   </Text>
                 ) : null}
@@ -280,7 +334,7 @@ export default function PlaceOrderModal({
 
             {needsSize ? (
               <View style={{ marginTop: 14 }}>
-                <Text style={styles.formLabel}>Select Size *</Text>
+                <Text style={[styles.formLabel, { color: textPrimary }]}>Select Size *</Text>
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }}>
                   {sizeEntries.map((entry) => {
                     const soldOut = isSizeSoldOut(product, entry.label);
@@ -296,8 +350,20 @@ export default function PlaceOrderModal({
                           paddingVertical: 8,
                           borderRadius: 10,
                           borderWidth: 1.5,
-                          borderColor: soldOut ? '#FECACA' : active ? '#EA580C' : '#E2E8F0',
-                          backgroundColor: soldOut ? '#FEF2F2' : active ? '#EA580C' : '#F8FAFC',
+                          borderColor: soldOut
+                            ? isDarkMode
+                              ? 'rgba(248, 113, 113, 0.35)'
+                              : '#FECACA'
+                            : active
+                              ? '#EA580C'
+                              : borderCol,
+                          backgroundColor: soldOut
+                            ? isDarkMode
+                              ? 'rgba(239, 68, 68, 0.12)'
+                              : '#FEF2F2'
+                            : active
+                              ? '#EA580C'
+                              : subBg,
                           minWidth: 112,
                           opacity: soldOut ? 0.75 : 1,
                         }}
@@ -307,7 +373,13 @@ export default function PlaceOrderModal({
                           style={{
                             fontSize: 12,
                             fontWeight: '500',
-                            color: soldOut ? '#991B1B' : active ? '#FFFFFF' : '#0F172A',
+                            color: soldOut
+                              ? isDarkMode
+                                ? '#FCA5A5'
+                                : '#991B1B'
+                              : active
+                                ? '#FFFFFF'
+                                : textPrimary,
                             textDecorationLine: soldOut ? 'line-through' : 'none',
                           }}
                         >
@@ -318,7 +390,13 @@ export default function PlaceOrderModal({
                             fontSize: 11,
                             fontWeight: '700',
                             marginTop: 2,
-                            color: soldOut ? '#DC2626' : active ? '#FED7AA' : '#EA580C',
+                            color: soldOut
+                              ? isDarkMode
+                                ? '#F87171'
+                                : '#DC2626'
+                              : active
+                                ? '#FED7AA'
+                                : brandAccent,
                           }}
                         >
                           {soldOut ? 'Sold Out' : `₱${Number(entry.price || 0).toLocaleString()}`}
@@ -329,7 +407,7 @@ export default function PlaceOrderModal({
                               fontSize: 10,
                               fontWeight: '600',
                               marginTop: 2,
-                              color: active ? '#99F6E4' : '#B45309',
+                              color: active ? '#FEF3C7' : isDarkMode ? '#FBBF24' : '#B45309',
                             }}
                           >
                             Only {units} left
@@ -340,7 +418,14 @@ export default function PlaceOrderModal({
                   })}
                 </View>
                 {needsSize && !selectedSize ? (
-                  <Text style={{ fontSize: 12, color: '#DC2626', marginTop: 6, fontWeight: '600' }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: isDarkMode ? '#F87171' : '#DC2626',
+                      marginTop: 6,
+                      fontWeight: '600',
+                    }}
+                  >
                     Choose an available size to continue.
                   </Text>
                 ) : null}
@@ -355,17 +440,17 @@ export default function PlaceOrderModal({
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                backgroundColor: '#F8FAFC',
+                backgroundColor: subBg,
                 borderRadius: 12,
                 borderWidth: 1,
-                borderColor: '#E2E8F0',
+                borderColor: borderCol,
                 paddingHorizontal: 14,
                 paddingVertical: 12,
               }}
             >
               <View>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>Quantity</Text>
-                <Text style={{ fontSize: 11.5, color: '#64748B', fontWeight: '600', marginTop: 2 }}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: textPrimary }}>Quantity</Text>
+                <Text style={{ fontSize: 11.5, color: textMuted, fontWeight: '600', marginTop: 2 }}>
                   {availableStock > 0 ? `${availableStock} in stock` : 'Out of stock'}
                 </Text>
               </View>
@@ -378,23 +463,23 @@ export default function PlaceOrderModal({
                     width: 34,
                     height: 34,
                     borderRadius: 10,
-                    backgroundColor: quantity <= 1 ? '#E2E8F0' : '#FFFFFF',
+                    backgroundColor: quantity <= 1 ? elevatedBg : sheetBg,
                     borderWidth: 1.5,
-                    borderColor: '#CBD5E1',
+                    borderColor: controlBorderCol,
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: quantity <= 1 ? 0.55 : 1,
                   }}
                   activeOpacity={0.85}
                 >
-                  <BootstrapIcon name="dash" size={14} color="#0F172A" />
+                  <BootstrapIcon name="dash" size={14} color={textPrimary} />
                 </TouchableOpacity>
 
                 <Text
                   style={{
                     fontSize: 16,
                     fontWeight: '600',
-                    color: '#0F172A',
+                    color: textPrimary,
                     minWidth: 28,
                     textAlign: 'center',
                   }}
@@ -409,16 +494,16 @@ export default function PlaceOrderModal({
                     width: 34,
                     height: 34,
                     borderRadius: 10,
-                    backgroundColor: quantity >= maxQty ? '#E2E8F0' : '#FFFFFF',
+                    backgroundColor: quantity >= maxQty ? elevatedBg : sheetBg,
                     borderWidth: 1.5,
-                    borderColor: '#CBD5E1',
+                    borderColor: controlBorderCol,
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: quantity >= maxQty ? 0.55 : 1,
                   }}
                   activeOpacity={0.85}
                 >
-                  <BootstrapIcon name="plus" size={14} color="#0F172A" />
+                  <BootstrapIcon name="plus" size={14} color={textPrimary} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -433,7 +518,7 @@ export default function PlaceOrderModal({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 6,
-                  backgroundColor: canConfirm ? '#EA580C' : '#94A3B8',
+                  backgroundColor: canConfirm ? '#EA580C' : isDarkMode ? '#334155' : '#94A3B8',
                   opacity: canConfirm ? 1 : 0.55,
                 },
               ]}
@@ -457,7 +542,7 @@ export default function PlaceOrderModal({
               }}
               activeOpacity={0.8}
             >
-              <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B' }}>Cancel</Text>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: textMuted }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>

@@ -1,3 +1,4 @@
+/// <reference path="../deno.d.ts" />
 // Supabase Edge Function: customization-preview
 // Validates customization against DB, then calls n8n AI preview workflow.
 // AI never decides price, stock, or compatibility.
@@ -23,15 +24,15 @@ function buildPrompt(motorcycle: Record<string, unknown>, items: Record<string, 
       ? items.map((p) => `- ${p.name || p.product_name || 'part'}`).join('\n')
       : '- stock OEM parts';
   return [
-    `Generate a realistic commercial motorcycle visualization of a ${bikeLabel}.`,
-    'Keep the motorcycle model recognizable. Do not change it into another model. Do not generate a car.',
-    'Visually represent ONLY these selected motorcycle parts and accessories:',
+    `Perform a surgical in-place motorcycle customization preview of a ${bikeLabel}.`,
+    'Keep the exact motorcycle model, camera angle, body panel colors, decals, brake mechanism (drum vs disc), and rear grab bar intact. Do not change it into another model or generate a car.',
+    'Physically install ONLY these selected motorcycle parts in their anatomically and perspective-correct mounting positions (mirrors facing the rider with back housing toward the front, rims keeping spoke colors and stock brake setup, seat cover preserving the rear grab rail):',
     parts,
-    'Do not add unrelated parts. Photorealistic studio lighting, sharp detail, 4K commercial product photo.',
+    'Do not add unrelated parts or floating product cards. Photorealistic studio lighting, sharp detail, 4K commercial product photo.',
   ].join('\n');
 }
 
-Deno.serve(async (req) => {
+Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
@@ -64,7 +65,7 @@ Deno.serve(async (req) => {
       return json({ error: 'Customization has no selected parts.' }, 400);
     }
 
-    const productIds = items.map((i) => i.product_id);
+    const productIds = items.map((i: Record<string, unknown>) => i.product_id);
     const motorcycle = {
       brand: customization.motorcycle_brand,
       model: customization.motorcycle_model,

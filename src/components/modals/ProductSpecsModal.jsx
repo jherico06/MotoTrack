@@ -14,6 +14,7 @@ import { shopStyles as styles } from '../../styles/shop.styles.js';
 import { productService } from '../../services/products/productService.js';
 import { isProductSoldOut } from '../../utils/productSizes.js';
 import { sanitizeCompareAtPrice } from '../../utils/productCatalog.js';
+import { useTheme } from '../../context/ThemeContext.jsx';
 import PlaceOrderModal from './PlaceOrderModal.jsx';
 
 function StarRow({ rating, size = 14 }) {
@@ -57,6 +58,15 @@ export default function ProductSpecsModal({
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
+  const { isDarkMode = false } = useTheme?.() || {};
+  const bgCard = isDarkMode ? '#1C2025' : '#FFFFFF';
+  const bgSub = isDarkMode ? '#181B1F' : '#F8FAFC';
+  const bgElevated = isDarkMode ? '#252A30' : '#F1F5F9';
+  const border = isDarkMode ? '#282D34' : '#E2E8F0';
+  const borderLight = isDarkMode ? '#242930' : '#F1F5F9';
+  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
+  const textSecondary = isDarkMode ? '#CBD5E1' : '#334155';
+  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
   const productSoldOut = isProductSoldOut(product);
   const [reviews, setReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
@@ -137,6 +147,7 @@ export default function ProductSpecsModal({
         <View
           style={[
             styles.modalOverlay,
+            isDarkMode && { backgroundColor: 'rgba(0, 0, 0, 0.72)' },
             isDesktop && {
               justifyContent: 'center',
               alignItems: 'center',
@@ -152,28 +163,33 @@ export default function ProductSpecsModal({
           <View
             style={[
               styles.modalSheet,
-              { maxHeight: '92%' },
+              {
+                maxHeight: '92%',
+                backgroundColor: bgCard,
+                borderWidth: isDarkMode ? 1 : 0,
+                borderColor: border,
+              },
               isDesktop && {
                 borderRadius: 24,
                 borderTopLeftRadius: 24,
                 borderTopRightRadius: 24,
                 maxWidth: 620,
                 alignSelf: 'center',
-                boxShadow: '0 20px 60px rgba(0, 0, 0, 0.25)',
+                boxShadow: isDarkMode ? '0 20px 60px rgba(0, 0, 0, 0.5)' : '0 20px 60px rgba(0, 0, 0, 0.25)',
               },
               windowWidth < 400 && { paddingHorizontal: 12, paddingTop: 16, paddingBottom: 24 },
             ]}
           >
-            <View style={styles.modalHeaderRow}>
+            <View style={[styles.modalHeaderRow, { borderBottomColor: borderLight }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                 <View
                   style={{
                     width: 38,
                     height: 38,
                     borderRadius: 12,
-                    backgroundColor: '#FFF7ED',
+                    backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
                     borderWidth: 1,
-                    borderColor: '#FED7AA',
+                    borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.32)' : '#FED7AA',
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
@@ -181,14 +197,14 @@ export default function ProductSpecsModal({
                   <BootstrapIcon name="box-seam-fill" size={16} color="#EA580C" />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.modalTitle}>Product Details</Text>
-                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                  <Text style={[styles.modalTitle, { color: textPrimary }]}>Product Details</Text>
+                  <Text style={{ fontSize: 12, color: textMuted, marginTop: 1 }}>
                     Specifications & customer reviews
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={handleClose}>
-                <BootstrapIcon name="x-lg" size={14} color="#64748b" />
+              <TouchableOpacity style={[styles.modalCloseBtn, { backgroundColor: bgElevated }]} onPress={handleClose}>
+                <BootstrapIcon name="x-lg" size={14} color={textMuted} />
               </TouchableOpacity>
             </View>
 
@@ -199,24 +215,24 @@ export default function ProductSpecsModal({
             >
               <Image source={{ uri: product.image }} style={styles.specImageBanner} />
 
-              <Text style={styles.specTitle}>{product.name}</Text>
+              <Text style={[styles.specTitle, { color: textPrimary }]}>{product.name}</Text>
 
               <View style={styles.specBrandRow}>
-                <View style={styles.specBrandBadge}>
-                  <Text style={styles.specBrandText}>
+                <View style={[styles.specBrandBadge, isDarkMode && { backgroundColor: bgElevated, borderColor: border }]}>
+                  <Text style={[styles.specBrandText, isDarkMode && { color: textSecondary }]}>
                     {product.brand} • {product.category}
                   </Text>
                 </View>
                 {productSoldOut ? (
                   <View
                     style={{
-                      backgroundColor: '#FEE2E2',
+                      backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.16)' : '#FEE2E2',
                       paddingHorizontal: 8,
                       paddingVertical: 4,
                       borderRadius: 8,
                     }}
                   >
-                    <Text style={{ fontSize: 11, fontWeight: '600', color: '#DC2626' }}>SOLD OUT</Text>
+                    <Text style={{ fontSize: 11, fontWeight: '600', color: isDarkMode ? '#F87171' : '#DC2626' }}>SOLD OUT</Text>
                   </View>
                 ) : null}
               </View>
@@ -227,45 +243,45 @@ export default function ProductSpecsModal({
                   <Text style={{ fontSize: 13, color: '#F59E0B', fontWeight: '600' }}>
                     {avgReviewScore.toFixed(1)}
                   </Text>
-                  <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>
+                  <Text style={{ fontSize: 12, color: textMuted, fontWeight: '600' }}>
                     ({reviews.length} {reviews.length === 1 ? 'review' : 'reviews'})
                   </Text>
                 </View>
               ) : (
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                  <BootstrapIcon name="star" size={13} color="#94A3B8" />
-                  <Text style={{ fontSize: 12, color: '#94A3B8', fontWeight: '600' }}>
+                  <BootstrapIcon name="star" size={13} color={textMuted} />
+                  <Text style={{ fontSize: 12, color: textMuted, fontWeight: '600' }}>
                     No ratings yet
                   </Text>
                 </View>
               )}
 
               <View style={styles.specPriceRow}>
-                <Text style={styles.specPriceMain}>₱{displayPrice.toFixed(2)}</Text>
+                <Text style={[styles.specPriceMain, isDarkMode && { color: '#FB923C' }]}>₱{displayPrice.toFixed(2)}</Text>
                 {compareAt ? (
-                  <Text style={styles.specPriceOld}>₱{compareAt.toFixed(2)}</Text>
+                  <Text style={[styles.specPriceOld, { color: textMuted }]}>₱{compareAt.toFixed(2)}</Text>
                 ) : null}
               </View>
 
-              <Text style={[styles.formLabel, { marginTop: 4 }]}>Description</Text>
-              <Text style={styles.specDescription}>
+              <Text style={[styles.formLabel, { marginTop: 4, color: textMuted }]}>Description</Text>
+              <Text style={[styles.specDescription, { color: textSecondary }]}>
                 {product.description || 'No description available for this part.'}
               </Text>
 
               {product.features?.length ? (
                 <View style={{ marginTop: 12 }}>
-                  <Text style={styles.formLabel}>Key Features</Text>
+                  <Text style={[styles.formLabel, { color: textMuted }]}>Key Features</Text>
                   {product.features.map((feat, idx) => (
                     <View key={idx} style={styles.featureBullet}>
                       <BootstrapIcon name="check2" size={14} color="#EA580C" />
-                      <Text style={styles.featureBulletText}>{feat}</Text>
+                      <Text style={[styles.featureBulletText, { color: textSecondary }]}>{feat}</Text>
                     </View>
                   ))}
                 </View>
               ) : null}
 
               <View style={{ marginTop: 16, marginBottom: 4 }}>
-                <Text style={styles.formLabel}>Customer Reviews</Text>
+                <Text style={[styles.formLabel, { color: textMuted }]}>Customer Reviews</Text>
                 {reviewsLoading ? (
                   <View style={{ paddingVertical: 16, alignItems: 'center' }}>
                     <ActivityIndicator color="#EA580C" />
@@ -276,12 +292,12 @@ export default function ProductSpecsModal({
                       marginTop: 8,
                       padding: 14,
                       borderRadius: 12,
-                      backgroundColor: '#F8FAFC',
+                      backgroundColor: bgSub,
                       borderWidth: 1,
-                      borderColor: '#E2E8F0',
+                      borderColor: border,
                     }}
                   >
-                    <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '600' }}>
+                    <Text style={{ fontSize: 13, color: textMuted, fontWeight: '600' }}>
                       No customer comments yet. Be the first to review after your order is delivered.
                     </Text>
                   </View>
@@ -293,9 +309,9 @@ export default function ProductSpecsModal({
                         style={{
                           padding: 12,
                           borderRadius: 12,
-                          backgroundColor: '#F8FAFC',
+                          backgroundColor: bgSub,
                           borderWidth: 1,
-                          borderColor: '#E2E8F0',
+                          borderColor: border,
                         }}
                       >
                         <View
@@ -306,10 +322,10 @@ export default function ProductSpecsModal({
                             marginBottom: 6,
                           }}
                         >
-                          <Text style={{ fontSize: 13, fontWeight: '600', color: '#0F172A' }}>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: textPrimary }}>
                             {rev.customerName || rev.customer_name || 'Rider'}
                           </Text>
-                          <Text style={{ fontSize: 11, color: '#94A3B8', fontWeight: '600' }}>
+                          <Text style={{ fontSize: 11, color: textMuted, fontWeight: '600' }}>
                             {formatReviewDate(rev.createdAt || rev.created_at)}
                           </Text>
                         </View>
@@ -317,7 +333,7 @@ export default function ProductSpecsModal({
                         <Text
                           style={{
                             fontSize: 13,
-                            color: '#334155',
+                            color: textSecondary,
                             marginTop: 8,
                             lineHeight: 19,
                           }}
@@ -365,7 +381,7 @@ export default function ProductSpecsModal({
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 6,
-                    backgroundColor: '#FFFFFF',
+                    backgroundColor: isDarkMode ? bgElevated : '#FFFFFF',
                     borderWidth: 1.5,
                     borderColor: '#EA580C',
                     opacity: productSoldOut ? 0.5 : 1,
@@ -376,7 +392,7 @@ export default function ProductSpecsModal({
                 activeOpacity={0.9}
               >
                 <BootstrapIcon name="lightning-fill" size={14} color="#EA580C" />
-                <Text style={[styles.checkoutBtnText, { color: '#EA580C' }]}>Buy Now</Text>
+                <Text style={[styles.checkoutBtnText, { color: isDarkMode ? '#FB923C' : '#EA580C' }]}>Buy Now</Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -3,9 +3,19 @@ import { View, Text, TouchableOpacity, Modal } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
 import { shopStyles as styles } from '../../styles/shop.styles.js';
 import { useAuth } from '../../context/AuthContext.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin, onNavigateToAdmin }) {
   const { currentUser, adminLogin, logout, setRedirectReason } = useAuth();
+  const { isDarkMode = false } = useTheme?.() || {};
+
+  const bgCard = isDarkMode ? '#1C2025' : '#FFFFFF';
+  const bgSub = isDarkMode ? '#252A30' : '#F1F5F9';
+  const border = isDarkMode ? '#282D34' : '#F1F5F9';
+  const borderAlt = isDarkMode ? '#334155' : '#E2E8F0';
+  const textPrimary = isDarkMode ? '#F8FAFC' : '#0F172A';
+  const textSecondary = isDarkMode ? '#CBD5E1' : '#475569';
+  const textMuted = isDarkMode ? '#94A3B8' : '#64748B';
 
   const handleInstantAdminSwitch = () => {
     if (adminLogin) {
@@ -26,7 +36,7 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
+      <View style={[styles.modalOverlay, isDarkMode && { backgroundColor: 'rgba(0, 0, 0, 0.72)' }]}>
         <View
           style={[
             styles.modalSheet,
@@ -34,6 +44,9 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
               borderTopLeftRadius: 28,
               borderTopRightRadius: 28,
               paddingBottom: 24,
+              backgroundColor: bgCard,
+              borderWidth: isDarkMode ? 1 : 0,
+              borderColor: borderAlt,
             },
           ]}
         >
@@ -45,7 +58,7 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
               justifyContent: 'space-between',
               paddingBottom: 14,
               borderBottomWidth: 1,
-              borderBottomColor: '#F1F5F9',
+              borderBottomColor: border,
               marginBottom: 16,
             }}
           >
@@ -55,9 +68,9 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
                   width: 38,
                   height: 38,
                   borderRadius: 12,
-                  backgroundColor: '#FFF7ED',
+                  backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
                   borderWidth: 1,
-                  borderColor: '#FED7AA',
+                  borderColor: isDarkMode ? 'rgba(234, 88, 12, 0.32)' : '#FED7AA',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
@@ -65,10 +78,10 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
                 <BootstrapIcon name="shield-lock-fill" size={17} color="#EA580C" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 16.5, fontWeight: '600', color: '#0F172A' }}>
+                <Text style={{ fontSize: 16.5, fontWeight: '600', color: textPrimary }}>
                   Admin Privileges Required
                 </Text>
-                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+                <Text style={{ fontSize: 12, color: textMuted, marginTop: 1 }}>
                   Store administrator verification
                 </Text>
               </View>
@@ -78,21 +91,21 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
                 width: 34,
                 height: 34,
                 borderRadius: 17,
-                backgroundColor: '#F1F5F9',
+                backgroundColor: bgSub,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
               onPress={onClose}
               activeOpacity={0.7}
             >
-              <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+              <BootstrapIcon name="x-lg" size={14} color={textMuted} />
             </TouchableOpacity>
           </View>
 
           <Text
             style={{
               fontSize: 13.5,
-              color: '#64748B',
+              color: textMuted,
               lineHeight: 20,
               marginBottom: 20,
             }}
@@ -130,7 +143,7 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
           {/* Sign In with Another Account */}
           <TouchableOpacity
             style={{
-              backgroundColor: '#F1F5F9',
+              backgroundColor: bgSub,
               width: '100%',
               paddingVertical: 13,
               borderRadius: 14,
@@ -140,13 +153,13 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
               justifyContent: 'center',
               gap: 8,
               borderWidth: 1,
-              borderColor: '#E2E8F0',
+              borderColor: borderAlt,
             }}
             onPress={handleManualAdminLogin}
             activeOpacity={0.85}
           >
-            <BootstrapIcon name="box-arrow-in-right" size={14} color="#475569" />
-            <Text style={{ color: '#475569', fontWeight: '600', fontSize: 13.5 }}>
+            <BootstrapIcon name="box-arrow-in-right" size={14} color={textSecondary} />
+            <Text style={{ color: textSecondary, fontWeight: '600', fontSize: 13.5 }}>
               Sign In with Admin Credentials
             </Text>
           </TouchableOpacity>
@@ -160,7 +173,7 @@ export default function AccessDeniedModal({ visible, onClose, onNavigateToLogin,
             onPress={onClose}
             activeOpacity={0.7}
           >
-            <Text style={{ color: '#64748B', fontWeight: '700', fontSize: 13 }}>
+            <Text style={{ color: textMuted, fontWeight: '700', fontSize: 13 }}>
               Cancel & Stay on Store
             </Text>
           </TouchableOpacity>

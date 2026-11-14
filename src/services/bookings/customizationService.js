@@ -454,17 +454,17 @@ export const customizationService = {
 
     return [
       `REGISTERED MOTORCYCLE (must stay identical): ${bikeLabel}.`,
-      `Vehicle type: ${vehicleType}. ${typeLock}${colorPhrase}${nick}`,
-      'TASK: Show THIS same motorcycle with the selected store products physically installed on it.',
+      `Vehicle type: ${vehicleType}. ${typeLock}${nick}`,
+      'TASK: Perform a surgical in-place photo edit showing THIS exact motorcycle with the selected store products physically installed on it.',
       'Rules:',
-      '- Keep the exact same brand, model, year identity, silhouette, headlight shape, seat, and proportions.',
-      '- Do NOT replace the motorcycle with a different model.',
+      '- Keep the exact same brand, model, year identity, camera angle, silhouette, fairing colors/decals, headlight shape, brake type (drum vs disc), rear grab rail, and proportions.',
+      '- Do NOT replace the motorcycle with a different model or recolor any body panels.',
       '- Do NOT generate a car or unrelated vehicle.',
-      '- The selected products must look installed/mounted on the bike (not floating, not shown as separate product shots).',
-      '- Only change appearance where those installed parts belong.',
+      '- The selected products must look physically installed/mounted on the bike in the correct 3D perspective (mirrors mounted on handlebars with reflective glass facing the rider and back shell facing forward; rims preserving spoke color and original brake hardware; seats preserving the rear passenger grab bar).',
+      '- Only change appearance at the exact mounting zones where those installed parts belong.',
       'SELECTED PRODUCTS TO INSTALL:',
       installLines,
-      'Output: one photorealistic 3/4-front studio photo of the customized registered motorcycle.',
+      'Output: one photorealistic studio photo of the customized registered motorcycle.',
     ].join('\n');
   },
 

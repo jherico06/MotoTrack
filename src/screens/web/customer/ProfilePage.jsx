@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -364,6 +364,9 @@ export default function ProfilePage({
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const handleCloseNotifDropdown = useCallback(() => setIsNotifDropdownOpen(false), []);
+  const handleCloseProfileDropdown = useCallback(() => setIsProfileDropdownOpen(false), []);
+  const handleCloseMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
   const [brandSettings, setBrandSettings] = useState(() => systemSettingsService.getSettings());
 
   useEffect(() => {
@@ -380,21 +383,26 @@ export default function ProfilePage({
   const customerHeaderBorder = isDarkMode ? '#374151' : '#24272B';
 
   // ─── ACTIVE NAVIGATION TAB ───
-  // ─── ACTIVE NAVIGATION TAB ───
   // 'overview' | 'garage' | 'orders' | 'bookings' | 'profile' | 'notifications' | 'settings'
-  const resolveWebTab = (t) => {
-    const raw = (t && typeof t === 'object' ? t.tab : t);
-    if (raw === 'bookings') {
-      onNavigateToGarage?.();
-      return 'garage';
-    }
-    return raw === 'overview' ? 'garage' : raw;
+  const onNavigateToWishlistRef = useRef(onNavigateToWishlist);
+  const onNavigateToGarageRef = useRef(onNavigateToGarage);
+
+  useEffect(() => {
+    onNavigateToWishlistRef.current = onNavigateToWishlist;
+    onNavigateToGarageRef.current = onNavigateToGarage;
+  }, [onNavigateToWishlist, onNavigateToGarage]);
+
+  const normalizeWebTab = (t) => {
+    const raw = t && typeof t === 'object' ? t.tab : t;
+    if (raw === 'overview' || raw === 'bookings') return 'garage';
+    return raw;
   };
+
   const [activeTab, setActiveTab] = useState(() => {
-    const raw = resolveWebTab(initialTab);
+    const raw = normalizeWebTab(initialTab);
     if (
       raw === 'orders' ||
-            raw === 'garage' ||
+      raw === 'garage' ||
       raw === 'settings' ||
       raw === 'notifications' ||
       raw === 'profile'
@@ -404,14 +412,22 @@ export default function ProfilePage({
     return 'garage';
   });
 
+  // Depend solely on initialTab so parent re-renders (e.g. toggling dark mode)
+  // never re-run this effect and reset the user's locally selected tab.
   useEffect(() => {
-    const raw = resolveWebTab(initialTab);
-    if (raw === 'wishlist') {
-      onNavigateToWishlist?.();
-    } else if (raw) {
-      setActiveTab(raw === 'overview' || raw === 'bookings' ? 'garage' : raw);
+    const rawObjTab = initialTab && typeof initialTab === 'object' ? initialTab.tab : initialTab;
+    if (rawObjTab === 'bookings') {
+      onNavigateToGarageRef.current?.();
+      setActiveTab('garage');
+      return;
     }
-  }, [initialTab, onNavigateToWishlist, onNavigateToGarage]);
+    const raw = normalizeWebTab(initialTab);
+    if (raw === 'wishlist') {
+      onNavigateToWishlistRef.current?.();
+    } else if (raw) {
+      setActiveTab(raw);
+    }
+  }, [initialTab]);
 
   // Profile Form State
   const initialName = currentUser?.name || currentUser?.fullName || '';
@@ -1770,7 +1786,7 @@ export default function ProfilePage({
 
               <NotificationDropdown
                 isOpen={isNotifDropdownOpen}
-                onClose={() => setIsNotifDropdownOpen(false)}
+                onClose={handleCloseNotifDropdown}
                 onNavigateToScreen={(screen, params) => {
                   if (screen === 'store' || screen === 'shop') onNavigateToStore?.();
                   else if (screen === 'garage') onNavigateToGarage?.();
@@ -1819,7 +1835,7 @@ export default function ProfilePage({
                   showDashboard={false}
                   isDark={isDarkMode}
                   onToggleDarkMode={toggleDarkMode}
-                  onClose={() => setIsProfileDropdownOpen(false)}
+                  onClose={handleCloseProfileDropdown}
                   onNavigateToDashboard={(tab = 'garage') => setActiveTab(tab)}
                   onNavigateToOrders={() => setActiveTab('orders')}
                   onNavigateToProfile={(tab = 'profile') => {
@@ -6495,7 +6511,7 @@ export default function ProfilePage({
       {/* Mobile Customer Navigation Drawer */}
       <CustomerMobileNavDrawer
         isOpen={isMobileNavOpen}
-        onClose={() => setIsMobileNavOpen(false)}
+        onClose={handleCloseMobileNav}
         currentScreen="profile"
         onNavigateToScreen={(screen, params) => {
           if (screen === 'shop') onNavigateToStore?.();

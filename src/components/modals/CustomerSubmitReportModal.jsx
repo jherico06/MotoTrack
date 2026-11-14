@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,10 @@ import {
   useWindowDimensions,
   Platform,
 } from 'react-native';
-import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { BootstrapIcon } from '../common/BootstrapIcon.jsx';
 import { ratingsReportsService, REPORT_CATEGORIES } from '../../services/feedback/ratingsReportsService.js';
 import { useCart } from '../../context/CartContext.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 export default function CustomerSubmitReportModal({
   visible = false,
@@ -24,10 +25,14 @@ export default function CustomerSubmitReportModal({
   initialOrder = null,
   onClose = () => {},
   onSubmitSuccess = () => {},
+  isDarkMode: isDarkProp,
 }) {
   const { width: windowWidth } = useWindowDimensions();
   const isDesktop = windowWidth >= 768;
   const { showToast } = useCart();
+  const { isDarkMode: themeDark } = useTheme();
+  const isDarkMode = typeof isDarkProp === 'boolean' ? isDarkProp : Boolean(themeDark);
+  const styles = useMemo(() => createStyles(isDarkMode), [isDarkMode]);
   const [selectedCategory, setSelectedCategory] = useState('general_feedback');
   const [rating, setRating] = useState(0); // 0 = no rating provided
   const [message, setMessage] = useState('');
@@ -124,14 +129,18 @@ export default function CustomerSubmitReportModal({
                   </View>
                 </View>
                 <TouchableOpacity style={styles.closeBtn} onPress={onClose} activeOpacity={0.75}>
-                  <BootstrapIcon name="x-lg" size={14} color="#64748B" />
+                  <BootstrapIcon name="x-lg" size={14} color={isDarkMode ? '#94A3B8' : '#64748B'} />
                 </TouchableOpacity>
               </View>
 
               <ScrollView style={styles.scrollArea} showsVerticalScrollIndicator={false}>
                 {errorMsg ? (
                   <View style={styles.errorBanner}>
-                    <BootstrapIcon name="exclamation-circle-fill" size={14} color="#DC2626" />
+                    <BootstrapIcon
+                      name="exclamation-circle-fill"
+                      size={14}
+                      color={isDarkMode ? '#F87171' : '#DC2626'}
+                    />
                     <Text style={styles.errorText}>{errorMsg}</Text>
                   </View>
                 ) : null}
@@ -146,7 +155,10 @@ export default function CustomerSubmitReportModal({
                         key={cat.id}
                         style={[
                           styles.catPill,
-                          isSelected && { borderColor: cat.color, backgroundColor: cat.color + '15' },
+                          isSelected && {
+                            borderColor: cat.color,
+                            backgroundColor: cat.color + (isDarkMode ? '26' : '15'),
+                          },
                         ]}
                         onPress={() => setSelectedCategory(cat.id)}
                         activeOpacity={0.8}
@@ -154,7 +166,7 @@ export default function CustomerSubmitReportModal({
                         <BootstrapIcon
                           name={cat.icon}
                           size={13}
-                          color={isSelected ? cat.color : '#64748B'}
+                          color={isSelected ? cat.color : isDarkMode ? '#94A3B8' : '#64748B'}
                         />
                         <Text
                           style={[
@@ -190,7 +202,7 @@ export default function CustomerSubmitReportModal({
                         <BootstrapIcon
                           name={star <= rating ? 'star-fill' : 'star'}
                           size={24}
-                          color={star <= rating ? '#D97706' : '#CBD5E1'}
+                          color={star <= rating ? '#F59E0B' : isDarkMode ? '#333A42' : '#CBD5E1'}
                         />
                       </TouchableOpacity>
                     ))}
@@ -350,291 +362,298 @@ export default function CustomerSubmitReportModal({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    ...Platform.select({
-      web: { backdropFilter: 'blur(4px)' },
-    }),
-  },
-  backdropDesktop: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  backdropMobile: {
-    justifyContent: 'flex-end',
-    alignItems: 'stretch',
-    padding: 0,
-  },
-  modalCard: {
-    width: '100%',
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-    display: 'flex',
-    flexDirection: 'column',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.15,
-    shadowRadius: 24,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  modalCardDesktop: {
-    maxWidth: 620,
-    maxHeight: '88%',
-    borderRadius: 24,
-  },
-  modalCardMobile: {
-    maxWidth: '100%',
-    maxHeight: '92%',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  headerIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: '#FFF7ED',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontFamily: 'Inter',
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-    letterSpacing: -0.2,
-  },
-  headerSub: {
-    fontFamily: 'Inter',
-    fontSize: 11.5,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scrollArea: {
-    padding: 20,
-    flex: 1,
-  },
-  label: {
-    fontFamily: 'Inter',
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#475569',
-    letterSpacing: 0.4,
-    marginBottom: 8,
-  },
-  categoryGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
-  },
-  catPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
-    cursor: 'pointer',
-  },
-  catPillText: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#334155',
-  },
-  ratingSection: {
-    marginBottom: 16,
-    backgroundColor: '#F8FAFC',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  clearRatingText: {
-    fontFamily: 'Inter',
-    fontSize: 11,
-    color: '#64748B',
-    textDecorationLine: 'underline',
-  },
-  starsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 6,
-  },
-  starTouch: {
-    padding: 2,
-    cursor: 'pointer',
-  },
-  ratingHint: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#D97706',
-    marginLeft: 6,
-  },
-  txSection: {
-    marginBottom: 16,
-  },
-  txTabs: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 8,
-  },
-  txTab: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 5,
-    backgroundColor: '#F1F5F9',
-  },
-  txTabActive: {
-    backgroundColor: '#EA580C',
-  },
-  txTabText: {
-    fontFamily: 'Inter',
-    fontSize: 11.5,
-    fontWeight: '500',
-    color: '#475569',
-  },
-  txTabTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  selectorWrap: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: 6,
-    overflow: 'hidden',
-  },
-  itemPickRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-    backgroundColor: '#FFFFFF',
-  },
-  itemPickRowSelected: {
-    backgroundColor: '#FFF7ED',
-  },
-  itemPickTitle: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#0F172A',
-  },
-  itemPickSub: {
-    fontFamily: 'Inter',
-    fontSize: 11,
-    color: '#64748B',
-  },
-  itemPickStatus: {
-    fontFamily: 'Inter',
-    fontSize: 10.5,
-    fontWeight: '600',
-    color: '#059669',
-  },
-  textArea: {
-    fontFamily: 'Inter',
-    fontSize: 12.5,
-    color: '#0F172A',
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    padding: 12,
-    minHeight: 110,
-    textAlignVertical: 'top',
-    marginBottom: 16,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-  },
-  cancelBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 6,
-    backgroundColor: '#F1F5F9',
-  },
-  cancelBtnText: {
-    fontFamily: 'Inter',
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  submitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 6,
-    backgroundColor: '#EA580C',
-  },
-  submitBtnText: {
-    fontFamily: 'Inter',
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  errorBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 10,
-    borderRadius: 6,
-    backgroundColor: '#FEF2F2',
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    marginBottom: 14,
-  },
-  errorText: {
-    fontFamily: 'Inter',
-    fontSize: 12,
-    color: '#DC2626',
-    flex: 1,
-  },
-});
+const createStyles = (isDarkMode) =>
+  StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: isDarkMode ? 'rgba(2, 6, 23, 0.72)' : 'rgba(15, 23, 42, 0.6)',
+      ...Platform.select({
+        web: { backdropFilter: 'blur(4px)' },
+      }),
+    },
+    backdropDesktop: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    backdropMobile: {
+      justifyContent: 'flex-end',
+      alignItems: 'stretch',
+      padding: 0,
+    },
+    modalCard: {
+      width: '100%',
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+      overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: isDarkMode ? 0.45 : 0.15,
+      shadowRadius: 24,
+      elevation: 8,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    },
+    modalCardDesktop: {
+      maxWidth: 620,
+      maxHeight: '88%',
+      borderRadius: 24,
+    },
+    modalCardMobile: {
+      maxWidth: '100%',
+      maxHeight: '92%',
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+    },
+    headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+    },
+    headerIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 8,
+      backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.16)' : '#FFF7ED',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? 'rgba(251, 146, 60, 0.35)' : 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      fontFamily: 'Inter',
+      fontSize: 16,
+      fontWeight: '700',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      letterSpacing: -0.2,
+    },
+    headerSub: {
+      fontFamily: 'Inter',
+      fontSize: 11.5,
+      color: '#94A3B8',
+      marginTop: 2,
+    },
+    closeBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 6,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? '#282D34' : 'transparent',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    scrollArea: {
+      padding: 20,
+      flex: 1,
+    },
+    label: {
+      fontFamily: 'Inter',
+      fontSize: 10.5,
+      fontWeight: '600',
+      color: isDarkMode ? '#CBD5E1' : '#475569',
+      letterSpacing: 0.4,
+      marginBottom: 8,
+    },
+    categoryGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginBottom: 16,
+    },
+    catPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      cursor: 'pointer',
+    },
+    catPillText: {
+      fontFamily: 'Inter',
+      fontSize: 12,
+      fontWeight: '500',
+      color: isDarkMode ? '#E2E8F0' : '#334155',
+    },
+    ratingSection: {
+      marginBottom: 16,
+      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      padding: 12,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+    },
+    clearRatingText: {
+      fontFamily: 'Inter',
+      fontSize: 11,
+      color: '#94A3B8',
+      textDecorationLine: 'underline',
+    },
+    starsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 6,
+    },
+    starTouch: {
+      padding: 2,
+      cursor: 'pointer',
+    },
+    ratingHint: {
+      fontFamily: 'Inter',
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDarkMode ? '#FBBF24' : '#D97706',
+      marginLeft: 6,
+    },
+    txSection: {
+      marginBottom: 16,
+    },
+    txTabs: {
+      flexDirection: 'row',
+      gap: 6,
+      marginBottom: 8,
+    },
+    txTab: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 5,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+    },
+    txTabActive: {
+      backgroundColor: '#EA580C',
+    },
+    txTabText: {
+      fontFamily: 'Inter',
+      fontSize: 11.5,
+      fontWeight: '500',
+      color: isDarkMode ? '#CBD5E1' : '#475569',
+    },
+    txTabTextActive: {
+      color: '#FFFFFF',
+      fontWeight: '600',
+    },
+    selectorWrap: {
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      borderRadius: 6,
+      overflow: 'hidden',
+    },
+    itemPickRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: isDarkMode ? '#282D34' : '#F1F5F9',
+      backgroundColor: isDarkMode ? '#181B1F' : '#FFFFFF',
+    },
+    itemPickRowSelected: {
+      backgroundColor: isDarkMode ? 'rgba(234, 88, 12, 0.14)' : '#FFF7ED',
+    },
+    itemPickTitle: {
+      fontFamily: 'Inter',
+      fontSize: 12,
+      fontWeight: '600',
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+    },
+    itemPickSub: {
+      fontFamily: 'Inter',
+      fontSize: 11,
+      color: '#94A3B8',
+    },
+    itemPickStatus: {
+      fontFamily: 'Inter',
+      fontSize: 10.5,
+      fontWeight: '600',
+      color: isDarkMode ? '#34D399' : '#059669',
+    },
+    textArea: {
+      fontFamily: 'Inter',
+      fontSize: 12.5,
+      color: isDarkMode ? '#F8FAFC' : '#0F172A',
+      backgroundColor: isDarkMode ? '#181B1F' : '#F8FAFC',
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: isDarkMode ? '#333A42' : '#CBD5E1',
+      padding: 12,
+      minHeight: 110,
+      textAlignVertical: 'top',
+      marginBottom: 16,
+    },
+    footer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 10,
+      paddingHorizontal: 20,
+      paddingVertical: 14,
+      borderTopWidth: 1,
+      borderTopColor: isDarkMode ? '#282D34' : '#E2E8F0',
+      backgroundColor: isDarkMode ? '#1C2025' : '#FFFFFF',
+    },
+    cancelBtn: {
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+      borderRadius: 6,
+      backgroundColor: isDarkMode ? '#252A30' : '#F1F5F9',
+      borderWidth: isDarkMode ? 1 : 0,
+      borderColor: isDarkMode ? '#282D34' : 'transparent',
+    },
+    cancelBtnText: {
+      fontFamily: 'Inter',
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: isDarkMode ? '#CBD5E1' : '#475569',
+    },
+    submitBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 18,
+      paddingVertical: 9,
+      borderRadius: 6,
+      backgroundColor: '#EA580C',
+    },
+    submitBtnText: {
+      fontFamily: 'Inter',
+      fontSize: 12.5,
+      fontWeight: '600',
+      color: '#FFFFFF',
+    },
+    errorBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: 10,
+      borderRadius: 6,
+      backgroundColor: isDarkMode ? 'rgba(239, 68, 68, 0.14)' : '#FEF2F2',
+      borderWidth: 1,
+      borderColor: isDarkMode ? 'rgba(248, 113, 113, 0.35)' : '#FECACA',
+      marginBottom: 14,
+    },
+    errorText: {
+      fontFamily: 'Inter',
+      fontSize: 12,
+      color: isDarkMode ? '#FCA5A5' : '#DC2626',
+      flex: 1,
+    },
+  });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -83,6 +83,9 @@ export default function CustomizerPageWeb({
   );
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const handleCloseNotifDropdown = useCallback(() => setIsNotifDropdownOpen(false), []);
+  const handleCloseMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
+  const handleCloseUserDropdown = useCallback(() => setIsUserDropdownOpen(false), []);
 
   useEffect(() => {
     const unsub = notificationService.subscribe(() => {
@@ -116,7 +119,7 @@ export default function CustomizerPageWeb({
 
   useEffect(() => {
     if (currentUser) {
-      motorcycleService.syncFromSupabase(currentUser).catch(() => {});
+      motorcycleService.syncFromSupabase(currentUser).catch(() => { });
     }
     const unsub = motorcycleService.subscribe(() => {
       if (!currentUser) {
@@ -582,233 +585,233 @@ export default function CustomizerPageWeb({
           className="web-header"
           dataSet={{ webHeader: true }}
           accessibilityRole="header">
-        <View
-          style={[
-            styles.headerInner,
-            isTablet && { paddingHorizontal: 18, paddingVertical: 10, minHeight: 60, gap: 12 },
-            windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8, minHeight: 56 },
-            windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
-          ]}
-        >
-          {/* Left: Mobile Nav Toggle + Logo */}
           <View
             style={[
-              styles.headerLeft,
-              windowWidth < 768 && { gap: 8 },
-              windowWidth < 400 && { gap: 4 },
+              styles.headerInner,
+              isTablet && { paddingHorizontal: 18, paddingVertical: 10, minHeight: 60, gap: 12 },
+              windowWidth < 768 && { paddingHorizontal: 12, paddingVertical: 10, gap: 8, minHeight: 56 },
+              windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 8, gap: 4 },
             ]}
           >
-            {windowWidth < 768 && (
-              <TouchableOpacity
-                style={styles.mobileNavToggleBtn}
-                onPress={() => setIsMobileNavOpen(true)}
-                activeOpacity={0.8}
-                accessibilityLabel="Open Navigation Menu"
-              >
-                <BootstrapIcon name="list" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            )}
-            {windowWidth >= 768 && (
-              <TouchableOpacity
-                style={[styles.logoWrap, isTablet && { marginRight: 4 }]}
-                onPress={() => onNavigateToStore?.()}
-                activeOpacity={0.8}
-              >
-                <BrandLogo size={windowWidth < 768 ? 28 : isTablet ? 30 : windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Center Navigation: Shop, Book a Service, Customize (Desktop / Tablet only) */}
-          {windowWidth >= 768 && (
-            <View style={[styles.headerCenterNav, isTablet && { gap: 8 }]}>
-              {/* Shop Button */}
-              <TouchableOpacity
-                className="main-nav-tab"
-                style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
-                onPress={() => onNavigateToStore?.()}
-                activeOpacity={0.8}
-                title="Shop"
-              >
-                <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Shop</Text>
-              </TouchableOpacity>
-
-              {/* Book a Service Button */}
-              <TouchableOpacity
-                className="main-nav-tab"
-                style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
-                onPress={() => onNavigateToGarage?.()}
-                activeOpacity={0.8}
-                title="Book a Service"
-              >
-                <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>
-                  {isTablet ? 'Book Service' : 'Book a Service'}
-                </Text>
-              </TouchableOpacity>
-
-
-
-              {/* Customize Button (Active) */}
-              <TouchableOpacity
-                className="main-nav-tab"
-                style={[styles.headerCenterBtnActive, isTablet && { height: 34, paddingHorizontal: 9 }]}
-                activeOpacity={0.9}
-                title="Customize"
-              >
-                <Text style={[styles.headerCenterBtnTextActive, isTablet && { fontSize: 13 }]}>
-                  Customize
-                </Text>
-              </TouchableOpacity>
-
-              {/* Garage Button */}
-              <TouchableOpacity
-                className="main-nav-tab"
-                style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
-                onPress={() => onNavigateToProfile?.('garage')}
-                activeOpacity={0.8}
-                title="Garage"
-              >
-                <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Garage</Text>
-              </TouchableOpacity>
-
-              {/* Orders Button */}
-              <TouchableOpacity
-                className="main-nav-tab"
-                style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
-                onPress={() => onNavigateToOrders?.()}
-                activeOpacity={0.8}
-                title="Orders"
-              >
-                <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Orders</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          <View style={[styles.headerActions, windowWidth < 400 ? { gap: 4 } : windowWidth < 768 ? { gap: 8 } : undefined]}>
-            {/* Search Bar / Icon (Smooth appearance, placed before Wishlist) */}
-            <HeaderSearchWidget
-              onSearch={(query) => onNavigateToStore?.({ search: query })}
-              isDark={isDarkMode}
-            />
-
-            {windowWidth >= 768 && (<TouchableOpacity
-              style={styles.navActionIconBtn}
-              onPress={() => onNavigateToWishlist?.()}
-              activeOpacity={0.8}
-              title="Saved Wishlist"
+            {/* Left: Mobile Nav Toggle + Logo */}
+            <View
+              style={[
+                styles.headerLeft,
+                windowWidth < 768 && { gap: 8 },
+                windowWidth < 400 && { gap: 4 },
+              ]}
             >
-              <BootstrapIcon name="bookmark" size={16} color="#FFFFFF" />
-              {savedWishlistCount > 0 && (
-                <View style={styles.navBadgeCircle}>
-                  <Text style={styles.navBadgeText}>{savedWishlistCount}</Text>
-                </View>
+              {windowWidth < 768 && (
+                <TouchableOpacity
+                  style={styles.mobileNavToggleBtn}
+                  onPress={() => setIsMobileNavOpen(true)}
+                  activeOpacity={0.8}
+                  accessibilityLabel="Open Navigation Menu"
+                >
+                  <BootstrapIcon name="list" size={20} color="#FFFFFF" />
+                </TouchableOpacity>
               )}
-            </TouchableOpacity>)}
+              {windowWidth >= 768 && (
+                <TouchableOpacity
+                  style={[styles.logoWrap, isTablet && { marginRight: 4 }]}
+                  onPress={() => onNavigateToStore?.()}
+                  activeOpacity={0.8}
+                >
+                  <BrandLogo size={windowWidth < 768 ? 28 : isTablet ? 30 : windowWidth < 1024 ? 32 : 42} textColor="#FFFFFF" />
+                </TouchableOpacity>
+              )}
+            </View>
 
-            <View style={{ position: 'relative' }}>
-              <TouchableOpacity
+            {/* Center Navigation: Shop, Book a Service, Customize (Desktop / Tablet only) */}
+            {windowWidth >= 768 && (
+              <View style={[styles.headerCenterNav, isTablet && { gap: 8 }]}>
+                {/* Shop Button */}
+                <TouchableOpacity
+                  className="main-nav-tab"
+                  style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
+                  onPress={() => onNavigateToStore?.()}
+                  activeOpacity={0.8}
+                  title="Shop"
+                >
+                  <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Shop</Text>
+                </TouchableOpacity>
+
+                {/* Book a Service Button */}
+                <TouchableOpacity
+                  className="main-nav-tab"
+                  style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
+                  onPress={() => onNavigateToGarage?.()}
+                  activeOpacity={0.8}
+                  title="Book a Service"
+                >
+                  <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>
+                    {isTablet ? 'Book Service' : 'Book a Service'}
+                  </Text>
+                </TouchableOpacity>
+
+
+
+                {/* Customize Button (Active) */}
+                <TouchableOpacity
+                  className="main-nav-tab"
+                  style={[styles.headerCenterBtnActive, isTablet && { height: 34, paddingHorizontal: 9 }]}
+                  activeOpacity={0.9}
+                  title="Customize"
+                >
+                  <Text style={[styles.headerCenterBtnTextActive, isTablet && { fontSize: 13 }]}>
+                    Customize
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Garage Button */}
+                <TouchableOpacity
+                  className="main-nav-tab"
+                  style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
+                  onPress={() => onNavigateToProfile?.('garage')}
+                  activeOpacity={0.8}
+                  title="Garage"
+                >
+                  <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Garage</Text>
+                </TouchableOpacity>
+
+                {/* Orders Button */}
+                <TouchableOpacity
+                  className="main-nav-tab"
+                  style={[styles.headerCenterBtn, isTablet && { height: 34, paddingHorizontal: 9 }]}
+                  onPress={() => onNavigateToOrders?.()}
+                  activeOpacity={0.8}
+                  title="Orders"
+                >
+                  <Text style={[styles.headerCenterBtnText, isTablet && { fontSize: 13 }]}>Orders</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={[styles.headerActions, windowWidth < 400 ? { gap: 4 } : windowWidth < 768 ? { gap: 8 } : undefined]}>
+              {/* Search Bar / Icon (Smooth appearance, placed before Wishlist) */}
+              <HeaderSearchWidget
+                onSearch={(query) => onNavigateToStore?.({ search: query })}
+                isDark={isDarkMode}
+              />
+
+              {windowWidth >= 768 && (<TouchableOpacity
                 style={styles.navActionIconBtn}
-                onPress={() => {
-                  setIsUserDropdownOpen(false);
-                  setIsNotifDropdownOpen((prev) => !prev);
-                }}
+                onPress={() => onNavigateToWishlist?.()}
                 activeOpacity={0.8}
-                dataSet={{ notificationButton: true }}
-                {...(Platform.OS === 'web' ? { 'data-notification-button': 'true' } : {})}
+                title="Saved Wishlist"
               >
-                <BootstrapIcon name="bell" size={16} color="#FFFFFF" />
-                {unreadNotifCount > 0 && (
+                <BootstrapIcon name="bookmark" size={16} color="#FFFFFF" />
+                {savedWishlistCount > 0 && (
                   <View style={styles.navBadgeCircle}>
-                    <Text style={styles.navBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
+                    <Text style={styles.navBadgeText}>{savedWishlistCount}</Text>
                   </View>
                 )}
-              </TouchableOpacity>
+              </TouchableOpacity>)}
 
-              <NotificationDropdown
-                isOpen={isNotifDropdownOpen}
-                onClose={() => setIsNotifDropdownOpen(false)}
-                onNavigateToScreen={(screen, params) => {
-                  if (screen === 'store' || screen === 'shop') onNavigateToStore?.();
-                  else if (screen === 'orders') onNavigateToOrders?.();
-                  else if (screen === 'notifications') onNavigateToProfile?.('notifications');
-                  else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
-                  else if (screen === 'garage') onNavigateToGarage?.();
-                }}
-                currentUser={currentUser}
-              />
-            </View>
-
-            {windowWidth >= 768 && (<TouchableOpacity
-              style={styles.navActionIconBtn}
-              onPress={() => setIsCartModalOpen(true)}
-              activeOpacity={0.85}
-              title="Cart"
-            >
-              <BootstrapIcon name="cart3" size={17} color="#FFFFFF" />
-              {cartItemCount > 0 && (
-                <View style={styles.navBadgeCircle}>
-                  <Text style={styles.navBadgeText}>{cartItemCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>)}
-
-            {currentUser ? (
-              <View style={[styles.loggedInContainer, { position: 'relative' }]}>
-                <UserProfileButton
-                  currentUser={currentUser}
+              <View style={{ position: 'relative' }}>
+                <TouchableOpacity
+                  style={styles.navActionIconBtn}
                   onPress={() => {
-                    setIsNotifDropdownOpen(false);
-                    setIsUserDropdownOpen(!isUserDropdownOpen);
+                    setIsUserDropdownOpen(false);
+                    setIsNotifDropdownOpen((prev) => !prev);
                   }}
-                  size={windowWidth < 400 ? 34 : 40}
-                />
-                <UserProfileDropdown
+                  activeOpacity={0.8}
+                  dataSet={{ notificationButton: true }}
+                  {...(Platform.OS === 'web' ? { 'data-notification-button': 'true' } : {})}
+                >
+                  <BootstrapIcon name="bell" size={16} color="#FFFFFF" />
+                  {unreadNotifCount > 0 && (
+                    <View style={styles.navBadgeCircle}>
+                      <Text style={styles.navBadgeText}>{unreadNotifCount > 9 ? '9+' : unreadNotifCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <NotificationDropdown
+                  isOpen={isNotifDropdownOpen}
+                  onClose={handleCloseNotifDropdown}
+                  onNavigateToScreen={(screen, params) => {
+                    if (screen === 'store' || screen === 'shop') onNavigateToStore?.();
+                    else if (screen === 'orders') onNavigateToOrders?.();
+                    else if (screen === 'notifications') onNavigateToProfile?.('notifications');
+                    else if (screen === 'profile') onNavigateToProfile?.(params?.tab || 'garage');
+                    else if (screen === 'garage') onNavigateToGarage?.();
+                  }}
                   currentUser={currentUser}
-                  isOpen={isUserDropdownOpen}
-                  currentScreen="customizer"
-                  showDashboard={false}
-                  isDark={isDarkMode}
-                  onToggleDarkMode={toggleDarkMode}
-                  onClose={() => setIsUserDropdownOpen(false)}
-                  onNavigateToDashboard={() => onNavigateToProfile?.('garage')}
-                  onNavigateToOrders={() => onNavigateToOrders?.()}
-                  onNavigateToProfile={(tab = 'profile') => onNavigateToProfile?.(typeof tab === 'string' ? tab : 'profile')}
-                  onNavigateToSettings={() => onNavigateToProfile?.('settings')}
-                  onNavigateToWishlist={() => onNavigateToWishlist?.()}
-                  onNavigateToAdmin={() => onNavigateToAdmin?.()}
-                  onLogout={() => {
-                    if (onLogout) onLogout();
-                    else {
-                      logout?.();
-                      showToast?.('Logged out successfully');
-                      onNavigateToStore?.();
-                    }
-                  }}
                 />
               </View>
-            ) : (
-              <TouchableOpacity
-                style={[
-                  styles.signInHeaderBtn,
-                  windowWidth < 640 && { paddingHorizontal: 10, paddingVertical: 6, gap: 4 },
-                  windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 5 },
-                  windowWidth < 360 && { width: 34, height: 34, paddingHorizontal: 0, paddingVertical: 0, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
-                ]}
-                onPress={() => onNavigateToLogin?.()}
+
+              {windowWidth >= 768 && (<TouchableOpacity
+                style={styles.navActionIconBtn}
+                onPress={() => setIsCartModalOpen(true)}
                 activeOpacity={0.85}
+                title="Cart"
               >
-                <BootstrapIcon name="person" size={16} color="#FFFFFF" />
-                {windowWidth >= 360 && (
-                  <Text style={[styles.signInHeaderBtnText, windowWidth < 400 && { fontSize: 12 }]}>Sign In</Text>
+                <BootstrapIcon name="cart3" size={17} color="#FFFFFF" />
+                {cartItemCount > 0 && (
+                  <View style={styles.navBadgeCircle}>
+                    <Text style={styles.navBadgeText}>{cartItemCount}</Text>
+                  </View>
                 )}
-              </TouchableOpacity>
-            )}
+              </TouchableOpacity>)}
+
+              {currentUser ? (
+                <View style={[styles.loggedInContainer, { position: 'relative' }]}>
+                  <UserProfileButton
+                    currentUser={currentUser}
+                    onPress={() => {
+                      setIsNotifDropdownOpen(false);
+                      setIsUserDropdownOpen(!isUserDropdownOpen);
+                    }}
+                    size={windowWidth < 400 ? 34 : 40}
+                  />
+                  <UserProfileDropdown
+                    currentUser={currentUser}
+                    isOpen={isUserDropdownOpen}
+                    currentScreen="customizer"
+                    showDashboard={false}
+                    isDark={isDarkMode}
+                    onToggleDarkMode={toggleDarkMode}
+                    onClose={handleCloseUserDropdown}
+                    onNavigateToDashboard={() => onNavigateToProfile?.('garage')}
+                    onNavigateToOrders={() => onNavigateToOrders?.()}
+                    onNavigateToProfile={(tab = 'profile') => onNavigateToProfile?.(typeof tab === 'string' ? tab : 'profile')}
+                    onNavigateToSettings={() => onNavigateToProfile?.('settings')}
+                    onNavigateToWishlist={() => onNavigateToWishlist?.()}
+                    onNavigateToAdmin={() => onNavigateToAdmin?.()}
+                    onLogout={() => {
+                      if (onLogout) onLogout();
+                      else {
+                        logout?.();
+                        showToast?.('Logged out successfully');
+                        onNavigateToStore?.();
+                      }
+                    }}
+                  />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  style={[
+                    styles.signInHeaderBtn,
+                    windowWidth < 640 && { paddingHorizontal: 10, paddingVertical: 6, gap: 4 },
+                    windowWidth < 400 && { paddingHorizontal: 8, paddingVertical: 5 },
+                    windowWidth < 360 && { width: 34, height: 34, paddingHorizontal: 0, paddingVertical: 0, borderRadius: 17, justifyContent: 'center', alignItems: 'center' },
+                  ]}
+                  onPress={() => onNavigateToLogin?.()}
+                  activeOpacity={0.85}
+                >
+                  <BootstrapIcon name="person" size={16} color="#FFFFFF" />
+                  {windowWidth >= 360 && (
+                    <Text style={[styles.signInHeaderBtnText, windowWidth < 400 && { fontSize: 12 }]}>Sign In</Text>
+                  )}
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
         </View>
-      </View>
 
-      {/* ─── MAIN CONTENT ─── */}
-      <View style={[styles.maxContainer, windowWidth < 480 && { paddingHorizontal: 12, paddingTop: 12 }, windowWidth >= 480 && windowWidth < 768 && { paddingHorizontal: 16, paddingTop: 16 }]}>
+        {/* ─── MAIN CONTENT ─── */}
+        <View style={[styles.maxContainer, windowWidth < 480 && { paddingHorizontal: 12, paddingTop: 12 }, windowWidth >= 480 && windowWidth < 768 && { paddingHorizontal: 16, paddingTop: 16 }]}>
           <AiMotorcycleInstallStudio
             currentUser={currentUser}
             initialSelectedProduct={initialSelectedProduct}
@@ -868,15 +871,27 @@ export default function CustomizerPageWeb({
               </View>
 
               <View style={styles.partModalSpecsRow}>
-                <View style={styles.partModalSpecChip}>
+                <View
+                  style={[
+                    styles.partModalSpecChip,
+                    isDarkMode && { backgroundColor: '#1E2A24', borderWidth: 1, borderColor: '#26332E' },
+                  ]}
+                >
                   <BootstrapIcon name="check-circle" size={12} color="#EA580C" />
-                  <Text style={styles.partModalSpecText}>
+                  <Text style={[styles.partModalSpecText, isDarkMode && { color: '#CBD5E1' }]}>
                     Compatible with {activeMotorcycle?.brand} {activeMotorcycle?.model}
                   </Text>
                 </View>
-                <View style={styles.partModalSpecChip}>
+                <View
+                  style={[
+                    styles.partModalSpecChip,
+                    isDarkMode && { backgroundColor: '#1E2A24', borderWidth: 1, borderColor: '#26332E' },
+                  ]}
+                >
                   <BootstrapIcon name="lightning-charge-fill" size={12} color="#10B981" />
-                  <Text style={styles.partModalSpecText}>Plug-and-Play Fitment</Text>
+                  <Text style={[styles.partModalSpecText, isDarkMode && { color: '#CBD5E1' }]}>
+                    Plug-and-Play Fitment
+                  </Text>
                 </View>
               </View>
 
@@ -891,11 +906,16 @@ export default function CustomizerPageWeb({
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={styles.partModalCancelBtn}
+                  style={[
+                    styles.partModalCancelBtn,
+                    isDarkMode && { backgroundColor: '#1E2A24', borderColor: '#334155' },
+                  ]}
                   onPress={() => setViewingPartDetails(null)}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.partModalCancelBtnText}>Cancel / Back</Text>
+                  <Text style={[styles.partModalCancelBtnText, isDarkMode && { color: '#CBD5E1' }]}>
+                    Cancel / Back
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -984,7 +1004,7 @@ export default function CustomizerPageWeb({
       {/* Mobile Customer Navigation Drawer */}
       <CustomerMobileNavDrawer
         isOpen={isMobileNavOpen}
-        onClose={() => setIsMobileNavOpen(false)}
+        onClose={handleCloseMobileNav}
         currentScreen="customizer"
         onNavigateToScreen={(screen, params) => {
           if (screen === 'shop') onNavigateToStore?.();

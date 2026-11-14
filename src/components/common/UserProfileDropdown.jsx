@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import BootstrapIcon from './BootstrapIcon.jsx';
 import ConfirmModal from '../modals/ConfirmModal.jsx';
-import CompanyInfoModal from '../modals/CompanyInfoModal.jsx';
+import CompanyInfoModal from '../web/CompanyInfoModal.jsx';
 import { ANDROID_TOP_INSET } from '../../utils/safeArea.js';
 import { appStorage } from '../../services/system/storageAdapter.js';
 import { useTheme } from '../../context/ThemeContext.jsx';
@@ -45,7 +45,6 @@ export default function UserProfileDropdown({
   const { width: windowWidth } = useWindowDimensions();
   const isMobileScreen = windowWidth < 768 || isMobile;
   const dropdownRef = useRef(null);
-  const [currentView, setCurrentView] = useState('main'); // 'main' | 'settings_privacy'
   const [hoveredItem, setHoveredItem] = useState(null);
   const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
@@ -53,11 +52,6 @@ export default function UserProfileDropdown({
   const [reportText, setReportText] = useState('');
   const [reportSubmitted, setReportSubmitted] = useState(false);
   const [isDisplayModalOpen, setIsDisplayModalOpen] = useState(false);
-  const [isLanguageModalOpen, setIsLanguageModalOpen] = useState(false);
-  const [selectedLanguage, setSelectedLanguage] = useState('English (US)');
-  const [isPrivacyCheckupOpen, setIsPrivacyCheckupOpen] = useState(false);
-  const [isPrivacyCenterOpen, setIsPrivacyCenterOpen] = useState(false);
-  const [isContentPrefOpen, setIsContentPrefOpen] = useState(false);
   const [highLegibility, setHighLegibility] = useState(true);
 
   // Global Theme Context hook
@@ -123,10 +117,9 @@ export default function UserProfileDropdown({
     btnSubmitText: '#FFFFFF',
   };
 
-  // Reset to main view whenever dropdown closes
+  // Reset hovered item whenever dropdown closes
   useEffect(() => {
     if (!isOpen) {
-      setCurrentView('main');
       setHoveredItem(null);
     }
   }, [isOpen]);
@@ -215,11 +208,7 @@ export default function UserProfileDropdown({
     !isLogoutConfirmOpen &&
     !isHelpModalOpen &&
     !isReportModalOpen &&
-    !isDisplayModalOpen &&
-    !isLanguageModalOpen &&
-    !isPrivacyCheckupOpen &&
-    !isPrivacyCenterOpen &&
-    !isContentPrefOpen
+    !isDisplayModalOpen
   ) {
     return null;
   }
@@ -230,6 +219,8 @@ export default function UserProfileDropdown({
     onClose();
     if (onNavigateToSettings) {
       onNavigateToSettings();
+    } else if (onNavigateToScreen) {
+      onNavigateToScreen('profile', { tab: 'settings' });
     } else if (onNavigateToDashboard) {
       onNavigateToDashboard('settings');
     } else if (onNavigateToProfile) {
@@ -263,17 +254,6 @@ export default function UserProfileDropdown({
     setIsDisplayModalOpen(true);
   };
 
-  const handleOpenActivityLog = () => {
-    onClose();
-    if (onNavigateToOrders) {
-      onNavigateToOrders();
-    } else if (onNavigateToDashboard) {
-      onNavigateToDashboard('orders');
-    } else if (onNavigateToProfile) {
-      onNavigateToProfile('orders');
-    }
-  };
-
   const handleSubmitReport = () => {
     if (!reportText.trim()) return;
     setReportSubmitted(true);
@@ -284,104 +264,7 @@ export default function UserProfileDropdown({
     }, 1400);
   };
 
-  const dropdownContent = currentView === 'settings_privacy' ? (
-    /* ═══════════════════════════════════════════════════════
-       SUBMENU: SETTINGS & PRIVACY (THEMED)
-       ═══════════════════════════════════════════════════════ */
-    <View style={styles.submenuContainer}>
-      {/* Top Header with Back Arrow and Title */}
-      <View style={styles.submenuHeader}>
-        <TouchableOpacity
-          style={[styles.backButton, { backgroundColor: theme.iconWrapBg }]}
-          onPress={() => setCurrentView('main')}
-          activeOpacity={0.7}
-          accessibilityLabel="Back to main menu"
-        >
-          <BootstrapIcon name="arrow-left" size={16} color={theme.iconColor} />
-        </TouchableOpacity>
-        <Text style={[styles.submenuTitle, { color: theme.textPrimary }]}>Settings & privacy</Text>
-      </View>
-
-      {/* List of 6 Items */}
-      <View style={styles.menuList}>
-        {/* 1. Settings */}
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={handleOpenAccountSettings}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="gear-fill" size={16} color={theme.iconColor} />
-          </View>
-          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Settings</Text>
-        </TouchableOpacity>
-
-        {/* 2. Language */}
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => setIsLanguageModalOpen(true)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="globe" size={16} color={theme.iconColor} />
-          </View>
-          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Language</Text>
-          <BootstrapIcon name="chevron-right" size={15} color={theme.textMuted} />
-        </TouchableOpacity>
-
-        {/* 3. Privacy checkup */}
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => setIsPrivacyCheckupOpen(true)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="shield-check" size={16} color={theme.iconColor} />
-          </View>
-          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Privacy checkup</Text>
-        </TouchableOpacity>
-
-        {/* 4. Privacy Center */}
-        <TouchableOpacity
-          style={[styles.menuItem, { backgroundColor: theme.bgHover }]}
-          onPress={() => {
-            onClose();
-            setIsPrivacyCenterOpen(true);
-          }}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="shield-lock-fill" size={16} color={theme.iconColor} />
-          </View>
-          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Privacy Center</Text>
-        </TouchableOpacity>
-
-        {/* 5. Activity log */}
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={handleOpenActivityLog}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="list-task" size={16} color={theme.iconColor} />
-          </View>
-          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Activity log</Text>
-        </TouchableOpacity>
-
-        {/* 6. Content preferences */}
-        <TouchableOpacity
-          style={styles.menuItem}
-          onPress={() => setIsContentPrefOpen(true)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-            <BootstrapIcon name="sliders" size={16} color={theme.iconColor} />
-          </View>
-          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Content preferences</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  ) : (
+  const dropdownContent = (
     /* ═══════════════════════════════════════════════════════
        MAIN MENU VIEW (THEMED)
        ═══════════════════════════════════════════════════════ */
@@ -461,13 +344,13 @@ export default function UserProfileDropdown({
           </TouchableOpacity>
         )}
 
-        {/* 2. Settings & privacy */}
+        {/* 2. Settings */}
         <TouchableOpacity
           style={[
             styles.menuItem,
             hoveredItem === 'settings' && { backgroundColor: theme.bgHover },
           ]}
-          onPress={() => setCurrentView('settings_privacy')}
+          onPress={handleOpenAccountSettings}
           activeOpacity={0.7}
           {...(Platform.OS === 'web'
             ? {
@@ -479,7 +362,7 @@ export default function UserProfileDropdown({
           <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
             <BootstrapIcon name="gear-fill" size={16} color={theme.iconColor} />
           </View>
-          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Settings & privacy</Text>
+          <Text style={[styles.menuTitle, { color: theme.textPrimary }]}>Settings</Text>
           <BootstrapIcon name="chevron-right" size={16} color={theme.chevronColor} />
         </TouchableOpacity>
 
@@ -721,188 +604,6 @@ export default function UserProfileDropdown({
         initialTab="contact"
         onClose={() => setIsHelpModalOpen(false)}
       />
-
-      {/* Privacy Center Modal */}
-      <CompanyInfoModal
-        visible={isPrivacyCenterOpen}
-        initialTab="privacy"
-        onClose={() => setIsPrivacyCenterOpen(false)}
-      />
-
-      {/* Language Picker Modal */}
-      <Modal
-        visible={isLanguageModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsLanguageModalOpen(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setIsLanguageModalOpen(false)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
-              <View style={[styles.reportCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-                <View style={styles.reportHeader}>
-                  <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-                    <BootstrapIcon name="globe" size={18} color={theme.iconColor} />
-                  </View>
-                  <Text style={[styles.reportTitle, { color: theme.textPrimary }]}>Select Language</Text>
-                </View>
-
-                <View style={{ gap: 8, marginVertical: 12 }}>
-                  {['English (US)', 'Filipino (Tagalog)', 'Bisaya (Cebuano)'].map((lang) => {
-                    const isSelected = selectedLanguage === lang;
-                    return (
-                      <TouchableOpacity
-                        key={lang}
-                        style={[
-                          styles.selectionRow,
-                          {
-                            backgroundColor: isSelected ? theme.accentBg : theme.bgSub,
-                            borderColor: isSelected ? theme.accentText : theme.border,
-                          },
-                        ]}
-                        onPress={() => setSelectedLanguage(lang)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[styles.selectionRowText, { color: isSelected ? theme.accentText : theme.textPrimary, fontWeight: isSelected ? '700' : '600' }]}>
-                          {lang}
-                        </Text>
-                        {isSelected && (
-                          <BootstrapIcon name="check-circle-fill" size={17} color={theme.accentText} />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.reportSubmitBtn, { alignSelf: 'flex-end', marginTop: 8, backgroundColor: theme.btnSubmitBg }]}
-                  onPress={() => setIsLanguageModalOpen(false)}
-                >
-                  <Text style={styles.reportSubmitText}>Save Preference</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Privacy Checkup Modal */}
-      <Modal
-        visible={isPrivacyCheckupOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsPrivacyCheckupOpen(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setIsPrivacyCheckupOpen(false)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
-              <View style={[styles.reportCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-                <View style={styles.reportHeader}>
-                  <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-                    <BootstrapIcon name="shield-check" size={18} color={theme.iconColor} />
-                  </View>
-                  <Text style={[styles.reportTitle, { color: theme.textPrimary }]}>Privacy checkup</Text>
-                </View>
-
-                <Text style={[styles.reportDesc, { color: theme.textMuted }]}>
-                  Your data and rider privacy settings are protected and managed under MotoTrack standards.
-                </Text>
-
-                <View style={{ gap: 12, marginVertical: 10 }}>
-                  <View style={[styles.displayRow, { borderBottomColor: theme.divider }]}>
-                    <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>Profile & Contact Data</Text>
-                      <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>Only shared with assigned technician/rider during active orders</Text>
-                    </View>
-                    <View style={[styles.activeTag, { backgroundColor: theme.accentBg, borderColor: theme.accentBorder, borderWidth: 1 }]}>
-                      <Text style={[styles.activeTagText, { color: theme.accentText }]}>Encrypted</Text>
-                    </View>
-                  </View>
-
-                  <View style={[styles.displayRow, { borderBottomColor: theme.divider }]}>
-                    <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>Garage Fleet Details</Text>
-                      <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>Motorcycle specifications used solely for parts compatibility</Text>
-                    </View>
-                    <View style={[styles.activeTag, { backgroundColor: theme.accentBg, borderColor: theme.accentBorder, borderWidth: 1 }]}>
-                      <Text style={[styles.activeTagText, { color: theme.accentText }]}>Private</Text>
-                    </View>
-                  </View>
-
-                  <View style={[styles.displayRow, { borderBottomColor: theme.divider }]}>
-                    <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>Order Tracking Location</Text>
-                      <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>Live GPS tracking expires upon delivery completion</Text>
-                    </View>
-                    <View style={[styles.activeTag, { backgroundColor: theme.accentBg, borderColor: theme.accentBorder, borderWidth: 1 }]}>
-                      <Text style={[styles.activeTagText, { color: theme.accentText }]}>Secure</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.reportSubmitBtn, { alignSelf: 'flex-end', marginTop: 8, backgroundColor: theme.btnSubmitBg }]}
-                  onPress={() => setIsPrivacyCheckupOpen(false)}
-                >
-                  <Text style={styles.reportSubmitText}>Looks Good</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Content Preferences Modal */}
-      <Modal
-        visible={isContentPrefOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsContentPrefOpen(false)}
-      >
-        <TouchableWithoutFeedback onPress={() => setIsContentPrefOpen(false)}>
-          <View style={styles.modalOverlay}>
-            <TouchableWithoutFeedback onPress={(e) => e?.stopPropagation?.()}>
-              <View style={[styles.reportCard, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-                <View style={styles.reportHeader}>
-                  <View style={[styles.circularIconWrap, { backgroundColor: theme.iconWrapBg }]}>
-                    <BootstrapIcon name="sliders" size={18} color={theme.iconColor} />
-                  </View>
-                  <Text style={[styles.reportTitle, { color: theme.textPrimary }]}>Content preferences</Text>
-                </View>
-
-                <View style={{ gap: 12, marginVertical: 10 }}>
-                  <View style={[styles.displayRow, { borderBottomColor: theme.divider }]}>
-                    <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>Motorcycle Compatibility Feed</Text>
-                      <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>Prioritize parts compatible with your registered bike</Text>
-                    </View>
-                    <View style={[styles.activeTag, { backgroundColor: theme.accentBg, borderColor: theme.accentBorder, borderWidth: 1 }]}>
-                      <Text style={[styles.activeTagText, { color: theme.accentText }]}>On</Text>
-                    </View>
-                  </View>
-
-                  <View style={[styles.displayRow, { borderBottomColor: theme.divider }]}>
-                    <View style={{ flex: 1, paddingRight: 8 }}>
-                      <Text style={[styles.displayRowTitle, { color: theme.textPrimary }]}>Restock & Price Drop Alerts</Text>
-                      <Text style={[styles.displayRowSub, { color: theme.textMuted }]}>Push notifications for wishlist & restocked items</Text>
-                    </View>
-                    <View style={[styles.activeTag, { backgroundColor: theme.accentBg, borderColor: theme.accentBorder, borderWidth: 1 }]}>
-                      <Text style={[styles.activeTagText, { color: theme.accentText }]}>On</Text>
-                    </View>
-                  </View>
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.reportSubmitBtn, { alignSelf: 'flex-end', marginTop: 8, backgroundColor: theme.btnSubmitBg }]}
-                  onPress={() => setIsContentPrefOpen(false)}
-                >
-                  <Text style={styles.reportSubmitText}>Done</Text>
-                </TouchableOpacity>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
 
       {/* Report a Problem Dialog */}
       <Modal

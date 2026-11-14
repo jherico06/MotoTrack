@@ -24,10 +24,15 @@ export function getCustomizeApiBaseUrl() {
   if (Platform.OS === 'web') {
     if (typeof window !== 'undefined' && window.location?.hostname) {
       const hostname = window.location.hostname;
+      const isPrivateLanIp =
+        /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+        /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+        /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname);
       const isLocalhost =
         hostname === 'localhost' ||
         hostname === '127.0.0.1' ||
-        hostname === '0.0.0.0';
+        hostname === '0.0.0.0' ||
+        (isPrivateLanIp && window.location.protocol === 'http:');
 
       if (isLocalhost) {
         if (fromEnv && fromEnv.startsWith('http://') && !fromEnv.includes('192.168.')) {
@@ -108,33 +113,107 @@ function guessName(uri = '', fallback = 'photo.jpg') {
 }
 
 /**
- * Web browsers need a Blob/File in FormData.
+ * Compress a browser Blob/File via HTML Canvas when needed so multipart
+ * uploads stay well below Vercel Serverless Function's 4.5 MB body limit.
+ */
+async function compressWebBlobIfNeeded(blob, maxDimension = 1280, quality = 0.86) {
+  if (!blob || typeof document === 'undefined' || typeof Image === 'undefined') {
+    return blob;
+  }
+  // Keep small images untouched (< 650 KB)
+  if (blob.size > 0 && blob.size <= 650 * 1024) {
+    return blob;
+  }
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(blob);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        URL.revokeObjectURL(objectUrl);
+        let { width, height } = img;
+        if (!width || !height) {
+          resolve(blob);
+          return;
+        }
+        if (width > maxDimension || height > maxDimension) {
+          const ratio = Math.min(maxDimension / width, maxDimension / height);
+          width = Math.max(1, Math.round(width * ratio));
+          height = Math.max(1, Math.round(height * ratio));
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(blob);
+          return;
+        }
+        // Fill white background for transparent PNGs converted to JPEG
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(0, 0, width, height);
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (compressed) => {
+            resolve(compressed && compressed.size < blob.size ? compressed : blob);
+          },
+          'image/jpeg',
+          quality
+        );
+      } catch (_err) {
+        resolve(blob);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(blob);
+    };
+    img.src = objectUrl;
+  });
+}
+
+/**
+ * Web browsers need a Blob/File in FormData for local files, or URL fields for remote https:// images.
  * RN needs a local { uri, name, type } for local files.
- * Remote HTTP/HTTPS URLs must NEVER be passed as { uri } file objects on RN — pass them as URL fields!
+ * Remote HTTP/HTTPS URLs are passed as URL fields so Vercel Serverless payload stays under 4.5 MB.
  */
 async function appendImage(form, field, uri, fallbackName) {
   const mime = guessMime(uri);
   const name = guessName(uri, fallbackName);
 
   if (Platform.OS === 'web') {
-    if (
-      typeof uri === 'string' &&
-      (uri.startsWith('data:') || uri.startsWith('blob:') || /^https?:\/\//i.test(uri))
-    ) {
-      try {
-        const res = await fetch(uri);
-        const blob = await res.blob();
-        form.append(field, blob, name);
-        return;
-      } catch (_e) {
-        // Fall back to string URL parameter
-        form.append(`${field}Url`, uri);
-        form.append(`${field}Uri`, uri);
-        return;
+    if (typeof uri === 'string') {
+      // Remote HTTP/HTTPS URLs (e.g. Supabase Storage): pass URL text fields directly
+      // so the server downloads them and the request never hits Vercel's 4.5 MB payload cap.
+      if (/^https?:\/\//i.test(uri)) {
+        const isLocalUrl = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?\//i.test(uri);
+        if (!isLocalUrl) {
+          form.append(`${field}Url`, uri);
+          form.append(`${field}Uri`, uri);
+          return;
+        }
+      }
+
+      if (uri.startsWith('data:') || uri.startsWith('blob:') || /^https?:\/\//i.test(uri)) {
+        try {
+          const res = await fetch(uri);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const rawBlob = await res.blob();
+          const blob = await compressWebBlobIfNeeded(rawBlob);
+          const finalName = blob.type === 'image/jpeg' ? name.replace(/\.(png|webp|heic)$/i, '.jpg') : name;
+          form.append(field, blob, finalName);
+          return;
+        } catch (_e) {
+          // Fall back to string URL parameter
+          form.append(`${field}Url`, uri);
+          form.append(`${field}Uri`, uri);
+          return;
+        }
       }
     }
     if (uri && typeof uri === 'object' && (uri instanceof Blob || (typeof File !== 'undefined' && uri instanceof File))) {
-      form.append(field, uri, name);
+      const compressed = await compressWebBlobIfNeeded(uri);
+      const finalName = compressed.type === 'image/jpeg' ? name.replace(/\.(png|webp|heic)$/i, '.jpg') : name;
+      form.append(field, compressed, finalName);
       return;
     }
   }

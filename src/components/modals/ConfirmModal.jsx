@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import BootstrapIcon from '../common/BootstrapIcon.jsx';
+import { useTheme } from '../../context/ThemeContext.jsx';
 
 /**
  * MotoTrack Confirmation & Alert Dialog Modal
@@ -26,9 +27,10 @@ export default function ConfirmModal({
   hideCancel = false,
   isDark: isDarkProp,
 }) {
+  const { isDarkMode: themeDark = false } = useTheme?.() || {};
   if (!visible) return null;
 
-  const isDark = isDarkProp ?? (typeof document !== 'undefined' && document.documentElement?.classList.contains('dark'));
+  const isDark = isDarkProp ?? (Boolean(themeDark) || (typeof document !== 'undefined' && document.documentElement?.classList.contains('dark')));
 
   const actualType = danger ? 'danger' : type;
   const isDanger = actualType === 'danger';

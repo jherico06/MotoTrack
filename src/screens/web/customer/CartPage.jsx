@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -96,6 +96,9 @@ export default function CartPageWeb({
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [isNotifDropdownOpen, setIsNotifDropdownOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+  const handleCloseUserDropdown = useCallback(() => setIsUserDropdownOpen(false), []);
+  const handleCloseNotifDropdown = useCallback(() => setIsNotifDropdownOpen(false), []);
+  const handleCloseMobileNav = useCallback(() => setIsMobileNavOpen(false), []);
   const [unreadNotifCount, setUnreadNotifCount] = useState(() =>
     currentUser ? notificationService.getUnreadCount(currentUser) : 0
   );
@@ -474,7 +477,7 @@ export default function CartPageWeb({
 
                 <NotificationDropdown
                   isOpen={isNotifDropdownOpen}
-                  onClose={() => setIsNotifDropdownOpen(false)}
+                  onClose={handleCloseNotifDropdown}
                   onNavigateToScreen={(screen, params) => {
                     setIsNotifDropdownOpen(false);
                     navigateFromCart(screen, params);
@@ -515,7 +518,7 @@ export default function CartPageWeb({
                     isOpen={isUserDropdownOpen}
                     currentScreen="cart"
                     showDashboard={false}
-                    onClose={() => setIsUserDropdownOpen(false)}
+                    onClose={handleCloseUserDropdown}
                     onNavigateToDashboard={() => navigateFromCart('profile', { tab: 'garage' })}
                     onNavigateToOrders={() => navigateFromCart('orders')}
                     onNavigateToProfile={(tab = 'profile') =>
@@ -1204,7 +1207,7 @@ export default function CartPageWeb({
       {/* Mobile Nav Drawer */}
       <CustomerMobileNavDrawer
         isOpen={isMobileNavOpen}
-        onClose={() => setIsMobileNavOpen(false)}
+        onClose={handleCloseMobileNav}
         currentScreen="cart"
         onNavigateToScreen={(screen, params) => {
           setIsMobileNavOpen(false);
